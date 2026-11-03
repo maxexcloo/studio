@@ -138,6 +138,10 @@ async function fixture(
   const requests = [];
   const jobs = new Map();
   const assets = new Map();
+  // The gallery's uploads, newest first; `owner` is the account the studio saw send each.
+  const uploads = [];
+  const uploader = (req) =>
+    String(req.headers["x-studio-mcp-account"] || req.headers.authorization || "");
   const submitted = [];
   const downloads = [];
   let failAfter = Infinity;
@@ -211,6 +215,15 @@ async function fixture(
       .toLowerCase()
       .split(/\s+/)
       .filter(Boolean);
+    // Uploads alone, the caller's own, by file name.
+    if (req.query.uploads === "1")
+      return res.json({
+        items: uploads.filter(
+          (item) =>
+            item.owner === uploader(req) &&
+            terms.every((term) => item.filename.toLowerCase().includes(term)),
+        ),
+      });
     res.json({
       items: [...jobs.values()]
         .reverse()
@@ -297,14 +310,24 @@ async function fixture(
       url: "/fixture-reference.png",
     };
     assets.set(asset.id, asset);
+    // Listed under the gallery's Uploads for the account that sent it.
+    uploads.unshift({
+      id: `upload-${asset.id}`,
+      assetId: asset.id,
+      owner: uploader(req),
+      uploaded: true,
+      status: "done",
+      type: "image",
+      filename: "reference.png",
+    });
     res.json({ asset });
   });
-  // Extend's last frame of a gallery video.
+  // Extend's last frame of a gallery video, or an upload's own reference.
   app.post("/api/reference-assets/from-gallery", express.json(), (req, res) => {
-    const asset = {
-      id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`,
-      source: "gallery",
-    };
+    const upload = uploads.find((item) => item.id === req.body.galleryItemId);
+    const asset = upload
+      ? assets.get(upload.assetId)
+      : { id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`, source: "gallery" };
     assets.set(asset.id, asset);
     res.json({ ok: true, asset });
   });
@@ -386,6 +409,7 @@ async function fixture(
   return {
     app,
     assets,
+    uploads,
     base,
     mcp,
     kube: control.kube,
@@ -822,6 +846,7 @@ test("media and administrator credentials discover only their own friendly tools
     "Search",
     "Status",
     "Upload",
+    "UploadLink",
   ]);
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
@@ -835,6 +860,7 @@ test("media and administrator credentials discover only their own friendly tools
     Search: "Search Gallery",
     Status: "Check Status",
     Upload: "Upload Reference",
+    UploadLink: "Upload Link",
   });
   await failure(media, "GPUStatus");
   const admin = await f.client("administrator", controlKey);
@@ -1573,6 +1599,10 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   const f = await fixture(t);
   const client = await f.client();
   await failure(client, "Upload", { content_base64: "not-an-image", filename: "reference.png" });
+  // A chat host that can't pass the attachment sends nothing; the refusal says what to do instead.
+  const empty = await call(client, "Upload", { content_base64: "" });
+  assert.equal(empty.isError, true);
+  assert.match(texts(empty), /call UploadLink.*Search with uploads: true/);
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
     .toBuffer();
@@ -1972,7 +2002,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 10);
+    assert.equal((await client.listTools()).tools.length, 11);
     const [first] = data(await call(client, "Models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];
@@ -1993,6 +2023,20 @@ test(
     assert.notEqual((await call(client, "Cancel", { job_id: id })).isError, true);
     // Search reads the real gallery route through the loopback.
     assert.ok(Array.isArray(data(await call(client, "Search", { query: "" })).results));
+    // An upload link's photo becomes an upload, which Search finds as a reference.
+    const form = new FormData();
+    form.append("image", new Blob([png], { type: "image/png" }), "holiday.png");
+    const { link } = data(await call(client, "UploadLink"));
+    const sent = await fetch(link.replace("localhost", "127.0.0.1"), {
+      method: "POST",
+      body: form,
+    });
+    assert.equal(sent.status, 201, await sent.clone().text());
+    const [upload] = data(
+      await call(client, "Search", { query: "holiday", uploads: true }),
+    ).results;
+    assert.match(upload.reference_asset_id, /^gallery:/);
+    assert.equal(upload.name, "holiday.png");
 
     // LibreChat connects afresh for each turn and names its conversation: the turns are one MCP Chat.
     const turn = async (prompt) => {
@@ -3442,6 +3486,101 @@ test("Search finds the account's own finished work through the gallery search, a
   t.after(() => chat.close());
   assert.ok(chat.tools.some((tool) => tool.name === "Search"));
   assert.match(chat.instructions, /To find earlier work, call Search\./);
+});
+
+test("Search with uploads finds only the caller's uploads, an UploadLink adds one once, and Generate takes their references", async (t) => {
+  const account = (userId) => ({
+    userId,
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  });
+  const f = await fixture(t, {
+    accountMode: true,
+    authenticateGatewayIdentity: (user) => account(`${user}-account`),
+    internalCredential: (accountId) => ({
+      "X-Studio-Mcp-Internal": "fixture-internal",
+      "X-Studio-Mcp-Account": accountId,
+    }),
+  });
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  // An image Alice uploaded in Studio itself, and one Bob sent through Upload.
+  f.assets.set("studio-asset", { id: "studio-asset", source: "upload" });
+  f.uploads.push({
+    id: "upload-studio",
+    assetId: "studio-asset",
+    owner: "alice-account",
+    uploaded: true,
+    status: "done",
+    type: "image",
+    filename: "beach-photo.jpg",
+    createdAt: "2026-11-02T10:00:00.000Z",
+  });
+  await call(bob, "Upload", { content_base64: png.toString("base64") });
+  const search = async (client, args = {}) =>
+    data(await call(client, "Search", { query: "", uploads: true, ...args })).results.map(
+      (hit) => hit.reference_asset_id,
+    );
+  assert.deepEqual(await search(alice), ["studio-asset"]);
+  assert.equal(f.requests.findLast((request) => request.path === "/gallery").query.uploads, "1");
+  assert.deepEqual(await search(alice, { query: "beach" }), ["studio-asset"]);
+  assert.deepEqual(await search(alice, { query: "otter" }), []);
+  const [bobs] = await search(bob);
+  assert.ok(bobs && bobs !== "studio-asset");
+  // The reference reaches Alice's job; Bob can't use hers.
+  await failure(bob, "Generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A beach"],
+    reference_asset_ids: ["studio-asset"],
+  });
+  await generate(alice, { reference_asset_ids: ["studio-asset"] });
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, [
+    { slot: "reference", assetId: "studio-asset" },
+  ]);
+
+  // UploadLink: a sealed page that takes one image for its owner without a Studio sign-in.
+  const linked = await call(alice, "UploadLink");
+  assert.match(texts(linked), /Ask the user to open this link and upload the photo they attached/);
+  const link = data(linked).link;
+  assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/upload\/u2\./);
+  const page = localLink(f, link);
+  const opened = await fetch(page);
+  assert.equal(opened.status, 200);
+  assert.match(await opened.text(), /<input type="file" name="image"/);
+  const tampered = page.slice(0, -2) + (page.endsWith("A") ? "BA" : "AA");
+  assert.equal((await fetch(tampered)).status, 404);
+  const post = (url, content, type = "image/png") => {
+    const form = new FormData();
+    form.append("image", new Blob([content], { type }), "photo.png");
+    return fetch(url, { method: "POST", body: form });
+  };
+  const refused = await post(page, Buffer.from("not an image"), "text/plain");
+  assert.equal(refused.status, 400);
+  assert.match(await refused.text(), /That isn&#39;t a PNG, JPEG or WebP image\.<\/p><form/);
+  const sent = await post(page, png);
+  assert.equal(sent.status, 201);
+  assert.match(await sent.text(), /Uploaded — go back to the chat\./);
+  assert.equal(
+    f.requests.findLast((request) => request.path === "/reference-assets/upload").account,
+    "alice-account",
+  );
+  // Used once, the link is closed.
+  assert.equal((await post(page, png)).status, 404);
+  assert.match(await (await fetch(page)).text(), /has been used or has expired/);
+  const found = await search(alice);
+  assert.equal(found.length, 2);
+  assert.equal(found[1], "studio-asset");
+  await generate(alice, { reference_asset_ids: [found[0]] });
+  assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, found[0]);
+  assert.deepEqual(await search(bob), [bobs]);
+  // A link ends after 15 minutes.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const late = localLink(f, data(await call(alice, "UploadLink")).link);
+  t.mock.timers.tick(15 * 60 * 1000 + 1);
+  assert.equal((await fetch(late)).status, 404);
+  t.mock.timers.reset();
 });
 
 // Provider-backed cloud video, shaped like the studio's Grok profiles: an optional image animates the scene.
