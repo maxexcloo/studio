@@ -154,7 +154,8 @@ primary component reference and verify APIs against the installed version.
   Role (once references are placed: Edit and Reference as pressed chips, then
   Paint Mask where the profile inpaints, in one group), LoRAs, Aspect, Count, a
   video's Length, a set Seed (clearable), Backend (when the profile has several),
-  Expert settings, Compare and Presets, then Image/Video and Generate. Placing the first reference applies the
+  Expert settings (its fields alphabetical, Allow Fallback under Worker), Compare
+  and Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
