@@ -5,8 +5,6 @@ import "./data-snapshot.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
-import { addProbe, logWarning } from "./crash-log.js";
-import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
 import {
   galleryJobResponse,
   registerGalleryReadRoutes,
@@ -121,6 +119,7 @@ import {
   workerById,
 } from "./workers.js";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -146,7 +145,6 @@ import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
 import { mcpOutputPath } from "./mcp/media.js";
 import { stripMetadata } from "./metadata-strip.js";
-import { startServers } from "./listen.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
@@ -183,7 +181,7 @@ import {
   storedWritingRecord,
   onGalleryFilesDeleted,
 } from "./gallery/store.js";
-import { buildStats, getThumbnail } from "./thumbnails.js";
+import { getThumbnail } from "./thumbnails.js";
 import {
   clearPromptHistory,
   forgetPrompts,
@@ -304,9 +302,6 @@ import {
 
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer(), flush: flushPendingGallery });
-
-// Thumbnails building and waiting, in every heartbeat and crash line.
-addProbe("thumbs", () => buildStats());
 
 const app = express();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
@@ -625,7 +620,7 @@ registerMultiUserAuthRoutes(app, {
     (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id),
 });
 
-// How a second start finds out Studio already holds the port (see launch.js).
+// Liveness, for the container health check and the test servers.
 app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "studio", version: appVersion }));
 
 // Readiness: the studio can serve once its data folder is writable. ComfyUI workers may come and go
@@ -740,21 +735,6 @@ app.get("/api/diagnostics", async (_req, res) => {
   const report = diagnostics({ version: appVersion, stats, comfyBusy, comfyLocal: comfyIsLocal() });
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
-
-const serverStartedAt = Date.now();
-// How the last run ended, when it went wrong (exit-record.js), logged at start.
-// Read once listening: a second copy that finds this one running must not take over its record.
-function beginSession() {
-  const previousExit = startSession({ now: serverStartedAt });
-  if (previousExit)
-    logWarning("The last run stopped unexpectedly", {
-      who: previousExit.who,
-      reason: previousExit.reason,
-      code: previousExit.code,
-      signal: previousExit.signal,
-    });
-  setInterval(() => noteAlive(), 60_000).unref();
-}
 
 // Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
@@ -3276,84 +3256,72 @@ startMediaWarmup();
 
 // dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
 const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);
-const serverStartup = startServers(app, {
-  host,
-  port,
-  onFatal(error) {
-    let message = `\n  Studio couldn’t start: ${error.message}\n`;
-    // Where the running copy answered: this computer, or the one address HOST names.
-    const runningHost =
-      !error.host || error.host === "127.0.0.1"
-        ? "localhost"
-        : error.host.includes(":")
-          ? `[${error.host}]`
-          : error.host;
-    if (error.studioRunning)
-      message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
-    else if (error.code === "EADDRINUSE")
-      message = `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`;
-    console.error(message);
-    // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
-    process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
-  },
-  onListening({ port: listening }) {
-    beginSession();
-    // Phone links in Settings use the bound address.
-    setListeningPort(listening);
-    // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
-    // on a name, never on an address.
-    const shownHost =
-      host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
-    const pagePort = dev ? 5173 : listening;
-    console.log(
-      `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
-    );
-    void (async () => {
-      // Listening beyond this computer: say where a phone can open it.
-      if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
-        const addresses = Object.values(os.networkInterfaces())
-          .flatMap((entries) => entries || [])
-          .filter((entry) => entry.family === "IPv4" && !entry.internal)
-          .map((entry) => `http://${entry.address}:${pagePort}`);
-        for (const address of addresses) console.log(`    ➜  Network   ${address}`);
-      }
-      // No workers is a setup of its own: say so.
-      if (!listWorkers().length) {
-        if (!demoMode)
-          console.log(
-            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
-          );
-        return;
-      }
-      // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
-      const answering = await fetch(`${comfyUrl}/system_stats`, {
-        signal: AbortSignal.timeout(3000),
-      }).then(
-        (response) => response.ok,
-        () => false,
-      );
-      if (!answering && !demoMode)
+// A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
+// request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
+// POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
+const server = http.createServer(app);
+server.keepAliveTimeout = 120_000;
+server.headersTimeout = 121_000;
+server.once("error", (error) => {
+  console.error(
+    error.code === "EADDRINUSE"
+      ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`
+      : `\n  Studio couldn’t start: ${error.message}\n`,
+  );
+  process.exit(1);
+});
+server.listen(Number(port), host, () => {
+  const listening = server.address().port;
+  // Phone links in Settings use the bound address.
+  setListeningPort(listening);
+  // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
+  // on a name, never on an address.
+  const shownHost =
+    host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
+  const pagePort = dev ? 5173 : listening;
+  console.log(
+    `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
+  );
+  void (async () => {
+    // Listening beyond this computer: say where a phone can open it.
+    if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
+      const addresses = Object.values(os.networkInterfaces())
+        .flatMap((entries) => entries || [])
+        .filter((entry) => entry.family === "IPv4" && !entry.internal)
+        .map((entry) => `http://${entry.address}:${pagePort}`);
+      for (const address of addresses) console.log(`    ➜  Network   ${address}`);
+    }
+    // No workers is a setup of its own: say so.
+    if (!listWorkers().length) {
+      if (!demoMode)
         console.log(
-          `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
+          "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
         );
-    })().catch(() => {});
-    // Tells a parent process (the server tests) where this one listens.
-    process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
-  },
+      return;
+    }
+    // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
+    const answering = await fetch(`${comfyUrl}/system_stats`, {
+      signal: AbortSignal.timeout(3000),
+    }).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (!answering && !demoMode)
+      console.log(
+        `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
+      );
+  })().catch(() => {});
+  // Tells a parent process (the server tests) where this one listens.
+  process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
 });
 
 drainServer = async () => {
   // MCP calls waiting inline for images reply with their links instead of outliving the grace.
   mcp?.endWaits();
-  const listening = await serverStartup;
-  const closed = Promise.all(
-    (listening?.servers || []).map(
-      (server) =>
-        new Promise((resolve, reject) => {
-          server.close((error) => (error ? reject(error) : resolve()));
-        }),
-    ),
-  );
+  const closed = new Promise((resolve, reject) => {
+    if (!server.listening) return resolve();
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
   await Promise.all([generationQueue.stop(), closed]);
   await flushGalleryStrict();
   store.close();
