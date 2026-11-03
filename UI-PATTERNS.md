@@ -167,8 +167,9 @@ primary component reference and verify APIs against the installed version.
   While the phone Drawer is open, notifications sit over the prompt text, below
   its header and the prompt's actions, never over the chips or action row.
 - The Chat composer is the gallery prompt box, compact: the growing message
-  above a chip rail of References and the text model (`ChipSelect`, as
-  Profile), then one Send/Stop action. The model list shows administrators
+  above a chip rail with the text model (`ChipSelect`, as Profile), shown only
+  when the account has another model it can choose, then the compact bar's
+  References action and one Send/Stop action. The model list shows administrators
   models whose Studio text workloads are stopped; choosing one starts it,
   confirming first with the workloads it stops when no GPU is free, and selects
   it once ready, with progress under the rail. Others see models that run,
