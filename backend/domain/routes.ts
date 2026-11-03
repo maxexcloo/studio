@@ -310,7 +310,7 @@ export function registerRewriteRoutes(
 }
 
 /**
- * Settings › Maintenance › Unfinished Items, for administrators: every account's jobs that have not
+ * Settings › Generation › Unfinished Items, for administrators: every account's jobs that have not
  * finished, oldest first, to retry (end it and queue it again) or delete (end it and take it out of
  * the queue).
  */

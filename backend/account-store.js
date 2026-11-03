@@ -9,6 +9,7 @@ import {
   validAccountKey,
 } from "./account-policy.js";
 import { currentDataDir } from "./data-dir.js";
+import { accountPreferences, forgetAccountPreferences } from "./account-preferences.js";
 
 const dataDir = currentDataDir();
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
@@ -39,6 +40,15 @@ const usernameKey = (value) =>
     .trim()
     .normalize("NFKC")
     .toLocaleLowerCase("en-AU");
+
+/** What an account may use now: its role, its group, and the features it turned off for itself. */
+const accessFor = (account, profiles = readStore().profiles) =>
+  effectiveAccountAccess(account, profiles, null, accountPreferences(account.id));
+const enabledAdministrators = (store) =>
+  store.accounts.filter(
+    (item) => item.role === accountRoles.administrator && item.disabled !== true,
+  );
+const lastAdministrator = "Keep at least one enabled administrator account.";
 
 function readStore() {
   if (cache) return cache;
@@ -84,7 +94,7 @@ export function accountStoreSnapshot() {
   return {
     version: store.version,
     accounts: store.accounts.map(
-      ({ id, username, role, accessProfileId, disabled, createdAt, identity, oidc }) => ({
+      ({ id, username, role, accessProfileId, disabled, createdAt, identity, oidc, password }) => ({
         id,
         username,
         role,
@@ -92,6 +102,8 @@ export function accountStoreSnapshot() {
         disabled,
         createdAt,
         identity,
+        // Whether an administrator may set a new password: single sign-on accounts have none here.
+        passwordSignIn: Boolean(password) && identity?.provider !== "pocket-id",
         ...(oidc ? { signInLinked: true } : {}),
       }),
     ),
@@ -107,7 +119,18 @@ export function listAccounts() {
 export function accountAccessForId(accountId) {
   const store = readStore();
   const account = store.accounts.find((item) => item.id === accountId);
-  return account ? effectiveAccountAccess(account, store.profiles) : null;
+  return account ? accessFor(account, store.profiles) : null;
+}
+
+/** The Cloud Models and Uncensored Models an ordinary account's group grants, before its own choices. */
+export function groupGrants(accountId) {
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  if (account?.role !== accountRoles.user) return null;
+  const group = store.profiles[account.accessProfileId];
+  if (!group) return null;
+  const { features } = normaliseAccessProfile(group);
+  return { cloudModels: features.cloudModels, uncensoredModels: features.uncensoredModels };
 }
 
 /** Stored grants stay listed while discovery is degraded; the UI marks them unavailable. */
@@ -284,7 +307,7 @@ export async function verifyLocalAccount(username, password) {
   if (!saved || account.disabled || account.identity?.provider === "pocket-id") return null;
   const expected = Buffer.from(saved.hash, "base64url");
   if (expected.length !== hash.length || !crypto.timingSafeEqual(expected, hash)) return null;
-  const access = effectiveAccountAccess(account, readStore().profiles);
+  const access = accessFor(account);
   return access.authenticated ? access : null;
 }
 
@@ -314,7 +337,7 @@ export function accountSession(token) {
     (item) => item.id === session.accountId && item.disabled !== true,
   );
   if (!account) return null;
-  const access = effectiveAccountAccess(account, readStore().profiles);
+  const access = accessFor(account);
   return access.authenticated ? access : null;
 }
 
@@ -324,7 +347,7 @@ export function verifyAccountMcpToken(token) {
   const account = readStore().accounts.find(
     (item) => item.mcpTokenHash === hash && item.disabled !== true,
   );
-  const access = account ? effectiveAccountAccess(account, readStore().profiles) : null;
+  const access = account ? accessFor(account) : null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
@@ -480,17 +503,87 @@ export function setAccountDisabled(accountId, disabled) {
   if (
     account.role === accountRoles.administrator &&
     disabled &&
-    readStore().accounts.filter(
-      (item) => item.role === accountRoles.administrator && item.disabled !== true,
-    ).length < 2
-  ) {
-    throw new Error("Keep at least one enabled administrator account.");
-  }
+    enabledAdministrators(readStore()).length < 2
+  )
+    throw new Error(lastAdministrator);
   account.disabled = Boolean(disabled);
   if (account.disabled)
     readStore().sessions = readStore().sessions.filter((item) => item.accountId !== accountId);
   saveStore();
   return { id: account.id, disabled: account.disabled };
+}
+
+/**
+ * Makes an account an administrator or an ordinary user. A new user joins the default group; an
+ * administrator needs none. Nobody changes their own role, and the last enabled administrator stays.
+ */
+export function setAccountRole(accountId, role, actorId) {
+  if (![accountRoles.administrator, accountRoles.user].includes(role))
+    throw new Error("Choose administrator or user.");
+  if (accountId === actorId) throw new Error("Ask another administrator to change your role.");
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error("That account was not found.");
+  if (account.role !== role) {
+    if (
+      account.role === accountRoles.administrator &&
+      account.disabled !== true &&
+      enabledAdministrators(store).length < 2
+    )
+      throw new Error(lastAdministrator);
+    if (role === accountRoles.user) account.accessProfileId = defaultAccessProfileId();
+    else delete account.accessProfileId;
+    account.role = role;
+    saveStore();
+  }
+  return { id: account.id, role: account.role, accessProfileId: account.accessProfileId };
+}
+
+/**
+ * Removes an account with its sessions, MCP token, chat gateway links and preferences. Its gallery
+ * files and other saved records stay on disk. Nobody deletes their own account, and the last
+ * enabled administrator stays.
+ */
+export function deleteAccount(accountId, actorId) {
+  if (accountId === actorId) throw new Error("Ask another administrator to delete your account.");
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error("That account was not found.");
+  if (
+    account.role === accountRoles.administrator &&
+    account.disabled !== true &&
+    enabledAdministrators(store).length < 2
+  )
+    throw new Error(lastAdministrator);
+  store.accounts = store.accounts.filter((item) => item.id !== accountId);
+  store.sessions = store.sessions.filter((item) => item.accountId !== accountId);
+  store.gatewayLinks = store.gatewayLinks.filter((item) => item.accountId !== accountId);
+  saveStore();
+  forgetAccountPreferences(accountId);
+}
+
+/** An administrator sets a new password for an account that signs in with one; its sessions end. */
+export async function resetAccountPassword(accountId, password) {
+  const found = readStore().accounts.find((item) => item.id === accountId);
+  if (!found) throw new Error("That account was not found.");
+  if (!found.password || found.identity?.provider === "pocket-id")
+    throw new Error("This account doesn’t sign in with a password.");
+  if (typeof password !== "string" || password.length < 8)
+    throw new Error("Use a password of at least 8 characters.");
+  const salt = crypto.randomBytes(16);
+  const hashed = {
+    kdf,
+    salt: salt.toString("base64url"),
+    hash: (await scryptAsync(password, salt)).toString("base64url"),
+  };
+  // Recheck after the asynchronous KDF.
+  const store = readStore();
+  const account = store.accounts.find((item) => item.id === accountId);
+  if (!account) throw new Error("That account was not found.");
+  account.password = hashed;
+  store.sessions = store.sessions.filter((item) => item.accountId !== accountId);
+  saveStore();
+  return { id: account.id };
 }
 
 /* -------------------------------------------- Trusted chat gateway identities */
@@ -511,7 +604,7 @@ export function gatewayAccountAccess(identity, email = "") {
   const account = store.accounts.find(
     (item) => item.id === link.accountId && item.disabled !== true,
   );
-  const access = account ? effectiveAccountAccess(account, store.profiles) : null;
+  const access = account ? accessFor(account, store.profiles) : null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
@@ -534,7 +627,7 @@ function linkGatewayEmail(store, identity, email) {
     store.accounts.push(account);
   }
   if (account?.disabled) return null;
-  const access = account ? effectiveAccountAccess(account, store.profiles) : null;
+  const access = account ? accessFor(account, store.profiles) : null;
   if (!access?.authenticated) return null;
   store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
   store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
@@ -655,6 +748,6 @@ export function signInWithOidcIdentity({
     store.accounts.push(account);
     saveStore();
   }
-  const access = effectiveAccountAccess(account, store.profiles);
+  const access = accessFor(account, store.profiles);
   return access.authenticated ? { access } : { refused: true };
 }

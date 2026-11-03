@@ -27,7 +27,10 @@ import {
   rotateAccountMcpToken,
   saveAccessProfile,
   deleteAccessProfile,
+  deleteAccount,
+  resetAccountPassword,
   setAccountDisabled,
+  setAccountRole,
   verifyAccountMcpToken,
   verifyLocalAccount,
 } from "./account-store.js";
@@ -619,13 +622,31 @@ export function registerMultiUserAuthRoutes(
     try {
       // Each change is explicit: a missing or misspelt field must never re-enable an account.
       const body = req.body || {};
+      const actor = req.studioAccount?.userId;
       let account;
       if (typeof body.accessProfileId === "string")
         account = assignAccessProfile(req.params.id, body.accessProfileId);
       else if (typeof body.disabled === "boolean")
         account = setAccountDisabled(req.params.id, body.disabled);
-      else return res.status(400).json({ ok: false, error: "Choose a group or account status" });
+      else if (typeof body.role === "string")
+        account = setAccountRole(req.params.id, body.role, actor);
+      else if (typeof body.password === "string")
+        account = await resetAccountPassword(req.params.id, body.password);
+      else
+        return res
+          .status(400)
+          .json({ ok: false, error: "Choose a group, role, account status or password" });
       res.json({ ok: true, account });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  del("/api/accounts/users/:id", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      deleteAccount(req.params.id, req.studioAccount?.userId);
+      res.json({ ok: true });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

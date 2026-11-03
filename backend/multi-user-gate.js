@@ -41,6 +41,8 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/sessions\/[\w-]+\/chat$/],
   ["POST", /^\/api\/sessions\/[\w-]+\/chat$/],
   ["GET", /^\/api\/prompts$/],
+  ["GET", /^\/api\/preferences$/],
+  ["PATCH", /^\/api\/preferences$/],
   ["POST", /^\/api\/prompts\/(clear|enabled|forget|pin)$/],
   ["GET", /^\/api\/loras\/[^/]+$/],
   ["PUT", /^\/api\/loras\/[^/]+$/],

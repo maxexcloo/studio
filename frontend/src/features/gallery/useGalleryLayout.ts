@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useLocalStorage, useLongPress, useMediaQuery } from "@mantine/hooks";
+import { useLongPress, useMediaQuery } from "@mantine/hooks";
 import { useMantineTheme } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { easing } from "../../theme";
@@ -177,15 +177,6 @@ export function useGalleryLayout() {
   const gap = phone ? 4 : 8;
   const cell = (width - gap * (columns - 1)) / columns;
   return { phone, columns, host, width, cell, gap, anchor };
-}
-
-/** Phone captions stay hidden unless the Tile Captions preference is on. */
-export function useTileCaptions() {
-  return useLocalStorage<boolean>({
-    key: "studio-tile-captions",
-    defaultValue: false,
-    getInitialValueInEffect: false,
-  });
 }
 
 /**

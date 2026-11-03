@@ -1,21 +1,26 @@
 import type { ReactNode } from "react";
-import { ActionIcon, Badge, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Stack, Tooltip } from "@mantine/core";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
-import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
+import { RuntimePanel, servicesStatusQuery, workersQuery } from "../runtime/RuntimePanel";
 import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { SectionHeader } from "../../ui/SectionToolbar";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
-import { MaintenanceSettings } from "./MaintenanceSettings";
-import { ModelSettings } from "./ModelSettings";
+import { GenerationSettings } from "./GenerationSettings";
+import { IntegrationSettings } from "./IntegrationSettings";
 import { OwnAccount } from "./OwnAccount";
+import { Preferences } from "./Preferences";
 import { ProfileDefinitions } from "./ProfileDefinitions";
 import { useSettingsNavigation } from "./SettingsNavigation";
-import { StudioPreferences } from "./StudioPreferences";
 
-const workerQueries = [servicesStatusQuery.queryKey, runtimeStatusQuery.queryKey];
+const workerQueries = [
+  servicesStatusQuery.queryKey,
+  runtimeStatusQuery.queryKey,
+  workersQuery.queryKey,
+];
 function WorkerSettings({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const refreshing =
@@ -44,7 +49,7 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
   );
 }
 export function SettingsPage() {
-  const { admin, multi, options } = useSettingsNavigation();
+  const { multi, options } = useSettingsNavigation();
   return (
     <WorkspaceSections
       label="Settings"
@@ -52,32 +57,23 @@ export function SettingsPage() {
       content={{
         account: (
           <Stack component="section" aria-label="Your Account" id="account">
-            <Group gap="xs">
-              <Badge>{multi ? (admin ? "Administrator" : "User") : "Single-User Mode"}</Badge>
-            </Group>
             {multi ? (
-              <>
-                {!admin && (
-                  <Text size="sm" c="dimmed">
-                    Your access group decides which models, cloud models and uncensored content you
-                    can use.
-                  </Text>
-                )}
-                <OwnAccount />
-              </>
+              <OwnAccount />
             ) : (
-              <Text size="sm" c="dimmed">
-                Single-user mode: no sign-in and every feature on. Accounts, groups and personal MCP
-                access need multi-user mode.
-              </Text>
+              <SettingGroup title="Sign-In">
+                <SettingRow
+                  label="Single-User Mode"
+                  description="No sign-in and every feature on. Accounts, groups and personal MCP access need multi-user mode."
+                />
+              </SettingGroup>
             )}
           </Stack>
         ),
+        preferences: <Preferences />,
+        generation: <GenerationSettings />,
         groups: (heading) => <GroupsAdmin heading={heading} />,
-        maintenance: <MaintenanceSettings />,
-        models: <ModelSettings />,
+        integrations: <IntegrationSettings />,
         profiles: (heading) => <ProfileDefinitions heading={heading} />,
-        studio: <StudioPreferences />,
         users: (heading) => <UsersAdmin heading={heading} />,
         workers: (heading) => <WorkerSettings heading={heading} />,
         about: <AboutStudio />,

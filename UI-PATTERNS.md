@@ -107,13 +107,27 @@ primary component reference and verify APIs against the installed version.
   rest icons with tooltips; phones may fold a crowded toolbar's actions into
   More) at the end of the same row, above compact rows with status
   badges and row menus. Sections are alphabetical, About apart at the end, and
-  so are their groups and rows unless order carries meaning. No accordions:
+  so are their groups and rows unless order carries meaning; Settings labels
+  its Personal sections (Account, Preferences) and then its Administration ones,
+  each run alphabetical, in the desktop navigation and the phone Section Select. No accordions:
   headings group a section's parts, and creating or configuring a record opens
   a popup. Dense records use the shared `DataTable` on Mantine Table
   (sortable headers, the toolbar query, one empty line, loading and the row menu;
   phones drop secondary columns into the main cell); preview cards are for visual
   content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
+- Settings, and Dream's settings, are shared `SettingGroup` and `SettingRow`
+  rows (`ui/SettingRows.tsx`): a label and dimmed description on the left, the
+  control on the right, stacking full width on phones. A Switch is an on/off
+  setting that applies at once, optimistically, the saved value (or a refetch
+  and the default notification after a failure) settling it while the rest of
+  the section stays usable; Checkboxes only pick items inside a form or table.
+  Choices are Selects 240 px wide on desktop; row actions are `compact-sm`
+  default buttons; number fields commit on blur or Enter. Creating or editing a
+  record, anything that asks for a password, and free text open a dialog with
+  Save. Consequential actions sit in a red Danger Zone group, last in their
+  section, or a row menu, and always confirm with `ConfirmDialog`. Preferences
+  follow the account, never the device.
 - A click outside an open popover, menu or dropdown only closes it; nothing
   beneath reacts until no popup is open. `ui/popupClicks.ts` owns this for every
   Mantine dropdown (marked `data-popup` by the theme); outside-click handlers
@@ -400,7 +414,7 @@ primary component reference and verify APIs against the installed version.
   Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, with Ask beside its send arrow) over Animate, Edit, Recreate and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
-  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Edit Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Edit Prompt, R Run Again, F Star; listed in Settings › About › Keyboard Shortcuts). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while

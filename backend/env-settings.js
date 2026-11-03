@@ -10,7 +10,7 @@ import { runtimeDatabase, withOfflineDatabase } from "./persistence/runtime.ts";
  * env file (`<data>/.env`, the image's STUDIO_ENV_FILE) to the SQLite `settings` document
  * Settings saves to now (deployment-settings.js). Studio loads that file as environment, so until
  * this runs those values show as the deployment's and locked.
- * - `moved`: the keys Settings › Models saved (`savedKeys`) go to the document, replacing a value
+ * - `moved`: the keys Settings › Generation saved (`savedKeys`) go to the document, replacing a value
  *   saved there (`replaced`), since the file's value was the one in effect.
  * - `removed`: the switches Studio no longer reads (`retiredKeys`) and empty values go.
  * - `kept`: every other key stays in the file; with none left the file goes.

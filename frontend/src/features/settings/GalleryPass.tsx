@@ -4,7 +4,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { ScanText } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
-import { SettingRow } from "./SettingRows";
+import { SettingRow } from "../../ui/SettingRows";
 
 type PassScope = "all" | "outdated" | "missing";
 /** An administrator's pass over idle gallery work (backend/domain/idle-work.ts). */
@@ -53,7 +53,7 @@ const scopeLabels: Record<PassScope, string> = {
 };
 
 /**
- * A Settings › Maintenance row that starts or stops a pass at `route` and follows it; with
+ * A Settings › Generation row that starts or stops a pass at `route` and follows it; with
  * `scopeLabel` it also chooses the pass's scope (All, Missing or Out of Date, the default).
  */
 export function GalleryPass({
@@ -115,6 +115,7 @@ export function GalleryPass({
       {scopeLabel && (
         <Select
           aria-label={scopeLabel}
+          size="xs"
           w={190}
           data={(["all", "missing", "outdated"] as const).map((value) => ({
             value,
@@ -130,6 +131,7 @@ export function GalleryPass({
       )}
       {data?.active ? (
         <Button
+          size="compact-sm"
           variant="default"
           leftSection={<icons.stop size={16} />}
           loading={change.isPending}
@@ -139,6 +141,7 @@ export function GalleryPass({
         </Button>
       ) : (
         <Button
+          size="compact-sm"
           variant="default"
           leftSection={<ScanText size={16} />}
           loading={change.isPending}

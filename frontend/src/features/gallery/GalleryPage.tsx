@@ -28,7 +28,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { ComposerDock } from "../generation/ComposerDock";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { useGallerySelection } from "./useGallerySelection";
-import { useTileCaptions } from "./useGalleryLayout";
+import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";

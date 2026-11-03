@@ -66,7 +66,8 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Dream Settings" });
   const videos = settings.getByRole("switch", { name: /^Videos/ });
-  await videos.click();
+  // The row's accessible name is on the visually hidden input, which the phone drawer scrolls.
+  await videos.dispatchEvent("click");
   await expect(videos).toBeChecked();
   const buffer = settings.getByRole("textbox", { name: "Unseen Buffer" });
   await buffer.fill("20");

@@ -6,7 +6,7 @@ import type {
   UpscaleQuality,
 } from "../../../../shared/upscale";
 import { api } from "../../api";
-import { SettingRow } from "./SettingRows";
+import { SettingRow } from "../../ui/SettingRows";
 
 const finishingQuery = queryOptions({
   queryKey: ["finishing"],
@@ -18,7 +18,7 @@ const qualities: { value: UpscaleQuality; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
-/** Settings › Studio: smart upscale of starred images while the GPU is idle. */
+/** Settings › Preferences: smart upscale of starred images while the GPU is idle. */
 export function FinishStarredImages() {
   const client = useQueryClient();
   const finishing = useQuery(finishingQuery);
@@ -37,30 +37,35 @@ export function FinishStarredImages() {
     onSuccess: (status) => client.setQueryData(finishingQuery.queryKey, status),
     onError: () => client.invalidateQueries({ queryKey: finishingQuery.queryKey }),
   });
+  // An account without upscaling has nothing to finish; while loading the row holds its place.
+  if (finishing.isError) return null;
   const status = finishing.data;
-  if (!status?.settings) return null;
-  const { settings } = status;
+  const settings = status?.settings;
   return (
     <>
       <SettingRow
         label="Finish Starred Images"
         description={
-          settings.enabled && status.waiting
+          settings?.enabled && status?.waiting
             ? `Upscale images you star while the GPU is idle. ${status.waiting} waiting.`
             : "Upscale images you star while the GPU is idle."
         }
       >
         <Switch
+          // Remounts once loaded so the saved state appears without the thumb sliding.
+          key={settings ? "loaded" : "loading"}
           aria-label="Finish Starred Images"
-          checked={settings.enabled}
+          checked={settings?.enabled ?? false}
+          disabled={!settings}
           onChange={(event) => save.mutate({ enabled: event.currentTarget.checked })}
         />
       </SettingRow>
-      {settings.enabled && (
+      {settings?.enabled && (
         <>
           <SettingRow label="Finishing Quality" wide>
             <Select
               aria-label="Finishing Quality"
+              w={{ base: "100%", sm: 240 }}
               data={qualities}
               value={settings.quality}
               allowDeselect={false}
