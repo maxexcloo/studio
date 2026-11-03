@@ -37,23 +37,15 @@ export function IntegrationSettings() {
         </SettingRow>
       </SettingGroup>
       <SettingGroup title="Prompt Assistant">
-        <SettingRow
-          label="Prompt Assistant"
-          description={
-            assistant.available ? `Model ${model.effective || "not chosen"}` : assistant.note
-          }
-        >
-          {status(assistant.available, assistant.available ? "On" : "Off")}
-        </SettingRow>
         {assistant.available && (
           // Automatic (no saved model) lets Studio pick the local or cloud model for each call.
           <SettingRow
             wide
-            label="Assistant Model"
-            description={`${sourceNote(model)} · Replaces the automatic choice for every assistant call.`}
+            label="Model"
+            description={`${sourceNote(model)} · The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model.`}
           >
             <Select
-              aria-label="Assistant Model"
+              aria-label="Prompt Assistant Model"
               data={[
                 { value: "", label: "Automatic" },
                 ...[...new Set([...models, model.configured].filter(Boolean))].map((id) => ({
@@ -71,6 +63,14 @@ export function IntegrationSettings() {
             />
           </SettingRow>
         )}
+        <SettingRow
+          label="Status"
+          description={
+            assistant.available ? `Using ${model.effective || "no model yet"}` : assistant.note
+          }
+        >
+          {status(assistant.available, assistant.available ? "On" : "Off")}
+        </SettingRow>
       </SettingGroup>
     </Stack>
   );
