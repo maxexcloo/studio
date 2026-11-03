@@ -178,7 +178,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   });
   if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { workloads, pools, operation, history, desired, settings } = status.data;
+  const { workloads, pools, operation, history, settings } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
   const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
@@ -187,7 +187,6 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
     entry.type === "restart"
       ? `Restart ${names(entry.start)}`
       : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
-  const drifted = Boolean(desired && !operation && !sameSet(desired, running));
   return (
     <Stack gap="md" component="section" aria-label="GPU Workloads">
       <Group gap="sm" align="baseline">
@@ -201,19 +200,6 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       {operation && (
         <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
           {operation.progress}
-        </Alert>
-      )}
-      {drifted && (
-        <Alert color="yellow" title="Placement Changed Outside Studio">
-          <Stack gap="xs" align="flex-start">
-            <Text size="sm">
-              Studio last applied {names(desired!)}; something else (such as a Flux upgrade) has
-              changed what runs.
-            </Text>
-            <Button size="compact-sm" variant="default" onClick={() => setSelection(desired!)}>
-              Select Last Placement
-            </Button>
-          </Stack>
         </Alert>
       )}
       <DataTable

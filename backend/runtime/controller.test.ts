@@ -128,7 +128,6 @@ test("a two-GPU start stops both holders and waits for their pods to go before s
       /Waiting for Image, Text to release their GPUs/.test(step.message),
     ),
   );
-  assert.equal((await controller.observe()).desired?.join(), "video-tp2,gaming");
 });
 
 test("previews are complete, checked against capacity and stale signatures are refused", async () => {

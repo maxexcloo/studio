@@ -1,39 +1,19 @@
-import { canAdmin } from "../access.js";
 import { animateProfile } from "../animate-profile.js";
 import { familyLabels, modelsForAccount, withFailing, withProfileAliases } from "./catalogue.js";
 
-/**
- * The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is
- * model/catalogue.js; `libraryUpdates()` the Library's update check, once it is registered.
- */
-export function registerModelRoutes(app, { catalogue, libraryUpdates }) {
-  /** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
-  function withLibrary(models, req) {
-    if (!models?.features) return models;
-    const library = canAdmin(req);
-    // Update Available puts a dot on the Library's dock icon.
-    const updates = library ? libraryUpdates()?.summary().available || 0 : 0;
-    return {
-      ...models,
-      features: { ...models.features, library, ...(updates ? { libraryUpdates: updates } : {}) },
-    };
-  }
-
+/** The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is model/catalogue.js. */
+export function registerModelRoutes(app, { catalogue }) {
   app.get("/api/models", async (req, res) => {
     try {
       // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
       const { models } = await catalogue.mediaModels(req.query.cached !== "1");
       res.json({
-        ...withFailing(withProfileAliases(withLibrary(modelsForAccount(models, req), req))),
+        ...withFailing(withProfileAliases(modelsForAccount(models, req))),
         familyLabels,
       });
     } catch {
       res.json({
-        ...withFailing(
-          withProfileAliases(
-            withLibrary(modelsForAccount(catalogue.unavailableModels(), req), req),
-          ),
-        ),
+        ...withFailing(withProfileAliases(modelsForAccount(catalogue.unavailableModels(), req))),
         familyLabels,
       });
     }

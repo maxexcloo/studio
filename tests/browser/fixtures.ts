@@ -268,7 +268,7 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
     if (path === "/api/models")
-      return respond({ profiles, features: { library: true, presets: true }, familyLabels });
+      return respond({ profiles, features: { presets: true }, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running: Animate takes the local video profile.
     if (path === "/api/animate/profile")
@@ -775,7 +775,7 @@ export async function fixtures(page: Page) {
 export async function serveProfiles(
   page: Page,
   profiles: Profile[],
-  features?: { library: boolean; presets: boolean },
+  features?: { presets: boolean },
 ) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles, features, familyLabels } }),

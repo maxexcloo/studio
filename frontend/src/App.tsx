@@ -64,7 +64,7 @@ function Workspace() {
   const mode = (overlay ? background : location).pathname;
   const chatRoute = mode.startsWith("/chat");
   if (
-    (location.pathname === "/library" && !library.pending && !library.allowed) ||
+    (location.pathname === "/library" && !library.allowed) ||
     (chatRoute && !chat) ||
     (mode === "/dream" && !dream)
   )
