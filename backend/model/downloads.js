@@ -10,7 +10,7 @@ import path from "node:path";
 import { comfyUrl } from "../comfy/comfy.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "../hf-access.js";
-import { civitaiFetch } from "../civitai/access.js";
+import { civitaiFetch, isCivitaiHost } from "../civitai/access.js";
 
 /**
  * Streams catalogue files and verified provider files into the worker's model
@@ -33,7 +33,7 @@ const allowedFolders = new Set([
   "loras",
   "clip_vision",
 ]);
-const allowedHosts = new Set(["civitai.com", "huggingface.co"]);
+const allowedHosts = new Set(["civitai.com", "civitai.red", "huggingface.co"]);
 
 let queue = [];
 let active = null;
@@ -336,7 +336,7 @@ async function fetchIntoWorker(entry, signal) {
   const bound = saved.note?.source === source && saved.note?.sha256 === entry.sha256.toLowerCase();
   let offset = bound ? saved.partialBytes || 0 : 0;
   const note = saved.note || {};
-  const request = new URL(entry.url).hostname === "civitai.com" ? civitaiFetch : fetch;
+  const request = isCivitaiHost(new URL(entry.url).hostname) ? civitaiFetch : fetch;
   const validator = resumeValidator(note);
   const headers = offset
     ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) }
