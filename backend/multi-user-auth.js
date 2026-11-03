@@ -42,6 +42,23 @@ export const multiUserEnabled = process.env.STUDIO_MULTI_USER === "1";
 const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
 
+/**
+ * Whose guesses these are. Behind Traefik every request comes from the proxy's address, so a proxied
+ * request counts against the client Cloudflare names, else the one the nearest proxy appended to
+ * X-Forwarded-For. A client can choose its own bucket with these headers, so they serve only
+ * rate limiting, never a trust decision (that stays with clientOf).
+ */
+function guessLane(req) {
+  const client = clientOf(req);
+  if (!client.proxied) return client.address;
+  const forwarded = String(req.headers?.["x-forwarded-for"] || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const named = String(req.headers?.["cf-connecting-ip"] || "").trim() || forwarded.at(-1);
+  return named ? `client:${named.slice(0, 64)}` : client.address;
+}
+
 // Personal MCP tokens reach only the routes MCP itself calls, never account or studio administration.
 const mcpBearerRoutes = [
   ["GET", /^\/api\/models$/],
@@ -310,14 +327,7 @@ export function registerMultiUserAuthRoutes(
   post("/api/accounts/sign-in", async (req, res) => {
     if (!multiUserEnabled)
       return res.status(404).json({ ok: false, error: "Account sign-in is disabled." });
-    const client = clientOf(req);
-    // One lane per address and username: behind a proxy every client shares an address.
-    const lane = `${client.address}|${String(req.body?.username || "")
-      .trim()
-      .normalize("NFKC")
-      .toLocaleLowerCase("en-AU")
-      .slice(0, 64)}`;
-    const result = await limiter.attempt(lane, false, () =>
+    const result = await limiter.attempt(guessLane(req), false, () =>
       verifyLocalAccount(req.body?.username, req.body?.password),
     );
     if (result.reason === "busy") {
@@ -476,9 +486,8 @@ export function registerMultiUserAuthRoutes(
     };
     try {
       validateOwnAccountChange(access.userId, changes);
-      // Checking the current password is a guess like a sign-in, so it shares the limiter.
-      const lane = `${clientOf(req).address}|me:${access.userId}`;
-      const result = await limiter.attempt(lane, false, async () => {
+      // Checking the current password is a guess like a sign-in, so it shares the client's lane.
+      const result = await limiter.attempt(guessLane(req), false, async () => {
         try {
           return await updateOwnAccount(access.userId, changes, {
             keepSessionToken: cookieToken(req),
