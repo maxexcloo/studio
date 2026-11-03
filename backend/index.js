@@ -197,6 +197,7 @@ import { fillVideoSizes } from "./library/library.js";
 import {
   getComfyVideoGif,
   getComfyVideoLoop,
+  getComfyVideoPlayback,
   getComfyVideoPoster,
   getComfyVideoPreview,
   sendVideoPreview,
@@ -3021,6 +3022,16 @@ app.get("/comfy/video-preview", async (req, res) => {
         .type("video/mp4")
         .attachment(`${path.parse(filename).name} loop.mp4`)
         .send(await getComfyVideoLoop(filename, subfolder, type));
+      return;
+    }
+    // The viewer's copy (getComfyVideoPlayback); a video not kept here plays as ComfyUI has it.
+    if (req.query.format === "play") {
+      const playback = await getComfyVideoPlayback(filename, subfolder, type);
+      if (!playback)
+        res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
+      else if (playback.original)
+        res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
+      else sendVideoPreview(req, res, playback.file, cacheControl);
       return;
     }
     // The still comes from the original, ahead of any preview still being encoded.

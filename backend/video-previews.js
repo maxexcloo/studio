@@ -609,6 +609,144 @@ export async function getComfyVideoPreview(filename, subfolder, type) {
   });
 }
 
+/**
+ * Whether iOS Safari plays a video as it is: H.264 at 8-bit 4:2:0 in MP4 or QuickTime, within the
+ * 4096 × 2304 an iPhone decodes, with AAC, MP3 or no sound. Read from ffmpeg's report of the file.
+ */
+export function playsOnIos(report) {
+  const container = report.match(/Input #0, ([^\n]*?), from/)?.[1] || "";
+  const video = report.match(/Stream #[^\n]*?Video: ([^\n]*)/)?.[1] || "";
+  const audio = report.match(/Stream #[^\n]*?Audio: (\w+)/)?.[1];
+  const size = video.match(/[\s,](\d{2,5})x(\d{2,5})[\s,[]/);
+  return (
+    container.startsWith("mov,mp4") &&
+    /^h264 \((?:Constrained Baseline|Baseline|Main|High)\)/.test(video) &&
+    /, yuvj?420p[(,]/.test(video) &&
+    Boolean(size) &&
+    Math.max(Number(size[1]), Number(size[2])) <= 4096 &&
+    Math.min(Number(size[1]), Number(size[2])) <= 2304 &&
+    (!audio || audio === "aac" || audio === "mp3")
+  );
+}
+
+/** Whether an MP4's index (moov) comes before its media (mdat), so playback starts from its first bytes. */
+async function indexFirst(file) {
+  const handle = await fs.promises.open(file, "r");
+  try {
+    const { size } = await handle.stat();
+    const header = Buffer.alloc(16);
+    for (let at = 0; at + 8 <= size;) {
+      await handle.read(header, 0, 16, at);
+      const type = header.toString("latin1", 4, 8);
+      if (type === "moov") return true;
+      if (type === "mdat") return false;
+      let length = header.readUInt32BE(0);
+      if (length === 1) length = Number(header.readBigUInt64BE(8));
+      if (length < 8) return false;
+      at += length;
+    }
+    return false;
+  } finally {
+    await handle.close();
+  }
+}
+
+/** The copy the viewer plays, by file and revision: the original, or a cached iOS-safe MP4. */
+const playbackPlans = new Map();
+
+/**
+ * What the viewer plays on every browser, since iOS Safari plays only some videos and plays them
+ * smoothly only with the index first: the original when it already plays there; else a copy with
+ * the index moved first (a quick stream copy); else an H.264 4:2:0 MP4 with AAC sound, at most
+ * 1920 pixels a side. Copies are cached beside the previews; a person waits for them, so they go
+ * ahead of grid work. Null for a video that isn't on this computer.
+ */
+export async function getComfyVideoPlayback(filename, subfolder, type) {
+  const local = localOutputFile(filename, subfolder, type);
+  if (!local) return null;
+  const stat = await fs.promises.stat(local);
+  const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
+  const key = identityKey(comfySource(filename, subfolder, type));
+  const output = path.join(dir, `${key}-play-${revision}.mp4`);
+  const known = playbackPlans.get(output);
+  if (known === "original") return { file: local, original: true };
+  if (known && fs.existsSync(output)) return { file: output, original: false };
+  if (stat.size > maxSourceBytes) throw new Error("This video is too large to play here.");
+  const { stderr } = await run(["-i", local], { timeout: 15_000 });
+  const plan = !playsOnIos(stderr) ? "encode" : (await indexFirst(local)) ? "original" : "remux";
+  playbackPlans.set(output, plan);
+  if (playbackPlans.size > 1000) playbackPlans.delete(playbackPlans.keys().next().value);
+  if (plan === "original") return { file: local, original: true };
+  if (fs.existsSync(output)) return { file: output, original: false };
+  const file = await coalesce(
+    `play:${key}`,
+    async () => {
+      await fs.promises.mkdir(dir, { recursive: true });
+      const temporary = `${output}.${crypto.randomUUID()}.part`;
+      try {
+        const {
+          code,
+          stderr: report,
+          timedOut,
+        } = await run(
+          [
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            local,
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
+            "-sn",
+            "-dn",
+            ...(plan === "remux"
+              ? ["-c", "copy"]
+              : [
+                  "-vf",
+                  "scale=w='min(1920,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1",
+                  "-c:v",
+                  "libx264",
+                  "-threads",
+                  "2",
+                  "-preset",
+                  "veryfast",
+                  "-crf",
+                  "20",
+                  "-pix_fmt",
+                  "yuv420p",
+                  "-c:a",
+                  "aac",
+                ]),
+            "-map_metadata",
+            "-1",
+            "-movflags",
+            "+faststart",
+            "-f",
+            "mp4",
+            temporary,
+          ],
+          { timeout: 600_000, low: true },
+        );
+        if (code !== 0 || timedOut)
+          throw new Error(
+            timedOut
+              ? "Preparing the video timed out."
+              : `Preparing failed: ${report.slice(0, 500)}`,
+          );
+        await fs.promises.rename(temporary, output);
+        await sweep().catch(() => {});
+        return output;
+      } finally {
+        await fs.promises.rm(temporary, { force: true });
+      }
+    },
+    { poster: true },
+  );
+  return { file, original: false };
+}
+
 /** Hiding/deleting the original also removes its cached plaintext preview, after any encoder finishes. */
 export async function forgetItemVideoPreviews(item) {
   if (item?.type !== "video" || !item.url) return 0;
@@ -628,6 +766,7 @@ export async function forgetItemVideoPreviews(item) {
   const key = identityKey(identity);
   await pending.get(key)?.catch(() => {});
   await pending.get(`poster:${key}`)?.catch(() => {});
+  await pending.get(`play:${key}`)?.catch(() => {});
   remoteVersions.delete(key);
   let removed = 0;
   for (const name of await fs.promises.readdir(dir).catch(() => [])) {
