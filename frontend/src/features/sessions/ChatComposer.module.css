@@ -13,20 +13,28 @@
   justify-content: center;
 }
 
+/* The actions keep to the last line as the message grows, centred with a single line. */
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--mantine-spacing-xs);
+}
+
 .message {
+  flex: 1 1 50%;
   min-width: 0;
 }
 
-/* The message lines up with the chips below it, as the composer's prompt does. */
+/* One line of text (with its 1 px border) is as tall as the bar's 44 px actions. */
 .writing textarea {
-  padding: 6px var(--mantine-spacing-xs) 0;
-  line-height: 1.55;
+  padding: 9px var(--mantine-spacing-xs);
+  line-height: 24px;
 }
 
-/* The model chip takes the free width, keeping References and Send at the end. */
-.rail {
-  flex: 1;
+/* The model chip gives way to the message, its name shortening first. */
+.actions {
   min-width: 0;
+  height: 44px;
 }
 
 .starting {
