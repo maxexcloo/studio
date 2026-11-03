@@ -233,3 +233,12 @@ export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [],
     families,
   );
 }
+
+/** LoRAs the catalogue marks uncensored (an unknown marker is not); they need Uncensored Models. */
+export function uncensoredLoraNames() {
+  return new Set(
+    Object.values(loraCatalogue().entries())
+      .filter((entry) => entry.folder === "loras" && entry.uncensored === true)
+      .map((entry) => entry.file),
+  );
+}
