@@ -31,7 +31,13 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import { referenceDetails, referenceGroup } from "./payload";
+import {
+  referenceCapacity,
+  referenceDetails,
+  referenceGroup,
+  referenceGroupAssets,
+  referenceGroups,
+} from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import {
   galleryReferenceType,
@@ -102,6 +108,17 @@ export function ReferencePicker({
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
   const settle = () => browse({ target: null });
+  /** Whether one more image placed at `into` leaves no free slot, so picking it closes the picker. */
+  function fills(into: ReferenceTarget) {
+    const placed = list.get();
+    const slot = referenceGroup(profile, into.slot)[0].id;
+    return referenceGroups(profile).every(
+      (group) =>
+        referenceGroupAssets(placed, group).length +
+          (!into.replace && group[0].id === slot ? 1 : 0) >=
+        referenceCapacity(group),
+    );
+  }
   const activeFilters = useActiveFilters({
     kind: "image",
     value: filters,
@@ -281,10 +298,12 @@ export function ReferencePicker({
         onQueryChange={(query) => browse({ query })}
         filterCount={activeFilters.length}
         chips={
-          <FilterChips
-            chips={activeFilters}
-            onClear={() => browse({ filters: emptyGalleryFilters })}
-          />
+          activeFilters.length > 0 && (
+            <FilterChips
+              chips={activeFilters}
+              onClear={() => browse({ filters: emptyGalleryFilters })}
+            />
+          )
         }
         filters={
           <GalleryFilterPanel
@@ -319,7 +338,11 @@ export function ReferencePicker({
                 drag={item.drag}
                 onToggle={() => {
                   if (item.removes) list.set(list.get().filter((asset) => !item.matches(asset)));
-                  else item.choose();
+                  else {
+                    item.choose();
+                    // Filling the last free slot ends the pick, saving the dismissing click.
+                    if (target && fills(target)) setOpened(false);
+                  }
                   settle();
                 }}
                 action={
