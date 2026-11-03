@@ -59,7 +59,7 @@ export function ViewerPrompt({
   const done = item.status === "done" && Boolean(item.url);
   const video = item.type === "video";
   // The ways this item can change: an image edits, recreates and animates; a video animates again.
-  const upscale = findAction(groups, "upscale-balanced") ?? findAction(groups, "upscale-again");
+  const upscale = findAction(groups, "upscale-run") ?? findAction(groups, "upscale-again");
   const actions: ChangeAction[] = [
     ...(video ? [] : (["edit", "recreate"] as const)),
     "animate" as const,
