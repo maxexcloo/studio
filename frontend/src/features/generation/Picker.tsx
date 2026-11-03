@@ -384,7 +384,7 @@ export function ChipThumbnails({
 }
 
 export type SavedSort = "name-asc" | "name-desc" | "newest" | "oldest";
-const sortLabels: Record<SavedSort, string> = {
+export const savedSortLabels: Record<SavedSort, string> = {
   "name-asc": "Name A–Z",
   "name-desc": "Name Z–A",
   newest: "Newest First",
@@ -418,25 +418,30 @@ export function savedItems<T extends SavedItem>(items: T[], query: string, sort:
     .map(({ item }) => item);
 }
 
-/** The header action that sorts saved stacks and presets. */
-export function SortMenu({
+/** The header action that sorts a picker's list: saved stacks and presets, and the LoRAs. */
+export function SortMenu<Sort extends string>({
+  label = "Sort",
+  labels,
   value,
   onChange,
 }: {
-  value: SavedSort;
-  onChange: (sort: SavedSort) => void;
+  label?: string;
+  /** Each order's name, in menu order, such as `savedSortLabels`. */
+  labels: Record<Sort, string>;
+  value: Sort;
+  onChange: (sort: Sort) => void;
 }) {
   return (
     <Menu position="bottom-end" withinPortal={false}>
-      <Tooltip label={`Sort: ${sortLabels[value]}`}>
+      <Tooltip label={`Sort: ${labels[value]}`}>
         <Menu.Target>
-          <ActionIcon aria-label="Sort" variant="subtle" color="gray">
+          <ActionIcon aria-label={label} variant="subtle" color="gray">
             <ArrowDownUp size={18} />
           </ActionIcon>
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown>
-        {(Object.keys(sortLabels) as SavedSort[]).map((sort) => (
+        {(Object.keys(labels) as Sort[]).map((sort) => (
           <Menu.Item
             key={sort}
             role="menuitemradio"
@@ -444,7 +449,7 @@ export function SortMenu({
             rightSection={sort === value ? <Check size={14} /> : undefined}
             onClick={() => onChange(sort)}
           >
-            {sortLabels[sort]}
+            {labels[sort]}
           </Menu.Item>
         ))}
       </Menu.Dropdown>

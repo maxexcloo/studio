@@ -11,6 +11,7 @@ import {
   SaveCurrent,
   SavedList,
   SortMenu,
+  savedSortLabels,
   savedItems,
   type SavedSort,
 } from "./Picker";
@@ -112,7 +113,7 @@ export function PresetPicker({
         label="Presets"
         query={query}
         onQueryChange={setQuery}
-        actions={<SortMenu value={sort} onChange={setSort} />}
+        actions={<SortMenu labels={savedSortLabels} value={sort} onChange={setSort} />}
       />
       {presets.error && (
         <Text c="red" size="sm">

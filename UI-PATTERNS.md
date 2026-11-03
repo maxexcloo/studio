@@ -150,7 +150,7 @@ primary component reference and verify APIs against the installed version.
   (`Picker.tsx`): tabs, then search, active filter chips and Filter ▾ in one
   row at the gallery toolbar's compact size; a
   selected tile fades with a check and a second click removes it; saved stacks
-  and presets sort, rename, update and delete, and ask before replacing the
+  and presets sort (`SortMenu`, as the LoRA choices do), rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
@@ -217,8 +217,10 @@ primary component reference and verify APIs against the installed version.
   copy of a series never shows, with Unclassified, those without a family, as a filter) and saved Stacks; type filters follow the catalogue Type.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
-  up, then unrated, then thumbs down, each alphabetically; Dream loads only thumbs
-  up.
+  up, then unrated, then thumbs down, each alphabetically (the picker's Sort can
+  order its choices by name instead); Dream loads only thumbs up. Library and
+  Settings lists sort by their `DataTable` headers, and the reference picker
+  keeps the gallery's order.
 - References pick from the gallery. Uploads are the uploader's gallery images
   and videos (a video is placed by its first frame), hidden until the gallery's Uploads filter is on (the picker's too, where the
   Upload tile sits). Gallery drag-and-drop passes an
