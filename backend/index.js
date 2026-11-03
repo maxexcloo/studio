@@ -6,7 +6,6 @@ import "./data-snapshot.js";
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
 import {
-  galleryJobResponse,
   registerGalleryReadRoutes,
   registerGalleryHistoryRoutes,
   registerGalleryErrorRoutes,
@@ -24,11 +23,8 @@ import {
   registerSuggestionRoutes,
 } from "./domain/suggestions.ts";
 import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
-import { ChatStore } from "./domain/chat-store.ts";
-import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
-import { publicJob, queuePriority, Store } from "./domain/store.ts";
-import { GenerationQueue } from "./domain/queue.ts";
+import { queuePriority, Store } from "./domain/store.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
@@ -39,128 +35,77 @@ import {
   runtimeDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
-import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
-import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
-import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
-import { providerMediaWriter } from "./providers/media.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
-import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
-import { withPngText } from "./png-text.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
-import { withResolution } from "../shared/resolution.ts";
-import { pausedReason, terminalStatuses } from "../shared/queue.ts";
-import {
-  registerMaintenanceRoutes,
-  registerRewriteRoutes,
-  unconfirmedCancel,
-} from "./domain/routes.ts";
+import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
+import { createLocalText, createServicesObserver } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
+import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
+import { registerModelRoutes } from "./model/routes.js";
+import { registerStatusRoutes } from "./status-routes.js";
+import { createAssistantContext } from "./assistant-context.js";
+import { modelFileReferences, profileDefinitions } from "./library/file-users.js";
+import { draftCheckpointProfile } from "./profile/import-draft.js";
+import { createGenerationQueue } from "./generation-queue.js";
+import { createSessionChat } from "./chat-service.js";
+import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
+import { registerUpscaleRoutes } from "./upscale-routes.js";
+import { registerJobRoutes } from "./job-routes.js";
+import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
+import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
+import { registerDeploymentRoutes } from "./deployment-routes.js";
+import { registerLoraRoutes } from "./lora/routes.js";
+import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
-import {
-  createEditableProfile,
-  listEditableProfiles,
-  profileIdTaken,
-  readEditableProfile,
-  registerProfileEditorRoutes,
-  repointProfiles,
-  validateProfileText,
-} from "./profile/editor.js";
+import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
-import { draftProfileFromImport } from "./profile/drafts.js";
 import { seedSamples } from "./profile/seed.js";
-import { createAssistant, draftedProfile } from "./assistant.js";
-import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
-import { catalogDownloadsForFile } from "./catalog-downloads.js";
-import { families, familyFromName } from "./family-catalog.js";
-import {
-  assistantIntegration,
-  assistantSettingKeys,
-  assistantSettingValue,
-  downscaleReferences,
-  registerAssistantRoutes,
-} from "./assistant-routes.js";
-import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
-import { animateProfile } from "./animate-profile.js";
+import { registerAssistantRoutes } from "./assistant-routes.js";
+import { createPromptStage } from "./prompt-stage.js";
 import {
   canonicalProfileId,
   guideStore,
-  livePrompting,
-  profileAliasBackend,
   profileStore,
   withCanonicalProfile,
 } from "./profile/store.js";
 
-import { requireAdmin, requireLocal } from "./route-access.js";
+import { requireAdmin } from "./route-access.js";
 import express from "express";
 import {
-  allowedProfile,
   configuredBackends,
   currentComfyBackend,
-  isDefaultBackend,
-  mergeWorkerModels,
-  noteWorkerProfiles,
-  profileOnBackendKey,
-  readyWorkers,
   routeJob,
-  workerAvailability,
   withComfyBackend,
 } from "./comfy/backends.js";
-import {
-  capabilityForProfile,
-  defaultWorkerId,
-  listWorkers,
-  noWorkerMessage,
-  useWorkloadWorkers,
-  workerById,
-} from "./workers.js";
+import { defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import {
   networkListening,
   demoMode,
   comfy,
-  inDotFolder,
-  localOutputFile,
   comfyUrl,
   host,
-  noteComfyFetchError,
-  noteComfyReachable,
-  isComfyTimeout,
   optionsFor,
   port,
   root,
   setListeningPort,
 } from "./comfy/comfy.js";
-import { canAdmin, clientOf } from "./access.js";
+import { clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
-import { mcpOutputPath } from "./mcp/media.js";
-import { stripMetadata } from "./metadata-strip.js";
-import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
-import { presetsEnabled } from "./features.js";
-import {
-  catalogueFlags,
-  describeFlag,
-  flagEnabled,
-  isCatalogueFlag,
-  saveDeploymentSetting,
-  settingSource,
-} from "./deployment-settings.js";
-import { civitaiTokenStatus } from "./civitai/access.js";
-import { hfFetch, hfTokenStatus } from "./hf-access.js";
-import { primeModelMetadata } from "./model/families.js";
+import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
+import { flagEnabled } from "./deployment-settings.js";
+import { hfFetch } from "./hf-access.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -168,108 +113,35 @@ import {
   isGalleryHidden,
   galleryKey,
   flushPendingGallery,
-  replaceGalleryJob,
   makePendingItems,
   gallery,
   dataDir,
   recordsFromComfyHistory,
-  saveGallery,
   setGallery,
   cleanupGalleryState,
   updateGalleryJob,
   galleryRevisionValue,
-  storedWritingRecord,
   onGalleryFilesDeleted,
 } from "./gallery/store.js";
-import { getThumbnail } from "./thumbnails.js";
-import {
-  clearPromptHistory,
-  forgetPrompts,
-  listPrompts,
-  promptHistoryEnabled,
-  recordPrompt,
-  setPromptHistoryEnabled,
-  setPromptPinned,
-} from "./prompt-history.js";
 import { fillVideoSizes } from "./library/library.js";
-import {
-  getComfyVideoGif,
-  getComfyVideoLoop,
-  getComfyVideoPlayback,
-  getComfyVideoPoster,
-  getComfyVideoPreview,
-  sendVideoPreview,
-  sendVideoPoster,
-} from "./video-previews.js";
-import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
-import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
+import { jobs, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
-import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
-import {
-  deleteImportedWorkflow,
-  getCustomWorkflow,
-  loadCustomWorkflows,
-  saveImportedWorkflow,
-  userWorkflowsDir,
-} from "./custom-workflows.js";
-import { galleryStats, profileStats } from "./stats.js";
-import {
-  loadWorkflowPreferences,
-  previewWorkflowImport,
-  saveWorkflowPreferences,
-  workflowSummaries,
-} from "./workflow-catalog.js";
+import { strengthRange } from "./lora/policy.js";
+import { loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
 
-import {
-  applyLoraOps,
-  clearLoraState,
-  loadLoraLibrary,
-  loadLoraStack,
-  saveLoraLibrary,
-  saveLoraStack,
-} from "./lora/stacks.js";
-import {
-  bytesForReferenceAccount,
-  galleryStill,
-  referenceAssetForAccount,
-  referenceExistsForAccount,
-  stageReferenceAssetsForAccount,
-} from "./references.js";
-import { generationEstimate, upscaleEstimate } from "./timings.js";
-import { upscaleWork } from "./upscale-timing.js";
-import {
-  normalizeQuality,
-  upscalePlan,
-  upscaleQualities,
-  upscaleTargets,
-  upscaleStatus,
-  uploadUpscaleVideoSource,
-} from "./upscale.js";
-import {
-  findUpscaleTarget,
-  prepareUpscale,
-  runUpscaleJob,
-  toggleUpscaleView,
-} from "./upscale-jobs.js";
+import { loadLoraLibrary } from "./lora/stacks.js";
+import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
 import { compressJson, serveApp } from "./http-assets.js";
-import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import {
-  isMediaUrl,
-  mediaRoot,
-  mediaSubfolder,
-  mediaType,
-  outputMediaPattern,
-  videoPattern,
-} from "./media-paths.js";
+import { isMediaUrl } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
-import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
+import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import {
   accountForRequest,
@@ -278,19 +150,8 @@ import {
   registerMultiUserAuthRoutes,
 } from "./multi-user-auth.js";
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
-import {
-  ownerIdForRequest,
-  outputFilenameBelongsToRequest,
-  recordBelongsToAccount,
-  recordBelongsToRequest,
-  recordsForRequest,
-} from "./account-ownership.js";
-import {
-  isCloudProfile,
-  mayUseFeature,
-  mayUseGenerationProfile,
-  visibleGenerationProfiles,
-} from "./account-policy.js";
+import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
+import { isCloudProfile, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -309,58 +170,6 @@ const app = express();
 app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ network: networkListening }));
-async function resolveSignedMcpResult(owner, jobId, index) {
-  if (!accountAccessForId(owner)?.authenticated) return null;
-  const item = gallery.find(
-    (entry) =>
-      entry.ownerId === owner &&
-      entry.jobId === jobId &&
-      entry.index === index &&
-      entry.status === "done",
-  );
-  if (!item || !mcpOutputPath(item.url)) return null;
-  const source = new URL(item.url, "http://localhost");
-  const filename = source.searchParams.get("filename") || "";
-  const subfolder = source.searchParams.get("subfolder") || "";
-  const type = source.searchParams.get("type") || "output";
-  const request = { studioAccount: { userId: owner } };
-  if (
-    !ownerMediaTypes.has(type) ||
-    !outputMediaPattern.test(filename) ||
-    inDotFolder(subfolder) ||
-    !outputFilenameBelongsToRequest(filename, subfolder, request)
-  )
-    return null;
-  try {
-    const backend = item.settings?.comfyBackend || defaultWorkerId();
-    // Studio media is read from its folder only, whichever worker made it.
-    const file = localOutputFile(filename, subfolder, type);
-    if (type === mediaType && !file) return null;
-    const bytes = file
-      ? await fs.promises.readFile(file)
-      : await withComfyBackend(backend, () =>
-          comfy(
-            `/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`,
-            { timeout: 120000 },
-          ),
-        );
-    const extension = path.extname(filename).toLowerCase();
-    const mime = {
-      ".jpeg": "image/jpeg",
-      ".jpg": "image/jpeg",
-      ".m4v": "video/mp4",
-      ".mkv": "video/x-matroska",
-      ".mov": "video/quicktime",
-      ".mp4": "video/mp4",
-      ".png": "image/png",
-      ".webm": "video/webm",
-      ".webp": "image/webp",
-    }[extension];
-    return mime ? { content: Buffer.from(bytes), mime } : null;
-  } catch {
-    return null;
-  }
-}
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue
 // and profile stores take in what the older files hold, which stay where they are
 // (profile/seed.js, library/catalogue.js, profile/store.js).
@@ -394,7 +203,7 @@ const mcp = registerMcpRoutes(app, {
   noteGatewayIdentity,
   internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
-  domainRequest: mcpGenerationRequest,
+  domainRequest: (...args) => mcpDomainRequest(...args),
   cloudVideoFailures: (since) =>
     store
       .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
@@ -429,70 +238,17 @@ app.use((error, _req, res, next) => {
 });
 // Gallery pages and model lists travel compressed to phones and tablets; this computer skips the work.
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
-// Each worker's latest ComfyUI answer (node list and stats), by worker id.
-const emptyContext = { info: null, stats: null, fetchedAt: 0 };
 const store = new Store(runtimeDatabase(dataDir));
-const contextCaches = new Map();
-const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
-// A stopped extra worker fails slowly (a name that no longer resolves, a refused
-// connection), so its failure is remembered briefly rather than retried on every
-// catalogue load and run.
-// The default worker is always asked: its absence is what the studio's offline screen shows.
-const workerUnreachableForMs = 30_000;
-const workerUnreachableUntil = new Map();
-const backendUnreachable = (error) =>
-  error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error);
-
-// One fetch of a worker's context at a time: callers that arrive meanwhile share it.
-const shareContextRequest = sharedRequests();
-const catalogueReadTimeoutMs = 5000;
-// Each worker's latest failed context read, reused briefly so admission, routing and
-// eligibility do not each wait out the deadline of a hung worker in turn.
-const contextFailures = new Map();
-
-/**
- * A worker's node list, stats and model folders, cached for 30 seconds. A
- * request already on its way is shared, so a burst of callers (a page load's
- * models, workflows and upscale status) asks ComfyUI once. `force` always
- * skips the cache and a recent failure; callers still share a request already in flight.
- */
-function loadComfyContext({ force = false } = {}) {
-  const backend = currentComfyBackend();
-  const cached = contextFor(backend);
-  const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
-  if (fresh) return Promise.resolve(cached);
-  const failure = contextFailures.get(backend);
-  if (!force && failure && Date.now() - failure.at < catalogueReadTimeoutMs)
-    return Promise.reject(failure.error);
-  return shareContextRequest(backend, () => fetchComfyContext(backend));
-}
-
-async function fetchComfyContext(backend) {
-  const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
-  const [info, stats] = await Promise.all([
-    comfy("/object_info", { signal }),
-    comfy("/system_stats", { signal }).catch(() => ({})),
-  ]).catch((error) => {
-    contextFailures.set(backend, { error, at: Date.now() });
-    throw error;
-  });
-  contextFailures.delete(backend);
-  // Model-type detection is synchronous; fetch what it needs from a remote ComfyUI first.
-  await primeModelMetadata(
-    {
-      unet: optionsFor(info, "UNETLoader", "unet_name"),
-      checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
-    },
-    { signal },
-  ).catch(() => null);
-  const result = { info, stats, fetchedAt: Date.now() };
-  const worker = workerById(backend);
-  if (worker) {
-    contextCaches.set(backend, result);
-    store.saveWorkerModels(backend, worker.url, { info, stats });
-  }
-  return result;
-}
+// The media catalogue across every worker, and each worker's ComfyUI context (model/catalogue.js).
+const catalogue = createModelCatalogue({ store, runtime, directCloud });
+const {
+  catalogueModels,
+  comfyDownMessage,
+  loadComfyContext,
+  mediaModels,
+  presetModels,
+  unavailableModels,
+} = catalogue;
 
 const recoverRunningJobs = createJobRecovery({
   backends: configuredBackends,
@@ -581,21 +337,7 @@ const observeServices = createServicesObserver({
   workers: listWorkers,
   controller: runtime?.controller,
 });
-app.get("/api/services/status", async (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  const waitingWorkers = store
-    .jobs(ownerIdForRequest(req))
-    .filter((job) => ["waiting", "starting"].includes(job.status))
-    .map((job) => job.backend || job.input.backendId)
-    .filter(Boolean);
-  res.json(
-    await observeServices({
-      allowed: ["image", "video", "text"],
-      administrator: !req.studioAccount || canAdmin(req),
-      waitingWorkers,
-    }),
-  );
-});
+registerStatusRoutes(app, { observeServices, store });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
 // Cloud profiles are granted by the Cloud Models feature, so they are listed apart.
 const discoveredProfiles = async () => {
@@ -613,507 +355,22 @@ registerMultiUserAuthRoutes(app, {
     (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id),
 });
 
-// Liveness, for the container health check and the test servers.
-app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "studio", version: appVersion }));
-
-// Readiness: the studio can serve once its data folder is writable. ComfyUI workers may come and go
-// without taking the studio out of service, so they do not decide this.
-app.get("/api/ready", (_req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  try {
-    fs.mkdirSync(dataDir, { recursive: true });
-    const probe = path.join(dataDir, `.ready-${process.pid}`);
-    fs.writeFileSync(probe, "");
-    fs.rmSync(probe, { force: true });
-    res.json({ ok: true, ready: true });
-  } catch {
-    res.status(503).json({ ok: false, ready: false, error: "The data folder is not writable." });
-  }
-});
-
-/**
- * What a generation with these settings should take here, for the composer:
- * `ms` once this model's estimates are trusted, and `queueMs` when Studio's own
- * queue has to finish first. Empty when there is nothing honest to say.
- */
-app.get("/api/estimate", (req, res) => {
-  const query = req.query || {};
-  const body = {
-    kind: query.kind === "video" ? "video" : "image",
-    model: String(query.model || ""),
-    profileId: String(query.profileId || ""),
-    ...(query.profileBackend ? { profileBackend: String(query.profileBackend) } : {}),
-    family: String(query.family || ""),
-    width: Number(query.width) || 0,
-    height: Number(query.height) || 0,
-    count: Number(query.count) || 1,
-    steps: Number(query.steps) || 0,
-    frames: Number(query.frames) || 0,
-    // What else changes the time: images it reads, and a native size's tiled decode.
-    refs: Number(query.refs) || 0,
-    tiledDecode: query.tiled === "1",
-  };
-  const now = Date.now();
-  const estimate = generationEstimate(body, { now });
-  // Variations run one after another as separate runs: the first as things stand, the rest with the model loaded.
-  const runs = Math.max(1, Math.min(8, Number(query.runs) || 1));
-  const rest = runs > 1 ? generationEstimate(body, { now, warm: true }) : null;
-  // Smart upscale is part of each run: its time, from the upscales this machine has made, is added to every one.
-  const upscaleQuality =
-    body.kind === "image" && upscaleQualities.includes(query.upscale) ? query.upscale : "";
-  const plan = upscaleQuality
-    ? upscalePlan({
-        width: body.width,
-        height: body.height,
-        quality: upscaleQuality,
-        target: Number(query.upscaleTarget) || 0,
-      })
-    : null;
-  const upscale = plan
-    ? upscaleEstimate({
-        quality: upscaleQuality,
-        faceDetail: query.faceDetail === "1",
-        work: upscaleWork({
-          width: plan.estimatedWidth,
-          height: plan.estimatedHeight,
-          count: body.count,
-        }),
-      })
-    : null;
-  const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
-  const backend =
-    routeJob(capabilityForProfile(body), {
-      profileId: profileOnBackendKey(body.profileId, body.profileBackend),
-    })?.id || "";
-  const clears = backend ? queueClearsAt(now, backend) : null;
-  const queueMs = clears === null ? null : Math.max(0, clears - now);
-  const upscaleMs = upscale?.totalMs || 0;
-  res.json({
-    ok: true,
-    ...(trusted
-      ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) }
-      : {}),
-    ...(queueMs ? { queueMs } : {}),
-  });
-});
-
-app.get("/api/stats", (req, res) => {
-  res.json({
-    ok: true,
-    version: appVersion,
-    sinceRelease: null,
-    stats: galleryStats(recordsForRequest(gallery, req)),
-  });
-});
-
-// Settings › Profiles: each profile's runs, failures, stars and speed across every account.
-app.get("/api/stats/profiles", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true, profiles: profileStats(filterVisibleGallery(gallery)) });
-});
-
-// Versions, system and GPU for a bug report (Settings › About, and a failed card's Copy report).
-app.get("/api/diagnostics", async (_req, res) => {
-  // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
-  let comfyBusy = false;
-  const stats = !comfyUrl
-    ? null
-    : await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then(
-        (response) => (response.ok ? response.json() : null),
-        (error) => {
-          comfyBusy = isComfyTimeout(error);
-          return null;
-        },
-      );
-  const report = diagnostics({ version: appVersion, stats, comfyBusy, comfyLocal: comfyIsLocal() });
-  res.json({ ok: true, ...report, text: diagnosticsText(report) });
-});
-
-// Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
-const ownerMediaTypes = new Set(["output", mediaType]);
-
-/** What to say when ComfyUI does not answer: restarting on purpose, or simply not there. */
-function comfyDownMessage(detail = "") {
-  const worker = workerById(currentComfyBackend());
-  if (!worker) return noWorkerMessage("image");
-  if (!isDefaultBackend())
-    return `Can’t reach ${worker.name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
-  return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
-}
-
-async function backendModels(backend, force = false) {
-  const extra = !isDefaultBackend(backend);
-  if (extra && Date.now() < (workerUnreachableUntil.get(backend) || 0))
-    throw new Error(`${workerById(backend)?.name || "That worker"} did not answer just now.`);
-  return withComfyBackend(backend, async () => {
-    try {
-      const context = await loadComfyContext({ force });
-      const models = inferModels(context.info, context.stats);
-      // What this worker has, so a job for one of its profiles goes to it (routeJob).
-      noteWorkerProfiles(backend, models.profiles || []);
-      return { ...context, models };
-    } catch (error) {
-      if (extra && backendUnreachable(error))
-        workerUnreachableUntil.set(backend, Date.now() + workerUnreachableForMs);
-      contextCaches.delete(backend);
-      throw error;
-    }
-  });
-}
-
-/**
- * The catalogue across every worker (comfy/backends.js), with whether each
- * capability's workers answered (`backends`), so MCP can refuse local video
- * while no video worker is up. One worker that runs everything keeps
- * upstream's catalogue exactly.
- */
-async function mediaModels(force = false) {
-  const workers = listWorkers();
-  const direct = (await directCloud?.profiles().catch(() => [])) || [];
-  if (!workers.length && !direct.length)
-    throw Object.assign(new Error(noWorkerMessage("image")), { noWorker: true });
-  const settled = await Promise.allSettled(
-    workers.map((worker) => backendModels(worker.id, force)),
-  );
-  const answered = workers
-    .map((worker, index) => ({
-      worker,
-      result: settled[index].status === "fulfilled" ? settled[index].value : null,
-    }))
-    .filter((entry) => entry.result);
-  if (demoMode && !answered.length && !direct.length)
-    throw settled[0]?.reason || new Error("No worker is available.");
-  const parked = await parkedWorkers(runtime?.controller, workers);
-  const configured = inferModels({}, {}, { configuredOnly: true });
-  const catalogues = workers
-    .map((worker) => {
-      const online = answered.find((entry) => entry.worker.id === worker.id);
-      if (online) return online;
-      const observed = store.workerModels(worker.id, worker.url);
-      // Persist worker observations; project current runtime catalogue metadata on each read.
-      const cached = observed?.info && inferModels(observed.info, observed.stats);
-      // Current runtime definitions replace cached custom profiles, including their permissions and defaults.
-      const profiles = [
-        ...(cached?.profiles || []).filter((profile) => !profile.id.startsWith("custom:")),
-        ...configured.profiles,
-      ]
-        .filter((profile) => worker.capabilities.includes(capabilityForProfile(profile)))
-        .map((profile) => ({
-          ...profile,
-          ready: undefined,
-          availability: parked.has(worker.id) ? "parked" : "offline",
-          readiness: "unknown",
-        }));
-      return { worker, result: { models: { ...(cached || configured), profiles } } };
-    })
-    .sort(
-      (left, right) =>
-        Number(answered.some((item) => item.worker.id === right.worker.id)) -
-        Number(answered.some((item) => item.worker.id === left.worker.id)),
-    );
-  const backends = workerAvailability(
-    new Set(answered.map(({ worker }) => worker.id)),
-    workers,
-    parked,
-  );
-  const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result ||
-    answered[0]?.result ||
-    catalogues[0]?.result || { models: offlineModelResult() };
-  const complete =
-    workers.length === 1 &&
-    ["image", "video"].every((capability) => workers[0].capabilities.includes(capability));
-  const models = complete
-    ? { ...primary.models, backends }
-    : {
-        ...mergeWorkerModels(
-          catalogues.map(({ worker, result }) => ({ worker, models: result.models })),
-          inferModels({}, {}),
-        ),
-        backends,
-      };
-  models.profiles = (models.profiles || []).map((profile) => {
-    // Every worker shares the catalogue, so only one whose capabilities run the profile lists it.
-    const listing = catalogues.filter(
-      ({ worker, result }) =>
-        allowedProfile(worker, profile) &&
-        result.models.profiles?.some((candidate) => candidate.id === profile.id),
-    );
-    // Where a combined profile's backend is ready on some workers only, those are its workers.
-    const ready = listing.filter(({ result }) =>
-      result.models.profiles.some(
-        (candidate) => candidate.id === profile.id && candidate.ready !== false,
-      ),
-    );
-    return {
-      ...profile,
-      workerIds: (profile.backendOptions && ready.length ? ready : listing).map(
-        ({ worker }) => worker.id,
-      ),
-    };
-  });
-  if (direct.length) {
-    const ids = new Set(direct.map((profile) => profile.id));
-    models.profiles = [...models.profiles.filter((profile) => !ids.has(profile.id)), ...direct];
-  }
-  for (const kind of ["image", "video"]) {
-    models[`${kind}Models`] = models.profiles
-      .filter((profile) => profile.kind === kind)
-      .map((profile) => ({ label: profile.label, value: profile.id }));
-    if (!models.profiles.some((profile) => profile.id === models.defaults?.[`${kind}Model`]))
-      models.defaults = {
-        ...models.defaults,
-        [`${kind}Model`]: models.profiles.find((profile) => profile.kind === kind)?.id || "",
-      };
-  }
-  models.capabilities = {
-    ...models.capabilities,
-    image: models.profiles.some((profile) => profile.kind === "image"),
-    video: models.profiles.some((profile) => profile.kind === "video"),
-  };
-  if (!answered.length && workers.length)
-    models.reason = workers.every((worker) => parked.has(worker.id))
-      ? "Configured workers are parked: stopped on purpose. An administrator can start them in Settings › Workers."
-      : "Configured workers are offline. Selected jobs wait until their worker is available.";
-  models.workers = workers.map((worker) => {
-    const available = answered.some((entry) => entry.worker.id === worker.id);
-    const workloads = workerWorkloads(worker);
-    return {
-      id: worker.id,
-      name: worker.name,
-      capabilities: worker.capabilities,
-      available,
-      ...(!available && parked.has(worker.id) ? { parked: true } : {}),
-      // The deployments an administrator can start for it (Settings › Workers).
-      ...(workloads.length ? { workloads } : {}),
-    };
-  });
-  return { primary, models };
-}
-
-/** /api/models with no worker answering: nothing to run, with the plain reason. */
-function unavailableModels() {
-  if (demoMode) return mockModelResult();
-  if (!listWorkers().length)
-    return {
-      ...inferModels({}, {}),
-      reason: noWorkerMessage("image"),
-      backends: workerAvailability(),
-    };
-  return offlineModelResult(comfyUrl);
-}
-
-function modelsForAccount(models, req) {
-  if (!req.studioAccount) return models;
-  const profiles = visibleGenerationProfiles(models.profiles || [], req.studioAccount).map(
-    (profile) => {
-      if (mayUseFeature(req.studioAccount, "loras")) return profile;
-      return {
-        ...profile,
-        capabilities: { ...profile.capabilities, lora: false },
-        options: { ...profile.options, loras: [] },
-      };
-    },
-  );
-  // Saved images stay administration: they are shared across Studio (the Library itself is withLibrary below).
-  const features = models.features
-    ? {
-        ...models.features,
-        presets: Boolean(models.features.presets) && req.studioAccount.role === "administrator",
-      }
-    : models.features;
-  return {
-    ...models,
-    loras: mayUseFeature(req.studioAccount, "loras") ? models.loras : [],
-    profiles,
-    ...(features ? { features } : {}),
-  };
-}
-
-/**
- * Each profile lists the merged ids that now resolve to it, so the browser can match records that
- * name them, and the backend each per-backend id ran on (`aliasBackends`), so reruns keep it.
- */
-function withProfileAliases(models) {
-  const aliases = {};
-  const backends = {};
-  for (const id of Object.keys(profileStore().aliases())) {
-    const kept = canonicalProfileId(`custom:${id}`);
-    (aliases[kept] ||= []).push(`custom:${id}`);
-    const backend = profileAliasBackend(id);
-    if (backend) (backends[kept] ||= {})[`custom:${id}`] = backend;
-  }
-  if (!Object.keys(aliases).length || !models?.profiles) return models;
-  return {
-    ...models,
-    profiles: models.profiles.map((profile) =>
-      aliases[profile.id]
-        ? {
-            ...profile,
-            aliases: aliases[profile.id],
-            ...(backends[profile.id] ? { aliasBackends: backends[profile.id] } : {}),
-          }
-        : profile,
-    ),
-  };
-}
-
-/** Profiles whose recent runs mostly fail carry `failing`: the composer badges them and MCP's own pick passes them over. */
-function withFailing(models) {
-  if (!models?.profiles) return models;
-  const stats = profileStats(filterVisibleGallery(gallery));
-  return {
-    ...models,
-    profiles: models.profiles.map((profile) =>
-      stats[profile.id]?.failing ? { ...profile, failing: true } : profile,
-    ),
-  };
-}
-
-/** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
-function withLibrary(models, req) {
-  if (!models?.features) return models;
-  const library = canAdmin(req);
-  // Update Available puts a dot on the Library's dock icon.
-  const updates = library ? libraryUpdates?.summary().available || 0 : 0;
-  return {
-    ...models,
-    features: { ...models.features, library, ...(updates ? { libraryUpdates: updates } : {}) },
-  };
-}
-let libraryUpdates = null;
-
-function accountMayUseLoras(req) {
-  return !req.studioAccount || mayUseFeature(req.studioAccount, "loras");
-}
-
-// Every family's display name, from the catalogue that defines the family.
-const familyLabels = Object.fromEntries(
-  Object.entries(families).map(([id, family]) => [id, family.label]),
-);
-
-app.get("/api/models", async (req, res) => {
-  try {
-    // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
-    const { models } = await mediaModels(req.query.cached !== "1");
-    res.json({
-      ...withFailing(withProfileAliases(withLibrary(modelsForAccount(models, req), req))),
-      familyLabels,
-    });
-  } catch {
-    res.json({
-      ...withFailing(
-        withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)),
-      ),
-      familyLabels,
-    });
-  }
-});
-
-/** The media catalogue; demo mode without workers serves its sample one. */
-const catalogueModels = () =>
-  mediaModels(false)
-    .then((result) => result.models)
-    .catch((error) => {
-      if (demoMode) return mockModelResult();
-      throw error;
-    });
-/** Animate's profile for an account (animate-profile.js), from its catalogue and whether a local video worker answered. */
-async function animateChoice(account, { tier, width, height } = {}) {
-  const models = modelsForAccount(await catalogueModels(), { studioAccount: account });
-  return animateProfile(models.profiles || [], {
-    defaultId: models.defaults?.videoModel,
-    localRunning: models.backends?.video?.available !== false,
-    localParked: models.backends?.video?.parked === true,
-    tier,
-    width,
-    height,
-  });
-}
-// Every Animate surface asks this before queuing or staging, so it shows the model that will run.
-app.get("/api/animate/profile", async (req, res) => {
-  try {
-    const { profile, cloud, size, tiers } = await animateChoice(req.studioAccount, {
-      // Fast or Quality, as Animate's menu offers them.
-      tier: req.query.tier === "quality" ? "quality" : "fast",
-      width: Number(req.query.width),
-      height: Number(req.query.height),
-    });
-    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, size, tiers });
-  } catch (error) {
-    res.status(409).json({ ok: false, error: error.message });
-  }
-});
+registerModelRoutes(app, { catalogue, libraryUpdates: () => library.updates });
 
 registerModelDownloadRoutes(app, { loadComfyContext });
-const presetRoutes = registerPresetRoutes(app, {
-  models: async () => {
-    const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
-    return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
-  },
-});
+const presetRoutes = registerPresetRoutes(app, { models: presetModels });
 // The Library (library/routes.js): imports, their records and grades, and what is installed with its provenance.
 const unique = (...lists) => [
   ...new Set(lists.flat().filter((name) => typeof name === "string" && name)),
 ];
-const presetModels = async () => {
-  const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
-  return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
-};
-/** Each saved profile definition: its name, declared family and text. */
-async function profileDefinitions() {
-  const names = await fs.promises.readdir(userWorkflowsDir).catch(() => []);
-  const definitions = [];
-  for (const name of names) {
-    if (!name.endsWith(".json") || name.startsWith(".")) continue;
-    const text = await fs.promises
-      .readFile(path.join(userWorkflowsDir, name), "utf8")
-      .catch(() => "");
-    let block = {};
-    try {
-      const parsed = JSON.parse(text);
-      block = parsed.studio || {};
-    } catch {
-      /* Unreadable definitions still count as naming the files they mention. */
-    }
-    definitions.push({
-      name: name.replace(/\.json$/, ""),
-      family: String(block.family || ""),
-      text,
-    });
-  }
-  return definitions;
-}
-/** What still uses a model file, so an update removes the old one only when nothing does (Decision 4). */
-async function modelFileReferences({ file }) {
-  if (!file) return [];
-  const quoted = JSON.stringify(file);
-  const users = (await profileDefinitions())
-    .filter((definition) => definition.text.includes(quoted))
-    .map((definition) => `the ${definition.name} profile`);
-  for (const profile of (await presetModels().catch(() => ({ profiles: [] }))).profiles || []) {
-    if (
-      [profile.defaults?.model, profile.model, profile.baseModel].includes(file) &&
-      !users.includes(`the ${profile.id} profile`)
-    )
-      users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
-  }
-  const stacks = [path.join(dataDir, "lora-stacks.json")];
-  try {
-    for (const owner of await fs.promises.readdir(path.join(dataDir, "accounts")))
-      stacks.push(path.join(dataDir, "accounts", owner, "lora-stacks.json"));
-  } catch {
-    /* Single-user. */
-  }
-  let saved = 0;
-  for (const stack of stacks)
-    if ((await fs.promises.readFile(stack, "utf8").catch(() => "")).includes(quoted)) saved += 1;
-  if (saved) users.push(saved === 1 ? "a saved LoRA stack" : `${saved} saved LoRA stacks`);
-  return users;
-}
 const library = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
-  draftProfile: (record, options) => draftCheckpointProfile(record, options),
+  draftProfile: (record, options) =>
+    draftCheckpointProfile(record, options, {
+      engine: assistantEngine,
+      info: () => profileObjectInfo("image"),
+    }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
   loraInfo: (names) => loraInfos(names),
   installed: async () => {
@@ -1152,88 +409,12 @@ const library = registerLibraryRoutes(app, {
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
-  references: modelFileReferences,
+  references: (model) => modelFileReferences(model, presetModels),
   profileDefinitions,
   schedule: !demoMode,
 });
-libraryUpdates = library.updates;
 
-/** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
-function workflowsForRequest(req, workflows) {
-  if (!req.studioAccount || canAdmin(req)) return workflows;
-  return workflows
-    .filter((item) =>
-      mayUseGenerationProfile(req.studioAccount, {
-        id: item.profileId,
-        family: item.family,
-        uncensored: item.uncensored,
-        aiDrafted: item.aiDrafted,
-      }),
-    )
-    .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
-}
-
-app.get("/api/workflows", async (req, res) => {
-  try {
-    const { info, stats } = await loadComfyContext().catch(() => ({ info: {}, stats: {} }));
-    const models = Object.keys(info || {}).length
-      ? inferModels(info, stats)
-      : demoMode
-        ? mockModelResult()
-        : offlineModelResult(comfyUrl);
-    const preferences = loadWorkflowPreferences();
-    res.json({
-      workflows: workflowsForRequest(
-        req,
-        workflowSummaries({ info, profiles: models.profiles, preferences }),
-      ),
-      preferences,
-    });
-  } catch {
-    const models = demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
-    const preferences = loadWorkflowPreferences();
-    res.json({
-      workflows: workflowsForRequest(
-        req,
-        workflowSummaries({ info: {}, profiles: models.profiles, preferences }),
-      ),
-      preferences,
-    });
-  }
-});
-
-app.post("/api/workflows/import/preview", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const raw = req.body?.workflow || req.body;
-    const { info } = await loadComfyContext().catch(() => ({ info: {} }));
-    res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "", info) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/workflows/import", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const raw = req.body?.workflow || req.body;
-    const { info } = await loadComfyContext().catch(() => ({ info: {} }));
-    // The review's own notes (the node list, what was guessed) aren't part of the workflow.
-    const { nodes: _nodes, guessed: _guessed, ...metadata } = req.body?.metadata || {};
-    const normalized =
-      (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) || raw?.prompt
-        ? {
-            graph: previewWorkflowImport(raw, req.body?.filename || "", info).graph,
-            studio: metadata,
-          }
-        : raw;
-    const workflow = saveImportedWorkflow(normalized, metadata);
-    const { graph: _graph, ...summary } = workflow;
-    res.json({ ok: true, workflow: summary });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
+registerWorkflowRoutes(app, { loadComfyContext });
 
 const profileObjectInfo = async (kind) =>
   (
@@ -1261,125 +442,16 @@ registerProfileRoutes(app, {
   }),
 });
 
-/**
- * A checkpoint or diffusion model import's AI-drafted profile and guide (profile/drafts.js): the
- * nearest same-family profile as template, parts through Download Missing, checked against
- * ComfyUI's object_info before it is written. Administrators only until approved.
- */
-async function draftCheckpointProfile(record, options) {
-  return draftProfileFromImport(record, options, {
-    templates: () =>
-      listEditableProfiles()
-        .filter((item) => item.readable)
-        .map((item) => {
-          try {
-            return { ...item, raw: JSON.parse(readEditableProfile(item.id).text) };
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean),
-    info: () => profileObjectInfo("image"),
-    families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-    familyFromName: (file) => familyFromName(file),
-    taken: profileIdTaken,
-    downloadsFor: catalogDownloadsForFile,
-    engine: assistantEngine,
-    draftedProfile,
-    validate: validateProfileText,
-    create: (id, text, { by }) =>
-      createEditableProfile(id, text, {
-        by,
-        origin: "ai",
-        aiDrafted: true,
-        info: null,
-        note: `Drafted from import ${record.id}`,
-      }),
-    guides: guideStore(),
-  });
-}
-
-// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
-const assistantGuides = (() => {
-  try {
-    return livePrompting();
-  } catch (error) {
-    console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`);
-    return () => null;
-  }
-})();
-const assistantProfiles = async (req) => {
-  try {
-    return modelsForAccount(await catalogueModels(), req).profiles || [];
-  } catch {
-    return [];
-  }
-};
-const assistantLoras = async (req) => {
-  if (!accountMayUseLoras(req)) return [];
-  try {
-    const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
-    const infos = await loraInfos(names);
-    return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
-  } catch {
-    return [];
-  }
-};
-const assistantGuide = (profile) => {
-  try {
-    return assistantGuides(profile);
-  } catch {
-    return null;
-  }
-};
+// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature,
+// reading what an account may use (assistant-context.js).
+const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
-  frame: (req, id) => assistantImage(req.studioAccount, id),
-  profiles: assistantProfiles,
-  guide: assistantGuide,
-  loras: assistantLoras,
-  // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
-  starred: async (req, profile) => {
-    const families = new Map((await assistantProfiles(req)).map((item) => [item.id, item.family]));
-    const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
-      id === profile.id || (profile.family && families.get(id) === profile.family);
-    const items = gallery
-      .filter(
-        (item) =>
-          item.favorite &&
-          item.status === "done" &&
-          item.prompt &&
-          recordBelongsToRequest(item, req) &&
-          same(item),
-      )
-      .slice(0, 6);
-    return {
-      examples: items.map((item) => item.prompt),
-      loras: [
-        ...new Set(
-          items.flatMap((item) =>
-            (item.settings?.loras || []).map((lora) => lora?.name).filter(Boolean),
-          ),
-        ),
-      ],
-    };
-  },
-});
-
-app.delete("/api/workflows/:id", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
-    const preferences = loadWorkflowPreferences();
-    preferences.favorites = preferences.favorites.filter(
-      (id) => id !== `custom:${result.id}` && id !== result.id,
-    );
-    delete preferences.lastUsed[`custom:${result.id}`];
-    saveWorkflowPreferences(preferences);
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
+  frame: (req, id) => assistant.image(req.studioAccount, id),
+  profiles: assistant.profiles,
+  guide: assistant.guide,
+  loras: assistant.loras,
+  starred: assistant.starred,
 });
 
 registerGalleryReadRoutes(app, {
@@ -1395,69 +467,7 @@ registerGalleryReadRoutes(app, {
   },
 });
 
-app.delete("/api/loras", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  clearLoraState(ownerIdForRequest(req));
-  res.json({ ok: true });
-});
-
-app.get("/api/loras/library", (req, res) => {
-  if (!accountMayUseLoras(req))
-    return res.json({ found: false, library: { strengths: {}, snapshots: {} } });
-  const library = loadLoraLibrary(ownerIdForRequest(req));
-  res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
-});
-
-app.put("/api/loras/library", (req, res) => {
-  if (!accountMayUseLoras(req))
-    return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
-  try {
-    res.json({ ok: true, library: saveLoraLibrary(req.body?.library, ownerIdForRequest(req)) });
-  } catch (error) {
-    res.status(500).json({ ok: false, error: `Couldn’t save the LoRA library: ${error.message}` });
-  }
-});
-
-// Clients send edits, not whole copies, so two devices never overwrite each other.
-app.post("/api/loras/library/ops", (req, res) => {
-  if (!accountMayUseLoras(req))
-    return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
-  try {
-    res.json({ ok: true, library: applyLoraOps(req.body?.ops, ownerIdForRequest(req)) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-// What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
-app.get("/api/loras/info", async (_req, res) => {
-  if (!accountMayUseLoras(_req)) return res.json({ ok: true, loras: {} });
-  try {
-    const { info } = await loadComfyContext();
-    res.json({ ok: true, loras: await loraInfos(optionsFor(info, "LoraLoader", "lora_name")) });
-  } catch (error) {
-    res.status(503).json({ ok: false, loras: {}, error: comfyDownMessage(error?.message) });
-  }
-});
-
-app.get("/api/loras/:workflowId", (req, res) => {
-  if (!accountMayUseLoras(req)) return res.json({ found: false, loras: [] });
-  const loras = loadLoraStack(req.params.workflowId, ownerIdForRequest(req));
-  res.json({ found: loras !== null, loras: loras || [] });
-});
-
-app.put("/api/loras/:workflowId", (req, res) => {
-  if (!accountMayUseLoras(req))
-    return res.status(403).json({ ok: false, error: "LoRA access is disabled for this account." });
-  try {
-    res.json({
-      ok: true,
-      loras: saveLoraStack(req.params.workflowId, req.body?.loras, ownerIdForRequest(req)),
-    });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
+registerLoraRoutes(app, { comfyDownMessage, loadComfyContext });
 
 // Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
 // A gone or disabled account's prompts never reach the text model.
@@ -1514,76 +524,7 @@ registerGalleryHistoryRoutes(app, {
   },
 });
 
-app.get("/api/prompts", (req, res) => {
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  const ownerId = ownerIdForRequest(req);
-  res.json({
-    prompts: listPrompts(req.query.kind, ownerId),
-    enabled: promptHistoryEnabled(req.query.kind, ownerId),
-  });
-});
-
-app.post("/api/prompts/enabled", (req, res) => {
-  const ownerId = ownerIdForRequest(req);
-  const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
-  res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
-});
-
-app.post("/api/prompts/pin", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: setPromptPinned(
-      String(req.body?.text || ""),
-      Boolean(req.body?.pinned),
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
-
-// The prompt assistant keeps the text it replaced (a rewrite, a written negative), so History can bring it back.
-app.post("/api/prompts/record", (req, res) => {
-  const kind = req.body?.kind === "negative" ? "negative" : "positive";
-  const ownerId = ownerIdForRequest(req);
-  recordPrompt(String(req.body?.text || "").slice(0, 8000), kind, ownerId);
-  res.json({ ok: true, prompts: listPrompts(kind, ownerId) });
-});
-
-app.post("/api/prompts/forget", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: forgetPrompts(
-      [String(req.body?.text || "")],
-      new Set(),
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
-
-app.post("/api/prompts/clear", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: clearPromptHistory(
-      { keepPinned: req.body?.keepPinned !== false },
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
-
-/**
- * A thumbnail's caching. The gallery asks for every thumbnail with a `v` that
- * names its item (mediaUrl.ts), so a reused file name is a new address: that
- * one is used straight from the browser's cache for a while and checked again
- * in the background after, so a reload or a scroll back sends no requests and
- * a file changed in place still shows up on the next look. Without `v` the
- * address is only a file name, so it is checked every time.
- */
-function thumbnailCacheControl(req) {
-  if (req.query.type === mediaType) return derivedMediaCache;
-  return req.query.v ? "private, max-age=600, stale-while-revalidate=2592000" : "private, no-cache";
-}
+registerPromptHistoryRoutes(app);
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
@@ -1591,91 +532,7 @@ registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
-/**
- * What the deployment decides, for Settings: each value with its source
- * (deployment, this studio's .env, or the default) and whether it is locked.
- */
-app.get("/api/settings/deployment", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.setHeader("Cache-Control", "no-store");
-  const models = await mediaModels(false)
-    .then((result) => result.models)
-    .catch(() => unavailableModels());
-  const profiles = (models.profiles || []).map((profile) => ({
-    id: profile.id,
-    label: profile.displayName || profile.label || profile.id,
-    kind: profile.kind,
-    ready: profile.ready !== false,
-  }));
-  const defaultFor = (key, effective) => ({
-    key,
-    configured: process.env[key] || "",
-    effective: effective || "",
-    ...settingSource(key),
-  });
-  res.json({
-    ok: true,
-    defaults: {
-      image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
-      video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
-      profiles,
-    },
-    catalogue: catalogueFlags.map(describeFlag),
-    integrations: {
-      civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
-      huggingFace: { token: hfTokenStatus() },
-      assistant: await assistantIntegration({
-        engine: assistantEngine,
-        source: settingSource,
-        // The gateway lists only running models; stopped text workloads' models are choices too.
-        workloadModels: (runtime?.controller.workloads || [])
-          .filter((item) => item.kind === "text" && item.model)
-          .map((item) => item.model),
-      }),
-    },
-  });
-});
-
-app.post("/api/settings/deployment", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const key = String(req.body?.key || "");
-  const value = req.body?.value;
-  try {
-    if (isCatalogueFlag(key)) {
-      if (typeof value !== "boolean") throw new Error("Choose on or off.");
-      // On (the default) is no saved value at all, so a later default change still applies.
-      res.json({
-        ok: true,
-        setting: {
-          ...saveDeploymentSetting(key, value ? "" : "0"),
-          key,
-        },
-      });
-      return;
-    }
-    if (assistantSettingKeys.includes(key)) {
-      res.json({
-        ok: true,
-        setting: {
-          ...saveDeploymentSetting(key, assistantSettingValue(key, value)),
-          key,
-        },
-      });
-      return;
-    }
-    if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
-      const id = String(value || "").trim();
-      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
-      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
-      return;
-    }
-    res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
-  } catch (error) {
-    res
-      .status(error.message.includes("deployment configuration") ? 409 : 400)
-      .json({ ok: false, error: error.message });
-  }
-});
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, runtime, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = registerGenerationRoutes(app, {
@@ -1688,236 +545,6 @@ const generationRoutes = registerGenerationRoutes(app, {
   comfyDownMessage,
 });
 
-// This runtime owns only the IDs persisted in its own SQLite queue and gallery.
-const mediaLeases = new Map();
-// Manual work goes to the first worker that can run it; background work (MCP, Dream, finishing)
-// prefers a worker that also runs video, keeping the first free for manual work.
-async function queueResourceFor(input, priority = queuePriority.manual) {
-  if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
-  const models = await mediaModels(false)
-    .then((result) => result.models)
-    .catch(() => (demoMode ? mockModelResult() : { profiles: [] }));
-  const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input.profileId));
-  const capability = profile
-    ? capabilityForProfile(profile)
-    : input.kind === "video"
-      ? "video"
-      : "image";
-  const worker = routeJob(capability, {
-    profileId: profileOnBackendKey(input.profileId, input.profileBackend),
-    prefers: priority > queuePriority.manual ? ["video"] : [],
-  });
-  // Only a worker that can run the job holds it (generation-routes.js ignores any other pin);
-  // background work goes where it is routed, whatever worker its source input names.
-  const backend =
-    priority === queuePriority.manual &&
-    typeof input.backendId === "string" &&
-    workerById(input.backendId)?.capabilities.includes(capability)
-      ? input.backendId
-      : worker?.id || defaultWorkerId() || "";
-  return `worker:${backend}`;
-}
-/** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
-function managedWorkloads(job) {
-  if (job.resource.startsWith("provider:cliproxyapi")) return [];
-  return workerWorkloads(workerById(job.backend));
-}
-function workerWorkloads(worker) {
-  if (!worker || !runtime) return [];
-  return runtime.controller.workloads
-    .filter(
-      (workload) =>
-        workload.kind !== "text" &&
-        workload.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""),
-    )
-    .map((workload) => workload.id);
-}
-async function permitQueueFallback(job) {
-  if (job.input.allowFallback !== true) return false;
-  const models = await mediaModels(false)
-    .then((result) => result.models)
-    .catch(() => null);
-  const profile = models?.profiles.find(
-    (item) => item.id === canonicalProfileId(job.input.profileId),
-  );
-  const backend = profile?.workerIds?.find((id) => id !== job.backend);
-  if (!backend) return false;
-  const latest = store.job(job.ownerId, job.id);
-  store.save({
-    ...latest,
-    backend,
-    resource: `worker:${backend}`,
-  });
-  return true;
-}
-const queueAdapter = createGenerationQueueAdapter({
-  generate: generationRoutes.generate,
-  jobs,
-  gallery: () => gallery,
-  accountForOwner: accountAccessForId,
-  flushGallery: flushGalleryStrict,
-  durableSave: async (job) => {
-    const records = gallery.filter(
-      (item) =>
-        item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
-    );
-    const moved = await withComfyBackend(job.backend, () =>
-      ingestRunResults(
-        records.map((item) => ({
-          output: item,
-          ...(item.upscale?.url ? { upscale: item.upscale } : {}),
-        })),
-        job.ownerId,
-        { strict: true },
-      ),
-    );
-    for (const result of moved.results)
-      updateGalleryJob(result.output.id, {
-        ...result.output,
-        ...(result.upscale ? { upscale: result.upscale } : {}),
-      });
-    await flushGalleryStrict();
-    const live = jobs.get(job.id);
-    if (live && (live.ownerId || "") === job.ownerId)
-      jobs.set(job.id, {
-        ...live,
-        status: "done",
-        error: "",
-        outputs: gallery.filter(
-          (item) =>
-            item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
-        ),
-      });
-    if (moved.comfyFiles.length)
-      await withComfyBackend(job.backend, async () => {
-        await removeComfyFiles(moved.comfyFiles);
-        if (job.providerJobId)
-          await forgetComfyRun({ promptIds: [job.providerJobId] }).catch(() => false);
-      });
-  },
-  cancelPrompt: ({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId)),
-  recover: async (job) => {
-    if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
-      jobs.set(job.id, {
-        status: job.cancelRequested ? "canceling" : "running",
-        recovered: true,
-        promptId: job.providerJobId,
-        comfyBackend: job.backend,
-        ownerId: job.ownerId || undefined,
-      });
-    await recoverRunningJobs();
-  },
-  eligible: async (job) => {
-    if (demoMode) return;
-    if (!job.backend || !workerById(job.backend)) {
-      if (await permitQueueFallback(job))
-        return "Moving to another worker with explicit fallback permission.";
-      return "Waiting for the selected worker to be configured.";
-    }
-    const workloads = managedWorkloads(job);
-    try {
-      if (workloads.length && !mediaLeases.has(job.id))
-        mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
-      await withComfyBackend(job.backend, () => loadComfyContext());
-    } catch (error) {
-      mediaLeases.get(job.id)?.release();
-      mediaLeases.delete(job.id);
-      if (await permitQueueFallback(job))
-        return "Moving to another worker with explicit fallback permission.";
-      return error.message;
-    }
-  },
-  settled: async (job) => {
-    if (job.status === "failed") updateGalleryJob(job.id, { status: "error", error: job.reason });
-    if (job.status === "cancelled") updateGalleryJob(job.id, { status: "canceled" });
-    mediaLeases.get(job.id)?.release();
-    mediaLeases.delete(job.id);
-  },
-});
-// Reconstruct leases synchronously before the HTTP listener accepts work.
-for (const job of store
-  .jobs()
-  .filter(
-    (item) =>
-      !terminalStatuses.has(item.status) &&
-      (["starting", "running", "saving"].includes(item.status) || item.providerJobId),
-  )) {
-  const workloads = managedWorkloads(job);
-  if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
-}
-const directCloudAdapter =
-  directCloud &&
-  createCloudQueueAdapter({
-    store,
-    provider: cloudProvider,
-    resolve: directCloud.resolve,
-    saveMedia: providerMediaWriter(mediaRoot, mediaSubfolder, writeBytesFileAsync, withPngText),
-    saveGallery: async (job, outputs, request) => {
-      await replaceGalleryJob(
-        job.id,
-        outputs,
-        {
-          ...job.input,
-          kind: request.kind,
-          ownerId: job.ownerId,
-          model: job.input.model || job.input.profileId,
-          modelName: request.model,
-          comfyBackend: "cliproxyapi",
-          width: outputs[0]?.width || request.width,
-          height: outputs[0]?.height || request.height,
-          duration: request.duration,
-          resolution: request.resolution,
-        },
-        jobs,
-      );
-      await flushGalleryStrict();
-    },
-  });
-const upscaleQueueAdapter = createUpscaleQueueAdapter({
-  store,
-  jobs,
-  itemFor: (ownerId, itemId) =>
-    gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
-  execute: (job, callbacks) =>
-    withComfyBackend(job.backend, async () => {
-      const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
-      if (!job.providerJobId && job.ownerId && !account?.authenticated)
-        throw new Error("This account can no longer upscale images.");
-      const info = job.providerJobId ? null : (await loadComfyContext()).info;
-      return runUpscaleJob(job.id, job.input.upscaleBody, info, undefined, {
-        ...callbacks,
-        promptId: job.providerJobId,
-        plan: job.input.upscalePlan,
-      });
-    }),
-  cancelPrompt: (promptId, backend) => withComfyBackend(backend, () => cancelPrompt(promptId)),
-  flushGallery: flushGalleryStrict,
-  eligible: queueAdapter.eligible,
-  settled: async (job) => {
-    const item = gallery.find(
-      (entry) => entry.id === job.input.galleryItemId && (entry.ownerId || "") === job.ownerId,
-    );
-    if (item && item.upscale?.jobId === job.id && ["failed", "cancelled"].includes(job.status))
-      updateGalleryJob(item.id, {
-        upscale: {
-          ...item.upscale,
-          status: job.status === "failed" ? "error" : "canceled",
-          error: job.reason,
-          progress: null,
-        },
-      });
-    await queueAdapter.settled(job);
-  },
-});
-/** A reference image as the text model reads it ({ mime, data }, downscaled), or null. */
-async function assistantImage(account, id) {
-  if (!id) return null;
-  const reference = await bytesForReferenceAccount(account, id);
-  const [image] = await downscaleReferences([
-    `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
-  ]);
-  return image || null;
-}
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -1925,92 +552,27 @@ const promptStage = createPromptStage({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     return ownerId && !account?.authenticated ? null : account;
   },
-  profiles: (account) => assistantProfiles({ studioAccount: account }),
-  guide: assistantGuide,
+  profiles: (account) => assistant.profiles({ studioAccount: account }),
+  guide: assistant.guide,
   dream: () => dream,
-  frame: assistantImage,
+  frame: assistant.image,
 });
-const generationAdapter = withUpscaleAdapter(
-  directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
-  upscaleQueueAdapter,
-);
-const generationQueue = new GenerationQueue(
-  store,
-  {
-    ...generationAdapter,
-    // A local generation may move to another idle worker that runs it: the forms fill in a
-    // worker by default, so it is where the job starts rather than a pin.
-    alternatives: (job) =>
-      job.resource.startsWith("worker:") && job.operation !== "upscale"
-        ? readyWorkers(
-            job.input.kind === "video" ? "video" : "image",
-            profileOnBackendKey(job.input.profileId, job.input.profileBackend),
-          ).map((worker) => `worker:${worker.id}`)
-        : [],
-    settled: async (job) => {
-      await generationAdapter.settled(job);
-      if (job.status !== "completed") return;
-      const items = gallery.filter(
-        (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
-      );
-      void titler.completed(items);
-      void imageSearch.completed(items);
-    },
+// The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
+const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
+  assistantEngine,
+  catalogue,
+  cloudProvider,
+  completed: (items) => {
+    void titler.completed(items);
+    void imageSearch.completed(items);
   },
+  directCloud,
+  generationRoutes,
   promptStage,
-);
-async function validateGenerationInput(input, account) {
-  if (input.writing === undefined) return validateGeneration(input, account);
-  if (typeof input.writing?.prompt === "string") {
-    // Already written (a Dream variation): the record goes with the prompt it explains.
-    const record = storedWritingRecord(input.writing);
-    if (record) input.writing = { ...record, prompt: input.writing.prompt };
-    else delete input.writing;
-    return validateGeneration(input, account);
-  }
-  // Written in the queue: only the request is admitted, and the rest is checked as it will run,
-  // with a stand-in for the prompt still to be written.
-  input.writing = writingRequest(input.writing);
-  const issue = writingIssue(input.writing, { engine: assistantEngine, account });
-  if (issue) return { status: issue.status, payload: { ok: false, error: issue.error } };
-  input.prompt = "(written by the prompt assistant)";
-  try {
-    return await validateGeneration(input, account);
-  } finally {
-    input.prompt = "";
-  }
-}
-async function validateGeneration(input, account) {
-  // A per-backend id merged into a combined profile runs on the backend it named.
-  const named = profileAliasBackend(input.profileId);
-  // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
-  for (const key of ["profileId", "model", "workflow"])
-    if (typeof input[key] === "string") input[key] = canonicalProfileId(input[key]);
-  // The backend a combined profile's run uses, stored with it: the one asked for while the profile
-  // still defines it, else its current one. Any other profile runs without one.
-  const combined =
-    typeof input.profileId === "string" && input.profileId.startsWith("custom:")
-      ? getCustomWorkflow(input.profileId)
-      : null;
-  const wanted = input.profileBackend || named;
-  if (combined?.backendIds?.length)
-    input.profileBackend = combined.backendIds.includes(wanted) ? wanted : combined.backend;
-  else delete input.profileBackend;
-  // Every path (composer, Chat, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
-  const sized = (await mediaModels().catch(() => null))?.models?.profiles?.find(
-    (profile) => profile.id === input.profileId,
-  );
-  Object.assign(input, withResolution(input, sized));
-  if (directCloud?.isProfile(input)) {
-    try {
-      await directCloud.resolve({ ownerId: account?.userId || "", input });
-      return { status: 200, payload: { ok: true } };
-    } catch (error) {
-      return { status: error.status || 400, payload: { ok: false, error: error.message } };
-    }
-  }
-  return generationRoutes.validateInput(input, account);
-}
+  recoverRunningJobs,
+  runtime,
+  store,
+});
 // Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
 function chatTitle(account, sessionId, prompt) {
   return sessionChat.title(account?.userId || "", sessionId, prompt);
@@ -2138,7 +700,7 @@ const dream = createDream({
   },
   textBusy,
   writer: assistantEngine,
-  guide: assistantGuide,
+  guide: assistant.guide,
   gallery: (ownerId) =>
     gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
@@ -2191,22 +753,10 @@ const finishing = createFinishing({
   item: (ownerId, itemId) =>
     gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
   idle: studioIdle,
-  ready: async (quality) => {
-    const worker = routeJob("upscale");
-    if (!worker) return { reason: noWorkerMessage("upscale") };
-    return withComfyBackend(worker.id, async () => {
-      const { info, failure } = await upscaleInfo();
-      if (failure) return { reason: failure.payload.error };
-      const status = upscaleStatus(info, quality);
-      if (!status.ready) return { reason: upscaleUnready(status) };
-      return {
-        faceDetail: status.faceDetail.nodesInstalled && status.faceDetail.detectors.length > 0,
-      };
-    });
-  },
+  ready: (quality) => upscale.upscaleReady(quality),
   fullBody: fullBodyPerson,
   upscale: (ownerId, request) =>
-    queueUpscale(ownerId ? accountAccessForId(ownerId) : undefined, request, {
+    upscale.queueUpscale(ownerId ? accountAccessForId(ownerId) : undefined, request, {
       priority: queuePriority.finishing,
     }),
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
@@ -2299,173 +849,17 @@ generationRoutes.setAdmission(async (req, res) => {
   res.status(result.status).json(result.payload);
 });
 
-/** The catalogue profile a Chat draft names, if any. */
-async function chatProfile(input) {
-  const models = await catalogueModels();
-  return models.profiles?.find((item) => item.id === canonicalProfileId(input?.profileId));
-}
-async function selectedChatMediaProfile(input, operation) {
-  const profile = await chatProfile(input);
-  const reject = (message) => {
-    throw Object.assign(new Error(message), { status: 400 });
-  };
-  if (!profile) reject("Choose an available generation model before asking Chat to create media.");
-  const kind = operation === "animate" ? "video" : "image";
-  if ((profile.kind || "image") !== kind)
-    reject(
-      `Choose a ${kind} model for this action; the selected model will not be changed automatically.`,
-    );
-  if (
-    operation !== "image" &&
-    !(
-      profile.capabilities?.startImage ||
-      profile.imageModes?.reference ||
-      profile.mediaInputs?.length
-    )
-  )
-    reject("Choose a model that supports image references for this action.");
-  return profile;
-}
-let chatGateway;
-const sessionChat = new ChatService({
-  store: new ChatStore(store.db),
-  settings: chatSettings,
-  // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
-  taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
-  session: (ownerId, id) => store.session(ownerId, id),
-  // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
-  agent: (ownerId, sessionId, owned) =>
-    mcp.agent({
-      owner: ownerId,
-      account: ownerId ? accountAccessForId(ownerId) : undefined,
-      session: sessionId,
-      ...owned,
-    }),
-  results: (ownerId, sessionId) =>
-    store.jobs(ownerId, sessionId).map((job) => ({
-      id: job.id,
-      status: job.status,
-      kind: job.input.kind,
-      profile: job.input.profileId,
-      prompt: job.input.prompt,
-    })),
-  // A text workload's model reads images as its workloads say; Bifrost's cloud models all do.
-  vision: async (modelId) => {
-    const served = (runtime?.controller.workloads || []).filter(
-      (item) =>
-        item.kind === "text" &&
-        item.model &&
-        // A workload model without a provider prefix matches only itself, not every model.
-        (item.model.includes("/")
-          ? modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1))
-          : modelId === item.model),
-    );
-    return served.length ? served.every((item) => item.vision === true) : true;
-  },
-  models: async (ownerId) => {
-    const settings = chatSettings();
-    if (!settings) return [];
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated) return [];
-    chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
-    const models = ((await chatGateway?.listModelDetails()) || []).filter((model) =>
-      chatModelAllowed(model.id, settings.patterns),
-    );
-    const workloads = (runtime?.controller.workloads || []).filter(
-      (item) =>
-        item.kind === "text" && item.model && chatModelAllowed(item.model, settings.patterns),
-    );
-    if (!workloads.length) return models;
-    // Only administrators may start a stopped model, as in Settings › Workers.
-    const admin = !multiUserEnabled || account?.role === "administrator";
-    const phases = admin
-      ? undefined
-      : Object.fromEntries(
-          (await runtime.controller.observe()).workloads.map(({ id, phase }) => [id, phase]),
-        );
-    return servedChatModels(models, workloads, phases);
-  },
-  revision: async (ownerId, sessionId, revision) => {
-    const source = store.job(ownerId, revision.sourceJobId);
-    if (!source || source.sessionId !== sessionId)
-      throw Object.assign(new Error("Source generation not found."), { status: 404 });
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
-    const kind = revision.operation === "animate" ? "video" : "image";
-    if (revision.input.kind && revision.input.kind !== kind)
-      throw Object.assign(new Error("The selected operation does not match the media kind."), {
-        status: 400,
-      });
-    const input = { ...revision.input, kind };
-    const profile = await selectedChatMediaProfile(input, revision.operation);
-    const startImage = input.startImageId || input.startImage;
-    if (startImage && !referenceExistsForAccount(account, startImage))
-      throw Object.assign(new Error("The start image does not belong to this account."), {
-        status: 400,
-      });
-    if (!input.referenceAssets?.length && startImage)
-      input.referenceAssets = [
-        { assetId: startImage, slot: profile.mediaInputs?.[0]?.id || "reference" },
-      ];
-    if (revision.operation !== "image" && !input.referenceAssets?.length)
-      throw Object.assign(
-        new Error("Choose a reference image before submitting a refinement or animation."),
-        { status: 400 },
-      );
-    if (input.referenceAssets !== undefined && !Array.isArray(input.referenceAssets))
-      throw Object.assign(new Error("Choose reference images as an array."), { status: 400 });
-    for (const reference of input.referenceAssets || [])
-      if (
-        !reference ||
-        typeof reference.assetId !== "string" ||
-        !referenceExistsForAccount(account, reference.assetId)
-      )
-        throw Object.assign(new Error("Choose reference images belonging to this account."), {
-          status: 400,
-        });
-    const checked = await validateGenerationInput(input, account || undefined);
-    if (checked.status >= 400)
-      throw Object.assign(new Error(checked.payload.error), { status: checked.status });
-    return {
-      sourceJobId: source.id,
-      operation: revision.operation,
-      input,
-      previousInput: source.input,
-    };
-  },
-  reference: async (ownerId, id) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account no longer has access."), { status: 403 });
-    const image = await assistantImage(account, id);
-    if (!image)
-      throw Object.assign(new Error("This reference image cannot be used by Chat."), {
-        status: 400,
-      });
-    return `data:${image.mime};base64,${image.data}`;
-  },
-  // A card revision, already checked by `revision`, runs exactly as submitted.
-  admit: async ({ ownerId, sessionId, turnId, draft }) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
-    const result = await admitGeneration(
-      {
-        ...draft.input,
-        kind: draft.operation === "animate" ? "video" : "image",
-        clientJobId: turnId,
-        allowFallback: draft.input.allowFallback === true,
-      },
-      account || undefined,
-      { sessionId, operation: draft.operation, parentJobId: draft.parentJobId },
-    );
-    if (result.status >= 400)
-      throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
-        status: result.status,
-      });
-    return { job: publicJob(store.job(ownerId, result.payload.jobId)) };
-  },
+// Studio Chat (chat-service.js).
+const sessionChat = createSessionChat({
+  admit: admitGeneration,
+  catalogueModels,
+  mcp,
+  referenceImage: assistant.image,
+  runtime,
+  store,
+  taste,
+  tasteWriter,
+  validate: validateGenerationInput,
 });
 // A group's Chat feature gates Studio Chat; single-user mode has no account and keeps it.
 app.use(
@@ -2477,51 +871,6 @@ app.use(
   }),
 );
 
-// Only generation and its owned results use direct domain calls; other MCP tools retain their transport.
-async function mcpGenerationRequest(method, route, input, owner) {
-  const url = new URL(route, "http://localhost");
-  const jobMatch = method === "GET" && url.pathname.match(/^\/api\/jobs\/([^/]+)$/);
-  const galleryMatch = method === "GET" && url.pathname.match(/^\/api\/gallery\/jobs\/([^/]+)$/);
-  if (!(method === "POST" && url.pathname === "/api/generate") && !jobMatch && !galleryMatch)
-    return undefined;
-  const account = multiUserEnabled ? accountAccessForId(owner) : undefined;
-  if (multiUserEnabled && !account?.authenticated)
-    return { status: 401, payload: { ok: false, error: "This account no longer has access." } };
-  if (jobMatch)
-    return {
-      status: 200,
-      payload: generationJobResponse(account, decodeURIComponent(jobMatch[1])),
-    };
-  if (galleryMatch)
-    return galleryJobResponse(
-      account,
-      decodeURIComponent(galleryMatch[1]),
-      url.searchParams.get("settings") === "1",
-    );
-  const { queueSet, studioSession, ...body } = input || {};
-  // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
-  if (studioSession) {
-    const parent = studioSession.parent && store.job(owner, studioSession.parent);
-    const parentJobId = parent?.sessionId === studioSession.id ? parent.id : undefined;
-    return admitGeneration(
-      body,
-      account,
-      {
-        sessionId: studioSession.id,
-        operation:
-          body.kind === "video"
-            ? "animate"
-            : parentJobId && body.referenceAssets?.length
-              ? "refine"
-              : "image",
-        parentJobId,
-      },
-      { priority: queuePriority.manual, queueSet },
-    );
-  }
-  // External chat work queues after manual Studio requests; its set keeps it together once started.
-  return admitGeneration(body, account, undefined, { priority: queuePriority.mcp, queueSet });
-}
 generationQueue.start();
 dream.start();
 finishing.start();
@@ -2531,642 +880,25 @@ titler.start();
 suggester.start();
 nextSteps.start();
 
-/**
- * Upscaling runs on a worker with Upscale (workers.js): the routes below run
- * inside its scope, so its node list, uploads and the job itself all go there.
- */
-function onUpscaleWorker(handler) {
-  return (req, res) => {
-    const worker = routeJob("upscale");
-    if (!worker) {
-      const { status, payload } = noUpscaleWorker();
-      res.status(status).json(payload);
-      return undefined;
-    }
-    return withComfyBackend(worker.id, () => handler(req, res));
-  };
-}
-const noUpscaleWorker = () => ({
-  status: 503,
-  payload: {
-    ok: false,
-    offline: true,
-    noWorker: true,
-    error: noWorkerMessage("upscale"),
-  },
+const upscale = registerUpscaleRoutes(app, {
+  finishing,
+  loadComfyContext,
+  queue: generationQueue,
+  store,
 });
 
-/** `force` reads ComfyUI again instead of the 30s cache. */
-async function upscaleInfo({ force = false } = {}) {
-  try {
-    return { info: (await loadComfyContext({ force })).info };
-  } catch {
-    return {
-      failure: {
-        status: 503,
-        payload: {
-          ok: false,
-          offline: true,
-          error: `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
-        },
-      },
-    };
-  }
-}
-const upscaleUnready = (status) =>
-  status.nodesInstalled
-    ? "The SeedVR2 models aren’t installed yet."
-    : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`;
-async function upscaleContext(res, options) {
-  const { info, failure } = await upscaleInfo(options);
-  if (failure) res.status(failure.status).json(failure.payload);
-  return info || null;
-}
-
-app.get(
-  "/api/upscale/status",
-  onUpscaleWorker(async (req, res) => {
-    const info = await upscaleContext(res, { force: req.query.fresh === "1" });
-    if (!info) return;
-    const status = {
-      ...upscaleStatus(info, req.query.quality),
-      qualities: upscaleQualities,
-      targets: upscaleTargets,
-    };
-    res.json({ ok: true, ...status });
-  }),
-);
-
-/**
- * Queues a smart upscale of one of the account's gallery items on a worker with Upscale, answering
- * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Starred Images).
- */
-async function queueUpscale(account, request, origin) {
-  const worker = routeJob("upscale");
-  if (!worker) return noUpscaleWorker();
-  return withComfyBackend(worker.id, () => queueUpscaleOnWorker(account, request, origin));
-}
-
-async function queueUpscaleOnWorker(account, request, origin) {
-  const target = request.target === undefined ? 0 : Number(request.target);
-  if (target !== 0 && !upscaleTargets.includes(target)) {
-    return {
-      status: 400,
-      payload: {
-        ok: false,
-        error: "Choose an upscale target of 2048 or 4096, or 0 for automatic sizing.",
-      },
-    };
-  }
-  const { info, failure } = await upscaleInfo();
-  if (failure) return failure;
-  const quality = normalizeQuality(request.quality);
-  const itemId = String(request.galleryItemId || "");
-  const ownedItem = gallery.find(
-    (item) => item.id === itemId && recordBelongsToAccount(item, account),
-  );
-  if (account && !ownedItem)
-    return {
-      status: 404,
-      payload: { ok: false, reason: "missing", error: "This image is no longer in the gallery." },
-    };
-  const faceDetail =
-    Boolean(request.faceDetail) && (ownedItem || findUpscaleTarget(itemId))?.type !== "video";
-  const status = upscaleStatus(info, quality);
-  if (!status.ready)
-    return {
-      status: 400,
-      payload: { ok: false, error: upscaleUnready(status), status },
-    };
-  if (faceDetail && !status.faceDetail.nodesInstalled)
-    return {
-      status: 400,
-      payload: {
-        ok: false,
-        error: `Face detail needs the Impact Pack nodes: ${status.faceDetail.missingNodes.join(", ")}.`,
-      },
-    };
-  // Say exactly why an image cannot be upscaled; the tile shows this in a popover.
-  const item = findUpscaleTarget(itemId);
-  if (!item)
-    return {
-      status: 404,
-      payload: {
-        ok: false,
-        reason: "missing",
-        error:
-          "This image is no longer in the gallery. It may have been deleted on another device. Reload the page.",
-      },
-    };
-  if (!["image", "video"].includes(item.type))
-    return {
-      status: 400,
-      payload: { ok: false, reason: "video", error: "Upscale supports gallery images and videos." },
-    };
-  if (item.status !== "done")
-    return {
-      status: 409,
-      payload: {
-        ok: false,
-        reason: "unfinished",
-        error: "This image is still rendering. Upscale it when it’s done.",
-      },
-    };
-  if (["queued", "running"].includes(item.upscale?.status))
-    return { status: 409, payload: { ok: false, error: "This image is already being upscaled." } };
-  let imageName = "";
-  let upscaleItem = item;
-  try {
-    if (item.type === "video") {
-      imageName = await uploadUpscaleVideoSource(item);
-    } else {
-      const asset = referenceAssetForAccount(account, item.id);
-      const [staged] = await stageReferenceAssetsForAccount(account, [
-        { assetId: asset.id, slot: "upscale", source: asset.source },
-      ]);
-      imageName = staged?.comfyName || "";
-      if (staged) {
-        if (
-          !(
-            Number.isFinite(staged.width) &&
-            staged.width > 0 &&
-            Number.isFinite(staged.height) &&
-            staged.height > 0
-          )
-        )
-          throw new Error("The source image dimensions could not be read.");
-        upscaleItem = { ...item, width: staged.width, height: staged.height };
-      }
-    }
-  } catch (error) {
-    return {
-      status: 400,
-      payload: {
-        ok: false,
-        reason: "source",
-        error: `Couldn’t read the original image: ${error.message}`,
-      },
-    };
-  }
-  if (!imageName)
-    return {
-      status: 502,
-      payload: {
-        ok: false,
-        reason: "source",
-        error:
-          "ComfyUI didn’t accept the original image. Make sure ComfyUI is running and can write to its input folder.",
-      },
-    };
-  const customWorkflow = String(item.model || "").startsWith("custom:")
-    ? getCustomWorkflow(item.model, item.settings?.profileBackend)
-    : null;
-  const { body, plan } = prepareUpscale({
-    item: upscaleItem,
-    imageName,
-    quality,
-    target,
-    faceDetail,
-    info,
-    customWorkflow,
-  });
-  const ownerId = account?.userId || "";
-  const parent = item.jobId && store.job(ownerId, item.jobId);
-  const session = parent
-    ? store.session(ownerId, parent.sessionId)
-    : store.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-  const queued = store.enqueue(
-    ownerId,
-    session.id,
-    {
-      prompt: item.prompt || "",
-      galleryItemId: item.id,
-      upscaleBody: body,
-      upscalePlan: plan,
-    },
-    "upscale",
-    parent?.id,
-    `worker:${currentComfyBackend()}`,
-    undefined,
-    origin,
-  );
-  updateGalleryJob(item.id, {
-    upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
-  });
-  finishing.admitted(queued);
-  void generationQueue.tick().catch(() => undefined);
-  return {
-    status: 200,
-    payload: { ok: true, jobId: queued.id, plan, revision: galleryRevisionValue() },
-  };
-}
-
-app.post("/api/upscale", async (req, res) => {
-  const { status, payload } = await queueUpscale(req.studioAccount, req.body || {});
-  res.status(status).json(payload);
+const { generationJobResponse } = registerJobRoutes(app, { store, queue: generationQueue });
+// MCP's generation and its owned results go straight to the domain (mcp/studio-requests.js).
+const mcpDomainRequest = createMcpDomainRequest({
+  admit: admitGeneration,
+  jobResponse: generationJobResponse,
+  store,
 });
-
-app.post("/api/upscale/toggle", (req, res) => {
-  try {
-    const itemId = String(req.body?.galleryItemId || "");
-    const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-    if (req.studioAccount && !ownedItem)
-      return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
-    const item = toggleUpscaleView(itemId, req.body?.active);
-    res.json({
-      ok: true,
-      upscaleActive: Boolean(item.upscaleActive),
-      revision: galleryRevisionValue(),
-    });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-function generationJobResponse(account, id) {
-  const queued = store.job(account?.userId || "", id);
-  if (queued && !jobs.has(id)) {
-    const status =
-      {
-        completed: "done",
-        failed: "error",
-        cancelled: "canceled",
-        writing: "queued",
-        waiting: "queued",
-        starting: "queued",
-        saving: "running",
-      }[queued.status] || queued.status;
-    return {
-      status,
-      items: queued.items,
-      outputs: queued.outputs,
-      error: queued.status === "failed" ? queued.reason : undefined,
-      // A paused queue's hold is the one waiting reason a chat hears.
-      ...(queued.reason === pausedReason ? { reason: pausedReason } : {}),
-      // The prompt's thinking stays in Studio; a chat hears only the status.
-      progress: queued.status === "writing" ? undefined : queued.progress,
-      ...(queued.resource.startsWith("provider:cliproxyapi")
-        ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
-        : {}),
-    };
-  }
-  const job = jobs.get(id);
-  if (!job || (account && job.ownerId !== account.userId)) {
-    return { status: "missing" };
-  }
-  return { ...job, items: job.items || [] };
-}
-app.get("/api/jobs/:id", (req, res) => {
-  res.json(generationJobResponse(req.studioAccount, req.params.id));
-});
-
-app.post("/api/jobs/:id/cancel", async (req, res) => {
-  if (store.job(ownerIdForRequest(req), req.params.id)) {
-    try {
-      await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
-    } catch {
-      return res.status(503).json({
-        ok: false,
-        error: unconfirmedCancel,
-      });
-    }
-    return res.json({ ok: true });
-  }
-  const job = jobs.get(req.params.id);
-  if (!job) {
-    // Nothing here runs it any more (Studio restarted): only the tile is left to settle.
-    // Its prompt id went with the job, so ComfyUI is left alone rather than interrupted blindly.
-    const hasOwnedRecord = recordsForRequest(gallery, req).some(
-      (item) => item.jobId === req.params.id,
-    );
-    if (!hasOwnedRecord) return res.json({ ok: true, stale: true, changed: false });
-    const changed = updateGalleryJob(req.params.id, { status: "canceled" });
-    res.json({ ok: true, stale: true, changed });
-    return;
-  }
-  // Another account's live job answers exactly like an unknown one.
-  if (req.studioAccount && job.ownerId !== req.studioAccount.userId)
-    return res.json({ ok: true, stale: true, changed: false });
-  jobs.set(req.params.id, { ...job, status: "canceling" });
-  // Its pictures are saved and only Smart upscale is left: they stay, and runJob delivers them.
-  if (!job.keepsPicture) updateGalleryJob(req.params.id, { status: "canceled" });
-  // Without a prompt id yet, runJob takes it back out of ComfyUI as soon as /prompt answers.
-  if (job.promptId)
-    await withComfyBackend(job.comfyBackend, () => cancelPrompt(job.promptId)).catch(() => null);
-  res.json({ ok: true });
-});
-
-app.post("/api/queue/cancel", async (req, res) => {
-  const ownerId = ownerIdForRequest(req);
-  for (const pending of store
-    .jobs(ownerId)
-    .filter((job) => ["writing", "queued", "waiting"].includes(job.status)))
-    await generationQueue.cancel(ownerId, pending.id);
-  const promptIds = cancelOwnJobs(ownerId);
-  setGallery(
-    gallery.map((item) =>
-      recordBelongsToRequest(item, req) &&
-      item.status === "pending" &&
-      !jobs.get(item.jobId)?.keepsPicture
-        ? { ...item, status: "canceled" }
-        : item,
-    ),
-  );
-  saveGallery();
-  // Only Studio's own prompts: ComfyUI's queue also holds runs from its own UI and other apps.
-  await Promise.allSettled(
-    promptIds.map(({ promptId, backend }) =>
-      withComfyBackend(backend, () => cancelPrompt(promptId)),
-    ),
-  );
-  res.json({ ok: true });
-});
-
 registerGalleryErrorRoutes(app);
-
-/** Marks every Studio job still waiting or running as canceled, and returns the prompt ids ComfyUI knows them by. */
-function cancelOwnJobs(ownerId = "") {
-  const promptIds = [];
-  for (const [id, job] of jobs) {
-    if (ownerId && job.ownerId !== ownerId) continue;
-    if (job.status === "queued" || job.status === "running" || job.status === "canceling") {
-      if (job.promptId) promptIds.push({ promptId: job.promptId, backend: job.comfyBackend });
-      // Only upscaling now: its pictures stay, and runJob delivers them once ComfyUI lets go.
-      if (job.keepsPicture) {
-        jobs.set(id, { ...job, status: "canceling" });
-        continue;
-      }
-      setTerminalJob(id, { status: "canceled" });
-      updateGalleryJob(id, { status: "canceled" });
-    }
-  }
-  return promptIds;
-}
-
-// Whether ComfyUI runs on this machine, for the bug report.
-const comfyIsLocal = () => {
-  try {
-    return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(new URL(comfyUrl).hostname);
-  } catch {
-    return false;
-  }
-};
 
 registerGalleryDeleteRoute(app);
 
-app.get("/comfy/video-preview", async (req, res) => {
-  const filename = String(req.query.filename || "");
-  const subfolder = String(req.query.subfolder || "");
-  const type = String(req.query.type || "output");
-  if (
-    req.studioAccount &&
-    (!ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))
-  ) {
-    res.status(404).end();
-    return;
-  }
-  if (
-    !["output", "input", "temp", mediaType].includes(type) ||
-    !videoPattern.test(filename) ||
-    filename !== path.basename(filename) ||
-    /[\\/]/.test(filename) ||
-    inDotFolder(subfolder)
-  ) {
-    res.status(404).end();
-    return;
-  }
-  try {
-    const cacheControl = type === mediaType ? derivedMediaCache : undefined;
-    if (req.query.format === "gif") {
-      res
-        .type("image/gif")
-        .attachment(`${path.parse(filename).name}.gif`)
-        .send(await getComfyVideoGif(filename, subfolder, type));
-      return;
-    }
-    if (req.query.format === "loop") {
-      res
-        .type("video/mp4")
-        .attachment(`${path.parse(filename).name} loop.mp4`)
-        .send(await getComfyVideoLoop(filename, subfolder, type));
-      return;
-    }
-    // The viewer's copy (getComfyVideoPlayback); a video not kept here plays as ComfyUI has it.
-    if (req.query.format === "play") {
-      const playback = await getComfyVideoPlayback(filename, subfolder, type);
-      if (!playback)
-        res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
-      else if (playback.original)
-        res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
-      else sendVideoPreview(req, res, playback.file, cacheControl);
-      return;
-    }
-    // The still comes from the original, ahead of any preview still being encoded.
-    if (req.query.poster === "1")
-      await sendVideoPoster(
-        req,
-        res,
-        await getComfyVideoPoster(filename, subfolder, type),
-        cacheControl,
-      );
-    else
-      sendVideoPreview(
-        req,
-        res,
-        await getComfyVideoPreview(filename, subfolder, type),
-        cacheControl,
-      );
-  } catch {
-    if (!res.headersSent) res.status(503).end();
-  }
-});
-
-app.get("/comfy/thumb", async (req, res) => {
-  const filename = String(req.query.filename || "");
-  const subfolder = String(req.query.subfolder || "");
-  const type = String(req.query.type || "output");
-  if (!filename) {
-    res.status(400).json({ ok: false, error: "filename is required." });
-    return;
-  }
-  if (
-    req.studioAccount &&
-    (!ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))
-  ) {
-    res.status(404).json({ ok: false, error: "Not an output." });
-    return;
-  }
-  // The same outputs /comfy/view serves, and nothing else.
-  if (
-    !["output", "input", "temp", mediaType].includes(type) ||
-    !outputMediaPattern.test(filename) ||
-    inDotFolder(req.query.subfolder)
-  ) {
-    res.status(404).json({ error: "Not an output." });
-    return;
-  }
-  try {
-    // A video's thumbnail is its poster, so every small view that asks for one gets a picture.
-    if (videoPattern.test(filename)) {
-      await sendVideoPoster(
-        req,
-        res,
-        await getComfyVideoPoster(filename, subfolder, type),
-        thumbnailCacheControl(req),
-      );
-      return;
-    }
-    // ?size=display is the viewer's larger copy (thumbnails.js RENDITIONS).
-    const thumbnail = await getThumbnail(
-      filename,
-      subfolder,
-      type,
-      req.query.size === "display" ? "display" : "thumb",
-    );
-    if (!thumbnail) {
-      res.status(404).json({ ok: false, error: "Source image is unavailable." });
-      return;
-    }
-    // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
-    if (thumbnail.original) {
-      res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
-      return;
-    }
-    // The ETag is a source-content hash, so revalidation safely handles a reused filename.
-    res.setHeader("Cache-Control", thumbnailCacheControl(req));
-    if (req.headers["if-none-match"] === thumbnail.etag) {
-      res.status(304).end();
-      return;
-    }
-    if (thumbnail.etag) res.setHeader("ETag", thumbnail.etag);
-    res.type("image/webp");
-    await pipeline(fs.createReadStream(thumbnail.file), res);
-  } catch (error) {
-    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message });
-    else res.destroy();
-  }
-});
-
-/**
- * "Share without settings" for an output: the whole file, with the prompt and
- * workflow ComfyUI wrote into it taken out (metadata-strip.js). Buffered, since
- * the file changes; never cached, since the plain one lives at the same address.
- */
-async function sendWithoutSettings(req, res) {
-  const params = new URLSearchParams(
-    Object.entries(req.query)
-      .filter(([key]) => key !== "clean")
-      .map(([key, value]) => [key, String(value)]),
-  );
-  let response;
-  try {
-    response = await fetch(`${comfyUrl}/view?${params}`, { signal: AbortSignal.timeout(120000) });
-    noteComfyReachable();
-  } catch (error) {
-    noteComfyFetchError(error);
-    res.status(502).json({ ok: false, error: "ComfyUI isn’t answering." });
-    return;
-  }
-  if (!response.ok) {
-    res.status(response.status).json({ ok: false, error: "ComfyUI doesn’t have this file." });
-    return;
-  }
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const type = response.headers.get("content-type") || "";
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  res.type(type || path.extname(String(req.query.filename || "")) || "application/octet-stream");
-  res.send(stripMetadata(bytes).buffer);
-}
-
-app.get("/comfy/*path", async (req, res) => {
-  try {
-    const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
-    const proxyPath = Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path;
-    const filename = String(req.query.filename || "");
-    if (
-      req.studioAccount &&
-      (proxyPath !== "view" ||
-        !ownerMediaTypes.has(String(req.query.type || "output")) ||
-        !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))
-    ) {
-      res.status(404).json({ ok: false, error: "Not an output." });
-      return;
-    }
-    // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
-    // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
-    // and neither are dot folders among the outputs (such as an old `.studio-trash`).
-    if (
-      proxyPath !== "view" ||
-      !["output", "input", "temp", mediaType].includes(String(req.query.type || "output")) ||
-      !outputMediaPattern.test(String(req.query.filename || "")) ||
-      inDotFolder(req.query.subfolder)
-    ) {
-      res.status(404).json({ ok: false, error: "Not an output." });
-      return;
-    }
-    // Forward conditional headers so an unchanged image gets a 304 instead of a
-    // full re-transfer over a slow LAN link, and stream the body instead of
-    // buffering it so bytes start moving to the client as soon as they arrive.
-    const conditional = {};
-    for (const header of ["if-none-match", "if-modified-since", "range", "if-range"]) {
-      if (req.headers[header]) conditional[header] = req.headers[header];
-    }
-    // Studio-owned media is served from its folder only, never forwarded to ComfyUI.
-    if (String(req.query.type || "") === mediaType) {
-      const file = localOutputFile(
-        String(req.query.filename || ""),
-        String(req.query.subfolder || ""),
-        mediaType,
-      );
-      if (!file) {
-        res.status(404).json({ ok: false, error: "This file is no longer available." });
-        return;
-      }
-      if (req.query.clean === "1") {
-        res.setHeader("Cache-Control", "private, no-store, max-age=0");
-        res.type(path.extname(file) || "application/octet-stream");
-        res.send(stripMetadata(fs.readFileSync(file)).buffer);
-        return;
-      }
-      if (req.query.download === "1") res.attachment(path.basename(file));
-      res.sendFile(file, { headers: { "Cache-Control": immutableMediaCache } });
-      return;
-    }
-    if (req.query.clean === "1") {
-      await sendWithoutSettings(req, res);
-      return;
-    }
-    let response;
-    try {
-      response = await fetch(`${comfyUrl}/${proxyPath}${query}`, { headers: conditional });
-      noteComfyReachable();
-    } catch (error) {
-      noteComfyFetchError(error);
-      throw error;
-    }
-    res.status(response.status);
-    const etag = response.headers.get("etag");
-    const lastModified = response.headers.get("last-modified");
-    const contentLength = response.headers.get("content-length");
-    if (etag) res.setHeader("ETag", etag);
-    if (lastModified) res.setHeader("Last-Modified", lastModified);
-    if (contentLength) res.setHeader("Content-Length", contentLength);
-    for (const header of ["accept-ranges", "content-range", "content-disposition"]) {
-      const value = response.headers.get(header);
-      if (value) res.setHeader(header, value);
-    }
-    res.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
-    if (response.status === 304 || !response.body) {
-      res.end();
-      return;
-    }
-    res.type(response.headers.get("content-type") || "application/octet-stream");
-    await pipeline(Readable.fromWeb(response.body), res);
-  } catch (error) {
-    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message });
-    else res.destroy();
-  }
-});
+registerComfyMediaRoutes(app);
 
 const dist = path.join(root, "dist");
 // An unknown API route must fail as JSON, never fall through to the app page.
