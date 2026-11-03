@@ -2,6 +2,7 @@
 // Which Generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
+import { keptTriggers } from "../lora/prompts.js";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
@@ -446,8 +447,8 @@ export function prepareLoras(profile, infos = {}, loras = []) {
     stack.push({
       name,
       strength: Number.isFinite(strength) ? strength : (range?.default ?? 0.7),
-      // A reused run keeps Trigger Words off; MCP callers never set it themselves.
-      ...(triggers === false ? { triggers } : {}),
+      // A reused run keeps its Trigger Words choice; MCP callers never set it themselves.
+      ...keptTriggers(triggers),
     });
   }
   return stack;

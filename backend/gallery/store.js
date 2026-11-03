@@ -14,6 +14,7 @@ import {
 } from "../persistence/gallery-rows.ts";
 import { generationRecord } from "../generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./filters.js";
+import { keptTriggers } from "../lora/prompts.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls, videoPattern } from "../media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -1157,7 +1158,7 @@ export function generationSettings(body) {
           name: String(item.name || ""),
           enabled: true,
           strength: Number(item.strength ?? 0.7),
-          ...(item.triggers === false ? { triggers: false } : {}),
+          ...keptTriggers(item.triggers),
         }))
     : [];
   if (loras.length) settings.loras = loras;
