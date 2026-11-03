@@ -107,7 +107,6 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await page.keyboard.press("Escape");
   await expect(controls).toBeVisible();
   // An open sort menu closes first.
-  await pickerTab(page, "LoRAs", "Stacks");
   const sort = controls.getByRole("button", { name: "Sort", exact: true });
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");

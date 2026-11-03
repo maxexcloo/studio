@@ -211,10 +211,12 @@ primary component reference and verify APIs against the installed version.
   names such as Flux 2. Each option is a complete profile, titled with its name and
   its description beneath; preserve exact profile IDs. A combined profile's backend
   (ComfyUI, Radiance) shows only on the composer's Backend chip, where it is switched,
-  never in profile lists. The LoRA picker's tabs are
-  Recommended (the default: LoRAs for the profile's family), Favourites (this
-  family's thumbs up), All (every LoRA the profile can load, so another family's
-  copy of a series never shows, with Unclassified, those without a family, as a filter) and saved Stacks; type filters follow the catalogue Type.
+  never in profile lists. The LoRA picker's tabs choose which LoRAs it lists,
+  narrowest first: Recommended (the default: LoRAs for the profile's family),
+  Favourites (this family's thumbs up) and All (every LoRA the profile can load,
+  so another family's copy of a series never shows, with Unclassified, those
+  without a family, as a filter); type filters follow the catalogue Type.
+  Saved Stacks are not a tab: they list under the current Stack, which they replace.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
   up, then unrated, then thumbs down, each alphabetically (the picker's Sort can
