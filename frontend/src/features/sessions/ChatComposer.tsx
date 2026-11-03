@@ -102,7 +102,10 @@ function ChatModelPicker({
   );
 }
 
-/** The Chat prompt box: the message above a short chip rail (References, Model) and Send/Stop. */
+/**
+ * The Chat prompt box: the message above the model chip (when there is a choice), then References
+ * and Send/Stop as in the gallery's compact prompt bar.
+ */
 function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId } = useChat();
   const { sessionId } = useGeneration().draft;
@@ -119,6 +122,8 @@ function ChatComposer() {
     status.isError ||
     status.data?.available === false ||
     parked;
+  // The model chip shows only when there is another model to choose.
+  const choosable = status.data?.models.some((model) => !model.parked && model.id !== modelId);
   const phone = usePhone();
   const admin = useIsAdmin();
   const runtime = useWorkloadStart(
@@ -160,11 +165,16 @@ function ChatComposer() {
           }}
         />
       </div>
-      <Group wrap="nowrap" gap="xs" justify="space-between" align="flex-end">
-        <div className={railClasses.rail} role="group" aria-label="Chat Inputs">
-          <ReferencePicker />
-          <ChatModelPicker disabled={replying} runtime={runtime} />
+      <Group wrap="nowrap" gap="xs" align="flex-end">
+        <div
+          className={`${railClasses.rail} ${classes.rail}`}
+          role="group"
+          aria-label="Chat Inputs"
+        >
+          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
         </div>
+        {/* References and Send sit as in the gallery's compact prompt bar. */}
+        <ReferencePicker compact />
         {replying ? (
           <Tooltip label="Stop Response">
             <ActionIcon

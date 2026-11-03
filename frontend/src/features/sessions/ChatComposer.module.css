@@ -23,6 +23,12 @@
   line-height: 1.55;
 }
 
+/* The model chip takes the free width, keeping References and Send at the end. */
+.rail {
+  flex: 1;
+  min-width: 0;
+}
+
 .starting {
   padding-inline: var(--mantine-spacing-xs);
 }

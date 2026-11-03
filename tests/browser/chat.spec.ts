@@ -373,12 +373,9 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   if (!testInfo.project.use.isMobile) await page.setViewportSize({ width: 1920, height: 1000 });
   await page.goto("/chat");
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
-  // The model chip sits on the composer's rail beside References and names the model.
-  const inputs = page.getByRole("group", { name: "Chat Inputs", exact: true });
-  await expect(inputs.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveText(
-    "Studio Assistant",
-  );
-  await expect(inputs.getByRole("button", { name: "Choose References" })).toBeVisible();
+  // With only one model there is no model chip; References sits beside Send as in the gallery.
+  await expect(page.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toBeVisible();
   // Without a sidebar, phones list the chats in place of the empty state; the header's Chats
   // drawer offers New Chat.
   await expectNoChatOpen(page);
