@@ -2,7 +2,13 @@ import { Alert, Select, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { deploymentQuery, sourceNote, useDeploymentSetting, type Setting } from "./deployment";
+import {
+  deploymentQuery,
+  sourceNote,
+  useDeploymentSetting,
+  type Flag,
+  type Setting,
+} from "./deployment";
 import { GalleryPass } from "./GalleryPass";
 import { UnfinishedItems } from "./UnfinishedItems";
 
@@ -41,32 +47,30 @@ export function GenerationSettings() {
       </SettingRow>
     );
   };
+  const flagRow = (flag: Flag) => (
+    <SettingRow
+      key={flag.key}
+      label={flag.label}
+      description={`${flag.description} ${sourceNote(flag)}.`}
+    >
+      <Switch
+        aria-label={flag.label}
+        checked={flag.value}
+        disabled={flag.locked}
+        onChange={(event) => save.mutate({ key: flag.key, value: event.currentTarget.checked })}
+      />
+    </SettingRow>
+  );
+  // The gallery passes' switch sits with them under Gallery.
+  const whileBusy = catalogue.find((flag) => flag.key === "STUDIO_GALLERY_WHILE_BUSY");
+  const features = catalogue.filter((flag) => flag !== whileBusy);
   return (
     <Stack gap="lg">
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
       </SettingGroup>
-      {catalogue.length > 0 && (
-        <SettingGroup title="Features">
-          {catalogue.map((flag) => (
-            <SettingRow
-              key={flag.key}
-              label={flag.label}
-              description={`${flag.description} ${sourceNote(flag)}.`}
-            >
-              <Switch
-                aria-label={flag.label}
-                checked={flag.value}
-                disabled={flag.locked}
-                onChange={(event) =>
-                  save.mutate({ key: flag.key, value: event.currentTarget.checked })
-                }
-              />
-            </SettingRow>
-          ))}
-        </SettingGroup>
-      )}
+      {features.length > 0 && <SettingGroup title="Features">{features.map(flagRow)}</SettingGroup>}
       <SettingGroup title="Gallery">
         <GalleryPass
           route="/api/gallery/captions"
@@ -83,6 +87,7 @@ export function GenerationSettings() {
           remaining="to index"
           progressLabel="Index Progress"
         />
+        {whileBusy && flagRow(whileBusy)}
         <UnfinishedItems />
       </SettingGroup>
     </Stack>
