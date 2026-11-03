@@ -267,10 +267,31 @@
   border-radius: var(--mantine-radius-sm);
 }
 
-/* Chip thumbnails overlap like a stack, with a count beyond the first few. */
+/* A chip's name and thumbnails share one cell, so the chip is as wide as the wider of them. */
+.chipContent {
+  display: inline-grid;
+  align-items: center;
+}
+
+.chipContent > * {
+  grid-area: 1 / 1;
+}
+
+.chipName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chipName[data-hidden] {
+  visibility: hidden;
+}
+
+/* Chip thumbnails overlap like a stack, with a count beyond the first few; the widest is reserved. */
 .thumbs {
   display: inline-flex;
   align-items: center;
+  min-width: 4rem;
 }
 
 .thumb {
