@@ -7,7 +7,6 @@ import type { WorkloadPhase } from "../../../../shared/runtime";
 import { useIsAdmin } from "../auth/AccountGate";
 import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { ComposerDock } from "../generation/ComposerDock";
-import railClasses from "../generation/GenerationInputControls.module.css";
 import { usePromptIdeas } from "../generation/PromptIdeas";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
@@ -103,8 +102,8 @@ function ChatModelPicker({
 }
 
 /**
- * The Chat prompt box: the message above the model chip (when there is a choice), then References
- * and Send/Stop as in the gallery's compact prompt bar.
+ * The Chat prompt box: one row of the message, one line until it wraps or takes Shift+Enter, then
+ * the model chip (when there is a choice), References and Send/Stop as in the gallery's compact bar.
  */
 function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId } = useChat();
@@ -145,61 +144,59 @@ function ChatComposer() {
         void send();
       }}
     >
-      <div className={classes.message} {...ideas.focusProps}>
-        <TextBox
-          aria-label="Message"
-          placeholder="Message Studio"
-          variant="unstyled"
-          autosize
-          minRows={1}
-          maxRows={6}
-          className={classes.writing}
-          value={text}
-          onChange={setText}
-          overlay={ideas.ideas}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (!replying && !unavailable) void send();
-            }
-          }}
-        />
-      </div>
-      <Group wrap="nowrap" gap="xs" align="flex-end">
-        <div
-          className={`${railClasses.rail} ${classes.rail}`}
-          role="group"
-          aria-label="Chat Inputs"
-        >
-          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
-        </div>
-        {/* References and Send sit as in the gallery's compact prompt bar. */}
-        <ReferencePicker compact />
-        {replying ? (
-          <Tooltip label="Stop Response">
-            <ActionIcon
-              aria-label="Stop Response"
-              variant="default"
-              onClick={() =>
-                stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
+      <div className={classes.row}>
+        <div className={classes.message} {...ideas.focusProps}>
+          <TextBox
+            aria-label="Message"
+            placeholder="Message Studio"
+            variant="unstyled"
+            autosize
+            minRows={1}
+            maxRows={5}
+            className={classes.writing}
+            value={text}
+            onChange={setText}
+            overlay={ideas.ideas}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                if (!replying && !unavailable) void send();
               }
-            >
-              <icons.stop size={16} />
-            </ActionIcon>
-          </Tooltip>
-        ) : (
-          <Tooltip label={parked ? "Model Parked by an Administrator" : "Send Message"}>
-            <ActionIcon
-              type="submit"
-              aria-label="Send Message"
-              disabled={!text.trim() || unavailable}
-              variant="filled"
-            >
-              <ArrowUp size={18} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-      </Group>
+            }}
+          />
+        </div>
+        {/* The model chip, References and Send sit as in the gallery's compact prompt bar. */}
+        <Group wrap="nowrap" gap="xs" className={classes.actions}>
+          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
+          <ReferencePicker compact />
+          {replying ? (
+            <Tooltip label="Stop Response">
+              <ActionIcon
+                aria-label="Stop Response"
+                variant="default"
+                size={44}
+                onClick={() =>
+                  stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
+                }
+              >
+                <icons.stop size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <Tooltip label={parked ? "Model Parked by an Administrator" : "Send Message"}>
+              <ActionIcon
+                type="submit"
+                aria-label="Send Message"
+                disabled={!text.trim() || unavailable}
+                variant="filled"
+                size={44}
+              >
+                <ArrowUp size={20} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </Group>
+      </div>
       {runtime.starting && (
         <Group gap={6} wrap="nowrap" className={classes.starting} role="status">
           {runtime.starting.error ? (
