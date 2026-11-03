@@ -204,7 +204,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   );
 });
 
-test("Recommended lists the family's LoRAs; All adds the rest, with Unclassified as a filter", async ({
+test("Recommended lists the family's LoRAs; All adds the rest, filtered by type", async ({
   page,
 }) => {
   await fixtures(page);
@@ -229,10 +229,9 @@ test("Recommended lists the family's LoRAs; All adds the rest, with Unclassified
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  await page
-    .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
-    .getByText("Unclassified", { exact: true })
-    .click();
+  const types = page.getByRole("radiogroup", { name: "LoRA Filter", exact: true });
+  await expect(types.getByText("Unclassified", { exact: true })).toHaveCount(0);
+  await types.getByText("Style", { exact: true }).click();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await pickerTab(page, "LoRAs", "Recommended");

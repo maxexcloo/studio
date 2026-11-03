@@ -230,8 +230,8 @@ primary component reference and verify APIs against the installed version.
   never in profile lists. The LoRA picker's tabs choose which LoRAs it lists,
   narrowest first: Recommended (the default: LoRAs for the profile's family),
   Favourites (this family's thumbs up) and All (every LoRA the profile can load,
-  so another family's copy of a series never shows, with Unclassified, those
-  without a family, as a filter); type filters follow the catalogue Type.
+  so another family's copy of a series never shows); type filters follow the
+  catalogue Type.
   Saved Stacks are not a tab: they list under the current Stack, which they replace.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
