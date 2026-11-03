@@ -422,7 +422,7 @@ primary component reference and verify APIs against the installed version.
   nothing can run. Options are submenus on desktop and expand in place on phones,
   never as a second floating layer. The options: Prompt (opens the composer) ›
   Edit, Use as Reference (images), Recreate (an upload with a suggested prompt;
-  the run is its version), Run Again (new seed), Run Again (Same Seed); Edit opens
+  the run is its version; several selected uploads queue one run each), Run Again (new seed), Run Again (Same Seed); Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
   original kept); Animate › Fast or Quality as a small segmented control at the
