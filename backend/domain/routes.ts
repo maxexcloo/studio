@@ -4,7 +4,6 @@ import {
   type GenerationOperation,
   type QueueCancelAllResponse,
   type QueueMedia,
-  type QueueMove,
   type QueueResponse,
   type UnfinishedJob,
 } from "../../shared/queue.ts";
@@ -241,10 +240,10 @@ export function registerRewriteRoutes(
     });
   app.post("/api/queue/:id/move", (req, res) => {
     const to = req.body?.to;
-    if (!["top", "up", "down"].includes(String(to)))
-      return res.status(400).json({ error: "Move to top, up or down." });
+    if (typeof to !== "number" || !Number.isInteger(to) || to < 0)
+      return res.status(400).json({ error: "Move to a place in the queue." });
     if (!store.job(owner(req), req.params.id)) return missing(res);
-    return store.move(owner(req), req.params.id, to as QueueMove)
+    return store.move(owner(req), req.params.id, to)
       ? res.json({ ok: true })
       : res.status(409).json({ error: "Only waiting generations can be moved." });
   });
