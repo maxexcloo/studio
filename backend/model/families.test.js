@@ -186,14 +186,9 @@ test("every node pack is one registry entry, and a missing one comes with both i
   assert.ok(part.install.commands.length >= 1);
 });
 
-/* ------------------------------------------------------------ Lumina 2, Ideogram 4, MageFlow, ERNIE */
+/* ------------------------------------------------------------ Lumina 2, MageFlow, ERNIE */
 
-const newNodes = () =>
-  Object.fromEntries(
-    ["Ideogram4Scheduler", "DualModelGuider", "CFGOverride", "TextEncodeMageFlowEdit"].map(
-      (name) => [name, node()],
-    ),
-  );
+const newNodes = () => ({ TextEncodeMageFlowEdit: node() });
 const newTypes = [
   "stable_diffusion",
   "lumina2",
@@ -203,7 +198,6 @@ const newTypes = [
   "flux2",
   "chroma",
   "minimax",
-  "ideogram4",
   "mage",
 ];
 
