@@ -39,13 +39,8 @@ export function settingSource(key) {
   return { source: "deployment", locked: true };
 }
 
-const flag = (key, label, description, { defaultOn = true } = {}) => ({
-  key,
-  label,
-  description,
-  kind: "flag",
-  defaultOn,
-});
+// Each switch is on unless set to 0.
+const flag = (key, label, description) => ({ key, label, description, kind: "flag" });
 
 /**
  * Catalogue switches: what the generation catalogue offers. LoRAs, Cloud Models
@@ -53,12 +48,6 @@ const flag = (key, label, description, { defaultOn = true } = {}) => ({
  * stays a deployment variable that switches presets off for everyone (features.js).
  */
 export const catalogueFlags = [
-  flag(
-    "STUDIO_VIDEO_CLOUD_FALLBACK",
-    "Video Cloud Fallback",
-    "While the local video worker is off, MCP video runs on a granted cloud profile instead of being refused.",
-    { defaultOn: false },
-  ),
   flag(
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
@@ -71,8 +60,7 @@ export const catalogueFlags = [
   ),
 ];
 
-const flagOn = (item) =>
-  item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1";
+const flagOn = (item) => process.env[item.key] !== "0";
 
 /** Whether a catalogue switch is on now (Settings saves apply at once). */
 export function flagEnabled(key) {
