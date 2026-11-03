@@ -24,11 +24,14 @@ export const iconChipProps = {
 const nestedLayers =
   '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [aria-haspopup][aria-expanded="true"]';
 
-/** A chip panel's Escape: closes the panel only when no nested layer took the key. */
+/**
+ * A chip panel's Escape: closes the panel only when no nested layer, such as a chip popup opened
+ * inside it (the picker's Filters), took the key.
+ */
 export function escapePanel(event: KeyboardEvent<HTMLElement>, close: () => void) {
   if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
   const layer = (event.target as Element).closest(nestedLayers);
-  if (layer && !layer.hasAttribute("data-chip-popup")) return;
+  if (layer && layer !== event.currentTarget) return;
   event.preventDefault();
   event.stopPropagation();
   close();

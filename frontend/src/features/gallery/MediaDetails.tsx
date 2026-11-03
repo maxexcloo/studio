@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { backendLabel, isProfile } from "../generation/payload";
+import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { mediaTitle } from "./mediaLabels";
 import { useDerivations } from "./versions";
@@ -84,11 +84,13 @@ function generationDetails(
   const inpaint = settings.inpaint as { strength?: number } | undefined;
   const video = item.type === "video";
   return {
-    profile: String(
-      settings.profileName ||
-        recorded?.displayName ||
-        recorded?.label ||
-        fileStem(settings.modelName || (item.model?.startsWith("custom:") ? "" : item.model)),
+    profile: shownProfileName(
+      String(
+        settings.profileName ||
+          recorded?.displayName ||
+          recorded?.label ||
+          fileStem(settings.modelName || (item.model?.startsWith("custom:") ? "" : item.model)),
+      ),
     ),
     loras: (Array.isArray(settings.loras) ? settings.loras : [])
       .filter((lora) => lora?.name && lora.enabled !== false)

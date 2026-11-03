@@ -3,7 +3,7 @@ import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } fr
 import { ChevronDown, FastForward } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
-import { isProfile } from "../generation/payload";
+import { isProfile, shownProfileName } from "../generation/payload";
 import { ActionMenuItems, findAction } from "../gallery/ActionBar";
 import { AnimateDialog, useMediaActions } from "../gallery/MediaActions";
 import { useMediaTransfer } from "../gallery/mediaShare";
@@ -29,7 +29,9 @@ const operationLabels = {
 
 /** The compact card's settings: only what the run recorded, without repeating the profile. */
 function settingChips(input: QueueJob["input"], profile?: Profile) {
-  const name = String(input.profileName || profile?.displayName || profile?.label || "");
+  const name = shownProfileName(
+    String(input.profileName || profile?.displayName || profile?.label || ""),
+  );
   const steps = input.steps && !new RegExp(`\\b${input.steps}\\s*steps?\\b`, "i").test(name);
   const loras = Array.isArray(input.loras)
     ? input.loras.filter((lora: { enabled?: boolean }) => lora.enabled !== false)

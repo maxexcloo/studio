@@ -14,7 +14,7 @@ import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
-import { closingPopup, popupLayer } from "../../ui/popupClicks";
+import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 function GenerationScrollArea(props: ScrollAreaProps) {
@@ -151,7 +151,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }
   const outside = useClickOutside<HTMLDivElement>(
     (event) => {
-      if (closingPopup() || inLayer(event.target as HTMLElement)) return;
+      // A layer over the composer, such as Compare or a confirmation, takes the press itself.
+      if (closingPopup() || inLayer(event.target as HTMLElement) || layerAbove(dock.current))
+        return;
       collapse(false);
       // The click that closes the composer does nothing else, such as opening what lies under it.
       const swallow = (click: Event) => {
@@ -310,8 +312,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               paddingBottom: 0,
             },
           }}
+          id="generate"
           opened={opened}
-          onClose={collapse}
+          onClose={closeWhenTop("generate", collapse)}
           title="Generate"
           closeButtonProps={{ "aria-label": "Close Generate" }}
           position="bottom"

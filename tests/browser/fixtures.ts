@@ -937,11 +937,21 @@ export async function withExpertSettings(page: Page, steps: () => Promise<void>)
   await closePopup(page, "Expert Settings");
 }
 
-/** Turns on the reference picker's Uploads filter, which lists uploaded images. */
+/** Chooses what an open Filters popup shows: All, Starred or Uploads. */
+export async function showOnly(page: Page, choice: "All" | "Starred" | "Uploads") {
+  await page
+    .getByRole("dialog", { name: "Filters", exact: true })
+    .getByRole("radiogroup", { name: "Show", exact: true })
+    .getByText(choice, { exact: true })
+    .click();
+}
+
+/** Shows the reference picker's Uploads, which lists uploaded images. */
 export async function showUploads(page: Page) {
   const picker = page.getByRole("region", { name: "References", exact: true });
   await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await picker.getByRole("button", { name: "Uploads", exact: true }).click();
+  await showOnly(page, "Uploads");
+  await closePopup(page, "Filters");
 }
 
 /** Closes the References popup, leaving the composer open; a pick filling the last slot already did. */

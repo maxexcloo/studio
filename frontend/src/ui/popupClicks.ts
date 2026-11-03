@@ -10,11 +10,43 @@ let closing = false;
 /** Whether the current press is dismissing a popup, so outside-click handlers can ignore it. */
 export const closingPopup = () => closing;
 
-// Select keeps its dropdown mounted but hidden, and a closing popup fades towards opacity 0.
-const popupOpen = () =>
-  [...document.querySelectorAll<HTMLElement>(popupLayer)].some(
-    (layer) => layer.getClientRects().length && layer.style.opacity !== "0",
+// Select keeps its dropdown mounted but hidden, and a closing layer fades towards opacity 0.
+const shown = (layer: HTMLElement) => layer.getClientRects().length && layer.style.opacity !== "0";
+const popupOpen = () => [...document.querySelectorAll<HTMLElement>(popupLayer)].some(shown);
+
+/**
+ * Whether an open popup, dialog or drawer is stacked over `owner` (over the page without one). A
+ * press outside or Escape then belongs to that topmost layer, so `owner`'s own outside-click and
+ * Escape handlers leave it alone. Layers portal to the end of the page as they open, so one above
+ * `owner` follows it there, and the layer `owner` sits in does not count. A key handler passes its
+ * event: Escape belongs to any layer above, other keys only to the one they were pressed in, so a
+ * key straight after closing a layer is not lost while it fades.
+ */
+export const layerAbove = (
+  owner: Element | null = null,
+  key?: KeyboardEvent | React.KeyboardEvent,
+) => {
+  const target = key && key.key !== "Escape" ? key.target : undefined;
+  return [
+    ...document.querySelectorAll<HTMLElement>(
+      `${popupLayer}, .mantine-Modal-content, .mantine-Drawer-content`,
+    ),
+  ].some(
+    (layer) =>
+      shown(layer) &&
+      !layer.contains(owner) &&
+      (target === undefined || layer.contains(target as Node | null)) &&
+      (!owner || owner.compareDocumentPosition(layer) & Node.DOCUMENT_POSITION_FOLLOWING),
   );
+};
+
+/**
+ * A Modal or Drawer `onClose` (give the dialog this `id`) that does nothing while another layer is
+ * open over it: Mantine closes every open dialog on Escape, not only the topmost.
+ */
+export const closeWhenTop = (id: string, close: () => void) => () => {
+  if (!layerAbove(document.getElementById(`${id}-body`))) close();
+};
 
 window.addEventListener(
   "pointerdown",

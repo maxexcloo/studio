@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import {
   ActionIcon,
+  Box,
   Button,
   NumberInput,
   Select,
@@ -53,45 +55,46 @@ export function ExpertSettings({
     (slot, index) =>
       input.textEncoders?.[index] || (index === 0 ? input.textEncoder : "") || slot.default,
   );
+  // Each setting the profile offers, listed alphabetically; wide ones take the full row.
+  const fields: { label: string; wide?: boolean; control: ReactNode }[] = [];
   function number(
     key: keyof GenerationInput & string,
     label: string,
     range: ReturnType<typeof controlRange>,
     description?: string,
   ) {
-    if (!range) return null;
-    return (
-      <NumberInput
-        label={label}
-        description={description}
-        value={typeof input[key] === "number" ? (input[key] as number) : ""}
-        onChange={(value) => onChange({ [key]: value })}
-        {...range}
-      />
-    );
+    if (!range) return;
+    fields.push({
+      label,
+      control: (
+        <NumberInput
+          label={label}
+          description={description}
+          value={typeof input[key] === "number" ? (input[key] as number) : ""}
+          onChange={(value) => onChange({ [key]: value })}
+          {...range}
+        />
+      ),
+    });
   }
   // Duration-driven workflows take seconds; frame-driven ones take frames. Never both.
   const duration = video && capabilities.duration === true;
   const frames = video && !duration && capabilities.frames !== false;
   const fps = video && !duration && capabilities.fps !== false;
   const seconds = input.fps > 0 ? `${Number((input.frames / input.fps).toFixed(1))} s` : undefined;
-  const content = (
-    <Stack gap="sm">
-      <SimpleGrid cols={2} spacing="xs">
-        {number("steps", "Steps", stepsRange(profile))}
-        {number("cfg", "Guidance", controlRange(profile, "cfg", { min: 0, max: 30, step: 0.5 }))}
-        {capabilities.denoise === true &&
-          number(
-            "denoise",
-            "Denoise",
-            controlRange(profile, "denoise", { min: 0, max: 1, step: 0.05 }),
-          )}
-        {duration &&
-          number("duration", "Duration (Seconds)", controlRange(profile, "duration", { min: 1 }))}
-        {frames && number("frames", "Frames", controlRange(profile, "frames", { min: 1 }), seconds)}
-        {fps && number("fps", "FPS", controlRange(profile, "fps", { min: 1, max: 120 }))}
-      </SimpleGrid>
-      {capabilities.seed !== false && (
+  number("steps", "Steps", stepsRange(profile));
+  number("cfg", "Guidance", controlRange(profile, "cfg", { min: 0, max: 30, step: 0.5 }));
+  if (capabilities.denoise === true)
+    number("denoise", "Denoise", controlRange(profile, "denoise", { min: 0, max: 1, step: 0.05 }));
+  if (duration)
+    number("duration", "Duration (Seconds)", controlRange(profile, "duration", { min: 1 }));
+  if (frames) number("frames", "Frames", controlRange(profile, "frames", { min: 1 }), seconds);
+  if (fps) number("fps", "FPS", controlRange(profile, "fps", { min: 1, max: 120 }));
+  if (capabilities.seed !== false)
+    fields.push({
+      label: "Seed",
+      wide: true,
+      control: (
         <TextInput
           label="Seed"
           placeholder="Random"
@@ -113,23 +116,31 @@ export function ExpertSettings({
             )
           }
         />
-      )}
-      {selections.map(({ options, field, label }) =>
-        profile?.options?.[options]?.length && capabilities[field] !== false ? (
+      ),
+    });
+  for (const { options, field, label } of selections)
+    if (profile?.options?.[options]?.length && capabilities[field] !== false)
+      fields.push({
+        label,
+        wide: true,
+        control: (
           <Select
-            key={field}
             label={label}
             comboboxProps={nested}
             data={profile.options[options]}
             value={String(input[field] || "")}
             onChange={(value) => onChange({ [field]: value })}
           />
-        ) : null,
-      )}
-      {encoderSlots.map((slot, index) => (
+        ),
+      });
+  encoderSlots.forEach((slot, index) => {
+    const label = encoderSlots.length > 1 ? slot.label : "Text Encoder";
+    fields.push({
+      label,
+      wide: true,
+      control: (
         <Select
-          key={slot.slot}
-          label={encoderSlots.length > 1 ? slot.label : "Text Encoder"}
+          label={label}
           comboboxProps={nested}
           data={slot.options}
           value={encoders[index]}
@@ -142,8 +153,14 @@ export function ExpertSettings({
             onChange({ textEncoders, textEncoder: textEncoders[0] });
           }}
         />
-      ))}
-      {!encoderSlots.length && !!profile?.options?.textEncoders?.length && (
+      ),
+    });
+  });
+  if (!encoderSlots.length && !!profile?.options?.textEncoders?.length)
+    fields.push({
+      label: "Text Encoder",
+      wide: true,
+      control: (
         <Select
           label="Text Encoder"
           comboboxProps={nested}
@@ -154,8 +171,13 @@ export function ExpertSettings({
             if (textEncoder !== null) onChange({ textEncoder });
           }}
         />
-      )}
-      {!!profile?.options?.weightDtypes?.length && capabilities.weightDtype !== false && (
+      ),
+    });
+  if (!!profile?.options?.weightDtypes?.length && capabilities.weightDtype !== false)
+    fields.push({
+      label: "Weight Type",
+      wide: true,
+      control: (
         <Select
           label="Weight Type"
           comboboxProps={nested}
@@ -166,9 +188,13 @@ export function ExpertSettings({
             if (weightDtype !== null) onChange({ weightDtype });
           }}
         />
-      )}
-      {inpaint && (
-        <SimpleGrid cols={2} spacing="xs">
+      ),
+    });
+  if (inpaint)
+    fields.push(
+      {
+        label: "Mask Strength",
+        control: (
           <NumberInput
             label="Mask Strength"
             min={0}
@@ -179,6 +205,11 @@ export function ExpertSettings({
               onChange({ inpaint: { ...inpaint, strength: Number(strength) } })
             }
           />
+        ),
+      },
+      {
+        label: "Edge Softness",
+        control: (
           <NumberInput
             label="Edge Softness"
             min={0}
@@ -187,10 +218,16 @@ export function ExpertSettings({
             value={inpaint.feather ?? 0.4}
             onChange={(feather) => onChange({ inpaint: { ...inpaint, feather: Number(feather) } })}
           />
-        </SimpleGrid>
-      )}
-      {workerIds.length > 1 && (
-        <>
+        ),
+      },
+    );
+  // Fallback belongs with the worker it falls back from, so it sorts with Worker.
+  if (workerIds.length > 1)
+    fields.push({
+      label: "Worker",
+      wide: true,
+      control: (
+        <Stack gap="sm">
           <Select
             label="Worker"
             comboboxProps={nested}
@@ -213,8 +250,19 @@ export function ExpertSettings({
             checked={Boolean(input.allowFallback)}
             onChange={(event) => onChange({ allowFallback: event.currentTarget.checked })}
           />
-        </>
-      )}
+        </Stack>
+      ),
+    });
+  fields.sort((a, b) => a.label.localeCompare(b.label));
+  const content = (
+    <Stack gap="sm">
+      <SimpleGrid cols={2} spacing="xs" verticalSpacing="sm">
+        {fields.map(({ label, wide, control }) => (
+          <Box key={label} style={wide ? { gridColumn: "1 / -1" } : undefined}>
+            {control}
+          </Box>
+        ))}
+      </SimpleGrid>
       {(worker?.gpuDevices?.length || profile?.provider) && (
         <Stack gap={2}>
           {!!worker?.gpuDevices?.length && (

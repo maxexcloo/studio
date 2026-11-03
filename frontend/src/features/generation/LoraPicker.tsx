@@ -15,6 +15,7 @@ import {
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { icons } from "../../ui/icons";
+import { modelFamilyLabel } from "../../ui/modelFamily";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -79,8 +80,6 @@ const loraTabs = [
   { value: "all", label: "All" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
-/** All's filter for LoRAs without a model family. */
-const unclassified = "unclassified";
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
 export const defaultStrength = (range: LoraInfo["strengthRange"]) =>
   range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1);
@@ -279,14 +278,12 @@ function LoraControls({
         ? compatible.filter((file) => ratings[file] === "up")
         : compatible;
   const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
-  const filters = [...(tab === "all" ? [unclassified] : []), ...types];
-  const filter = filters.includes(picker.filter) ? picker.filter : "all";
+  const filter = types.includes(picker.filter) ? picker.filter : "all";
   const terms = picker.query.trim().toLowerCase();
   const shown = listed
     .filter(
       (file) =>
-        (filter === "all" ||
-          (filter === unclassified ? !familiesOf(file).length : typeOf(file) === filter)) &&
+        (filter === "all" || typeOf(file) === filter) &&
         (!terms ||
           [title(file), file, ...(metadata[file]?.triggers || [])]
             .join(" ")
@@ -327,25 +324,39 @@ function LoraControls({
   ) : info.error ? (
     <Alert color="red">{info.error.message}</Alert>
   ) : shown.length ? (
-    <PickerGrid label="LoRA Choices" rows={phone}>
+    // A list on every breakpoint, so names, families and types scan down one column.
+    <PickerGrid label="LoRA Choices" rows>
       {shown.map((file) => (
         <PickerTile
           key={file}
           label={title(file)}
           title={title(file)}
           detail={
-            typeNames[typeOf(file)] ||
-            typeOf(file) ||
-            (familiesOf(file).length ? undefined : "Unclassified")
+            [
+              familiesOf(file)
+                .map((key) => modelFamilyLabel(key))
+                .join(", "),
+              typeNames[typeOf(file)] || typeOf(file),
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
           }
           image={previews.data?.previews[file]}
           placeholder={icons.loras}
-          aspect={phone ? "1" : "4 / 3"}
           selected={selected.has(file)}
-          row={phone}
+          row
           onToggle={() => toggle(file)}
           action={
             <Group gap={4} wrap="nowrap">
+              <Button
+                size="compact-sm"
+                variant={selected.has(file) ? "subtle" : "light"}
+                color={selected.has(file) ? "gray" : undefined}
+                aria-label={`${selected.has(file) ? "Remove" : "Add"} ${title(file)}`}
+                onClick={() => toggle(file)}
+              >
+                {selected.has(file) ? "Remove" : "Add"}
+              </Button>
               {(
                 [
                   ["up", "Thumbs Up", ThumbsUp, "green"],
@@ -354,7 +365,7 @@ function LoraControls({
               ).map(([rating, label, Icon, color]) => (
                 <ActionIcon
                   key={rating}
-                  variant={phone ? "subtle" : "default"}
+                  variant="subtle"
                   color="gray"
                   aria-label={`${label} ${title(file)}`}
                   aria-pressed={ratings[file] === rating}
@@ -392,21 +403,18 @@ function LoraControls({
         <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
       }
       filterCount={filter === "all" ? 0 : 1}
+      onClearFilters={() => picker.setFilter("all")}
       filters={
-        filters.length > 0 && (
+        types.length > 0 && (
           <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
             <Group gap={6} role="radiogroup" aria-label="LoRA Filter">
-              {[
-                ["all", "Any"],
-                ...filters.map((value) => [
-                  value,
-                  value === unclassified ? "Unclassified" : typeNames[value] || value,
-                ]),
-              ].map(([value, label]) => (
-                <Chip key={value} value={value} variant="light">
-                  {label}
-                </Chip>
-              ))}
+              {[["all", "Any"], ...types.map((value) => [value, typeNames[value] || value])].map(
+                ([value, label]) => (
+                  <Chip key={value} value={value} variant="light">
+                    {label}
+                  </Chip>
+                ),
+              )}
             </Group>
           </Chip.Group>
         )

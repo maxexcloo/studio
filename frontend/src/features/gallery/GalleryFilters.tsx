@@ -12,21 +12,26 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api } from "../../api";
 import { usePhone } from "../../ui/usePhone";
-import type { MediaKind } from "../../types";
+import type { MediaKind, Profile } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { chipProps, iconChipProps } from "../generation/chip";
-import { loraInfoQuery } from "../generation/LoraPicker";
+import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
+import { profileName, shownProfileName } from "../generation/payload";
+import { profileNameParts } from "../../../../shared/profiles";
 import classes from "./GalleryFilters.module.css";
 
 export interface GalleryFilterOption {
   value: string;
   label: string;
   description?: string;
+  /** Every recorded value the option stands for, when one clean name covers several. */
+  keys?: string[];
 }
+const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
 const facets = ["model", "lora", "size", "aspect", "chat"] as const;
 type Facet = (typeof facets)[number];
@@ -85,34 +90,82 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
 
-/** Each facet's options with readable labels, selected values included. */
+/**
+ * A recorded model no profile names (a file or a removed profile's id), read as words without its
+ * folder, extension, backend or quantisation: "flux1-dev-fp8_e4m3fn.safetensors" reads "Flux1 Dev".
+ */
+function modelKeyName(key: string) {
+  const words = (
+    key
+      .replace(/^custom:/, "")
+      .split(/[\\/]/)
+      .pop() || key
+  )
+    .replace(/\.(safetensors|gguf|ckpt|pth?|bin|sft)$/i, "")
+    .split(/[-_\s]+/)
+    .filter(
+      (word) =>
+        word &&
+        !/^(comfyui|radiance|bf16|fp(4|8|16|32)|nvfp4|mxfp4|e4m3fn|e5m2|scaled|gguf|nf4|int[48]|q\d(_k)?(_[a-z0-9]+)?)$/i.test(
+          word,
+        ),
+    );
+  return words.map((word) => word[0].toUpperCase() + word.slice(1)).join(" ") || key;
+}
+
+/** One option per clean name, standing for every recorded value with that name, A–Z. */
+function byName(keys: string[], name: (key: string) => string): GalleryFilterOption[] {
+  const named = new Map<string, string[]>();
+  for (const key of keys) named.set(name(key), [...(named.get(name(key)) || []), key]);
+  return [...named]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, keys]) => ({ value: label, label, keys }));
+}
+
+/**
+ * Each facet's options with readable labels, selected values included. Models and LoRAs show the
+ * names the composer does, one option per name.
+ */
 function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues) {
   const { profiles } = useGenerationActions();
   const facets = useQuery(galleryFacetsQuery(kind));
   const loraInfo = useQuery(loraInfoQuery);
-  const modelLabels = new Map(
-    profiles.flatMap((profile) =>
-      [profile.model, profile.baseModel, profile.id]
-        .filter((item): item is string => Boolean(item))
-        .map((item) => [item, profile.recipe?.modelLabel || profile.displayName || profile.label]),
-    ),
+  // A file takes the name its profiles share ("Flux Dev" from "Flux Dev · Fast" and "Flux Dev ·
+  // Quality"), else their shared model label.
+  const loaders = new Map<string, Profile[]>();
+  for (const profile of profiles)
+    for (const file of new Set([profile.model, profile.baseModel]))
+      if (file) loaders.set(file, [...(loaders.get(file) || []), profile]);
+  const sharedName = (using: Profile[]) => {
+    const [first, ...rest] = using.map((profile) =>
+      profileNameParts(profile.displayName || profile.label),
+    );
+    let length = 0;
+    while (length < first.length && rest.every((parts) => parts[length] === first[length]))
+      length++;
+    return first.slice(0, length).join(" · ");
+  };
+  const modelNames = new Map(
+    [...loaders].map(([file, using]) => {
+      const labels = new Set(using.map((profile) => profile.recipe?.modelLabel));
+      const label = labels.size === 1 ? [...labels][0] : undefined;
+      return [file, sharedName(using) || (label && shownProfileName(label)) || modelKeyName(file)];
+    }),
   );
-  const options = (key: "model" | "lora") =>
-    [
-      ...new Set([
-        ...(key === "model" ? facets.data?.models || [] : facets.data?.loras || []),
-        ...value[key],
-      ]),
-    ].map((item) => ({
-      value: item,
-      label:
-        key === "model" ? modelLabels.get(item) || item : loraInfo.data?.loras[item]?.title || item,
-    }));
+  for (const profile of profiles)
+    for (const id of [profile.id, ...(profile.aliases || [])])
+      modelNames.set(id, profileName(profile));
+  const keys = (key: "model" | "lora") => [
+    ...new Set([
+      ...(key === "model" ? facets.data?.models || [] : facets.data?.loras || []),
+      ...value[key],
+    ]),
+  ];
   return {
     facets,
     options: {
-      model: options("model"),
-      lora: options("lora"),
+      model: byName(keys("model"), (key) => modelNames.get(key) || modelKeyName(key)),
+      lora: byName(keys("lora"), (key) => loraTitle(loraInfo.data?.loras[key], key)),
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       chat: facets.data?.chats || [],
@@ -142,14 +195,24 @@ export function useActiveFilters(
       : []),
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
     ...extra,
-    ...facets.flatMap((facet) =>
-      value[facet].map((selected) => ({
-        key: `${facet}:${selected}`,
-        label: options[facet].find((option) => option.value === selected)?.label || selected,
+    ...facets.flatMap((facet) => {
+      const chosen = options[facet].filter((option) =>
+        keysOf(option).some((key) => value[facet].includes(key)),
+      );
+      const named = new Set(chosen.flatMap(keysOf));
+      return [
+        ...chosen,
+        ...value[facet].filter((key) => !named.has(key)).map((key) => ({ value: key, label: key })),
+      ].map((option) => ({
+        key: `${facet}:${option.value}`,
+        label: option.label,
         remove: () =>
-          onChange({ ...value, [facet]: value[facet].filter((item) => item !== selected) }),
-      })),
-    ),
+          onChange({
+            ...value,
+            [facet]: value[facet].filter((key) => !keysOf(option).includes(key)),
+          }),
+      }));
+    }),
   ];
 }
 
@@ -238,37 +301,10 @@ export function FilterButton({
   );
 }
 
-/** An on/off filter chip: outlined when off, tinted with a check when on. */
-export function FilterToggle({
-  label,
-  name = label,
-  on,
-  onChange,
-}: {
-  label: string;
-  /** The accessible name when the visible label is shortened. */
-  name?: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <Button
-      {...chipProps}
-      aria-label={name}
-      aria-pressed={on}
-      variant={on ? "light" : "default"}
-      leftSection={on ? <Check size={14} /> : undefined}
-      onClick={() => onChange(!on)}
-    >
-      {label}
-    </Button>
-  );
-}
-
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) on its own row, then the on/off filters (`toggles` first, then Starred and
- * Uploads), the date and each facet. Choices apply at once.
+ * (Grid or Runs) on its own row, then Show (All, Starred or Uploads, one at a time), the view's
+ * own `toggles` (such as All Versions), the date and each facet. Choices apply at once.
  */
 export function GalleryFilterPanel({
   kind,
@@ -278,21 +314,26 @@ export function GalleryFilterPanel({
   toggles,
 }: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
   const { facets, options } = useFacetOptions(kind, value);
-  const toggle = (key: "starred" | "uploads", label: string) => (
-    <FilterToggle
-      label={label}
-      on={value[key]}
-      onChange={(on) => onChange({ ...value, [key]: on })}
-    />
-  );
+  const show = value.uploads ? "uploads" : value.starred ? "starred" : "all";
+  // A clean name stands for all its recorded values; typing any part of it finds it.
   const many = (key: "model" | "lora" | "chat", label: string) => (
     <MultiSelect
       size="sm"
       label={label}
       placeholder={value[key].length ? undefined : "Any"}
       data={options[key]}
-      value={value[key]}
-      onChange={(next) => onChange({ ...value, [key]: next })}
+      value={options[key]
+        .filter((option) => keysOf(option).some((item) => value[key].includes(item)))
+        .map((option) => option.value)}
+      onChange={(next) =>
+        onChange({
+          ...value,
+          // In the order they were picked.
+          [key]: next.flatMap((picked) =>
+            keysOf(options[key].find((option) => option.value === picked)!),
+          ),
+        })
+      }
       searchable
       clearable
       nothingFoundMessage="No Matches"
@@ -344,13 +385,25 @@ export function GalleryFilterPanel({
         </Button>
       )}
       {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
+      {/* One of these at a time, so a single choice rather than on/off chips. */}
       <Input.Wrapper label="Show">
-        <Group gap={6} mt={4}>
-          {toggles}
-          {toggle("starred", "Starred")}
-          {toggle("uploads", "Uploads")}
-        </Group>
+        <SegmentedControl
+          aria-label="Show"
+          fullWidth
+          size="xs"
+          mt={4}
+          value={show}
+          onChange={(next) =>
+            onChange({ ...value, starred: next === "starred", uploads: next === "uploads" })
+          }
+          data={[
+            { value: "all", label: "All" },
+            { value: "starred", label: "Starred" },
+            { value: "uploads", label: "Uploads" },
+          ]}
+        />
       </Input.Wrapper>
+      {toggles}
       <Divider />
       <Input.Wrapper label="Date">
         <SegmentedControl

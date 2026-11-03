@@ -222,13 +222,13 @@
   height: 26px;
 }
 
-/* The surface extends outward so prompt text stays aligned with the rest of Details. */
+/* Framed like the composer's text box and kept inside the Details column, so no edge is clipped. */
 .promptText {
-  margin-inline: calc(-1px - var(--mantine-spacing-xs));
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-md);
-  padding: calc(var(--mantine-spacing-xs) / 2) var(--mantine-spacing-xs);
-  background: var(--mantine-color-default-hover);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  background: var(--mantine-color-default);
+  overflow-wrap: anywhere;
 }
 
 /* The track takes its width at once on opening and only after the panel has slid away on closing;
