@@ -4,7 +4,6 @@ import type {
   GenerationInput,
   GenerationOperation,
   QueueJob,
-  QueueMove,
   StudioSession,
 } from "../../shared/queue.ts";
 import { awaitsWriting } from "../../shared/queue.ts";
@@ -324,19 +323,18 @@ export class Store {
   }
 
   /**
-   * Moves one of the owner's pending queue items to the top of, or one place up or down among, the
-   * owner's other pending items (Dream's stay out, as in the queue panel). The items trade their
-   * places in the queue order (`created_at, rowid`), so other accounts' work keeps its place.
-   * Returns false when the item is not one of the owner's pending items.
+   * Moves one of the owner's pending queue items to place `to` (from 0) among the owner's pending
+   * items (Dream's stay out, as in the queue panel). The items trade their places in the queue
+   * order (`created_at, rowid`), so other accounts' work keeps its place. Returns false when the
+   * item is not one of the owner's pending items.
    */
-  move(ownerId: string, id: string, to: QueueMove): boolean {
+  move(ownerId: string, id: string, to: number): boolean {
     const pending = this.jobs(ownerId).filter(
       (job) => pendingStatuses.has(job.status) && job.priority !== queuePriority.dream,
     );
     const from = pending.findIndex((job) => job.id === id);
     if (from < 0) return false;
-    const target =
-      to === "top" ? 0 : Math.max(0, Math.min(pending.length - 1, from + (to === "up" ? -1 : 1)));
+    const target = Math.min(pending.length - 1, to);
     if (target === from) return true;
     const read = this.db.prepare("SELECT rowid, created_at FROM studio_queue WHERE id = ?");
     const places = pending.map((job) => read.get(job.id) as { rowid: number; created_at: string });

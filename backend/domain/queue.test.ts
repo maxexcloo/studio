@@ -617,9 +617,9 @@ test("moves reorder only the owner's pending items, within their tiers and other
     const a2 = enqueue("alice", alice.id);
     const aMcp = enqueue("alice", alice.id, mcp("set"));
     const b2 = enqueue("bob", bob.id);
-    assert.equal(store.move("alice", aMcp, "top"), true);
-    assert.equal(store.move("alice", a1, "down"), true);
-    assert.equal(store.move("bob", a2, "top"), false);
+    assert.equal(store.move("alice", aMcp, 0), true);
+    assert.equal(store.move("alice", a1, 2), true);
+    assert.equal(store.move("bob", a2, 0), false);
     // Alice's items trade places among themselves; Bob's keep theirs.
     assert.deepEqual(
       store.jobs().map((job) => job.id),
