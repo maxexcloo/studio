@@ -753,10 +753,12 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
 }, testInfo) => {
   await fixtures(page);
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText: async (text: string) => ((window as any).copied = text) },
-    });
+    document.execCommand = (command: string) => {
+      const selected = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = selected.value;
+      return true;
+    };
   });
   await page.goto("/");
   await page.locator("[data-composer-prompt]").click();
