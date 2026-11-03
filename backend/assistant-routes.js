@@ -113,8 +113,16 @@ export function assistantRecord(value, loras = []) {
   };
 }
 
-/** Settings › Models › Integrations: the assistant's gateway, chosen models and vision. */
-export async function assistantIntegration({ environment = process.env, engine, source }) {
+/**
+ * Settings › Models › Integrations: the assistant's gateway, chosen model and vision, and the models
+ * to choose from: the gateway's and those of Studio's text workloads (`workloadModels`).
+ */
+export async function assistantIntegration({
+  environment = process.env,
+  engine,
+  source,
+  workloadModels = [],
+}) {
   let settings = null;
   let problem = "";
   try {
@@ -143,7 +151,7 @@ export async function assistantIntegration({ environment = process.env, engine, 
   ]);
   return {
     available: true,
-    models,
+    models: [...new Set([...models, ...workloadModels])],
     model: { ...row(assistantModelKey, model), vision },
   };
 }

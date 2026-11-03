@@ -255,7 +255,13 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
 
 test("Settings rows: gateway models, vision and validated model names", async () => {
   const source = () => ({ source: "default", locked: false });
-  const integration = await assistantIntegration({ environment, engine, source });
+  // A stopped text workload's model is offered too, though the gateway lists only running ones.
+  const integration = await assistantIntegration({
+    environment,
+    engine,
+    source,
+    workloadModels: ["local/auto", "local/stopped"],
+  });
   assert.deepEqual(
     [
       integration.available,
@@ -263,7 +269,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
       integration.model.effective,
       integration.model.vision,
     ],
-    [true, ["cloud/auto", "local/auto"], "cloud/auto", true],
+    [true, ["cloud/auto", "local/auto", "local/stopped"], "cloud/auto", true],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,
