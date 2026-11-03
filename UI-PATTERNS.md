@@ -140,7 +140,7 @@ primary component reference and verify APIs against the installed version.
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
   few controls (Clear References sits there), then the content; choices apply at
   once and closing the popup is the only dismissal, with no Use or Done action
-  (a reference pick that fills the last free slot closes References itself).
+  (picking the reference for a profile that takes one closes References).
   Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
   popover never opens a second level on phones. References, LoRAs and Presets share one picker
   (`Picker.tsx`): tabs, then search, active filter chips and Filter ▾ in one
