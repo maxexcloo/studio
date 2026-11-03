@@ -138,6 +138,11 @@ primary component reference and verify APIs against the installed version.
   Mantine otherwise closes every open dialog on Escape. A trigger's
   Tooltip wraps `Popover.Target`/`Menu.Target`, so the trigger itself carries
   `aria-expanded` and pressing it still toggles the popup.
+- Choose the control by how many options can hold at once: one of several is a
+  SegmentedControl (or a radio `Chip.Group` for a long list, as the LoRA type
+  filter), where exactly one is chosen and an "All" or "Any" option is a choice,
+  never something switched off; one on/off setting is a Switch; options that
+  combine are toggle chips (Size, Aspect Ratio) or a MultiSelect.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
   parent controls and keyboard focus.
@@ -367,9 +372,8 @@ primary component reference and verify APIs against the installed version.
   Import's link field, which then says how many it added to Uploads. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
-  a segmented control on its own row; Show, one row of on/off chips (All Versions
-  in Grid, Starred, Uploads), outlined when off and tinted with a check when on;
-  then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. The reference picker uses the same chips, Filter ▾
+  a segmented control on its own row; Show, a segmented control of All, Starred
+  and Uploads (one at a time); in Grid, the All Versions switch; then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. The reference picker uses the same chips, Filter ▾
   and panel in the same popup. Search narrows within the filters; filter actions preserve
   the query. Gallery filters and zoom are remembered per account. Every labelled
   control that opens a menu or picker shows ▾; icon-only bar controls do not.
@@ -432,7 +436,7 @@ primary component reference and verify APIs against the installed version.
   the result (`currentMedia`).
 - Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
-  generation by default (the All Versions filter chip, on). Turning it off
+  generation by default (the All Versions switch, on). Turning it off
   collapses a result and its versions (runs made from it: Edit, Recreate, Run Again
   and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it

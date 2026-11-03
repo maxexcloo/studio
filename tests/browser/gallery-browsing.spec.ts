@@ -7,6 +7,7 @@ import {
   image,
   selectionAction,
   selectionMenuItem,
+  showOnly,
   stamp,
 } from "./fixtures";
 const results = (count: number) =>
@@ -513,18 +514,14 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  // The view (Grid or Runs) sits apart from the on/off filters, which share one row.
+  // The view (Grid or Runs) sits apart from Show, one choice of All, Starred or Uploads.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  const toggles = ["All Versions", "Starred", "Uploads"].map((name) =>
-    page.getByRole("button", { name, exact: true }),
-  );
-  const tops = await Promise.all(toggles.map(async (toggle) => (await toggle.boundingBox())!.y));
-  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(4);
-  await page.getByRole("button", { name: "Starred", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+  await showOnly(page, "Starred");
+  await expect(page.getByRole("radio", { name: "Starred", exact: true })).toBeChecked();
+  await showOnly(page, "Uploads");
+  await expect(page.getByRole("radio", { name: "Starred", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: "All Versions", exact: true })).toBeChecked();
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
@@ -620,7 +617,7 @@ test("Uploads stay out of the gallery until its Uploads filter is on", async ({ 
   await expect(tile("made")).toBeVisible();
   await expect(tile("uploaded")).toHaveCount(0);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Uploads", exact: true }).click();
+  await showOnly(page, "Uploads");
   await expect(tile("uploaded")).toBeVisible();
   await expect(tile("made")).toHaveCount(0);
 });

@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api } from "../../api";
 import { usePhone } from "../../ui/usePhone";
@@ -238,37 +238,10 @@ export function FilterButton({
   );
 }
 
-/** An on/off filter chip: outlined when off, tinted with a check when on. */
-export function FilterToggle({
-  label,
-  name = label,
-  on,
-  onChange,
-}: {
-  label: string;
-  /** The accessible name when the visible label is shortened. */
-  name?: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-}) {
-  return (
-    <Button
-      {...chipProps}
-      aria-label={name}
-      aria-pressed={on}
-      variant={on ? "light" : "default"}
-      leftSection={on ? <Check size={14} /> : undefined}
-      onClick={() => onChange(!on)}
-    >
-      {label}
-    </Button>
-  );
-}
-
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) on its own row, then the on/off filters (`toggles` first, then Starred and
- * Uploads), the date and each facet. Choices apply at once.
+ * (Grid or Runs) on its own row, then Show (All, Starred or Uploads, one at a time), the view's
+ * own `toggles` (such as All Versions), the date and each facet. Choices apply at once.
  */
 export function GalleryFilterPanel({
   kind,
@@ -278,13 +251,7 @@ export function GalleryFilterPanel({
   toggles,
 }: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
   const { facets, options } = useFacetOptions(kind, value);
-  const toggle = (key: "starred" | "uploads", label: string) => (
-    <FilterToggle
-      label={label}
-      on={value[key]}
-      onChange={(on) => onChange({ ...value, [key]: on })}
-    />
-  );
+  const show = value.uploads ? "uploads" : value.starred ? "starred" : "all";
   const many = (key: "model" | "lora" | "chat", label: string) => (
     <MultiSelect
       size="sm"
@@ -344,13 +311,25 @@ export function GalleryFilterPanel({
         </Button>
       )}
       {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
+      {/* One of these at a time, so a single choice rather than on/off chips. */}
       <Input.Wrapper label="Show">
-        <Group gap={6} mt={4}>
-          {toggles}
-          {toggle("starred", "Starred")}
-          {toggle("uploads", "Uploads")}
-        </Group>
+        <SegmentedControl
+          aria-label="Show"
+          fullWidth
+          size="xs"
+          mt={4}
+          value={show}
+          onChange={(next) =>
+            onChange({ ...value, starred: next === "starred", uploads: next === "uploads" })
+          }
+          data={[
+            { value: "all", label: "All" },
+            { value: "starred", label: "Starred" },
+            { value: "uploads", label: "Uploads" },
+          ]}
+        />
       </Input.Wrapper>
+      {toggles}
       <Divider />
       <Input.Wrapper label="Date">
         <SegmentedControl
