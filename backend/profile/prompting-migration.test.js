@@ -142,7 +142,7 @@ test("the profile prompting step keeps only what differs from each guide, with a
     assert.equal(fs.readFileSync(path.join(restored, "workflows", `${id}.json`), "utf8"), text);
 
   // A guide change now reaches every profile that doesn't keep that field itself.
-  const store = createGuideStore({ dataDir: dir, seedFile: "", log: quiet });
+  const store = createGuideStore({ dataDir: dir });
   store.save("klein", { ...guides.packs.klein, summary: "Expand with an LLM." }, { by: "admin" });
   assert.equal(resolved(dir, "plain").summary, "Expand with an LLM.");
   assert.equal(resolved(dir, "combined", "radiance").summary, "Expand with an LLM.");

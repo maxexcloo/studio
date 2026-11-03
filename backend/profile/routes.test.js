@@ -14,7 +14,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-delete process.env.STUDIO_MCP_PROMPTING_PATH;
 const { userWorkflowsDir } = await import("../custom-workflows.js");
 const { profileStore, guideStore, createProfileStore } = await import("./store.js");
 const editor = await import("./editor.js");
