@@ -6,7 +6,7 @@ import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Models, Profile } from "../../types";
-import { backendLabel, isProfile } from "./payload";
+import { backendLabel, isProfile, profileName } from "./payload";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { ChipOption, ChipSelect } from "./ChipSelect";
 
@@ -27,8 +27,6 @@ function profileReadiness(profile: Profile, workers: Models["workers"]) {
       }
     : { label: "Offline", color: "red" };
 }
-
-const profileName = (profile: Profile) => profile.displayName || profile.label;
 
 /** A shared name gains the part of the profile ID that differs, such as "· fp8" or "· comfyui". */
 function profileLabel(profile: Profile, profiles: Profile[]) {

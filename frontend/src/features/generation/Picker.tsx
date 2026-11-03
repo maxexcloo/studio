@@ -53,6 +53,7 @@ export function ChipPopup({
   width,
   position = "top-start",
   trap = true,
+  withinPortal = true,
   children,
 }: {
   title: string;
@@ -66,6 +67,8 @@ export function ChipPopup({
   position?: PopoverProps["position"];
   /** Off while a confirmation over the popup owns focus and clicks. */
   trap?: boolean;
+  /** Off for a popup inside another, so pressing in it is not outside its parent. */
+  withinPortal?: boolean;
   children: ReactNode;
 }) {
   const phone = usePhone();
@@ -122,6 +125,7 @@ export function ChipPopup({
       closeOnEscape={false}
       returnFocus
       shadow="md"
+      withinPortal={withinPortal}
     >
       <Tooltip label={title} disabled={!tooltip || opened}>
         <Popover.Target>{target}</Popover.Target>
@@ -145,8 +149,8 @@ export function ChipPopup({
 }
 
 /**
- * Tabs, then the search, active filter chips and filter toggle in one compact row, sized like the
- * gallery toolbar; the filters open inline below it.
+ * Tabs, then the search, Filter ▾, active filter chips and `actions` in one compact row, in the
+ * gallery toolbar's order and size; Filter ▾ opens the filters in a popup, as the gallery's does.
  */
 export function PickerHeader<Tab extends string>({
   label,
@@ -158,6 +162,7 @@ export function PickerHeader<Tab extends string>({
   onQueryChange,
   filters,
   filterCount = 0,
+  onClearFilters,
   chips,
   actions,
 }: {
@@ -174,10 +179,10 @@ export function PickerHeader<Tab extends string>({
   onQueryChange: (query: string) => void;
   filters?: ReactNode;
   filterCount?: number;
+  onClearFilters?: () => void;
   actions?: ReactNode;
 }) {
   const [filtering, setFiltering] = useState(false);
-  const open = filtering && !!filters;
   return (
     <Box className={classes.header}>
       <div className={classes.headerRow}>
@@ -201,23 +206,42 @@ export function PickerHeader<Tab extends string>({
             onChange={(event) => onQueryChange(event.currentTarget.value)}
             onClear={() => onQueryChange("")}
           />
-          {actions}
-          {chips && <div className={classes.chips}>{chips}</div>}
           {filters && (
-            <FilterButton
-              label={`Filter ${searched}`}
-              count={filterCount}
-              opened={open}
-              onClick={() => setFiltering(!open)}
-            />
+            <ChipPopup
+              title="Filters"
+              opened={filtering}
+              onOpenedChange={setFiltering}
+              width={340}
+              position="bottom-end"
+              withinPortal={false}
+              headerEnd={
+                onClearFilters && (
+                  <Button
+                    size="compact-sm"
+                    variant="subtle"
+                    disabled={!filterCount}
+                    onClick={onClearFilters}
+                  >
+                    Clear
+                  </Button>
+                )
+              }
+              target={
+                <FilterButton
+                  label={`Filter ${searched}`}
+                  count={filterCount}
+                  opened={filtering}
+                  onClick={() => setFiltering(!filtering)}
+                />
+              }
+            >
+              {filters}
+            </ChipPopup>
           )}
+          {chips && <div className={classes.chips}>{chips}</div>}
+          {actions}
         </div>
       </div>
-      {open && (
-        <div className={classes.filters} role="group" aria-label={`${searched} Filters`}>
-          {filters}
-        </div>
-      )}
     </Box>
   );
 }

@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import type { MediaItem } from "../../types";
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
+import { layerAbove } from "../../ui/popupClicks";
 import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
@@ -380,7 +381,12 @@ function RunPanel({
       radius="lg"
       p="sm"
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !event.defaultPrevented) {
+        // A tile's menu portals out but its Escape bubbles here; it closes only the menu.
+        if (
+          event.key === "Escape" &&
+          !event.defaultPrevented &&
+          !layerAbove(event.currentTarget, event)
+        ) {
           event.preventDefault();
           onClose();
         }

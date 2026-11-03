@@ -7,6 +7,7 @@ import {
   image,
   selectionAction,
   selectionMenuItem,
+  showOnly,
   stamp,
 } from "./fixtures";
 const results = (count: number) =>
@@ -513,18 +514,14 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  // The view (Grid or Runs) sits apart from the on/off filters, which share one row.
+  // The view (Grid or Runs) sits apart from Show, one choice of All, Starred or Uploads.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  const toggles = ["All Versions", "Starred", "Uploads"].map((name) =>
-    page.getByRole("button", { name, exact: true }),
-  );
-  const tops = await Promise.all(toggles.map(async (toggle) => (await toggle.boundingBox())!.y));
-  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(4);
-  await page.getByRole("button", { name: "Starred", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+  await showOnly(page, "Starred");
+  await expect(page.getByRole("radio", { name: "Starred", exact: true })).toBeChecked();
+  await showOnly(page, "Uploads");
+  await expect(page.getByRole("radio", { name: "Starred", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("switch", { name: "All Versions", exact: true })).toBeChecked();
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
@@ -620,9 +617,52 @@ test("Uploads stay out of the gallery until its Uploads filter is on", async ({ 
   await expect(tile("made")).toBeVisible();
   await expect(tile("uploaded")).toHaveCount(0);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Uploads", exact: true }).click();
+  await showOnly(page, "Uploads");
   await expect(tile("uploaded")).toBeVisible();
   await expect(tile("made")).toHaveCount(0);
+});
+
+test("Model filters list each clean name once and find it by any part", async ({ page }) => {
+  const state = await fixtures(page);
+  await page.route("**/api/gallery/filters*", (route) =>
+    route.fulfill({
+      json: {
+        models: [
+          "image.safetensors",
+          "image:test",
+          "ideogram-3-fp8.safetensors",
+          "Ideogram_3_ComfyUI.safetensors",
+          "custom:ideogram-turbo",
+        ],
+        loras: [],
+        sizes: [],
+        aspects: [],
+        chats: [],
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const models = page.getByRole("combobox", { name: "Models", exact: true });
+  await models.click();
+  // Files and ids read as the composer's names, without folder, backend or quantisation.
+  await expect(page.getByRole("option")).toHaveText([
+    "Ideogram 3",
+    "Ideogram Turbo",
+    "Image Quality",
+    "Studio Image",
+  ]);
+  await models.fill("ideo");
+  await expect(page.getByRole("option")).toHaveText(["Ideogram 3", "Ideogram Turbo"]);
+  await page.getByRole("option", { name: "Ideogram 3", exact: true }).click();
+  await models.press("Escape");
+  await page.keyboard.press("Escape");
+  const chips = page.getByRole("group", { name: "Active Filters", exact: true });
+  await expect(chips.getByRole("button", { name: /^Remove / })).toHaveText(["Ideogram 3"]);
+  // One name filters by every file it covers.
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("model"))
+    .toEqual(["ideogram-3-fp8.safetensors", "Ideogram_3_ComfyUI.safetensors"]);
 });
 
 test("Gallery filters submit repeated models together with LoRA, size, aspect and date", async ({

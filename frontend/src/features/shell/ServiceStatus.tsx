@@ -17,7 +17,7 @@ import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
-import { popupLayer } from "../../ui/popupClicks";
+import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ServiceStatus.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -47,17 +47,14 @@ export function StatusAction({ chat }: { chat: boolean }) {
   // The dropdown closes on Escape or a press outside it, but not in a menu or confirmation it opened.
   useEffect(() => {
     if (phone || !opened) return;
-    const elsewhere = (event: Event) => {
-      const layer = (event.target as Element).closest(`${popupLayer}, .mantine-Modal-root`);
-      return !layer || layer === dropdown.current;
-    };
     const away = (event: globalThis.PointerEvent) => {
       const pressed = event.target as Element;
       if (target.current?.contains(pressed) || dropdown.current?.contains(pressed)) return;
-      if (elsewhere(event)) close();
+      if (!layerAbove(dropdown.current)) close();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && elsewhere(event)) close();
+      if (event.key === "Escape" && !event.defaultPrevented && !layerAbove(dropdown.current, event))
+        close();
     };
     document.addEventListener("pointerdown", away, true);
     document.addEventListener("keydown", escape);
@@ -140,8 +137,9 @@ export function StatusAction({ chat }: { chat: boolean }) {
     <>
       <Tooltip label={tooltip}>{trigger}</Tooltip>
       <Drawer.Root
+        id="status"
         opened={opened}
-        onClose={close}
+        onClose={closeWhenTop("status", close)}
         position="left"
         size="85%"
         classNames={{ content: classes.content }}

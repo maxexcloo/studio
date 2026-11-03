@@ -15,6 +15,7 @@ import { LibraryTitle } from "./features/library/LibraryNavigation";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
+import { closeWhenTop } from "./ui/popupClicks";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { usePhone } from "./ui/usePhone";
@@ -128,12 +129,13 @@ function Workspace() {
               </div>
             </AppShell.Main>
             <Modal
+              id="workspace"
               opened={!!overlay}
-              onClose={() =>
+              onClose={closeWhenTop("workspace", () =>
                 location.state?.backgroundLocation
                   ? navigate(-1)
-                  : navigate("/images", { replace: true })
-              }
+                  : navigate("/images", { replace: true }),
+              )}
               aria-label={panel === "library" ? "Library" : "Settings"}
               title={
                 phone ? (

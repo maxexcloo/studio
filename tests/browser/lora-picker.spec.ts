@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { closeLoras, create, fixtures, pickerTab, profiles, serveProfiles } from "./fixtures";
+import {
+  closeLoras,
+  closePopup,
+  create,
+  fixtures,
+  pickerTab,
+  profiles,
+  serveProfiles,
+} from "./fixtures";
 
 test("LoRA ratings persist and order the list, tabs and search narrow the choices, and Trigger Words reach the generation", async ({
   page,
@@ -154,6 +162,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
     .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
     .getByText("Style", { exact: true })
     .click();
+  await closePopup(page, "Filters");
   await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await expect(
@@ -165,6 +174,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
+  await closePopup(page, "Filters");
   await page.getByRole("button", { name: "Other Detail", exact: true }).click();
   await expect(
     page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
@@ -204,7 +214,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   );
 });
 
-test("Recommended lists the family's LoRAs; All adds the rest, with Unclassified as a filter", async ({
+test("Recommended lists the family's LoRAs; All adds the rest, filtered by type", async ({
   page,
 }) => {
   await fixtures(page);
@@ -229,14 +239,18 @@ test("Recommended lists the family's LoRAs; All adds the rest, with Unclassified
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  await page
-    .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
-    .getByText("Unclassified", { exact: true })
-    .click();
+  const types = page.getByRole("radiogroup", { name: "LoRA Filter", exact: true });
+  await expect(types.getByText("Unclassified", { exact: true })).toHaveCount(0);
+  await types.getByText("Style", { exact: true }).click();
+  await closePopup(page, "Filters");
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await pickerTab(page, "LoRAs", "Recommended");
-  await choices.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  // Each row adds or removes its LoRA from its own action, as tapping the row does.
+  await choices.getByRole("button", { name: "Add Detail Slider", exact: true }).click();
+  await expect(
+    choices.getByRole("button", { name: "Remove Detail Slider", exact: true }),
+  ).toBeVisible();
   // Without a published default, a new LoRA starts at 1 kept within its range.
   await expect(
     page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),

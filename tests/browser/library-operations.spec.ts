@@ -360,6 +360,24 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
   await expect(page.getByText("No Imports", { exact: true })).toBeVisible();
 });
 
+test("A Reddit link in Library › Import adds the post's images to Uploads", async ({ page }) => {
+  await fixtures(page);
+  const requests: unknown[] = [];
+  await page.route("**/api/library/imports**", (route) => route.fulfill({ json: { imports: [] } }));
+  await page.route("**/api/gallery/import/reddit", (route) => {
+    requests.push(route.request().postDataJSON());
+    return route.fulfill({ json: { title: "Birds", imported: 3, failed: [] } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit URL" });
+  await link.fill("https://www.reddit.com/r/birds/comments/abc/birds/");
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await expect(page.getByText("3 images added to Uploads.", { exact: true })).toBeVisible();
+  await expect(link).toHaveValue("");
+  expect(requests).toEqual([{ url: "https://www.reddit.com/r/birds/comments/abc/birds/" }]);
+});
+
 test("Administrators retain model management when deployment imports are disabled", async ({
   page,
 }) => {

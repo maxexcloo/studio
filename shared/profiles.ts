@@ -13,3 +13,10 @@ export const sharedProfileFields: readonly string[] = Object.freeze([
   "uncensored",
   "prompting",
 ]);
+
+/** A profile name's "·" segments without its backend's, so "Krea 2 · ComfyUI · Fast" keeps "Krea 2" and "Fast". */
+export const profileNameParts = (name: string) =>
+  String(name)
+    .split("·")
+    .map((part) => part.trim())
+    .filter((part) => part && !Object.hasOwn(profileBackendLabels, part.toLowerCase()));

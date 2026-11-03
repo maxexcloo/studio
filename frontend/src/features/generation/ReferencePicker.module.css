@@ -17,8 +17,7 @@
   gap: 6px;
 }
 
-.cell,
-.upload {
+.cell {
   position: relative;
   display: grid;
   place-items: center;
@@ -53,8 +52,7 @@
   box-shadow: 0 0 0 1px var(--mantine-primary-color-filled);
 }
 
-.cell:focus-visible,
-.upload:focus-visible {
+.cell:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 2px;
 }
@@ -71,19 +69,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Upload sits first among the choices, in the normal text colour. */
-.upload {
-  width: 100%;
-  aspect-ratio: 1;
-  border-style: dashed;
-  background: transparent;
-}
-
-.upload:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 @media (max-width: 48em) {

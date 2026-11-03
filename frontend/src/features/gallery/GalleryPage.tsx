@@ -6,6 +6,7 @@ import {
   Loader,
   SegmentedControl,
   Stack,
+  Switch,
   Text,
   Tooltip,
   VisuallyHidden,
@@ -32,12 +33,7 @@ import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
-import {
-  appendGalleryFilters,
-  emptyGalleryFilters,
-  FilterToggle,
-  galleryFacetsQuery,
-} from "./GalleryFilters";
+import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
@@ -265,11 +261,10 @@ export function GalleryPage() {
           }
           toggles={
             view === "grid" && (
-              <FilterToggle
-                label="All"
-                name="All Versions"
-                on={allVersions}
-                onChange={setAllVersions}
+              <Switch
+                label="All Versions"
+                checked={allVersions}
+                onChange={(event) => setAllVersions(event.currentTarget.checked)}
               />
             )
           }

@@ -29,7 +29,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import type { Account } from "../../types";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
-import { isCloudProfile } from "../generation/payload";
+import { isCloudProfile, profileName } from "../generation/payload";
 import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
 
 const featureLabels = {
@@ -115,10 +115,7 @@ function GroupEditor({
             searchable
             data={ids.map((id) => ({
               value: id,
-              label:
-                profiles.find((profile) => profile.id === id)?.displayName ||
-                profiles.find((profile) => profile.id === id)?.label ||
-                id,
+              label: profileName(profiles.find((profile) => profile.id === id) || { label: id }),
             }))}
             {...form.getInputProps("generationProfiles")}
           />

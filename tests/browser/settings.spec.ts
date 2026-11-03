@@ -179,6 +179,10 @@ test("Unfinished Items in Settings › Generation retry and delete any account's
     ["retry", { ownerId: "member", id: "stuck" }],
     ["delete", { ownerId: "admin", id: "slow" }],
   ]);
+  // Escape closes only the topmost dialog, leaving Settings open under it.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
 });
 
 test("Tile Captions in Settings › Preferences pin phone tile captions", async ({

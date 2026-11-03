@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, showUploads, stamp, viewerAction } from "./fixtures";
+import { create, fixtures, image, showOnly, showUploads, stamp, viewerAction } from "./fixtures";
 
 // A one-second clip; WebKit's test builds may not decode it, which only the viewer's player needs.
 const clip = execFileSync(createRequire(import.meta.url)("ffmpeg-static"), [
@@ -65,7 +65,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   });
   await page.goto("/video");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Uploads", exact: true }).click();
+  await showOnly(page, "Uploads");
   await page.keyboard.press("Escape");
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Recreate has the one option, its suggested prompt, so it runs at once.

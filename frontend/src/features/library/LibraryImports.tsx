@@ -34,6 +34,18 @@ const stateLabels: Record<string, string> = {
   ready: "Ready",
   resolving: "Resolving",
 };
+interface RedditImport {
+  title: string;
+  imported: number;
+  failed: { image: number; error: string }[];
+}
+const isRedditLink = (url: string) => {
+  try {
+    return /(^|\.)(reddit\.com|redd\.it|reddit\.excloo\.com)$/.test(new URL(url.trim()).hostname);
+  } catch {
+    return false;
+  }
+};
 const stateLabel = (state: string) =>
   stateLabels[state] ||
   state.replace(/(^|-)([a-z])/g, (_, gap, letter) => `${gap ? " " : ""}${letter.toUpperCase()}`);
@@ -73,6 +85,17 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
       opened(result);
     },
   });
+  // A Reddit post's images become the account's uploads (backend/gallery/reddit.js), not an import.
+  const reddit = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () => post<RedditImport>("/api/gallery/import/reddit", { url: url.trim() }),
+    onSuccess: () => {
+      setUrl("");
+      void client.invalidateQueries({ queryKey: ["gallery"] });
+      void client.invalidateQueries({ queryKey: ["reference-gallery"] });
+    },
+  });
+  const redditLink = isRedditLink(url);
   const uploading = useMutation({
     meta: { inlineError: true },
     mutationFn: async (file: File) => {
@@ -123,19 +146,22 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
     record.title || record.name || record.image?.name || record.input?.url || record.id;
   const rows =
     view === "attention" ? records.filter((record) => record.state === "needs-files") : records;
-  const failed = importing.error || uploading.error;
+  const failed = importing.error || uploading.error || reddit.error;
+  const added = reddit.data;
   return (
     <Stack gap="md">
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          importing.mutate();
+          reddit.reset();
+          if (redditLink) reddit.mutate();
+          else importing.mutate();
         }}
       >
         <Group gap="xs" wrap="nowrap" align="start">
           <TextInput
-            aria-label="Civitai or Hugging Face URL"
-            placeholder="Civitai or Hugging Face link"
+            aria-label="Civitai, Hugging Face or Reddit URL"
+            placeholder="Civitai, Hugging Face or Reddit link"
             value={url}
             onChange={(event) => setUrl(event.currentTarget.value)}
             required
@@ -143,7 +169,7 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
             flex={1}
             miw={0}
           />
-          <Button type="submit" loading={importing.isPending}>
+          <Button type="submit" loading={importing.isPending || reddit.isPending}>
             Import
           </Button>
           <FileButton
@@ -167,6 +193,14 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
         </Group>
       </form>
       {failed && <Alert color="red">{failed.message}</Alert>}
+      {added && (
+        <Text size="sm" c={added.failed.length ? "red" : "dimmed"}>
+          {added.imported} {added.imported === 1 ? "image" : "images"} added to Uploads
+          {added.failed.length > 0 &&
+            `; ${added.failed.length} couldn’t be saved: ${added.failed.map((entry) => entry.error).join(" ")}`}
+          .
+        </Text>
+      )}
       {records.length > 0 && (
         <SectionToolbar
           label="Imports"

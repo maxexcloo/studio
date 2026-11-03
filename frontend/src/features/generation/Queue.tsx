@@ -37,7 +37,7 @@ import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useGenerationActions } from "./GenerationProvider";
-import { isProfile } from "./payload";
+import { isProfile, profileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
 import { terminalStatuses, type QueueMove, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
@@ -213,12 +213,7 @@ function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; las
           {String(job.input?.prompt || "Generation")}
         </Text>
         <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
-          {[
-            profile?.displayName || profile?.label,
-            statusLabels[job.status],
-            progress?.phase,
-            job.reason,
-          ]
+          {[profile && profileName(profile), statusLabels[job.status], progress?.phase, job.reason]
             .filter(Boolean)
             .join(" · ")}
         </Text>
