@@ -149,7 +149,7 @@ import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
 import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
-import { lorasEnabled, presetsEnabled } from "./features.js";
+import { presetsEnabled } from "./features.js";
 import {
   catalogueFlags,
   describeFlag,
@@ -1122,11 +1122,11 @@ const library = registerLibraryRoutes(app, {
   catalogue: loraCatalogue,
   draftProfile: (record, options) => draftCheckpointProfile(record, options),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  loraInfo: (names) => (lorasEnabled ? loraInfos(names) : Promise.resolve({})),
+  loraInfo: (names) => loraInfos(names),
   installed: async () => {
     const { info } = await loadComfyContext();
     return {
-      loras: lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [],
+      loras: optionsFor(info, "LoraLoader", "lora_name"),
       checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
       diffusion_models: unique(
         optionsFor(info, "UNETLoader", "unet_name"),
@@ -1323,7 +1323,7 @@ const assistantProfiles = async (req) => {
   }
 };
 const assistantLoras = async (req) => {
-  if (!accountMayUseLoras(req) || !lorasEnabled) return [];
+  if (!accountMayUseLoras(req)) return [];
   try {
     const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
     const infos = await loraInfos(names);
@@ -1411,7 +1411,7 @@ app.delete("/api/loras", (req, res) => {
 app.get("/api/loras/library", (req, res) => {
   if (!accountMayUseLoras(req))
     return res.json({ found: false, library: { strengths: {}, snapshots: {} } });
-  const library = lorasEnabled ? loadLoraLibrary(ownerIdForRequest(req)) : null;
+  const library = loadLoraLibrary(ownerIdForRequest(req));
   res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
 });
 
@@ -1439,7 +1439,6 @@ app.post("/api/loras/library/ops", (req, res) => {
 // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
 app.get("/api/loras/info", async (_req, res) => {
   if (!accountMayUseLoras(_req)) return res.json({ ok: true, loras: {} });
-  if (!lorasEnabled) return res.json({ ok: true, loras: {} });
   try {
     const { info } = await loadComfyContext();
     res.json({ ok: true, loras: await loraInfos(optionsFor(info, "LoraLoader", "lora_name")) });
@@ -1450,7 +1449,7 @@ app.get("/api/loras/info", async (_req, res) => {
 
 app.get("/api/loras/:workflowId", (req, res) => {
   if (!accountMayUseLoras(req)) return res.json({ found: false, loras: [] });
-  const loras = lorasEnabled ? loadLoraStack(req.params.workflowId, ownerIdForRequest(req)) : null;
+  const loras = loadLoraStack(req.params.workflowId, ownerIdForRequest(req));
   res.json({ found: loras !== null, loras: loras || [] });
 });
 
@@ -1670,13 +1669,12 @@ app.post("/api/settings/deployment", (req, res) => {
     if (isCatalogueFlag(key)) {
       if (typeof value !== "boolean") throw new Error("Choose on or off.");
       const item = catalogueFlags.find((entry) => entry.key === key);
-      // Back to the default is no line at all, so a later default change still applies.
+      // Back to the default is no saved value at all, so a later default change still applies.
       res.json({
         ok: true,
         setting: {
           ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"),
           key,
-          applies: item.applies,
         },
       });
       return;
@@ -1687,7 +1685,6 @@ app.post("/api/settings/deployment", (req, res) => {
         setting: {
           ...saveDeploymentSetting(key, assistantSettingValue(key, value)),
           key,
-          applies: "now",
         },
       });
       return;
@@ -1695,7 +1692,7 @@ app.post("/api/settings/deployment", (req, res) => {
     if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
       const id = String(value || "").trim();
       if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
-      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key, applies: "now" } });
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
       return;
     }
     res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
@@ -2194,7 +2191,7 @@ const dream = createDream({
   },
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return null;
+    if (account && !mayUseFeature(account, "loras")) return null;
     return loadLoraLibrary(ownerId);
   },
   // As submit validation (validation.js) would judge them: another family's LoRA is dropped.

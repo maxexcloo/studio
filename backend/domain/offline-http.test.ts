@@ -142,7 +142,6 @@ test(
           STUDIO_DATA_DIR: dataDir,
           STUDIO_DEMO: "0",
           STUDIO_MULTI_USER: "1",
-          STUDIO_ENABLE_GROK: "0",
           STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
           STUDIO_CLIPROXYAPI_URL: "",
           STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),

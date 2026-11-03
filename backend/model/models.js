@@ -9,7 +9,7 @@ import {
 import { classifyModel } from "./families.js";
 import { families } from "../family-catalog.js";
 import { canonicalProfileId } from "../profile/store.js";
-import { inpaintingEnabled, lorasEnabled, presetsEnabled } from "../features.js";
+import { presetsEnabled } from "../features.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 
 function modelBasename(name = "") {
@@ -260,7 +260,7 @@ export function inferModels(
   const samplers = optionsFor(info, "KSampler", "sampler_name");
   const schedulers = optionsFor(info, "KSampler", "scheduler");
   const weightDtypes = optionsFor(info, "UNETLoader", "weight_dtype");
-  const loras = lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [];
+  const loras = optionsFor(info, "LoraLoader", "lora_name");
   const textMeta = textRange(info, "CLIPTextEncode", "text");
   const samplerRange = {
     steps: nodeRange(info, "KSampler", "steps", { default: 20, min: 1, max: 10000, step: 1 }),
@@ -449,7 +449,6 @@ export function inferModels(
           // A mask needs an image the graph takes in, a saved image to stitch into and the stitch's
           // core nodes (checked once a worker answers).
           inpaint:
-            inpaintingEnabled &&
             workflow.kind === "image" &&
             workflow.capabilities.inpaint !== false &&
             Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
@@ -474,11 +473,6 @@ export function inferModels(
       });
   }
 
-  if (!lorasEnabled)
-    for (const profile of profiles) {
-      profile.capabilities.lora = false;
-      if (profile.options.loras) profile.options.loras = [];
-    }
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");
   const videoProfiles = profiles.filter((profile) => profile.kind === "video");
   // A ready model is the better first pick than one still waiting on files.
@@ -495,7 +489,7 @@ export function inferModels(
     videoModels: videoProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     profiles,
     // Release switches the studio needs to know about (features.js).
-    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
+    features: { presets: presetsEnabled() },
     textEncoders: clips,
     vaes,
     clipTypes,
@@ -550,7 +544,7 @@ export function mockModelResult() {
         startImage: true,
         startImageRequired: false,
         denoise: true,
-        inpaint: inpaintingEnabled,
+        inpaint: true,
       },
     }),
     buildProfile({
@@ -629,7 +623,7 @@ export function mockModelResult() {
 
   return {
     isMock: true,
-    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
+    features: { presets: presetsEnabled() },
     imageModels: imageProfiles.map((p) => ({ label: p.label, value: p.id })),
     videoModels: videoProfiles.map((p) => ({ label: p.label, value: p.id })),
     profiles: [...imageProfiles, ...videoProfiles],
@@ -655,7 +649,7 @@ export function mockModelResult() {
 
 function emptyModelResult(extra = {}) {
   return {
-    features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
+    features: { presets: presetsEnabled() },
     imageModels: [],
     videoModels: [],
     profiles: [],
