@@ -607,3 +607,27 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   await call(routes["POST /api/accounts/gateway-admin"], { ...admin, body: { on: false } });
   assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")), null);
 });
+
+test("behind the proxy, one client's wrong passwords lock out only that client", async () => {
+  const via = (client, password) => ({
+    socket: { remoteAddress: "10.42.0.7" },
+    headers: {
+      host: "studio.example.test",
+      "x-forwarded-for": "10.42.0.9",
+      "cf-connecting-ip": client,
+    },
+    body: { username: "recovery", password },
+  });
+  for (let index = 0; index < 5; index += 1)
+    await call(routes["POST /api/accounts/sign-in"], via("198.51.100.1", "not the password"));
+  const locked = await call(
+    routes["POST /api/accounts/sign-in"],
+    via("198.51.100.1", "a secure recovery password"),
+  );
+  assert.equal(locked.statusCode, 429);
+  const other = await call(
+    routes["POST /api/accounts/sign-in"],
+    via("198.51.100.2", "a secure recovery password"),
+  );
+  assert.equal(other.statusCode, 200, other.body.error);
+});
