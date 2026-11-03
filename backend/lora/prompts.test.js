@@ -24,6 +24,7 @@ test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, 
     said: { triggers: ["Dusk"] },
     off: { triggers: ["offword"] },
     disabled: { triggers: ["unused"] },
+    chosen: { triggers: ["mist", "rain", "snow"] },
   };
   const stack = [
     { name: "second" },
@@ -31,14 +32,16 @@ test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, 
     { name: "said" },
     { name: "off", triggers: false },
     { name: "disabled", enabled: false },
+    // Only the words switched on, in the catalogue's order.
+    { name: "chosen", triggers: ["Snow", "mist"] },
   ];
   assert.equal(
     withLoraTriggers("A harbour at dusk.", stack, infos),
-    "glowfx, OHWX, A harbour at dusk.",
+    "glowfx, OHWX, mist, snow, A harbour at dusk.",
   );
   assert.equal(
     withLoraTriggers("ohwx, a harbour at dusk", stack, infos),
-    "glowfx, ohwx, a harbour at dusk",
+    "glowfx, mist, snow, ohwx, a harbour at dusk",
   );
   assert.equal(withLoraTriggers("A harbour", [], infos), "A harbour");
 });
