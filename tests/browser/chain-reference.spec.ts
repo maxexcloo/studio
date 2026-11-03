@@ -112,7 +112,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .getByRole("menuitem", { name: "Move Earlier", exact: true })
     .click();
   // Uploads off again: the gallery's generations.
-  await picker.getByRole("button", { name: "Uploads", exact: true }).click();
+  await picker.getByRole("button", { name: "Remove Uploads Filter", exact: true }).click();
   for (const label of ["Reference 11 · Start", "Reference 12 · End"]) {
     await cells.getByRole("button", { name: label, exact: true }).click();
     await page

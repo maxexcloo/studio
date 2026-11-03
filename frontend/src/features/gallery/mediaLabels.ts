@@ -1,6 +1,6 @@
 import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
-import { isProfile } from "../generation/payload";
+import { isProfile, shownProfileName } from "../generation/payload";
 
 /**
  * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the text
@@ -29,7 +29,9 @@ export function mediaDetail(item: MediaItem, profiles: Profile[]) {
       ? (sameDay(created, new Date()) ? timeOnly : dayAndTime).format(created)
       : "";
   const profile = profiles.find((entry) => isProfile(entry, settings.profileId));
-  const name = String(settings.profileName || profile?.displayName || profile?.label || "");
+  const name = shownProfileName(
+    String(settings.profileName || profile?.displayName || profile?.label || ""),
+  );
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;
   const duration = item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "";

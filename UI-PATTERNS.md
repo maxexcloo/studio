@@ -128,12 +128,21 @@ primary component reference and verify APIs against the installed version.
   Save. Consequential actions sit in a red Danger Zone group, last in their
   section, or a row menu, and always confirm with `ConfirmDialog`. Preferences
   follow the account, never the device.
-- A click outside an open popover, menu or dropdown only closes it; nothing
-  beneath reacts until no popup is open. `ui/popupClicks.ts` owns this for every
-  Mantine dropdown (marked `data-popup` by the theme); outside-click handlers
-  check `closingPopup()` and match popup layers with `popupLayer`. A trigger's
+- A click outside or Escape closes only the topmost open layer (popover, menu,
+  dropdown, dialog, drawer or sheet); nothing beneath reacts until it has gone.
+  `ui/popupClicks.ts` owns this: a click outside a Mantine dropdown (marked
+  `data-popup` by the theme) only closes it; custom outside-click and Escape
+  handlers (the composer, Status, runs, selection, Dream keys, gallery search)
+  step aside while `layerAbove(owner)` finds a layer stacked over them; and a
+  Modal or Drawer that other dialogs open over takes `closeWhenTop`, since
+  Mantine otherwise closes every open dialog on Escape. A trigger's
   Tooltip wraps `Popover.Target`/`Menu.Target`, so the trigger itself carries
   `aria-expanded` and pressing it still toggles the popup.
+- Choose the control by how many options can hold at once: one of several is a
+  SegmentedControl (or a radio `Chip.Group` for a long list, as the LoRA type
+  filter), where exactly one is chosen and an "All" or "Any" option is a choice,
+  never something switched off; one on/off setting is a Switch; options that
+  combine are toggle chips (Size, Aspect Ratio) or a MultiSelect.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
   parent controls and keyboard focus.
@@ -154,7 +163,8 @@ primary component reference and verify APIs against the installed version.
   Role (once references are placed: Edit and Reference as pressed chips, then
   Paint Mask where the profile inpaints, in one group), LoRAs, Aspect, Count, a
   video's Length, a set Seed (clearable), Backend (when the profile has several),
-  Expert settings, Compare and Presets, then Image/Video and Generate. Placing the first reference applies the
+  Expert settings (its fields alphabetical, Allow Fallback under Worker), Compare
+  and Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
@@ -163,9 +173,13 @@ primary component reference and verify APIs against the installed version.
   (picking the reference for a profile that takes one closes References).
   Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
   popover never opens a second level on phones. References, LoRAs and Presets share one picker
-  (`Picker.tsx`): tabs, then search, active filter chips and Filter ▾ in one
-  row at the gallery toolbar's compact size; a
-  selected tile fades with a check and a second click removes it; saved stacks
+  (`Picker.tsx`): tabs, then search, Filter ▾, active filter chips and the
+  picker's actions (Sort; References' Upload) in one row at the gallery
+  toolbar's compact size, Filter ▾ opening the filters in a popup titled Filters
+  with Clear, as the gallery's does (a nested popover on desktop); a
+  selected tile fades with a check and a second click removes it (References
+  are a grid of pictures; LoRAs a list on every breakpoint, each row a small
+  thumbnail, the name, its family and type, then Add or Remove and the thumbs); saved stacks
   and presets sort (`SortMenu`, as the LoRA choices do), rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
@@ -227,11 +241,12 @@ primary component reference and verify APIs against the installed version.
   names such as Flux 2. Each option is a complete profile, titled with its name and
   its description beneath; preserve exact profile IDs. A combined profile's backend
   (ComfyUI, Radiance) shows only on the composer's Backend chip, where it is switched,
-  never in profile lists. The LoRA picker's tabs choose which LoRAs it lists,
+  never in profile lists; a single-backend profile's name drops its "· ComfyUI" or
+  "· Radiance" segment wherever it shows. The LoRA picker's tabs choose which LoRAs it lists,
   narrowest first: Recommended (the default: LoRAs for the profile's family),
   Favourites (this family's thumbs up) and All (every LoRA the profile can load,
-  so another family's copy of a series never shows, with Unclassified, those
-  without a family, as a filter); type filters follow the catalogue Type.
+  so another family's copy of a series never shows); type filters follow the
+  catalogue Type.
   Saved Stacks are not a tab: they list under the current Stack, which they replace.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
@@ -240,8 +255,9 @@ primary component reference and verify APIs against the installed version.
   Settings lists sort by their `DataTable` headers, and the reference picker
   keeps the gallery's order.
 - References pick from the gallery. Uploads are the uploader's gallery images
-  and videos (a video is placed by its first frame), hidden until the gallery's Uploads filter is on (the picker's too, where the
-  Upload tile sits). Gallery drag-and-drop passes an
+  and videos (a video is placed by its first frame), hidden until the gallery's Uploads filter is on (the picker's too). The
+  picker's Upload stays in its toolbar and places the files in the next slot.
+  Gallery drag-and-drop passes an
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.
   Explicit slot IDs survive reordering; optional End-only inputs and one asset
@@ -351,17 +367,20 @@ primary component reference and verify APIs against the installed version.
   only, so other accounts and the queue tiers keep their order.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
-- Image lists share one toolbar row (`GalleryFilters.tsx`): search, the active
-  filters as removable chips with Clear All (scrolling sideways, so the row never
-  changes height), then on desktop the result count and the zoom slider, Filter ▾,
-  Upload ▾ (Upload Files…, Upload Folder…, Import from Reddit…; files and
-  folders dropped on the gallery upload too) and Select. Phones expand the search from an icon into a full-width focused
+- Image lists share one toolbar row (`GalleryFilters.tsx`): search, Filter ▾
+  right of it, the active filters as removable chips with Clear All (scrolling
+  sideways, so the row never changes height), then on desktop the result count
+  and the zoom slider, and at the end Upload ▾ (Upload Files… and Upload Folder…; files and folders dropped on the
+  gallery upload too) with Select right of it. A Reddit post's images import from Library ›
+  Import's link field, which then says how many it added to Uploads. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
-  a segmented control on its own row; Show, one row of on/off chips (All Versions
-  in Grid, Starred, Uploads), outlined when off and tinted with a check when on;
-  then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. The reference picker uses the same chips, Filter ▾
-  and panel, inline. Search narrows within the filters; filter actions preserve
+  a segmented control on its own row; Show, a segmented control of All, Starred
+  and Uploads (one at a time); in Grid, the All Versions switch; then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. Models and LoRAs list
+  the composer's names once each, without file names, backend or quantisation, and
+  typing any part of a name finds it; a name filters by every recorded value it
+  covers. The reference picker uses the same chips, Filter ▾
+  and panel in the same popup. Search narrows within the filters; filter actions preserve
   the query. Gallery filters and zoom are remembered per account. Every labelled
   control that opens a menu or picker shows ▾; icon-only bar controls do not.
 - Grid and Runs zoom between column counts (1–4 on phones, 2–8 wider) by
@@ -403,8 +422,9 @@ primary component reference and verify APIs against the installed version.
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
-  prompts and the caption sit on the same subtle surface aligned with the
-  column and scroll within a bounded height, the caption starting expanded
+  prompts and the caption sit in boxes framed like the composer's text box,
+  inside the column (never bleeding past its edges), wrapping long words and
+  scrolling within a bounded height, the caption starting expanded
   until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
   sections run Prompt, Caption, From, Derived, Model, LoRAs, References,
   Settings, Output and Timing, each a heading over its content, and an
@@ -422,7 +442,7 @@ primary component reference and verify APIs against the installed version.
   the result (`currentMedia`).
 - Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
-  generation by default (the All Versions filter chip, on). Turning it off
+  generation by default (the All Versions switch, on). Turning it off
   collapses a result and its versions (runs made from it: Edit, Recreate, Run Again
   and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it

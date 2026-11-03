@@ -2,13 +2,12 @@ import { useRef, useState } from "react";
 import { Button, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FolderUp, Link, Upload } from "lucide-react";
+import { ChevronDown, FolderUp, Upload } from "lucide-react";
 import { api } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
 import { ActionMenuItems, menuWidth } from "./ActionBar";
-import { RedditImportDialog } from "./RedditImportDialog";
 
 const listedFailures = 5;
 
@@ -113,18 +112,17 @@ export function useGalleryUpload(onUploaded: () => void) {
     void client.invalidateQueries({ queryKey: ["reference-gallery"] });
     onUploaded();
   }
-  return { upload, uploading, uploaded: onUploaded };
+  return { upload, uploading };
 }
 
 /**
- * The gallery toolbar's Upload ▾: many files or a whole folder, or a Reddit post's images, saved as
- * the account's own uploads.
+ * The gallery toolbar's Upload ▾: many files or a whole folder, saved as the account's own uploads.
+ * Library › Import takes a Reddit post's images.
  */
 export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGalleryUpload> }) {
   const phone = usePhone();
   const filesInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
-  const [reddit, setReddit] = useState(false);
   const take = (input: HTMLInputElement) => {
     const files = [...(input.files || [])];
     // Choosing the same files again still fires a change.
@@ -163,12 +161,6 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
                   icon: FolderUp,
                   onClick: () => folderInput.current?.click(),
                 },
-                {
-                  id: "import-reddit",
-                  label: "Import from Reddit…",
-                  icon: Link,
-                  onClick: () => setReddit(true),
-                },
               ],
             ]}
           />
@@ -190,11 +182,6 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
         aria-label="Upload Folder"
         {...{ webkitdirectory: "" }}
         onChange={(event) => take(event.currentTarget)}
-      />
-      <RedditImportDialog
-        opened={reddit}
-        onClose={() => setReddit(false)}
-        onImported={upload.uploaded}
       />
     </>
   );

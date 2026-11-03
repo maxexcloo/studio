@@ -23,7 +23,7 @@ import {
   type PairAnswer,
 } from "./queries";
 import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
-import { popupLayer } from "../../ui/popupClicks";
+import { layerAbove } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
 type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine" | "more";
@@ -53,7 +53,6 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-const layers = `[role="dialog"], [role="alertdialog"], ${popupLayer}`;
 // Calibration joins in once Dream has fewer unseen results than this.
 const few = 6;
 
@@ -323,12 +322,7 @@ export function DreamDeck({
         return;
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, select, [contenteditable='true']")) return;
-      if (
-        [...document.querySelectorAll<HTMLElement>(layers)].some(
-          (layer) => layer.getClientRects().length,
-        )
-      )
-        return;
+      if (layerAbove(null, event)) return;
       const choice = keyRef.current(direction);
       if (!choice) return;
       event.preventDefault();

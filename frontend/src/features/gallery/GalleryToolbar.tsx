@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Group, Slider, Text, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { Search, SquareMinus, SquarePlus } from "lucide-react";
+import { layerAbove } from "../../ui/popupClicks";
 import { SearchInput } from "../../ui/SearchInput";
 import { usePhone } from "../../ui/usePhone";
 import type { MediaKind } from "../../types";
@@ -19,8 +20,8 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, the active filters as removable chips, the result count,
- * the zoom slider (desktop; phones pinch), Filter ▾ and `actions`. Phones open the search from its
+ * The gallery's one toolbar row: search, Filter ▾, the active filters as removable chips, the result
+ * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones open the search from its
  * icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
 export function GalleryToolbar({
@@ -68,15 +69,14 @@ export function GalleryToolbar({
     if (searching) searchInput.current?.focus();
   }, [searching]);
   function openSearch(event: KeyboardEvent) {
-    if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || !toolbar.current)
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.keyCode === 229 ||
+      !toolbar.current ||
+      layerAbove(toolbar.current, event)
+    )
       return;
-    const selector =
-      '[role="dialog"], [role="alertdialog"], .mantine-Popover-dropdown, .mantine-Combobox-dropdown';
-    const owner = toolbar.current.closest(selector);
-    const layers = [...document.querySelectorAll<HTMLElement>(selector)].filter(
-      (layer) => layer.getClientRects().length && !layer.closest("[inert]"),
-    );
-    if (owner ? !owner.contains(event.target as Node) : layers.length) return;
     event.preventDefault();
     if (phone && !searching) setSearching(true);
     else requestAnimationFrame(() => searchInput.current?.focus());
@@ -139,19 +139,12 @@ export function GalleryToolbar({
       ) : (
         search
       )}
-      <FilterChips chips={chips} onClear={clear} />
-      {results && !phone && (
-        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-          {results}
-        </Text>
-      )}
-      {!phone && <ZoomSlider />}
       <ChipPopup
         title="Filters"
         opened={filtering}
         onOpenedChange={setFiltering}
         width={340}
-        position="bottom-end"
+        position="bottom-start"
         headerEnd={
           <>
             {phone && results && (
@@ -181,6 +174,13 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
+      <FilterChips chips={chips} onClear={clear} />
+      {results && !phone && (
+        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+          {results}
+        </Text>
+      )}
+      {!phone && <ZoomSlider />}
       {actions}
     </Group>
   );
