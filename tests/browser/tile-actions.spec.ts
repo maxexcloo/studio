@@ -94,6 +94,8 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
+  // Off the menu, so no submenu opens under the pointer.
+  await page.mouse.move(0, 0);
   // The viewer's sections and order, plus Compare: Animate, Edit, Recreate, Upscale | Compare,
   // Continue in Chat | Copy, Download | Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
