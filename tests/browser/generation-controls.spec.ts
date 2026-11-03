@@ -684,8 +684,14 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   await expect(prompt).toHaveValue("Keep this direction");
   await prompt.fill("Keep this direction, in soft daylight");
   await prompt.press("Escape");
-  if (testInfo.project.use.isMobile)
-    await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
+  if (testInfo.project.use.isMobile) {
+    // Escape closes only the topmost layer: the prompt editor lands in Generate, and a second closes it.
+    const generate = page.getByRole("dialog", { name: "Generate", exact: true });
+    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeHidden();
+    await expect(generate).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(generate).toBeHidden();
+  }
   const controls = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(controls).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(

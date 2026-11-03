@@ -27,6 +27,7 @@ import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
@@ -599,8 +600,9 @@ export function MediaViewer({
         </div>
         {phone && (
           <Drawer
+            id="details-sheet"
             opened={sheet}
-            onClose={() => setSheet(false)}
+            onClose={closeWhenTop("details-sheet", () => setSheet(false))}
             position="bottom"
             size="80%"
             radius="lg"

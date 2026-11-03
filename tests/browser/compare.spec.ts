@@ -9,7 +9,7 @@ const compareBy = (dialog: Locator, label: string) =>
 
 test("Compare from the composer queues one seeded variant per chosen local profile and starring the winner loads it", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   // Another family that ignores negatives, and a cloud profile Compare leaves out.
   await serveProfiles(page, [
@@ -26,6 +26,14 @@ test("Compare from the composer queues one seeded variant per chosen local profi
   ]);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
+  if (testInfo.project.name === "desktop") {
+    // A click outside Compare closes only Compare; the composer under it stays open.
+    await page.getByRole("button", { name: "Compare", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Compare", exact: true })).toBeVisible();
+    await page.mouse.click(20, 500);
+    await expect(page.getByRole("dialog", { name: "Compare", exact: true })).toBeHidden();
+    await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();
+  }
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page
     .getByRole("list", { name: "LoRA Choices", exact: true })

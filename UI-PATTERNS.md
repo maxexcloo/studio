@@ -128,10 +128,14 @@ primary component reference and verify APIs against the installed version.
   Save. Consequential actions sit in a red Danger Zone group, last in their
   section, or a row menu, and always confirm with `ConfirmDialog`. Preferences
   follow the account, never the device.
-- A click outside an open popover, menu or dropdown only closes it; nothing
-  beneath reacts until no popup is open. `ui/popupClicks.ts` owns this for every
-  Mantine dropdown (marked `data-popup` by the theme); outside-click handlers
-  check `closingPopup()` and match popup layers with `popupLayer`. A trigger's
+- A click outside or Escape closes only the topmost open layer (popover, menu,
+  dropdown, dialog, drawer or sheet); nothing beneath reacts until it has gone.
+  `ui/popupClicks.ts` owns this: a click outside a Mantine dropdown (marked
+  `data-popup` by the theme) only closes it; custom outside-click and Escape
+  handlers (the composer, Status, runs, selection, Dream keys, gallery search)
+  step aside while `layerAbove(owner)` finds a layer stacked over them; and a
+  Modal or Drawer that other dialogs open over takes `closeWhenTop`, since
+  Mantine otherwise closes every open dialog on Escape. A trigger's
   Tooltip wraps `Popover.Target`/`Menu.Target`, so the trigger itself carries
   `aria-expanded` and pressing it still toggles the popup.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover

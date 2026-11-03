@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { failure } from "../../api";
+import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { ActionBarGroups, ActionMenuItems, menuWidth, type Action } from "./ActionBar";
@@ -185,13 +186,11 @@ export function GallerySelectionBar({
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
+      // Typing belongs to the field, and Escape to a layer stacked over the gallery.
       if (
         event.defaultPrevented ||
-        document.querySelector('[role="dialog"]') ||
-        // Typing, and Escape closing a menu or popover, belong to those controls.
-        target.closest(
-          "input, textarea, [contenteditable], [role='menu'], .mantine-Popover-dropdown",
-        )
+        layerAbove(null, event) ||
+        target.closest("input, textarea, [contenteditable]")
       )
         return;
       if (event.key === "Escape") selection.end();
