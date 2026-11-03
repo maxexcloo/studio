@@ -55,14 +55,11 @@ const pastTense: Record<string, string> = {
   Extend: "Extended",
   Recreate: "Recreated",
 };
-/** A card request's quiet line; older records sent the whole prompt, so derive theirs. */
-function quietLine(message: ChatMessage, jobIndex: Map<string, number>) {
+/** A card request's quiet line: its request ("Edit iteration 2", "Animate this result") done. */
+function quietLine(message: ChatMessage) {
   if (message.role !== "user" || !message.revision) return undefined;
   const [verb, ...rest] = message.content.split(" ");
-  if (pastTense[verb] && /^iteration \d+$/.test(rest.join(" ")))
-    return `${pastTense[verb]} ${rest.join(" ")}`;
-  const source = jobIndex.get(message.revision.sourceJobId);
-  return source === undefined ? "Edited an iteration" : `Edited iteration ${source + 1}`;
+  return [pastTense[verb] || verb, ...rest].join(" ");
 }
 
 /** What a staged card does to its source, as its heading and the request it records. */
@@ -214,7 +211,7 @@ function SessionPage() {
                 <Fragment key={entry.key}>
                   <ChatTurn
                     message={entry.message}
-                    quiet={quietLine(entry.message, jobIndex)}
+                    quiet={quietLine(entry.message)}
                     source={
                       entry.message.draft?.parentJobId &&
                       jobIndex.has(entry.message.draft.parentJobId)

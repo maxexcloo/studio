@@ -2,8 +2,8 @@ import type { DatabaseSync } from "node:sqlite";
 
 /**
  * Gallery records as one `studio_gallery` row each, keyed by `galleryKey`, so a save writes only
- * the items that changed. The `gallery-rows-v1` step of migrate-runtime creates the table and moves
- * the `gallery` document into it; until then the document stays authoritative.
+ * the items that changed. The `gallery-rows-v1` step of migrate-runtime moved the older `gallery`
+ * document into it.
  */
 export const galleryRowsMigration = "gallery-rows-v1";
 
@@ -14,7 +14,7 @@ export function galleryKey(item: GalleryItem | null | undefined): string {
 }
 
 export const createGalleryTable =
-  "CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL)";
+  "CREATE TABLE IF NOT EXISTS studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL)";
 
 export function readGalleryRows(db: DatabaseSync): unknown[] {
   return (db.prepare("SELECT value FROM studio_gallery").all() as { value: string }[]).map((row) =>

@@ -5,11 +5,28 @@ import path from "node:path";
 import test from "node:test";
 import { migrateRuntime, restoreRuntimeBackup } from "./migration.ts";
 import {
+  assertCurrentStorage,
   closeRuntimeDatabase,
+  databaseFile,
+  hasMigration,
   readRuntimeDocument,
-  usesRuntimeDatabase,
+  runtimeDatabase,
   writeRuntimeDocument,
 } from "./runtime.ts";
+
+test("a new data folder starts with every table, the gallery's included", (t) => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-new-folder-"));
+  t.after(() => {
+    closeRuntimeDatabase(data);
+    fs.rmSync(data, { recursive: true, force: true });
+  });
+  assertCurrentStorage(data);
+  const tables = runtimeDatabase(data)
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")
+    .all()
+    .map((row) => row.name);
+  assert.deepEqual(tables, ["studio_documents", "studio_gallery", "studio_migrations"]);
+});
 
 test("migration dry run, verified backup, SQLite authority and restoration preserve identities and result links", (t) => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-migration-"));
@@ -41,7 +58,7 @@ test("migration dry run, verified backup, SQLite authority and restoration prese
   assert.equal(fs.existsSync(path.join(data, "studio.sqlite")), false);
   const result = migrateRuntime(data, { apply: true });
   assert.equal(result.applied, true);
-  assert.equal(usesRuntimeDatabase(data), true);
+  assert.equal(hasMigration(runtimeDatabase(data), "runtime-json-v1"), true);
   for (const [name, value] of Object.entries(documents))
     assert.deepEqual(readRuntimeDocument(data, name), value);
   writeRuntimeDocument(data, "gallery", [...documents.gallery, { id: "new" }]);
@@ -99,6 +116,6 @@ test("a backup manifest write failure leaves legacy state authoritative", (t) =>
     },
   );
   assert.throws(() => migrateRuntime(data, { apply: true }), /Backup disk is full/);
-  assert.equal(usesRuntimeDatabase(data), false);
+  assert.equal(fs.existsSync(databaseFile(data)), false);
   assert.equal(fs.readFileSync(path.join(data, "gallery.json"), "utf8"), original);
 });

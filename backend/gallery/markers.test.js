@@ -19,29 +19,21 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 
 const view = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`;
+const { readRuntimeDocument, writeRuntimeDocument } = await import("../persistence/runtime.ts");
+const saved = () => JSON.stringify(readRuntimeDocument(dataDir, "gallery-hidden"));
 // A marker list as older versions wrote it: output names in the clear.
-fs.writeFileSync(
-  path.join(dataDir, "gallery-hidden.json"),
-  JSON.stringify({ [view("image_00007_.png")]: Date.now() }),
-);
+writeRuntimeDocument(dataDir, "gallery-hidden", { [view("image_00007_.png")]: Date.now() });
 
 const store = await import("./store.js");
 const thumbnails = await import("../thumbnails.js");
 
 test("the list of deleted outputs no longer says what they were", () => {
-  const onDisk = fs.readFileSync(path.join(dataDir, "gallery-hidden.json"), "utf8");
-  assert.ok(!onDisk.includes("image_00007_"), "the old readable list was turned into digests");
-  assert.ok(
-    !fs
-      .readFileSync(path.join(dataDir, "gallery-hidden.json.bak"), "utf8")
-      .includes("image_00007_"),
-    "its backup too",
-  );
+  assert.ok(!saved().includes("image_00007_"), "the old readable list was turned into digests");
   const old = { url: view("image_00007_.png"), createdAt: new Date(0).toISOString() };
   assert.equal(store.isGalleryHidden(old), true, "and it still works");
 
   store.hideGalleryItems([{ url: view("image_00008_.png") }]);
-  const after = fs.readFileSync(path.join(dataDir, "gallery-hidden.json"), "utf8");
+  const after = saved();
   assert.ok(!after.includes("image_00008_"));
   assert.equal(
     store.isGalleryHidden({ url: view("image_00008_.png"), createdAt: new Date(0).toISOString() }),

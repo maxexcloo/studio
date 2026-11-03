@@ -5,12 +5,16 @@ import { createGalleryTable, galleryKey, galleryRowsMigration } from "./gallery-
 import {
   databaseFile,
   hasMigration,
+  legacyFiles,
   readOfflineRuntime,
   runtimeDatabase,
   withOfflineDatabase,
 } from "./runtime.ts";
 
-const documents = ["accounts", "gallery", "gallery-hidden"] as const;
+const documents = legacyFiles.map((file) => path.basename(file, ".json"));
+// What the legacy records step (legacy-records.js) backs up beside account LoRA stacks: files, and
+// the rows it rewrites as JSON lists.
+const legacyRecordFiles = ["lora-stacks", "model-types", "studio_gallery", "studio_chat_messages"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
@@ -230,8 +234,9 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
  * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
  * uploads step's backup (uploads.js) restores the whole reference store it moved aside, the
  * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, the
- * LoRA layers step's (library/lora-layers.js) the catalogue and the account access step's
- * (account-migration.js) the accounts store.
+ * LoRA layers step's (library/lora-layers.js) the catalogue, the account access step's
+ * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
+ * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -242,14 +247,16 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
     const store = mapping.source === "reference-assets/index.json";
     const profile = /^workflows\/[a-z0-9][a-z0-9._-]*\.json$/.test(mapping.source);
     const catalogue = mapping.source === "library/catalogue.json";
+    const stacks = /^accounts\/[0-9a-f]{64}\/lora-stacks\.json$/.test(mapping.source);
     if (
       !store &&
       !profile &&
       !catalogue &&
-      !documents.some((name) => mapping.source === `${name}.json`)
+      !stacks &&
+      ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
     )
       throw new Error("Unsupported backup mapping");
-    if (profile || catalogue)
+    if (profile || catalogue || stacks)
       fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {
         recursive: true,
         mode: 0o700,

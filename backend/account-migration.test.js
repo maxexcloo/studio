@@ -5,11 +5,19 @@ import path from "node:path";
 import test from "node:test";
 import { accountAccess } from "./account-migration.js";
 import { restoreRuntimeBackup } from "./persistence/migration.ts";
+import {
+  closeRuntimeDatabase,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 
 test("waiting accounts join the default group and groups keep only the features Studio reads, once", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-account-access-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const file = path.join(dataDir, "accounts.json");
+  t.after(() => {
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
+  const saved = () => readRuntimeDocument(dataDir, "accounts");
   const original = {
     version: 1,
     requireApproval: true,
@@ -28,8 +36,8 @@ test("waiting accounts join the default group and groups keep only the features 
       },
     },
   };
-  fs.writeFileSync(file, JSON.stringify(original));
-  const text = fs.readFileSync(file, "utf8");
+  writeRuntimeDocument(dataDir, "accounts", original);
+  const text = JSON.stringify(original);
 
   const plan = accountAccess(dataDir);
   assert.deepEqual(
@@ -54,21 +62,21 @@ test("waiting accounts join the default group and groups keep only the features 
       },
     ],
   );
-  assert.equal(fs.readFileSync(file, "utf8"), text, "a dry run writes nothing");
+  assert.equal(JSON.stringify(saved()), text, "a dry run writes nothing");
 
   const applied = accountAccess(dataDir, { apply: true });
-  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  const next = saved();
   assert.equal(applied.applied, true);
-  assert.equal(saved.requireApproval, undefined);
-  assert.equal(saved.defaultAccessProfileId, "user");
-  assert.deepEqual(saved.profiles.user.features, {
+  assert.equal(next.requireApproval, undefined);
+  assert.equal(next.defaultAccessProfileId, "user");
+  assert.deepEqual(next.profiles.user.features, {
     chat: true,
     cloudModels: false,
     dream: true,
     loras: false,
     uncensoredModels: false,
   });
-  assert.deepEqual(saved.profiles.artists.features, {
+  assert.deepEqual(next.profiles.artists.features, {
     chat: true,
     cloudModels: false,
     dream: true,
@@ -76,7 +84,7 @@ test("waiting accounts join the default group and groups keep only the features 
     uncensoredModels: false,
   });
   assert.deepEqual(
-    saved.accounts.map((account) => [account.id, account.accessProfileId, account.pending]),
+    next.accounts.map((account) => [account.id, account.accessProfileId, account.pending]),
     [
       ["admin", undefined, undefined],
       ["member", "artists", undefined],

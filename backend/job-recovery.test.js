@@ -348,7 +348,6 @@ test("a restored long video keeps its index, request time, settings and elapsed 
       createdAt,
       ownerId: "account-a",
       settings: { profileId: "h3-fl-stock20", frames: 192 },
-      startImageId: "ref-1",
     },
   ];
   s.jobs.set("fl20", {
@@ -387,7 +386,6 @@ test("a restored long video keeps its index, request time, settings and elapsed 
   assert.equal(record.index, 0, "MCP results and signed links find outputs by index");
   assert.equal(record.createdAt, createdAt);
   assert.equal(record.ownerId, "account-a");
-  assert.equal(record.startImageId, "ref-1");
   assert.deepEqual(record.settings, { profileId: "h3-fl-stock20", frames: 192 });
   assert.equal(record.durationMs, end - Date.parse(createdAt));
   assert.deepEqual(record.timing, { runMs: 19 * 60_000, queueMs: 5_000 });

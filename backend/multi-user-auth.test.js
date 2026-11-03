@@ -15,6 +15,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
+const { readRuntimeDocument } = await import("./persistence/runtime.ts");
 
 const routes = {};
 registerMultiUserAuthRoutes(
@@ -89,7 +90,7 @@ test("only the local machine can bootstrap the first recovery administrator, onc
     local({ username: "second", password: "a secure second password" }),
   );
   assert.equal(repeated.statusCode, 409);
-  assert.equal(fs.existsSync(path.join(temporary, "data", "accounts.json")), true);
+  assert.equal(readRuntimeDocument(path.join(temporary, "data"), "accounts").accounts.length, 1);
 });
 
 test("local password sign-in sets an HttpOnly session and sign-out revokes it", async () => {

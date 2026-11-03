@@ -6,6 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
+import { writeGalleryRows } from "./persistence/gallery-rows.ts";
+import { runtimeDatabase } from "./persistence/runtime.ts";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-warmup-"));
 process.env.STUDIO_DATA_DIR = dataDir;
@@ -60,13 +62,10 @@ const record = (filename, type, minutesAgo, extra = {}) => ({
   createdAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
   ...extra,
 });
-fs.writeFileSync(
-  path.join(dataDir, "gallery.json"),
-  JSON.stringify([
-    record("a-newest.png", "image", 1),
-    ...(canEncode ? [record("clip.mp4", "video", 3)] : []),
-  ]),
-);
+writeGalleryRows(runtimeDatabase(dataDir), [
+  record("a-newest.png", "image", 1),
+  ...(canEncode ? [record("clip.mp4", "video", 3)] : []),
+]);
 
 const { warmGallery, warmNewOutputs } = await import("./media-warmup.js");
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
