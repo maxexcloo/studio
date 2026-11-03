@@ -34,9 +34,11 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * Every multi-line text box. `tools` adds compact Copy and Clear (undoable) beside the box's own
- * right section. On phones the box is a summary of its text: tapping it (or `edit`) opens it full
- * screen with the same right section, Copy, Clear and Done, and `below` under the text; Done,
- * Escape or dismissing the keyboard returns to the page. `submit` adds its send arrow there too,
+ * right section: a multi-row box on desktop lines them all up in one column beside the text, so
+ * the text keeps the box's full height; a one-row box and the phone summary keep them inside. On
+ * phones the box is a summary of its text: tapping it (or `edit`) opens it full screen with the
+ * same right section, Copy, Clear and Done, and `below` under the text; Done, Escape or
+ * dismissing the keyboard returns to the page. `submit` adds its send arrow there too,
  * so typing and sending take one tap.
  */
 export function TextBox({
@@ -155,6 +157,7 @@ export function TextBox({
   ];
   // Multi-row boxes stack their actions in a column; a one-row box lines them up.
   const stacked = (props.minRows ?? 1) > 1;
+  const column = tools && stacked && !phone;
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -162,38 +165,55 @@ export function TextBox({
     event.stopPropagation();
     close();
   };
+  const textarea = (
+    <Textarea
+      {...props}
+      // While the phone editor is open, it alone is the box.
+      aria-hidden={editing || undefined}
+      value={value}
+      onChange={(event) => onChange(event.currentTarget.value)}
+      // A phone box only summarises its text, which the editor scrolls instead; tapping it opens
+      // the editor without raising the keyboard.
+      styles={phone ? { input: { overflowY: "hidden" } } : undefined}
+      inputMode={phone ? "none" : props.inputMode}
+      onClick={(event) => {
+        onClick?.(event);
+        if (phone && !props.readOnly && !props.disabled) setEditing(true);
+      }}
+      // While the phone editor is open, it alone carries the actions.
+      rightSection={
+        editing || column ? undefined : tools ? (
+          <Group gap={stacked ? 4 : 0} wrap="nowrap" align="flex-start">
+            {stacked ? <Stack gap={4}>{rightSection}</Stack> : rightSection}
+            {stacked ? <Stack gap={4}>{actions}</Stack> : actions}
+          </Group>
+        ) : (
+          rightSection
+        )
+      }
+      rightSectionWidth={
+        column
+          ? undefined
+          : tools
+            ? Number(rightSectionWidth ?? 36) + (stacked ? 40 : 72)
+            : rightSectionWidth
+      }
+      rightSectionPointerEvents={tools ? "all" : props.rightSectionPointerEvents}
+    />
+  );
   return (
     <>
-      <Textarea
-        {...props}
-        // While the phone editor is open, it alone is the box.
-        aria-hidden={editing || undefined}
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        // A phone box only summarises its text, which the editor scrolls instead; tapping it opens
-        // the editor without raising the keyboard.
-        styles={phone ? { input: { overflowY: "hidden" } } : undefined}
-        inputMode={phone ? "none" : props.inputMode}
-        onClick={(event) => {
-          onClick?.(event);
-          if (phone && !props.readOnly && !props.disabled) setEditing(true);
-        }}
-        // While the phone editor is open, it alone carries the actions.
-        rightSection={
-          editing ? undefined : tools ? (
-            <Group gap={stacked ? 4 : 0} wrap="nowrap" align="flex-start">
-              {stacked ? <Stack gap={4}>{rightSection}</Stack> : rightSection}
-              {stacked ? <Stack gap={4}>{actions}</Stack> : actions}
-            </Group>
-          ) : (
-            rightSection
-          )
-        }
-        rightSectionWidth={
-          tools ? Number(rightSectionWidth ?? 36) + (stacked ? 40 : 72) : rightSectionWidth
-        }
-        rightSectionPointerEvents={tools ? "all" : props.rightSectionPointerEvents}
-      />
+      {column ? (
+        <div className={classes.columned}>
+          {textarea}
+          <Stack gap={4} className={classes.tools}>
+            {rightSection}
+            {actions}
+          </Stack>
+        </div>
+      ) : (
+        textarea
+      )}
       {!editing && overlay}
       {below}
       {phone && (

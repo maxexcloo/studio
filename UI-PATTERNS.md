@@ -133,7 +133,7 @@ primary component reference and verify APIs against the installed version.
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
   generation-input action and icon-only Generate. Expanded controls are one prompt
-  box with a history action inside it, the negative prompt under it when the
+  box with its tools beside it, the negative prompt under it when the
   profile takes one, and a row of compact chips: Profile, References, Reference
   Role (once references are placed: Edit and Reference as pressed chips, then
   Paint Mask where the profile inpaints, in one group), LoRAs, Aspect, Count, a
@@ -159,7 +159,9 @@ primary component reference and verify APIs against the installed version.
   one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
-  offers Undo in its notification. On phones a text box is a summary of its
+  offers Undo in its notification. On desktop the prompt's tools (Recent Prompts,
+  Prompt Assistance, Copy, Clear) stand in one icon column right of the text,
+  which keeps the full height; the one-row negative keeps them inside its box. On phones a text box is a summary of its
   text; tapping it (prompt, negative, Chat message, profile and guide editors and
   the rest) opens it full screen, without the keyboard until the text is tapped,
   with the same actions as the inline box (the
