@@ -50,7 +50,7 @@ const time = (value?: string) => {
 };
 
 type Row = [label: string, value: string];
-// Holds the Size row's place while the size loads, so the table does not grow afterwards.
+// Holds the File Size row's place while the size loads, so the table does not grow afterwards.
 const pendingValue = "…";
 interface Details {
   profile: string;
@@ -116,12 +116,13 @@ function generationDetails(
     ]),
     output: rows([
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
-      ["Drawn At", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
+      // An upscale's size as the model drew it.
+      ["Original Size", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
       ["Duration", video && settings.duration ? `${settings.duration}s` : ""],
       ["Frames", video ? settings.frames : ""],
       ["FPS", video ? settings.fps : ""],
       ["File", item.outputName || item.filename],
-      ["Size", size === null ? pendingValue : bytes(size)],
+      ["File Size", size === null ? pendingValue : bytes(size)],
       ["Time", time(item.createdAt)],
     ]),
     // The stages in the order they ran, then their totals.
@@ -200,11 +201,21 @@ function useMediaSize(url: string) {
   });
 }
 
-function Section({ title, rows }: { title: string; rows: Row[] }) {
-  if (!rows.length) return null;
+/** One Details section: its heading over its content. */
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Stack gap={6}>
       <Title order={6}>{title}</Title>
+      {children}
+    </Stack>
+  );
+}
+
+/** Label and value rows, the label column dimmed. */
+function Section({ title, rows }: { title: string; rows: Row[] }) {
+  if (!rows.length) return null;
+  return (
+    <DetailSection title={title}>
       <Table
         variant="vertical"
         layout="fixed"
@@ -228,7 +239,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
           ))}
         </Table.Tbody>
       </Table>
-    </Stack>
+    </DetailSection>
   );
 }
 
@@ -244,8 +255,7 @@ function Related({
 }) {
   if (!items.length) return null;
   return (
-    <Stack gap={6}>
-      <Title order={6}>{title}</Title>
+    <DetailSection title={title}>
       {items.map((related) =>
         open ? (
           <Anchor
@@ -264,12 +274,12 @@ function Related({
           </Text>
         ),
       )}
-    </Stack>
+    </DetailSection>
   );
 }
 
 /**
- * Details › Caption, Source, Prompt, From, Derived, Model, LoRAs, References, Settings, Output and Timing
+ * Details › Prompt, Caption, Source, From, Derived, Model, LoRAs, References, Settings, Output and Timing
  * for one result; `open` shows a related result in the viewer.
  */
 export function MediaDetails({
@@ -287,9 +297,13 @@ export function MediaDetails({
   const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
+      <DetailSection title="Prompt">
+        <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
+        <WritingThinking writing={item.writing} />
+        {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
+      </DetailSection>
       {(item.caption?.text || !!item.caption?.tags?.length) && (
-        <Stack gap={6}>
-          <Title order={6}>Caption</Title>
+        <DetailSection title="Caption">
           {item.caption?.text && <Text size="sm">{item.caption.text}</Text>}
           {!!item.caption?.tags?.length && (
             <Group gap={4} aria-label="Caption Tags">
@@ -312,33 +326,24 @@ export function MediaDetails({
                 ))}
             </Group>
           )}
-        </Stack>
+        </DetailSection>
       )}
       {item.source && (
-        <Stack gap={6}>
-          <Title order={6}>Source</Title>
+        <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
           </Anchor>
-        </Stack>
+        </DetailSection>
       )}
-      <Stack gap={6}>
-        <Title order={6}>Prompt</Title>
-        <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
-        <WritingThinking writing={item.writing} />
-        {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
-      </Stack>
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <Related title="Derived" items={related.derived} open={open} />
       {details.profile && (
-        <Stack gap={6}>
-          <Title order={6}>Model</Title>
+        <DetailSection title="Model">
           <Text size="sm">{details.profile}</Text>
-        </Stack>
+        </DetailSection>
       )}
       {!!details.loras.length && (
-        <Stack gap={6}>
-          <Title order={6}>LoRAs</Title>
+        <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
             <Group key={lora.name} justify="space-between" wrap="nowrap" gap="xs">
               <Text size="sm" truncate>
@@ -349,11 +354,10 @@ export function MediaDetails({
               </Badge>
             </Group>
           ))}
-        </Stack>
+        </DetailSection>
       )}
       {!!details.references.length && (
-        <Stack gap={6}>
-          <Title order={6}>References</Title>
+        <DetailSection title="References">
           <Group gap="xs">
             {details.references.map((asset, index) => (
               <Tooltip
@@ -371,7 +375,7 @@ export function MediaDetails({
               </Tooltip>
             ))}
           </Group>
-        </Stack>
+        </DetailSection>
       )}
       <Section title="Settings" rows={details.settings} />
       <Section title="Output" rows={details.output} />

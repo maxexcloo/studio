@@ -374,7 +374,11 @@ primary component reference and verify APIs against the installed version.
   Models, Custom Animation, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
   prompts sit on a subtle surface aligned with the column and scroll within a
-  bounded height; LoRAs have their own heading, each with its strength. The
+  bounded height; LoRAs have their own heading, each with its strength. Its
+  sections run Prompt, Caption, From, Derived, Model, LoRAs, References,
+  Settings, Output and Timing, each a heading over its content, and an
+  upscale's Output adds the Original Size the model drew beside its
+  Dimensions. The
   desktop details sidebar is open by default and its toggle is remembered.
   Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
