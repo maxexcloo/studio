@@ -10,13 +10,12 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
-import { ArrowUp, Brush, Image as ImageIcon, Video, X } from "lucide-react";
+import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { defaultProfile, useGeneration } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
-import { chipProps } from "./chip";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails, usesNegative } from "./payload";
 import { PromptFields } from "./PromptFields";
@@ -215,23 +214,14 @@ export function GenerationEditor({
     />
   );
   const expert = { opened: expertOpen, onOpenedChange: setExpertOpen };
-  const mask = primary && profile?.capabilities?.inpaint && (
-    <Button.Group>
-      <Button {...chipProps} leftSection={<Brush size={15} />} onClick={() => setMaskOpen(true)}>
-        {input.inpaint ? "Edit Mask" : "Paint Mask"}
-      </Button>
-      {!!input.inpaint && (
-        <Button
-          {...chipProps}
-          px="xs"
-          aria-label="Remove Mask"
-          onClick={() => onChange({ inpaint: null })}
-        >
-          <X size={14} />
-        </Button>
-      )}
-    </Button.Group>
-  );
+  const mask =
+    primary && profile?.capabilities?.inpaint
+      ? {
+          painted: !!input.inpaint,
+          onPaint: () => setMaskOpen(true),
+          onRemove: () => onChange({ inpaint: null }),
+        }
+      : undefined;
   return (
     <>
       <form
