@@ -39,7 +39,7 @@ export const captionVersion = createHash("sha256")
  * format. Only while the running text model reads images, and never with cloud.
  */
 export function createCaptioner(options: {
-  /** The Settings › Models switch (STUDIO_GALLERY_CAPTIONS). */
+  /** The Settings › Generation switch (STUDIO_GALLERY_CAPTIONS). */
   enabled(): boolean;
   writer: CaptionWriter | null;
   idle(): boolean;
@@ -58,7 +58,7 @@ export function createCaptioner(options: {
   return createIdleWork<CaptionItem>({
     ...options,
     name: "Gallery captions",
-    off: "Gallery Captions is off in Settings › Models.",
+    off: "Gallery Captions is off in Settings › Generation.",
     async unavailable() {
       if (!writer) return "No assistant model is configured.";
       if (!(await writer.supportsVision())) return "The running text model can't read images.";
