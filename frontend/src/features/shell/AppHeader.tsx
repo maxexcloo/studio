@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ActionIcon, Box, Button, FloatingIndicator, Group, Tooltip } from "@mantine/core";
-import { Image, Library, MessageCircle, Settings, Sparkles, Video } from "lucide-react";
+import { Image, Library, MessageCircle, Video } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
@@ -13,13 +14,13 @@ import classes from "./AppHeader.module.css";
 
 const modes = [
   { to: "/chat", label: "Chat", icon: MessageCircle },
-  { to: "/dream", label: "Dream", icon: Sparkles },
+  { to: "/dream", label: "Dream", icon: icons.dream },
   { to: "/images", label: "Images", icon: Image },
   { to: "/video", label: "Videos", icon: Video },
 ];
 const navigation = [
   { to: "/library", label: "Library", icon: Library },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/settings", label: "Settings", icon: icons.settings },
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();

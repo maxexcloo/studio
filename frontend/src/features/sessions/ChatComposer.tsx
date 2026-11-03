@@ -1,5 +1,6 @@
 import { ActionIcon, Alert, Badge, CloseButton, Group, Loader, Text, Tooltip } from "@mantine/core";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useIsMutating } from "@tanstack/react-query";
 import type { ChatModel } from "../../../../shared/chat";
 import type { WorkloadPhase } from "../../../../shared/runtime";
@@ -173,7 +174,7 @@ function ChatComposer() {
                 stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
               }
             >
-              <Square size={16} />
+              <icons.stop size={16} />
             </ActionIcon>
           </Tooltip>
         ) : (

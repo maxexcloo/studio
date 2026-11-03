@@ -14,7 +14,8 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis, Pencil, Trash2, Video } from "lucide-react";
+import { Pencil, Video } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useMatch, useNavigate } from "react-router";
 import { api } from "../../api";
 import type { Session } from "../../types";
@@ -108,7 +109,7 @@ export function ChatMenu({
             color="gray"
             aria-label={`Chat Options for ${title}`}
           >
-            <Ellipsis size={18} />
+            <icons.more size={18} />
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>
@@ -118,7 +119,7 @@ export function ChatMenu({
           <Menu.Item
             h={36}
             color="red"
-            leftSection={<Trash2 size={16} />}
+            leftSection={<icons.delete size={16} />}
             onClick={() => setDeleting(true)}
           >
             Delete

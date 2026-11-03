@@ -3,41 +3,25 @@ import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import {
   ArrowLeftRight,
   Camera,
-  Columns2,
-  Columns3,
-  Copy,
-  Download,
   Eye,
   FastForward,
   Film,
   ImageDown,
   Flame,
-  Gem,
   ImagePlus,
-  ImageUpscale,
   ListChecks,
   Loader,
-  MessageSquareShare,
-  Pencil,
   PenLine,
-  Play,
-  Rabbit,
   Repeat,
   Rewind,
-  RotateCw,
   ScanFace,
   ScanText,
   Scissors,
-  Share,
   Shuffle,
   Snail,
-  SlidersHorizontal,
-  Sparkles,
-  Square,
-  Star,
   TextQuote,
-  Trash2,
   Waves,
+  Wind,
   Zap,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
@@ -46,6 +30,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -79,29 +64,29 @@ import { useVideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
-  chat: { label: "Continue in Chat", icon: MessageSquareShare },
-  prompt: { label: "Prompt", icon: SlidersHorizontal },
-  animate: { label: "Animate", icon: Play },
-  edit: { label: "Edit", icon: Pencil },
-  retry: { label: "Retry", icon: RotateCw },
-  stop: { label: "Stop", icon: Square },
-  compare: { label: "Compare", icon: Columns3 },
-  upscale: { label: "Upscale", icon: ImageUpscale },
-  copy: { label: "Copy", icon: Copy },
-  download: { label: "Download", icon: Download },
-  share: { label: "Share", icon: Share },
-  delete: { label: "Delete", icon: Trash2, color: "red" as const },
-  star: { label: "Star", icon: Star },
+  chat: { label: "Continue in Chat", icon: icons.chat },
+  prompt: { label: "Prompt", icon: icons.prompt },
+  animate: { label: "Animate", icon: icons.animate },
+  edit: { label: "Edit", icon: icons.edit },
+  retry: { label: "Retry", icon: icons.retry },
+  stop: { label: "Stop", icon: icons.stop },
+  compare: { label: "Compare", icon: icons.compare },
+  upscale: { label: "Upscale", icon: icons.upscale },
+  copy: { label: "Copy", icon: icons.copy },
+  download: { label: "Download", icon: icons.download },
+  share: { label: "Share", icon: icons.share },
+  delete: { label: "Delete", icon: icons.delete, color: "red" as const },
+  star: { label: "Star", icon: icons.star },
 };
 export type ItemActionId = keyof typeof definitions;
 /**
- * The sections: Continue in Chat and Prompt first, Star then Delete last, the rest alphabetical within each.
- * Compare shows only in menus and the selection bar; Share takes Download's place where phones share.
+ * The sections and order everywhere: Edit, Animate, Prompt | Upscale | Copy, Download | Star,
+ * Delete. Retry and Stop lead for unfinished work and Continue in Chat follows Prompt; Compare
+ * joins Upscale only in menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
-  ["chat", "prompt"],
-  ["animate", "edit", "retry", "stop"],
-  ["compare", "upscale"],
+  ["retry", "stop", "edit", "animate", "prompt", "chat"],
+  ["upscale", "compare"],
   ["copy", "download", "share"],
   ["star", "delete"],
 ];
@@ -120,7 +105,7 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
-  living: Sparkles,
+  living: Wind,
   action: Zap,
   spicy: Flame,
   custom: PenLine,
@@ -338,18 +323,11 @@ export function useMediaActions(
   const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
-  const animateNote = [
-    animation.error?.message,
-    assistant.data && !assistant.data.available ? "Motion themes need the prompt assistant." : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
   const quick = useQuickUpscale(item, ready && mayUpscale);
   const upscaleBusy = upscaling(item) || quick.queue.isPending;
   const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
     quick.queue.mutate({ quality, faceDetail });
-  const copyDetails = () => void copyText(settingsText(), "Details");
   const themeItems = (disabled: boolean) =>
     assistant.data?.available
       ? themes.map((theme) => ({
@@ -381,24 +359,36 @@ export function useMediaActions(
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        note: animateNote,
+        // Only why nothing can run shows above the options.
+        note: animation.error?.message,
         menu: [
-          // Fast or Quality picks the video model for the themes and the composer below.
-          (animation.data?.tiers ?? []).map((option) => ({
-            id: `animate-${option}`,
-            label: option === "fast" ? "Fast" : "Quality",
-            icon: option === "fast" ? Rabbit : Gem,
-            checked: option === tier,
-            keepOpen: true,
-            onClick: () => setTier(option),
-          })),
-          reviewItems,
-          themeItems(!animation.data),
           [
+            // Fast or Quality picks the video model for the themes and the composer below.
+            ...((animation.data?.tiers.length ?? 0) > 1
+              ? [
+                  {
+                    id: "animate-tier",
+                    label: "Fast or Quality",
+                    icon: icons.animate,
+                    choice: {
+                      value: tier,
+                      options: [
+                        { value: "fast", label: "Fast" },
+                        { value: "quality", label: "Quality" },
+                      ],
+                      onChange: (value: string) => setTier(value as typeof tier),
+                    },
+                  },
+                ]
+              : []),
+            ...reviewItems,
+          ],
+          [
+            ...themeItems(!animation.data),
             {
               id: "animate-composer",
               label: "Animate in Composer",
-              icon: SlidersHorizontal,
+              icon: icons.prompt,
               disabled: !animation.data,
               onClick: () => action.mutate("animate"),
             },
@@ -412,8 +402,8 @@ export function useMediaActions(
         // A theme continues the clip from its last frame at once; the composer shows it first.
         menu: [
           reviewItems,
-          themeItems(action.isPending),
           [
+            ...themeItems(action.isPending),
             {
               id: "extend",
               label: "Extend in Composer",
@@ -435,7 +425,6 @@ export function useMediaActions(
       item.type === "video" &&
       itemAction("edit", {
         loading: videoEdit.isPending,
-        note: "Each edit is saved as a new version.",
         menu: [
           [
             { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
@@ -479,18 +468,18 @@ export function useMediaActions(
         disabled: chat.isPending,
         onClick: () => chat.mutate(),
       }),
-    // Prompt opens the result in the composer; its options run it again from here.
+    // Prompt opens the result in the composer (its first option); the others run it again from here.
     itemAction("prompt", {
       disabled: action.isPending,
       loading: running === "regenerate" || running === "repeat",
-      onClick: () => action.mutate("image"),
+      onClick: ready ? undefined : () => action.mutate("image"),
       menu: ready
         ? [
             [
               {
                 id: "prompt-composer",
                 label: "Edit",
-                icon: SlidersHorizontal,
+                icon: icons.prompt,
                 disabled: action.isPending,
                 onClick: () => action.mutate("image"),
               },
@@ -519,31 +508,51 @@ export function useMediaActions(
     ready &&
       mayUpscale &&
       itemAction("upscale", {
-        // With an upscale, the click switches between it and the original; otherwise it runs Balanced.
+        // Its first option is the usual click: with an upscale, switching between it and the
+        // original; otherwise Balanced.
         label: upscaling(item) ? "Upscaling…" : "Upscale",
         pressed: upscaled && Boolean(item.upscaleActive),
         loading: upscaleBusy && !upscaled,
         disabled: upscaled ? version.isPending : upscaleBusy,
-        onClick: upscaled
-          ? () => version.mutate(!item.upscaleActive)
-          : () => queueUpscale("balanced"),
-        note: quick.faceNote || undefined,
         menu: [
+          upscaled
+            ? [
+                {
+                  id: "show-upscale",
+                  label: "Show Upscale",
+                  icon: Eye,
+                  checked: Boolean(item.upscaleActive),
+                  disabled: version.isPending,
+                  onClick: () => version.mutate(!item.upscaleActive),
+                },
+                ...(onCompare && image
+                  ? [
+                      {
+                        id: "compare-upscale",
+                        label: "Compare Upscale",
+                        icon: icons.compareSideBySide,
+                        checked: Boolean(compare),
+                        onClick: onCompare,
+                      },
+                    ]
+                  : []),
+              ]
+            : [],
           [
             ...(upscaled
               ? [
                   {
                     id: "upscale-again",
                     label: "Regenerate Upscale",
-                    icon: RotateCw,
+                    icon: icons.retry,
                     disabled: upscaleBusy,
                     onClick: () => queueUpscale("balanced"),
                   },
                 ]
-              : (["fast", "balanced", "high"] as const).map((quality) => ({
+              : (["balanced", "fast", "high"] as const).map((quality) => ({
                   id: `upscale-${quality}`,
                   label: quality[0].toUpperCase() + quality.slice(1),
-                  icon: ImageUpscale,
+                  icon: icons.upscale,
                   disabled: upscaleBusy,
                   onClick: () => queueUpscale(quality),
                 }))),
@@ -551,7 +560,7 @@ export function useMediaActions(
               ? [
                   {
                     id: "upscale-face",
-                    label: upscaled ? "Regenerate with Face Detail" : "Balanced with Face Detail",
+                    label: "Face Detail",
                     icon: ScanFace,
                     disabled: upscaleBusy || !quick.faceDetail,
                     onClick: () => queueUpscale("balanced", true),
@@ -561,47 +570,27 @@ export function useMediaActions(
             {
               id: "upscale-options",
               label: "Upscale Options…",
-              icon: SlidersHorizontal,
+              icon: icons.settings,
               disabled: upscaleBusy,
               onClick: onUpscale,
             },
           ],
-          upscaled
-            ? [
-                {
-                  id: "show-upscale",
-                  label: "Show Upscale",
-                  icon: Eye,
-                  checked: Boolean(item.upscaleActive),
-                  disabled: version.isPending,
-                  keepOpen: true,
-                  onClick: () => version.mutate(!item.upscaleActive),
-                },
-                ...(onCompare && image
-                  ? [
-                      {
-                        id: "compare-upscale",
-                        label: "Compare Upscale",
-                        icon: Columns2,
-                        checked: Boolean(compare),
-                        onClick: onCompare,
-                      },
-                    ]
-                  : []),
-              ]
-            : [],
         ],
       }),
     itemAction("copy", {
-      onClick: copyDetails,
       menu: [
         [
-          { id: "copy-details", label: "Details", icon: ListChecks, onClick: copyDetails },
           {
             id: "copy-prompt",
             label: "Prompt",
             icon: TextQuote,
             onClick: () => void copyText(item.prompt || "", "Prompt"),
+          },
+          {
+            id: "copy-details",
+            label: "Details",
+            icon: ListChecks,
+            onClick: () => void copyText(settingsText(), "Details"),
           },
         ],
       ],
@@ -624,18 +613,16 @@ export function useMediaActions(
               gif && loop
                 ? [
                     [
-                      // Its own download leads, as Prompt and Edit list theirs, so a menu that
-                      // stands in for the button (More, card menus) still offers it.
                       {
                         id: "download-video",
-                        label: "Download Video",
-                        icon: Download,
+                        label: "Video",
+                        icon: icons.download,
                         link: transfer.download,
                       },
-                      { id: "download-gif", label: "Download as GIF", icon: Film, link: gif },
+                      { id: "download-gif", label: "GIF", icon: Film, link: gif },
                       {
                         id: "download-loop",
-                        label: "Download Back and Forth",
+                        label: "Back and Forth",
                         icon: ArrowLeftRight,
                         link: loop,
                       },
@@ -783,7 +770,7 @@ export function AnimateDialog({
                   Run
                 </Button>
               ) : (
-                <Button onClick={write}>Try Again</Button>
+                <Button onClick={write}>Retry</Button>
               )}
             </Group>
           </Stack>

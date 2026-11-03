@@ -36,7 +36,6 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   await viewerAction(page, "Edit");
-  await expect(page.getByText("Each edit is saved as a new version.")).toBeVisible();
   await page.getByRole("menuitem", { name: "Reverse", exact: true }).click();
   await expect(page.getByText("Saved as a new version.", { exact: true })).toBeVisible();
   expect(edits).toEqual([{ galleryItemId: "clip", kind: "reverse" }]);

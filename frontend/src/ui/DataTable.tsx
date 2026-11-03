@@ -8,7 +8,8 @@ import {
   VisuallyHidden,
   type MantineBreakpoint,
 } from "@mantine/core";
-import { ChevronDown, ChevronsUpDown, ChevronUp, Ellipsis } from "lucide-react";
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
+import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 
@@ -164,7 +165,7 @@ export function DataTable<T>({
                           color="gray"
                           aria-label={`Actions for ${name}`}
                         >
-                          <Ellipsis size={18} />
+                          <icons.more size={18} />
                         </ActionIcon>
                       </Menu.Target>
                       <Menu.Dropdown>{actions}</Menu.Dropdown>

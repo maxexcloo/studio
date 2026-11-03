@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, stamp } from "./fixtures";
+import { fixtures, stamp, viewerAction } from "./fixtures";
 
 const original = await sharp({
   create: { width: 800, height: 1200, channels: 3, background: "#46a3ff" },
@@ -80,20 +80,10 @@ for (const failFirst of [false, true]) {
     expect(originalImage).not.toBeNull();
     expect(picture).not.toBeNull();
     try {
-      // With an upscale, Upscale's click shows it; phones list it under More.
-      if (page.viewportSize()!.width < 768) {
-        await viewer.getByRole("button", { name: "More", exact: true }).click();
-        await page.getByRole("menuitem", { name: "Upscale", exact: true }).click();
-        const show = page.getByRole("menuitem", { name: "Show Upscale", exact: true });
-        await show.click();
-        await expect(show).toHaveAttribute("aria-checked", "true");
-        await page.keyboard.press("Escape");
-        await expect(page.getByRole("menu")).toHaveCount(0);
-      } else {
-        const version = viewer.getByRole("button", { name: "Upscale", exact: true });
-        await version.click();
-        await expect(version).toHaveAttribute("aria-pressed", "true");
-      }
+      // With an upscale, Upscale's first option shows it; phones list it under More.
+      await viewerAction(page, "Upscale");
+      await page.getByRole("menuitem", { name: "Show Upscale", exact: true }).click();
+      await expect(page.getByRole("menu")).toHaveCount(0);
       await expect.poll(() => requested).toBe(true);
       expect(toggles).toEqual([{ galleryItemId: item.id, active: true }]);
       await expect(image).toHaveAttribute("src", originalUrl);

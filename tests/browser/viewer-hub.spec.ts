@@ -60,7 +60,7 @@ async function seed(
 
 /** Prompt › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
@@ -213,7 +213,7 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 test("Viewer runs queue into the strip and Prompt opens the composer", async ({ page }) => {
   const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -227,6 +227,7 @@ test("Viewer runs queue into the strip and Prompt opens the composer", async ({ 
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
   await viewerAction(page, "Prompt");
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -273,11 +274,12 @@ test("Run Again and Prompt draw a new seed; only Run Again (Same Seed) keeps it"
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Prompt");
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -327,7 +329,7 @@ test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran o
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -336,6 +338,7 @@ test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran o
     seed: 1234567,
   });
   await viewerAction(page, "Prompt");
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
@@ -350,7 +353,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   const { state } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect(
     page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
@@ -379,7 +382,7 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
   });
 });
 
-test("Animate runs Fast unless Quality is checked", async ({ page }) => {
+test("Animate runs Fast unless Quality is chosen", async ({ page }) => {
   const tiers: string[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
@@ -396,10 +399,11 @@ test("Animate runs Fast unless Quality is checked", async ({ page }) => {
     }),
   );
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const fast = page.getByRole("menuitem", { name: "Fast", exact: true });
-  await expect(fast).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("menuitem", { name: "Quality", exact: true }).click();
-  await expect(fast).toHaveAttribute("aria-checked", "false");
+  // Fast or Quality is a segmented control at the top of the menu.
+  const choice = page.getByRole("radiogroup", { name: "Fast or Quality", exact: true });
+  await expect(choice.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
+  await choice.getByText("Quality", { exact: true }).click();
+  await expect(choice.getByRole("radio", { name: "Quality", exact: true })).toBeChecked();
   await expect.poll(() => tiers.at(-1)).toBe("quality");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -623,9 +627,7 @@ test("With neither local video nor Grok, Animate says why and queues nothing", a
   expect(state.jobs).toHaveLength(1);
 });
 
-test("Details copy the prompt in one click and Copy Settings copies every input", async ({
-  page,
-}, testInfo) => {
+test("Copy ▾ copies the prompt first and Details copies every input", async ({ page }) => {
   await page.addInitScript(() => {
     // Copying happens within the tap, as iOS Safari needs: the copy command, not the clipboard API.
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
@@ -636,7 +638,7 @@ test("Details copy the prompt in one click and Copy Settings copies every input"
       return true;
     };
   });
-  const { viewer } = await seed(page, {
+  await seed(page, {
     negative: "blurry",
     settings: {
       profileId: "image:test",
@@ -647,18 +649,15 @@ test("Details copy the prompt in one click and Copy Settings copies every input"
       vae: "models/vae/ae.safetensors",
     },
   });
-  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
-  if (testInfo.project.use.isMobile) {
-    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
-  }
-  await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
+  await viewerAction(page, "Copy");
+  await expect(page.getByRole("menuitem", { name: /^(Prompt|Details)$/ })).toHaveText([
+    "Prompt",
+    "Details",
+  ]);
+  await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
-  // The top-right notification covers the desktop Details header, so dismiss it first.
-  const copied = page.getByRole("alert").filter({ hasText: "Prompt copied" });
-  await copied.getByRole("button").click();
-  await expect(copied).toBeHidden();
-  await details.getByRole("button", { name: "Copy Settings", exact: true }).click();
+  await viewerAction(page, "Copy");
+  await page.getByRole("menuitem", { name: "Details", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => (window as any).copied))
     .toBe(
@@ -790,20 +789,18 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     "src",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=play",
   );
-  await viewerAction(page, "Download Options");
-  await expect(page.getByRole("menuitem", { name: "Download Video", exact: true })).toHaveAttribute(
+  await viewerAction(page, "Download");
+  await expect(page.getByRole("menuitem", { name: "Video", exact: true })).toHaveAttribute(
     "href",
     "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
   );
-  const gif = page.getByRole("menuitem", { name: "Download as GIF", exact: true });
+  const gif = page.getByRole("menuitem", { name: "GIF", exact: true });
   await expect(gif).toHaveAttribute(
     "href",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
   );
   await expect(gif).toHaveAttribute("download", /\.gif$/);
-  await expect(
-    page.getByRole("menuitem", { name: "Download Back and Forth", exact: true }),
-  ).toHaveAttribute(
+  await expect(page.getByRole("menuitem", { name: "Back and Forth", exact: true })).toHaveAttribute(
     "href",
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=loop",
   );
@@ -1118,6 +1115,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
   await viewerAction(page, "Prompt");
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   // Phones open the prompt in its own editor, which Done closes.

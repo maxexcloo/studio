@@ -67,12 +67,17 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", originalUrl);
     await expect(download).toHaveAttribute("href", originalUrl);
     await expect(download).toHaveAttribute("download", `source.${originalExtension}`);
-    // With an upscale, Upscale's click switches between it and the original.
+    // With an upscale, Upscale's first option switches between it and the original.
     const version = page
       .getByRole("dialog", { name: "Generation", exact: true })
       .getByRole("button", { name: "Upscale", exact: true });
+    const showUpscale = async () => {
+      await version.click();
+      await expect(page.getByRole("menuitem").first()).toHaveText("Show Upscale");
+      await page.getByRole("menuitem", { name: "Show Upscale", exact: true }).click();
+    };
     await expect(version).toHaveAttribute("aria-pressed", "false");
-    await version.click();
+    await showUpscale();
     await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => toggles.length).toBe(1);
     expect(toggles[0]).toEqual({ galleryItemId: item.id, active: true });
@@ -80,7 +85,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(download).toHaveAttribute("href", upscaleUrl);
     await expect(download).toHaveAttribute("download", `source.${upscaleExtension}`);
     // Its options regenerate it and compare an image's upscale with its original.
-    await viewerAction(page, "Upscale Options");
+    await viewerAction(page, "Upscale");
     await expect(
       page.getByRole("menuitem", { name: "Regenerate Upscale", exact: true }),
     ).toBeVisible();
@@ -97,7 +102,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
-    await version.click();
+    await showUpscale();
     await expect(version).toHaveAttribute("aria-pressed", "false");
     await expect.poll(() => toggles.length).toBe(2);
     expect(toggles[1]).toEqual({ galleryItemId: item.id, active: false });

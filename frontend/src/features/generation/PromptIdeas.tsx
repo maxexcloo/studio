@@ -1,7 +1,7 @@
 import { useState, type FocusEvent } from "react";
 import { Button, Group, Transition } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { MediaKind } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { promptIdeasQuery } from "../taste/suggestions";
@@ -64,7 +64,7 @@ export function usePromptIdeas({
                 variant="default"
                 className={classes.idea}
                 classNames={{ inner: classes.inner, label: classes.label }}
-                leftSection={<Sparkles size={12} aria-hidden />}
+                leftSection={<icons.assistant size={12} aria-hidden />}
                 title={idea}
                 // Keeps the prompt focused, so the ideas stay until the click lands.
                 onMouseDown={(event) => event.preventDefault()}

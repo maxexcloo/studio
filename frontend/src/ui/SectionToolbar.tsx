@@ -10,7 +10,8 @@ import {
   Stack,
   Tooltip,
 } from "@mantine/core";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
+import { icons } from "./icons";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
 import classes from "./SectionToolbar.module.css";
@@ -123,7 +124,7 @@ export function SectionToolbar({
                   color={filterCount ? undefined : "gray"}
                   pos="relative"
                 >
-                  <SlidersHorizontal size={18} />
+                  <icons.filter size={18} />
                   {filterCount > 0 && (
                     <Badge
                       size="xs"

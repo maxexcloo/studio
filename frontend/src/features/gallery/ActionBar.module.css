@@ -33,13 +33,25 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* A split control's menu half stays narrow so it reads as one action. */
-.splitMenu {
-  width: 22px;
-  min-width: 22px;
+/* A menu's setting (Fast or Quality) sits at its top, as wide as its rows. */
+.choice {
+  padding: 4px;
 }
 
-/* Phones: a few labelled actions sharing the bar's width, icons over their names. */
+/* Phones expand an item's options in place, indented under it. */
+.inline {
+  padding-left: 12px;
+}
+
+.expand {
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+[data-expanded] .expand {
+  transform: rotate(180deg);
+}
+
+/* The phone viewer: a few labelled actions sharing the bar's width, icons over their names. */
 .stackedBar {
   display: flex;
   flex: 1;
@@ -52,7 +64,8 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  min-width: 0;
+  /* Each control keeps room for its name. */
+  min-width: 64px;
   min-height: 48px;
   padding: 4px 2px;
   border-radius: var(--mantine-radius-lg);
@@ -60,27 +73,6 @@
   font-size: var(--mantine-font-size-xs);
   font-weight: 500;
   transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-/* A whole control keeps room for its name; a split one shares its width with its ▾. */
-.stackedBar > .stacked {
-  min-width: 64px;
-}
-
-.stackedSplit {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-}
-
-/* A split action's ▾ stays narrow beside its labelled half. */
-.stackedMenu {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  flex-shrink: 0;
-  border-radius: var(--mantine-radius-lg);
-  color: var(--mantine-color-dimmed);
 }
 
 .stacked span {
@@ -103,5 +95,5 @@
 }
 
 .stacked:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
 }

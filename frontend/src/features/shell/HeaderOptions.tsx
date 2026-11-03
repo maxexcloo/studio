@@ -1,6 +1,7 @@
 import { forwardRef, useState } from "react";
 import { ActionIcon, Menu, Popover } from "@mantine/core";
-import { Library, MoreHorizontal, Palette, Settings } from "lucide-react";
+import { Library, Palette } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceControls } from "../../ui/Appearance";
 import { AccountMenuContent } from "../auth/AccountMenu";
@@ -18,11 +19,11 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
     <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md">
       <Menu.Target>
         <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray">
-          <MoreHorizontal size={20} />
+          <icons.more size={20} />
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
-        <AccountMenuContent accountFirst>
+        <AccountMenuContent>
           {library.allowed && (
             <Menu.Item
               component={Link}
@@ -37,7 +38,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
             component={Link}
             to="/settings"
             state={{ backgroundLocation: location }}
-            leftSection={<Settings size={18} />}
+            leftSection={<icons.settings size={18} />}
           >
             Settings
           </Menu.Item>

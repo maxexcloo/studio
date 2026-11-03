@@ -19,13 +19,13 @@ const source = {
     vae: "vae.safetensors",
   },
 };
-/** Upscale's ▾ › Upscale Options…, the form with quality, size and Face Detail. */
+/** Upscale › Upscale Options…, the form with quality, size and Face Detail. */
 async function upscaleOptions(page: Page) {
-  await viewerAction(page, "Upscale Options");
+  await viewerAction(page, "Upscale");
   await page.getByRole("menuitem", { name: "Upscale Options…", exact: true }).click();
 }
 
-test("Upscale queues Balanced in one click and its menu runs a quality or Face Detail directly", async ({
+test("Upscale's menu leads with Balanced and runs a quality or Face Detail directly", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -39,11 +39,14 @@ test("Upscale queues Balanced in one click and its menu runs a quality or Face D
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  // Phones list Upscale under More, where its options are a submenu.
-  if (page.viewportSize()!.width < 768) {
-    await viewerAction(page, "Upscale Options");
-    await page.getByRole("menuitem", { name: "Balanced", exact: true }).click();
-  } else await viewerAction(page, "Upscale");
+  // Phones list Upscale under More, where its options expand in place.
+  await viewerAction(page, "Upscale");
+  await expect(page.getByRole("menuitem", { name: /^(Balanced|Fast|High)$/ })).toHaveText([
+    "Balanced",
+    "Fast",
+    "High",
+  ]);
+  await page.getByRole("menuitem", { name: "Balanced", exact: true }).click();
   await expect.poll(() => submitted.length).toBe(1);
   expect(submitted[0]).toEqual({
     galleryItemId: source.id,
@@ -51,17 +54,17 @@ test("Upscale queues Balanced in one click and its menu runs a quality or Face D
     target: 0,
     faceDetail: false,
   });
-  await viewerAction(page, "Upscale Options");
+  await viewerAction(page, "Upscale");
   await page.getByRole("menuitem", { name: "High", exact: true }).click();
   await expect.poll(() => submitted.length).toBe(2);
   expect(submitted[1]).toMatchObject({ quality: "high", faceDetail: false });
-  await viewerAction(page, "Upscale Options");
-  await page.getByRole("menuitem", { name: "Balanced with Face Detail", exact: true }).click();
+  await viewerAction(page, "Upscale");
+  await page.getByRole("menuitem", { name: "Face Detail", exact: true }).click();
   await expect.poll(() => submitted.length).toBe(3);
   expect(submitted[2]).toMatchObject({ quality: "balanced", faceDetail: true });
 });
 
-test("Upscale lists Face Detail and says why when the worker can't run it", async ({ page }) => {
+test("Upscale lists Face Detail, disabled when the worker can't run it", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push({ ...source });
   await page.route("**/api/upscale/status*", (route) =>
@@ -75,15 +78,8 @@ test("Upscale lists Face Detail and says why when the worker can't run it", asyn
   );
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await viewerAction(page, "Upscale Options");
-  await expect(
-    page.getByRole("menuitem", { name: "Balanced with Face Detail", exact: true }),
-  ).toBeDisabled();
-  await expect(
-    page.getByText("Face Detail needs the worker’s face detector and Impact Pack nodes.", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  await viewerAction(page, "Upscale");
+  await expect(page.getByRole("menuitem", { name: "Face Detail", exact: true })).toBeDisabled();
 });
 
 test("Upscale quality, 2K/4K size and face detail reach one submission while pending", async ({
