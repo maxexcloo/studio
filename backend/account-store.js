@@ -132,10 +132,15 @@ export function accountAccessForId(accountId) {
   return account ? accessFor(account, store.profiles) : null;
 }
 
-/** The Cloud Models and Uncensored Models an ordinary account's group grants, before its own choices. */
+/**
+ * The Cloud Models and Uncensored Models an account's role or group grants, before its own choices:
+ * both for an administrator.
+ */
 export function groupGrants(accountId) {
   const store = readStore();
   const account = store.accounts.find((item) => item.id === accountId);
+  if (account?.role === accountRoles.administrator)
+    return { cloudModels: true, uncensoredModels: true };
   if (account?.role !== accountRoles.user) return null;
   const group = store.profiles[account.accessProfileId];
   if (!group) return null;

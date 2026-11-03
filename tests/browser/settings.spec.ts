@@ -238,6 +238,22 @@ test("A device's earlier Tile Captions choice moves to the account once", async 
   expect(state.preferences.preferences.tileCaptions).toBe(false);
 });
 
+test("An administrator turns Cloud and Uncensored Models off for itself in Settings › Preferences", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  state.preferences.grants = { cloudModels: true, uncensoredModels: true };
+  await page.goto("/settings#preferences");
+  const models = page.getByRole("region", { name: "Models", exact: true });
+  await expect(models.getByRole("switch")).toHaveCount(2);
+  const uncensored = models.getByRole("switch", { name: "Uncensored Models", exact: true });
+  await expect(uncensored).toBeChecked();
+  await uncensored.click({ force: true });
+  await expect(uncensored).not.toBeChecked();
+  await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
+});
+
 test("Finish Starred Images in Settings › Preferences saves its switch, quality and face detail", async ({
   page,
 }) => {
