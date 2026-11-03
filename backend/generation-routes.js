@@ -112,7 +112,19 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           },
         };
       }
+      // The profile authorised here is the one that runs: execution reads workflow and model.
+      if (
+        (input.workflow && input.workflow !== profile.workflow) ||
+        (input.model && input.model !== profile.model)
+      )
+        return {
+          status: 400,
+          payload: { ok: false, error: "The requested model does not match the selected profile." },
+        };
       if (accountUser) {
+        // An ordinary account runs the profile's own checkpoint (graphs.js falls back to the
+        // selected mode's), never a file named in the request; a reused result carries the one it ran.
+        delete input.modelName;
         if (!mayUseGenerationProfile(account, profile))
           return {
             status: 403,
@@ -508,14 +520,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           return {
             status: 400,
             payload: { ok: false, error: "The selected profile does not support this media kind." },
-          };
-        if (input.model && input.model !== routed.profile.model)
-          return {
-            status: 400,
-            payload: {
-              ok: false,
-              error: "The requested model does not match the selected profile.",
-            },
           };
         for (const [field, ceiling] of Object.entries({
           count: 4096,
