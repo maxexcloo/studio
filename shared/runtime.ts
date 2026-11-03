@@ -56,7 +56,6 @@ export interface RuntimeSettings {
 export interface RuntimeStatus {
   settings: RuntimeSettings;
   pools: { id: string; capacity: number; used: number }[];
-  desired?: string[];
   operation?: RuntimeOperation;
   history: RuntimeOperation[];
   workloads: RuntimeWorkload[];

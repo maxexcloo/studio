@@ -22,7 +22,7 @@ async function setup(page: Page) {
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await serveProfiles(page, [profile], { library: true, presets: true });
+  await serveProfiles(page, [profile], { presets: true });
   for (const prompt of ["Alpha", "Beta"])
     state.gallery.push({
       id: prompt.toLowerCase(),

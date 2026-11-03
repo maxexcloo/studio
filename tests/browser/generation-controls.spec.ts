@@ -46,7 +46,7 @@ test("Changing the second encoder and weight type preserves the first encoder in
     },
     options: { ...profiles[0].options, weightDtypes: ["default", "fp8_e4m3fn"] },
   };
-  await serveProfiles(page, [profile], { library: true, presets: true });
+  await serveProfiles(page, [profile], { presets: true });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An encoder comparison");
   await withExpertSettings(page, async () => {
@@ -136,7 +136,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     capabilities: { ...profiles[0].capabilities, inpaint: false },
     defaults: { ...profiles[0].defaults, referenceRole: "edit" },
   };
-  await serveProfiles(page, [profile], { library: true, presets: true });
+  await serveProfiles(page, [profile], { presets: true });
   state.gallery.push({
     id: "portrait",
     jobId: "old-portrait",
@@ -218,7 +218,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
       { id: "end", role: "end", label: "End", required: false },
     ],
   };
-  await serveProfiles(page, [profile], { library: true, presets: true });
+  await serveProfiles(page, [profile], { presets: true });
   state.gallery.push({
     id: "ending",
     jobId: "ending-source",
@@ -533,7 +533,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     capabilities: { ...profiles[1].capabilities, duration: true },
     constraints: { duration: { min: 1, max: 10, step: 1 } },
   };
-  await serveProfiles(page, [still, motion], { library: true, presets: true });
+  await serveProfiles(page, [still, motion], { presets: true });
   state.gallery.push({
     id: "source",
     jobId: "source-job",

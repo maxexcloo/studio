@@ -259,7 +259,6 @@ export class RuntimeController {
     for (const entry of observed)
       if ("state" in entry && holds(entry.state))
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
-    const desired = this.record.desired;
     return {
       settings: this.settings,
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
@@ -267,7 +266,6 @@ export class RuntimeController {
         capacity,
         used: used[id] ?? 0,
       })),
-      ...(desired ? { desired } : {}),
       ...(this.current ? { operation: structuredClone(this.current) } : {}),
       history: structuredClone(this.record.operations.slice(0, 20)),
       workloads: observed.map((entry) => {

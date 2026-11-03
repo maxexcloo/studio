@@ -356,7 +356,7 @@ registerMultiUserAuthRoutes(app, {
     (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id),
 });
 
-registerModelRoutes(app, { catalogue, libraryUpdates: () => library.updates });
+registerModelRoutes(app, { catalogue });
 
 registerModelDownloadRoutes(app, { loadComfyContext });
 const presetRoutes = registerPresetRoutes(app, { models: presetModels });

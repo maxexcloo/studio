@@ -315,7 +315,7 @@ export function modelsForAccount(models, req) {
       };
     },
   );
-  // Saved images stay administration: they are shared across Studio (the Library itself is withLibrary in model/routes.js).
+  // Saved images stay administration: they are shared across Studio.
   const features = models.features
     ? {
         ...models.features,
