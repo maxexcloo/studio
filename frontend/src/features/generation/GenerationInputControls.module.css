@@ -13,6 +13,12 @@
     border-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
+/* A chosen chip in a group, such as Reference Role's Edit, is tinted like a selected filter chip. */
+.chip[aria-pressed="true"] {
+  background-color: var(--mantine-primary-color-light);
+  color: var(--mantine-primary-color-light-color);
+}
+
 .iconChip {
   aspect-ratio: 1;
   padding-inline: 0;
