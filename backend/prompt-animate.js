@@ -2,7 +2,9 @@
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt from the
  * source image's prompt and a theme, as the queue item's writing stage (prompt-stage.js), through
- * the same engine (assistant.js) as assistant-routes.js. Spicy needs Uncensored Models.
+ * the same engine (assistant.js) as assistant-routes.js. When the running text model reads images it
+ * also sees the frame the clip starts from, so the motion stays consistent with what is visible.
+ * Spicy needs Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
  *
@@ -10,6 +12,7 @@
  */
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { AssistantError, cleanPrompt, writerGuide } from "./assistant.js";
+import { userContent } from "./domain/model-content.ts";
 import { isCloudProfile } from "./cloud-profiles.js";
 import { families } from "./family-catalog.js";
 
@@ -57,9 +60,10 @@ const makesSound = (profile) =>
 
 /**
  * The writer's instructions. The guide comes first, including its format: a wrapped profile takes
- * only the description body, one without a wrapper every section its mode lists.
+ * only the description body, one without a wrapper every section its mode lists. `seen`: the writer
+ * is shown the frame too.
  */
-export function animateInstructions({ profile, guide, writing, seconds = 0 }) {
+export function animateInstructions({ profile, guide, writing, seconds = 0, seen = false }) {
   const audio = makesSound(profile);
   const beats = !seconds ? "two to four" : seconds <= 4 ? "two" : seconds <= 8 ? "three" : "four";
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
@@ -71,6 +75,9 @@ export function animateInstructions({ profile, guide, writing, seconds = 0 }) {
       ? "This continues an existing clip: its last frame is the attached image the new clip starts from, and the clip so far was made from the prompt below. Don't replay its action: escalate it or turn it, with a new development, a reaction, a reveal or a consequence of what just happened, and carry on the camera's motion from where it ended."
       : "The attached image is the first frame, made from the prompt below; the model already sees it. Don't re-describe it: spend the words on what changes.",
     "Keep the subject's identity, face, outfit, setting and style as they are unless the theme or instruction changes them.",
+    seen
+      ? "You can see that frame too: anchor the subject's identity, outfit, setting and composition in what is visible there, within the guide's format and length, so the motion stays consistent with it."
+      : "",
     `In the present tense, play the shot out as ${beats} beats that fill the ${clip}: the onset, how it develops, and the result or reaction the last frame lands on. Pace the beats to the time; don't cram in more action than the clip can show, and don't leave it static.`,
     "Make every beat concrete and physical: what the hands, eyes, head and body do; how hair, fabric, liquid, smoke, dust and light respond; how the subject touches or disturbs the things and people around them.",
     "Give the camera one deliberate, continuous path, or keep it locked off where the theme says so: name the shot, its speed and how the framing changes by the end.",
@@ -83,7 +90,9 @@ export function animateInstructions({ profile, guide, writing, seconds = 0 }) {
     "Reply with the prompt only, as plain text: no preamble, Markdown or notes, and no quotation marks around the whole prompt.",
     `Theme: ${animateThemes[writing.theme]}`,
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** The request as admitted: a known theme, the instruction and the source image's prompt. */
@@ -114,7 +123,8 @@ export function animateIssue(writing, { allowed }) {
 
 /**
  * Writes the motion prompt for `profile` and a clip of `seconds`, streaming through `onThinking`
- * and `onDelta`.
+ * and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data }, downscaled) and is
+ * asked only when the text model reads images.
  */
 export async function writeAnimatePrompt({
   engine,
@@ -122,27 +132,33 @@ export async function writeAnimatePrompt({
   guide,
   writing,
   seconds = 0,
+  frame = async () => null,
   signal,
   onThinking,
   onDelta,
 }) {
   const model = await engine.model("animate");
+  const image = (await engine.supportsVision()) ? await frame() : null;
   const reply = await engine.chat({
     call: "animate",
     model,
     messages: [
       {
         role: "system",
-        content: animateInstructions({ profile, guide, writing, seconds }),
+        content: animateInstructions({ profile, guide, writing, seconds, seen: Boolean(image) }),
       },
       {
         role: "user",
-        content: [
-          `${writing.extend ? "The clip so far was made from" : "The first frame was made from"}: ${writing.source || "(no prompt recorded)"}`,
-          writing.instruction ? `Instruction: ${writing.instruction}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n"),
+        content: userContent(
+          [
+            `${writing.extend ? "The clip so far was made from" : "The first frame was made from"}: ${writing.source || "(no prompt recorded)"}`,
+            writing.instruction ? `Instruction: ${writing.instruction}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          image ? [image] : [],
+          Boolean(image),
+        ),
       },
     ],
     temperature: 0.8,

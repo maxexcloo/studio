@@ -52,6 +52,7 @@ const video = { id: "video:test", label: "Motion", kind: "video" };
 const calls = [];
 const engine = {
   model: async (call) => `local/${call}`,
+  supportsVision: async () => false,
   chat: async (body) => {
     calls.push(body);
     body.onThinking?.("A push-in suits a bird.");
@@ -88,6 +89,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     account: () => undefined,
     profiles: async () => [video],
     guide: () => null,
+    frame: async () => assert.fail("a text-only model is never shown the frame"),
   });
   const written = await stage(
     {
@@ -133,4 +135,43 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     }),
     /unusable reply/,
   );
+});
+
+test("the writer sees the first frame when the running model reads images, and only then", async () => {
+  const frame = { mime: "image/jpeg", data: "AAAA" };
+  const asked = [];
+  const stage = (vision) =>
+    createPromptStage({
+      engine: { ...engine, supportsVision: async () => vision },
+      account: () => undefined,
+      profiles: async () => [video],
+      guide: () => null,
+      frame: async (_account, assetId) => (asked.push(assetId), frame),
+    })(
+      {
+        ownerId: "",
+        input: {
+          profileId: video.id,
+          referenceAssets: [{ assetId: "frame-1", slot: "image" }],
+          writing: { kind: "animate", theme: "living", source: "An amber bird" },
+        },
+      },
+      { signal: new AbortController().signal },
+    );
+  calls.length = 0;
+  await stage(true);
+  const [system, request] = calls[0].messages;
+  assert.deepEqual(asked, ["frame-1"]);
+  assert.match(system.content, /You can see that frame too: anchor .*identity, outfit, setting/);
+  assert.doesNotMatch(system.content, /under \d+ words/);
+  assert.deepEqual(request.content[1], {
+    type: "image_url",
+    image_url: { url: "data:image/jpeg;base64,AAAA" },
+  });
+  assert.match(request.content[0].text, /An amber bird/);
+  calls.length = 0;
+  await stage(false);
+  assert.deepEqual(asked, ["frame-1"]);
+  assert.equal(typeof calls[0].messages[1].content, "string");
+  assert.doesNotMatch(calls[0].messages[0].content, /You can see that frame/);
 });
