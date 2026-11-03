@@ -64,14 +64,23 @@ test("access profiles contain only currently available generation profiles and k
       name: "Artists",
       generationProfiles: ["image-fast"],
       allModels: false,
-      features: { cloudModels: false, loras: true, uncensoredModels: false },
+      // Chat and Dream stay on unless a group turns them off.
+      features: {
+        chat: true,
+        cloudModels: false,
+        dream: true,
+        loras: true,
+        uncensoredModels: false,
+      },
     },
   );
 });
 
-test("the built-in User group has no cloud models, LoRAs or uncensored models, and administrators have every feature", () => {
+test("the built-in User group has Chat and Dream but no cloud models, LoRAs or uncensored models, and administrators have every feature", () => {
   assert.deepEqual(builtInAccessProfile.features, {
+    chat: true,
     cloudModels: false,
+    dream: true,
     loras: false,
     uncensoredModels: false,
   });

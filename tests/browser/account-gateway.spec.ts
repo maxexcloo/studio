@@ -170,6 +170,21 @@ test("Sign-in gate keeps account data behind authentication", async ({ page }) =
   await expect(page.getByRole("link", { name: "Images", exact: true })).toHaveCount(0);
 });
 
+test("A group without Chat or Dream hides them and leaves their routes for Images", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "member", role: "user", features: { chat: false, dream: false } });
+  await page.goto("/dream");
+  await expect(page).toHaveURL(/\/images$/);
+  const modes = page.getByRole("navigation", { name: "Creative Modes" });
+  await expect(modes.getByRole("link", { name: "Images", exact: true })).toBeVisible();
+  await expect(modes.getByRole("link", { name: "Chat", exact: true })).toHaveCount(0);
+  await expect(modes.getByRole("link", { name: "Dream", exact: true })).toHaveCount(0);
+  await page.goto("/chat");
+  await expect(page).toHaveURL(/\/images$/);
+});
+
 test("Administrators save and verify per-user cloud and uncensored access through assigned groups", async ({
   page,
 }) => {

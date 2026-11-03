@@ -31,7 +31,9 @@ import { modelsQuery, useGenerationActions } from "../generation/GenerationProvi
 import { isCloudProfile } from "../generation/payload";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
+  chat: "Chat",
   cloudModels: "Cloud Models",
+  dream: "Dream",
   loras: "LoRAs",
   uncensoredModels: "Uncensored Models",
 };
@@ -65,7 +67,8 @@ function GroupEditor({
       name: "",
       allModels: false,
       generationProfiles: [],
-      features: Object.fromEntries(Object.keys(featureLabels).map((feature) => [feature, false])),
+      // As the server reads a group without them (backend/account-policy.js).
+      features: { chat: true, dream: true },
     },
   });
   const save = useMutation({
@@ -326,6 +329,8 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
               <Group gap={4}>
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
                 {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
+                {!group.features.chat && groupFeature(false, "Chat")}
+                {!group.features.dream && groupFeature(false, "Dream")}
               </Group>
             ),
           },

@@ -5,6 +5,7 @@ import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
+import { useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
@@ -26,6 +27,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();
   const [root, setRoot] = useState<HTMLElement | null>(null);
   const [selected, setSelected] = useState<HTMLElement | null>(null);
+  const shown = { "/chat": useGroupFeature("chat"), "/dream": useGroupFeature("dream") };
   return (
     <Group
       ref={setRoot}
@@ -36,30 +38,32 @@ function ModeSwitcher({ mode }: { mode: string }) {
       wrap="nowrap"
     >
       <FloatingIndicator target={selected} parent={root} className={classes.indicator} />
-      {modes.map((item) => {
-        const active = mode.startsWith(item.to);
-        return (
-          <Tooltip key={item.to} label={item.label} disabled={!phone}>
-            <Box component="span" style={{ display: "inline-flex" }}>
-              <Button
-                ref={active ? setSelected : undefined}
-                component={Link}
-                to={item.to}
-                aria-label={item.label}
-                aria-current={active ? "page" : undefined}
-                variant="subtle"
-                color={active ? undefined : "gray"}
-                className={classes.mode}
-                px={{ base: 8, sm: 12 }}
-                size="sm"
-                radius="xl"
-              >
-                {phone ? <item.icon size={20} /> : item.label}
-              </Button>
-            </Box>
-          </Tooltip>
-        );
-      })}
+      {modes
+        .filter((item) => shown[item.to as keyof typeof shown] !== false)
+        .map((item) => {
+          const active = mode.startsWith(item.to);
+          return (
+            <Tooltip key={item.to} label={item.label} disabled={!phone}>
+              <Box component="span" style={{ display: "inline-flex" }}>
+                <Button
+                  ref={active ? setSelected : undefined}
+                  component={Link}
+                  to={item.to}
+                  aria-label={item.label}
+                  aria-current={active ? "page" : undefined}
+                  variant="subtle"
+                  color={active ? undefined : "gray"}
+                  className={classes.mode}
+                  px={{ base: 8, sm: 12 }}
+                  size="sm"
+                  radius="xl"
+                >
+                  {phone ? <item.icon size={20} /> : item.label}
+                </Button>
+              </Box>
+            </Tooltip>
+          );
+        })}
     </Group>
   );
 }

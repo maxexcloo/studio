@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { accessFeatures, builtInAccessProfile } from "./account-policy.js";
+import { accessFeatures, builtInAccessProfile, normaliseAccessProfile } from "./account-policy.js";
 import { writeJsonFile } from "./json-store.js";
 import { verifiedBackup } from "./persistence/migration.ts";
 import {
@@ -94,9 +94,7 @@ export function accountAccess(dataDir, { apply = false } = {}) {
   for (const id of Object.keys(result.groups))
     profiles[id] = {
       ...profiles[id],
-      features: Object.fromEntries(
-        accessFeatures.map((name) => [name, profiles[id].features[name] === true]),
-      ),
+      features: normaliseAccessProfile(profiles[id]).features,
     };
   const { requireApproval: _requireApproval, ...rest } = store;
   const next = {

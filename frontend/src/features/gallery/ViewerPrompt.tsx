@@ -16,6 +16,7 @@ import type { Change, ChangeAction } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useGroupFeature } from "../auth/AccountGate";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askChange } from "../taste/suggestions";
 import { findAction, type ActionGroups } from "./ActionBar";
@@ -54,6 +55,7 @@ export function ViewerPrompt({
   const phone = usePhone();
   const assistant = useQuery(assistantQuery);
   const chat = useChatAction(item, onApplied);
+  const chatOn = useGroupFeature("chat");
   const [prompt, setPrompt] = useState(() => typedPrompt(item));
   const [asking, setAsking] = useState(false);
   const [request, setRequest] = useState("");
@@ -186,7 +188,7 @@ export function ViewerPrompt({
             ask.isPending && <Loader size="xs" color="gray" aria-label="Asking" />
           ) : (
             <Group gap={4} wrap="nowrap">
-              {done && (
+              {done && chatOn && (
                 <Tooltip label={continueInChat.label}>
                   <ActionIcon
                     variant="subtle"
