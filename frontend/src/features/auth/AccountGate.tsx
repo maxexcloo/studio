@@ -37,10 +37,6 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
-/** Every account may upscale; MediaActions still asks. */
-export function useMayUpscale() {
-  return true;
-}
 export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),

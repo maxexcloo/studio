@@ -34,7 +34,6 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { useMayUpscale } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -298,7 +297,6 @@ export function useMediaActions(
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
-  const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
@@ -324,7 +322,7 @@ export function useMediaActions(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
-  const quick = useQuickUpscale(item, ready && mayUpscale);
+  const quick = useQuickUpscale(item, ready);
   const upscaleBusy = upscaling(item) || quick.queue.isPending;
   const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
     quick.queue.mutate({ quality, faceDetail });
@@ -506,7 +504,6 @@ export function useMediaActions(
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     ready &&
-      mayUpscale &&
       itemAction("upscale", {
         // Its first option is the usual click: with an upscale, switching between it and the
         // original; otherwise Balanced.
