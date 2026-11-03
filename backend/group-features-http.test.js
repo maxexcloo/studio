@@ -100,3 +100,15 @@ test("Chat is on unless the account's group turns it off", { timeout: 30_000 }, 
   assert.equal(refused.status, 403);
   assert.equal(refused.body.error, off);
 });
+
+test(
+  "an ordinary account's workflow list leaves out every account's last use",
+  { timeout: 30_000 },
+  async () => {
+    const { status, body } = await call("/api/workflows", { cookie: cookies.member });
+    assert.equal(status, 200);
+    assert.ok(body.workflows.length);
+    assert.equal(body.preferences, undefined);
+    assert.ok(body.workflows.every((item) => !("lastUsedAt" in item)));
+  },
+);

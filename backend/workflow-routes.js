@@ -13,7 +13,10 @@ import {
 
 /** The workflow list, imports and their removal. `loadComfyContext` is model/catalogue.js's. */
 export function registerWorkflowRoutes(app, { loadComfyContext }) {
-  /** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
+  /**
+   * Ordinary accounts see only their permitted workflows, without server paths, delete handles or
+   * when anyone last used them: last use is recorded across every account.
+   */
   function workflowsForRequest(req, workflows) {
     if (!req.studioAccount || canAdmin(req)) return workflows;
     return workflows
@@ -25,8 +28,10 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
           aiDrafted: item.aiDrafted,
         }),
       )
-      .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
+      .map(({ path: _path, deleteId: _deleteId, lastUsedAt: _lastUsedAt, ...item }) => item);
   }
+  const preferencesForRequest = (req, preferences) =>
+    !req.studioAccount || canAdmin(req) ? { preferences } : {};
 
   app.get("/api/workflows", async (req, res) => {
     try {
@@ -42,7 +47,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
           req,
           workflowSummaries({ info, profiles: models.profiles, preferences }),
         ),
-        preferences,
+        ...preferencesForRequest(req, preferences),
       });
     } catch {
       const models = demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
@@ -52,7 +57,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
           req,
           workflowSummaries({ info: {}, profiles: models.profiles, preferences }),
         ),
-        preferences,
+        ...preferencesForRequest(req, preferences),
       });
     }
   });
