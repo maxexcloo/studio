@@ -85,7 +85,7 @@ export function GalleryPage() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const client = useQueryClient();
   // Queue changes (new, finished or failed work) refresh the gallery at once; only active work
-  // polls, for live previews. An idle gallery never polls.
+  // polls, for live previews; an idle gallery waits for the queue's own idle check.
   const jobs = useQuery({
     ...queueQuery,
     select: (data) => ({
