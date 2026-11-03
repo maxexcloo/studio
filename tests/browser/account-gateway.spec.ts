@@ -310,7 +310,10 @@ test("Administrators change roles, reset passwords and delete accounts and empty
   await expect(page.getByRole("menuitem", { name: "Delete Group", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await actions("Empty");
-  await page.getByRole("menuitem", { name: "Delete Group", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Actions for Empty" })
+    .getByRole("menuitem", { name: "Delete Group", exact: true })
+    .click();
   await page
     .getByRole("dialog", { name: "Delete Group", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
