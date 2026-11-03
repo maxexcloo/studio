@@ -17,8 +17,8 @@
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
  * `<data>/history/guides/<packId>/<n>.json`; the profile bindings (`profiles`, `variants`,
  * `negatives`) are versioned together as `_bindings`, an id no pack can have. The store is the only
- * source of guides. Studio is the only writer of live profiles and guides; the profiles
- * repository (`ai/profiles/`) is their backup, fed by Settings › Profiles › Export.
+ * source of guides. Studio is the only writer of live profiles and guides; Settings › Profiles ›
+ * Export backs them up.
  *
  * Origins: "seed" (a sample profile or an older seed), "studio" (an administrator in Studio), "ai"
  * (assistant drafts) and "chat" (MCP admin tools). An AI-drafted save sets aiDrafted; an
