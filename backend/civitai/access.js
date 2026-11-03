@@ -25,10 +25,12 @@ export async function civitaiFetch(
   { transport = fetch, token = process.env.CIVITAI_API_TOKEN, media = false } = {},
 ) {
   let url = civitaiAssetUrl(input);
+  // civitai.com answers HTTP 451 to this deployment's region; civitai.red serves the same API and files.
+  if (url.hostname === "civitai.com") url.hostname = "civitai.red";
   for (let hop = 0; hop < 6; hop += 1) {
     const headers = new Headers(init.headers);
     headers.delete("authorization");
-    if (!media && token && url.hostname === "civitai.com")
+    if (!media && token && url.hostname === "civitai.red")
       headers.set("authorization", `Bearer ${token}`);
     let response;
     try {
@@ -58,7 +60,7 @@ export async function limitedBody(response, limit) {
 }
 
 export async function civitaiJson(pathname, { request = civitaiFetch } = {}) {
-  const response = await request(`https://civitai.com/api/v1/${pathname}`, {
+  const response = await request(`https://civitai.red/api/v1/${pathname}`, {
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) {
@@ -83,7 +85,7 @@ export async function civitaiJson(pathname, { request = civitaiFetch } = {}) {
 /** The public page retains generation associations omitted by the REST image API. */
 export async function civitaiGenerationData(id, { request = civitaiFetch } = {}) {
   if (!Number.isSafeInteger(id) || id < 1) throw new Error("Choose a valid Civitai image.");
-  const response = await request(`https://civitai.com/images/${id}`, {
+  const response = await request(`https://civitai.red/images/${id}`, {
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) {
