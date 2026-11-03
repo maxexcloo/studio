@@ -137,9 +137,9 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Asking for a change in plain words shows the chosen action and prompt before it runs", async ({
+test("Ask turns a change in plain words into the chosen action's prompt in place, to run or undo", async ({
   page,
-}) => {
+}, testInfo) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -160,11 +160,16 @@ test("Asking for a change in plain words shows the chosen action and prompt befo
       });
     }),
   );
-  await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
-  await sendField(page, "Ask for a Change", "make it night", "Ask");
-  const proposal = viewer.getByRole("group", { name: "Proposed Change", exact: true });
-  await expect(proposal).toContainText("Edit");
-  await expect(proposal).toContainText("An amber bird at night");
+  // Phones ask from the full-screen editor, whose header carries the field's actions.
+  const phone = Boolean(testInfo.project.use.isMobile);
+  const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  await field.fill("make it night");
+  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  // The proposal replaces the text in place under the chosen action; Undo restores the request.
+  await expect(field).toHaveValue("An amber bird at night");
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked).toEqual([
     {
       surface: "change",
@@ -173,16 +178,20 @@ test("Asking for a change in plain words shows the chosen action and prompt befo
       actions: ["edit", "recreate", "animate", "upscale"],
     },
   ]);
+  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(field).toHaveValue("make it night");
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
+  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
-  await proposal.getByRole("button", { name: "Run Edit", exact: true }).click();
+  await surface.getByRole("button", { name: "Run", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "refine",
     parentItemId: "hub",
     input: { prompt: "An amber bird at night", count: 1 },
   });
-  await expect(proposal).toBeHidden();
-  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
 test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
@@ -190,13 +199,9 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's field carries the change typed so far into the Chat; phones list it under More.
-  if (desktop) {
-    await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
-    await viewer
-      .getByRole("textbox", { name: "Ask for a Change", exact: true })
-      .fill("make it night");
-  }
+  // Desktop's field carries a change typed over the prompt into the Chat; phones list it under More.
+  if (desktop)
+    await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
   await viewerAction(page, "Continue in Chat");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/chat$/);
