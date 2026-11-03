@@ -285,7 +285,7 @@ export function createServicesObserver({
                 : state === "parked"
                   ? "Parked: stopped on purpose. An administrator can start it."
                   : state === "offline"
-                    ? "The direct runtime health checks are offline."
+                    ? "No runtime answered its health check."
                     : "Runtime readiness is unknown.",
         };
       }),
