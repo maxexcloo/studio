@@ -64,6 +64,20 @@ function fixture(t) {
         },
       },
       definitions: { "loras/defined.safetensors": { title: "Defined" } },
+      provider: {
+        "civitai:2:3": {
+          id: "civitai:2:3",
+          file: "style.safetensors",
+          folder: "loras",
+          label: "Provider Style",
+          version: "v2",
+          baseModel: "Krea 2",
+          sourceUrl: civitai,
+          trainedWords: ["providerword"],
+          sha256: "a".repeat(64),
+          bytes: 1024,
+        },
+      },
     },
     edits: {
       "loras/style.safetensors": {
@@ -73,20 +87,6 @@ function fixture(t) {
         editedAt: "2026-10-30T00:00:00.000Z",
         history: [{ at: "2026-10-30T00:00:00.000Z", by: "admin-1", patch: { note: null } }],
       },
-    },
-  });
-  write("model-download-sources.json", {
-    "civitai:2:3": {
-      id: "civitai:2:3",
-      file: "style.safetensors",
-      folder: "loras",
-      label: "Provider Style",
-      version: "v2",
-      baseModel: "Krea 2",
-      sourceUrl: civitai,
-      trainedWords: ["providerword"],
-      sha256: "a".repeat(64),
-      bytes: 1024,
     },
   });
   return dir;
@@ -110,10 +110,23 @@ function shown(dir) {
       families,
     );
   return Object.fromEntries(
-    Object.entries(store.definitions()).map(([key, fields]) => [
-      key,
-      { fields, origin: store.entry(key).origin, info: info(key.slice("loras/".length)) },
-    ]),
+    Object.entries(store.entries()).map(([key, entry]) => {
+      // The editable fields, without provenance and edit records.
+      const {
+        kind,
+        folder,
+        file,
+        sha256,
+        bytes,
+        source,
+        origin,
+        editedAt,
+        by,
+        history,
+        ...fields
+      } = entry;
+      return [key, { fields, origin, info: info(key.slice("loras/".length)) }];
+    }),
   );
 }
 
@@ -259,7 +272,7 @@ test("the seed and admin layers fold into definitions and edits, leaving every L
     original,
   );
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
-  assert.deepEqual(Object.keys(saved.layers).sort(), ["definitions"]);
+  assert.deepEqual(Object.keys(saved.layers).sort(), ["definitions", "provider"]);
   assert.deepEqual(
     saved.edits["loras/style.safetensors"].history,
     [{ at: "2026-10-30T00:00:00.000Z", by: "admin-1", patch: { note: null } }],

@@ -4,14 +4,14 @@
  * text encoders, VAEs and CLIP vision), keyed by `folder/file`, with provenance and a hash index:
  * `<data>/library/catalogue.json`.
  *
- * It merges these source files, which stay where they are and are never deleted or written here:
- *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
- *   - manifest: the pinned model manifest, `<data>/config/models.json`
- *
- * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent. The `definitions` layer has no source file:
- * it holds the model metadata migrate-runtime folded in from the retired lora-catalogue.json
- * `seed` and `admin` layers (lora-layers.js). Studio's own edits are a layer above all of them.
+ * The `manifest` layer copies the pinned model manifest, `<data>/config/models.json`, which stays
+ * where it is and is never written here: the layer is refreshed when the file changes and kept
+ * when it goes, so the sync is idempotent. The other layers have no source file. `provider` holds
+ * the Civitai and Hugging Face download specs, keyed by download id, which library/downloads.js
+ * records here (migrate-runtime folded in the retired model-download-sources.json,
+ * download-sources.js). `definitions` holds the model metadata migrate-runtime folded in from the
+ * retired lora-catalogue.json `seed` and `admin` layers (lora-layers.js). Studio's own edits are a
+ * layer above all of them.
  * On a conflict the more specific source wins: edits over definitions over provider details over
  * the manifest, except that provider metadata wins for links and hashes.
  *
@@ -289,10 +289,7 @@ export function createCatalogueStore({
   const file = path.join(dataDir, "library", "catalogue.json");
   const manifestPrefix = () =>
     String(environment.STUDIO_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
-  const sources = {
-    provider: () => path.join(dataDir, "model-download-sources.json"),
-    manifest: () => path.join(dataDir, "config", "models.json"),
-  };
+  const sources = { manifest: () => path.join(dataDir, "config", "models.json") };
   let state = null;
   let hashIndex = null;
   let checkedAt = 0;
@@ -320,38 +317,31 @@ export function createCatalogueStore({
     return state;
   }
 
-  /** One source file's content, as the layer stores it, keyed by catalogue key (provider: by download id). */
-  function layerFrom(name, value) {
+  /** The manifest's content as its layer stores it, keyed by catalogue key. */
+  function layerFrom(value) {
+    if (!Array.isArray(value)) return null;
     const layer = {};
-    if (name === "provider") {
-      if (!isObject(value)) return null;
-      for (const [id, spec] of Object.entries(value))
-        if (isObject(spec) && safeKey(spec.folder, spec.file) && providerSource({ ...spec, id }))
-          layer[id] = { ...structuredClone(spec), id };
-    } else if (name === "manifest") {
-      if (!Array.isArray(value)) return null;
-      const prefix = manifestPrefix();
-      for (const entry of value) {
-        if (
-          !isObject(entry) ||
-          typeof entry.path !== "string" ||
-          !sha(entry.sha256) ||
-          !entry.path.startsWith(prefix)
-        )
-          continue;
-        const { folder, file: name2 } = splitCatalogueKey(entry.path.slice(prefix.length));
-        const key = safeKey(folder, name2);
-        if (key)
-          layer[key] = {
-            path: entry.path,
-            sha256: sha(entry.sha256),
-            size: Number(entry.size) || 0,
-            ...(typeof entry.url === "string" && /^https:\/\//.test(entry.url)
-              ? { url: entry.url }
-              : {}),
-            ...(typeof entry.source === "string" ? { source: entry.source } : {}),
-          };
-      }
+    const prefix = manifestPrefix();
+    for (const entry of value) {
+      if (
+        !isObject(entry) ||
+        typeof entry.path !== "string" ||
+        !sha(entry.sha256) ||
+        !entry.path.startsWith(prefix)
+      )
+        continue;
+      const { folder, file: name } = splitCatalogueKey(entry.path.slice(prefix.length));
+      const key = safeKey(folder, name);
+      if (key)
+        layer[key] = {
+          path: entry.path,
+          sha256: sha(entry.sha256),
+          size: Number(entry.size) || 0,
+          ...(typeof entry.url === "string" && /^https:\/\//.test(entry.url)
+            ? { url: entry.url }
+            : {}),
+          ...(typeof entry.source === "string" ? { source: entry.source } : {}),
+        };
     }
     return layer;
   }
@@ -486,15 +476,15 @@ export function createCatalogueStore({
         read.signature === current.signatures[name]
       )
         continue;
-      const layer = layerFrom(name, read.value);
+      const layer = layerFrom(read.value);
       if (layer) changes[name] = { signature: read.signature, layer };
     }
     return changes;
   }
 
   /**
-   * Brings the catalogue up to date with its source files: changed sources replace their layer, a
-   * missing source keeps its last layer. Writes only when something changed. Returns whether it did.
+   * Brings the catalogue up to date with the manifest: a changed manifest replaces its layer, a
+   * missing one keeps its last layer. Writes only when something changed. Returns whether it did.
    */
   function sync({ dryRun = false } = {}) {
     const current = load();
@@ -519,7 +509,7 @@ export function createCatalogueStore({
     return true;
   }
 
-  /** Re-syncs at most every `throttleMs`; 0 checks the sources on every read. */
+  /** Re-syncs at most every `throttleMs`; 0 checks the manifest on every read. */
   const fresh = (throttleMs = 0) => {
     if (!throttleMs || Date.now() - checkedAt >= throttleMs) {
       checkedAt = Date.now();
@@ -533,7 +523,7 @@ export function createCatalogueStore({
     const preview = sync({ dryRun: true });
     if (preview.changed.length || !fs.existsSync(file))
       log.info?.(
-        `[library] Catalogue: merging ${preview.changed.map((name) => `${name} (${preview.counts[name]})`).join(", ") || "nothing new"} into library/catalogue.json; the source files stay as they are.`,
+        `[library] Catalogue: merging ${preview.changed.map((name) => `${name} (${preview.counts[name]})`).join(", ") || "nothing new"} into library/catalogue.json; the manifest stays as it is.`,
       );
     return sync();
   }
@@ -576,6 +566,22 @@ export function createCatalogueStore({
     hashIndex = null;
     writeJsonFile(file, current);
     return { entry: current.entries[key], previous: undo };
+  }
+
+  /** The provider download spec recorded under `id`, or null. */
+  function download(id) {
+    const { provider } = load().layers;
+    return Object.hasOwn(provider, id) ? provider[id] : null;
+  }
+
+  /** Records a provider download's spec under its id; its file's entry gains the provider details. */
+  function rememberDownload(spec) {
+    const current = load();
+    current.layers.provider[spec.id] = structuredClone(spec);
+    const key = safeKey(spec.folder, spec.file);
+    if (key) place(current, key);
+    hashIndex = null;
+    writeJsonFile(file, current);
   }
 
   /** Undoes the newest change to an entry, recorded as a change of its own. */
@@ -628,8 +634,8 @@ export function createCatalogueStore({
 
   /**
    * The LoRA view in the old shapes lora/info.js reads, so /api/loras/info keeps its response:
-   * `sources` as model-download-sources.json had them, `catalogue` by LoRA name as the definitions
-   * with Studio's edits over them.
+   * `sources` as the provider layer holds them (by download id), `catalogue` by LoRA name as the
+   * definitions with Studio's edits over them.
    */
   function loraView() {
     const current = fresh();
@@ -658,18 +664,9 @@ export function createCatalogueStore({
     edit,
     undo,
     approve,
+    download,
+    rememberDownload,
     loraView,
-    definitions: () =>
-      Object.fromEntries(
-        Object.entries(fresh().entries).map(([key, entry]) => [
-          key,
-          Object.fromEntries(
-            [...editableFields]
-              .filter((field) => entry[field] !== undefined)
-              .map((field) => [field, entry[field]]),
-          ),
-        ]),
-      ),
     manifestFile: () => sources.manifest(),
     plan: () => sync({ dryRun: true }),
   };
