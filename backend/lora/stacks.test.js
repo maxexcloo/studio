@@ -6,8 +6,15 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-loras-"));
 process.env.STUDIO_DATA_DIR = dir;
-const { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary } =
-  await import("./stacks.js");
+const {
+  applyLoraOps,
+  clearLoraState,
+  forgetLora,
+  loadLoraLibrary,
+  loadLoraStack,
+  saveLoraLibrary,
+  saveLoraStack,
+} = await import("./stacks.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const stack = (id, name, loras = [{ name: "a.safetensors", strength: 1 }]) => ({ id, name, loras });
@@ -112,4 +119,28 @@ test("stacks saved per workflow by older builds move to the family", () => {
   const library = loadLoraLibrary();
   assert.equal(library.snapshots["krea2-workflow"], undefined);
   assert.equal(library.snapshots[key][0].id, "legacy");
+});
+
+test("a removed LoRA leaves every account's stacks, strengths, ratings and recents", () => {
+  clearLoraState("account-c");
+  saveLoraStack("fast", [{ name: "gone.safetensors" }, { name: "kept.safetensors" }], "account-c");
+  saveLoraLibrary(
+    {
+      strengths: { fast: { "gone.safetensors": 0.5 } },
+      ratings: { "gone.safetensors": "up" },
+      recents: ["gone.safetensors", "kept.safetensors"],
+      snapshots: { [key]: [stack("s", "Saved", [{ name: "gone.safetensors", strength: 1 }])] },
+    },
+    "account-c",
+  );
+  assert.ok(forgetLora("gone.safetensors") >= 1);
+  assert.deepEqual(
+    loadLoraStack("fast", "account-c").map((item) => item.name),
+    ["kept.safetensors"],
+  );
+  const library = loadLoraLibrary("account-c");
+  assert.deepEqual(
+    [library.strengths.fast, library.ratings, library.recents, library.snapshots[key][0].loras],
+    [{}, {}, ["kept.safetensors"], []],
+  );
 });
