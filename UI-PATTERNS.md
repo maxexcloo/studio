@@ -360,8 +360,9 @@ primary component reference and verify APIs against the installed version.
   of owned active jobs; accepted work may remain active until the provider
   confirms cancellation or outputs are safely saved. Clearing only takes failed
   jobs out of the queue; their records and chat cards stay.
-- Pause Queue holds the account's work that has not started (Resume releases it);
-  administrators of a multi-user Studio also Pause All for every account. Held
+- The queue has one Pause Queue, which holds the account's work that has not
+  started (Resume releases it); for administrators of a multi-user Studio it
+  holds every account's. Held
   work keeps its place and reads Paused wherever its waiting reason shows (the
   queue, MCP Result); started work finishes. Each waiting row's Move menu (Move
   to Top, Move Up, Move Down) reorders it among the account's own waiting work

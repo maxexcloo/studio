@@ -59,6 +59,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["HEAD", "/comfy/thumb"],
     ["POST", "/api/accounts/mcp-token/revoke"],
     ["POST", "/api/suggestions"],
+    ["POST", "/api/queue/pause"],
   ])
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
@@ -71,6 +72,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["DELETE", "/api/loras"],
     ["GET", "/api/logs"],
     ["POST", "/api/runtime/restart"],
+    ["POST", "/api/queue/pause-all"],
   ]) {
     const denied = call(path, user, method);
     assert.equal(denied.continued, false, `${method} ${path}`);

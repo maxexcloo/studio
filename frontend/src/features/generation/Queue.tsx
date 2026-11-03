@@ -279,7 +279,7 @@ export function QueueActions() {
   const jobs = shownJobs(queue.data.jobs);
   // An empty queue offers its Resume in the empty state instead.
   if (!jobs.length) return null;
-  const pauses = pauseActions(queue.data.paused, everyone);
+  const pause = pauseControl(queue.data.paused, everyone);
   const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
     jobs.some((job) =>
       key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
@@ -300,10 +300,8 @@ export function QueueActions() {
   );
   return (
     <Group gap={4} wrap="nowrap">
-      {pauses.map(({ key, label }) =>
-        queueAction(label, key.startsWith("resume") ? icons.resume : icons.pause, () =>
-          action.mutate({ id: "", action: key }),
-        ),
+      {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
+        pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
       )}
       {available.map((key) =>
         queueAction(bulk[key].label, bulk[key].icon, () => setConfirming(key)),
@@ -334,17 +332,18 @@ function usePausesEveryone() {
   const multiUser = useAccount().data?.mode === "multi-user";
   return useIsAdmin() && multiUser;
 }
-function pauseActions(paused: QueuePause, everyone: boolean) {
-  const pauses: { key: QueueAction["action"]; label: string }[] = [
-    paused.mine ? { key: "resume", label: "Resume" } : { key: "pause", label: "Pause Queue" },
-  ];
-  if (everyone)
-    pauses.push(
-      paused.all
-        ? { key: "resume-all", label: "Resume All" }
-        : { key: "pause-all", label: "Pause All" },
-    );
-  return pauses;
+/**
+ * The queue's one Pause: an administrator of a multi-user Studio holds every account's work, their
+ * own included; anyone else holds their own. Resume releases whichever holds the account's work.
+ */
+function pauseControl(paused: QueuePause, everyone: boolean) {
+  const held = paused.mine || (everyone && paused.all);
+  const actions: QueueAction["action"][] = held
+    ? [paused.mine && "resume", everyone && paused.all && "resume-all"].filter(
+        (key): key is QueueAction["action"] => Boolean(key),
+      )
+    : [everyone ? "pause-all" : "pause"];
+  return { held, label: held ? "Resume" : "Pause Queue", actions };
 }
 export function Queue() {
   const queue = useQueue();
@@ -356,18 +355,18 @@ export function Queue() {
   const jobs = shownJobs(queue.data.jobs);
   if (!jobs.length) {
     // An empty queue still offers the one action that lets work start again.
-    const resume = pauseActions(paused, everyone).find(({ key }) => key.startsWith("resume"));
+    const pause = pauseControl(paused, everyone);
     return (
       <EmptyState
         fill
         action={
-          resume && (
+          pause.held && (
             <Button
               variant="default"
               loading={action.isPending}
-              onClick={() => action.mutate({ id: "", action: resume.key })}
+              onClick={() => pause.actions.forEach((key) => action.mutate({ id: "", action: key }))}
             >
-              {resume.label}
+              Resume
             </Button>
           )
         }

@@ -31,11 +31,11 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await expect.poll(order).toEqual(["running-job", "first", "second", "third"]);
   await expect(queue.getByText("Image Quality · Generating", { exact: true })).toBeVisible();
 
+  // An administrator's one Pause holds every account's work.
   await queue.getByRole("button", { name: "Pause Queue", exact: true }).click();
   await expect(queue.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
   await expect(queue.getByText("Queued · Paused", { exact: true })).toHaveCount(3);
-  await queue.getByRole("button", { name: "Pause All", exact: true }).click();
-  await queue.getByRole("button", { name: "Resume All", exact: true }).click();
+  expect(state.queuePause).toEqual({ mine: false, all: true });
   await queue.getByRole("button", { name: "Resume", exact: true }).click();
   await expect(queue.getByRole("button", { name: "Pause Queue", exact: true })).toBeVisible();
   expect(state.queuePause).toEqual({ mine: false, all: false });
