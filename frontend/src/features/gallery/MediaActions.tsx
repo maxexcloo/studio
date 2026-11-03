@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Button, Group, Modal, Stack } from "@mantine/core";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import {
   ArrowLeftRight,
   Camera,
@@ -26,6 +26,7 @@ import {
   Rewind,
   RotateCw,
   ScanFace,
+  ScanText,
   Scissors,
   Share,
   Shuffle,
@@ -45,7 +46,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
+import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 import { useMayUpscale } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
@@ -62,7 +65,9 @@ import {
   animateProfileQuery,
   animateThemes,
   mediaDraft,
+  useAnimateReview,
   useAnimateTier,
+  useAnimateWriter,
   useMediaAction,
   useMediaIteration,
   type AnimateTheme,
@@ -259,7 +264,8 @@ export interface MediaActionOptions {
   iterating?: Iteration["kind"];
   onApplied?: () => void;
   onCompare?: () => void;
-  onCustomAnimation: () => void;
+  /** Opens Animate's dialog for a theme: Custom Animation, or any theme under Review Prompt First. */
+  onAnimate: (theme: AnimateTheme) => void;
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
@@ -282,7 +288,7 @@ export function useMediaActions(
     iterating,
     onApplied = () => {},
     onCompare,
-    onCustomAnimation,
+    onAnimate,
     onDelete,
     onRetried,
     onTrim,
@@ -312,6 +318,7 @@ export function useMediaActions(
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
   const [tier, setTier] = useAnimateTier();
+  const [review, setReview] = useAnimateReview();
   // The menu keeps its choice while a switch between Fast and Quality loads.
   const animation = useQuery({
     ...animateProfileQuery(item, tier),
@@ -350,9 +357,25 @@ export function useMediaActions(
           label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
           icon: themeIcons[theme],
           disabled,
-          onClick: theme === "custom" ? onCustomAnimation : () => run({ kind: "animate", theme }),
+          onClick:
+            theme === "custom" || review
+              ? () => onAnimate(theme)
+              : () => run({ kind: "animate", theme }),
         }))
       : [];
+  // Themes write the prompt into an editable review before anything queues.
+  const reviewItems = assistant.data?.available
+    ? [
+        {
+          id: "animate-review",
+          label: "Review Prompt First",
+          icon: ScanText,
+          checked: review,
+          keepOpen: true,
+          onClick: () => setReview(!review),
+        },
+      ]
+    : [];
   const actions = [
     retry,
     image &&
@@ -369,6 +392,7 @@ export function useMediaActions(
             keepOpen: true,
             onClick: () => setTier(option),
           })),
+          reviewItems,
           themeItems(!animation.data),
           [
             {
@@ -387,6 +411,7 @@ export function useMediaActions(
         loading: running === "animate" || action.isPending,
         // A theme continues the clip from its last frame at once; the composer shows it first.
         menu: [
+          reviewItems,
           themeItems(action.isPending),
           [
             {
@@ -635,53 +660,135 @@ export function MediaActionMenu({ item, ...options }: MediaActionOptions & { ite
   return <ActionMenuItems groups={useMediaActions(item, options)} />;
 }
 
-/** Animate › Custom Animation: the instruction the assistant writes the motion prompt from. */
-export function CustomAnimationDialog({
+/**
+ * Animate's dialog for a theme. Custom Animation first asks for the instruction; under Review
+ * Prompt First the assistant then writes the motion prompt for editing (a full-screen sheet on
+ * phones), and Run queues exactly the prompt shown. Otherwise the theme queues as the menu would.
+ */
+export function AnimateDialog({
   item,
   sessionId,
   iterate,
-  opened,
+  theme,
   onClose,
 }: {
   item: MediaItem;
   sessionId?: string;
   iterate?: (iteration: Iteration) => void;
-  opened: boolean;
+  theme: AnimateTheme;
   onClose: () => void;
 }) {
+  const phone = usePhone();
   const iteration = useMediaIteration(item, sessionId);
+  const run = iterate ?? iteration.mutate;
+  const [review] = useAnimateReview();
+  const writer = useAnimateWriter(item, sessionId);
   const [instruction, setInstruction] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const writing = useRef<AbortController>(null);
+  const asking = theme === "custom" && writer.isIdle;
+  const write = () => {
+    writing.current?.abort();
+    writing.current = new AbortController();
+    writer.mutate(
+      { theme, instruction: instruction.trim() || undefined, signal: writing.current.signal },
+      { onSuccess: (written) => setPrompt(written.prompt) },
+    );
+  };
+  useEffect(() => {
+    if (theme !== "custom") write();
+    return () => writing.current?.abort();
+  }, []);
+  const written = writer.data;
   return (
-    <Modal opened={opened} onClose={onClose} title="Custom Animation" centered size="sm">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!instruction.trim()) return;
-          (iterate ?? iteration.mutate)({
-            kind: "animate",
-            theme: "custom",
-            instruction: instruction.trim(),
-          });
-          onClose();
-        }}
-      >
-        <Stack>
-          <TextBox
-            label="Instruction"
-            placeholder="What should happen in the video?"
-            autosize
-            minRows={3}
-            data-autofocus
-            value={instruction}
-            onChange={setInstruction}
-          />
-          <Group justify="flex-end">
-            <Button type="submit" disabled={!instruction.trim()}>
-              Animate
-            </Button>
-          </Group>
-        </Stack>
-      </form>
+    <Modal
+      opened
+      onClose={onClose}
+      title={asking ? "Custom Animation" : "Review Prompt"}
+      centered
+      size={asking ? "sm" : "md"}
+      fullScreen={phone}
+    >
+      {asking ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!instruction.trim()) return;
+            if (review) return write();
+            run({ kind: "animate", theme, instruction: instruction.trim() });
+            onClose();
+          }}
+        >
+          <Stack>
+            <TextBox
+              label="Instruction"
+              placeholder="What should happen in the video?"
+              autosize
+              minRows={3}
+              data-autofocus
+              value={instruction}
+              onChange={setInstruction}
+            />
+            <Group justify="flex-end">
+              <Button type="submit" disabled={!instruction.trim()}>
+                {review ? "Write Prompt" : "Animate"}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      ) : writer.isPending ? (
+        <LoadingState label="Writing Prompt…" />
+      ) : (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!written || !prompt.trim()) return;
+            run({
+              kind: "animate",
+              theme,
+              instruction: instruction.trim() || undefined,
+              written: { prompt: prompt.trim(), model: written.model, thinking: written.thinking },
+            });
+            onClose();
+          }}
+        >
+          <Stack>
+            {writer.error && (
+              <Alert color="red" title="Couldn’t Write the Prompt">
+                {writer.error.message}
+              </Alert>
+            )}
+            {written && (
+              <>
+                <TextBox
+                  label="Prompt"
+                  autosize
+                  minRows={4}
+                  data-autofocus
+                  value={prompt}
+                  onChange={setPrompt}
+                />
+                <Text size="sm" c="dimmed">
+                  {written.profileLabel}
+                  {written.tier ? ` · ${written.tier === "fast" ? "Fast" : "Quality"}` : ""}
+                </Text>
+              </>
+            )}
+            <Group justify="flex-end">
+              <Button variant="default" onClick={onClose}>
+                Cancel
+              </Button>
+              {written ? (
+                <Button type="submit" disabled={!prompt.trim()}>
+                  Run
+                </Button>
+              ) : (
+                <Button onClick={write}>Try Again</Button>
+              )}
+            </Group>
+          </Stack>
+        </form>
+      )}
     </Modal>
   );
 }

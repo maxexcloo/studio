@@ -276,7 +276,7 @@ primary component reference and verify APIs against the installed version.
   `useRemembered` helper (browser storage under `studio-<name>:<account>`): the
   gallery composer's image and video drafts, the Chat draft, gallery view,
   filters and versions, Compare's mode and variants, the last Library and
-  Settings section, Dream's view and tuning, Animate's Fast or Quality, and the LoRA picker tab. Transient
+  Settings section, Dream's view and tuning, Animate's Fast or Quality and Review Prompt First, and the LoRA picker tab. Transient
   state (open popups, selections, search queries) is never remembered. Keep
   account data and credentials out of browser storage.
 - Account access groups own model grants and Cloud Models/uncensored permissions.
@@ -287,8 +287,11 @@ primary component reference and verify APIs against the installed version.
   chosen profile it takes the shared backend pick (Fast unless Quality is chosen; local video while it runs,
   otherwise granted Grok), and says why before queuing when nothing can run. Show truthful queue states and reasons.
   A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
-  in one click without a review pause (the viewer's plain-language change is the exception): its thinking and prompt stream in the item, and Details keeps
-  the thinking collapsed under the prompt.
+  in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
+  the thinking collapsed under the prompt. The exceptions are the viewer's plain-language change and
+  Animate's Review Prompt First (checked in Animate ▾, off by default): a theme or Custom Animation
+  then writes the prompt into a compact dialog (a full-screen sheet on phones) with the prompt
+  editable, the video model and Fast or Quality shown, and Run, which queues exactly that prompt, or Cancel.
 - The status panel shows compact active rows with a muted spinner and Stop;
   completed/cancelled work leaves the list, failed work retains Retry and Clear.
   Stop All and Clear Failed use `ConfirmDialog`. Stop All requests cancellation
@@ -392,7 +395,7 @@ primary component reference and verify APIs against the installed version.
   Use as Reference (images), Recreate (an upload with a suggested prompt; the run is
   its version), Run Again (new seed), Run Again (Same Seed); Edit
   opens the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
-  Fast or Quality (checked; Fast by default, shown when they run different video profiles, for the themes and the composer), themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
+  Fast or Quality (checked; Fast by default, shown when they run different video profiles, for the themes and the composer), Review Prompt First (checked), themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
   Detail (listed even when the worker can't run it, saying why), Upscale
