@@ -15,6 +15,7 @@ import { profilePrompting } from "../profile/prompting-migration.js";
 import { migrateUploads } from "../uploads.js";
 import { versionSources } from "../version-sources.js";
 import { legacyRecords } from "../legacy-records.js";
+import { envSettings } from "../env-settings.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -48,6 +49,7 @@ else {
     profilePrompting: profilePrompting(dataDir, { apply: values.apply }),
     loraLayers: loraLayers(dataDir, { apply: values.apply }),
     legacyRecords: legacyRecords(dataDir, { apply: values.apply }),
+    envSettings: envSettings(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
       ? {
           dreamOwnership: dreamOwnership(dataDir, {
