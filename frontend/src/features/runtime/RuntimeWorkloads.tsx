@@ -24,8 +24,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeading } from "../../ui/SectionHeading";
-import { SettingRow } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -187,197 +186,201 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       ? `Restart ${names(entry.start)}`
       : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
   return (
-    <Stack gap="md" component="section" aria-label="GPU Workloads">
-      <SectionHeading>GPU Workloads</SectionHeading>
-      <AutomaticControl settings={settings} />
-      {operation && (
-        <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
-          {operation.progress}
-        </Alert>
-      )}
-      <DataTable
-        label="GPU Workloads"
-        rows={workloads}
-        rowKey={(item) => item.id}
-        rowName={(item) => item.label}
-        empty="No GPU Workloads"
-        columns={[
-          {
-            key: "run",
-            header: "Run",
-            width: 44,
-            cell: (item) => (
-              <Checkbox
-                aria-label={`Run ${item.label}`}
-                checked={chosen.includes(item.id)}
-                disabled={Boolean(operation)}
-                onChange={(event) =>
-                  setSelection(
-                    event.currentTarget.checked
-                      ? [...chosen, item.id]
-                      : chosen.filter((id) => id !== item.id),
-                  )
-                }
-              />
-            ),
-          },
-          {
-            key: "workload",
-            header: "Workload",
-            main: true,
-            sortValue: (item) => item.label,
-            cell: (item) => {
-              const note =
-                item.reason ||
-                reasons[item.id] ||
-                (item.acceptedOperations > 0 &&
-                  `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
-              return (
-                <>
-                  <Text size="sm" fw={500}>
-                    {item.label}
-                  </Text>
-                  {note && (
-                    <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                      {note}
-                    </Text>
-                  )}
-                </>
-              );
-            },
-          },
-          {
-            key: "gpus",
-            header: "GPUs",
-            visibleFrom: "sm",
-            sortValue: (item) => item.gpus,
-            cell: (item) => <Text size="sm">{item.gpus}</Text>,
-          },
-          {
-            key: "state",
-            header: "State",
-            sortValue: (item) => phaseLabel(item.phase),
-            cell: (item) => (
-              <Badge color={phaseColour(item.phase)} miw="max-content">
-                {phaseLabel(item.phase)}
-              </Badge>
-            ),
-          },
-        ]}
-        rowActions={(item) =>
-          item.phase === "parked" || item.phase === "down" ? (
-            <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
-              Start
-            </Menu.Item>
-          ) : (
-            <Menu.Item
-              disabled={Boolean(operation) || item.phase !== "running"}
-              onClick={() => setRestarting(item.id)}
-            >
-              Restart
-            </Menu.Item>
-          )
-        }
-      />
-      <Group justify="flex-end" gap="xs">
-        <Button
-          variant="default"
-          disabled={!selection || sameSet(chosen, running)}
-          onClick={() => setSelection(null)}
-        >
-          Reset
-        </Button>
-        <Button
-          disabled={Boolean(operation) || sameSet(chosen, running)}
-          loading={previewing.isPending}
-          onClick={() => previewing.mutate(chosen)}
-        >
-          Preview Changes
-        </Button>
-      </Group>
-      <ConfirmDialog
-        opened={Boolean(preview)}
-        title="Apply GPU Placement"
-        action="Apply"
-        pending={applying.isPending}
-        error={applying.error?.message}
-        onConfirm={() => applying.mutate(preview!)}
-        onClose={() => {
-          setPreview(null);
-          applying.reset();
-        }}
-      >
-        {preview && <PlacementChanges preview={preview} label={label} />}
-      </ConfirmDialog>
-      <ConfirmDialog
-        opened={Boolean(restarting)}
-        title={`Restart ${restarting ? label(restarting) : ""}`}
-        action="Restart"
-        pending={restart.isPending}
-        error={restart.error?.message}
-        onConfirm={() => restart.mutate(restarting!)}
-        onClose={() => {
-          setRestarting(null);
-          restart.reset();
-        }}
-      >
-        Accepted work finishes first, then it restarts with the same model and GPUs.
-      </ConfirmDialog>
-      {!!history.length && (
-        <Stack gap={4} align="flex-start" component="section" aria-label="History">
-          <SectionHeading>History</SectionHeading>
+    <>
+      <SettingGroup title="GPU Workloads">
+        <Stack gap="md">
+          <AutomaticControl settings={settings} />
+          {operation && (
+            <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
+              {operation.progress}
+            </Alert>
+          )}
           <DataTable
-            label="Runtime Changes"
-            rows={allChanges ? history : history.slice(0, 3)}
-            rowKey={(entry) => entry.id}
-            rowName={change}
-            empty="No Changes"
+            label="GPU Workloads"
+            rows={workloads}
+            rowKey={(item) => item.id}
+            rowName={(item) => item.label}
+            empty="No GPU Workloads"
             columns={[
               {
-                key: "time",
-                header: "Time",
-                cell: (entry) => (
-                  <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                    {new Date(entry.startedAt).toLocaleString(undefined, {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </Text>
+                key: "run",
+                header: "Run",
+                width: 44,
+                cell: (item) => (
+                  <Checkbox
+                    aria-label={`Run ${item.label}`}
+                    checked={chosen.includes(item.id)}
+                    disabled={Boolean(operation)}
+                    onChange={(event) =>
+                      setSelection(
+                        event.currentTarget.checked
+                          ? [...chosen, item.id]
+                          : chosen.filter((id) => id !== item.id),
+                      )
+                    }
+                  />
                 ),
               },
               {
-                key: "change",
-                header: "Change",
+                key: "workload",
+                header: "Workload",
                 main: true,
-                cell: (entry) => (
-                  <Text
-                    size="sm"
-                    truncate
-                    title={`${entry.error || entry.progress} · ${entry.requestedBy}`}
-                  >
-                    {change(entry)}
-                    {entry.error && ` · ${entry.error}`}
-                  </Text>
-                ),
+                sortValue: (item) => item.label,
+                cell: (item) => {
+                  const note =
+                    item.reason ||
+                    reasons[item.id] ||
+                    (item.acceptedOperations > 0 &&
+                      `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+                  return (
+                    <>
+                      <Text size="sm" fw={500}>
+                        {item.label}
+                      </Text>
+                      {note && (
+                        <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                          {note}
+                        </Text>
+                      )}
+                    </>
+                  );
+                },
               },
               {
-                key: "result",
-                header: "Result",
-                cell: (entry) => (
-                  <Badge color={operationColour(entry.status)} miw="max-content">
-                    {operationLabel(entry.status)}
+                key: "gpus",
+                header: "GPUs",
+                visibleFrom: "sm",
+                sortValue: (item) => item.gpus,
+                cell: (item) => <Text size="sm">{item.gpus}</Text>,
+              },
+              {
+                key: "state",
+                header: "State",
+                sortValue: (item) => phaseLabel(item.phase),
+                cell: (item) => (
+                  <Badge color={phaseColour(item.phase)} miw="max-content">
+                    {phaseLabel(item.phase)}
                   </Badge>
                 ),
               },
             ]}
+            rowActions={(item) =>
+              item.phase === "parked" || item.phase === "down" ? (
+                <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
+                  Start
+                </Menu.Item>
+              ) : (
+                <Menu.Item
+                  disabled={Boolean(operation) || item.phase !== "running"}
+                  onClick={() => setRestarting(item.id)}
+                >
+                  Restart
+                </Menu.Item>
+              )
+            }
           />
-          {history.length > 3 && (
-            <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
-              {allChanges ? "Show Less" : "Show All"}
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              disabled={!selection || sameSet(chosen, running)}
+              onClick={() => setSelection(null)}
+            >
+              Reset
             </Button>
-          )}
+            <Button
+              disabled={Boolean(operation) || sameSet(chosen, running)}
+              loading={previewing.isPending}
+              onClick={() => previewing.mutate(chosen)}
+            >
+              Preview Changes
+            </Button>
+          </Group>
+          <ConfirmDialog
+            opened={Boolean(preview)}
+            title="Apply GPU Placement"
+            action="Apply"
+            pending={applying.isPending}
+            error={applying.error?.message}
+            onConfirm={() => applying.mutate(preview!)}
+            onClose={() => {
+              setPreview(null);
+              applying.reset();
+            }}
+          >
+            {preview && <PlacementChanges preview={preview} label={label} />}
+          </ConfirmDialog>
+          <ConfirmDialog
+            opened={Boolean(restarting)}
+            title={`Restart ${restarting ? label(restarting) : ""}`}
+            action="Restart"
+            pending={restart.isPending}
+            error={restart.error?.message}
+            onConfirm={() => restart.mutate(restarting!)}
+            onClose={() => {
+              setRestarting(null);
+              restart.reset();
+            }}
+          >
+            Accepted work finishes first, then it restarts with the same model and GPUs.
+          </ConfirmDialog>
         </Stack>
+      </SettingGroup>
+      {!!history.length && (
+        <SettingGroup title="History">
+          <Stack gap={4} align="flex-start">
+            <DataTable
+              label="Runtime Changes"
+              rows={allChanges ? history : history.slice(0, 3)}
+              rowKey={(entry) => entry.id}
+              rowName={change}
+              empty="No Changes"
+              columns={[
+                {
+                  key: "time",
+                  header: "Time",
+                  cell: (entry) => (
+                    <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                      {new Date(entry.startedAt).toLocaleString(undefined, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </Text>
+                  ),
+                },
+                {
+                  key: "change",
+                  header: "Change",
+                  main: true,
+                  cell: (entry) => (
+                    <Text
+                      size="sm"
+                      truncate
+                      title={`${entry.error || entry.progress} · ${entry.requestedBy}`}
+                    >
+                      {change(entry)}
+                      {entry.error && ` · ${entry.error}`}
+                    </Text>
+                  ),
+                },
+                {
+                  key: "result",
+                  header: "Result",
+                  cell: (entry) => (
+                    <Badge color={operationColour(entry.status)} miw="max-content">
+                      {operationLabel(entry.status)}
+                    </Badge>
+                  ),
+                },
+              ]}
+            />
+            {history.length > 3 && (
+              <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
+                {allChanges ? "Show Less" : "Show All"}
+              </Button>
+            )}
+          </Stack>
+        </SettingGroup>
       )}
-    </Stack>
+    </>
   );
 }
