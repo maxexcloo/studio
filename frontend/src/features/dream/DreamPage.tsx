@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Group,
+  ScrollArea,
   SegmentedControl,
   Stack,
   Text,
@@ -13,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { useRemembered } from "../auth/useRemembered";
+import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
@@ -89,11 +91,11 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   return <EmptyState fill>Nothing New Yet</EmptyState>;
 }
 
-/** Dream: the deck of unseen results with its status, pause and settings, or the discards. */
+/** Dream: the deck with its status, pause and settings, the discards or the taste profile. */
 export function DreamPage() {
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
-  const [view, setView] = useRemembered<"deck" | "discarded">("dream-view", "deck");
+  const [view, setView] = useRemembered<"deck" | "discarded" | "taste">("dream-view", "deck");
   const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
   const status = data && statusLine(data);
@@ -108,6 +110,7 @@ export function DreamPage() {
           data={[
             { value: "deck", label: "Deck" },
             { value: "discarded", label: "Discarded" },
+            { value: "taste", label: "Taste" },
           ]}
         />
         <div className={classes.status} role="status" aria-label="Dream Status">
@@ -139,6 +142,10 @@ export function DreamPage() {
       </Group>
       {view === "discarded" ? (
         <DiscardedDreams />
+      ) : view === "taste" ? (
+        <ScrollArea flex={1} mih={0} w="100%" maw={760} mx="auto">
+          <TasteProfile />
+        </ScrollArea>
       ) : dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
       ) : dream.isError ? (

@@ -260,7 +260,8 @@ primary component reference and verify APIs against the installed version.
   judging them never alters the gallery beyond an optional Star.
 - An editable, LLM-maintained taste profile learns from swipes, stars,
   iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,
-  viewer next-step suggestions and Chat.
+  viewer next-step suggestions and Chat. Dream's Taste view (beside Deck and
+  Discarded) edits it.
 - Suggestions never move the layout or act on their own: prompt ideas float
   over an empty, focused prompt and fill it (in Chat as "Create an image: …");
   viewer next steps hold their row with placeholder chips while loading, written
