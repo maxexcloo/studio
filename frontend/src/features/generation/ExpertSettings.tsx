@@ -1,11 +1,11 @@
 import {
   ActionIcon,
   Button,
-  Checkbox,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   Tooltip,
@@ -206,7 +206,7 @@ export function ExpertSettings({
             allowDeselect={false}
             onChange={(backendId) => onChange({ backendId })}
           />
-          <Checkbox
+          <Switch
             label="Allow Fallback to Another Worker"
             description="Studio waits for the selected backend unless you allow another."
             checked={Boolean(input.allowFallback)}
