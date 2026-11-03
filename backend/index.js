@@ -225,6 +225,7 @@ import {
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
+import { registerRedditImportRoute } from "./gallery/reddit.js";
 
 import {
   applyLoraOps,
@@ -1588,6 +1589,7 @@ function thumbnailCacheControl(req) {
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
+registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
 /**
  * What the deployment decides, for Settings: each value with its source
