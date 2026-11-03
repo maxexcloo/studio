@@ -44,7 +44,7 @@ test("Compare from the composer queues one seeded variant per chosen local profi
   await page.getByRole("option", { name: "Other Image", exact: true }).click();
   await chosen.press("Escape");
   await expect(dialog).toContainText("LoRAs that don’t suit a profile’s family are left out");
-  await dialog.getByRole("button", { name: "Compare 3 Variants", exact: true }).click();
+  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const [run] = state.comparisons;
@@ -105,7 +105,7 @@ test("Compare runs LoRAs on and off, side by side and as a strength sweep with o
     "B · Detail Slider 0.7",
     "C · Detail Slider 1",
   ]);
-  await dialog.getByRole("button", { name: "Compare 3 Variants", exact: true }).click();
+  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
 
   await expect(page).toHaveURL(/\/compare\//);
   const [run] = state.comparisons;
@@ -152,7 +152,7 @@ test("Compare from the tile menu keeps the result's seed, compares prompts with 
   const second = dialog.getByRole("group", { name: "Variant B", exact: true });
   await second.getByRole("textbox", { name: "Prompt", exact: true }).fill("A jade bird");
   await second.getByRole("textbox", { name: "Negative Prompt", exact: true }).fill("feathers");
-  await dialog.getByRole("button", { name: "Compare 2 Variants", exact: true }).click();
+  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
 
   await expect(page).toHaveURL(/\/compare\//);
   const [run] = state.comparisons;

@@ -594,7 +594,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
                 events={{ hover: true, focus: true, touch: true }}
               >
                 <Button type="submit" loading={run.isPending} {...blockedProps(blockedReason)}>
-                  Compare {variants.length} Variants
+                  Compare
                 </Button>
               </Tooltip>
             </Group>
