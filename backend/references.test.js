@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
 import test from "node:test";
 import sharp from "sharp";
 
@@ -66,6 +67,32 @@ test("uploaded images and byte reads are limited to their account owner", async 
     referenceAssets.bytesForReference(ownerA, assetB.id),
     /no longer in the gallery/,
   );
+});
+
+test("a multipart upload streams to disk and its temporary file is moved into place", async () => {
+  const image = await sharp({
+    create: { width: 16, height: 16, channels: 3, background: "#654321" },
+  })
+    .png()
+    .toBuffer();
+  const boundary = "studio-upload-boundary";
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="streamed.png"\r\nContent-Type: image/png\r\n\r\n`,
+    ),
+    image,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  const req = Object.assign(Readable.from([body]), {
+    headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+  });
+  const upload = await referenceAssets.readMultipartUpload(req);
+  assert.equal(upload.buffer, undefined, "the upload is not held in memory");
+  assert.deepEqual(fs.readFileSync(upload.file), image);
+  const { asset } = await referenceAssets.saveUpload(upload, "account-s");
+  assert.equal(fs.existsSync(upload.file), false);
+  const owner = { studioAccount: { userId: "account-s", role: "user" } };
+  assert.deepEqual((await referenceAssets.bytesForReference(owner, asset.id)).buffer, image);
 });
 
 test("non-image uploads are rejected", async () => {
@@ -212,10 +239,15 @@ test("a video upload is an uploaded gallery video, used by its first frame and r
     clip,
   ]);
   const buffer = fs.readFileSync(clip);
+  // As a multipart upload leaves it: a temporary file, moved into place.
+  const uploaded = path.join(temporary, "uploaded.mp4");
+  fs.copyFileSync(clip, uploaded);
   const { item, asset } = await referenceAssets.saveUpload(
-    { buffer, name: "clip.mp4", mime: "video/mp4" },
+    { file: uploaded, name: "clip.mp4", mime: "video/mp4" },
     "account-v",
   );
+  assert.equal(fs.existsSync(uploaded), false);
+  assert.equal(item.size, buffer.length);
   assert.equal(item.type, "video");
   assert.equal(item.uploaded, true);
   assert.equal(item.mime, "video/mp4");
