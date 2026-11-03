@@ -101,9 +101,11 @@ primary component reference and verify APIs against the installed version.
   keep visited forms mounted to preserve edits; a section that fails to render
   shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
-  (`SectionHeader`: segmented views, an expanding search, filters in one popover
-  and icon actions, labelled in Settings › Users and Groups, whose actions are
-  rare) at the end of the same row, above compact rows with status
+  (`SectionHeader`: segmented views, an expanding search, filters in one popover,
+  then the actions: a create or primary action as a labelled compact subtle
+  button (`ToolbarAction`: New User, New Group, New Guide, Import Workflow), the
+  rest icons with tooltips; phones may fold a crowded toolbar's actions into
+  More) at the end of the same row, above compact rows with status
   badges and row menus. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning. No accordions:
   headings group a section's parts, and creating or configuring a record opens
