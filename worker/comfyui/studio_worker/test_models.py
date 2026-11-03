@@ -61,6 +61,12 @@ class WorkerModelTests(unittest.TestCase):
             state(self.root, "loras", self.file.name, True)["sha256"], self.sha
         )
 
+    def test_published_models_and_new_folders_are_world_readable(self):
+        (self.root / "loras").rmdir()
+        self.receive([b"abcdef"])
+        self.assertEqual(self.file.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(self.file.parent.stat().st_mode & 0o777, 0o755)
+
     def test_bad_checksum_is_never_published(self):
         with self.assertRaisesRegex(ValueError, "checksum"):
             self.receive([b"broken"])

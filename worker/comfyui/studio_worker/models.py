@@ -279,7 +279,15 @@ async def receive(root, folder, filename, offset, expected_size, sha256, note, c
             raise ValueError(
                 "A model already uses this filename. Replace it explicitly first."
             )
+        # Models stay world-readable so a non-root mirror can copy them.
+        missing = [
+            parent
+            for parent in [file.parent, *file.parent.parents]
+            if not parent.exists()
+        ]
         file.parent.mkdir(parents=True, exist_ok=True)
+        for parent in missing:
+            parent.chmod(0o755)
         partial = Path(str(file) + ".part")
         metadata = Path(str(file) + ".part.json")
         if offset:
@@ -331,6 +339,7 @@ async def receive(root, folder, filename, offset, expected_size, sha256, note, c
             partial.unlink()
             metadata.unlink(missing_ok=True)
             raise ValueError("The model did not match its published checksum.")
+        partial.chmod(0o644)
         # A concurrently created destination must survive. link() fails if it exists.
         os.link(partial, file, follow_symlinks=False)
         partial.unlink()
