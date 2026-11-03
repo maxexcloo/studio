@@ -157,7 +157,8 @@ primary component reference and verify APIs against the installed version.
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. On phones a text box is a summary of its
   text; tapping it (prompt, negative, Chat message, profile and guide editors and
-  the rest) opens it full screen with the same actions as the inline box (the
+  the rest) opens it full screen, without the keyboard until the text is tapped,
+  with the same actions as the inline box (the
   prompt's Recent Prompts and Prompt Assistance, Copy, Clear) and Done, with
   prompt ideas and assistant suggestions under its text; Done, Escape or
   dismissing the keyboard returns to the page. Desktop edits in place.

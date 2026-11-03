@@ -4,6 +4,7 @@ import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
+import { usePhone } from "../../ui/usePhone";
 import type { QueueJob, ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
@@ -91,6 +92,7 @@ export function GenerationForm({
   const navigate = useNavigate();
   const location = useLocation();
   const compare = useCompare();
+  const phone = usePhone();
   useEffect(() => {
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
@@ -125,6 +127,8 @@ export function GenerationForm({
             maxRows={1}
             variant="unstyled"
             className={classes.compactPrompt}
+            // A phone tap opens the prompt editor, so the bar never raises the keyboard.
+            inputMode={phone ? "none" : undefined}
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
           />
