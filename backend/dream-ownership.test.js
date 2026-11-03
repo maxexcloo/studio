@@ -4,9 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { dreamOwnership } from "./dream-ownership.js";
+import { readGalleryRows, writeGalleryRows } from "./persistence/gallery-rows.ts";
 import {
   closeRuntimeDatabase,
   readRuntimeDocument,
+  runtimeDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
 
@@ -19,15 +21,12 @@ test("Dream answers on other accounts' records are cleared once; the owner's sta
     ownerId,
     ...(dream ? { dream } : {}),
   });
-  fs.writeFileSync(
-    path.join(dataDir, "gallery.json"),
-    JSON.stringify([
-      item("mine", "n", mark("kept")),
-      item("seen", "n"),
-      item("theirs", "m", mark("discarded")),
-      item("old", "m"),
-    ]),
-  );
+  writeGalleryRows(runtimeDatabase(dataDir), [
+    item("mine", "n", mark("kept")),
+    item("seen", "n"),
+    item("theirs", "m", mark("discarded")),
+    item("old", "m"),
+  ]);
   writeRuntimeDocument(dataDir, "dream:n", { recent: [], judged: ["old", "seen"] });
   const signal = (kind, id) => ({ at: "2026-10-01T00:00:00Z", kind, jobId: `job-${id}` });
   writeRuntimeDocument(dataDir, "taste:n", {
@@ -44,16 +43,13 @@ test("Dream answers on other accounts' records are cleared once; the owner's sta
     [1, { discarded: 1 }, 1, 1],
   );
   dreamOwnership(dataDir, { owner: "n", apply: true });
-  const gallery = JSON.parse(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8"));
-  assert.deepEqual(
-    gallery.map((entry) => [entry.id, entry.dream?.state]),
-    [
-      ["mine", "kept"],
-      ["seen", undefined],
-      ["theirs", undefined],
-      ["old", undefined],
-    ],
-  );
+  const gallery = readGalleryRows(runtimeDatabase(dataDir));
+  assert.deepEqual(gallery.map((entry) => [entry.id, entry.dream?.state]).sort(), [
+    ["mine", "kept"],
+    ["old", undefined],
+    ["seen", undefined],
+    ["theirs", undefined],
+  ]);
   assert.deepEqual(readRuntimeDocument(dataDir, "dream:n").judged, ["seen"]);
   const taste = readRuntimeDocument(dataDir, "taste:n");
   assert.deepEqual(

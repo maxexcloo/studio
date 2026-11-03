@@ -59,16 +59,8 @@ export function readJsonFile(file) {
 let temporaryCount = 0;
 const temporaryFor = (file) => `${file}.tmp-${process.pid}-${(temporaryCount += 1)}`;
 
-/**
- * `compact` drops the indentation: the gallery can hold 50,000 items, and
- * pretty-printing it roughly doubles the file and the time to write it.
- * Either form reads back the same.
- */
-export function writeJsonFile(file, value, { mode, compact = false } = {}) {
-  writeBytesFile(file, compact ? JSON.stringify(value) : JSON.stringify(value, null, 2), {
-    mode,
-    backup: true,
-  });
+export function writeJsonFile(file, value, { mode } = {}) {
+  writeBytesFile(file, JSON.stringify(value, null, 2), { mode, backup: true });
 }
 
 /** Same-directory writes become visible only after the bytes and directory entry are durable. */
@@ -131,105 +123,6 @@ export async function writeBytesFileAsync(file, bytes, { mode, validate, durable
 }
 
 export const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
-
-/**
- * JSON.stringify(value), compact, without holding up the server: an array is
- * turned into text a slice at a time, with requests served in between.
- */
-export async function jsonTextAsync(value, sliceSize = 500) {
-  if (!Array.isArray(value)) return JSON.stringify(value);
-  const slices = [];
-  for (let start = 0; start < value.length; start += sliceSize) {
-    if (start) await yieldToEventLoop();
-    // JSON.stringify writes null for what it cannot represent in an array; so does this.
-    slices.push(
-      value
-        .slice(start, start + sliceSize)
-        .map((item) => JSON.stringify(item) ?? "null")
-        .join(","),
-    );
-  }
-  return `[${slices.join(",")}]`;
-}
-
-/**
- * The same crash-safe write, without holding up the server: the text is made
- * by jsonTextAsync and the file work is asynchronous.
- *
- * `shouldCommit` is asked right before the rename; returning false drops this
- * write (a newer one already landed), so an older copy never replaces a newer.
- * Resolves to whether the file was replaced.
- */
-export async function writeJsonFileAsync(
-  file,
-  value,
-  { mode, sliceSize = 500, shouldCommit = () => true } = {},
-) {
-  await fs.promises.mkdir(path.dirname(file), { recursive: true });
-  const temporary = temporaryFor(file);
-  const backupTemporary = `${temporary}.bak`;
-  const handle = await fs.promises.open(temporary, "w", mode);
-  let committed = false;
-  let backedUp = false;
-  try {
-    try {
-      await handle.write(await jsonTextAsync(value, sliceSize));
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    if (!shouldCommit()) return false;
-    // The backup is copied beside the file first and only takes .bak's place
-    // below, together with the rename. A synchronous write landing while the
-    // copy runs (hiding an image rewrites the gallery and its backup to take
-    // its prompt out) must not find its clean .bak replaced by the older copy.
-    try {
-      await fs.promises.copyFile(file, backupTemporary);
-      if (mode !== undefined) await fs.promises.chmod(backupTemporary, mode);
-      backedUp = true;
-    } catch {
-      // No current file yet, or it is busy: keep the older backup.
-    }
-    // Asked again: a synchronous write may have landed while the backup was copied.
-    if (!shouldCommit()) return false;
-    if (backedUp) {
-      try {
-        fs.renameSync(backupTemporary, `${file}.bak`);
-      } catch {
-        // Keep the older backup.
-      }
-    }
-    fs.renameSync(temporary, file);
-    committed = true;
-    const directory = await fs.promises.open(path.dirname(file), "r");
-    try {
-      await directory.sync();
-    } finally {
-      await directory.close();
-    }
-    return true;
-  } finally {
-    if (!committed) await fs.promises.rm(temporary, { force: true }).catch(() => {});
-    await fs.promises.rm(backupTemporary, { force: true }).catch(() => {});
-  }
-}
-
-/** Temporary files a killed process left next to `file` (never one still being written by this one). */
-export function removeStaleTemporaries(file) {
-  const dir = path.dirname(file);
-  const prefix = `${path.basename(file)}.tmp-`;
-  const own = `${prefix}${process.pid}-`;
-  let names = [];
-  try {
-    names = fs.readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const name of names) {
-    if (name.startsWith(prefix) && !name.startsWith(own))
-      fs.rmSync(path.join(dir, name), { force: true });
-  }
-}
 
 /** Deleting on purpose must take the backup too, or the next read would bring the file back. */
 export function removeJsonFile(file) {

@@ -1,12 +1,5 @@
-import fs from "node:fs";
-import {
-  readRuntimeDocument,
-  usesRuntimeDatabase,
-  writeRuntimeDocument,
-} from "./persistence/runtime.ts";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import crypto from "node:crypto";
-import path from "node:path";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
 import {
   accountRoles,
@@ -18,8 +11,6 @@ import {
 import { currentDataDir } from "./data-dir.js";
 
 const dataDir = currentDataDir();
-
-const storePath = path.join(dataDir, "accounts.json");
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessions = 500;
 const kdf = "scrypt-n32768-r8-p1";
@@ -52,9 +43,7 @@ const usernameKey = (value) =>
 function readStore() {
   if (cache) return cache;
   try {
-    const saved = usesRuntimeDatabase(dataDir)
-      ? readRuntimeDocument(dataDir, "accounts")
-      : readJsonFile(storePath);
+    const saved = readRuntimeDocument(dataDir, "accounts");
     cache = {
       ...emptyStore(),
       ...saved,
@@ -77,23 +66,13 @@ function readStore() {
   return cache;
 }
 
-function saveStore({ scrubBackup = false } = {}) {
+function saveStore() {
   const store = readStore();
   const now = Date.now();
   store.sessions = store.sessions
     .filter((session) => Number(session.expiresAt) > now)
     .slice(-maxSessions);
-  if (usesRuntimeDatabase(dataDir)) {
-    writeRuntimeDocument(dataDir, "accounts", store);
-    return;
-  }
-  writeJsonFile(storePath, store, { mode: 0o600 });
-  if (scrubBackup) writeJsonFile(storePath, store, { mode: 0o600 });
-  try {
-    fs.chmodSync(storePath, 0o600);
-  } catch {
-    /* Windows keeps its own ACLs. */
-  }
+  writeRuntimeDocument(dataDir, "accounts", store);
 }
 
 export function resetAccountStoreForTests() {
@@ -366,7 +345,7 @@ export function revokeAccountMcpToken(accountId) {
   if (!account) throw new Error("That account was not found.");
   delete account.mcpTokenHash;
   delete account.mcpTokenCreatedAt;
-  saveStore({ scrubBackup: true });
+  saveStore();
 }
 
 export function accountMcpTokenStatus(accountId) {
@@ -379,7 +358,7 @@ export function revokeAccountSession(token) {
   const store = readStore();
   const previous = store.sessions.length;
   store.sessions = store.sessions.filter((item) => item.tokenHash !== tokenHash(token));
-  if (store.sessions.length !== previous) saveStore({ scrubBackup: true });
+  if (store.sessions.length !== previous) saveStore();
   return store.sessions.length !== previous;
 }
 
@@ -491,7 +470,7 @@ export async function updateOwnAccount(accountId, changes = {}, { keepSessionTok
       (item) => item.accountId !== accountId || (keep && item.tokenHash === keep),
     );
   }
-  saveStore({ scrubBackup: Boolean(hashed) });
+  saveStore();
   return ownAccount(accountId);
 }
 
@@ -510,7 +489,7 @@ export function setAccountDisabled(accountId, disabled) {
   account.disabled = Boolean(disabled);
   if (account.disabled)
     readStore().sessions = readStore().sessions.filter((item) => item.accountId !== accountId);
-  saveStore({ scrubBackup: account.disabled });
+  saveStore();
   return { id: account.id, disabled: account.disabled };
 }
 
@@ -607,7 +586,7 @@ export function setGatewayLink(identity, accountId) {
     store.gatewayLinks.push({ identity, accountId, linkedAt: new Date().toISOString() });
     store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
   }
-  saveStore({ scrubBackup: !accountId });
+  saveStore();
   return listGatewayIdentities();
 }
 
@@ -619,7 +598,7 @@ export function dismissGatewayIdentity(identity) {
   if (pending.length === store.gatewayPending.length)
     throw new Error("That chat user is not waiting.");
   store.gatewayPending = pending;
-  saveStore({ scrubBackup: true });
+  saveStore();
   return listGatewayIdentities();
 }
 

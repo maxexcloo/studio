@@ -1,17 +1,10 @@
 import {
-  hasMigration,
+  assertCurrentStorage,
   readRuntimeDocument,
   runtimeDatabase,
-  usesRuntimeDatabase,
   writeRuntimeDocument,
-  writeRuntimeText,
 } from "../persistence/runtime.ts";
-import {
-  galleryKey,
-  galleryRowsMigration,
-  readGalleryRows,
-  writeGalleryRows,
-} from "../persistence/gallery-rows.ts";
+import { galleryKey, readGalleryRows, writeGalleryRows } from "../persistence/gallery-rows.ts";
 import { generationRecord } from "../generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./filters.js";
 import { keptTriggers } from "../lora/prompts.js";
@@ -21,14 +14,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { localOutputFile } from "../comfy/comfy.js";
 import { defaultWorkerId } from "../workers.js";
-
-import {
-  jsonTextAsync,
-  readJsonFile,
-  removeStaleTemporaries,
-  writeJsonFile,
-  writeJsonFileAsync,
-} from "../json-store.js";
 import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from "./order.js";
 import { currentDataDir } from "../data-dir.js";
 import { recordBelongsToAccount } from "../account-ownership.js";
@@ -36,8 +21,7 @@ import { hasReferenceImage } from "../workflow-modes.js";
 import { replyTitle } from "../../shared/titles.ts";
 
 export const dataDir = currentDataDir();
-export const galleryPath = path.join(dataDir, "gallery.json");
-const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
+assertCurrentStorage(dataDir);
 export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
 let galleryRevision = Date.now();
@@ -45,58 +29,23 @@ let galleryRevision = Date.now();
 let hiddenVersion = 0;
 
 /**
- * Where the gallery lives: `gallery.json` until the runtime migration, then the `gallery` document,
- * then (after migrate-runtime's gallery-rows-v1) one SQLite row per item, written as items change.
- */
-const storage = !usesRuntimeDatabase(dataDir)
-  ? "json"
-  : hasMigration(runtimeDatabase(dataDir), galleryRowsMigration)
-    ? "rows"
-    : "document";
-
-/**
- * In row storage, each saved item by key as last written. Items are replaced, never changed in
- * place, so a save writes only the keys whose item is a different object.
+ * The gallery is one SQLite row per item. Each saved item by key as last written: items are
+ * replaced, never changed in place, so a save writes only the keys whose item is a different object.
  */
 let savedRows = new Map();
 
-function readStoredGallery() {
-  if (storage === "json") return readJsonFile(galleryPath);
-  if (storage === "document") return readRuntimeDocument(dataDir, "gallery");
+function loadGallery() {
   const items = readGalleryRows(runtimeDatabase(dataDir));
   savedRows = new Map(items.map((item) => [galleryKey(item), item]));
-  return sortGallery(items);
-}
-
-function loadGallery() {
-  const database = storage !== "json";
-  try {
-    if (!database) removeStaleTemporaries(galleryPath);
-    const staleAfter = 30 * 60 * 1000;
-    return readStoredGallery().map((item) => {
-      let next = item;
-      if (
-        !database &&
-        next.status === "pending" &&
-        Date.now() - Date.parse(next.createdAt || 0) > staleAfter
-      ) {
-        next = { ...next, status: "canceled" };
-      }
-      // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
-      if (
-        next.type === "image" &&
-        !next.thumbnailUrl &&
-        typeof next.url === "string" &&
-        next.url.startsWith("/comfy/view?")
-      ) {
-        next = { ...next, thumbnailUrl: next.url.replace("/comfy/view?", "/comfy/thumb?") };
-      }
-      return next;
-    });
-  } catch (error) {
-    if (database && error.code !== "ENOENT") throw error;
-    return [];
-  }
+  return sortGallery(items).map((item) =>
+    // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
+    item.type === "image" &&
+    !item.thumbnailUrl &&
+    typeof item.url === "string" &&
+    item.url.startsWith("/comfy/view?")
+      ? { ...item, thumbnailUrl: item.url.replace("/comfy/view?", "/comfy/thumb?") }
+      : item,
+  );
 }
 
 export let gallery = loadGallery();
@@ -144,14 +93,11 @@ export function markerOf(key) {
 let hiddenGalleryIds = loadHiddenGalleryIds();
 
 function loadHiddenGalleryIds() {
-  const database = usesRuntimeDatabase(dataDir);
   let raw;
   try {
-    raw = database
-      ? readRuntimeDocument(dataDir, "gallery-hidden")
-      : readJsonFile(hiddenGalleryPath);
+    raw = readRuntimeDocument(dataDir, "gallery-hidden");
   } catch (error) {
-    if (database && error.code !== "ENOENT") throw error;
+    if (error.code !== "ENOENT") throw error;
     return new Map();
   }
   const entries = Array.isArray(raw)
@@ -166,8 +112,6 @@ function loadHiddenGalleryIds() {
   );
   if (plain.length || Array.isArray(raw)) {
     try {
-      // Twice, so the store's .bak copy of the readable list is replaced too.
-      persistHiddenMarkers(Object.fromEntries(markers));
       persistHiddenMarkers(Object.fromEntries(markers));
     } catch {
       // Stays as it was until the next save.
@@ -609,35 +553,19 @@ export function hasExistingOutputFile(item) {
 
 /**
  * Saving. Changes are gathered for a moment, and a save that is due when the
- * server stops is written before it exits. Row storage writes only the items
- * that changed. The file and the document hold the whole gallery, tens of
- * megabytes of JSON, so they are turned into compact text in the background
- * (see jsonTextAsync) and replaced whole, the file keeping its previous copy as
- * .bak.
+ * server stops is written before it exits. A save writes only the rows that changed.
  */
 const saveDelayMs = Math.max(0, Number(process.env.STUDIO_GALLERY_SAVE_MS ?? 1000));
 let saveTimer = null;
 let dirty = false;
 let writing = null;
-// Which save is newest, so a slow background write never replaces a newer one.
-let writeSequence = 0;
-let committedSequence = 0;
 // Counts changes, so a strict flush waits for its own changes rather than for
 // the gallery to go quiet: changes made while a save is under way are not failures.
 let changeCount = 0;
 let savedChangeCount = 0;
 let saveFailure = null;
 
-function persistableGallery() {
-  const items = [];
-  for (const item of gallery) {
-    items.push(item.preview ? withoutPreview(item) : item);
-    if (items.length >= galleryLimit) break;
-  }
-  return items;
-}
-
-/** Row storage: upserts the items that changed since the last save and deletes the ones gone. */
+/** Upserts the items that changed since the last save and deletes the ones gone. */
 function writeChangedRows() {
   const current = new Map();
   for (const item of gallery) {
@@ -676,33 +604,15 @@ export async function flushGallery() {
   }
   if (!dirty) return undefined;
   dirty = false;
-  const sequence = (writeSequence += 1);
   const changes = changeCount;
-  writing = (
-    storage === "rows"
-      ? Promise.resolve().then(() => {
-          writeChangedRows();
-          return true;
-        })
-      : storage === "document"
-        ? jsonTextAsync(persistableGallery()).then((text) => {
-            // A blocking save (writeGalleryNow) may have landed while the text was made.
-            if (sequence <= committedSequence) return false;
-            writeRuntimeText(dataDir, "gallery", text);
-            return true;
-          })
-        : writeJsonFileAsync(galleryPath, persistableGallery(), {
-            shouldCommit: () => sequence > committedSequence,
-          })
-  )
-    .then((replaced) => {
-      if (replaced) committedSequence = sequence;
-      // Not replaced means a newer save, holding these changes too, already landed.
+  writing = Promise.resolve()
+    .then(() => {
+      writeChangedRows();
       savedChangeCount = Math.max(savedChangeCount, changes);
       saveFailure = null;
     })
     .catch((error) => {
-      // Try again shortly; the old file (and its backup) are still whole.
+      // Try again shortly; the transaction left the saved rows whole.
       dirty = true;
       saveFailure = error;
       console.warn(`[Studio] Could not save the gallery: ${error.message}`);
@@ -736,8 +646,7 @@ export async function flushGalleryStrict() {
 }
 
 function persistHiddenMarkers(value) {
-  if (usesRuntimeDatabase(dataDir)) writeRuntimeDocument(dataDir, "gallery-hidden", value);
-  else writeJsonFile(hiddenGalleryPath, value);
+  writeRuntimeDocument(dataDir, "gallery-hidden", value);
 }
 
 /** Writes the gallery at once, blocking: for when the process is about to exit. */
@@ -746,18 +655,14 @@ function writeGalleryNow() {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  const sequence = (writeSequence += 1);
   const changes = changeCount;
   try {
-    if (storage === "rows") writeChangedRows();
-    else if (storage === "document") writeRuntimeDocument(dataDir, "gallery", persistableGallery());
-    else writeJsonFile(galleryPath, persistableGallery(), { compact: true });
+    writeChangedRows();
   } catch (error) {
     saveFailure = error;
     throw error;
   }
   dirty = false;
-  committedSequence = sequence;
   savedChangeCount = changes;
   saveFailure = null;
 }
@@ -1020,14 +925,6 @@ export function makePendingItems(id, body) {
     width: Number(body.inpaint?.image?.width || body.width || 0),
     height: Number(body.inpaint?.image?.height || body.height || 0),
     model: body.model || "",
-    // Legacy single-reference keys, only on records that still carry one (useMediaAction.ts reads them).
-    ...(body.startImageId
-      ? {
-          referenceImage: body.startImageId,
-          referenceImageName: body.startImageName || "",
-          startImageId: body.startImageId,
-        }
-      : {}),
     settings: generationSettings(body),
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
@@ -1253,13 +1150,6 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         width: Number(videoSize?.width || body.inpaint?.image?.width || body.width || 0),
         height: Number(videoSize?.height || body.inpaint?.image?.height || body.height || 0),
         model: body.model || "",
-        ...(body.startImageId
-          ? {
-              referenceImage: body.startImageId,
-              referenceImageName: body.startImageName || "",
-              startImageId: body.startImageId,
-            }
-          : {}),
         settings: generationSettings(body),
         ...(body.assistant ? { assistant: body.assistant } : {}),
         ...(storedWritingRecord(body.writing)

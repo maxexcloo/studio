@@ -32,9 +32,6 @@ const metadataFolders = { unet: "diffusion_models", checkpoint: "checkpoints" };
 const choicesPath = () => path.join(dataDir, "model-types.json");
 let choicesCache = null;
 
-// Earlier builds stored coarser type names; read them as today's families.
-const legacyChoices = { "z-image": "zimage", wan: "wan22_5b", checkpoint: "" };
-
 function choiceKey(source, name) {
   return `${source}:${name}`;
 }
@@ -53,9 +50,7 @@ function loadModelChoices() {
 /** "family" or "family/variant", checked against what that folder can load. */
 function parseChoice(value, source) {
   if (typeof value !== "string") return null;
-  const raw = Object.hasOwn(legacyChoices, value) ? legacyChoices[value] : value;
-  if (!raw) return null;
-  const [familyId, variantId = ""] = raw.split("/");
+  const [familyId, variantId = ""] = value.split("/");
   const family = families[familyId];
   if (!family || !family.sources.includes(source)) return null;
   if (variantId && !family.variants.some((variant) => variant.id === variantId)) return null;

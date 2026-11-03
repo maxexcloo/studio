@@ -30,29 +30,23 @@ export interface StackRecord {
   id: string;
   name: string;
   savedAt?: string;
-  detail?: string;
   key: string;
   stack: SavedStack;
 }
 
-/**
- * The saved stacks for this family, plus any an older build saved under the profile, and the
- * edits on them. Deleting offers Undo.
- */
-export function useLoraStacks(family: string, profileId: string) {
+/** The saved stacks for this family and the edits on them. Deleting offers Undo. */
+export function useLoraStacks(family: string) {
   const cache = useQueryClient();
   const library = useQuery(loraLibraryQuery);
   const familyKey = `family:${family || "other"}`;
-  const keys = [...new Set([familyKey, profileId].filter(Boolean))];
-  const records: StackRecord[] = keys.flatMap((key) =>
-    (library.data?.library.snapshots[key] || []).map((stack) => ({
-      id: JSON.stringify([key, stack.id]),
+  const records: StackRecord[] = (library.data?.library.snapshots[familyKey] || []).map(
+    (stack) => ({
+      id: JSON.stringify([familyKey, stack.id]),
       name: stack.name,
       savedAt: stack.savedAt,
-      detail: key === familyKey ? undefined : "Saved for this profile by an older version",
-      key,
+      key: familyKey,
       stack,
-    })),
+    }),
   );
   const change = useMutation({
     mutationFn: ({ ops }: { ops: Operation[]; deleted?: StackRecord }) =>

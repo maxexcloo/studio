@@ -3,11 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { createProfileStore } from "./profile/store.js";
-import {
-  usesRuntimeDatabase,
-  withOfflineDatabase,
-  writeRuntimeDocument,
-} from "./persistence/runtime.ts";
+import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step that renames the old `nsfw` marker to `uncensored`: each profile's
@@ -92,20 +88,12 @@ export function uncensoredMarker(dataDir, { apply = false } = {}) {
  */
 function updateAccessProfiles(dataDir, { apply }, change) {
   const changed = [];
-  const database = usesRuntimeDatabase(dataDir);
-  const accountsFile = path.join(dataDir, "accounts.json");
-  if (!database && !fs.existsSync(accountsFile)) return changed;
-  const accounts = database
-    ? withOfflineDatabase(dataDir, (db) => {
-        const row = db.prepare("SELECT value FROM studio_documents WHERE name = ?").get("accounts");
-        return row ? JSON.parse(row.value) : null;
-      })
-    : readJsonFile(accountsFile);
+  const accounts = withOfflineDatabase(dataDir, (db) => {
+    const row = db.prepare("SELECT value FROM studio_documents WHERE name = ?").get("accounts");
+    return row ? JSON.parse(row.value) : null;
+  });
   for (const [id, profile] of Object.entries(accounts?.profiles || {}))
     if (isObject(profile?.features) && change(profile.features)) changed.push(id);
-  if (apply && changed.length) {
-    if (database) writeRuntimeDocument(dataDir, "accounts", accounts);
-    else writeJsonFile(accountsFile, accounts);
-  }
+  if (apply && changed.length) writeRuntimeDocument(dataDir, "accounts", accounts);
   return changed;
 }

@@ -123,7 +123,7 @@ function cleanLibrary(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     strengths: cleanStrengths(source.strengths),
-    // Stacks are keyed by model family ("family:z-image"); older builds keyed them by workflow id.
+    // Stacks are keyed by model family ("family:zimage").
     snapshots: cleanSnapshots(source.snapshots),
     ratings: cleanRatings(source.ratings),
     recents: cleanNames(source.recents, 12),
@@ -202,15 +202,6 @@ function applyOp(state, library, op) {
     case "stack.delete":
       if (key) library.snapshots[key] = list().filter((item) => item.id !== op.id);
       break;
-    case "stack.move": {
-      // Stacks older builds saved per workflow move to the model family.
-      const from = String(op.from || "");
-      if (!key || !from || from === key || !library.snapshots[from]) break;
-      for (const stack of library.snapshots[from])
-        if (!list().some((item) => item.id === stack.id)) list().push(stack);
-      delete library.snapshots[from];
-      break;
-    }
     case "strengths": {
       const workflow = String(op.workflowId || "");
       if (workflow)

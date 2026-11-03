@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { uncensoredMarker } from "./uncensored-marker.js";
 
 test("the old nsfw marker becomes uncensored in profiles, the catalogue and groups, once", () => {
@@ -27,7 +28,7 @@ test("the old nsfw marker becomes uncensored in profiles, the catalogue and grou
     },
   });
   write("library/imports/one.json", { nsfw: true, draft: { nsfw: null } });
-  write("accounts.json", {
+  writeRuntimeDocument(dataDir, "accounts", {
     profiles: {
       user: { features: { nsfwModels: false } },
       open: { features: { nsfwModels: true } },
@@ -51,7 +52,7 @@ test("the old nsfw marker becomes uncensored in profiles, the catalogue and grou
     uncensored: true,
     draft: { uncensored: null },
   });
-  assert.deepEqual(JSON.parse(read("accounts.json")).profiles.open.features, {
+  assert.deepEqual(readRuntimeDocument(dataDir, "accounts").profiles.open.features, {
     uncensoredModels: true,
   });
   const again = uncensoredMarker(dataDir);

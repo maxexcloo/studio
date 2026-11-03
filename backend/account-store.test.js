@@ -14,6 +14,9 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const store = await import("./account-store.js");
+const { readRuntimeDocument, writeRuntimeDocument } = await import("./persistence/runtime.ts");
+const dataDir = path.join(temporary, "data");
+const savedText = () => JSON.stringify(readRuntimeDocument(dataDir, "accounts"));
 
 test("local account passwords and bearer sessions are stored only as verifiers", async () => {
   store.saveAccessProfile(
@@ -40,27 +43,20 @@ test("local account passwords and bearer sessions are stored only as verifiers",
 
   const session = store.createAccountSession(account.id);
   assert.equal(store.accountSession(session.token).userId, account.id);
-  const saved = fs.readFileSync(path.join(temporary, "data", "accounts.json"), "utf8");
+  const saved = savedText();
   assert.equal(saved.includes("a secure local password"), false);
   assert.equal(saved.includes(session.token), false);
   assert.match(saved, /scrypt-n32768-r8-p1/);
   if (process.platform !== "win32")
-    assert.equal(fs.statSync(path.join(temporary, "data", "accounts.json")).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.join(dataDir, "studio.sqlite")).mode & 0o777, 0o600);
 
   store.revokeAccountSession(session.token);
   assert.equal(store.accountSession(session.token), null);
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(temporary, "data", "accounts.json.bak"), "utf8")).sessions
-      .length,
-    0,
-  );
+  assert.equal(readRuntimeDocument(dataDir, "accounts").sessions.length, 0);
 
   const mcp = store.rotateAccountMcpToken(account.id);
   assert.equal(store.verifyAccountMcpToken(mcp.token).userId, account.id);
-  assert.equal(
-    fs.readFileSync(path.join(temporary, "data", "accounts.json"), "utf8").includes(mcp.token),
-    false,
-  );
+  assert.equal(savedText().includes(mcp.token), false);
   const rotated = store.rotateAccountMcpToken(account.id);
   assert.equal(store.verifyAccountMcpToken(mcp.token), null);
   assert.equal(store.verifyAccountMcpToken(rotated.token).userId, account.id);
@@ -120,8 +116,7 @@ test("ordinary accounts cannot be created without one existing profile", async (
 });
 
 test("the built-in User profile is added only where its ID is free, and an empty Administrator group is removed", () => {
-  const file = path.join(temporary, "data", "accounts.json");
-  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  const saved = readRuntimeDocument(dataDir, "accounts");
   saved.profiles.user = {
     id: "user",
     name: "Our Users",
@@ -129,7 +124,7 @@ test("the built-in User profile is added only where its ID is free, and an empty
     features: { gallery: true },
   };
   saved.profiles.administrator = { id: "administrator", name: "Administrator", allModels: true };
-  fs.writeFileSync(file, JSON.stringify(saved));
+  writeRuntimeDocument(dataDir, "accounts", saved);
   store.resetAccountStoreForTests();
   assert.equal(store.ensureBuiltInAccessProfile(), false);
   const profiles = store.listAccessProfiles();

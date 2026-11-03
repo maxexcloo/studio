@@ -14,6 +14,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const { duplicateProfiles, mergeDuplicateProfiles } = await import("./merge.js");
+const { readGalleryRows, writeGalleryRows } = await import("../persistence/gallery-rows.ts");
+const { runtimeDatabase } = await import("../persistence/runtime.ts");
 const { canonicalProfileId, guideStore, profileStore } = await import("./store.js");
 const { getCustomWorkflow, userWorkflowsDir } = await import("../custom-workflows.js");
 const { buildExport } = await import("./export.js");
@@ -79,8 +81,9 @@ saveWorkflowPreferences(
   { immediate: true },
 );
 // Owner data the merge must leave byte for byte.
+const ownerRecord = { id: "g1", settings: { profileId: `custom:${oldId}` } };
+writeGalleryRows(runtimeDatabase(temporary), [ownerRecord]);
 const ownerFiles = {
-  "gallery.json": JSON.stringify([{ id: "g1", settings: { profileId: `custom:${oldId}` } }]),
   "accounts/user-1/presets.json": JSON.stringify([{ input: { profileId: `custom:${oldId}` } }]),
 };
 for (const [name, body] of Object.entries(ownerFiles)) {
@@ -137,6 +140,7 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${keptId}`]);
   for (const [name, body] of Object.entries(ownerFiles))
     assert.equal(fs.readFileSync(path.join(temporary, name), "utf8"), body);
+  assert.deepEqual(readGalleryRows(runtimeDatabase(temporary)), [ownerRecord]);
 
   assert.deepEqual(duplicateProfiles().merges, []);
   assert.deepEqual(mergeDuplicateProfiles({ hash: preview.hash }), { merged: [], backup: "" });
