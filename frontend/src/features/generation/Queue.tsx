@@ -35,10 +35,11 @@ import { terminalStatuses, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
-  // Idle queues don't poll: every in-app submit (composer, viewer, Chat stream) invalidates this
-  // query, and work started elsewhere (another tab, MCP) appears on window focus.
+  // Every in-app submit (composer, viewer, Chat stream) invalidates this query; an idle queue still
+  // checks now and then, so work started elsewhere (an MCP client, another tab) shows, and the
+  // gallery with it, without the window regaining focus.
   refetchInterval: (query) =>
-    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : false,
+    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 15_000,
 });
 export function useQueue() {
   return useQuery(queueQuery);
