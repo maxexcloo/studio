@@ -489,7 +489,8 @@ export function deleteGalleryFiles(items) {
           fs.unlinkSync(imported);
           deleted += 1;
         }
-      } catch {
+      } catch (error) {
+        console.warn(`[Studio] Could not delete a gallery file: ${error.message}`);
         skipped += 1;
       }
       continue;
@@ -502,7 +503,8 @@ export function deleteGalleryFiles(items) {
           fs.unlinkSync(file);
           deleted += 1;
         }
-      } catch {
+      } catch (error) {
+        console.warn(`[Studio] Could not delete a gallery file: ${error.message}`);
         skipped += 1;
       }
     }

@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { openDatabase } from "../persistence/runtime.ts";
-import { GenerationQueue, type JobObservation, type QueueAdapter } from "./queue.ts";
+import { createGenerationQueueAdapter } from "./generation-adapter.ts";
+import {
+  GenerationQueue,
+  type JobObservation,
+  type QueueAdapter,
+  unreachableCancelReason,
+} from "./queue.ts";
 import { pausedReason } from "../../shared/queue.ts";
 import { everyone, queuePriority, Store } from "./store.ts";
 
@@ -622,6 +628,53 @@ test("moves reorder only the owner's pending items, within their tiers and other
     // Moved to the top, MCP work still runs after every account's manual work.
     await drain(queue);
     assert.deepEqual(queue.submitted, [b1, a2, a1, b2, aMcp]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a running job whose worker refuses connections cancels at once; one that times out stays recorded", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const live = new Map<string, Record<string, unknown>>();
+  const released: string[] = [];
+  // What comfy/queue.js cancelPrompt answers for a refused connection; anything else throws.
+  let worker = async () => "unreachable";
+  const queue = new GenerationQueue(
+    store,
+    createGenerationQueueAdapter({
+      async generate(req, res) {
+        const id = req.body.clientJobId;
+        live.set(id, { status: "running", promptId: `p-${id}`, ownerId: "alice" });
+        res.json({ ok: true });
+      },
+      jobs: live,
+      gallery: () => [],
+      accountForOwner: () => ({ authenticated: true }),
+      flushGallery: async () => undefined,
+      cancelPrompt: () => worker(),
+      settled: async (job) => {
+        released.push(job.id);
+      },
+    }),
+  );
+  try {
+    const session = store.createSession("alice");
+    const parked = store.enqueue("alice", session.id, { prompt: "A bird" }, "image");
+    await queue.tick();
+    assert.equal(store.job("alice", parked.id)?.status, "running");
+    const cancelled = await queue.cancel("alice", parked.id);
+    assert.equal(cancelled?.status, "cancelled");
+    assert.equal(cancelled?.reason, unreachableCancelReason);
+    assert.deepEqual(released, [parked.id]);
+
+    worker = async () => {
+      throw Object.assign(new Error("The operation timed out."), { name: "TimeoutError" });
+    };
+    const busy = store.enqueue("alice", session.id, { prompt: "A fish" }, "image");
+    await queue.tick();
+    await assert.rejects(queue.cancel("alice", busy.id), /timed out/);
+    assert.equal(store.job("alice", busy.id)?.status, "running");
+    assert.equal(store.job("alice", busy.id)?.cancelRequested, true);
   } finally {
     store.close();
   }

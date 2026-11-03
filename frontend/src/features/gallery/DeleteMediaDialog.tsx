@@ -15,28 +15,31 @@ export function DeleteMediaDialog({
   onDeleted: (deleted: string[], failed: string[]) => void;
 }) {
   const cache = useQueryClient();
-  const [failedCount, setFailedCount] = useState(0);
+  // Why the last attempt failed: how many items, and the server's reasons.
+  const [failure, setFailure] = useState<{ count: number; reasons: string[] } | null>(null);
   const deletion = useMutation({
     mutationFn: async (selected: string[]) => {
       const deleted: string[] = [],
-        failed: string[] = [];
+        failed: string[] = [],
+        reasons = new Set<string>();
       for (const id of selected) {
         try {
           await api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" });
           deleted.push(id);
-        } catch {
+        } catch (error) {
           failed.push(id);
+          if (error instanceof Error) reasons.add(error.message);
         }
       }
-      return { deleted, failed };
+      return { deleted, failed, reasons: [...reasons] };
     },
-    onSuccess: async ({ deleted, failed }) => {
+    onSuccess: async ({ deleted, failed, reasons }) => {
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["gallery"] }),
         cache.invalidateQueries({ queryKey: ["gallery-filters"] }),
         cache.invalidateQueries({ queryKey: ["session"] }),
       ]);
-      setFailedCount(failed.length);
+      setFailure(failed.length ? { count: failed.length, reasons } : null);
       onDeleted(deleted, failed);
       if (!failed.length) close();
     },
@@ -45,7 +48,7 @@ export function DeleteMediaDialog({
     <ConfirmDialog
       opened={opened}
       onClose={() => {
-        setFailedCount(0);
+        setFailure(null);
         close();
       }}
       title={ids.length === 1 ? "Delete Item" : "Delete Selected Items"}
@@ -54,8 +57,8 @@ export function DeleteMediaDialog({
       disabled={!ids.length}
       onConfirm={() => deletion.mutate(ids)}
       error={
-        !!failedCount &&
-        `${failedCount} ${failedCount === 1 ? "item" : "items"} couldn’t be deleted. Try again.`
+        failure &&
+        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn’t be deleted. ${failure.reasons.join(" ") || "Try again."}`
       }
     >
       Delete {ids.length} {ids.length === 1 ? "item and its file" : "items and their files"}?

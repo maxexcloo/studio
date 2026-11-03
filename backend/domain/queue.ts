@@ -17,10 +17,15 @@ export interface JobObservation {
   outputs?: QueueMedia[];
 }
 
+/** Why a job was cancelled without its worker's confirmation: the worker could not be running it. */
+export const unreachableCancelReason =
+  "Cancelled. Its worker wasn't reachable, so nothing was left running there.";
+
 export interface QueueAdapter {
   submit(job: OwnedJob): Promise<JobObservation>;
   observe(job: OwnedJob): Promise<JobObservation | undefined>;
-  cancel(job: OwnedJob): Promise<void>;
+  /** Asks the provider to stop the job; a returned `cancelled` means it cannot be running there. */
+  cancel(job: OwnedJob): Promise<JobObservation | void>;
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   settled?(job: OwnedJob): Promise<void>;
@@ -506,8 +511,25 @@ export class GenerationQueue {
       cancelRequested: true,
       reason: "Cancelling the recorded generation.",
     });
-    await this.adapter.cancel(pending);
-    return this.store.job(ownerId, id);
+    let outcome;
+    try {
+      outcome = await this.adapter.cancel(pending);
+    } catch (error) {
+      // The request stays recorded; recovery confirms the cancellation once the worker answers.
+      console.warn(`[Studio] Could not confirm cancelling job ${id}: ${(error as Error).message}`);
+      throw error;
+    }
+    const latest = this.store.job(ownerId, id)!;
+    if (outcome?.status !== "cancelled" || terminalStatuses.has(latest.status)) return latest;
+    console.warn(`[Studio] Cancelled job ${id} without its worker: ${outcome.reason}`);
+    const cancelled = this.store.save({
+      ...latest,
+      status: "cancelled",
+      progress: undefined,
+      reason: outcome.reason || unreachableCancelReason,
+    });
+    await this.adapter.settled?.(cancelled);
+    return cancelled;
   }
 
   /**
