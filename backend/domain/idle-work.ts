@@ -246,7 +246,9 @@ export function createIdleWork<Item extends IdleItem>(options: {
       if (controller.signal.aborted) return "yielded";
       const reason = (error as Error).message;
       note(reason);
-      streak.push(key(item));
+      // A missing file fails only its own item; it says nothing about the service.
+      const missing = (error as { status?: number }).status === 404;
+      if (!missing) streak.push(key(item));
       if (streak.length >= failureStreak) {
         // Not these items' fault: give them back and wait before trying again.
         for (const failure of streak) failed.delete(failure);
