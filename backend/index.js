@@ -741,6 +741,8 @@ const studioIdle = () =>
       "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
     )
     .get();
+// Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
+const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
 // Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
 const finishing = createFinishing({
   dataDir,
@@ -791,7 +793,7 @@ const runtimeLoad = (name) => () => {
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
-  idle: studioIdle,
+  idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
@@ -807,7 +809,7 @@ const imageSearch = createImageSearch({
   enabled: () => !demoMode && flagEnabled("STUDIO_IMAGE_SEARCH"),
   encoder: createSiglip({ dataDir, fetch: hfFetch }),
   vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
-  idle: studioIdle,
+  idle: galleryIdle,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: galleryStill,
@@ -819,7 +821,7 @@ onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
   writer: assistantEngine,
-  idle: studioIdle,
+  idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
@@ -828,7 +830,7 @@ const titler = createTitler({
 // Suggested prompts (domain/suggested-prompts.ts) for items without one, such as uploads; Recreate uses them.
 const suggester = createPromptSuggester({
   writer: assistantEngine,
-  idle: studioIdle,
+  idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
@@ -839,7 +841,7 @@ const suggester = createPromptSuggester({
 const nextSteps = createNextStepWork({
   suggestions,
   writer: assistantEngine,
-  idle: studioIdle,
+  idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
