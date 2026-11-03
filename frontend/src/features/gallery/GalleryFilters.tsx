@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   Badge,
   Button,
+  Divider,
   Group,
   Input,
   MultiSelect,
@@ -240,16 +241,20 @@ export function FilterButton({
 /** An on/off filter chip: outlined when off, tinted with a check when on. */
 export function FilterToggle({
   label,
+  name = label,
   on,
   onChange,
 }: {
   label: string;
+  /** The accessible name when the visible label is shortened. */
+  name?: string;
   on: boolean;
   onChange: (on: boolean) => void;
 }) {
   return (
     <Button
       {...chipProps}
+      aria-label={name}
       aria-pressed={on}
       variant={on ? "light" : "default"}
       leftSection={on ? <Check size={14} /> : undefined}
@@ -340,12 +345,13 @@ export function GalleryFilterPanel({
       )}
       {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
       <Input.Wrapper label="Show">
-        <Group gap={6} mt={4} wrap="nowrap">
+        <Group gap={6} mt={4}>
           {toggles}
           {toggle("starred", "Starred")}
           {toggle("uploads", "Uploads")}
         </Group>
       </Input.Wrapper>
+      <Divider />
       <Input.Wrapper label="Date">
         <SegmentedControl
           aria-label="Date"
@@ -357,11 +363,12 @@ export function GalleryFilterPanel({
           data={dates.map(({ value, label }) => ({ value, label }))}
         />
       </Input.Wrapper>
+      <Divider />
       {many("model", "Models")}
       {many("lora", "LoRAs")}
+      {(options.size.length > 0 || options.aspect.length > 0) && <Divider />}
       {options.size.length > 0 && choices("size", "Size")}
       {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
-      {options.chat.length > 0 && many("chat", "Chats")}
     </Stack>
   );
 }

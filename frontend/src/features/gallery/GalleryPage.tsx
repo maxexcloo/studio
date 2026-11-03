@@ -251,7 +251,12 @@ export function GalleryPage() {
           }
           toggles={
             view === "grid" && (
-              <FilterToggle label="All Versions" on={allVersions} onChange={setAllVersions} />
+              <FilterToggle
+                label="All"
+                name="All Versions"
+                on={allVersions}
+                onChange={setAllVersions}
+              />
             )
           }
           actions={
