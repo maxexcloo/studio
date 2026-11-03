@@ -134,10 +134,11 @@ primary component reference and verify APIs against the installed version.
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
   generation-input action and icon-only Generate. Expanded controls are one prompt
   box with a history action inside it, the negative prompt under it when the
-  profile takes one, and a row of compact chips: Profile, Backend (when the
-  profile has several), Reference Role (once references are placed), References,
-  LoRAs, Aspect, Count, a video's Length, a set Seed (clearable), Expert settings, Compare and
-  Presets, then Image/Video and Generate. Placing the first reference applies the
+  profile takes one, and a row of compact chips: Profile, References, Reference
+  Role (once references are placed: Edit and Reference as pressed chips, then
+  Paint Mask where the profile inpaints, in one group), LoRAs, Aspect, Count, a
+  video's Length, a set Seed (clearable), Backend (when the profile has several),
+  Expert settings, Compare and Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its

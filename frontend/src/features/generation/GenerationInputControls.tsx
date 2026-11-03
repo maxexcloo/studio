@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
-import { Bookmark, ChevronDown, X } from "lucide-react";
+import { Bookmark, Brush, ChevronDown, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
@@ -76,11 +76,64 @@ function lengthChoices(input: GenerationInput, profile?: Profile) {
   };
 }
 
+interface MaskControl {
+  painted: boolean;
+  onPaint: () => void;
+  onRemove: () => void;
+}
+
+/**
+ * How the placed references are used, as one group of chips: Edit or Reference, then the mask
+ * painted on the first one (a mask edits that image, so Reference is off while there is one).
+ */
+function ReferenceRole({
+  input,
+  onChange,
+  mask,
+}: {
+  input: GenerationInput;
+  onChange: (patch: Partial<GenerationInput>) => void;
+  mask?: MaskControl;
+}) {
+  const role = !input.inpaint && input.referenceRole === "reference" ? "reference" : "edit";
+  return (
+    <Button.Group aria-label="Reference Role">
+      {(
+        [
+          ["edit", "Edit"],
+          ["reference", "Reference"],
+        ] as const
+      ).map(([value, label]) => (
+        <Button
+          key={value}
+          {...chipProps}
+          aria-pressed={role === value}
+          disabled={value === "reference" && Boolean(input.inpaint)}
+          onClick={() => onChange({ referenceRole: value })}
+        >
+          {label}
+        </Button>
+      ))}
+      {mask && (
+        <Button {...chipProps} leftSection={<Brush size={15} />} onClick={mask.onPaint}>
+          {mask.painted ? "Edit Mask" : "Paint Mask"}
+        </Button>
+      )}
+      {mask?.painted && (
+        <Button {...iconChipProps} aria-label="Remove Mask" onClick={mask.onRemove}>
+          <X size={14} />
+        </Button>
+      )}
+    </Button.Group>
+  );
+}
+
 /**
  * The wrapping chip rail shared by the gallery composer and timeline cards, in one order on
- * every breakpoint: what runs (Profile, and its Backend when it has several), what it starts
- * from (Reference Role, References, Mask), what shapes it (LoRAs), what comes out (Aspect,
- * Count, a video's Length, a set Seed), then the tools (Expert, Compare, Presets).
+ * every breakpoint: what runs (Profile), what it starts from (References, then their role and
+ * mask as one group), what shapes it (LoRAs), what comes out (Aspect, Count, a video's Length,
+ * a set Seed), then the settings (Backend when the profile has several, Expert) and the tools
+ * (Compare, Presets).
  */
 export function GenerationInputControls({
   input,
@@ -100,7 +153,8 @@ export function GenerationInputControls({
   references?: ReactNode;
   /** Whether references are placed, which offers the Reference Role choice. */
   hasReferences?: boolean;
-  mask?: ReactNode;
+  /** Painting a mask on the first reference, for profiles that can inpaint. */
+  mask?: MaskControl;
   presets?: {
     opened: boolean;
     onOpenedChange: (opened: boolean) => void;
@@ -119,31 +173,10 @@ export function GenerationInputControls({
   return (
     <div className={classes.rail} role="group" aria-label="Generation Inputs">
       <ProfilePicker value={input} onChange={onChange} startParked />
-      {profile?.backend && backends.length > 1 && (
-        <ChoiceChip
-          label="Backend"
-          value={input.profileBackend || profile.backend}
-          onChange={(profileBackend) => onChange({ profileBackend })}
-          data={backends.map((option) => ({
-            value: option.id,
-            label: option.label || backendLabel(option.id),
-          }))}
-        />
-      )}
-      {references && hasReferences && (
-        <ChoiceChip
-          label="Reference Role"
-          value={!input.inpaint && input.referenceRole === "reference" ? "reference" : "edit"}
-          onChange={(referenceRole) => onChange({ referenceRole })}
-          data={[
-            { value: "edit", label: "Edit" },
-            // A mask edits the image it is painted on.
-            { value: "reference", label: "Reference", disabled: Boolean(input.inpaint) },
-          ]}
-        />
-      )}
       {references}
-      {mask}
+      {references && hasReferences && (
+        <ReferenceRole input={input} onChange={onChange} mask={mask} />
+      )}
       {profile?.capabilities.lora && (
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
@@ -176,6 +209,17 @@ export function GenerationInputControls({
         >
           Seed {seed}
         </Button>
+      )}
+      {profile?.backend && backends.length > 1 && (
+        <ChoiceChip
+          label="Backend"
+          value={input.profileBackend || profile.backend}
+          onChange={(profileBackend) => onChange({ profileBackend })}
+          data={backends.map((option) => ({
+            value: option.id,
+            label: option.label || backendLabel(option.id),
+          }))}
+        />
       )}
       <ExpertSettings input={input} profile={profile} onChange={onChange} {...expert} />
       {onCompare && input.kind === "image" && (

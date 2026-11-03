@@ -184,8 +184,10 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     page.getByText("The reference sets the output framing to 2:3.", { exact: true }),
   ).toBeVisible();
   await size.click();
-  await page.getByRole("combobox", { name: "Reference Role", exact: true }).click();
-  await page.getByRole("option", { name: "Reference", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Reference Role", exact: true })
+    .getByRole("button", { name: "Reference", exact: true })
+    .click();
   await expect(size).toHaveText("1280 × 768");
   await size.click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1280");
@@ -356,11 +358,12 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await loadSaved(page, "Preset", "Masked Study");
   await expect(page.getByRole("button", { name: "Clear Seed 117", exact: true })).toBeVisible();
   // A mask edits the image it is painted on, so Reference is offered but disabled.
-  const role = page.getByRole("combobox", { name: "Reference Role", exact: true });
-  await expect(role).toHaveText("Edit");
-  await role.click();
-  await expect(page.getByRole("option", { name: "Reference", exact: true })).toBeDisabled();
-  await role.click();
+  const role = page.getByRole("group", { name: "Reference Role", exact: true });
+  await expect(role.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(role.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
@@ -390,10 +393,12 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   const original = page.getByRole("article", { name: "Iteration 1", exact: true });
   await original.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
-  const cardRole = original.getByRole("combobox", { name: "Reference Role", exact: true });
-  await expect(cardRole).toHaveText("Edit");
-  await cardRole.click();
-  await expect(page.getByRole("option", { name: "Reference", exact: true })).toBeDisabled();
+  const cardRole = original.getByRole("group", { name: "Reference Role", exact: true });
+  await expect(cardRole.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(cardRole.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
 });
 
 test("LoRA trigger copying and published source links work in gallery and timeline editors", async ({
