@@ -60,7 +60,8 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   return (
     <Stack>
       <Text size="sm" c="dimmed">
-        Carries your account’s access. Send it as a bearer token, not in the endpoint URL.
+        Carries your account’s access. Send it as a bearer token; a client that only takes a URL
+        (such as Grok) can use the URL with the token in it.
       </Text>
       {status.error && <Alert color="red">{status.error.message}</Alert>}
       {error && <Alert color="red">{error}</Alert>}
@@ -107,13 +108,23 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
             autoComplete="off"
             onFocus={(event) => event.currentTarget.select()}
           />
-          <Button
-            variant="light"
-            style={{ alignSelf: "start" }}
-            onClick={() => void copyText(issuedToken, "Token")}
-          >
-            Copy Token
-          </Button>
+          <Group gap="xs">
+            <Button variant="light" onClick={() => void copyText(issuedToken, "Token")}>
+              Copy Token
+            </Button>
+            <Button
+              variant="light"
+              disabled={!status.data?.endpoint}
+              onClick={() =>
+                void copyText(
+                  `${status.data!.endpoint.replace(/\/+$/, "")}/${issuedToken}`,
+                  "URL with Token",
+                )
+              }
+            >
+              Copy URL with Token
+            </Button>
+          </Group>
         </Stack>
       )}
     </Stack>
