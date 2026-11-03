@@ -6,6 +6,7 @@ import {
   Group,
   Loader,
   Menu,
+  Select,
   Stack,
   Switch,
   Text,
@@ -23,8 +24,8 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { NumberSetting } from "../../ui/NumberSetting";
 import { SectionHeading } from "../../ui/SectionHeading";
+import { SettingRow } from "../settings/SettingRows";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -85,6 +86,7 @@ const operationLabel = (status: RuntimeOperation["status"]) =>
     status
   ];
 const holding = (phase: WorkloadPhase) => phase === "running" || phase === "starting";
+const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
@@ -100,39 +102,51 @@ function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
       }),
     onSettled: () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey }),
   });
+  const minutes = [...new Set([0, 10, 15, 30, 60, settings.parkIdleMinutes])].sort((x, y) => x - y);
   return (
-    <Stack gap="sm">
-      <Switch
+    <>
+      <SettingRow
         label="Automatic Control"
-        description="Queued work starts the stopped image or video workload it needs. Text workloads are only started and stopped here."
-        checked={settings.automatic}
-        onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
-      />
-      <NumberSetting
-        label="Park Idle After (Minutes)"
-        description="Frees an idle image or video workload’s GPUs; 0 never parks."
-        value={settings.parkIdleMinutes}
-        min={0}
-        max={1440}
-        disabled={!settings.automatic}
-        onSave={(parkIdleMinutes) => save.mutate({ parkIdleMinutes })}
-      />
+        description="Start image and video workers for queued work; text stays manual."
+      >
+        <Text size="sm" c="dimmed" opacity={settings.automatic ? 1 : 0.4}>
+          Park When Idle
+        </Text>
+        <Select
+          aria-label="Park When Idle"
+          w={110}
+          data={minutes.map((value) => ({
+            value: String(value),
+            label: value ? `${value} Min` : "Never",
+          }))}
+          value={String(settings.parkIdleMinutes)}
+          allowDeselect={false}
+          disabled={!settings.automatic}
+          onChange={(value) => value && save.mutate({ parkIdleMinutes: Number(value) })}
+        />
+        <Switch
+          aria-label="Automatic Control"
+          checked={settings.automatic}
+          onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
+        />
+      </SettingRow>
       {save.error && (
         <Alert color="red" title="Couldn’t Save Automatic Control">
           {save.error.message}
         </Alert>
       )}
-    </Stack>
+    </>
   );
 }
 
 /** Settings › Workers: which GPU deployments run, a previewed switch, restarts and the change history. */
-export function RuntimeWorkloads() {
+export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
   const client = useQueryClient();
   const status = useQuery(runtimeStatusQuery);
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [allChanges, setAllChanges] = useState(false);
   const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
   const previewing = useMutation({
     mutationFn: (workloads: string[]) =>
@@ -176,10 +190,11 @@ export function RuntimeWorkloads() {
   const drifted = Boolean(desired && !operation && !sameSet(desired, running));
   return (
     <Stack gap="md" component="section" aria-label="GPU Workloads">
-      <Group justify="space-between" gap="xs">
+      <Group gap="sm" align="baseline">
         <SectionHeading>GPU Workloads</SectionHeading>
-        <Text size="xs" c="dimmed">
-          {pools.map((pool) => `${pool.id}: ${pool.used} of ${pool.capacity} GPUs`).join(" · ")}
+        <Text size="sm" c="dimmed">
+          {sum(pools.map((pool) => pool.used))} of {sum(pools.map((pool) => pool.capacity))} GPUs in
+          use
         </Text>
       </Group>
       <AutomaticControl settings={settings} />
@@ -232,36 +247,42 @@ export function RuntimeWorkloads() {
             header: "Workload",
             main: true,
             sortValue: (item) => item.label,
-            cell: (item) => (
-              <>
-                <Text size="sm" fw={500}>
-                  {item.label}
-                </Text>
-                <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                  {item.reason ||
-                    (item.acceptedOperations
-                      ? `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`
-                      : item.id)}
-                </Text>
-              </>
-            ),
+            cell: (item) => {
+              const note =
+                item.reason ||
+                reasons[item.id] ||
+                (item.acceptedOperations > 0 &&
+                  `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+              return (
+                <>
+                  <Text size="sm" fw={500}>
+                    {item.label}
+                  </Text>
+                  {note && (
+                    <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                      {note}
+                    </Text>
+                  )}
+                </>
+              );
+            },
           },
           {
             key: "gpus",
             header: "GPUs",
             visibleFrom: "sm",
             sortValue: (item) => item.gpus,
-            cell: (item) => (
-              <Text size="sm">
-                {item.gpus} · {item.pool}
-              </Text>
-            ),
+            cell: (item) => <Text size="sm">{item.gpus}</Text>,
           },
           {
             key: "state",
             header: "State",
             sortValue: (item) => phaseLabel(item.phase),
-            cell: (item) => <Badge color={phaseColour(item.phase)}>{phaseLabel(item.phase)}</Badge>,
+            cell: (item) => (
+              <Badge color={phaseColour(item.phase)} miw="max-content">
+                {phaseLabel(item.phase)}
+              </Badge>
+            ),
           },
         ]}
         rowActions={(item) =>
@@ -324,43 +345,58 @@ export function RuntimeWorkloads() {
         Accepted work finishes first, then it restarts with the same model and GPUs.
       </ConfirmDialog>
       {!!history.length && (
-        <DataTable
-          label="Runtime Changes"
-          rows={history}
-          rowKey={(entry) => entry.id}
-          rowName={change}
-          empty="No Changes"
-          columns={[
-            {
-              key: "change",
-              header: "Change",
-              main: true,
-              cell: (entry) => (
-                <>
-                  <Text size="sm">{change(entry)}</Text>
-                  <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                    {entry.error || entry.progress} · {entry.requestedBy}
+        <Stack gap={4} align="flex-start">
+          <DataTable
+            label="Runtime Changes"
+            rows={allChanges ? history : history.slice(0, 3)}
+            rowKey={(entry) => entry.id}
+            rowName={change}
+            empty="No Changes"
+            columns={[
+              {
+                key: "time",
+                header: "Time",
+                cell: (entry) => (
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                    {new Date(entry.startedAt).toLocaleString(undefined, {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
                   </Text>
-                </>
-              ),
-            },
-            {
-              key: "started",
-              header: "Started",
-              visibleFrom: "sm",
-              sortValue: (entry) => new Date(entry.startedAt).getTime(),
-              cell: (entry) => <Text size="xs">{new Date(entry.startedAt).toLocaleString()}</Text>,
-            },
-            {
-              key: "status",
-              header: "Status",
-              sortValue: (entry) => operationLabel(entry.status),
-              cell: (entry) => (
-                <Badge color={operationColour(entry.status)}>{operationLabel(entry.status)}</Badge>
-              ),
-            },
-          ]}
-        />
+                ),
+              },
+              {
+                key: "change",
+                header: "Change",
+                main: true,
+                cell: (entry) => (
+                  <Text
+                    size="sm"
+                    truncate
+                    title={`${entry.error || entry.progress} · ${entry.requestedBy}`}
+                  >
+                    {change(entry)}
+                    {entry.error && ` · ${entry.error}`}
+                  </Text>
+                ),
+              },
+              {
+                key: "result",
+                header: "Result",
+                cell: (entry) => (
+                  <Badge color={operationColour(entry.status)} miw="max-content">
+                    {operationLabel(entry.status)}
+                  </Badge>
+                ),
+              },
+            ]}
+          />
+          {history.length > 3 && (
+            <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
+              {allChanges ? "Show Less" : "Show All"}
+            </Button>
+          )}
+        </Stack>
       )}
     </Stack>
   );
