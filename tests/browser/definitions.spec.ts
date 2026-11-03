@@ -194,7 +194,7 @@ test("Model classification saves and reads back while definition administration 
     modelType: "",
   };
   const writes: unknown[] = [];
-  await signIn(page, { id: "account-a", role: administrator ? "administrator" : "user" });
+  await signIn(page, { id: "account-a", role: "administrator" });
   await page.route("**/api/library/items", (route) =>
     administrator
       ? route.fulfill({ json: { items: [item] } })
@@ -228,7 +228,8 @@ test("Model classification saves and reads back while definition administration 
     "Original",
   );
   administrator = false;
-  await serveProfiles(page, profiles, { library: false, presets: false });
+  await signIn(page, { id: "account-a", role: "user" });
+  await serveProfiles(page, profiles, { presets: false });
   await page.goto("/library");
   await expect(page).toHaveURL(/\/images$/);
   const options = page.getByRole("button", { name: "More Options", exact: true });
