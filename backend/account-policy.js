@@ -17,20 +17,11 @@ export { isCloudProfile };
 
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
 
-const accessFeatures = Object.freeze([
-  "loras",
-  "imageGeneration",
-  "videoGeneration",
-  "imageReferences",
-  "videoReferences",
-  "gallery",
-  "promptHistory",
-  "cloudModels",
-  "uncensoredModels",
-  "presets",
-  "promptAssistant",
-  "upscale",
-]);
+/**
+ * What varies between groups beyond their models. Everything else (generation, references, the
+ * gallery, prompt history, upscaling and the prompt assistant) comes with an account.
+ */
+export const accessFeatures = Object.freeze(["cloudModels", "loras", "uncensoredModels"]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 
@@ -118,9 +109,6 @@ export function mayUseGenerationProfile(access, profile) {
   return access.allModels === true || access.generationProfiles.includes(id);
 }
 
-/** Upscale (and Finish Starred Images, smart upscale in a run) needs the Upscale feature. */
-export const upscaleOffMessage = "Upscaling is disabled for this account.";
-
 export function mayUseFeature(access, feature) {
   return Boolean(
     access?.authenticated &&
@@ -135,19 +123,14 @@ export function visibleGenerationProfiles(profiles, access) {
 }
 
 /**
- * The User access profile Studio adds when absent, so a default for new accounts is one choice
- * away: every local model except uncensored ones, no cloud models, no LoRAs and no presets. Once
- * added it is an ordinary access profile. Administrators have full access by role.
+ * The User access profile Studio adds when absent, the default for new accounts until an
+ * administrator picks another: every local model except uncensored ones, no cloud models and no
+ * LoRAs. Once added it is an ordinary access profile. Administrators have full access by role.
  */
 export const builtInAccessProfile = Object.freeze({
   id: "user",
   name: "User",
   generationProfiles: [],
   allModels: true,
-  features: Object.fromEntries(
-    accessFeatures.map((feature) => [
-      feature,
-      !["loras", "cloudModels", "uncensoredModels", "presets"].includes(feature),
-    ]),
-  ),
+  features: Object.fromEntries(accessFeatures.map((feature) => [feature, false])),
 });

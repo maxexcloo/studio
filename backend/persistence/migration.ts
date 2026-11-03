@@ -229,8 +229,9 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
 /**
  * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
  * uploads step's backup (uploads.js) restores the whole reference store it moved aside, the
- * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, and the
- * LoRA layers step's (library/lora-layers.js) the catalogue.
+ * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, the
+ * LoRA layers step's (library/lora-layers.js) the catalogue and the account access step's
+ * (account-migration.js) the accounts store.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)

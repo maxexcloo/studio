@@ -20,7 +20,7 @@ Check the live profile and catalogue definitions in Library. Check worker model 
 
 ### Chat Is Unavailable
 
-Check the Chat status and administrator-configured gateway endpoint, key and allowed model list. Keep gateway credentials server-side. The account must have prompt-assistant access, and a media request still needs permission for its selected profile. See [Configuration](CONFIGURATION.md).
+Check the Chat status and administrator-configured gateway endpoint, key and allowed model list. Keep gateway credentials server-side. A media request still needs permission for its selected profile. See [Configuration](CONFIGURATION.md).
 
 ## Generation Failures
 
@@ -92,7 +92,7 @@ For missing or gated Library downloads, verify the catalogue link, model licence
 
 ## Accounts & Devices
 
-Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage approval and disabled accounts in **Settings › Users** and permissions in **Settings › Groups**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
+Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage groups and disabled accounts in **Settings › Users** and permissions in **Settings › Groups**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
 
 Single-user mode answers only the computer running Studio; other devices need account mode ([Configuration](CONFIGURATION.md#multi-user-mode)). Keep container port bindings, proxy configuration and host validation consistent.
 

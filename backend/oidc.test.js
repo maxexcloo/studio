@@ -160,13 +160,12 @@ test("forged, mismatched or stale identity tokens are refused", async () => {
   );
 });
 
-test("verified emails link to matching accounts; other identities wait for approval", async () => {
+test("verified emails link to matching accounts; other identities become new accounts on the default group", async () => {
   store.saveAccessProfile(
     {
       id: "artists",
       name: "Artists",
       generationProfiles: ["image-fast"],
-      features: { gallery: true },
     },
     ["image-fast"],
   );
@@ -199,17 +198,18 @@ test("verified emails link to matching accounts; other identities wait for appro
     email: "studio",
     emailVerified: false,
   });
-  assert.equal(unverified.pending, true);
-  const pending = store.listAccounts().find((account) => account.pending);
-  assert.match(pending.username, /^oidc-/);
-  assert.equal(pending.role, "user");
-  store.assignAccessProfile(pending.id, "artists");
+  const created = store.listAccounts().find((account) => account.id === unverified.access.userId);
+  assert.match(created.username, /^oidc-/);
+  assert.deepEqual(
+    [created.role, created.accessProfileId],
+    ["user", store.defaultAccessProfileId()],
+  );
   assert.equal(
     store.signInWithOidcIdentity({ issuer, subject: "subject-2" }).access.userId,
-    pending.id,
+    created.id,
   );
 
-  // A matching email never links an administrator; that identity waits as its own pending account.
+  // A matching email never links an administrator; that identity becomes an account of its own.
   await store.createLocalAccount({
     username: "admin@excloo.com",
     password: "an administrator password",
@@ -221,8 +221,8 @@ test("verified emails link to matching accounts; other identities wait for appro
       subject: "attacker",
       email: "admin@excloo.com",
       emailVerified: true,
-    }).pending,
-    true,
+    }).access.role,
+    "user",
   );
   assert.equal(
     store.listAccounts().find((account) => account.username === "admin@excloo.com").signInLinked,

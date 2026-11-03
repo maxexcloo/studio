@@ -116,7 +116,7 @@ test("local password sign-in sets an HttpOnly session and sign-out revokes it", 
   );
 });
 
-test("only an authenticated administrator can create profiles and approve ordinary accounts", async () => {
+test("only an authenticated administrator can create profiles and ordinary accounts", async () => {
   const signedIn = await call(
     routes["POST /api/accounts/sign-in"],
     local({ username: "recovery", password: "a secure recovery password" }),
@@ -130,7 +130,7 @@ test("only an authenticated administrator can create profiles and approve ordina
       id: "artists",
       name: "Artists",
       generationProfiles: ["image-fast", "not-approved"],
-      features: { gallery: true, loras: true },
+      features: { loras: true },
     },
   });
   assert.deepEqual(createdProfile.body.profile.generationProfiles, ["image-fast"]);
@@ -155,9 +155,14 @@ test("only an authenticated administrator can create profiles and approve ordina
     body: { accessProfileId: "spare" },
   });
   assert.equal((await remove("spare")).statusCode, 400);
-  await call(routes["POST /api/accounts/default-profile"], {
+  const cleared = await call(routes["POST /api/accounts/default-profile"], {
     ...admin,
     body: { accessProfileId: "" },
+  });
+  assert.equal(cleared.statusCode, 400, "there is always a default group");
+  await call(routes["POST /api/accounts/default-profile"], {
+    ...admin,
+    body: { accessProfileId: "artists" },
   });
   assert.equal((await remove("spare")).statusCode, 200);
   assert.equal((await remove("spare")).statusCode, 400);
@@ -375,7 +380,7 @@ test("gateway identities map to accounts only through administrator links, and t
   assert.equal(gatewayAccountAccess("librechat-user-1"), null);
 });
 
-test("a forwarded gateway email links its identity to the enabled account with that username, and never creates one", async () => {
+test("a forwarded gateway email links its identity to the enabled account with that username, or to a new account on the default group", async () => {
   const { gatewayAccountAccess, noteGatewayIdentity } = await import("./account-store.js");
   const signedIn = await call(
     routes["POST /api/accounts/sign-in"],
@@ -419,25 +424,28 @@ test("a forwarded gateway email links its identity to the enabled account with t
   );
   assert.ok(gateway.links.find((item) => item.identity === "librechat-painter").linkedAt);
 
-  // A disabled account is not linked; an unknown email stays pending and creates nothing.
+  // A disabled account is not linked; an unknown email becomes a new account on the default group.
   assert.equal(gatewayAccountAccess("librechat-retired", "retired@example.test"), null);
-  assert.equal(gatewayAccountAccess("librechat-stranger", "stranger@example.test"), null);
   noteGatewayIdentity("librechat-retired");
-  noteGatewayIdentity("librechat-stranger");
+  const stranger = gatewayAccountAccess("librechat-stranger", "stranger@example.test");
   const after = (await call(routes["GET /api/accounts/admin"], admin)).body;
-  assert.equal(after.accounts.length, accounts);
+  assert.equal(after.accounts.length, accounts + 1);
   assert.equal(
-    after.gateway.links.some((item) =>
-      ["librechat-retired", "librechat-stranger"].includes(item.identity),
-    ),
-    false,
+    after.accounts.find((item) => item.id === stranger.userId).accessProfileId,
+    after.defaultAccessProfileId,
+  );
+  assert.deepEqual(
+    after.gateway.links
+      .filter((item) => ["librechat-retired", "librechat-stranger"].includes(item.identity))
+      .map((item) => item.accountId),
+    [stranger.userId],
   );
   assert.deepEqual(
     after.gateway.pending
       .map((item) => item.identity)
       .filter((identity) => identity !== "librechat-user-1")
       .sort(),
-    ["librechat-retired", "librechat-stranger"],
+    ["librechat-retired"],
   );
   // An email never overrides an existing link.
   assert.equal(

@@ -20,7 +20,6 @@ interface ProfileOptions {
   buildProfile(input: Value): Value;
   accountForOwner(id: string): Value | null;
   mayUseProfile(account: Value, profile: Value): boolean;
-  mayUseFeature(account: Value, feature: string): boolean;
   reference(account: Value | null, id: string): Promise<Uint8Array>;
   composePrompt(workflow: Value, prompt: string): string;
   environment?: NodeJS.ProcessEnv;
@@ -91,13 +90,7 @@ export function studioCloudProfiles(options: ProfileOptions) {
     if (!profile)
       throw new Error("This cloud profile is unavailable from its configured provider.");
     const account = job.ownerId ? options.accountForOwner(job.ownerId) : null;
-    const feature = profile.kind === "video" ? "videoGeneration" : "imageGeneration";
-    if (
-      job.ownerId &&
-      (!account ||
-        !options.mayUseProfile(account, profile) ||
-        !options.mayUseFeature(account, feature))
-    )
+    if (job.ownerId && (!account || !options.mayUseProfile(account, profile)))
       throw Object.assign(new Error("This account cannot use the selected cloud profile."), {
         status: 403,
       });
@@ -121,17 +114,6 @@ export function studioCloudProfiles(options: ProfileOptions) {
     if (input.loras?.some((item: Value) => item.enabled !== false))
       throw new Error("This cloud profile does not support LoRAs.");
     if (input.autoUpscale) throw new Error("Run Upscale after this cloud generation finishes.");
-    if (
-      (referenceId || input.startImage) &&
-      job.ownerId &&
-      !options.mayUseFeature(
-        account!,
-        profile.kind === "video" ? "videoReferences" : "imageReferences",
-      )
-    )
-      throw Object.assign(new Error("References are not enabled for this account."), {
-        status: 403,
-      });
     const prompt = String(input.prompt || "").trim();
     if (!prompt) throw new Error("Enter a prompt.");
     const count = Number(input.count ?? defaults.count);

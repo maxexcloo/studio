@@ -49,7 +49,6 @@ import {
 } from "./tiers.js";
 import { animateThemes } from "../prompt-animate.js";
 import { gatewaySettings } from "../assistant.js";
-import { mayUseFeature } from "../account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import fs from "node:fs";
@@ -341,11 +340,7 @@ export function registerMcpRoutes(
       return res.status(400).json({ error: "Invalid conversation identity." });
     const owner = account?.userId || (scope === "media" ? media.owner(user, token) : null);
     // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
-    // Prompt Assistant is an access-profile feature; the shared key without accounts (single user) has it.
-    const assistant =
-      scope === "media" &&
-      assistantGateway &&
-      (!account || mayUseFeature(account, "promptAssistant"));
+    const assistant = scope === "media" && assistantGateway;
     // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
     // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
     const admin =
@@ -1864,7 +1859,7 @@ export function registerMcpRoutes(
       conversation,
       refs,
       session,
-      assistant: assistantGateway && (!account || mayUseFeature(account, "promptAssistant")),
+      assistant: assistantGateway,
       // As for a chat gateway's linked account: administrators while Chat Gateway Admin Tools is on.
       admin: adminScope({ account, gateway: true, gatewayAdminTools }),
     });

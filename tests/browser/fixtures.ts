@@ -165,19 +165,11 @@ export async function fixtures(page: Page) {
         name: "Users",
         allModels: true,
         generationProfiles: ["image:test"],
-        features: {
-          imageGeneration: true,
-          videoGeneration: true,
-          gallery: true,
-          cloudModels: false,
-          uncensoredModels: false,
-        },
+        features: { cloudModels: false, loras: false, uncensoredModels: false },
       },
     ],
     availableProfiles: ["image:test", "image:fast", "video:test"],
     defaultAccessProfileId: "users",
-    requireApproval: true,
-    lockedFeatures: {},
   };
 
   await page.route("**/api/**", async (route) => {

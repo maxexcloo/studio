@@ -66,15 +66,11 @@ const issue = (features, writing) =>
     ?.status;
 
 test("Animate is admitted only for known themes, with Spicy behind Uncensored Models", () => {
-  assert.equal(issue({ promptAssistant: true }, { theme: "cinematic" }), undefined);
-  assert.equal(issue({}, { theme: "cinematic" }), 403);
-  assert.equal(issue({ promptAssistant: true }, { theme: "dance" }), 400);
-  assert.equal(issue({ promptAssistant: true }, { theme: "custom" }), 400);
-  assert.equal(issue({ promptAssistant: true }, { theme: "spicy" }), 403);
-  assert.equal(
-    issue({ promptAssistant: true, uncensoredModels: true }, { theme: "spicy" }),
-    undefined,
-  );
+  assert.equal(issue({}, { theme: "cinematic" }), undefined);
+  assert.equal(issue({}, { theme: "dance" }), 400);
+  assert.equal(issue({}, { theme: "custom" }), 400);
+  assert.equal(issue({}, { theme: "spicy" }), 403);
+  assert.equal(issue({ uncensoredModels: true }, { theme: "spicy" }), undefined);
   // A client can't pass off its own text as the written prompt.
   assert.equal(
     writingRequest({ kind: "animate", theme: "living", prompt: "x", thinking: "y" }).prompt,

@@ -109,9 +109,9 @@ test("ordinary accounts cannot be created without one existing profile", async (
     /existing group/,
   );
   // An ordinary account may go without a password (single sign-on only); an administrator may not.
-  await assert.rejects(
-    store.createLocalAccount({ username: "empty.pass", password: "" }),
-    /existing group/,
+  assert.equal(
+    (await store.createLocalAccount({ username: "empty.pass", password: "" })).accessProfileId,
+    "user",
   );
   await assert.rejects(
     store.createLocalAccount({ username: "empty.admin", password: "", role: "administrator" }),
@@ -144,37 +144,14 @@ test("the built-in User profile is added only where its ID is free, and an empty
   );
 });
 
-test("new accounts start on the default access profile: local at once, single sign-on and chat gateway after approval unless it is off", async () => {
-  store.saveAccessProfile(
-    {
-      id: "starter",
-      name: "Starter",
-      generationProfiles: ["image-fast"],
-      features: { imageGeneration: true },
-    },
-    ["image-fast"],
-  );
-  assert.equal(store.defaultAccessProfileId(), "");
-  // Without a default, a new sign-on account waits and an unknown gateway email gets nothing.
-  assert.deepEqual(
-    store.signInWithOidcIdentity({
-      issuer: "https://id.example",
-      subject: "one",
-      email: "one@example.com",
-      emailVerified: true,
-    }),
-    { pending: true },
-  );
-  assert.equal(store.gatewayAccountAccess("chat-one", "chat.one@example.com"), null);
-  await assert.rejects(
-    store.createLocalAccount({
-      username: "nodefault@example.com",
-      password: "a valid long password",
-    }),
-    /existing group/,
-  );
-
+test("new accounts start on the default access profile at once: local, single sign-on and chat gateway", async () => {
+  store.saveAccessProfile({ id: "starter", name: "Starter", generationProfiles: ["image-fast"] }, [
+    "image-fast",
+  ]);
+  // Without a choice, the built-in User group is the default; there is always one.
+  assert.equal(store.defaultAccessProfileId(), "user");
   assert.throws(() => store.setDefaultAccessProfile("missing"), /existing group/);
+  assert.throws(() => store.setDefaultAccessProfile(""), /existing group/);
   assert.equal(store.setDefaultAccessProfile("starter"), "starter");
   const local = await store.createLocalAccount({
     username: "local@example.com",
@@ -183,33 +160,6 @@ test("new accounts start on the default access profile: local at once, single si
   assert.equal(local.accessProfileId, "starter");
   const profileOf = (username) => store.listAccounts().find((item) => item.username === username);
 
-  // Require Approval is on until an administrator turns it off: new arrivals wait, unassigned.
-  assert.equal(store.requireApproval(), true);
-  assert.deepEqual(
-    store.signInWithOidcIdentity({
-      issuer: "https://id.example",
-      subject: "waits",
-      email: "waits@example.com",
-      emailVerified: true,
-    }),
-    { pending: true },
-  );
-  assert.equal(profileOf("waits@example.com").pending, true);
-  assert.equal(profileOf("waits@example.com").accessProfileId, undefined);
-  assert.equal(store.gatewayAccountAccess("chat-waits", "chat.waits@example.com"), null);
-  const waiting = profileOf("chat.waits@example.com");
-  assert.equal(waiting.pending, true);
-  assert.equal(
-    store.gatewayAccountAccess("chat-waits"),
-    null,
-    "linked, but nothing until it is approved",
-  );
-  // Approval gives it the default access profile.
-  store.assignAccessProfile(waiting.id, store.defaultAccessProfileId());
-  assert.equal(store.gatewayAccountAccess("chat-waits").userId, waiting.id);
-  assert.throws(() => store.setRequireApproval("no"), /on or off/);
-
-  assert.equal(store.setRequireApproval(false), false);
   const signedOn = store.signInWithOidcIdentity({
     issuer: "https://id.example",
     subject: "two",
@@ -218,7 +168,6 @@ test("new accounts start on the default access profile: local at once, single si
   });
   assert.equal(signedOn.access.authenticated, true);
   assert.equal(profileOf("two@example.com").accessProfileId, "starter");
-  assert.equal(profileOf("two@example.com").pending, undefined);
   const chat = store.gatewayAccountAccess("chat-two", "chat.two@example.com");
   assert.equal(chat.authenticated, true);
   assert.equal(profileOf("chat.two@example.com").accessProfileId, "starter");
@@ -228,5 +177,4 @@ test("new accounts start on the default access profile: local at once, single si
     chat.userId,
     "the identity stays linked to its new account",
   );
-  assert.equal(store.setDefaultAccessProfile(""), "");
 });

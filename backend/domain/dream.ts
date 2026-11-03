@@ -88,10 +88,6 @@ export interface DreamLora {
 /** What an account may do, or null once it is gone; `account` is undefined in single-user mode. */
 export interface DreamAccess {
   account?: GenerationAccount;
-  gallery: boolean;
-  image: boolean;
-  video: boolean;
-  assistant: boolean;
   uncensored: boolean;
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply and its reasoning apart. */
@@ -409,7 +405,7 @@ export function createDream(options: {
     const writer = options.writer;
     if (!writer) throw new Error("The prompt assistant is not configured.");
     const access = options.access(ownerId);
-    if (!access?.assistant) throw new Error("The prompt assistant is off for this account.");
+    if (!access) throw new Error("This account is unavailable.");
     const profile = (await options.catalogue(ownerId, access.account)).profiles.find(
       (item) => item.id === job.input.profileId,
     );
@@ -517,19 +513,13 @@ export function createDream(options: {
     const blocked = quick(ownerId, record);
     if (blocked) return blocked;
     const access = options.access(ownerId);
-    if (!access?.gallery)
-      return { status: "unavailable", reason: "This account may not use the gallery." };
-    if (!access.assistant)
-      return { status: "unavailable", reason: "The prompt assistant is off for this account." };
+    if (!access) return { status: "unavailable", reason: "This account is unavailable." };
     const writer = options.writer;
     if (!writer)
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
     const counts = today(ownerId);
-    const allowed = kinds(record.settings, counts).filter((kind) => access[kind]);
-    if (!allowed.length)
-      return { status: "unavailable", reason: "This account may not generate this media." };
     let reason = "";
-    for (const kind of allowed) {
+    for (const kind of kinds(record.settings, counts)) {
       const online = await options.online(kind);
       if (online.text !== "online")
         return { status: "unavailable", reason: unreachable("The text model", online.text) };
@@ -1118,8 +1108,8 @@ export type Dream = ReturnType<typeof createDream>;
 export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
   const owner = (req: Request) => req.studioAccount?.userId || "";
   const allowed = (req: Request, res: Response) => {
-    if (dream.access(owner(req))?.gallery) return true;
-    res.status(403).json({ ok: false, error: "Gallery access is disabled for this account." });
+    if (dream.access(owner(req))) return true;
+    res.status(403).json({ ok: false, error: "This account is unavailable." });
     return false;
   };
   const refuse = (res: Response, error: unknown) => {

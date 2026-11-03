@@ -591,9 +591,6 @@ test("new chats get a model title, stay New Chat while it is offline and never r
   const fallback = db.createSession("alice");
   await service.title("alice", fallback.id, "  an old lighthouse (storm:1.2), waves crashing");
   assert.equal(db.session("alice", fallback.id)?.title, "New Chat");
-  // Without the prompt assistant the prompt never reaches the text model: the first clause.
-  await service.title("alice", fallback.id, "  an old lighthouse (storm:1.2), waves", null);
-  assert.equal(db.session("alice", fallback.id)?.title, "An old lighthouse storm");
 
   const renamed = db.createSession("alice");
   reply = () => {

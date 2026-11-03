@@ -195,9 +195,7 @@ test("single sign-on accounts can't change their email or password here", async 
     email: "sso@example.test",
     emailVerified: true,
   });
-  assert.equal(result.pending, true);
-  const account = store.listAccounts().find((item) => item.username === "sso@example.test");
-  store.assignAccessProfile(account.id, "artists");
+  const account = store.listAccounts().find((item) => item.id === result.access.userId);
   assert.equal(store.ownAccount(account.id).canChangePassword, false);
   assert.equal(store.ownAccount(account.id).canChangeEmail, false);
   await assert.rejects(

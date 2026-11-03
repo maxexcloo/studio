@@ -86,16 +86,6 @@ export function uncensoredMarker(dataDir, { apply = false } = {}) {
   return result;
 }
 
-/** The migrate-runtime step that gives every existing access profile the Upscale feature, on. */
-export function upscaleFeature(dataDir, { apply = false } = {}) {
-  const accessProfiles = updateAccessProfiles(dataDir, { apply }, (features) => {
-    if (Object.hasOwn(features, "upscale")) return false;
-    features.upscale = true;
-    return true;
-  });
-  return { applied: apply, accessProfiles };
-}
-
 /**
  * Runs `change(features)` on each access profile's features and saves them when `apply` is set;
  * returns the ids of the profiles it changed (those `change` returns true for).

@@ -9,7 +9,7 @@ import type {
   ChatStep,
 } from "../../shared/chat.ts";
 import type { GenerationInput, QueueJob } from "../../shared/queue.ts";
-import { promptWords, replyTitle } from "../../shared/titles.ts";
+import { replyTitle } from "../../shared/titles.ts";
 import { ChatStore } from "./chat-store.ts";
 
 interface ChatSettings {
@@ -266,16 +266,15 @@ export class ChatService {
       : Promise.resolve([{ id: settings.model, label: settings.model }]);
   }
   /**
-   * Titles a new chat from its first request. `modelId: null` skips the text model and uses the
-   * first clause. A user rename always wins; while the text model is unavailable the chat stays
-   * New Chat, and nothing here rejects.
+   * Titles a new chat from its first request. A user rename always wins; while the text model is
+   * unavailable the chat stays New Chat, and nothing here rejects.
    */
-  async title(ownerId: string, sessionId: string, text: string, modelId?: string | null) {
+  async title(ownerId: string, sessionId: string, text: string, modelId?: string) {
     try {
       const session = this.options.session(ownerId, sessionId) as { titleSource?: string };
       if (!session || session.titleSource) return;
       let title = "";
-      const settings = modelId === null ? null : this.options.settings();
+      const settings = this.options.settings();
       if (settings) {
         const models = await this.models(ownerId, settings).catch(() => []);
         const model =
@@ -312,7 +311,6 @@ export class ChatService {
             );
         }
       }
-      if (modelId === null) title = promptWords(text) || "New Chat";
       if (title) this.options.store.generatedTitle(ownerId, sessionId, title);
     } catch {
       // Titling is cosmetic; the chat keeps its current title.

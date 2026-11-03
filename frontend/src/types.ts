@@ -170,7 +170,6 @@ export interface Account {
   accessProfileId?: string;
   accessProfile?: { name: string } | null;
   disabled?: boolean;
-  pending?: boolean;
   signInLinked?: boolean;
   provider?: string;
   canChangeEmail?: boolean;
