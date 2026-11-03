@@ -22,12 +22,11 @@ export const localUnlessAsked = (profiles, { request, name } = {}) =>
     ? profiles
     : profiles.filter((profile) => !isCloudProfile(profile));
 /**
- * What MCP says instead of sending video to the cloud while the local video worker is down. It names Grok
- * only when the account may use a cloud profile; with none granted, there is nothing to offer.
+ * What MCP says while the local video worker is down and the account has no cloud profile to go to.
  * A parked worker was stopped on purpose, so the user hears that, not that it failed.
  */
-export const localVideoUnavailable = (cloudOffered = false, parked = false) =>
-  `Local video is unavailable right now: ${parked ? parkedWorker("video") : "the video worker is offline."} ${cloudOffered ? "Tell the user; they can ask for Grok to make it in the cloud instead." : parked ? "Tell the user." : "Tell the user to try again later."}`;
+export const localVideoUnavailable = (parked = false) =>
+  `Local video is unavailable right now: ${parked ? `${parkedWorker("video")} Tell the user.` : "the video worker is offline. Tell the user to try again later."}`;
 /** What MCP says about a parked local worker: it is stopped on purpose, not broken. */
 export const parkedWorker = (kinds) => {
   const list = [kinds].flat();

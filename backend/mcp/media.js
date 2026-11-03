@@ -3,7 +3,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
-import { flagEnabled } from "../deployment-settings.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import {
@@ -393,8 +392,8 @@ export class McpMedia {
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
    * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
-   * unavailable, video is refused with what to tell the user, or with Video Cloud Fallback on goes to a granted
-   * cloud profile with a `note` to pass on. Animating an image follows animate-profile.js instead.
+   * unavailable, video goes to a granted cloud profile with a `note` to pass on, as Animate does
+   * (animate-profile.js), or is refused with what to tell the user when none is granted.
    */
   async choose(owner, options = {}) {
     const { profile, note } = await this.choices(owner, options);
@@ -411,8 +410,7 @@ export class McpMedia {
       profiles = ready.filter((profile) => !isCloudProfile(profile));
       const parked = models.backends?.[kind]?.parked === true;
       if (kind === "video" && models.backends?.video?.available === false) {
-        if (!cloudOffered || !flagEnabled("STUDIO_VIDEO_CLOUD_FALLBACK"))
-          throw new Error(localVideoUnavailable(cloudOffered, parked));
+        if (!cloudOffered) throw new Error(localVideoUnavailable(parked));
         profiles = ready.filter(isCloudProfile);
         note = `The local video worker is ${parked ? "parked" : "offline"}, so this went to the cloud. Tell the user. `;
       } else if (parked)

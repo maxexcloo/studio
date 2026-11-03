@@ -1634,12 +1634,11 @@ app.post("/api/settings/deployment", (req, res) => {
   try {
     if (isCatalogueFlag(key)) {
       if (typeof value !== "boolean") throw new Error("Choose on or off.");
-      const item = catalogueFlags.find((entry) => entry.key === key);
-      // Back to the default is no saved value at all, so a later default change still applies.
+      // On (the default) is no saved value at all, so a later default change still applies.
       res.json({
         ok: true,
         setting: {
-          ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"),
+          ...saveDeploymentSetting(key, value ? "" : "0"),
           key,
         },
       });
