@@ -149,6 +149,8 @@ const editableFields = new Set([
   "licence",
   "links",
   "compatibility",
+  // An administrator removed the entry (library/routes.js): it stays out of the catalogue until undone.
+  "removed",
 ]);
 
 /** What an import knows for certain about a file; never changed by hand. */
@@ -191,6 +193,10 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
       case "uncensored":
         if (typeof value !== "boolean") throw new Error("uncensored must be true or false.");
         clean.uncensored = value;
+        break;
+      case "removed":
+        if (value !== true) throw new Error("removed is true, or null to restore the entry.");
+        clean.removed = true;
         break;
       case "role":
         if (!["effect", "acceleration", "supporting"].includes(value))
@@ -373,6 +379,12 @@ export function createCatalogueStore({
     return layer;
   }
 
+  /** Rebuilds one key's entry after an edit, leaving it out while it is removed. */
+  function place(current, key) {
+    if (current.edits[key]?.fields?.removed) delete current.entries[key];
+    else current.entries[key] = build(key, current);
+  }
+
   /** The merged entry for one key, from every layer and Studio's edits. */
   function build(key, current) {
     const { folder, file: name } = splitCatalogueKey(key);
@@ -476,7 +488,12 @@ export function createCatalogueStore({
     for (const spec of Object.values(current.layers.provider))
       keys.add(safeKey(spec.folder, spec.file));
     keys.delete("");
-    current.entries = Object.fromEntries([...keys].sort().map((key) => [key, build(key, current)]));
+    current.entries = Object.fromEntries(
+      [...keys]
+        .filter((key) => !current.edits[key]?.fields?.removed)
+        .sort()
+        .map((key) => [key, build(key, current)]),
+    );
     hashIndex = null;
   }
 
@@ -578,7 +595,7 @@ export function createCatalogueStore({
         -historyLimit,
       ),
     };
-    current.entries[key] = build(key, current);
+    place(current, key);
     hashIndex = null;
     writeJsonFile(file, current);
     return { entry: current.entries[key], previous: undo };
@@ -602,7 +619,7 @@ export function createCatalogueStore({
       editedAt: new Date().toISOString(),
       history: previous.history.slice(0, -1),
     };
-    current.entries[key] = build(key, current);
+    place(current, key);
     hashIndex = null;
     writeJsonFile(file, current);
     return current.entries[key];
@@ -614,7 +631,7 @@ export function createCatalogueStore({
     if (!current.edits[key]?.aiDrafted) return current.entries[key] || null;
     const { aiDrafted: _drafted, ...rest } = current.edits[key];
     current.edits[key] = { ...rest, by: String(by || ""), editedAt: new Date().toISOString() };
-    current.entries[key] = build(key, current);
+    place(current, key);
     writeJsonFile(file, current);
     return current.entries[key];
   }
