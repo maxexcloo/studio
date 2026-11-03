@@ -11,7 +11,8 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { GalleryVertical, LayoutGrid, Layers, SquareCheck } from "lucide-react";
+import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
@@ -241,7 +242,7 @@ export function GalleryPage() {
                     value: "grid",
                     label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
                   },
-                  { value: "runs", label: <ViewLabel icon={<Layers size={14} />} text="Runs" /> },
+                  { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
                 ]}
               />
               {view === "grid" && (
@@ -250,7 +251,7 @@ export function GalleryPage() {
                   aria-label="All Versions"
                   aria-pressed={allVersions}
                   variant={allVersions ? "light" : "default"}
-                  leftSection={<GalleryVertical size={15} />}
+                  leftSection={<icons.versions size={15} />}
                   onClick={() => setAllVersions(!allVersions)}
                 >
                   All Versions

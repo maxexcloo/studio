@@ -11,7 +11,8 @@ import {
   type FloatingPosition,
   type PaperProps,
 } from "@mantine/core";
-import { Check, ChevronDown, Ellipsis, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -311,7 +312,7 @@ export function StackedActionBar({ primary, more }: { primary: Action[]; more: A
         <StackedControl key={action.id} action={action} />
       ))}
       {shown(more).length > 0 && (
-        <StackedControl action={{ id: "more", label: "More", icon: Ellipsis, menu: more }} />
+        <StackedControl action={{ id: "more", label: "More", icon: icons.more, menu: more }} />
       )}
     </div>
   );

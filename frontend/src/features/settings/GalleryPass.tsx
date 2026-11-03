@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { Button, Progress, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ScanText, Square } from "lucide-react";
+import { ScanText } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { SettingRow } from "./SettingRows";
 
@@ -130,7 +131,7 @@ export function GalleryPass({
       {data?.active ? (
         <Button
           variant="default"
-          leftSection={<Square size={16} />}
+          leftSection={<icons.stop size={16} />}
           loading={change.isPending}
           onClick={() => change.mutate("stop")}
         >

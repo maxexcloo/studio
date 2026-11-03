@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
-import { ChevronDown, FastForward, Pencil, Play } from "lucide-react";
+import { ChevronDown, FastForward } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { isProfile } from "../generation/payload";
 import { ActionMenuItems, findAction } from "../gallery/ActionBar";
@@ -151,7 +152,7 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
           variant="default"
           radius="xl"
           size="compact-sm"
-          leftSection={<Pencil size={14} />}
+          leftSection={<icons.edit size={14} />}
           loading={action.isPending && action.variables === "refine"}
           disabled={action.isPending}
           onClick={() => action.mutate("refine")}
@@ -166,7 +167,7 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
               variant="default"
               radius="xl"
               size="compact-sm"
-              leftSection={video ? <FastForward size={14} /> : <Play size={14} />}
+              leftSection={video ? <FastForward size={14} /> : <icons.animate size={14} />}
               rightSection={<ChevronDown size={14} />}
               loading={animate.loading}
               disabled={animate.disabled}
@@ -320,7 +321,7 @@ export function SessionIteration({
                   color="gray"
                   size="compact-sm"
                   radius="xl"
-                  leftSection={<Pencil size={14} />}
+                  leftSection={<icons.edit size={14} />}
                   style={{ flexShrink: 0 }}
                   aria-label={`Edit Iteration ${number}`}
                   onClick={() => setEditing(true)}

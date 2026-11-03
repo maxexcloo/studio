@@ -9,7 +9,7 @@ import {
   Text,
 } from "@mantine/core";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Heart } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useState } from "react";
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
@@ -69,7 +69,7 @@ export function DiscardedDreams() {
               m="xs"
               size="xs"
               variant="light"
-              leftSection={<Heart size={14} />}
+              leftSection={<icons.keep size={14} />}
               loading={keep.isPending && keep.variables?.id === item.id}
               onClick={() => keep.mutate(item)}
               aria-label={`Keep ${item.prompt || "Result"}`}

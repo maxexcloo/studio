@@ -23,13 +23,11 @@ import {
   ArrowUp,
   ArrowUpToLine,
   CircleAlert,
-  Eraser,
   Image,
   ListOrdered,
-  RotateCw,
   Video,
-  X,
 } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -126,7 +124,7 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
         disabled={action.isPending}
         onClick={onClick}
       >
-        {retry ? <RotateCw size={16} /> : <X size={16} />}
+        {retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
       </ActionIcon>
     </Tooltip>
   ) : (
@@ -256,7 +254,7 @@ function ClearJob({ job }: { job: QueueJob }) {
         disabled={action.isPending}
         onClick={() => action.mutate({ id: job.id, action: "clear" })}
       >
-        <Eraser size={16} />
+        <icons.clear size={16} />
       </ActionIcon>
     </Tooltip>
   );

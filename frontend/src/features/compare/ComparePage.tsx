@@ -11,7 +11,8 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { Link, useParams } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -147,7 +148,7 @@ export function ComparePage() {
                           loading={star.isPending && star.variables?.id === item.id}
                           onClick={() => star.mutate(item)}
                         >
-                          <Star size={18} fill={won ? "currentColor" : "none"} />
+                          <icons.winner size={18} fill={won ? "currentColor" : "none"} />
                         </ActionIcon>
                       </Tooltip>
                     )

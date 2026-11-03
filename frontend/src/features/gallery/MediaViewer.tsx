@@ -22,7 +22,8 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
-import { ChevronLeft, ChevronRight, Info, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
@@ -438,13 +439,7 @@ export function MediaViewer({
                     aria-expanded={phone ? sheet : details}
                     onClick={toggleDetails}
                   >
-                    {phone ? (
-                      <Info size={18} />
-                    ) : details ? (
-                      <PanelRightClose size={18} />
-                    ) : (
-                      <PanelRightOpen size={18} />
-                    )}
+                    <icons.details size={18} />
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label="Close (Esc)">

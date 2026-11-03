@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { Ellipsis, LoaderCircle, SquareCheck, TriangleAlert, X } from "lucide-react";
+import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
@@ -232,7 +233,7 @@ export function GallerySelectionBar({
             disabled={pending}
             onClick={selection.end}
           >
-            <X size={18} />
+            <icons.clear size={18} />
           </ActionIcon>
         </Tooltip>
         <Text size="sm" fw={500} role="status" className={classes.count}>
@@ -241,7 +242,7 @@ export function GallerySelectionBar({
         {!phone && (
           <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
             <ActionBarGroups
-              groups={[[...primary, { id: "more", label: "More", icon: Ellipsis, menu: more }]]}
+              groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
               menuPosition="bottom-end"
             />
           </div>

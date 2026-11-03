@@ -13,7 +13,8 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, Layers, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -152,7 +153,7 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
       aria-label="Choose LoRAs"
       aria-expanded={picker.opened}
       aria-controls={picker.controlsId}
-      leftSection={input.loras.length ? undefined : <Layers size={15} />}
+      leftSection={input.loras.length ? undefined : <icons.loras size={15} />}
       rightSection={<ChevronDown size={14} />}
       onPointerEnter={warm}
       onFocus={warm}
@@ -160,7 +161,7 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
     >
       {input.loras.length ? (
         <ChipThumbnails
-          placeholder={Layers}
+          placeholder={icons.loras}
           items={input.loras.map((lora) => ({
             key: lora.name,
             label: loraTitle(info.data?.loras[lora.name], lora.name),
@@ -328,7 +329,7 @@ function LoraControls({
               (familiesOf(file).length ? undefined : "Unclassified")
             }
             image={previews.data?.previews[file]}
-            placeholder={Layers}
+            placeholder={icons.loras}
             aspect={phone ? "1" : "4 / 3"}
             selected={selected.has(file)}
             row={phone}

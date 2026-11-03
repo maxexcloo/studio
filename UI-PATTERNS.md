@@ -24,6 +24,12 @@ primary component reference and verify APIs against the installed version.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
   `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and `copyText`.
+- `ui/icons.ts` gives each meaning one icon, and actions, modes and recurring
+  controls take theirs from it: SlidersHorizontal only for Prompt and composer
+  settings, ListFilter for filters, the gear for settings, Layers only for
+  versions, Sparkles only for the prompt assistant, Star only for starring, Trophy
+  for a comparison's winner, Blend for Compare and Columns for side by side,
+  Square for Stop, X for Clear, Info for Details and Ellipsis for More.
 - Style with Mantine props and theme `extend` defaults first; component-specific
   CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
   global class rules and per-call sizes that the theme should own.
@@ -55,7 +61,7 @@ primary component reference and verify APIs against the installed version.
 - Primary modes are Chat, Dream, Images and Videos in that order; Images is the
   landing page at `/images`; videos use `/video`, conversation uses
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
-  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Sparkles, Image and Video icons with
+  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Moon, Image and Video icons with
   accessible names and tooltips. The selected mode's pill slides between items (`FloatingIndicator`). On every breakpoint one status action sits
   right of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;

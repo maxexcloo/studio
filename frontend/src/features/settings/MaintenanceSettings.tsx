@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Badge, Button, Menu, Modal, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, ExternalLink, ListRestart, RotateCcw, Trash2 } from "lucide-react";
+import { ExternalLink, ListRestart } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
@@ -78,7 +79,7 @@ function DeleteFailedItems() {
       )}
       <Button
         variant="default"
-        leftSection={<Trash2 size={16} />}
+        leftSection={<icons.delete size={16} />}
         onClick={() => setConfirming(true)}
       >
         Delete
@@ -192,14 +193,14 @@ function UnfinishedItems() {
           rowActions={(job) => (
             <>
               <Menu.Item
-                leftSection={<Trash2 size={16} />}
+                leftSection={<icons.delete size={16} />}
                 color="red"
                 onClick={() => setDeleting(job)}
               >
                 Delete
               </Menu.Item>
               <Menu.Item
-                leftSection={<RotateCcw size={16} />}
+                leftSection={<icons.retry size={16} />}
                 onClick={() => act.mutate({ action: "retry", job })}
               >
                 Retry
@@ -254,7 +255,7 @@ export function MaintenanceSettings() {
             href="/api/gallery/export"
             download
             variant="default"
-            leftSection={<Download size={16} />}
+            leftSection={<icons.download size={16} />}
           >
             Export
           </Button>
@@ -277,7 +278,7 @@ export function MaintenanceSettings() {
         >
           <Button
             variant="default"
-            leftSection={<Copy size={16} />}
+            leftSection={<icons.copy size={16} />}
             loading={diagnostics.isPending}
             disabled={!diagnostics.data}
             onClick={() => diagnostics.data && void copyText(diagnostics.data.text, "Diagnostics")}

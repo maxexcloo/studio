@@ -1,7 +1,8 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Button, Checkbox, Loader, Progress, Text, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, Layers, RotateCw, X } from "lucide-react";
+import { CircleAlert } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../generation/Queue";
@@ -92,7 +93,7 @@ function TileStatus({
               size="compact-sm"
               variant="default"
               radius="xl"
-              leftSection={<X size={14} />}
+              leftSection={<icons.stop size={14} />}
               aria-label={`Cancel ${mediaTitle(item)}`}
               loading={action.isPending}
               onClick={() => action.mutate({ id: job.id, action: "cancel" })}
@@ -104,7 +105,7 @@ function TileStatus({
               size="compact-sm"
               variant="default"
               radius="xl"
-              leftSection={<RotateCw size={14} />}
+              leftSection={<icons.retry size={14} />}
               aria-label={`Try Again: ${mediaTitle(item)}`}
               loading={retrying}
               onClick={async () => {
@@ -131,7 +132,7 @@ function VersionBadge({ count, current }: { count: number; current?: number }) {
     <div className={classes.versions} aria-hidden>
       {current === undefined ? (
         <>
-          <Layers size={12} />
+          <icons.versions size={12} />
           {count}
         </>
       ) : count <= 8 ? (

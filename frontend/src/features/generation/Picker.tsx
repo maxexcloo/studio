@@ -23,7 +23,8 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { ArrowDownUp, Check, Ellipsis, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
@@ -537,7 +538,7 @@ export function SavedList<T extends SavedItem>({
                   color="gray"
                   aria-label={`${noun} Actions for ${item.name}`}
                 >
-                  <Ellipsis size={18} />
+                  <icons.more size={18} />
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>

@@ -12,7 +12,8 @@ import {
   Tooltip,
   useCombobox,
 } from "@mantine/core";
-import { History, Pin, PinOff, Trash2 } from "lucide-react";
+import { History, Pin, PinOff } from "lucide-react";
+import { icons } from "../../ui/icons";
 import {
   queryOptions,
   useMutation,
@@ -272,7 +273,7 @@ export function PromptHistory({
                           variant="subtle"
                           onClick={() => edit.mutate({ action: "forget", text: entry.text })}
                         >
-                          <Trash2 size={16} />
+                          <icons.delete size={16} />
                         </ActionIcon>
                       </Tooltip>
                     </Group>

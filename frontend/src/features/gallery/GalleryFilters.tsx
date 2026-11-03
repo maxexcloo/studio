@@ -11,7 +11,8 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { ChevronDown, RotateCw, SlidersHorizontal, Star, Upload, X } from "lucide-react";
+import { ChevronDown, Upload, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { api } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import type { MediaKind } from "../../types";
@@ -219,13 +220,13 @@ export function FilterButton({
         aria-label={label}
         aria-expanded={opened}
         variant={count || opened ? "light" : "default"}
-        leftSection={phone ? undefined : <SlidersHorizontal size={15} />}
+        leftSection={phone ? undefined : <icons.filter size={15} />}
         rightSection={phone ? undefined : <ChevronDown size={14} />}
         pos="relative"
         style={{ overflow: "visible" }}
         onClick={onClick}
       >
-        {phone ? <SlidersHorizontal size={16} /> : "Filter"}
+        {phone ? <icons.filter size={16} /> : "Filter"}
         {count > 0 && (
           <Badge size="xs" circle variant="filled" pos="absolute" top={-4} right={-4} aria-hidden>
             {count}
@@ -311,7 +312,7 @@ export function GalleryFilterPanel({
           {...chipProps}
           color="red"
           variant="light"
-          leftSection={<RotateCw size={15} />}
+          leftSection={<icons.retry size={15} />}
           loading={facets.isFetching}
           onClick={() => void facets.refetch()}
         >
@@ -323,7 +324,7 @@ export function GalleryFilterPanel({
         {toggle(
           "starred",
           "Starred",
-          <Star size={15} fill={value.starred ? "currentColor" : "none"} />,
+          <icons.star size={15} fill={value.starred ? "currentColor" : "none"} />,
         )}
         {toggle("uploads", "Uploads", <Upload size={15} />)}
       </Group>

@@ -5,11 +5,11 @@ import {
   MessagesSquare,
   Server,
   Shield,
-  SlidersHorizontal,
   UserRound,
   UsersRound,
   Wrench,
 } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 
@@ -53,7 +53,7 @@ const settingSections = {
   studio: {
     label: "Studio",
     description: "How Studio works for you.",
-    icon: SlidersHorizontal,
+    icon: icons.settings,
   },
   users: {
     label: "Users",

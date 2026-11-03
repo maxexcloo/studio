@@ -3,10 +3,6 @@ import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import {
   ArrowLeftRight,
   Camera,
-  Columns2,
-  Columns3,
-  Copy,
-  Download,
   Eye,
   FastForward,
   Film,
@@ -14,30 +10,20 @@ import {
   Flame,
   Gem,
   ImagePlus,
-  ImageUpscale,
   ListChecks,
   Loader,
-  MessageSquareShare,
-  Pencil,
   PenLine,
-  Play,
   Rabbit,
   Repeat,
   Rewind,
-  RotateCw,
   ScanFace,
   ScanText,
   Scissors,
-  Share,
   Shuffle,
   Snail,
-  SlidersHorizontal,
-  Sparkles,
-  Square,
-  Star,
   TextQuote,
-  Trash2,
   Waves,
+  Wind,
   Zap,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
@@ -46,6 +32,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -79,19 +66,19 @@ import { useVideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
-  chat: { label: "Continue in Chat", icon: MessageSquareShare },
-  prompt: { label: "Prompt", icon: SlidersHorizontal },
-  animate: { label: "Animate", icon: Play },
-  edit: { label: "Edit", icon: Pencil },
-  retry: { label: "Retry", icon: RotateCw },
-  stop: { label: "Stop", icon: Square },
-  compare: { label: "Compare", icon: Columns3 },
-  upscale: { label: "Upscale", icon: ImageUpscale },
-  copy: { label: "Copy", icon: Copy },
-  download: { label: "Download", icon: Download },
-  share: { label: "Share", icon: Share },
-  delete: { label: "Delete", icon: Trash2, color: "red" as const },
-  star: { label: "Star", icon: Star },
+  chat: { label: "Continue in Chat", icon: icons.chat },
+  prompt: { label: "Prompt", icon: icons.prompt },
+  animate: { label: "Animate", icon: icons.animate },
+  edit: { label: "Edit", icon: icons.edit },
+  retry: { label: "Retry", icon: icons.retry },
+  stop: { label: "Stop", icon: icons.stop },
+  compare: { label: "Compare", icon: icons.compare },
+  upscale: { label: "Upscale", icon: icons.upscale },
+  copy: { label: "Copy", icon: icons.copy },
+  download: { label: "Download", icon: icons.download },
+  share: { label: "Share", icon: icons.share },
+  delete: { label: "Delete", icon: icons.delete, color: "red" as const },
+  star: { label: "Star", icon: icons.star },
 };
 export type ItemActionId = keyof typeof definitions;
 /**
@@ -120,7 +107,7 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
-  living: Sparkles,
+  living: Wind,
   action: Zap,
   spicy: Flame,
   custom: PenLine,
@@ -398,7 +385,7 @@ export function useMediaActions(
             {
               id: "animate-composer",
               label: "Animate in Composer",
-              icon: SlidersHorizontal,
+              icon: icons.prompt,
               disabled: !animation.data,
               onClick: () => action.mutate("animate"),
             },
@@ -490,7 +477,7 @@ export function useMediaActions(
               {
                 id: "prompt-composer",
                 label: "Edit",
-                icon: SlidersHorizontal,
+                icon: icons.prompt,
                 disabled: action.isPending,
                 onClick: () => action.mutate("image"),
               },
@@ -535,7 +522,7 @@ export function useMediaActions(
                   {
                     id: "upscale-again",
                     label: "Regenerate Upscale",
-                    icon: RotateCw,
+                    icon: icons.retry,
                     disabled: upscaleBusy,
                     onClick: () => queueUpscale("balanced"),
                   },
@@ -543,7 +530,7 @@ export function useMediaActions(
               : (["fast", "balanced", "high"] as const).map((quality) => ({
                   id: `upscale-${quality}`,
                   label: quality[0].toUpperCase() + quality.slice(1),
-                  icon: ImageUpscale,
+                  icon: icons.upscale,
                   disabled: upscaleBusy,
                   onClick: () => queueUpscale(quality),
                 }))),
@@ -561,7 +548,7 @@ export function useMediaActions(
             {
               id: "upscale-options",
               label: "Upscale Options…",
-              icon: SlidersHorizontal,
+              icon: icons.settings,
               disabled: upscaleBusy,
               onClick: onUpscale,
             },
@@ -582,7 +569,7 @@ export function useMediaActions(
                       {
                         id: "compare-upscale",
                         label: "Compare Upscale",
-                        icon: Columns2,
+                        icon: icons.compareSideBySide,
                         checked: Boolean(compare),
                         onClick: onCompare,
                       },
@@ -629,7 +616,7 @@ export function useMediaActions(
                       {
                         id: "download-video",
                         label: "Download Video",
-                        icon: Download,
+                        icon: icons.download,
                         link: transfer.download,
                       },
                       { id: "download-gif", label: "Download as GIF", icon: Film, link: gif },
