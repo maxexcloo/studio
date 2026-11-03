@@ -6,7 +6,6 @@ import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { SectionHeader } from "../../ui/SectionToolbar";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
-import { TasteProfile } from "../taste/TasteProfile";
 import { AboutStudio } from "./AboutStudio";
 import { ChatGatewayAdmin, GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { MaintenanceSettings } from "./MaintenanceSettings";
@@ -72,7 +71,6 @@ export function SettingsPage() {
                 access need multi-user mode.
               </Text>
             )}
-            <TasteProfile />
           </Stack>
         ),
         gateway: <ChatGatewayAdmin />,

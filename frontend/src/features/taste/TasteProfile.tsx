@@ -31,7 +31,7 @@ const learnt = (taste: Taste) =>
     .filter(Boolean)
     .join(" · ");
 
-/** Settings › Account: the summary Studio keeps of what this account likes, editable by its owner. */
+/** Dream › Taste: the summary Studio keeps of what this account likes, editable by its owner. */
 export function TasteProfile() {
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
