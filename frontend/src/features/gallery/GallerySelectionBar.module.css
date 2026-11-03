@@ -29,8 +29,11 @@
   margin-left: auto;
 }
 
-/* Phones: a full-width toolbar on the header's surface, clear of the home indicator. */
+/* Phones: a full-width toolbar on the header's surface, clear of the home indicator, its icons
+ * centred. */
 .toolbar {
+  display: flex;
+  justify-content: center;
   width: 100%;
   padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
   background: var(--studio-glass-chrome);

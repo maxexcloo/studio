@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Tooltip } from "@mantine/core";
-import { Settings2 } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { NumberSetting } from "../../ui/NumberSetting";
@@ -94,7 +94,7 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
         aria-expanded={opened}
         onClick={() => setOpened((open) => !open)}
       >
-        <Settings2 size={18} />
+        <icons.settings size={18} />
       </ActionIcon>
     </Tooltip>
   );

@@ -22,20 +22,21 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
-import { ChevronLeft, ChevronRight, Info, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { DetailsCopyActions, MediaDetails } from "./MediaDetails";
+import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource, playbackUrl } from "./mediaSource";
-import { findAction, type ActionGroups } from "./ActionBar";
+import { findAction, usualAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -387,10 +388,18 @@ export function MediaViewer({
           )
             return;
           const shortcut = viewerShortcuts[event.key.toLowerCase()];
-          const action = shortcut && findAction(shortcutActions.current, shortcut);
-          if (action) {
+          const found = shortcut && findAction(shortcutActions.current, shortcut);
+          if (found) {
             event.preventDefault();
-            if (action.onClick && !action.disabled && !action.loading && !event.repeat)
+            // A control with options runs its first, as a click on it would.
+            const action = usualAction(found);
+            if (
+              action?.onClick &&
+              !found.disabled &&
+              !action.disabled &&
+              !action.loading &&
+              !event.repeat
+            )
               action.onClick();
           } else if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
             event.preventDefault();
@@ -438,13 +447,7 @@ export function MediaViewer({
                     aria-expanded={phone ? sheet : details}
                     onClick={toggleDetails}
                   >
-                    {phone ? (
-                      <Info size={18} />
-                    ) : details ? (
-                      <PanelRightClose size={18} />
-                    ) : (
-                      <PanelRightOpen size={18} />
-                    )}
+                    <icons.details size={18} />
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label="Close (Esc)">
@@ -570,17 +573,14 @@ export function MediaViewer({
               >
                 <ScrollArea h="100%" type="hover" offsetScrollbars>
                   <Stack gap="lg" p="md" pt="lg">
-                    <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
-                      <Stack gap={2} miw={0}>
-                        <Text fw={600} lineClamp={2}>
-                          {mediaTitle(item)}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {subtitle}
-                        </Text>
-                      </Stack>
-                      <DetailsCopyActions item={displayed} />
-                    </Group>
+                    <Stack gap={2} miw={0}>
+                      <Text fw={600} lineClamp={2}>
+                        {mediaTitle(item)}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {subtitle}
+                      </Text>
+                    </Stack>
                     <MediaDetails
                       item={displayed}
                       open={
@@ -615,12 +615,9 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Group justify="space-between" wrap="nowrap" gap="xs" mt={-8}>
-                <Text size="xs" c="dimmed">
-                  {subtitle}
-                </Text>
-                <DetailsCopyActions item={displayed} />
-              </Group>
+              <Text size="xs" c="dimmed" mt={-8}>
+                {subtitle}
+              </Text>
               <MediaDetails
                 item={displayed}
                 open={

@@ -1,18 +1,13 @@
 import type { ReactNode } from "react";
-import { ActionIcon, Menu } from "@mantine/core";
+import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { post } from "../../api";
 import { ownAccountQuery, useAccount } from "./AccountGate";
 
-export function AccountMenuContent({
-  accountFirst = false,
-  children,
-}: {
-  accountFirst?: boolean;
-  children?: ReactNode;
-}) {
+/** The account's name, Account and Sign Out, last after any `children` (the phone overflow's items). */
+export function AccountMenuContent({ children }: { children?: ReactNode }) {
   const location = useLocation(),
     client = useQueryClient();
   const account = useAccount(),
@@ -26,10 +21,11 @@ export function AccountMenuContent({
     },
   });
   const name = multi ? own.data?.account.username || "Your Account" : "Single-User Development";
-  const label = <Menu.Label>{name}</Menu.Label>;
   return (
     <>
-      {!accountFirst && label}
+      {children}
+      {children && <Menu.Divider />}
+      <Menu.Label>{name}</Menu.Label>
       <Menu.Item
         component={Link}
         to="/settings#account"
@@ -38,9 +34,6 @@ export function AccountMenuContent({
       >
         Account
       </Menu.Item>
-      {children}
-      {(multi || accountFirst) && <Menu.Divider />}
-      {accountFirst && label}
       {multi && (
         <Menu.Item
           leftSection={<LogOut size={16} />}
@@ -56,11 +49,13 @@ export function AccountMenuContent({
 export function AccountMenu() {
   return (
     <Menu position="bottom-end" shadow="md" width={240}>
-      <Menu.Target>
-        <ActionIcon aria-label="Your Account" variant="subtle" color="gray">
-          <UserRound size={19} />
-        </ActionIcon>
-      </Menu.Target>
+      <Tooltip label="Account">
+        <Menu.Target>
+          <ActionIcon aria-label="Your Account" variant="subtle" color="gray">
+            <UserRound size={19} />
+          </ActionIcon>
+        </Menu.Target>
+      </Tooltip>
       <Menu.Dropdown>
         <AccountMenuContent />
       </Menu.Dropdown>

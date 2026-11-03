@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Loader, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { Check, Sparkles, Square } from "lucide-react";
+import { Check } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import classes from "./PromptAssistant.module.css";
@@ -273,7 +274,7 @@ export function usePromptAssistant({
       >
         <span className={classes.icons}>
           <Loader className={classes.spinner} size={16} />
-          <Square className={classes.stop} size={14} />
+          <icons.stop className={classes.stop} size={14} />
         </span>
       </ActionIcon>
     </Tooltip>
@@ -282,7 +283,7 @@ export function usePromptAssistant({
       <Tooltip label="Prompt Assistance">
         <Menu.Target>
           <ActionIcon variant="subtle" color="gray" aria-label="Prompt Assistance">
-            <Sparkles size={16} />
+            <icons.assistant size={16} />
           </ActionIcon>
         </Menu.Target>
       </Tooltip>

@@ -1,4 +1,5 @@
-import { Boxes, Download, HardDriveDownload, Layers, Sparkles } from "lucide-react";
+import { Boxes, HardDriveDownload, Lightbulb } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
@@ -8,13 +9,13 @@ export const librarySections = {
     label: "Imports",
     description:
       "Import a Civitai or Hugging Face link, or an image, and review its compatibility.",
-    icon: Download,
+    icon: icons.download,
     admin: true,
   },
   presets: {
     label: "Inspiration",
     description: "Saved prompts and settings to start from.",
-    icon: Sparkles,
+    icon: Lightbulb,
     admin: true,
   },
   models: {
@@ -25,7 +26,7 @@ export const librarySections = {
   loras: {
     label: "LoRAs",
     description: "Style and subject adapters for compatible models.",
-    icon: Layers,
+    icon: icons.loras,
   },
   downloads: {
     label: "Downloads",

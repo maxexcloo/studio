@@ -9,7 +9,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { Pause, Play } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -134,7 +134,7 @@ export function DreamPage() {
               loading={save.isPending}
               onClick={() => save.mutate({ paused: !data.settings.paused })}
             >
-              {data.settings.paused ? <Play size={18} /> : <Pause size={18} />}
+              {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
             </ActionIcon>
           </Tooltip>
         )}

@@ -780,8 +780,9 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
-/** Opens the selection bar's More menu and returns one of its items. */
+/** A selection action beyond the bulk ones: on the desktop bar, or an item of the phone's More. */
 export async function selectionMenuItem(page: Page, label: string) {
+  if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);
   await selectionAction(page, "More").click();
   return page.getByRole("menuitem", { name: label, exact: true });
 }
@@ -793,30 +794,26 @@ export async function expectNoChatOpen(page: Page) {
   else await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
 }
 
-/** Turns on Compare Upscale in the viewer's Upscale options, then closes them. */
+/** Turns on Compare Upscale in the viewer's Upscale menu. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Upscale Options");
+  await viewerAction(page, "Upscale");
   await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
 /**
- * Runs a viewer action from its bar. Phones keep Edit, Animate and Prompt there and list the rest
- * under More, where a split action's options (Upscale Options) are its submenu.
+ * Clicks a viewer action on its bar. Phones keep Retry or Stop, Edit, Animate and Prompt there and
+ * list the rest under More. A control with options opens its menu (under More, it expands in
+ * place), and the test picks the item.
  */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  if ((page.viewportSize()?.width || 1440) >= 768)
-    return viewer.getByRole("button", { name: label, exact: true }).click();
-  // Phone controls open their options on tap, so "X Options" is X itself there.
-  const button = viewer.getByRole("button", { name: label.replace(/ Options$/, ""), exact: true });
-  if (await button.count()) {
-    await button.click();
-    // Prompt is a split button on desktop; a phone tap opens its options, whose first item is the click.
-    if (label === "Prompt") await page.getByRole("menu").getByRole("menuitem").first().click();
-    return;
-  }
+  const control = viewer
+    .getByRole("button", { name: label, exact: true })
+    .or(viewer.getByRole("link", { name: label, exact: true }));
+  if ((page.viewportSize()?.width || 1440) >= 768 || (await control.count()))
+    return control.click();
   await viewer.getByRole("button", { name: "More", exact: true }).click();
-  await page.getByRole("menuitem", { name: label.replace(/ Options$/, ""), exact: true }).click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {

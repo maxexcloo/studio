@@ -10,7 +10,8 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
-import { ArrowUp, Brush, Image as ImageIcon, RotateCcw, Video, X } from "lucide-react";
+import { ArrowUp, Brush, Image as ImageIcon, Video, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { defaultProfile, useGeneration } from "./GenerationProvider";
@@ -325,7 +326,7 @@ export function GenerationEditor({
                   aria-label="Clear"
                   onClick={onClear}
                 >
-                  <RotateCcw size={18} />
+                  <icons.clear size={18} />
                 </ActionIcon>
               ) : (
                 <Button variant="subtle" color="gray" size="sm" onClick={onClear}>

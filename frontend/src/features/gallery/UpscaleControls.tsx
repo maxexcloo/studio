@@ -162,14 +162,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   });
   const face = status.data?.faceDetail;
   const faceDetail = Boolean(face?.nodesInstalled && face.detectors.length);
-  return {
-    queue,
-    faceDetail,
-    faceNote:
-      face && !faceDetail
-        ? "Face Detail needs the worker’s face detector and Impact Pack nodes."
-        : "",
-  };
+  return { queue, faceDetail };
 }
 /** The same settings for the Upscale item in tile and Chat result menus. */
 export function UpscaleDialog({

@@ -68,7 +68,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   await page.getByRole("button", { name: "Uploads", exact: true }).click();
   await page.keyboard.press("Escape");
   await page.locator('[data-media-id="clip"]').click();
-  await viewerAction(page, "Prompt Options");
+  await viewerAction(page, "Prompt");
   await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   expect(recreated).toEqual([{ galleryItemId: "clip" }]);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });

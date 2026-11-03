@@ -2,7 +2,8 @@ import { useState, type ReactNode } from "react";
 import { ActionIcon, Alert, Badge, Group, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Combine, Ellipsis, FileDown, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
+import { Combine, FileDown, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
@@ -47,7 +48,7 @@ function SectionActions({ actions }: { actions: SectionAction[] }) {
       <Menu position="bottom-end">
         <Menu.Target>
           <ActionIcon variant="subtle" color="gray" aria-label="More Profile Actions">
-            <Ellipsis size={18} />
+            <icons.more size={18} />
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>

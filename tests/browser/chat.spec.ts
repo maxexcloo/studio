@@ -300,7 +300,7 @@ test("Waiting jobs show their reason and cancellation is scoped to the recorded 
   });
   await page.goto("/chat/session-1");
   await expect(page.getByText("Waiting for Media Worker to become available.")).toBeVisible();
-  await page.getByRole("button", { name: "Cancel Waiting bird", exact: true }).click();
+  await page.getByRole("button", { name: "Stop Waiting bird", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
 });

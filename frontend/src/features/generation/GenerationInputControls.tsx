@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
-import { Bookmark, ChevronDown, Columns3, X } from "lucide-react";
+import { Bookmark, ChevronDown, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
@@ -180,7 +181,7 @@ export function GenerationInputControls({
       {onCompare && input.kind === "image" && (
         <Tooltip label="Compare">
           <Button {...iconChipProps} aria-label="Compare" onClick={onCompare}>
-            <Columns3 size={16} />
+            <icons.compare size={16} />
           </Button>
         </Tooltip>
       )}
