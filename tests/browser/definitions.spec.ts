@@ -328,7 +328,7 @@ test("A combined profile's Backend select is a saved edit that switches what the
   await openNav(page, "Settings");
   await section(page, "Settings", "Profiles");
   const table = page.getByRole("table", { name: "Editable Profiles", exact: true });
-  await expect(table).toContainText("Radiance");
+  await expect(table).toContainText("Krea 2 Turbo · Fast");
   const editor = await editDefinition(page, "Profile");
   const description = editor.getByRole("textbox", { name: "Description", exact: true });
   await expect(description).toHaveValue("Radiance runtime.");

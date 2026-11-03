@@ -87,9 +87,8 @@ export function ProfilePicker({
   const selectedLabel = selected && profileLabel(selected, available);
   const readiness = selected && profileReadiness(selected, workers);
   // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the
-  // profile's; with several to choose from, the Backend chip shows it instead.
+  // profile's; only the composer's Backend chip shows it, where it is switched.
   const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
-  const backendBadge = selectedBackend && (selected.backendOptions?.length || 0) < 2;
   return (
     <>
       <ChipSelect
@@ -109,15 +108,6 @@ export function ProfilePicker({
               checked={checked}
               badges={
                 <>
-                  {profile?.backend && (
-                    <Badge size="xs" variant="default" title={profile.readyReason}>
-                      {backendLabel(
-                        profile.id === selected?.id && selectedBackend
-                          ? selectedBackend
-                          : profile.backend,
-                      )}
-                    </Badge>
-                  )}
                   {profile?.aiDrafted && (
                     <Badge size="xs" color="orange">
                       AI-Drafted
@@ -169,13 +159,6 @@ export function ProfilePicker({
             .join(" · ")
         }
         label={selectedLabel || "Choose a Profile"}
-        badge={
-          backendBadge && (
-            <Badge size="xs" variant="default" ml={6}>
-              {backendLabel(selectedBackend)}
-            </Badge>
-          )
-        }
       />
       {runtime.dialog}
     </>

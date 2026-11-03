@@ -20,7 +20,6 @@ export function ChipSelect({
   name,
   label,
   swatch,
-  badge,
   title,
   target,
   ...props
@@ -28,7 +27,6 @@ export function ChipSelect({
   name: string;
   label: ReactNode;
   swatch?: string;
-  badge?: ReactNode;
   title?: string;
   target?: Record<string, unknown>;
 }) {
@@ -64,7 +62,6 @@ export function ChipSelect({
           title={title}
         >
           <span className={classes.label}>{label}</span>
-          {badge}
         </Button>
       </ComboboxPopover.Target>
     </ComboboxPopover>
