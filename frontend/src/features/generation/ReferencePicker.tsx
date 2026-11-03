@@ -32,13 +32,7 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import {
-  referenceCapacity,
-  referenceDetails,
-  referenceGroup,
-  referenceGroupAssets,
-  referenceGroups,
-} from "./payload";
+import { referenceCapacity, referenceDetails, referenceGroup, referenceGroups } from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import {
   galleryReferenceType,
@@ -109,17 +103,9 @@ export function ReferencePicker({
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
   const settle = () => browse({ target: null });
-  /** Whether one more image placed at `into` leaves no free slot, so picking it closes the picker. */
-  function fills(into: ReferenceTarget) {
-    const placed = list.get();
-    const slot = referenceGroup(profile, into.slot)[0].id;
-    return referenceGroups(profile).every(
-      (group) =>
-        referenceGroupAssets(placed, group).length +
-          (!into.replace && group[0].id === slot ? 1 : 0) >=
-        referenceCapacity(group),
-    );
-  }
+  // A profile taking one reference closes the picker once it is picked, saving the dismissing click.
+  const groups = referenceGroups(profile);
+  const single = groups.length === 1 && referenceCapacity(groups[0]) === 1;
   const activeFilters = useActiveFilters({
     kind: "image",
     value: filters,
@@ -341,8 +327,7 @@ export function ReferencePicker({
                   if (item.removes) list.set(list.get().filter((asset) => !item.matches(asset)));
                   else {
                     item.choose();
-                    // Filling the last free slot ends the pick, saving the dismissing click.
-                    if (target && fills(target)) setOpened(false);
+                    if (single) setOpened(false);
                   }
                   settle();
                 }}
