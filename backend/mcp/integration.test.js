@@ -3552,7 +3552,8 @@ test("Search with uploads finds only the caller's uploads, an UploadLink adds on
   const opened = await fetch(page);
   assert.equal(opened.status, 200);
   assert.match(await opened.text(), /<input type="file" name="image"/);
-  const tampered = page.slice(0, -2) + (page.endsWith("A") ? "BA" : "AA");
+  // The tag's second-to-last character always changes; its last one only carries padding bits.
+  const tampered = page.slice(0, -2) + (page.at(-2) === "A" ? "B" : "A") + page.at(-1);
   assert.equal((await fetch(tampered)).status, 404);
   const post = (url, content, type = "image/png") => {
     const form = new FormData();
