@@ -560,7 +560,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "CatalogueEdit",
     "Edit Catalogue Entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile or saved LoRA stack uses it, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
     {
       key,
       patch: z
@@ -575,14 +575,13 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         .strict()
         .optional(),
       undo: z.boolean().default(false),
+      remove: z.boolean().default(false),
     },
-    async ({ key: target, patch, undo }, signal) => {
-      if (undo === Boolean(patch))
-        throw new Error(
-          undo
-            ? "Pass patch or undo, not both."
-            : "Pass patch (the fields to change) or undo: true.",
-        );
+    async ({ key: target, patch, undo, remove }, signal) => {
+      if ([Boolean(patch), undo, remove].filter(Boolean).length !== 1)
+        throw new Error("Pass one of patch (the fields to change), undo: true or remove: true.");
+      if (remove)
+        return mcpJson(await api("POST", "/api/library/catalogue/remove", { key: target }, signal));
       if (undo)
         return mcpJson(await api("POST", "/api/library/catalogue/undo", { key: target }, signal));
       if (!Object.keys(patch).length) throw new Error("patch names no field to change.");

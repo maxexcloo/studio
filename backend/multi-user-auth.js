@@ -97,7 +97,7 @@ const mcpAdminRoutes = [
   ["POST", /^\/api\/library\/lookup$/],
   ["GET", /^\/api\/library\/placement$/],
   ["PATCH", /^\/api\/library\/catalogue$/],
-  ["POST", /^\/api\/library\/catalogue\/undo$/],
+  ["POST", /^\/api\/library\/catalogue\/(?:remove|undo)$/],
   ["GET", /^\/api\/library\/updates$/],
   ["POST", /^\/api\/library\/updates\/(?:check|apply)$/],
   ["GET", /^\/api\/models\/downloads$/],

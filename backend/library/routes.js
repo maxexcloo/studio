@@ -12,6 +12,7 @@
  *   GET  /api/library/placement?key=          where model files live, and where one file sits
  *   PATCH /api/library/catalogue {key, patch} edit one catalogue entry; the reply has the previous values
  *   POST /api/library/catalogue/undo {key}    undo its newest change (recorded as a change of its own)
+ *   POST /api/library/catalogue/remove {key}  remove an unused entry and its installed file (undo restores the entry)
  *   POST /api/library/imports/image           {image: data URL, name}: a dropped PNG, WebP or JPEG
  *   GET  /api/library/imports/:id/picture     an image import's own picture
  *   POST /api/library/imports/:id/describe    describe an imported image with the vision model (a new record)
@@ -743,6 +744,35 @@ export function registerLibraryRoutes(
       async (req, res) => {
         const key = String(req.body?.key || "");
         res.json({ ok: true, key, entry: catalogue().undo(key, { by: by(req) }) });
+      },
+      { imports: false },
+    ),
+  );
+  // Removes an entry and its installed file, unless a profile or saved LoRA stack still uses it.
+  app.post(
+    "/api/library/catalogue/remove",
+    route(
+      async (req, res) => {
+        const key = String(req.body?.key || "");
+        const entry = catalogue().entry(key);
+        if (!entry)
+          return res.status(404).json({ ok: false, error: "That entry isn’t in the catalogue." });
+        const { folder, file } = splitCatalogueKey(key);
+        const users = await references({ folder, file });
+        if (users.length)
+          return res
+            .status(409)
+            .json({ ok: false, error: `Still used by ${users.join(", ")}.`, users });
+        const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
+        catalogue().edit(
+          key,
+          { removed: true },
+          {
+            by: by(req),
+            origin: fromChat(req) ? "chat" : "admin",
+          },
+        );
+        res.json({ ok: true, key, fileRemoved: removed });
       },
       { imports: false },
     ),
