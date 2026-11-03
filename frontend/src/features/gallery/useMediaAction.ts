@@ -278,6 +278,8 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
                 theme: iteration.theme,
                 instruction: iteration.instruction,
                 source: item.prompt || "",
+                // A video's theme continues it from its last frame, so the writer moves the action on.
+                ...(item.type === "video" ? { extend: true } : {}),
               },
             }
           : {}),

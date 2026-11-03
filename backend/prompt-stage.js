@@ -13,7 +13,7 @@
  */
 import { mayUseFeature } from "./account-policy.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
+import { animateIssue, animateRequest, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
 
 const text = (value, limit = maxPromptCharacters) =>
   String(typeof value === "string" ? value : "")
@@ -70,6 +70,7 @@ export function createPromptStage({ engine, account, profiles, guide, dream }) {
       profile,
       guide: guide(profile),
       writing,
+      seconds: clipSeconds(job.input, profile),
       signal,
       onThinking,
       onDelta,

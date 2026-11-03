@@ -25,9 +25,9 @@ if (!settings) {
 }
 
 const evals = loadEvals();
-const replies = { rewrite: new Map(), loras: new Map(), negative: new Map() };
+const replies = Object.fromEntries(Object.keys(evals).map((kind) => [kind, new Map()]));
 console.log(
-  `Replaying ${evals.rewrite.cases.length + evals.loras.cases.length + evals.negative.cases.length} cases on ${settings.chosen || settings.cloud}…`,
+  `Replaying ${Object.values(evals).reduce((sum, set) => sum + set.cases.length, 0)} cases on ${settings.chosen || settings.cloud}…`,
 );
 const { results, passed, total } = await runEvals({
   evals,
