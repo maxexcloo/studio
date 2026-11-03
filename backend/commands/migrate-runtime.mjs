@@ -7,6 +7,7 @@ import {
 } from "../persistence/migration.ts";
 import { combinedProfiles } from "../combined-profiles.js";
 import { dreamOwnership } from "../dream-ownership.js";
+import { downloadSources } from "../library/download-sources.js";
 import { loraLayers } from "../library/lora-layers.js";
 import { loraRatings } from "../lora/ratings.js";
 import { accountAccess } from "../account-migration.js";
@@ -48,6 +49,7 @@ else {
     versionSources: versionSources(dataDir, { apply: values.apply }),
     profilePrompting: profilePrompting(dataDir, { apply: values.apply }),
     loraLayers: loraLayers(dataDir, { apply: values.apply }),
+    downloadSources: downloadSources(dataDir, { apply: values.apply }),
     legacyRecords: legacyRecords(dataDir, { apply: values.apply }),
     envSettings: envSettings(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
