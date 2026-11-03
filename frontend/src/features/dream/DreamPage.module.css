@@ -1,10 +1,9 @@
-/* The deck fills the space below the header up to a comfortable height, so cards and buttons never move with the content. */
+/* The page fills the space below the header, so empty states centre in it. */
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-sm);
   height: calc(100dvh - var(--app-shell-header-offset, 68px) - 2 * var(--app-shell-padding, 1rem));
-  max-height: 60rem;
   min-height: 0;
 }
 /* The batch: one segment per result, judged ones filled and the current one marked. */
@@ -37,10 +36,12 @@
   flex: 1;
   min-width: 0;
 }
+/* Cards grow to a comfortable height, so they and the buttons never move with the content. */
 .stage {
   position: relative;
   flex: 1;
   min-height: 0;
+  max-height: 52rem;
 }
 .card {
   position: absolute;
