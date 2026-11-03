@@ -770,7 +770,7 @@ export function AnimateDialog({
                   Run
                 </Button>
               ) : (
-                <Button onClick={write}>Try Again</Button>
+                <Button onClick={write}>Retry</Button>
               )}
             </Group>
           </Stack>

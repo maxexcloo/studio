@@ -460,7 +460,9 @@ primary component reference and verify APIs against the installed version.
 - Tiles share one Mantine actions menu for More and context clicks; Star and
   Download also sit on the tile. Desktop
   reveals quick controls on hover/focus; phones keep More visible and show a
-  persistent star for favourites. Selection replaces these controls.
+  persistent star for favourites. Selection replaces these controls. A running
+  tile offers Stop and a failed one Retry, the words used everywhere for these
+  actions (never Cancel or Try Again).
 - Use semantic buttons/links and accessible names for icons. Phones show no
   tooltips by default (a tapped one lingers), so phone icons need visible names. Preserve drafts
   and keyboard focus through expansion. Honour the phone keyboard and safe

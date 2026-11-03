@@ -47,7 +47,7 @@ test("Gallery continues near the bottom and retains loaded results when the next
   ).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => failed).toBe(true);
-  const retry = page.getByRole("button", { name: "Try Again", exact: true });
+  const retry = page.getByRole("button", { name: "Retry", exact: true });
   await expect(retry).toBeVisible({ timeout: 20000 });
   await expect(
     page.getByRole("button", { name: /^Open image: Browse Result/ }).first(),
@@ -361,9 +361,7 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
     .toEqual(["chat-a"]);
 });
 
-test("Running tiles show progress with Cancel and Try Again replaces a failed tile", async ({
-  page,
-}) => {
+test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
   const state = await fixtures(page);
   const job = (id: string, status: string, extra = {}) => ({
     id,
@@ -413,11 +411,11 @@ test("Running tiles show progress with Cancel and Try Again replaces a failed ti
   await page.goto("/images");
   await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);
   await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
-  // One Cancel for the two-output run.
-  await expect(page.getByRole("button", { name: "Cancel Live study", exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "Cancel Live study", exact: true }).click();
+  // One Stop for the two-output run.
+  await expect(page.getByRole("button", { name: "Stop Live study", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Stop Live study", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await page.getByRole("button", { name: "Try Again: Failed study", exact: true }).click();
+  await page.getByRole("button", { name: "Retry Failed study", exact: true }).click();
   await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
   expect(state.gallery.map((item) => item.id)).not.toContain("failed");
@@ -492,7 +490,7 @@ test("Offline views report the API error and support retry", async ({ page }) =>
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText("The gallery is temporarily unavailable");
   fails = false;
-  await page.getByRole("button", { name: "Try Again" }).click();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(page.getByText("No Images", { exact: true })).toBeVisible();
 });
 

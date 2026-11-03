@@ -27,7 +27,7 @@ function useItemJob(item: MediaItem) {
   }).data;
 }
 
-/** Progress, phase and Cancel while generating; the reason and Try Again once failed. */
+/** Progress, phase and Stop while generating; the reason and Retry once failed. */
 function TileStatus({
   item,
   onTryAgain,
@@ -94,11 +94,11 @@ function TileStatus({
               variant="default"
               radius="xl"
               leftSection={<icons.stop size={14} />}
-              aria-label={`Cancel ${mediaTitle(item)}`}
+              aria-label={`Stop ${mediaTitle(item)}`}
               loading={action.isPending}
               onClick={() => action.mutate({ id: job.id, action: "cancel" })}
             >
-              Cancel
+              Stop
             </Button>
           ) : (
             <Button
@@ -106,7 +106,7 @@ function TileStatus({
               variant="default"
               radius="xl"
               leftSection={<icons.retry size={14} />}
-              aria-label={`Try Again: ${mediaTitle(item)}`}
+              aria-label={`Retry ${mediaTitle(item)}`}
               loading={retrying}
               onClick={async () => {
                 setRetrying(true);
@@ -117,7 +117,7 @@ function TileStatus({
                 }
               }}
             >
-              Try Again
+              Retry
             </Button>
           )}
         </div>

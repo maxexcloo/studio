@@ -276,7 +276,7 @@ export function GalleryPage() {
         <Alert color="red" title="Couldn’t Load the Gallery">
           {gallery.error.message}
           <Button variant="subtle" onClick={() => void gallery.refetch()}>
-            Try Again
+            Retry
           </Button>
         </Alert>
       ) : items.length ? (
@@ -327,7 +327,7 @@ export function GalleryPage() {
                     .then((result) => setPagingFailed(result.isFetchNextPageError))
                 }
               >
-                Try Again
+                Retry
               </Button>
             </Stack>
           ) : (
