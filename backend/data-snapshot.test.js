@@ -20,7 +20,7 @@ test("a fresh install has nothing to keep, and only notes its version", () => {
   assert.equal(fs.existsSync(path.join(empty, ".backups")), false);
 });
 
-test("a new version copies the state files, not thumbnails, references or backups", () => {
+test("a new version copies the state files, not media, thumbnails, references or backups", () => {
   fs.rmSync(path.join(dataDir, ".version"), { force: true });
   fs.writeFileSync(path.join(dataDir, "gallery.json"), "[1]");
   fs.writeFileSync(path.join(dataDir, "access.json"), "{}", { mode: 0o600 });
@@ -30,6 +30,8 @@ test("a new version copies the state files, not thumbnails, references or backup
   fs.writeFileSync(path.join(dataDir, ".thumbnails", "t.webp"), "thumb");
   fs.mkdirSync(path.join(dataDir, "reference-assets"), { recursive: true });
   fs.writeFileSync(path.join(dataDir, "reference-assets", "r.png"), "ref");
+  fs.mkdirSync(path.join(dataDir, "media"), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, "media", "m.png"), "media");
 
   const target = snapshotIfNewVersion({ dataDir, version: "0.12.0" });
   assert.match(path.basename(target), /^earlier-to-0\.12\.0-/);
@@ -38,6 +40,7 @@ test("a new version copies the state files, not thumbnails, references or backup
   assert.equal(fs.existsSync(path.join(target, "backups")), false);
   assert.equal(fs.existsSync(path.join(target, ".thumbnails")), false);
   assert.equal(fs.existsSync(path.join(target, "reference-assets")), false);
+  assert.equal(fs.existsSync(path.join(target, "media")), false);
   assert.equal(fs.existsSync(path.join(target, ".backups")), false, "never copies itself");
   if (process.platform !== "win32") assert.equal(fs.statSync(target).mode & 0o777, 0o700);
 
