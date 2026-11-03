@@ -2102,9 +2102,10 @@ const dream = createDream({
   store,
   taste,
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
+  // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated) return null;
+    if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
   catalogue: async (_ownerId, account) => {
@@ -2458,7 +2459,15 @@ const sessionChat = new ChatService({
     return { job: publicJob(store.job(ownerId, result.payload.jobId)) };
   },
 });
-app.use("/api", createChatRouter(sessionChat, ownerIdForRequest));
+// A group's Chat feature gates Studio Chat; single-user mode has no account and keeps it.
+app.use(
+  "/api",
+  createChatRouter(sessionChat, (req) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "chat"))
+      throw Object.assign(new Error("Chat is off for this account."), { status: 403 });
+    return ownerIdForRequest(req);
+  }),
+);
 
 // Only generation and its owned results use direct domain calls; other MCP tools retain their transport.
 async function mcpGenerationRequest(method, route, input, owner) {

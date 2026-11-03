@@ -1,7 +1,7 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { AccountGate } from "./features/auth/AccountGate";
+import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
 import { useRemembered } from "./features/auth/useRemembered";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
@@ -29,6 +29,8 @@ const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {
   const { appearance } = useAppearance();
   const library = useLibraryAccess();
+  const chat = useGroupFeature("chat");
+  const dream = useGroupFeature("dream");
   const location = useLocation();
   const navigate = useNavigate();
   const phone = usePhone();
@@ -61,7 +63,11 @@ function Workspace() {
   const panel = overlay || lastPanel;
   const mode = (overlay ? background : location).pathname;
   const chatRoute = mode.startsWith("/chat");
-  if (location.pathname === "/library" && !library.pending && !library.allowed)
+  if (
+    (location.pathname === "/library" && !library.pending && !library.allowed) ||
+    (chatRoute && !chat) ||
+    (mode === "/dream" && !dream)
+  )
     return <Navigate to="/images" replace />;
   return (
     <GenerationProvider workspace={chatRoute ? "chat" : "gallery"} remember>

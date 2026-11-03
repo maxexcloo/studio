@@ -1109,7 +1109,7 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
   const owner = (req: Request) => req.studioAccount?.userId || "";
   const allowed = (req: Request, res: Response) => {
     if (dream.access(owner(req))) return true;
-    res.status(403).json({ ok: false, error: "This account is unavailable." });
+    res.status(403).json({ ok: false, error: "Dream is unavailable for this account." });
     return false;
   };
   const refuse = (res: Response, error: unknown) => {

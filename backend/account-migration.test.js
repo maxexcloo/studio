@@ -62,12 +62,16 @@ test("waiting accounts join the default group and groups keep only the features 
   assert.equal(saved.requireApproval, undefined);
   assert.equal(saved.defaultAccessProfileId, "user");
   assert.deepEqual(saved.profiles.user.features, {
+    chat: true,
     cloudModels: false,
+    dream: true,
     loras: false,
     uncensoredModels: false,
   });
   assert.deepEqual(saved.profiles.artists.features, {
+    chat: true,
     cloudModels: false,
+    dream: true,
     loras: true,
     uncensoredModels: false,
   });

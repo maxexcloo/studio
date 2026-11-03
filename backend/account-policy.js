@@ -21,7 +21,15 @@ export const accountRoles = Object.freeze({ administrator: "administrator", user
  * What varies between groups beyond their models. Everything else (generation, references, the
  * gallery, prompt history, upscaling and the prompt assistant) comes with an account.
  */
-export const accessFeatures = Object.freeze(["cloudModels", "loras", "uncensoredModels"]);
+export const accessFeatures = Object.freeze([
+  "chat",
+  "cloudModels",
+  "dream",
+  "loras",
+  "uncensoredModels",
+]);
+// On unless a group turns them off, so groups saved before these existed keep them.
+const defaultOnFeatures = new Set(["chat", "dream"]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 
@@ -40,7 +48,12 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
     ? [...new Set(profile.generationProfiles.filter(usable))]
     : [];
   const features = Object.fromEntries(
-    accessFeatures.map((feature) => [feature, profile?.features?.[feature] === true]),
+    accessFeatures.map((feature) => [
+      feature,
+      defaultOnFeatures.has(feature)
+        ? profile?.features?.[feature] !== false
+        : profile?.features?.[feature] === true,
+    ]),
   );
   return {
     id: validAccountKey(profile?.id) ? profile.id : "",
@@ -124,13 +137,16 @@ export function visibleGenerationProfiles(profiles, access) {
 
 /**
  * The User access profile Studio adds when absent, the default for new accounts until an
- * administrator picks another: every local model except uncensored ones, no cloud models and no
- * LoRAs. Once added it is an ordinary access profile. Administrators have full access by role.
+ * administrator picks another: every local model except uncensored ones, Chat and Dream, no cloud
+ * models and no LoRAs. Once added it is an ordinary access profile. Administrators have full access
+ * by role.
  */
 export const builtInAccessProfile = Object.freeze({
   id: "user",
   name: "User",
   generationProfiles: [],
   allModels: true,
-  features: Object.fromEntries(accessFeatures.map((feature) => [feature, false])),
+  features: Object.fromEntries(
+    accessFeatures.map((feature) => [feature, defaultOnFeatures.has(feature)]),
+  ),
 });
