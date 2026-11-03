@@ -662,7 +662,7 @@ test("References, masking, expert controls and runtime presets remain editable",
 
   await withExpertSettings(page, async () => {
     await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
-    await page.getByRole("checkbox", { name: "Allow Fallback to Another Worker" }).check();
+    await page.getByRole("switch", { name: "Allow Fallback to Another Worker" }).check();
   });
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await saveCurrent(page, "Preset", "Bird Study");
