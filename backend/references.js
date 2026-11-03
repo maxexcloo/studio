@@ -1,7 +1,15 @@
 import crypto from "node:crypto";
-import { mediaFile, mediaParams, mediaPath, mediaSubfolder, mediaType } from "./media-paths.js";
+import {
+  mediaFile,
+  mediaParams,
+  mediaPath,
+  mediaRoot,
+  mediaSubfolder,
+  mediaType,
+} from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import Busboy from "busboy";
 import { comfy } from "./comfy/comfy.js";
 import {
@@ -74,16 +82,40 @@ function galleryAsset(item) {
   };
 }
 
-/** The `image` field of a multipart upload: an image, or a video up to `maxVideoBytes`. */
-export function readMultipartUpload(req) {
+/**
+ * Where multipart uploads are written while they arrive: a dot folder in the media folder, never
+ * served (media-paths.js) and on the same disk, so a video is moved into place rather than copied.
+ */
+const uploadsInFlight = path.join(mediaRoot, ".uploads");
+const staleUploadMs = 24 * 60 * 60 * 1000;
+
+/** Removes what a crash left mid-upload; only files a day old, so live uploads are never touched. */
+async function sweepUploadsInFlight() {
+  const names = await fs.promises.readdir(uploadsInFlight).catch(() => []);
+  for (const name of names) {
+    const file = path.join(uploadsInFlight, name);
+    const stat = await fs.promises.stat(file).catch(() => null);
+    if (stat && Date.now() - stat.mtimeMs > staleUploadMs)
+      await fs.promises.rm(file, { force: true });
+  }
+}
+
+/**
+ * The `image` field of a multipart upload, an image or a video up to `maxVideoBytes`, streamed to a
+ * temporary `file` so no upload is held in memory. saveUpload moves or removes the file.
+ */
+export async function readMultipartUpload(req) {
+  await fs.promises.mkdir(uploadsInFlight, { recursive: true });
+  await sweepUploadsInFlight();
+  const temporary = path.join(uploadsInFlight, crypto.randomUUID());
   return new Promise((resolve, reject) => {
     let settled = false;
     let found = false;
     let limited = false;
     let name = "reference-image";
     let mime = "";
-    const chunks = [];
     let size = 0;
+    let written = Promise.resolve();
     let parser;
     try {
       parser = Busboy({
@@ -97,7 +129,10 @@ export function readMultipartUpload(req) {
     const fail = (error) => {
       if (settled) return;
       settled = true;
-      reject(error instanceof Error ? error : new Error(String(error)));
+      written
+        .catch(() => {})
+        .then(() => fs.promises.rm(temporary, { force: true }))
+        .finally(() => reject(error instanceof Error ? error : new Error(String(error))));
     };
     parser.on("file", (field, file, info) => {
       if (field !== "image" || found) {
@@ -112,18 +147,24 @@ export function readMultipartUpload(req) {
       });
       file.on("data", (chunk) => {
         size += chunk.length;
-        chunks.push(chunk);
       });
-      file.on("error", fail);
+      written = pipeline(file, fs.createWriteStream(temporary, { mode: 0o600 }));
+      written.catch(fail);
     });
     parser.on("error", fail);
-    parser.on("finish", () => {
+    parser.on("finish", async () => {
       if (settled) return;
       if (!found) return fail(new Error("Choose an image or video to upload."));
       if (limited || size > maxVideoBytes)
         return fail(new Error(`Videos can be up to ${megabytes(maxVideoBytes)} MB.`));
+      try {
+        await written;
+      } catch (error) {
+        return fail(error);
+      }
+      if (settled) return;
       settled = true;
-      resolve({ buffer: Buffer.concat(chunks), name, mime, size });
+      resolve({ file: temporary, name, mime, size });
     });
     req.pipe(parser);
   });
@@ -182,20 +223,49 @@ function sniffVideo(buffer) {
   return "";
 }
 
+/** The first bytes of a file, enough for sniffVideo. */
+async function fileHead(file, length = 16) {
+  const handle = await fs.promises.open(file, "r");
+  try {
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(length), 0, length, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
 /**
  * An uploaded image, or MP4 or WebM video, as a gallery item (uploads.js), with the `source` it was
- * imported from, if any; the same bytes from the same owner return the first copy.
+ * imported from, if any; the same bytes from the same owner return the first copy. The content is
+ * a `buffer`, or a temporary `file` (readMultipartUpload) that is moved into place or removed.
  */
-export async function saveUpload({ buffer, name, mime: declaredMime = "", source }, ownerId = "") {
-  if (!buffer?.length) throw new Error("That file is empty.");
-  const video = sniffVideo(buffer);
+export async function saveUpload(upload, ownerId = "") {
+  try {
+    return await saveUploadContent(upload, ownerId);
+  } finally {
+    if (upload.file) await fs.promises.rm(upload.file, { force: true });
+  }
+}
+
+async function saveUploadContent(
+  { buffer, file: temporary, name, mime: declaredMime = "", source },
+  ownerId,
+) {
+  const size = temporary ? (await fs.promises.stat(temporary)).size : buffer?.length || 0;
+  if (!size) throw new Error("That file is empty.");
+  const video = sniffVideo(temporary ? await fileHead(temporary) : buffer);
   if (video && declaredMime.startsWith("image/"))
     throw new Error("That file isn’t the type of image its name says.");
   const limit = video ? maxVideoBytes : maxUploadBytes;
-  if (buffer.length > limit)
+  if (size > limit)
     throw new Error(`${video ? "Videos" : "Images"} can be up to ${megabytes(limit)} MB.`);
+  // Images are small enough to read whole; a video stays on disk.
+  if (!video && temporary) buffer = await fs.promises.readFile(temporary);
   const inspected = video ? { mime: video } : await inspectImage(buffer, declaredMime);
-  const hash = crypto.createHash("sha256").update(buffer).digest("hex");
+  const digest = crypto.createHash("sha256");
+  if (buffer) digest.update(buffer);
+  else for await (const chunk of fs.createReadStream(temporary)) digest.update(chunk);
+  const hash = digest.digest("hex");
   const stored = (item) => {
     const media = mediaParams(item.url);
     return Boolean(media && mediaFile(media.filename, media.subfolder));
@@ -210,7 +280,11 @@ export async function saveUpload({ buffer, name, mime: declaredMime = "", source
   const filename = `${id}.${mimeExtension(inspected.mime)}`;
   const file = mediaPath(filename, subfolder);
   if (!file) throw new Error("This upload's name cannot be stored.");
-  await writeBytesFileAsync(file, buffer, { mode: 0o600 });
+  if (buffer) await writeBytesFileAsync(file, buffer, { mode: 0o600 });
+  else {
+    await fs.promises.mkdir(path.dirname(file), { recursive: true });
+    await fs.promises.rename(temporary, file);
+  }
   if (video) {
     const clip = await probeVideo(file);
     if (!clip) {
@@ -228,7 +302,7 @@ export async function saveUpload({ buffer, name, mime: declaredMime = "", source
     ownerId,
     name: safeName(name),
     ...inspected,
-    size: buffer.length,
+    size,
     hash,
     createdAt: new Date().toISOString(),
     filename,
