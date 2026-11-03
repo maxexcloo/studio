@@ -13,7 +13,6 @@ import { usePhone } from "../../ui/usePhone";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
-import { backendLabel } from "../generation/payload";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 interface DefinitionRow {
@@ -24,8 +23,6 @@ interface DefinitionRow {
   kind?: string;
   version: number;
   aiDrafted?: boolean;
-  /** A combined profile's current backend. */
-  backend?: string;
 }
 const nouns = { profile: "Profile", guide: "Guide" } as const;
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
@@ -281,14 +278,9 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               // The name and its family wrap rather than cut off; Copy ID has the exact ID.
               cell: (entry) => (
                 <>
-                  <Group gap="xs">
-                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                      {entry.name || idOf(entry)}
-                    </Text>
-                    {entry.backend && (
-                      <Badge variant="default">{backendLabel(entry.backend)}</Badge>
-                    )}
-                  </Group>
+                  <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
+                    {entry.name || idOf(entry)}
+                  </Text>
                   <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
                     {[
                       entry.family && modelFamilyLabel(entry.family),
