@@ -269,29 +269,22 @@ const bulk = {
     text: "Failed generations leave the queue. Their chat cards stay and can still be retried.",
   },
 } as const;
-export function Queue() {
+/** The queue's own actions, as icons like each row's, on its heading's row. */
+export function QueueActions() {
   const queue = useQueue();
   const action = useQueueAction();
-  // In single-user mode the account's own pause already holds everything.
-  const multiUser = useAccount().data?.mode === "multi-user";
-  const everyone = useIsAdmin() && multiUser;
+  const everyone = usePausesEveryone();
   const [confirming, setConfirming] = useState<keyof typeof bulk>();
-  const jobs = (queue.data?.jobs ?? []).filter(
-    (job) => !["completed", "cancelled"].includes(job.status),
+  if (!queue.data) return null;
+  const jobs = shownJobs(queue.data.jobs);
+  // An empty queue offers its Resume in the empty state instead.
+  if (!jobs.length) return null;
+  const pauses = pauseActions(queue.data.paused, everyone);
+  const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
+    jobs.some((job) =>
+      key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
+    ),
   );
-  if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
-  if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
-  const { paused } = queue.data;
-  const pauses: { key: QueueAction["action"]; label: string }[] = [
-    paused.mine ? { key: "resume", label: "Resume" } : { key: "pause", label: "Pause Queue" },
-  ];
-  if (everyone)
-    pauses.push(
-      paused.all
-        ? { key: "resume-all", label: "Resume All" }
-        : { key: "pause-all", label: "Pause All" },
-    );
-  // The queue's own actions, as icons like each row's.
   const queueAction = (label: string, Icon: LucideIcon, onClick: () => void) => (
     <Tooltip key={label} label={label}>
       <ActionIcon
@@ -305,9 +298,65 @@ export function Queue() {
       </ActionIcon>
     </Tooltip>
   );
+  return (
+    <Group gap={4} wrap="nowrap">
+      {pauses.map(({ key, label }) =>
+        queueAction(label, key.startsWith("resume") ? icons.resume : icons.pause, () =>
+          action.mutate({ id: "", action: key }),
+        ),
+      )}
+      {available.map((key) =>
+        queueAction(bulk[key].label, bulk[key].icon, () => setConfirming(key)),
+      )}
+      <ConfirmDialog
+        opened={confirming !== undefined}
+        title={confirming ? bulk[confirming].title : ""}
+        action={confirming ? bulk[confirming].label : ""}
+        pending={action.isPending}
+        onClose={() => setConfirming(undefined)}
+        onConfirm={() =>
+          action
+            .mutateAsync({ id: "", action: confirming! })
+            .then(() => setConfirming(undefined))
+            // The MutationCache notification reports a failure; the dialog stays open to retry.
+            .catch(() => undefined)
+        }
+      >
+        {confirming && bulk[confirming].text}
+      </ConfirmDialog>
+    </Group>
+  );
+}
+const shownJobs = (jobs: QueueJob[]) =>
+  jobs.filter((job) => !["completed", "cancelled"].includes(job.status));
+// In single-user mode the account's own pause already holds everything.
+function usePausesEveryone() {
+  const multiUser = useAccount().data?.mode === "multi-user";
+  return useIsAdmin() && multiUser;
+}
+function pauseActions(paused: QueuePause, everyone: boolean) {
+  const pauses: { key: QueueAction["action"]; label: string }[] = [
+    paused.mine ? { key: "resume", label: "Resume" } : { key: "pause", label: "Pause Queue" },
+  ];
+  if (everyone)
+    pauses.push(
+      paused.all
+        ? { key: "resume-all", label: "Resume All" }
+        : { key: "pause-all", label: "Pause All" },
+    );
+  return pauses;
+}
+export function Queue() {
+  const queue = useQueue();
+  const action = useQueueAction();
+  const everyone = usePausesEveryone();
+  if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
+  if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
+  const { paused } = queue.data;
+  const jobs = shownJobs(queue.data.jobs);
   if (!jobs.length) {
     // An empty queue still offers the one action that lets work start again.
-    const resume = pauses.find(({ key }) => key.startsWith("resume"));
+    const resume = pauseActions(paused, everyone).find(({ key }) => key.startsWith("resume"));
     return (
       <EmptyState
         fill
@@ -327,24 +376,9 @@ export function Queue() {
       </EmptyState>
     );
   }
-  const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
-    jobs.some((job) =>
-      key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
-    ),
-  );
   const movable = jobs.filter(waiting);
   return (
     <Stack gap={0} aria-label="Queue">
-      <Group gap={4} justify="flex-end">
-        {pauses.map(({ key, label }) =>
-          queueAction(label, key.startsWith("resume") ? icons.resume : icons.pause, () =>
-            action.mutate({ id: "", action: key }),
-          ),
-        )}
-        {available.map((key) =>
-          queueAction(bulk[key].label, bulk[key].icon, () => setConfirming(key)),
-        )}
-      </Group>
       {paused.all && !everyone && (
         <Text size="xs" c="dimmed" py="xs">
           An administrator has paused the queue.
@@ -361,22 +395,6 @@ export function Queue() {
           }
         />
       ))}
-      <ConfirmDialog
-        opened={confirming !== undefined}
-        title={confirming ? bulk[confirming].title : ""}
-        action={confirming ? bulk[confirming].label : ""}
-        pending={action.isPending}
-        onClose={() => setConfirming(undefined)}
-        onConfirm={() =>
-          action
-            .mutateAsync({ id: "", action: confirming! })
-            .then(() => setConfirming(undefined))
-            // The MutationCache notification reports a failure; the dialog stays open to retry.
-            .catch(() => undefined)
-        }
-      >
-        {confirming && bulk[confirming].text}
-      </ConfirmDialog>
     </Stack>
   );
 }
