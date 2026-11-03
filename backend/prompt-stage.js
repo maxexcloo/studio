@@ -44,6 +44,8 @@ export function writingIssue(writing, { engine, account }) {
   const allowed = (feature) => !account || mayUseFeature(account, feature);
   if (!writing) return { status: 400, error: "Choose a known way to write the prompt." };
   if (!engine) return { status: 503, error: "The prompt assistant is not configured." };
+  if (writing.kind === "dream" && writing.spicy && !allowed("uncensoredModels"))
+    return { status: 403, error: "Spicy needs Uncensored Models for this account." };
   return writing.kind === "animate" ? animateIssue(writing, { engine, allowed }) : null;
 }
 
