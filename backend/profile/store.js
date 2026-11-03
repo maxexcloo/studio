@@ -15,7 +15,7 @@
  *
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
- * `<data>/history/guides/<packId>/<n>.json`; the profile bindings (`profiles`, `variants`,
+ * `<data>/history/guides/<packId>/<n>.json`; the bindings (`families`, `profiles`, `variants`,
  * `negatives`) are versioned together as `_bindings`, an id no pack can have. The store is the only
  * source of guides. Studio is the only writer of live profiles and guides; Settings › Profiles ›
  * Export backs them up.
@@ -365,7 +365,7 @@ export function createProfileStore({
 
 /* ------------------------------------------------------------ Guides */
 
-const bindingSections = ["profiles", "variants", "negatives"];
+const bindingSections = ["families", "negatives", "profiles", "variants"];
 const bindingsId = "_bindings";
 const versionedId = (id) => id === bindingsId || validPackId(id);
 const bindingsOf = (store) =>
@@ -558,8 +558,10 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
   }
 
   /**
-   * Replaces the profile bindings (`{profiles, variants, negatives}`, each an object) as a new
-   * version. `baseHash` refuses a stale edit; an AI draft sets aiDrafted, any other save clears it.
+   * Replaces the bindings (`{families, negatives, profiles, variants}`, each an object) as a new
+   * version; a section `value` leaves out keeps its current entries, so restoring a version from
+   * before the family map keeps it. `baseHash` refuses a stale edit; an AI draft sets aiDrafted,
+   * any other save clears it.
    */
   function saveBindings(
     value,
@@ -567,14 +569,16 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
   ) {
     if (!versionOrigins.includes(origin)) throw new Error("Choose who made the change.");
     if (!isObject(value) || bindingSections.some((key) => !isObject(value[key] ?? {})))
-      throw new Error("Guide bindings are an object of profiles, variants and negatives objects.");
+      throw new Error(
+        "Guide bindings are an object of families, negatives, profiles and variants objects.",
+      );
     const store = read();
     if (!store) throw notFound("There are no guides yet.");
     if (baseHash && hashOf(bindingsOf(store)) !== baseHash)
       throw conflict(
         "These guide bindings changed since you opened them. Reload them, then make your edit again.",
       );
-    return writeBindings(store, bindingsOf(value), {
+    return writeBindings(store, bindingsOf({ ...bindingsOf(store), ...value }), {
       by,
       origin,
       aiDrafted: Boolean(aiDrafted),
