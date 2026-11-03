@@ -222,8 +222,8 @@ export function registerMcpRoutes(
     throw new Error(
       "STUDIO_MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
     );
-  // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
-  const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
+  // Studio's guide store (guides/prompting.json), reloaded on change.
+  const prompting = livePrompting({ dataDir });
   const media = new McpMedia({
     dataDir,
     prompting,

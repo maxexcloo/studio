@@ -116,7 +116,7 @@ export function combinedProfiles(dataDir, { apply = false } = {}) {
 
   result.loraStacks = repointLoraStacks(dataDir, canonical, { apply });
 
-  const guides = createGuideStore({ dataDir, seedFile: "", log: quiet });
+  const guides = createGuideStore({ dataDir });
   const { bindings } = guides.bindings();
   const exists = (key) =>
     !key.startsWith("custom:") || fs.existsSync(path.join(workflowsDir, `${key.slice(7)}.json`));
