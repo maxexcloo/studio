@@ -33,7 +33,7 @@ import { referenceExistsForAccount, stageReferenceAssets } from "./references.js
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
-import { mayUseFeature, mayUseGenerationProfile, upscaleOffMessage } from "./account-policy.js";
+import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
@@ -112,9 +112,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         };
       }
       if (accountUser) {
-        const feature =
-          (input?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
-        if (!mayUseGenerationProfile(account, profile) || !mayUseFeature(account, feature))
+        if (!mayUseGenerationProfile(account, profile))
           return {
             status: 403,
             payload: {
@@ -126,22 +124,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           return {
             status: 403,
             payload: { ok: false, error: "LoRAs are not enabled for this account." },
-          };
-        if (input?.autoUpscale && !mayUseFeature(account, "upscale"))
-          return { status: 403, payload: { ok: false, error: upscaleOffMessage } };
-        const hasReference = Boolean(
-          input?.startImage || input?.startImageId || input?.referenceAssets?.length,
-        );
-        if (
-          hasReference &&
-          !mayUseFeature(
-            account,
-            feature === "videoGeneration" ? "videoReferences" : "imageReferences",
-          )
-        )
-          return {
-            status: 403,
-            payload: { ok: false, error: "References are not enabled for this account." },
           };
       }
       if (demoMode && !workers.length) return { backend: currentComfyBackend() };
@@ -307,11 +289,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     let { body, isMockJob } = prepared;
     body.comfyBackend = currentComfyBackend();
     body.ownerId = ownerIdForRequest(req);
-    // What the prompt assistant did for this run (preset, chosen LoRAs), for Details; only with the feature.
-    const assistant =
-      !req.studioAccount || mayUseFeature(req.studioAccount, "promptAssistant")
-        ? assistantRecord(req.body?.assistant, body.loras)
-        : null;
+    // What the prompt assistant did for this run (preset, chosen LoRAs), for Details.
+    const assistant = assistantRecord(req.body?.assistant, body.loras);
     if (assistant) body.assistant = assistant;
     else delete body.assistant;
     // The queue's writing stage wrote the prompt (prompt-stage.js): its results keep the thinking.
@@ -340,13 +319,12 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
               : {}),
           }
         : null;
-    if (!req.studioAccount || mayUseFeature(req.studioAccount, "promptHistory"))
-      try {
-        recordPrompt(body.prompt, "positive", body.ownerId);
-        recordPrompt(body.negative, "negative", body.ownerId);
-      } catch {
-        /* a run matters more than its history */
-      }
+    try {
+      recordPrompt(body.prompt, "positive", body.ownerId);
+      recordPrompt(body.negative, "negative", body.ownerId);
+    } catch {
+      /* a run matters more than its history */
+    }
     // The one place every path (composer, Chat, Compare, Dream, MCP) gets its LoRAs' trigger words,
     // never the prompt field: history and `typedPrompt` keep what was typed, the run and its
     // gallery record the prompt that ran.

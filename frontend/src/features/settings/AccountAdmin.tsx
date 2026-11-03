@@ -32,17 +32,8 @@ import { isCloudProfile } from "../generation/payload";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   cloudModels: "Cloud Models",
-  gallery: "Gallery",
-  imageGeneration: "Image Generation",
-  imageReferences: "Image References",
   loras: "LoRAs",
   uncensoredModels: "Uncensored Models",
-  presets: "Presets",
-  promptAssistant: "Prompt Assistance",
-  promptHistory: "Prompt History",
-  upscale: "Upscale",
-  videoGeneration: "Video Generation",
-  videoReferences: "Video References",
 };
 interface AccessGroup {
   id: string;
@@ -57,8 +48,6 @@ interface Administration {
   accessProfiles: AccessGroup[];
   availableProfiles: string[];
   defaultAccessProfileId: string;
-  requireApproval: boolean;
-  lockedFeatures: Record<string, boolean>;
 }
 function GroupEditor({
   initial,
@@ -138,8 +127,6 @@ function GroupEditor({
             <Checkbox
               key={feature}
               label={label}
-              disabled={admin.lockedFeatures[feature]}
-              description={admin.lockedFeatures[feature] ? "Disabled by the deployment" : undefined}
               {...form.getInputProps(`features.${feature}`, { type: "checkbox" })}
             />
           ))}
@@ -209,10 +196,7 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
 }
 function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => void }) {
   const form = useForm({
-    initialValues: {
-      accessProfileId: admin.defaultAccessProfileId,
-      requireApproval: admin.requireApproval,
-    },
+    initialValues: { accessProfileId: admin.defaultAccessProfileId },
   });
   const save = useMutation({
     meta: { inlineError: true },
@@ -232,15 +216,11 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
       <Stack>
         <Select
           label="Default Access Group"
+          description="New accounts, including first single sign-on, start in this group."
           data={admin.accessProfiles.map((group) => ({ value: group.id, label: group.name }))}
-          clearable
+          required
+          allowDeselect={false}
           {...form.getInputProps("accessProfileId")}
-          onChange={(value) => form.setFieldValue("accessProfileId", value || "")}
-        />
-        <Checkbox
-          label="Require Administrator Approval for New Sign-Ins"
-          description="Assign a group to approve a pending account."
-          {...form.getInputProps("requireApproval", { type: "checkbox" })}
         />
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
@@ -448,16 +428,9 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {account.username}
                 </Text>
                 <Group gap={4} mt={4}>
-                  {(account.disabled || account.pending || account.role === "administrator") && (
-                    <Badge
-                      miw="max-content"
-                      color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}
-                    >
-                      {account.disabled
-                        ? "Disabled"
-                        : account.pending
-                          ? "Awaiting Approval"
-                          : "Administrator"}
+                  {(account.disabled || account.role === "administrator") && (
+                    <Badge miw="max-content" color={account.disabled ? "red" : "gray"}>
+                      {account.disabled ? "Disabled" : "Administrator"}
                     </Badge>
                   )}
                   {account.signInLinked && (

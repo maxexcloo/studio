@@ -177,35 +177,16 @@ test(
         password: "fixture administrator password",
       });
       const adminCookie = cookie;
-      const features = {
-        imageGeneration: true,
-        imageReferences: true,
-        gallery: true,
-        promptAssistant: true,
-        cloudModels: false,
-        uncensoredModels: false,
-      };
       await api("/api/accounts/profiles", "POST", {
         id: "artists",
         name: "Artists",
         allModels: true,
-        features,
+        features: { cloudModels: false, uncensoredModels: false },
       });
       await api("/api/accounts/users", "POST", {
         username: "artist",
         password: "fixture artist password",
         accessProfileId: "artists",
-      });
-      await api("/api/accounts/profiles", "POST", {
-        id: "denied",
-        name: "No Assistant",
-        allModels: true,
-        features: { ...features, promptAssistant: false },
-      });
-      await api("/api/accounts/users", "POST", {
-        username: "denied",
-        password: "fixture denied password",
-        accessProfileId: "denied",
       });
       cookie = "";
       const account = await api("/api/accounts/sign-in", "POST", {
@@ -375,23 +356,6 @@ test(
           .status,
         404,
       );
-      cookie = "";
-      await api("/api/accounts/sign-in", "POST", {
-        username: "denied",
-        password: "fixture denied password",
-      });
-      const deniedSession = (await api("/api/sessions", "POST", { title: "No Chat" })).session;
-      assert.equal((await api("/api/chat/status")).available, false);
-      const before = requests.length;
-      assert.equal(
-        (
-          await request(`/api/sessions/${deniedSession.id}/chat`, "POST", {
-            content: "No permission",
-          })
-        ).status,
-        403,
-      );
-      assert.equal(requests.length, before);
       cookie = artistCookie;
       const messages = (await api(`/api/sessions/${session.id}/chat`)).messages;
       assert.equal(

@@ -278,9 +278,8 @@ test(
       const adminCookie = cookie;
       await api("/api/accounts/profiles", {
         id: "denied",
-        name: "No Generation",
-        allModels: true,
-        features: { gallery: true, imageGeneration: false },
+        name: "No Models",
+        generationProfiles: [],
       });
       await api("/api/accounts/users", {
         username: "denied",

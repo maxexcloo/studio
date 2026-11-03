@@ -181,7 +181,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await page.getByRole("textbox", { name: "Group ID", exact: true }).fill("member-cloud");
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
-  await page.getByRole("checkbox", { name: "Image Generation", exact: true }).check();
+  await page.getByRole("checkbox", { name: "LoRAs", exact: true }).check();
   await page.getByRole("button", { name: "Save Access Group", exact: true }).click();
   await expect
     .poll(

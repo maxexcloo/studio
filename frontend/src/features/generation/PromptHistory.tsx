@@ -21,7 +21,6 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
@@ -131,15 +130,12 @@ export function PromptHistory({
   value: string;
   onPick: (text: string) => void;
 }) {
-  const account = useAccount();
-  const admin = useIsAdmin();
-  const allowed = admin || account.data?.account?.features?.promptHistory === true;
   const [opened, setOpened] = useState(false),
     [query, setQuery] = useState("");
   const combobox = useCombobox({ opened });
   const client = useQueryClient();
-  const history = useQuery({ ...promptHistoryQuery(kind), enabled: allowed && opened });
-  const keep = useKeepRecentPrompts(allowed && opened);
+  const history = useQuery({ ...promptHistoryQuery(kind), enabled: opened });
+  const keep = useKeepRecentPrompts(opened);
   const edit = useMutation({
     mutationFn: (input: HistoryEdit) =>
       post<HistoryData>(`/api/prompts/${input.action}`, {
@@ -172,7 +168,6 @@ export function PromptHistory({
   useEffect(() => {
     if (opened) combobox.selectFirstOption();
   }, [opened, optionsKey]);
-  if (!allowed) return null;
   return (
     <ChipPopup
       title={title}
