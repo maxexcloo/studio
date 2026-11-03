@@ -7,29 +7,31 @@ export function copyText(text: string, label: string): Promise<void> {
     notifications.show({ message: `${label} copied` });
   }, failure);
 }
+/**
+ * Copies inside the tap itself, as iOS Safari requires: a selected text area and the copy command
+ * first, since it answers there and then. Were the clipboard API tried first, a fallback after its
+ * refusal would come after the tap, too late. The API serves browsers without the command.
+ */
 function writeText(text: string): Promise<void> {
-  const fallback = () => {
-    const input = document.createElement("textarea");
-    input.value = text;
-    input.readOnly = true;
-    input.dataset.composerLayer = "";
-    input.style.cssText = "position:fixed;left:-9999px;font-size:16px";
-    (document.activeElement?.closest('[role="dialog"]') || document.body).appendChild(input);
-    const previous = document.activeElement as HTMLElement | null;
-    input.select();
-    // iOS selects nothing with select() alone.
-    input.setSelectionRange(0, text.length);
-    const copied = document.execCommand("copy");
-    input.remove();
-    previous?.focus({ preventScroll: true });
-    if (!copied) throw new Error("Your browser could not copy the text.");
-  };
-  // Safari requires the clipboard request during the original tap.
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text).catch(fallback);
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.readOnly = true;
+  input.dataset.composerLayer = "";
+  input.style.cssText = "position:fixed;left:-9999px;font-size:16px";
+  (document.activeElement?.closest('[role="dialog"]') || document.body).appendChild(input);
+  const previous = document.activeElement as HTMLElement | null;
+  input.select();
+  // iOS selects nothing with select() alone.
+  input.setSelectionRange(0, text.length);
+  let copied = false;
   try {
-    fallback();
-    return Promise.resolve();
-  } catch (error) {
-    return Promise.reject(error);
+    copied = document.execCommand("copy");
+  } catch {
+    // Browsers that dropped the command throw; the clipboard API remains.
   }
+  input.remove();
+  previous?.focus({ preventScroll: true });
+  if (copied) return Promise.resolve();
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  return Promise.reject(new Error("Your browser could not copy the text."));
 }

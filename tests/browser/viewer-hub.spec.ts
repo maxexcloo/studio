@@ -570,14 +570,14 @@ test("Details copy the prompt in one click and Copy Settings copies every input"
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async (text: string) => {
-          (window as any).copied = text;
-        },
-      },
-    });
+    // Copying happens within the tap, as iOS Safari needs: the copy command, not the clipboard API.
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    document.execCommand = (command: string) => {
+      const selected = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = selected.value;
+      return true;
+    };
   });
   const { viewer } = await seed(page, {
     negative: "blurry",
