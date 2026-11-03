@@ -26,7 +26,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
         libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
     && zypper clean --all \
     # renovate: datasource=pypi depName=uv
-    && python3 -m pip install --no-cache-dir uv==0.13.6
+    && python3 -m pip install --no-cache-dir uv==0.13.7
 # Radiance comes last: a Radiance update then changes only these layers, not the whole image.
 COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
