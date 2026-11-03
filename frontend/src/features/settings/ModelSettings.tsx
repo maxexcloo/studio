@@ -25,7 +25,7 @@ interface Deployment {
   integrations: {
     civitai: { token: { set: boolean }; presets: boolean };
     huggingFace: { token: { set: boolean } };
-    assistant: { available: boolean; note?: string; model: Setting };
+    assistant: { available: boolean; note?: string; models: string[]; model: Setting };
   };
 }
 const deploymentQuery = {
@@ -85,6 +85,32 @@ export function ModelSettings() {
       </SettingRow>
     );
   };
+  // Automatic (no saved model) lets Studio pick the local or cloud model for each call.
+  const assistantModel = ({ models, model }: Deployment["integrations"]["assistant"]) => (
+    <SettingRow
+      wide
+      label="Assistant Model"
+      description={`${sourceNote(model)} · Replaces the automatic choice for every assistant call.`}
+    >
+      <Select
+        aria-label="Assistant Model"
+        data={[
+          { value: "", label: "Automatic" },
+          ...[...new Set([...models, model.configured].filter(Boolean))].map((id) => ({
+            value: id,
+            label: id,
+          })),
+        ]}
+        value={model.configured}
+        onChange={(value) => save.mutate({ key: model.key, value: value || "" })}
+        disabled={model.locked || save.isPending}
+        allowDeselect={false}
+        searchable
+        nothingFoundMessage="No Matching Models"
+        w={{ base: "100%", sm: 260 }}
+      />
+    </SettingRow>
+  );
   return (
     <Stack gap="lg">
       <SettingGroup title="Defaults">
@@ -144,6 +170,7 @@ export function ModelSettings() {
         >
           {onOff(integrations.assistant.available)}
         </SettingRow>
+        {integrations.assistant.available && assistantModel(integrations.assistant)}
       </SettingGroup>
     </Stack>
   );
