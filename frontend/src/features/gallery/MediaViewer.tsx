@@ -455,7 +455,8 @@ export function MediaViewer({
               </Group>
             </Group>
             <div className={classes.stage}>
-              {canNavigate && (
+              {/* Phones swipe between items instead. */}
+              {canNavigate && !phone && (
                 <Group className={classes.navigation} justify="space-between" wrap="nowrap">
                   <Tooltip label="Previous Generation (←)">
                     <ActionIcon

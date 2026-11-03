@@ -1009,14 +1009,16 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
   if (phone) await page.keyboard.press("Escape");
-  await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
+  // Phones swipe instead of showing the arrows.
+  const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
+  if (phone) await expect(next).toHaveCount(0);
+  else await next.click();
+  if (phone) await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
   // Navigation stops at the ends instead of wrapping round.
   await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
-  await expect(
-    dialog.getByRole("button", { name: "Next Generation", exact: true }),
-  ).toHaveAttribute("aria-disabled", "true");
+  if (!phone) await expect(next).toHaveAttribute("aria-disabled", "true");
   await page.keyboard.press("ArrowLeft");
   await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
   if (testInfo.project.use.browserName !== "webkit") {

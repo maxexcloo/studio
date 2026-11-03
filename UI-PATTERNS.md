@@ -357,7 +357,7 @@ primary component reference and verify APIs against the installed version.
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates,
+  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
   swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
