@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -16,7 +15,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Tooltip,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -31,7 +29,9 @@ import { modelsQuery, useGenerationActions } from "../generation/GenerationProvi
 import { isCloudProfile } from "../generation/payload";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
+  chat: "Chat",
   cloudModels: "Cloud Models",
+  dream: "Dream",
   loras: "LoRAs",
   uncensoredModels: "Uncensored Models",
 };
@@ -65,7 +65,8 @@ function GroupEditor({
       name: "",
       allModels: false,
       generationProfiles: [],
-      features: Object.fromEntries(Object.keys(featureLabels).map((feature) => [feature, false])),
+      // As the server reads a group without them (backend/account-policy.js).
+      features: { chat: true, dream: true },
     },
   });
   const save = useMutation({
@@ -249,7 +250,7 @@ const groupFeature = (on: boolean | undefined, label: string) => (
   </Badge>
 );
 
-/** An icon action in a section toolbar, named by its tooltip. */
+/** A labelled action in a section toolbar: account actions are rare enough to spell out. */
 function ToolbarAction({
   label,
   icon,
@@ -260,11 +261,9 @@ function ToolbarAction({
   onClick: () => void;
 }) {
   return (
-    <Tooltip label={label}>
-      <ActionIcon variant="subtle" color="gray" aria-label={label} onClick={onClick}>
-        {icon}
-      </ActionIcon>
-    </Tooltip>
+    <Button variant="subtle" size="compact-sm" leftSection={icon} onClick={onClick}>
+      {label}
+    </Button>
   );
 }
 
@@ -326,6 +325,8 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
               <Group gap={4}>
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
                 {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
+                {!group.features.chat && groupFeature(false, "Chat")}
+                {!group.features.dream && groupFeature(false, "Dream")}
               </Group>
             ),
           },
@@ -437,15 +438,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                     <Badge miw="max-content" color="gray">
                       Single Sign-On
                     </Badge>
-                  )}
-                  {account.role === "user" && groupOf(account) && (
-                    <>
-                      {groupFeature(groupOf(account)!.features.cloudModels, "Cloud Models")}
-                      {groupFeature(
-                        groupOf(account)!.features.uncensoredModels,
-                        "Uncensored Models",
-                      )}
-                    </>
                   )}
                 </Group>
               </>

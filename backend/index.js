@@ -134,6 +134,7 @@ import { loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
+import { registerRedditImportRoute } from "./gallery/reddit.js";
 
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
@@ -529,8 +530,9 @@ registerPromptHistoryRoutes(app);
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
+registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
-registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, runtime, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = registerGenerationRoutes(app, {
@@ -670,9 +672,10 @@ const dream = createDream({
   store,
   taste,
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
+  // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated) return null;
+    if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
   catalogue: async (_ownerId, account) => {
@@ -858,7 +861,15 @@ const sessionChat = createSessionChat({
   tasteWriter,
   validate: validateGenerationInput,
 });
-app.use("/api", createChatRouter(sessionChat, ownerIdForRequest));
+// A group's Chat feature gates Studio Chat; single-user mode has no account and keeps it.
+app.use(
+  "/api",
+  createChatRouter(sessionChat, (req) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "chat"))
+      throw Object.assign(new Error("Chat is off for this account."), { status: 403 });
+    return ownerIdForRequest(req);
+  }),
+);
 
 generationQueue.start();
 dream.start();

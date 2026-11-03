@@ -6,6 +6,7 @@
  *   GET  /api/profiles/editable/:id/versions/:n     one version with its text
  *   POST /api/profiles/editable/:id/revert          {version, baseHash}: that version again, as a new version
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
+ *   POST /api/profiles/editable/:id/remove          {baseHash}: removes the profile, with a backup (profile/remove.js)
  *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, and its own fields over it
  *   GET  /api/profiles/guides                       every guide pack with its version and AI-Drafted state
  *   GET  /api/profiles/guides/:packId               one pack with its hash (an edit's base) and meta
@@ -14,7 +15,7 @@
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
- *   GET  /api/profiles/guide-bindings               the profile bindings, variants and negatives, with their hash and meta
+ *   GET  /api/profiles/guide-bindings               the family map, profile bindings, variants and negatives, with their hash and meta
  *   PUT  /api/profiles/guide-bindings               {bindings, baseHash, draft?}: saves them as a new version
  *   GET  /api/profiles/guide-bindings/versions      their versions, newest first
  *   GET  /api/profiles/guide-bindings/versions/:n   one version with its bindings
@@ -34,6 +35,7 @@ import { approveEditableProfile, readEditableProfile, revertEditableProfile } fr
 import { writeExport } from "./export.js";
 import { backendCandidates, combineBackends } from "./backends.js";
 import { duplicateProfiles, mergeDuplicateProfiles } from "./merge.js";
+import { removeProfile } from "./remove.js";
 
 const fail = (res, error) =>
   res.status(error.status || 400).json({
@@ -130,6 +132,17 @@ export function registerProfileRoutes(
     }),
   );
 
+  app.post(
+    "/api/profiles/editable/:id/remove",
+    route(async (req, res) => {
+      const result = removeProfile(req.params.id, {
+        baseHash: String(req.body?.baseHash || ""),
+        by: accountName(req),
+      });
+      await onSaved(req.params.id);
+      res.json({ ok: true, ...result });
+    }),
+  );
   app.get(
     "/api/profiles/editable/:id/guide",
     route((req, res) => {

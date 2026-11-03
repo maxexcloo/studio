@@ -889,11 +889,13 @@ export function createAssistant(
   /**
    * A prompt from an image: with a vision model it is read, along with a negative, the best of the
    * offered profiles and LoRAs. Without vision, a `hint` (a caption or file name) is written up as
-   * text only (vision: false); with no hint it is unavailable, with the reason.
+   * text only (vision: false); with no hint it is unavailable, with the reason. A `title` the
+   * picture was posted under is context either way.
    */
   async function describe({
     images = [],
     hint = "",
+    title = "",
     profile = {},
     guide = null,
     profiles = [],
@@ -923,7 +925,12 @@ export function createAssistant(
       `Reply with JSON only: {"prompt": "...", "negative": "..." or "", "profile": one of ${JSON.stringify(profiles.map((item) => item.id).slice(0, 40))} or "", "loras": names from ${JSON.stringify(loras.map((item) => item.name).slice(0, 40))}}.`,
     ].join("\n");
     try {
-      const text = vision ? "Describe this image." : `Description: ${one(hint, 2000)}`;
+      const text = [
+        vision ? "Describe this image." : `Description: ${one(hint, 2000)}`,
+        title && `It was posted with the title: ${one(title, 300)}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
       const reply = await chat({
         call: "describe",
         model,

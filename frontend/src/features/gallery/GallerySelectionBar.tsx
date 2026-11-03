@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
+import { LoaderCircle, SquareCheck, TriangleAlert, WandSparkles } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
@@ -21,6 +21,7 @@ import { TrimVideoDialog } from "./videoEdits";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
+import { useRecreateMany } from "./useRecreateMany";
 import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
 import type { AnimateTheme } from "./useMediaAction";
@@ -69,6 +70,8 @@ export function GallerySelectionBar({
   const downloadUrl = `/api/gallery/export?${new URLSearchParams({ ids: ready.map((item) => item.id).join(",") })}`;
   const downloadTooLarge = ready.length > 1000 || downloadUrl.length > 6000;
   const favorites = useFavorites();
+  const uploads = ready.filter((item) => item.uploaded);
+  const recreate = useRecreateMany();
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
   const shareKey = ready.map((item) => item.id).join("\n");
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
@@ -127,7 +130,23 @@ export function GallerySelectionBar({
     selected.length === 1 ? oneItem.current.find((action) => action.id === id) : undefined;
   const actions = itemActionGroups([
     single("chat"),
-    single("prompt"),
+    // Several uploads share Prompt › Recreate, one run queued for each.
+    selected.length > 1 && uploads.length > 0
+      ? itemAction("prompt", {
+          menu: [
+            [
+              {
+                id: "recreate",
+                label: "Recreate",
+                icon: WandSparkles,
+                disabled: recreate.isPending,
+                loading: recreate.isPending,
+                onClick: () => recreate.mutate(uploads),
+              },
+            ],
+          ],
+        })
+      : single("prompt"),
     single("animate"),
     single("edit"),
     (failed.length > 0 || busy === "retry") &&

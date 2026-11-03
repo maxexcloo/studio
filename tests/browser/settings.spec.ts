@@ -49,8 +49,8 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect(page.getByText("2 failed items deleted", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
-    "Image Worker",
+  await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
+    "Text: Healthy · Images: Healthy · Videos: Offline (Video endpoint is offline.)",
   );
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -276,8 +276,8 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   ).toBeVisible();
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
-    "Image Worker",
+  await expect(page.getByRole("region", { name: "Services", exact: true })).toContainText(
+    "Images: Healthy",
   );
   await section(page, "Settings", "About");
   await expect(page.getByText("Development", { exact: true })).toBeVisible();
@@ -312,12 +312,11 @@ test("Status summarises service health and opens Workers over the current page",
   await workers.click();
   await expect(drawer).toBeHidden();
   const settings = page.getByRole("dialog", { name: /^Settings/ });
-  const images = settings.getByRole("combobox", { name: "Images Endpoint", exact: true });
-  await expect(images).toHaveValue("Image Worker");
-  await images.click();
-  await page.getByRole("option", { name: /Image Worker/ }).click();
-  await expect(settings.getByText("Fixture GPU", { exact: false })).toBeVisible();
-  await expect(settings.getByText("Observe Only", { exact: true })).toBeVisible();
+  // Observe-only Workers shows the service line and why nothing can be switched.
+  await expect(settings.getByRole("region", { name: "Services", exact: true })).toContainText(
+    "Videos: Offline (Video endpoint is offline.)",
+  );
+  await expect(settings.getByText(/runtime control is not configured/)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/chat$/);
   await expectNoChatOpen(page);
@@ -349,28 +348,32 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     ready: phase === "running" ? 1 : 0,
     acceptedOperations: 0,
   });
+  let settings = { automatic: false, parkIdleMinutes: 0 };
+  await page.route("**/api/runtime/settings", (route) => {
+    settings = route.request().postDataJSON();
+    return route.fulfill({ json: settings });
+  });
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
+        settings,
         pools: [{ id: "gpu", capacity: 2, used: 2 }],
-        history: [
-          {
-            id: "earlier",
-            type: "restart",
-            status: "completed",
-            requestedBy: "control-mcp",
-            startedAt: stamp,
-            finishedAt: stamp,
-            before: ["text"],
-            after: ["text"],
-            target: ["text", "image"],
-            stop: ["text"],
-            start: ["text"],
-            progress: "Done.",
-            steps: [],
-          },
-        ],
+        // Four changes, newest first; only the latest three show until Show All.
+        history: ["first", "second", "third", "earlier"].map((id) => ({
+          id,
+          type: "restart",
+          status: "completed",
+          requestedBy: "control-mcp",
+          startedAt: stamp,
+          finishedAt: stamp,
+          before: ["text"],
+          after: ["text"],
+          target: ["text", "image"],
+          stop: ["text"],
+          start: ["text"],
+          progress: "Done.",
+          steps: [],
+        })),
         workloads: [
           workload("image", "Image", "running"),
           workload("text", "Text", "running"),
@@ -399,9 +402,25 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   });
   await page.goto("/settings");
   await section(page, "Settings", "Workers");
+  await expect(page.getByText("2 of 2 GPUs in use", { exact: true })).toBeVisible();
+  // Idle parking applies only under automatic control, which saves 0 as Never.
+  const park = page.getByRole("combobox", { name: "Park When Idle", exact: true });
+  await expect(park).toBeDisabled();
+  await expect(park).toHaveValue("Never");
+  // The switch follows the saved settings, so it turns on once the save is read back.
+  await page.getByRole("switch", { name: "Automatic Control", exact: true }).click({ force: true });
+  await expect(park).toBeEnabled();
+  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 0 });
+  await park.click();
+  await page.getByRole("option", { name: "15 Min", exact: true }).click();
+  await expect(park).toHaveValue("15 Min");
+  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15 });
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
-  await expect(page.getByRole("table", { name: "Runtime Changes" })).toContainText("Restart Text");
+  const changes = page.getByRole("table", { name: "Runtime Changes" });
+  await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(3);
+  await page.getByRole("button", { name: "Show All", exact: true }).click();
+  await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(4);
   await table.getByRole("checkbox", { name: "Run Image", exact: true }).click();
   await table.getByRole("checkbox", { name: "Run Video", exact: true }).click();
   await page.getByRole("button", { name: "Preview Changes", exact: true }).click();
@@ -489,4 +508,61 @@ test("A parked service reads as parked, and administrators start it from Status"
   await expect(drawer.getByText("Starting Video.", { exact: true })).toBeVisible();
   expect(previews).toEqual([{ start: ["video"] }]);
   expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
+});
+
+test("Settings › Models picks the assistant model from the gateway's and text workloads' models", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const saved: unknown[] = [];
+  const setting = (key: string, configured = "", effective = "") => ({
+    key,
+    configured,
+    effective,
+    source: configured ? "studio" : "default",
+    locked: false,
+  });
+  let model = "";
+  await page.route("**/api/settings/deployment", (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      saved.push(body);
+      model = body.value;
+      return route.fulfill({ json: { ok: true, setting: body } });
+    }
+    return route.fulfill({
+      json: {
+        defaults: {
+          image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
+          video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          profiles: [],
+        },
+        catalogue: [],
+        integrations: {
+          civitai: { token: { set: false }, presets: false },
+          huggingFace: { token: { set: false } },
+          assistant: {
+            available: true,
+            models: ["cloud/auto", "local/auto", "local/stopped"],
+            model: setting("STUDIO_ASSISTANT_MODEL", model, model || "cloud/auto"),
+          },
+        },
+      },
+    });
+  });
+  await page.goto("/settings");
+  await section(page, "Settings", "Models");
+  const select = page.getByRole("combobox", { name: "Assistant Model", exact: true });
+  await expect(select).toHaveValue("Automatic");
+  await select.click();
+  await expect(page.getByRole("option")).toHaveText([
+    "Automatic",
+    "cloud/auto",
+    "local/auto",
+    "local/stopped",
+  ]);
+  await page.getByRole("option", { name: "local/stopped", exact: true }).click();
+  await expect(select).toHaveValue("local/stopped");
+  expect(saved).toEqual([{ key: "STUDIO_ASSISTANT_MODEL", value: "local/stopped" }]);
 });

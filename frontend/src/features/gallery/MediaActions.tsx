@@ -34,6 +34,7 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -293,6 +294,7 @@ export function useMediaActions(
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
   const chat = useChatAction(item, onApplied);
+  const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
@@ -461,6 +463,7 @@ export function useMediaActions(
         ],
       }),
     ready &&
+      chatOn &&
       itemAction("chat", {
         loading: chat.isPending,
         disabled: chat.isPending,

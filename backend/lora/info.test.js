@@ -18,6 +18,7 @@ test("metadata names the base model where the keys cannot", () => {
     "flux1",
   ]);
   assert.deepEqual(familiesFromMetadata({ ss_base_model_version: "sd_v1" }), ["sd15"]);
+  assert.deepEqual(familiesFromMetadata({ base_model: "Ideogram 4" }), ["ideogram4"]);
   assert.deepEqual(familiesFromMetadata({}), []);
 });
 

@@ -21,6 +21,7 @@ import { SettingGroup } from "./SettingRows";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -28,6 +29,7 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { WorkflowConnections } from "./WorkflowConnections";
 import { backendLabel } from "../generation/payload";
 import { sharedProfileFields } from "../../../../shared/profiles";
+import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 
@@ -80,6 +82,7 @@ function DefinitionForm({
   const [tab, setTab] = useState<string | null>("details");
   const [check, setCheck] = useState<Check | null>(null);
   const [versionText, setVersionText] = useState("");
+  const [removing, setRemoving] = useState(false);
   const path = definitionPath(kind, form.values.id);
   let raw: Record<string, unknown> | undefined,
     error = "";
@@ -159,6 +162,14 @@ function DefinitionForm({
       close();
     },
   });
+  const remove = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () => post(`${path}/remove`, { baseHash: loaded.hash }),
+    onSuccess: () => {
+      refresh();
+      close();
+    },
+  });
   const versions = useQuery({
     queryKey: ["definition-versions", kind, id],
     queryFn: () => api<{ versions: DefinitionMeta[] }>(`${path}/versions`),
@@ -173,7 +184,7 @@ function DefinitionForm({
     onSuccess: ({ version }) => setVersionText(version.text || pretty(version.pack)),
   });
   const meta = loaded.version || loaded.meta;
-  const busy = save.isPending || action.isPending;
+  const busy = save.isPending || action.isPending || remove.isPending;
   const collision = creating && existingIds.includes(form.values.id);
   return (
     <form
@@ -524,6 +535,16 @@ function DefinitionForm({
                 Approve Draft
               </Button>
             )}
+            {kind === "profile" && !creating && (
+              <Button
+                variant="default"
+                leftSection={<icons.delete size={16} />}
+                disabled={busy}
+                onClick={() => setRemoving(true)}
+              >
+                Remove Profile
+              </Button>
+            )}
           </Group>
           <Group gap="xs">
             <Button variant="subtle" color="gray" onClick={close}>
@@ -539,6 +560,17 @@ function DefinitionForm({
           </Group>
         </Group>
       </Stack>
+      <ConfirmDialog
+        opened={removing}
+        title="Remove Profile"
+        action="Remove"
+        pending={remove.isPending}
+        error={remove.error?.message}
+        onConfirm={() => remove.mutate()}
+        onClose={() => setRemoving(false)}
+      >
+        Remove {id}? Studio keeps a backup and its version history; gallery items made with it stay.
+      </ConfirmDialog>
     </form>
   );
 }

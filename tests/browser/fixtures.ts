@@ -717,7 +717,10 @@ export async function serveProfiles(
 }
 
 /** Signs `account` in to a multi-user instance. */
-export async function signIn(page: Page, account: { id: string; role: string }) {
+export async function signIn(
+  page: Page,
+  account: { id: string; role: string; features?: Record<string, boolean> },
+) {
   await page.route("**/api/accounts/status", (route) =>
     route.fulfill({ json: { mode: "multi-user", signedIn: true, account } }),
   );

@@ -17,9 +17,13 @@ import { requireAdmin } from "./route-access.js";
 
 /**
  * Settings › Deployment. `mediaModels` and `unavailableModels` are model/catalogue.js's;
- * `assistantEngine` is the prompt assistant, or undefined without one.
+ * `assistantEngine` is the prompt assistant, or undefined without one; `runtime` lists the text
+ * workloads whose models the assistant may use.
  */
-export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels }) {
+export function registerDeploymentRoutes(
+  app,
+  { assistantEngine, mediaModels, runtime, unavailableModels },
+) {
   /**
    * What the deployment decides, for Settings: each value with its source
    * (deployment, this studio's .env, or the default) and whether it is locked.
@@ -53,7 +57,14 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
       integrations: {
         civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
         huggingFace: { token: hfTokenStatus() },
-        assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource }),
+        assistant: await assistantIntegration({
+          engine: assistantEngine,
+          source: settingSource,
+          // The gateway lists only running models; stopped text workloads' models are choices too.
+          workloadModels: (runtime?.controller.workloads || [])
+            .filter((item) => item.kind === "text" && item.model)
+            .map((item) => item.model),
+        }),
       },
     });
   });
@@ -65,12 +76,11 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
     try {
       if (isCatalogueFlag(key)) {
         if (typeof value !== "boolean") throw new Error("Choose on or off.");
-        const item = catalogueFlags.find((entry) => entry.key === key);
-        // Back to the default is no saved value at all, so a later default change still applies.
+        // On (the default) is no saved value at all, so a later default change still applies.
         res.json({
           ok: true,
           setting: {
-            ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"),
+            ...saveDeploymentSetting(key, value ? "" : "0"),
             key,
           },
         });

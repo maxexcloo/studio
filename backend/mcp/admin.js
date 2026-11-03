@@ -543,9 +543,10 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   const strength = z
     .object({
-      default: z.number().finite().min(-5).max(5).optional(),
-      min: z.number().finite().min(-5).max(5).optional(),
-      max: z.number().finite().min(-5).max(5).optional(),
+      default: z.number().finite().optional(),
+      min: z.number().finite().optional(),
+      max: z.number().finite().optional(),
+      step: z.number().finite().positive().optional(),
     })
     .strict();
   const links = z
@@ -559,7 +560,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "CatalogueEdit",
     "Edit Catalogue Entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max}, uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
     {
       key,
       patch: z
@@ -641,7 +642,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Profiles",
     "Profiles & Guides",
-    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: which pack, variant and mode each profile (custom:<id>) uses, the variants and each profile's negatives, one document without an id. Read-only.",
+    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id. Read-only.",
     {
       action: z.enum(["list", "get", "diff"]).default("list"),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -721,9 +722,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "ProfileEdit",
     "Edit Profile or Guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version. edit, draft and revert need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"krea2": {"image": "krea2"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile (not a guide) after a backup, only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
     {
-      action: z.enum(["draft", "edit", "approve", "revert"]),
+      action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
       id: z.string().trim().min(1).max(120).optional(),
       text: z.string().min(2).max(2000000).optional(),
@@ -753,6 +754,11 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         throw new Error(
           "Pass base_hash: the hash from Profiles get, so a change made since is never overwritten.",
         );
+      if (action === "remove") {
+        if (target !== "profile")
+          throw new Error("remove takes a profile, not a guide or the bindings.");
+        return mcpJson(await api("POST", `${base}/remove`, { baseHash: base_hash }, signal));
+      }
       if (action === "revert") {
         if (!version) throw new Error("Pass version: the version to restore (from Profiles get).");
         return reply(await api("POST", `${base}/revert`, { version, baseHash: base_hash }, signal));

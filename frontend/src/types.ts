@@ -122,6 +122,8 @@ export interface MediaItem {
   favorite?: boolean;
   /** An uploaded image or video (references.js), listed under the gallery's Uploads filter. */
   uploaded?: boolean;
+  /** Where an imported upload came from: its Reddit post's link and title. */
+  source?: { url: string; title: string };
   settings?: Record<string, unknown>;
   model?: string;
   filename?: string;

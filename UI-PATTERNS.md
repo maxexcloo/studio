@@ -72,7 +72,7 @@ primary component reference and verify APIs against the installed version.
   summary at the bottom, which administrators tap to open Settings › Workers:
   on desktop a dropdown under the icon, which keeps its queue icon in Chat too
   (the sidebar lists the Chats); on phones a slideout, listing the Chats in Chat.
-  Endpoint selection and full runtime controls live in Settings › Workers, not
+  Full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Library, Settings,
   Theme, a divider, the account name, Account and supported Sign Out. Desktop
@@ -102,7 +102,8 @@ primary component reference and verify APIs against the installed version.
   shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
   (`SectionHeader`: segmented views, an expanding search, filters in one popover
-  and icon actions) at the end of the same row, above compact rows with status
+  and icon actions, labelled in Settings › Users and Groups, whose actions are
+  rare) at the end of the same row, above compact rows with status
   badges and row menus. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning. No accordions:
   headings group a section's parts, and creating or configuring a record opens
@@ -326,8 +327,9 @@ primary component reference and verify APIs against the installed version.
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Image lists share one toolbar row (`GalleryFilters.tsx`): search, the active
   filters as removable chips with Clear All (scrolling sideways, so the row never
-  changes height), then on desktop the result count and the zoom slider, Filter ▾
-  and Select. Phones expand the search from an icon into a full-width focused
+  changes height), then on desktop the result count and the zoom slider, Filter ▾,
+  Upload ▾ (Upload Files…, Upload Folder…, Import from Reddit…; files and
+  folders dropped on the gallery upload too) and Select. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
   a segmented control on its own row; Show, one row of on/off chips (All Versions
@@ -420,7 +422,7 @@ primary component reference and verify APIs against the installed version.
   nothing can run. Options are submenus on desktop and expand in place on phones,
   never as a second floating layer. The options: Prompt (opens the composer) ›
   Edit, Use as Reference (images), Recreate (an upload with a suggested prompt;
-  the run is its version), Run Again (new seed), Run Again (Same Seed); Edit opens
+  the run is its version; several selected uploads queue one run each), Run Again (new seed), Run Again (Same Seed); Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
   original kept); Animate › Fast or Quality as a small segmented control at the
