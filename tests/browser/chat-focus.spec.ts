@@ -54,6 +54,8 @@ test("Switching creative modes preserves unsent gallery inputs and the Chat mess
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
+  // Escape belongs to the Aspect popup until it has faded out.
+  await expect(page.getByRole("textbox", { name: "Width", exact: true })).toBeHidden();
   await page.keyboard.press("Escape");
   await openNav(page, "Chat");
   const message = page.getByRole("textbox", { name: "Message", exact: true });
