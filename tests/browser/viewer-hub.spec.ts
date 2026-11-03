@@ -598,7 +598,7 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
   // The frame showing is saved as an image, or becomes a reference in the composer.
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
-  await expect(page.getByText("Frame saved to Uploads.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Saved to Uploads", exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
   await page.getByRole("menuitem", { name: "Use Frame as Reference", exact: true }).click();
   await expect

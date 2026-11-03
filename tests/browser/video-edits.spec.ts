@@ -37,9 +37,11 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Reverse", exact: true }).click();
-  await expect(page.getByText("Saved as a new version.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Saved as New Version", exact: true }),
+  ).toBeVisible();
   expect(edits).toEqual([{ galleryItemId: "clip", kind: "reverse" }]);
-  await viewerAction(page, "Edit");
+  // The menu stays open after an edit.
   await page.getByRole("menuitem", { name: "Trim…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Trim Video", exact: true });
   await expect(dialog).toBeVisible();
@@ -54,4 +56,5 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
   await expect.poll(() => edits.length).toBe(2);
   expect(edits[1]).toMatchObject({ galleryItemId: "clip", kind: "trim", start: 200 });
   await expect(dialog).toBeHidden();
+  await expect(page.getByText("Saved as a new version.", { exact: true })).toBeVisible();
 });

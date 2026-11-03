@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
+import { useFlash } from "../../ui/useFlash";
 import { usePhone } from "../../ui/usePhone";
 import { escapePanel } from "./chip";
 import classes from "./Picker.module.css";
@@ -491,8 +492,7 @@ export function SavedList<T extends SavedItem>({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   // Update From Current changes nothing in view, so its row says Updated for a moment.
-  const [updated, setUpdated] = useState<string | null>(null);
-  const timer = useRef(0);
+  const [updated, flashUpdated] = useFlash<string>();
   if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
   return (
     <div className={classes.saved} role="list" aria-label={label}>
@@ -555,9 +555,7 @@ export function SavedList<T extends SavedItem>({
                   <Menu.Item
                     onClick={() => {
                       onUpdate(item);
-                      setUpdated(item.id);
-                      window.clearTimeout(timer.current);
-                      timer.current = window.setTimeout(() => setUpdated(null), 2000);
+                      flashUpdated(item.id);
                     }}
                   >
                     Update From Current

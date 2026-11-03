@@ -359,7 +359,8 @@ primary component reference and verify APIs against the installed version.
 - Use notifications for failures, Undo offers and outcomes with nowhere else to
   show (a menu item's Copy), and inline alerts for failed forms or views. Routine
   success shows where it happened, never as a toast: a copy button's check, a
-  saved record in its list, a short line beside the action. Notifications sit bottom right, raised clear of the composer and viewer
+  saved record in its list, a short line beside the action, or an open menu's item
+  relabelled for a moment (`useFlash`, like `useCopy`). Notifications sit bottom right, raised clear of the composer and viewer
   action bars, so they never cover header buttons. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
   and actions, and Australian English for explanatory prose. Placeholders are
