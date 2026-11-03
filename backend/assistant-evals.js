@@ -7,12 +7,14 @@
  *   rewrite.json   prompts per preset: subjects and quoted text kept, no setting words, preset tone
  *   loras.json     prompts against a frozen catalogue snapshot: expected and forbidden LoRAs
  *   negative.json  negatives: unused where the guide says so, wanted terms, no prompt subjects
+ *   animate.json   motion prompts per profile shape: the guide's sections or none, camera, sound
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAssistant } from "./assistant.js";
 import { settingWords } from "./assistant-presets.js";
+import { animateFiller, writeAnimatePrompt } from "./prompt-animate.js";
 
 export const evalsDir = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -21,7 +23,7 @@ export const evalsDir = path.join(
 );
 export const loadEvals = (dir = evalsDir) =>
   Object.fromEntries(
-    ["rewrite", "loras", "negative"].map((name) => [
+    ["rewrite", "loras", "negative", "animate"].map((name) => [
       name,
       JSON.parse(fs.readFileSync(path.join(dir, `${name}.json`), "utf8")),
     ]),
@@ -126,6 +128,97 @@ export function scoreNegative(item, result) {
   return { id: item.id, ok: checks.every((entry) => entry.ok), checks };
 }
 
+// Words that show a camera move or a sound cue; a motion prompt needs one of each (cases may narrow the camera).
+const cameraWords = [
+  "camera",
+  "shot",
+  "push",
+  "pull",
+  "dolly",
+  "orbit",
+  "track",
+  "pan",
+  "tilt",
+  "crane",
+  "static",
+  "locked",
+  "handheld",
+  "close-up",
+];
+const soundWords = [
+  "sound",
+  "ambience",
+  "hum",
+  "creak",
+  "rustle",
+  "crackle",
+  "clack",
+  "clang",
+  "scrape",
+  "thump",
+  "splash",
+  "crash",
+  "roar",
+  "hiss",
+  "slap",
+  "says",
+  "shout",
+  "whisper",
+  "growl",
+  "thunder",
+];
+// A section label at the start of a line, such as H3's `overall_soundscape:`.
+const sectionLabel = /^([a-z]+(?:_[a-z]+)*):/gm;
+
+/** Scores one motion prompt: the guide's sections in order (or none), a camera, sound, no filler. */
+export function scoreAnimate(item, output) {
+  const text = String(output || "");
+  const expect = item.expect || {};
+  const checks = [];
+  const check = (name, ok, detail = "") =>
+    checks.push({ name, ok: Boolean(ok), ...(ok || !detail ? {} : { detail }) });
+  check("written", text.trim(), "Empty");
+  check(
+    "no preamble",
+    !/^(here(?:'s| is)|sure|certainly|motion prompt)\b/i.test(text.trim()),
+    text.slice(0, 40),
+  );
+  for (const phrase of expect.keep || [])
+    check(`keeps "${phrase}"`, hasPhrase(text, phrase), "Missing");
+  const labels = [...text.matchAll(sectionLabel)].map((match) => match[1]);
+  const sections = expect.sections || [];
+  check(
+    sections.length ? "every section in order" : "no section labels",
+    labels.join() === sections.join() && (sections.length || !/^\s*\[Shot 1\]/.test(text)),
+    labels.join(", ") || "none",
+  );
+  const camera = expect.camera || cameraWords;
+  check(
+    "a camera move",
+    camera.some((word) => lower(text).includes(word)),
+    `None of ${camera.join(", ")}`,
+  );
+  check(
+    "sound",
+    soundWords.some((word) => lower(text).includes(word)),
+    "No sound cue",
+  );
+  if (expect.dialogue)
+    check(
+      "dialogue",
+      quotedText(text).length || /<d>[^<]+<\/d>/.test(text),
+      "No quoted or <d> line",
+    );
+  const filler = animateFiller.filter((word) => hasPhrase(text, word));
+  check("no filler", !filler.length, filler.join(", "));
+  for (const phrase of expect.avoid || [])
+    check(`moves on from "${phrase}"`, !hasPhrase(text, phrase), "Repeated");
+  const words = wordCount(text);
+  const [min, max] = [expect.minWords ?? 80, expect.maxWords ?? 600];
+  check(`${min} to ${max} words`, words >= min && words <= max, `${words} words`);
+  return { id: item.id, ok: checks.every((entry) => entry.ok), checks };
+}
+
 const reply = (content) => Response.json({ choices: [{ message: { content } }] });
 
 /**
@@ -163,7 +256,7 @@ export async function runEvals({
     log: {},
     ...(live ? {} : { timeoutMs: 5_000 }),
   });
-  const results = { rewrite: [], loras: [], negative: [] };
+  const results = { rewrite: [], loras: [], negative: [], animate: [] };
   for (const item of evals.rewrite.cases) {
     current = { kind: "rewrite", id: item.id };
     recorded.current = item.recorded;
@@ -204,6 +297,18 @@ export async function runEvals({
     });
     results.negative.push({ ...scoreNegative(item, result), output: result.negative });
   }
-  const all = [...results.rewrite, ...results.loras, ...results.negative];
+  for (const item of evals.animate.cases) {
+    current = { kind: "animate", id: item.id };
+    recorded.current = item.recorded;
+    const result = await writeAnimatePrompt({
+      engine,
+      profile: item.profile,
+      guide: item.guide || null,
+      writing: { kind: "animate", instruction: "", ...item.writing },
+      seconds: item.seconds || 0,
+    }).catch(() => ({ prompt: "" }));
+    results.animate.push({ ...scoreAnimate(item, result.prompt), output: result.prompt });
+  }
+  const all = Object.values(results).flat();
   return { results, passed: all.filter((entry) => entry.ok).length, total: all.length };
 }
