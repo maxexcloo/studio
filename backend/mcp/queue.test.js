@@ -72,6 +72,8 @@ async function fixture(t, beforeAcknowledgement) {
                 kind: "image",
                 model: "exact-model",
                 workflow: "family:flux",
+                // No batching, so each set is several jobs whose order the tests follow.
+                capabilities: { variations: false },
                 defaults: { width: 512, height: 512 },
               },
             ],

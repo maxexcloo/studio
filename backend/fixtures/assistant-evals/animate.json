@@ -1,0 +1,180 @@
+{
+  "about": "Animate and Extend cases, one per profile shape (wrapped H3, H3 with complete sections, Grok): the guide's format, beats with sound and dialogue, a camera move, no filler. Guides are trimmed snapshots of the live H3 and Grok packs.",
+  "cases": [
+    {
+      "id": "h3-wrapped-cinematic",
+      "profile": {
+        "id": "custom:video-h3-first-frame-fast-comfyui",
+        "label": "H3 First Frame Fast",
+        "kind": "video",
+        "family": "minimax-h3"
+      },
+      "guide": {
+        "summary": "H3 audiovisual prompts in MiniMax's section format: wrapped FL profiles take only the shot description.",
+        "rules": [
+          "Write the shot as a timeline of concrete beats: action onset, development, then result or reaction. Give each beat its visible motion, secondary motion and the sound it makes.",
+          "H3 generates synchronised audio: lip-synced dialogue, voiceover, sound effects, ambience and music. Fill the configured duration (8 seconds by default).",
+          "Give speakers stable IDs and write dialogue as “(S1) says: <d>[English] exact words.</d>”, with delivery outside."
+        ],
+        "mode": {
+          "id": "keyframe",
+          "summary": "The profile adds the section labels; write only the visual and audio description of the shot.",
+          "rules": [
+            "This profile wraps your text: it prepends “integrated_multimodal_description: [Shot 1] ” and appends a fixed soundscape and non_diegetic_music: N/A. Enter only the body of the description, without section labels or a leading [Shot 1].",
+            "Put dialogue and key sound events inside the description."
+          ]
+        }
+      },
+      "writing": {
+        "theme": "cinematic",
+        "source": "A woman in a red wool coat stands on a rain-soaked Tokyo street at night, neon signs reflecting in puddles, holding a clear umbrella."
+      },
+      "seconds": 8,
+      "expect": {
+        "keep": ["umbrella", "coat"],
+        "sections": [],
+        "dialogue": true
+      },
+      "recorded": "Live-action, night street in heavy rain. The woman in the red wool coat stands still under her clear umbrella as rain drums on its canopy and spatters off its rim in thin silver threads. The camera begins in a wide shot and pushes in at slow speed along the wet pavement, puddles rippling under each drop and the pink and blue neon reflections breaking apart and re-forming. She tilts the umbrella back, rain sheeting off its edge with a soft rush, and lifts her eyes to a sign that buzzes and flickers from blue to amber above her, the new light sliding across her cheek. A taxi hisses past behind her, its headlights sweeping across her coat and throwing spray against the kerb; the hem of the coat lifts in its draught. By the end the camera holds a close-up of her face, rain beading on the umbrella above, and (S1) says quietly, almost to herself: <d>[English] He's not coming.</d> Her breath clouds in the cold air as distant traffic hums on."
+    },
+    {
+      "id": "h3-sections-action",
+      "profile": {
+        "id": "custom:video-h3-reference-fast-comfyui",
+        "label": "H3 Reference Fast",
+        "kind": "video",
+        "family": "minimax-h3"
+      },
+      "guide": {
+        "summary": "H3 audiovisual prompts in MiniMax's section format: Ref profiles take complete sections.",
+        "rules": [
+          "Write the shot as a timeline of concrete beats: action onset, development, then result or reaction.",
+          "overall_soundscape takes one to four sentences of ambience and physical sounds without dialogue. non_diegetic_music takes one to three sentences, or N/A when there is no score."
+        ],
+        "mode": {
+          "id": "optional-reference",
+          "summary": "No wrapper: enter the three text-to-video sections, or all six reference sections when an image is attached.",
+          "rules": [
+            "With an attached image, enter subject_definitions, summary, retention_analysis, detailed_description, overall_soundscape and non_diegetic_music in that order. Use <Subject N> for reusable people, citing the supplied image, and <Picture N> when the image is a concrete first frame.",
+            "Start summary with a bracketed task prefix such as [keyframe completion]. In retention_analysis give one line per label with fully_preserved, partially_preserved, attribute_transfer or weak_reference and a short reason.",
+            "Open detailed_description with one or two style sentences before [Shot 1]."
+          ]
+        },
+        "variant": {
+          "id": "h3-structured",
+          "rules": [
+            "This profile adds no prefix, suffix or automatic formatting. Use the complete-section structure in the attached mode."
+          ]
+        }
+      },
+      "writing": {
+        "theme": "action",
+        "source": "A young skateboarder in a yellow hoodie at the top of a concrete bowl at sunset, board under one foot."
+      },
+      "seconds": 8,
+      "expect": {
+        "keep": ["skateboarder", "hoodie"],
+        "sections": [
+          "subject_definitions",
+          "summary",
+          "retention_analysis",
+          "detailed_description",
+          "overall_soundscape",
+          "non_diegetic_music"
+        ]
+      },
+      "recorded": "subject_definitions: <Subject 1> is the young skateboarder in the yellow hoodie from <Picture 1>. <Picture 1> is the first frame: the top of a concrete bowl at sunset, board under one foot.\n\nsummary: [keyframe completion] The shot begins from <Picture 1>; <Subject 1> drops into the bowl, carves up the far wall and lands a frontside grind back at the lip.\n\nretention_analysis: <Subject 1>: fully_preserved, the same face, hoodie and board throughout.\n<Picture 1>: fully_preserved, the shot opens on this exact frame.\n\ndetailed_description: Live-action, handheld, warm low sun. [Shot 1] The shot begins from <Picture 1>. <Subject 1> stamps the tail down and leans forward; the board tips over the coping with a sharp clack and drops into the bowl, wheels roaring on the concrete as the hood flaps behind his neck. The camera follows him down in a tracking shot at medium speed, staying low behind his shoulder as he crouches through the transition and the sun flares across the lens. He carves up the far wall, arms out for balance, sleeves snapping in the wind, a spray of grit skittering out from under the wheels. At the top he pops onto the coping and grinds along it with a long metallic scrape, sparks of light glinting off the steel edge, then drops back in and rolls to a stop in the flat bottom. He turns to the camera breathing hard, grinning, and (S1) shouts: <d>[English] Did you get that?</d> The camera eases to a stop at waist height as dust settles in the orange light behind him.\n\noverall_soundscape: Urethane wheels roaring on polished concrete, the clack of the tail and the long metal scrape of the grind. Distant traffic and a few birds over an empty skatepark at dusk.\n\nnon_diegetic_music: N/A"
+    },
+    {
+      "id": "grok-living",
+      "profile": {
+        "id": "custom:video-grok-imagine-cloud",
+        "label": "Grok Imagine Video",
+        "kind": "video",
+        "family": "grok"
+      },
+      "guide": {
+        "summary": "Shared subject-first guidance with image or video instructions for the selected cloud profile.",
+        "mode": {
+          "id": "video",
+          "rules": [
+            "Describe the opening composition, then the action as concrete beats with their secondary motion, then the camera movement, in playback order. Name specific movements and speeds instead of generic words such as cinematic, smooth or epic, and fill the selected duration.",
+            "Clips include an audio track. Describe sound effects and ambience, and write any speech in double quotes with who says it and how. One detailed paragraph is a good size."
+          ]
+        }
+      },
+      "writing": {
+        "theme": "living",
+        "source": "An old fisherman mending a net on a wooden dock at dawn, mist over the water, gulls in the distance."
+      },
+      "seconds": 6,
+      "expect": {
+        "keep": ["fisherman", "net"],
+        "sections": [],
+        "camera": ["static", "locked"]
+      },
+      "recorded": "Static, locked-off shot of the old fisherman on the wooden dock at dawn. His weathered fingers pull a loop of twine through the net and draw it tight with a soft creak of wet cord, and he exhales slowly, a faint cloud of breath drifting from his lips. Mist rolls in thin layers across the water behind him while small waves lap against the pilings with a hollow slap. The net shifts in his lap and a few drops fall from it, ticking on the planks. A gull cries far off and glides through the mist; the sky behind it warms from grey to pale gold as the sun clears the horizon and the first light catches the side of his face. He glances up at the water, then back to his work, and pulls the next knot tight, settling into the same pose he began in."
+    },
+    {
+      "id": "grok-extend-action",
+      "profile": {
+        "id": "custom:video-grok-imagine-cloud",
+        "label": "Grok Imagine Video",
+        "kind": "video",
+        "family": "grok"
+      },
+      "guide": {
+        "summary": "Shared subject-first guidance with image or video instructions for the selected cloud profile.",
+        "mode": {
+          "id": "video",
+          "rules": [
+            "Describe the opening composition, then the action as concrete beats with their secondary motion, then the camera movement, in playback order. Fill the selected duration.",
+            "Clips include an audio track. Describe sound effects and ambience, and write any speech in double quotes with who says it and how."
+          ]
+        }
+      },
+      "writing": {
+        "theme": "action",
+        "extend": true,
+        "source": "A knight in dented steel armour raises a longsword and charges across a muddy battlefield, the camera tracking alongside as rain falls."
+      },
+      "seconds": 8,
+      "expect": {
+        "keep": ["knight", "sword"],
+        "sections": [],
+        "avoid": ["charges", "raises a longsword"],
+        "dialogue": true
+      },
+      "recorded": "Mid-stride, the knight's boot skids in the mud and he plants his feet as a mounted rider bursts out of the rain ahead. He swings the sword up two-handed and the blades meet with a ringing clang, sparks spitting into the downpour; the horse rears, hooves thrashing, mud spraying across his breastplate. The tracking camera whips around to his side at speed as he ducks a second blow, rolls under the horse's flank and comes up behind it, rain streaming off his helmet. He drags the rider from the saddle with a grunt; both crash into a puddle with a heavy splash and the horse bolts, its hoofbeats fading into the storm. The knight stands over the fallen rider, chest heaving, sword point lowered, and growls through the visor, \"Yield.\" Thunder rolls and lightning flashes white across the field, lighting the smoke drifting behind them."
+    },
+    {
+      "id": "grok-custom",
+      "profile": {
+        "id": "custom:video-grok-imagine-cloud",
+        "label": "Grok Imagine Video",
+        "kind": "video",
+        "family": "grok"
+      },
+      "guide": {
+        "summary": "Shared subject-first guidance with image or video instructions for the selected cloud profile.",
+        "mode": {
+          "id": "video",
+          "rules": [
+            "Clips include an audio track. Describe sound effects and ambience, and write any speech in double quotes with who says it and how."
+          ]
+        }
+      },
+      "writing": {
+        "theme": "custom",
+        "instruction": "the cat knocks the cup off the table",
+        "source": "A ginger cat sitting on a kitchen table next to a white coffee cup, morning light through the window."
+      },
+      "seconds": 6,
+      "expect": {
+        "keep": ["cat", "cup"],
+        "sections": []
+      },
+      "recorded": "The ginger cat stares at the white coffee cup, tail flicking once against the tabletop with a soft thump. It reaches out a paw and taps the cup, which slides an inch across the wood with a dry scrape; coffee sloshes against the rim. The camera pushes in slowly from a medium shot to a close-up on the cat's face as it holds eye contact with the lens, then gives one more deliberate shove. The cup tips off the edge and shatters on the tiles below with a sharp crash, coffee splashing across the floor. The cat flattens its ears, then sits up and licks its paw, unbothered, whiskers twitching in the warm morning light while a fridge hums in the background."
+    }
+  ]
+}

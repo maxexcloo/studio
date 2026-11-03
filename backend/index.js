@@ -53,7 +53,11 @@ import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { pausedReason, terminalStatuses } from "../shared/queue.ts";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import {
+  registerMaintenanceRoutes,
+  registerRewriteRoutes,
+  unconfirmedCancel,
+} from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
@@ -193,6 +197,7 @@ import { fillVideoSizes } from "./library/library.js";
 import {
   getComfyVideoGif,
   getComfyVideoLoop,
+  getComfyVideoPlayback,
   getComfyVideoPoster,
   getComfyVideoPreview,
   sendVideoPreview,
@@ -1356,6 +1361,7 @@ const assistantGuide = (profile) => {
 };
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
+  frame: (req, id) => assistantImage(req.studioAccount, id),
   profiles: assistantProfiles,
   guide: assistantGuide,
   loras: assistantLoras,
@@ -1390,9 +1396,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 app.delete("/api/workflows/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    const result = deleteImportedWorkflow(
-      decodeURIComponent(req.params.id).replace(/^custom:/, ""),
-    );
+    const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
     const preferences = loadWorkflowPreferences();
     preferences.favorites = preferences.favorites.filter(
       (id) => id !== `custom:${result.id}` && id !== result.id,
@@ -1954,6 +1958,15 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
     await queueAdapter.settled(job);
   },
 });
+/** A reference image as the text model reads it ({ mime, data }, downscaled), or null. */
+async function assistantImage(account, id) {
+  if (!id) return null;
+  const reference = await bytesForReferenceAccount(account, id);
+  const [image] = await downscaleReferences([
+    `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
+  ]);
+  return image || null;
+}
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -1964,6 +1977,7 @@ const promptStage = createPromptStage({
   profiles: (account) => assistantProfiles({ studioAccount: account }),
   guide: assistantGuide,
   dream: () => dream,
+  frame: assistantImage,
 });
 const generationAdapter = withUpscaleAdapter(
   directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
@@ -2495,10 +2509,7 @@ const sessionChat = new ChatService({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated)
       throw Object.assign(new Error("This account no longer has access."), { status: 403 });
-    const reference = await bytesForReferenceAccount(account, id);
-    const [image] = await downscaleReferences([
-      `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
-    ]);
+    const image = await assistantImage(account, id);
     if (!image)
       throw Object.assign(new Error("This reference image cannot be used by Chat."), {
         status: 400,
@@ -2890,7 +2901,14 @@ app.get("/api/jobs/:id", (req, res) => {
 
 app.post("/api/jobs/:id/cancel", async (req, res) => {
   if (store.job(ownerIdForRequest(req), req.params.id)) {
-    await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
+    try {
+      await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
+    } catch {
+      return res.status(503).json({
+        ok: false,
+        error: unconfirmedCancel,
+      });
+    }
     return res.json({ ok: true });
   }
   const job = jobs.get(req.params.id);
@@ -3012,6 +3030,16 @@ app.get("/comfy/video-preview", async (req, res) => {
         .type("video/mp4")
         .attachment(`${path.parse(filename).name} loop.mp4`)
         .send(await getComfyVideoLoop(filename, subfolder, type));
+      return;
+    }
+    // The viewer's copy (getComfyVideoPlayback); a video not kept here plays as ComfyUI has it.
+    if (req.query.format === "play") {
+      const playback = await getComfyVideoPlayback(filename, subfolder, type);
+      if (!playback)
+        res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
+      else if (playback.original)
+        res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
+      else sendVideoPreview(req, res, playback.file, cacheControl);
       return;
     }
     // The still comes from the original, ahead of any preview still being encoded.

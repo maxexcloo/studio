@@ -29,7 +29,9 @@ export function queuePlace(queue, promptId) {
  * list, and interrupt only when it is the prompt running right now. Older
  * builds ignore /interrupt's prompt_id and stop whatever runs, which is why the
  * queue is checked first. Returns what it stopped ("canceled" from the atomic
- * call, else "running" or "pending"), or "" when there was nothing to stop.
+ * call, else "running" or "pending"), "" when there was nothing to stop, or
+ * "unreachable" when the worker refuses the connection or is gone (parked,
+ * stopped, no longer configured): nothing of Studio's can be running there.
  */
 export async function cancelPrompt(promptId, request = comfy) {
   if (!promptId) return "";
@@ -46,7 +48,17 @@ export async function cancelPrompt(promptId, request = comfy) {
   } catch {
     // Not there on this ComfyUI: do it the older way.
   }
-  const queue = await request("/queue", { timeout: 10_000 });
+  let queue;
+  try {
+    queue = await request("/queue", { timeout: 10_000 });
+  } catch (error) {
+    if (
+      error?.noWorker ||
+      /^(ECONNREFUSED|ENOTFOUND)$/.test(error?.code || error?.cause?.code || "")
+    )
+      return "unreachable";
+    throw error;
+  }
   const place = queuePlace(queue, promptId);
   if (place === "pending") {
     await request("/queue", {

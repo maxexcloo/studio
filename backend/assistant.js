@@ -270,9 +270,11 @@ export function cleanPrompt(text, limit = maxPromptCharacters) {
   body = body.replace(/^(?:rewritten\s+)?prompt\s*:\s*/i, "").trim();
   if (/^(["“])[\s\S]*(["”])$/.test(body) && !/["“”]/.test(body.slice(1, -1)))
     body = body.slice(1, -1).trim();
+  // Blank lines stay: they separate sections, such as H3's.
   return body
     .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n\s*/g, "\n")
+    .replace(/ ?\n ?/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim()
     .slice(0, limit);
 }

@@ -26,6 +26,8 @@ interface AnimateChoice {
 
 /** Animate's Fast or Quality choice, shared by every Animate menu; Fast until Quality is picked. */
 export const useAnimateTier = () => useRemembered<AnimateTier>("animate-tier", "fast");
+/** Animate's Review Prompt First: themes write the prompt for editing before it runs; off until chosen. */
+export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
@@ -142,6 +144,7 @@ export async function mediaDraft(
       : undefined;
   return {
     profile,
+    choice,
     note,
     seed: (item.settings?.seed ?? saved.seed) as string | number | undefined,
     draft: {
@@ -227,8 +230,14 @@ export type AnimateTheme = keyof typeof animateThemes;
 export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
-  | { kind: "animate"; theme: AnimateTheme; instruction?: string }
+  | { kind: "animate"; theme: AnimateTheme; instruction?: string; written?: WrittenPrompt }
   | { kind: "prompt"; prompt: string; operation: PromptOperation };
+/** A motion prompt the assistant wrote for review, as edited: it runs exactly as given. */
+export interface WrittenPrompt {
+  prompt: string;
+  model?: string;
+  thinking?: string;
+}
 /** How a given prompt runs: as Prompt › Edit would (a video animates again), an image edit or its animation. */
 export type PromptOperation = "image" | "refine" | "animate";
 
@@ -244,6 +253,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
+      const written = animate ? iteration.written : undefined;
       const given = iteration.kind === "prompt" ? iteration : undefined;
       const { profile, seed, draft, note } = await mediaDraft(
         item,
@@ -254,7 +264,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
         tier,
       );
       if (note) notifications.show({ message: note });
-      const prompt = given?.prompt ?? (animate ? "" : draft.input.prompt);
+      const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
       const repeat = iteration.kind === "repeat";
       // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.
       const count = given
@@ -270,17 +280,22 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
           profile,
           draft.references,
         ),
-        // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates.
-        ...(animate
-          ? {
-              writing: {
-                kind: "animate",
-                theme: iteration.theme,
-                instruction: iteration.instruction,
-                source: item.prompt || "",
-              },
-            }
-          : {}),
+        // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates; a
+        // reviewed prompt was written already and keeps its record.
+        ...(written
+          ? { writing: { kind: "animate", ...written } }
+          : animate
+            ? {
+                writing: {
+                  kind: "animate",
+                  theme: iteration.theme,
+                  instruction: iteration.instruction,
+                  source: item.prompt || "",
+                  // A video's theme continues it from its last frame, so the writer moves the action on.
+                  ...(item.type === "video" ? { extend: true } : {}),
+                },
+              }
+            : {}),
         operation: draft.input.kind === "video" ? "animate" : draft.operation,
         parentJobId: draft.parentJobId,
         parentItemId: draft.parentItemId,
@@ -303,6 +318,72 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
         ),
       );
       return result.jobId;
+    },
+  });
+}
+
+/** The prompt Review Prompt First shows, with the video model (and Fast or Quality) that will run it. */
+export interface AnimateReview extends WrittenPrompt {
+  profileLabel: string;
+  tier?: AnimateTier;
+}
+
+/**
+ * Writes Animate's motion prompt without queuing it, for Review Prompt First: the same writer as the
+ * queue's writing stage (backend/prompt-animate.js), from the same frame and video model.
+ */
+export function useAnimateWriter(item: MediaItem, sessionId?: string) {
+  const { profiles } = useGenerationActions();
+  const client = useQueryClient();
+  const [tier] = useAnimateTier();
+  return useMutation({
+    // Its failure shows in the dialog.
+    meta: { inlineError: true },
+    mutationFn: async ({
+      theme,
+      instruction,
+      signal,
+    }: {
+      theme: AnimateTheme;
+      instruction?: string;
+      signal: AbortSignal;
+    }): Promise<AnimateReview> => {
+      const { profile, choice, draft } = await mediaDraft(
+        item,
+        "animate",
+        profiles,
+        client,
+        sessionId,
+        tier,
+      );
+      // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.
+      const { duration, frames, fps } = generationInput(
+        draft.input,
+        profile,
+        draft.references,
+      ) as Record<string, unknown>;
+      const written = await api<WrittenPrompt>("/api/assistant/animate", {
+        method: "POST",
+        body: JSON.stringify({
+          profileId: profile.id,
+          theme,
+          instruction,
+          source: item.prompt || "",
+          extend: item.type === "video",
+          assetId: draft.references[0]?.id,
+          duration,
+          frames,
+          fps,
+        }),
+        signal,
+      });
+      return {
+        prompt: written.prompt,
+        model: written.model,
+        thinking: written.thinking,
+        profileLabel: profile.displayName || profile.label,
+        tier: choice && choice.tiers.length > 1 ? tier : undefined,
+      };
     },
   });
 }

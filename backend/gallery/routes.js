@@ -266,11 +266,13 @@ export function registerGalleryErrorRoutes(app) {
 export function registerGalleryDeleteRoute(app) {
   app.delete("/api/gallery/:id", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
-    const id = decodeURIComponent(req.params.id);
+    // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.
+    const id = req.params.id;
     const owned = recordsForRequest(gallery, req);
     const removed = owned.filter((item) => item.id === id || item.url === id);
     // Accounts never learn whether another owner's item exists.
     if (req.studioAccount && !removed.length) {
+      console.warn(`[Studio] Could not delete gallery item ${id}: not among the account's items`);
       res.status(404).json({ ok: false, error: "That item was not found." });
       return;
     }

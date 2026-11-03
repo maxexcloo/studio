@@ -138,6 +138,10 @@ async function fixture(
   const requests = [];
   const jobs = new Map();
   const assets = new Map();
+  // The gallery's uploads, newest first; `owner` is the account the studio saw send each.
+  const uploads = [];
+  const uploader = (req) =>
+    String(req.headers["x-studio-mcp-account"] || req.headers.authorization || "");
   const submitted = [];
   const downloads = [];
   let failAfter = Infinity;
@@ -158,6 +162,7 @@ async function fixture(
   app.use("/api", (req, _res, next) => {
     requests.push({
       path: req.path,
+      query: { ...req.query },
       method: req.method,
       body: req.body,
       authorization: req.headers.authorization,
@@ -203,26 +208,55 @@ async function fixture(
     if (job) job.status = "cancelled";
     res.json({ ok: true });
   });
-  app.get("/api/gallery", (_req, res) =>
+  // Like the studio's gallery list, newest first: `type`, `favorites` and every word of `q` in the
+  // title or prompt narrow it, and work still running always shows.
+  app.get("/api/gallery", (req, res) => {
+    const terms = String(req.query.q || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    // Uploads alone, the caller's own, by file name.
+    if (req.query.uploads === "1")
+      return res.json({
+        items: uploads.filter(
+          (item) =>
+            item.owner === uploader(req) &&
+            terms.every((term) => item.filename.toLowerCase().includes(term)),
+        ),
+      });
     res.json({
-      items: [...jobs.values()].flatMap(
-        (job) =>
-          job.gallery ??
-          (job.status === "done"
-            ? job.outputs.map((output, index) => ({
-                id: `${job.id}:${index}`,
-                jobId: job.id,
-                index,
-                status: "done",
-                type: job.kind,
-                ...output,
-              }))
-            : []),
-      ),
+      items: [...jobs.values()]
+        .reverse()
+        .flatMap(
+          (job) =>
+            job.gallery ??
+            (job.status === "done"
+              ? job.outputs.map((output, index) => ({
+                  id: `${job.id}:${index}`,
+                  jobId: job.id,
+                  index,
+                  status: "done",
+                  type: job.kind,
+                  prompt: job.settings?.prompt,
+                  ...(job.title ? { title: job.title } : {}),
+                  ...(job.favorite ? { favorite: true } : {}),
+                  ...output,
+                }))
+              : [{ id: `${job.id}:pending`, jobId: job.id, status: "pending", type: job.kind }]),
+        )
+        .filter(
+          (item) =>
+            item.status === "pending" ||
+            ((!req.query.type || item.type === req.query.type) &&
+              (req.query.favorites !== "1" || item.favorite) &&
+              terms.every((term) =>
+                `${item.title || ""} ${item.prompt || ""}`.toLowerCase().includes(term),
+              )),
+        ),
       hasMore: false,
       nextCursor: "",
-    }),
-  );
+    });
+  });
   app.get("/api/gallery/jobs/:id", (req, res) => {
     const job = jobs.get(req.params.id);
     // Like the studio's gallery record: the prompt and generation settings only on request.
@@ -276,14 +310,24 @@ async function fixture(
       url: "/fixture-reference.png",
     };
     assets.set(asset.id, asset);
+    // Listed under the gallery's Uploads for the account that sent it.
+    uploads.unshift({
+      id: `upload-${asset.id}`,
+      assetId: asset.id,
+      owner: uploader(req),
+      uploaded: true,
+      status: "done",
+      type: "image",
+      filename: "reference.png",
+    });
     res.json({ asset });
   });
-  // Extend's last frame of a gallery video.
+  // Extend's last frame of a gallery video, or an upload's own reference.
   app.post("/api/reference-assets/from-gallery", express.json(), (req, res) => {
-    const asset = {
-      id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`,
-      source: "gallery",
-    };
+    const upload = uploads.find((item) => item.id === req.body.galleryItemId);
+    const asset = upload
+      ? assets.get(upload.assetId)
+      : { id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`, source: "gallery" };
     assets.set(asset.id, asset);
     res.json({ ok: true, asset });
   });
@@ -365,6 +409,7 @@ async function fixture(
   return {
     app,
     assets,
+    uploads,
     base,
     mcp,
     kube: control.kube,
@@ -798,8 +843,10 @@ test("media and administrator credentials discover only their own friendly tools
     "Result",
     "Reuse",
     "Review",
+    "Search",
     "Status",
     "Upload",
+    "UploadLink",
   ]);
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
@@ -810,8 +857,10 @@ test("media and administrator credentials discover only their own friendly tools
     Result: "Show Result",
     Reuse: "Reuse Result",
     Review: "Review Image",
+    Search: "Search Gallery",
     Status: "Check Status",
     Upload: "Upload Reference",
+    UploadLink: "Upload Link",
   });
   await failure(media, "GPUStatus");
   const admin = await f.client("administrator", controlKey);
@@ -879,8 +928,9 @@ test("media and administrator credentials discover only their own friendly tools
   );
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
-    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes).
-    JSON.stringify(tools).length + media.getInstructions().length < 10200,
+    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
+    // then from 10,200 for Search.
+    JSON.stringify(tools).length + media.getInstructions().length < 10900,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1205,7 +1255,7 @@ test("a prompt holding generation instructions is refused with the count to pass
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
 });
 
-test("omitted counts queue one image or video job and an explicit count queues independent jobs", async (t) => {
+test("omitted counts queue one image or video job; a count is one image batch, or a job per video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
@@ -1219,29 +1269,28 @@ test("omitted counts queue one image or video job and an explicit count queues i
       [[profile.kind, 1]],
     );
     const pair = await generate(client, { profile_id: profile.id, count: 2 });
-    assert.equal(pair.jobs.length, 2);
+    const batched = profile.kind === "image";
+    assert.equal(pair.jobs.length, batched ? 1 : 2);
     assert.deepEqual(
-      f.submitted.slice(-2).map((body) => [body.kind, body.count]),
-      [
-        [profile.kind, 1],
-        [profile.kind, 1],
-      ],
+      f.submitted.slice(batched ? -1 : -2).map((body) => [body.kind, body.count]),
+      batched
+        ? [[profile.kind, 2]]
+        : [
+            [profile.kind, 1],
+            [profile.kind, 1],
+          ],
     );
   }
 });
 
-test("image variants queue separately with incrementing seeds and video keeps the actual video profile", async (t) => {
+test("image variants queue as one batch from the seed and video keeps the actual video profile", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const variants = await generate(client, { count: 3, seed: 20 });
-  assert.equal(variants.jobs.length, 3);
+  assert.equal(variants.jobs.length, 1);
   assert.deepEqual(
-    f.submitted.map((body) => body.count),
-    [1, 1, 1],
-  );
-  assert.deepEqual(
-    f.submitted.map((body) => body.seed),
-    ["20", "21", "22"],
+    f.submitted.map((body) => [body.count, body.seed]),
+    [[3, "20"]],
   );
   await generate(client, { profile_id: videoProfile.id });
   assert.equal(f.submitted.at(-1).kind, "video");
@@ -1550,6 +1599,10 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   const f = await fixture(t);
   const client = await f.client();
   await failure(client, "Upload", { content_base64: "not-an-image", filename: "reference.png" });
+  // A chat host that can't pass the attachment sends nothing; the refusal says what to do instead.
+  const empty = await call(client, "Upload", { content_base64: "" });
+  assert.equal(empty.isError, true);
+  assert.match(texts(empty), /call UploadLink.*Search with uploads: true/);
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
     .toBuffer();
@@ -1949,7 +2002,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 9);
+    assert.equal((await client.listTools()).tools.length, 11);
     const [first] = data(await call(client, "Models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];
@@ -1968,6 +2021,22 @@ test(
     const status = data(await call(client, "Status", { job_id: id }));
     assert.ok(["queued", "running", "done"].includes(status.status));
     assert.notEqual((await call(client, "Cancel", { job_id: id })).isError, true);
+    // Search reads the real gallery route through the loopback.
+    assert.ok(Array.isArray(data(await call(client, "Search", { query: "" })).results));
+    // An upload link's photo becomes an upload, which Search finds as a reference.
+    const form = new FormData();
+    form.append("image", new Blob([png], { type: "image/png" }), "holiday.png");
+    const { link } = data(await call(client, "UploadLink"));
+    const sent = await fetch(link.replace("localhost", "127.0.0.1"), {
+      method: "POST",
+      body: form,
+    });
+    assert.equal(sent.status, 201, await sent.clone().text());
+    const [upload] = data(
+      await call(client, "Search", { query: "holiday", uploads: true }),
+    ).results;
+    assert.match(upload.reference_asset_id, /^gallery:/);
+    assert.equal(upload.name, "holiday.png");
 
     // LibreChat connects afresh for each turn and names its conversation: the turns are one MCP Chat.
     const turn = async (prompt) => {
@@ -2280,7 +2349,7 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
     return client;
   };
   const first = await conversation("alice", "conversation-a");
-  const queued = await generate(first, { count: 2 });
+  const queued = await generate(first, { prompts: ["A landscape", "A lake"] });
   assert.deepEqual(
     queued.jobs.map((job) => job.ref),
     ["result 1", "result 2"],
@@ -2942,12 +3011,12 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   const started = performance.now();
   const pending = call(client, "Generate", { kind: "image", prompts: ["An egg"], count: 2 });
   once(
-    () => f.jobs.size === 2,
+    () => f.jobs.size === 1,
     () => {
       for (const job of f.jobs.values())
         Object.assign(job, {
           status: "done",
-          outputs: [{ url: `/comfy/view?filename=${job.id}.png` }],
+          outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
         });
     },
   );
@@ -2972,7 +3041,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   // images share one contact sheet directly under its header, in one paragraph, linking to All Results.
   assert.match(
     result.content[0].text,
-    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Results 1–2\*\* · Fixture Image\n\[!\[Results 1–2\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\((https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10})\)\n\n\[All Results\]\(\1\)\n\nPrompt: An egg$/,
+    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1 \(2 images\)\*\* · Fixture Image\n\[!\[Result 1 \(2 images\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   assert.ok(result.content[0].text.length < 660, `${result.content[0].text.length} characters`);
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
@@ -3181,14 +3250,11 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
       count: 2,
     }),
   );
-  assert.equal(tweaked.jobs.length, 2);
+  assert.equal(tweaked.jobs.length, 1);
   // The new prompt goes as written; /api/generate adds the LoRA's trigger.
   assert.deepEqual(
-    f.submitted.slice(2).map((body) => [body.prompt, body.cfg]),
-    [
-      ["A heron at dusk", 4],
-      ["A heron at dusk", 4],
-    ],
+    f.submitted.slice(2).map((body) => [body.prompt, body.cfg, body.count]),
+    [["A heron at dusk", 4, 2]],
   );
   assert.ok(
     models() - before <= 1,
@@ -3290,6 +3356,7 @@ test("Reuse animates an image from its first frame with the default first-frame 
     theme: "cinematic",
     instruction: "",
     source: "The heron takes flight",
+    extend: true,
   });
   // mode extend continues a video on its own model; length is seconds on the profile's frame grid.
   data(
@@ -3333,6 +3400,188 @@ test("Reuse follow-ups respect ownership", async (t) => {
   for (const mode of ["again", "animate", "reference"])
     await failure(bob, "Reuse", { job_id: id, mode });
   assert.equal(f.submitted.length, submitted);
+});
+
+test("Search finds the account's own finished work through the gallery search, and its refs work with Reuse and Review", async (t) => {
+  const f = await fixture(t);
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  const heron = jobId(
+    data(await call(alice, "Generate", { kind: "image", prompts: ["A red heron"], count: 1 })),
+  );
+  const fox = jobId(
+    data(await call(bob, "Generate", { kind: "image", prompts: ["A red fox"], count: 1 })),
+  );
+  finish(f);
+  // Work made in Studio itself, which no MCP call has named yet, and a run still going.
+  f.jobs.set("studio-lantern", {
+    id: "studio-lantern",
+    status: "done",
+    kind: "image",
+    title: "Red Lantern",
+    outputs: [
+      { url: "/comfy/view?filename=lantern-0.png" },
+      { url: "/comfy/view?filename=lantern-1.png" },
+    ],
+    settings: { prompt: "A red paper lantern at night", profileId: imageProfile.id },
+  });
+  f.jobs.set("studio-waves", {
+    id: "studio-waves",
+    status: "done",
+    kind: "video",
+    favorite: true,
+    outputs: [{ url: "/comfy/view?filename=waves.mp4" }],
+    settings: { prompt: "Red waves rolling in", profileId: videoProfile.id },
+  });
+  f.jobs.set("studio-kite", { id: "studio-kite", status: "running", kind: "image", outputs: [] });
+  const search = async (client, args) => {
+    const result = await call(client, "Search", args);
+    return { result, hits: data(result).results.map((hit) => [hit.job_id, hit.output_index]) };
+  };
+  const { result, hits } = await search(alice, { query: "red" });
+  // The gallery's own search runs it, finished outputs only; another MCP account's job stays out.
+  assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
+    q: "red",
+    includeFailed: "0",
+    limit: "200",
+  });
+  assert.deepEqual(hits, [
+    ["studio-waves", 0],
+    ["studio-lantern", 0],
+    ["studio-lantern", 1],
+    [heron, 0],
+  ]);
+  assert.match(texts(result), /^4 matches, newest first\./);
+  assert.match(
+    texts(result),
+    /- \[Result 3 output 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · /,
+  );
+  assert.match(texts(result), /\[Result 1\]\([^)]+\) · .*A red heron/);
+  // The images come as one contact sheet, drawn when opened.
+  const sheet = /!\[Matching images in order\]\(([^)]+\.jpg)\)/.exec(texts(result))[1];
+  const picture = await fetch(localLink(f, sheet));
+  assert.equal(picture.status, 200);
+  assert.equal(picture.headers.get("content-type"), "image/jpeg");
+  assert.deepEqual((await search(alice, { query: "red", kind: "video" })).hits, [
+    ["studio-waves", 0],
+  ]);
+  assert.deepEqual((await search(alice, { query: "", starred: true })).hits, [["studio-waves", 0]]);
+  assert.deepEqual((await search(alice, { query: "paper lantern", limit: 1 })).hits, [
+    ["studio-lantern", 0],
+  ]);
+  assert.match(texts(await call(alice, "Search", { query: "otter" })), /Nothing in the gallery/);
+  // Refs stay the same across searches and work like a Generate's.
+  assert.equal(
+    (await call(alice, "Review", { job_id: "result 3", output_index: 1 })).isError,
+    undefined,
+  );
+  const before = f.submitted.length;
+  data(await call(alice, "Reuse", { job_id: "result 3", prompt: "A blue paper lantern at night" }));
+  assert.equal(f.submitted.length, before + 1);
+  assert.equal(f.submitted.at(-1).prompt, "A blue paper lantern at night");
+  // Bob sees his own work; what Alice's search found is hers now.
+  assert.deepEqual((await search(bob, { query: "red" })).hits, [[fox, 0]]);
+  await failure(bob, "Review", { job_id: "studio-lantern" });
+  // Studio Chat runs the same tools in process.
+  const chat = await f.mcp.agent({ owner: "chat-owner", session: "chat-1" });
+  t.after(() => chat.close());
+  assert.ok(chat.tools.some((tool) => tool.name === "Search"));
+  assert.match(chat.instructions, /To find earlier work, call Search\./);
+});
+
+test("Search with uploads finds only the caller's uploads, an UploadLink adds one once, and Generate takes their references", async (t) => {
+  const account = (userId) => ({
+    userId,
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  });
+  const f = await fixture(t, {
+    accountMode: true,
+    authenticateGatewayIdentity: (user) => account(`${user}-account`),
+    internalCredential: (accountId) => ({
+      "X-Studio-Mcp-Internal": "fixture-internal",
+      "X-Studio-Mcp-Account": accountId,
+    }),
+  });
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  // An image Alice uploaded in Studio itself, and one Bob sent through Upload.
+  f.assets.set("studio-asset", { id: "studio-asset", source: "upload" });
+  f.uploads.push({
+    id: "upload-studio",
+    assetId: "studio-asset",
+    owner: "alice-account",
+    uploaded: true,
+    status: "done",
+    type: "image",
+    filename: "beach-photo.jpg",
+    createdAt: "2026-11-02T10:00:00.000Z",
+  });
+  await call(bob, "Upload", { content_base64: png.toString("base64") });
+  const search = async (client, args = {}) =>
+    data(await call(client, "Search", { query: "", uploads: true, ...args })).results.map(
+      (hit) => hit.reference_asset_id,
+    );
+  assert.deepEqual(await search(alice), ["studio-asset"]);
+  assert.equal(f.requests.findLast((request) => request.path === "/gallery").query.uploads, "1");
+  assert.deepEqual(await search(alice, { query: "beach" }), ["studio-asset"]);
+  assert.deepEqual(await search(alice, { query: "otter" }), []);
+  const [bobs] = await search(bob);
+  assert.ok(bobs && bobs !== "studio-asset");
+  // The reference reaches Alice's job; Bob can't use hers.
+  await failure(bob, "Generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A beach"],
+    reference_asset_ids: ["studio-asset"],
+  });
+  await generate(alice, { reference_asset_ids: ["studio-asset"] });
+  assert.deepEqual(f.submitted.at(-1).referenceAssets, [
+    { slot: "reference", assetId: "studio-asset" },
+  ]);
+
+  // UploadLink: a sealed page that takes one image for its owner without a Studio sign-in.
+  const linked = await call(alice, "UploadLink");
+  assert.match(texts(linked), /Ask the user to open this link and upload the photo they attached/);
+  const link = data(linked).link;
+  assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/upload\/u2\./);
+  const page = localLink(f, link);
+  const opened = await fetch(page);
+  assert.equal(opened.status, 200);
+  assert.match(await opened.text(), /<input type="file" name="image"/);
+  const tampered = page.slice(0, -2) + (page.endsWith("A") ? "BA" : "AA");
+  assert.equal((await fetch(tampered)).status, 404);
+  const post = (url, content, type = "image/png") => {
+    const form = new FormData();
+    form.append("image", new Blob([content], { type }), "photo.png");
+    return fetch(url, { method: "POST", body: form });
+  };
+  const refused = await post(page, Buffer.from("not an image"), "text/plain");
+  assert.equal(refused.status, 400);
+  assert.match(await refused.text(), /That isn&#39;t a PNG, JPEG or WebP image\.<\/p><form/);
+  const sent = await post(page, png);
+  assert.equal(sent.status, 201);
+  assert.match(await sent.text(), /Uploaded — go back to the chat\./);
+  assert.equal(
+    f.requests.findLast((request) => request.path === "/reference-assets/upload").account,
+    "alice-account",
+  );
+  // Used once, the link is closed.
+  assert.equal((await post(page, png)).status, 404);
+  assert.match(await (await fetch(page)).text(), /has been used or has expired/);
+  const found = await search(alice);
+  assert.equal(found.length, 2);
+  assert.equal(found[1], "studio-asset");
+  await generate(alice, { reference_asset_ids: [found[0]] });
+  assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, found[0]);
+  assert.deepEqual(await search(bob), [bobs]);
+  // A link ends after 15 minutes.
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const late = localLink(f, data(await call(alice, "UploadLink")).link);
+  t.mock.timers.tick(15 * 60 * 1000 + 1);
+  assert.equal((await fetch(late)).status, 404);
+  t.mock.timers.reset();
 });
 
 // Provider-backed cloud video, shaped like the studio's Grok profiles: an optional image animates the scene.
@@ -3800,7 +4049,8 @@ test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it w
     count: 6,
   });
   assert.equal(data(fromRequest).profile.id, "custom:bento-image-moss-base-dmd8");
-  assert.equal(data(fromRequest).jobs.length, 6);
+  assert.equal(data(fromRequest).jobs.length, 1);
+  assert.equal(f.submitted.at(-1).count, 6);
   assert.match(
     texts(fromRequest),
     /^Queued on MOSS Image Base · Fast .*\. Used MOSS Image Base · Fast .*, the model the request names\./,
@@ -3823,7 +4073,7 @@ test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it w
     [
       "custom:bento-image-moss-base-dmd8",
       "custom:bento-image-moss-sft",
-      ...Array(6).fill("custom:bento-image-moss-base-dmd8"),
+      "custom:bento-image-moss-base-dmd8",
       "custom:bento-image-boogu-turbo",
     ],
   );
@@ -3884,43 +4134,54 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(
     texts(excess),
-    "count is images per prompt, so 2 prompts × count 6 would queue 12 jobs; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
+    "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
   assert.match(
     generate.description,
-    /"4 sets of 2" is 4 distinct prompts with count 2; one call queues at most 10 jobs\./,
+    /"4 sets of 2" is 4 distinct prompts with count 2; at most 10 images per call\./,
   );
   assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
 
-test("ten images in one Generate call queue ten separate jobs, and a refusal stops the rest", async (t) => {
+test("a Generate count is one batched job where the profile batches, else a job per image", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
+  // Four images of one prompt are one job of count 4 (the model loads once); ten split at the batch limit of 8.
+  const four = await generate(client, { count: 4, seed: 1 });
+  assert.equal(four.jobs.length, 1);
   const ten = await generate(client, { count: 10, seed: 1 });
-  assert.equal(ten.jobs.length, 10);
+  assert.equal(ten.jobs.length, 2);
   assert.deepEqual(
-    f.submitted.map((body) => body.count),
-    Array(10).fill(1),
-  );
-  assert.deepEqual(
-    f.submitted.map((body) => body.seed),
-    Array.from({ length: 10 }, (_, index) => String(index + 1)),
+    f.submitted.map((body) => [body.count, body.seed]),
+    [
+      [4, "1"],
+      [8, "1"],
+      [2, "9"],
+    ],
   );
   const prompts = Array.from({ length: 10 }, (_, index) => `Plush animal ${index + 1}`);
   assert.equal((await generate(client, { prompts })).jobs.length, 10);
   assert.deepEqual(
-    f.submitted.slice(10).map((body) => body.prompt),
+    f.submitted.slice(3).map((body) => body.prompt),
     prompts,
   );
+  // A profile without a count control (capabilities.variations false) runs a job per image.
+  await f.profiles([{ ...imageProfile, capabilities: { variations: false } }]);
+  const single = await generate(client, { count: 4 });
+  assert.equal(single.jobs.length, 4);
+  assert.deepEqual(
+    f.submitted.slice(13).map((body) => body.count),
+    [1, 1, 1, 1],
+  );
   // When the studio refuses further jobs, those queued so far are kept and the reason is passed on.
-  f.failAfter(22, 422, { ok: false, error: "This profile can't run right now." });
-  const limited = await generate(client, { count: 10 });
+  f.failAfter(19, 422, { ok: false, error: "This profile can't run right now." });
+  const limited = await generate(client, { count: 4 });
   assert.equal(limited.status, "partially_queued");
   assert.equal(limited.jobs.length, 2);
   assert.match(limited.error, /can't run right now/);
-  assert.equal(f.submitted.length, 22);
+  assert.equal(f.submitted.length, 19);
 });
 
 test("the Generate wait is one shared deadline for every job of the call", async (t) => {
@@ -4181,7 +4442,7 @@ test("without a named model, Studio's default stands and the reply says which", 
   assert.equal(f.submitted.at(-1).prompt, 'A neon sign that says "OPEN"');
 });
 
-test("sets of two are one Generate call: one job per image, each prompt run as sent", async (t) => {
+test("sets of two are one Generate call: one batch per prompt, each prompt run as sent", async (t) => {
   const f = await fixture(t);
   await f.profiles(guidedCatalogue());
   const client = await f.client();
@@ -4194,10 +4455,10 @@ test("sets of two are one Generate call: one job per image, each prompt run as s
       count: 2,
     }),
   );
-  assert.equal(result.jobs.length, 8);
+  assert.equal(result.jobs.length, 4);
   assert.deepEqual(
-    f.submitted.map((item) => item.prompt),
-    prompts.flatMap((prompt) => [prompt, prompt]),
+    f.submitted.map((item) => [item.prompt, item.count]),
+    prompts.map((prompt) => [prompt, 2]),
   );
   // Without prompts nothing is written for the chat; it must write them itself.
   const missing = await call(client, "Generate", { kind: "image", request: "six photos" });
@@ -4367,7 +4628,7 @@ test("Review returns real image content and saved settings without generating or
 test("Review compares two owned results and refuses a hidden result before downloading it", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  await generate(client, { prompts: ["A heron"], count: 2 });
+  await generate(client, { prompts: ["A heron", "A crane"] });
   finish(f);
   const compared = await call(client, "Review", { job_id: "result 2", compare_to: "result 1" });
   assert.deepEqual(
@@ -5143,7 +5404,7 @@ test("each_profile with a tier covers every ready model of that tier in one call
   });
   assert.match(
     texts(many),
-    /^4 models × 4 images each would queue 16 jobs; one call queues at most 10\./,
+    /^4 models × 4 images each would queue 16; one call queues at most 10\./,
   );
   assert.equal(f.submitted.length, 1);
 });

@@ -36,6 +36,9 @@ const listed = (store: Store, ownerId: string) =>
   store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream && !job.cleared);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
+// A cancel the worker could not confirm yet (busy, or a proxy answering for it); recovery finishes it.
+export const unconfirmedCancel =
+  "Cancellation could not be confirmed. The recorded job remains available for recovery.";
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 
@@ -264,8 +267,7 @@ export function registerRewriteRoutes(
           try {
             await queue.cancel(ownerId, initial.id);
           } catch {
-            error =
-              "Cancellation could not be confirmed. The recorded job remains available for recovery.";
+            error = unconfirmedCancel;
           }
           const job = store.job(ownerId, initial.id)!;
           return {
@@ -290,7 +292,12 @@ export function registerRewriteRoutes(
     return res.json({ job: publicJob(clear(store, job)) });
   });
   app.post("/api/queue/:id/cancel", async (req, res) => {
-    const job = await queue.cancel(owner(req), req.params.id);
+    let job;
+    try {
+      job = await queue.cancel(owner(req), req.params.id);
+    } catch {
+      return res.status(503).json({ error: unconfirmedCancel });
+    }
     return job ? res.json({ job: publicJob(job) }) : missing(res);
   });
   app.post("/api/queue/:id/retry", (req, res) => {

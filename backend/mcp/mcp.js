@@ -2,6 +2,7 @@
 // Native port of the Studio MCP service; see mcp.LICENSE.
 import crypto from "node:crypto";
 import path from "node:path";
+import { Readable } from "node:stream";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -24,6 +25,7 @@ import {
   mcpJson,
   mcpOutputPath,
   replyRule,
+  uploadPage,
 } from "./media.js";
 import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
 import { canonicalProfileId, livePrompting } from "../profile/store.js";
@@ -84,7 +86,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To find earlier work, call Search. For an attached image, call UploadLink. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -368,7 +370,10 @@ export function registerMcpRoutes(
           title,
           description,
           inputSchema,
-          annotations: { readOnlyHint: false, destructiveHint: false, ...annotations },
+          // MCP reads a tool as not read-only, and then destructive, unless told otherwise.
+          annotations: annotations.readOnlyHint
+            ? annotations
+            : { destructiveHint: false, ...annotations },
         },
         async (args, extra = {}) => {
           // The SDK aborts extra.signal when the client disconnects; a cancellation notification aborts it here.
@@ -852,7 +857,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
         {
           request: z
             .string()
@@ -887,7 +892,7 @@ export function registerMcpRoutes(
             .array(z.string().min(1))
             .max(16)
             .optional()
-            .describe("From Upload, or Reuse with mode reference."),
+            .describe("From Search uploads, Upload or Reuse mode reference."),
           reference_role: z.enum(["edit", "reference"]).optional(),
           aspect: z
             .string()
@@ -1021,7 +1026,7 @@ export function registerMcpRoutes(
         const jobs = targets.length * (args.prompts?.length || 1) * count;
         if (jobs > maxJobsPerCall)
           throw new Error(
-            `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs} jobs; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
+            `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
           );
         // A preview's prompts run as shown when the same call follows without preview.
         const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
@@ -1150,6 +1155,94 @@ export function registerMcpRoutes(
             : media.result(owner, resolve(job_id), wait_seconds, { scope: refs, signal }),
         { readOnlyHint: true },
       );
+      tool(
+        server,
+        "Search",
+        "Search Gallery",
+        "Find the user's earlier work by its words or look, with refs for Reuse, Review and Result. uploads: the user's uploads, as reference_asset_ids.",
+        {
+          query: z.string().trim().max(200).default(""),
+          kind: z.enum(["image", "video"]).optional(),
+          starred: z.boolean().default(false),
+          uploads: z.boolean().default(false),
+          limit: z.number().int().min(1).max(24).default(8),
+        },
+        async (args, signal) => {
+          const hits = await media.search(owner, refs, args, { signal });
+          if (!hits.length)
+            return {
+              content: [{ type: "text", text: "Nothing in the gallery matches." }],
+              structuredContent: { results: [] },
+            };
+          if (args.uploads) {
+            const results = hits.map((item) => ({
+              reference_asset_id: item.assetId,
+              name: item.filename || "",
+              created_at: item.createdAt || "",
+            }));
+            const lines = hits.map((item) =>
+              [
+                `- ${item.assetId}`,
+                item.filename,
+                String(item.createdAt || "").slice(0, 10),
+                (item.caption?.text || item.suggestedPrompt) &&
+                  shortPrompt(item.caption?.text || item.suggestedPrompt),
+              ]
+                .filter(Boolean)
+                .join(" · "),
+            );
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `${hits.length === 1 ? "One upload" : `${hits.length} uploads`}, newest first. Pass one to Generate in reference_asset_ids.\n\n${lines.join("\n")}`,
+                },
+              ],
+              structuredContent: { results },
+            };
+          }
+          const results = hits.map((item) => ({
+            ref: media.refOf(owner, refs, item.jobId),
+            job_id: item.jobId,
+            output_index: item.index,
+            link: media.url(owner, item.jobId, item.index),
+          }));
+          const lines = hits.map((item, position) => {
+            const { ref, output_index, link } = results[position];
+            return [
+              `- [${ref[0].toUpperCase()}${ref.slice(1)}${output_index ? ` output ${output_index}` : ""}](${link})`,
+              item.title && shortPrompt(item.title),
+              item.settings?.modelName || item.model || item.settings?.profileId,
+              String(item.createdAt || "").slice(0, 10),
+              item.prompt && shortPrompt(item.prompt),
+            ]
+              .filter(Boolean)
+              .join(" · ");
+          });
+          // The images as one picture, in the order listed; it is drawn only when opened.
+          const images = hits.filter((item) => item.type === "image");
+          const picture = !images.length
+            ? ""
+            : `\n\n![Matching images in order](${
+                images.length === 1
+                  ? media.previewUrl(owner, images[0].jobId, images[0].index)
+                  : media.sheetUrl(
+                      owner,
+                      images.map((item) => [item.jobId, item.index]),
+                    )
+              })`;
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to Reuse, Review or Result.\n\n${lines.join("\n")}${picture}`,
+              },
+            ],
+            structuredContent: { results },
+          };
+        },
+        { readOnlyHint: true },
+      );
       if (actor.admin)
         registerAdminTools({
           tool,
@@ -1240,19 +1333,40 @@ export function registerMcpRoutes(
         { destructiveHint: true },
       );
       // Studio Chat attaches its references itself; a model cannot send an image's bytes.
-      if (!actor.session)
+      if (!actor.session) {
         tool(
           server,
           "Upload",
           "Upload Reference",
           "Upload a PNG, JPEG or WebP reference image (base64, at most 20 MB) for Generate.",
           {
-            content_base64: z.string().min(1).max(28000000),
+            // Left unbounded below so an empty file gets Upload's own advice, not a schema refusal.
+            content_base64: z.string().max(28000000),
             filename: z.string().default("reference.png"),
           },
           async ({ content_base64, filename }) =>
             mcpJson(await media.upload(owner, content_base64, filename)),
         );
+        tool(
+          server,
+          "UploadLink",
+          "Upload Link",
+          "A one-time page where the user uploads an image attached in chat.",
+          {},
+          async () => {
+            const { url, expires } = media.uploadUrl(owner);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `Ask the user to open this link and upload the photo they attached, then call Search with uploads to use it as a reference. It works once, for 15 minutes.\n\n[Upload Photo](${url})`,
+                },
+              ],
+              structuredContent: { link: url, expires_at: new Date(expires).toISOString() },
+            };
+          },
+        );
+      }
       tool(
         server,
         "Reuse",
@@ -1378,7 +1492,14 @@ export function registerMcpRoutes(
           if (prompt) plan.args.prompts = [prompt];
           else if (theme) {
             // The viewer's Animate themes: the queue item writes the motion prompt (prompt-animate.js).
-            const write = { animate: { theme, instruction: request || "", source: item.prompt } };
+            const write = {
+              animate: {
+                theme,
+                instruction: request || "",
+                source: item.prompt,
+                ...(item.type === "video" ? { extend: true } : {}),
+              },
+            };
             Object.assign(plan.args, { prompts: [""], write });
             source = "studio";
           }
@@ -1627,6 +1748,61 @@ export function registerMcpRoutes(
         res.status(404).json({ error: "The export link is invalid, unavailable or expired." });
       }
     });
+  // UploadLink's page, under /mcp/results so the public result route reaches it: the link is the
+  // credential, so no Studio sign-in; it takes one image for its owner, then closes.
+  app.all("/mcp/results/upload/:token", async (req, res) => {
+    const send = (status, page) =>
+      res
+        .status(status)
+        .set({
+          "Cache-Control": "private, no-store",
+          "Referrer-Policy": "no-referrer",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy":
+            "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+          "Content-Type": "text/html; charset=utf-8",
+        })
+        .send(uploadPage(page));
+    let claims;
+    try {
+      if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
+        throw new Error("Invalid host.");
+      if (!["GET", "POST"].includes(req.method)) throw new Error("Unsupported method.");
+      claims = media.uploadClaims(req.params.token);
+    } catch {
+      return send(404, {
+        message: "This upload link has been used or has expired. Ask the chat for a new one.",
+        open: false,
+      });
+    }
+    if (req.method === "GET") return send(200, {});
+    // At most the 20 MB image and its form; a body without a length is refused before it is read.
+    const length = Number(req.headers["content-length"]);
+    if (!(length > 0) || length > 20_100_000)
+      return send(413, { message: "The photo must be at most 20 MB." });
+    try {
+      const form = await new Request("http://upload.invalid/", {
+        method: "POST",
+        headers: { "content-type": String(req.headers["content-type"] || "") },
+        body: Readable.toWeb(req),
+        duplex: "half",
+      }).formData();
+      const file = form.get("image");
+      if (!(file instanceof Blob) || !file.size)
+        return send(400, { message: "Choose a photo to upload." });
+      await media.uploadByLink(
+        claims,
+        { buffer: Buffer.from(await file.arrayBuffer()), name: file.name || "photo" },
+        accountMode ? internalCredential(claims.owner) : undefined,
+      );
+      return send(201, { message: "Uploaded — go back to the chat.", open: false });
+    } catch (error) {
+      return send(400, {
+        message: error?.message || "Studio could not save this photo.",
+        open: media.uploadLinks.has(claims.nonce),
+      });
+    }
+  });
   app.get("/mcp/results/:token", async (req, res) => {
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())

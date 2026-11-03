@@ -9,7 +9,7 @@ import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
-import { mediaSource } from "../gallery/mediaSource";
+import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { queueQuery } from "../generation/Queue";
 import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
 import { PairContent, sideNames } from "./PairCard";
@@ -64,7 +64,7 @@ function Media({ item, playing }: { item: MediaItem; playing: boolean }) {
   if (item.type === "video" && playing)
     return (
       <video
-        src={source.url}
+        src={playbackUrl(source.url)}
         poster={source.thumbnailUrl}
         autoPlay
         muted
