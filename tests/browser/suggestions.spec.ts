@@ -63,7 +63,7 @@ async function openViewer(page: Page) {
   return state;
 }
 
-test("An idea chip fills the empty, focused composer prompt", async ({ page }) => {
+test("An idea chip fills the empty, focused composer prompt", async ({ page }, testInfo) => {
   await fixtures(page);
   const asked = await suggest(page);
   await create(page);
@@ -76,7 +76,8 @@ test("An idea chip fills the empty, focused composer prompt", async ({ page }) =
   expect(asked).toEqual([{ surface: "composer", kind: "image" }]);
   await group.getByRole("button", { name: ideas[1] }).click();
   await expect(prompt).toHaveValue(ideas[1]);
-  await expect(prompt).toBeFocused();
+  // Phones keep the keyboard down until the text is tapped.
+  if (!testInfo.project.use.isMobile) await expect(prompt).toBeFocused();
   await expect(group).toHaveCount(0);
   await prompt.fill("");
   await expect(group).toBeVisible();
