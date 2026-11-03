@@ -202,8 +202,9 @@ export function studioTheme({
           navbar: chrome,
         },
       }),
-      // Status pills are light; filled colour is for the one primary action in a view.
-      Badge: Badge.extend({ defaultProps: { variant: "light" } }),
+      // Status pills are light; filled colour is for the one primary action in a view. Labels keep
+      // their Title Case instead of Mantine's upper case.
+      Badge: Badge.extend({ defaultProps: { variant: "light", tt: "none" } }),
       Button: Button.extend({
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),

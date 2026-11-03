@@ -318,7 +318,6 @@ export function SessionIteration({
                     variant="default"
                     radius="xl"
                     size="lg"
-                    tt="none"
                     fw={500}
                     className={classes.chip}
                   >
