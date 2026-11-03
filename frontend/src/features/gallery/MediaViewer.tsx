@@ -434,7 +434,6 @@ export function MediaViewer({
                 <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
                   <ActionIcon
                     variant="default"
-                    size={phone ? 42 : undefined}
                     aria-label="Generation Details"
                     aria-expanded={phone ? sheet : details}
                     onClick={toggleDetails}
@@ -449,12 +448,7 @@ export function MediaViewer({
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label="Close (Esc)">
-                  <ActionIcon
-                    variant="default"
-                    size={phone ? 42 : undefined}
-                    aria-label="Close Generation"
-                    onClick={close}
-                  >
+                  <ActionIcon variant="default" aria-label="Close Generation" onClick={close}>
                     <X size={18} />
                   </ActionIcon>
                 </Tooltip>

@@ -381,7 +381,6 @@ export function DreamDeck({
           <ActionIcon
             variant={options.primary ? "filled" : "default"}
             radius="xl"
-            size={44}
             aria-label={label}
             disabled={options.disabled}
             onClick={() => void act(choice)}
@@ -394,6 +393,7 @@ export function DreamDeck({
         <Button
           variant={options.primary ? "filled" : "default"}
           radius="xl"
+          size="sm"
           leftSection={icon}
           disabled={options.disabled}
           onClick={() => void act(choice)}
@@ -404,13 +404,7 @@ export function DreamDeck({
     </Tooltip>
   );
   const star = (
-    <ActionIcon
-      variant="default"
-      radius="xl"
-      size={phone ? 44 : 36}
-      aria-label="Star"
-      onClick={() => void act("star")}
-    >
+    <ActionIcon variant="default" radius="xl" aria-label="Star" onClick={() => void act("star")}>
       <Star size={18} />
     </ActionIcon>
   );

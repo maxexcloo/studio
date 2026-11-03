@@ -16,6 +16,7 @@ import {
   Notification,
   Paper,
   Popover,
+  rem,
   ScrollArea,
   SegmentedControl,
   Select,
@@ -81,14 +82,26 @@ export function studioTheme({
   rounding,
   background,
   motionDuration,
+  phone,
   transparency,
 }: {
   primaryColor: string;
   rounding: Rounding;
   background: Background;
   motionDuration: number;
+  phone: boolean;
   transparency: boolean;
 }) {
+  // Two control densities: form controls (standard Button and inputs) and bars (icons, and the
+  // stepped-down compact sizes); phones raise both to 40 px touch targets.
+  const form = rem(phone ? 40 : 36);
+  const bar = phone ? 40 : 32;
+  const height = (size: unknown) =>
+    size === "md"
+      ? form
+      : size === "xs" || size === "sm" || String(size).startsWith("compact")
+        ? rem(bar)
+        : undefined;
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
   const transitionProps = {
     duration: motionDuration,
@@ -164,11 +177,11 @@ export function studioTheme({
     // defaults; compact surfaces (rows, toolbars, chip rails, popover forms) step down one tier.
     components: {
       ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
-      // One size for header and toolbar icons; the radius follows the Corners setting. Default
+      // Icons take the bar density; the radius follows the Corners setting. Default
       // icons take the glass fill without a backdrop blur of their own: tiles and the viewer show
       // dozens at once, and each blur layer stalls rendering on slow phones.
       ActionIcon: ActionIcon.extend({
-        defaultProps: { size: 36, radius: "xl" },
+        defaultProps: { size: bar, radius: "xl" },
         vars: (_theme, props) => ({
           root:
             props.variant === "default"
@@ -191,7 +204,10 @@ export function studioTheme({
       }),
       // Status pills are light; filled colour is for the one primary action in a view.
       Badge: Badge.extend({ defaultProps: { variant: "light" } }),
-      Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
+      Button: Button.extend({
+        defaultProps: { size: "md", fw: 500, autoContrast: true },
+        vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
+      }),
       Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
@@ -201,7 +217,10 @@ export function studioTheme({
         defaultProps: { transitionDuration: motionDuration },
         styles: { root: { transitionTimingFunction: easing.enter } },
       }),
-      Input: Input.extend({ defaultProps: { size: "md" } }),
+      Input: Input.extend({
+        defaultProps: { size: "md" },
+        vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
+      }),
       Menu: Menu.extend({
         defaultProps: { transitionProps: popupTransition },
         styles: { dropdown },
