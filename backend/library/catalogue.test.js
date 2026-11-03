@@ -10,8 +10,8 @@ const quiet = { info: () => {}, warn: () => {} };
 const families = ({ base_model: base }) => (/krea/i.test(base) ? ["krea2"] : []);
 
 /**
- * A data folder holding every source file, a catalogue with saved definitions and an
- * administrator's edit, and a retired lora-catalogue.json left behind, which is ignored.
+ * A data folder holding the manifest, a catalogue with saved definitions, a provider download and
+ * an administrator's edit, and a retired lora-catalogue.json left behind, which is ignored.
  */
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-catalogue-"));
@@ -34,6 +34,21 @@ function fixture(t) {
         },
         "loras/seed-only.safetensors": { title: "Seed Only", baseModel: "Krea 2" },
       },
+      provider: {
+        "civitai:2:3": {
+          id: "civitai:2:3",
+          file: "style.safetensors",
+          folder: "loras",
+          label: "Provider Style",
+          version: "v2",
+          baseModel: "Krea 2",
+          sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
+          trainedWords: ["providerword"],
+          sha256: hex("a"),
+          bytes: 1024,
+          url: "https://civitai.com/api/download/models/2",
+        },
+      },
     },
     edits: {
       "loras/style.safetensors": {
@@ -48,21 +63,6 @@ function fixture(t) {
   write("lora-catalogue.json", {
     "style.safetensors": { title: "Ignored" },
     "ignored.safetensors": { title: "Ignored" },
-  });
-  write("model-download-sources.json", {
-    "civitai:2:3": {
-      id: "civitai:2:3",
-      file: "style.safetensors",
-      folder: "loras",
-      label: "Provider Style",
-      version: "v2",
-      baseModel: "Krea 2",
-      sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
-      trainedWords: ["providerword"],
-      sha256: hex("a"),
-      bytes: 1024,
-      url: "https://civitai.com/api/download/models/2",
-    },
   });
   write("config/models.json", [
     {
@@ -90,13 +90,13 @@ function fixture(t) {
 
 const snapshot = (dir) =>
   Object.fromEntries(
-    ["lora-catalogue.json", "model-download-sources.json", "config/models.json"].map((name) => [
+    ["lora-catalogue.json", "config/models.json"].map((name) => [
       name,
       fs.readFileSync(path.join(dir, name), "utf8"),
     ]),
   );
 
-test("the migration merges every source by folder/file with provenance, the more specific source winning", (t) => {
+test("the catalogue merges every layer by folder/file with provenance, the more specific source winning", (t) => {
   const f = fixture(t);
   const before = snapshot(f.dir);
   const store = f.store();
@@ -149,7 +149,7 @@ test("the migration merges every source by folder/file with provenance, the more
   assert.deepEqual(snapshot(f.dir), before, "the source files stay exactly as they were");
 });
 
-test("the migration is idempotent and a source file that goes keeps its last layer", (t) => {
+test("the sync is idempotent and a manifest that goes keeps its last layer", (t) => {
   const f = fixture(t);
   f.store().migrate();
   const file = path.join(f.dir, "library", "catalogue.json");
@@ -157,9 +157,33 @@ test("the migration is idempotent and a source file that goes keeps its last lay
   const again = f.store();
   assert.equal(again.migrate(), false, "nothing new on the second start");
   assert.equal(fs.readFileSync(file, "utf8"), first);
-  // A source file that goes keeps its last layer.
-  fs.rmSync(path.join(f.dir, "model-download-sources.json"));
-  assert.equal(f.store().entry("loras/style.safetensors").sha256, hex("a"));
+  // A manifest that goes keeps its last layer.
+  fs.rmSync(path.join(f.dir, "config", "models.json"));
+  assert.equal(f.store().entry("vae/ae.safetensors").sha256, hex("b"));
+});
+
+test("a recorded provider download is kept by id and fills its file's entry", (t) => {
+  const f = fixture(t);
+  f.store().rememberDownload({
+    id: "hf:org/repo:" + "c".repeat(40) + ":dir/new.safetensors",
+    file: "new.safetensors",
+    folder: "loras",
+    label: "New",
+    url: "https://huggingface.co/org/repo/resolve/" + "c".repeat(40) + "/dir/new.safetensors",
+    sha256: hex("d"),
+    bytes: 7,
+  });
+  const store = f.store();
+  assert.equal(
+    store.download("hf:org/repo:" + "c".repeat(40) + ":dir/new.safetensors").label,
+    "New",
+  );
+  assert.equal(store.download("civitai:2:3").label, "Provider Style");
+  const entry = store.entry("loras/new.safetensors");
+  assert.deepEqual(
+    [entry.sha256, entry.bytes, entry.title, entry.source.provider],
+    [hex("d"), 7, "New", "hf"],
+  );
 });
 
 test("edits are validated, recorded with who made them, undoable and reviewable", (t) => {

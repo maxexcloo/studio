@@ -17,6 +17,8 @@ const documents = legacyFiles.map((file) => path.basename(file, ".json"));
 const legacyRecordFiles = ["lora-stacks", "model-types", "studio_gallery", "studio_chat_messages"];
 // What the env settings step (env-settings.js) backs up: the env file and the settings document.
 const envSettingsFiles = [".env", "settings.json"];
+// What the download sources step (library/download-sources.js) backs up beside the catalogue.
+const downloadSourcesFiles = ["model-download-sources.json", "model-download-sources.json.bak"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
@@ -236,7 +238,9 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
  * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
  * uploads step's backup (uploads.js) restores the whole reference store it moved aside, the
  * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, the
- * LoRA layers step's (library/lora-layers.js) the catalogue, the account access step's
+ * LoRA layers step's (library/lora-layers.js) the catalogue, the download sources step's
+ * (library/download-sources.js) the catalogue and model-download-sources.json with its `.bak`
+ * copy, the account access step's
  * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
  * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists, and the
  * env settings step's (env-settings.js) the env file and the settings document as `settings.json`.
@@ -257,6 +261,7 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
       !catalogue &&
       !stacks &&
       !envSettingsFiles.includes(mapping.source) &&
+      !downloadSourcesFiles.includes(mapping.source) &&
       ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
     )
       throw new Error("Unsupported backup mapping");
