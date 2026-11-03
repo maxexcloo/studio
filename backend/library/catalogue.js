@@ -12,11 +12,11 @@
  *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent. The `seed` and `admin` layers hold LoRA
- * entries synced from the retired lora-catalogue.json files; nothing refreshes them now. Studio's
- * own edits are a layer above all of them. On a conflict the more specific source wins: edits
- * over the admin layer over the seed layer over provider details over the manifest, except that
- * provider metadata wins for links and hashes.
+ * when the file goes, so the migration is idempotent. Studio's own edits are a layer above all
+ * of them. On a conflict the more specific source wins: edits over definitions over provider
+ * details over the manifest, except that provider metadata wins for links and hashes. The `seed`
+ * and `admin` layers of the retired lora-catalogue.json files are not read; migrate-runtime folds
+ * them into the definitions and edits (lora-layers.js).
  *
  * This module is the catalogue's only writer; writes are atomic (json-store.js).
  */
@@ -34,7 +34,7 @@ export const catalogueKinds = Object.freeze({
   clip_vision: "clip_vision",
 });
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
-const layerNames = ["seed", "definitions", "admin", "provider", "manifest"];
+const layerNames = ["definitions", "provider", "manifest"];
 const historyLimit = 20;
 const sha = (value) =>
   /^[a-f0-9]{64}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
@@ -95,7 +95,7 @@ function providerSource(spec) {
   return null;
 }
 
-/** The seed and admin layers' LoRA entry shape from Entry-shaped edits. */
+/** The retired lora-catalogue.json entry shape (lora/info.js reads it) from Entry-shaped fields. */
 function rawFromEdit(edit = {}) {
   const raw = {};
   for (const key of [
@@ -377,16 +377,13 @@ export function createCatalogueStore({
   function build(key, current) {
     const { folder, file: name } = splitCatalogueKey(key);
     const { layers, edits } = current;
-    const seed = layers.seed[key] || null;
     const definition = layers.definitions[key] || null;
-    const admin = layers.admin[key] || null;
     const providers = Object.values(layers.provider).filter(
       (spec) => safeKey(spec.folder, spec.file) === key,
     );
     const provider = providers.at(-1) || null;
     const manifest = layers.manifest[key] || null;
     const edit = edits[key] || null;
-    const local = { ...(seed || {}), ...(admin || {}) };
     const fields = { ...(definition || {}), ...(edit?.fields || {}) };
     const pick = (field, ...values) =>
       fields[field] !== undefined && fields[field] !== null
@@ -397,34 +394,27 @@ export function createCatalogueStore({
           .filter((value) => typeof value === "string" && value.trim())
           .join(" · ")
       : "";
-    const baseModel =
-      pick("baseModel", text(local.baseModel, 100), text(provider?.baseModel, 100)) || "";
-    const range = isObject(local.strengthRange)
-      ? local.strengthRange
-      : isObject(provider?.strengthRange)
-        ? provider.strengthRange
-        : null;
+    const baseModel = pick("baseModel", text(provider?.baseModel, 100)) || "";
+    const range = isObject(provider?.strengthRange) ? provider.strengthRange : null;
     const providerLinks = provider ? linksFrom(provider.sourceUrl) : {};
     const source = provider
       ? providerSource(provider)
       : manifest
         ? { provider: "manifest", path: manifest.path }
         : { provider: "manual" };
-    const origin =
-      edit?.origin ||
-      (admin ? "admin" : seed || definition ? "seed" : provider ? "import" : "manifest");
+    const origin = edit?.origin || (definition ? "seed" : provider ? "import" : "manifest");
     const entry = {
       kind: catalogueKinds[folder],
       folder,
       file: name,
       sha256: pick("sha256", sha(provider?.sha256), manifest?.sha256) || "",
       bytes: Number(fields.bytes) || Number(provider?.bytes) || manifest?.size || 0,
-      title: pick("title", text(local.title), providerTitle) || "",
+      title: pick("title", providerTitle) || "",
       version: pick("version", text(provider?.version, 200)) || "",
       baseModel,
-      ...(pick("type", local.type) ? { type: pick("type", local.type) } : {}),
-      ...(["original", "finetune"].includes(pick("modelType", local.modelType, provider?.modelType))
-        ? { modelType: pick("modelType", local.modelType, provider?.modelType) }
+      ...(pick("type") ? { type: pick("type") } : {}),
+      ...(["original", "finetune"].includes(pick("modelType", provider?.modelType))
+        ? { modelType: pick("modelType", provider?.modelType) }
         : {}),
       families:
         fields.families ||
@@ -432,12 +422,8 @@ export function createCatalogueStore({
           base_model: baseModel.replace(/^qwen\s+2\.1$/i, "Qwen-Image 2.1"),
         }) ||
         [],
-      ...(pick("role", local.role, provider?.role)
-        ? { role: pick("role", local.role, provider?.role) }
-        : {}),
-      triggers:
-        fields.triggers ||
-        (Array.isArray(local.triggers) ? list(local.triggers) : list(provider?.trainedWords)),
+      ...(pick("role", provider?.role) ? { role: pick("role", provider?.role) } : {}),
+      triggers: fields.triggers || list(provider?.trainedWords),
       strength:
         fields.strength ||
         (range
@@ -447,39 +433,28 @@ export function createCatalogueStore({
                 .map((part) => [part, range[part]]),
             )
           : {}),
-      ...((fields.tags || list(local.tags, 10, 80)).length
-        ? { tags: fields.tags || list(local.tags, 10, 80) }
+      ...(fields.tags?.length ? { tags: fields.tags } : {}),
+      ...(pick("negative") ? { negative: pick("negative") } : {}),
+      description: pick("description", text(provider?.description, 10000)) || "",
+      ...(pick("note", text(provider?.note, 500))
+        ? { note: pick("note", text(provider?.note, 500)) }
         : {}),
-      ...(pick("negative", text(local.negative, 500))
-        ? { negative: pick("negative", text(local.negative, 500)) }
-        : {}),
-      description:
-        pick("description", text(local.description, 10000), text(provider?.description, 10000)) ||
-        "",
-      ...(pick("note", text(local.note, 500), text(provider?.note, 500))
-        ? { note: pick("note", text(local.note, 500), text(provider?.note, 500)) }
-        : {}),
-      ...(pick("guidance", text(local.guidance, 1000))
-        ? { guidance: pick("guidance", text(local.guidance, 1000)) }
-        : {}),
-      ...(pick("compatibility", local.compatibility, provider?.compatibility)
-        ? { compatibility: pick("compatibility", local.compatibility, provider?.compatibility) }
+      ...(pick("guidance") ? { guidance: pick("guidance") } : {}),
+      ...(pick("compatibility", provider?.compatibility)
+        ? { compatibility: pick("compatibility", provider?.compatibility) }
         : {}),
       // Unknown until a source or an administrator says: null, never assumed safe.
       uncensored:
         typeof fields.uncensored === "boolean"
           ? fields.uncensored
-          : typeof local.uncensored === "boolean"
-            ? local.uncensored
-            : typeof provider?.uncensored === "boolean"
-              ? provider.uncensored
-              : null,
+          : typeof provider?.uncensored === "boolean"
+            ? provider.uncensored
+            : null,
       licence: fields.licence || { name: "", commercial: null, restrictions: [] },
       source: fields.source || source,
-      // Provider metadata wins for links; then the catalogue's own source page, then the manifest's address.
+      // Provider metadata wins for links, then the manifest's address.
       links: {
         ...linksFrom(manifest?.url),
-        ...linksFrom(local.sourceUrl),
         ...providerLinks,
         ...(fields.links || {}),
       },
@@ -494,9 +469,7 @@ export function createCatalogueStore({
 
   function rebuild(current) {
     const keys = new Set([
-      ...Object.keys(current.layers.seed),
       ...Object.keys(current.layers.definitions),
-      ...Object.keys(current.layers.admin),
       ...Object.keys(current.layers.manifest),
       ...Object.keys(current.edits),
     ]);
@@ -661,23 +634,19 @@ export function createCatalogueStore({
 
   /**
    * The LoRA view in the old shapes lora/info.js reads, so /api/loras/info keeps its response:
-   * `sources` as model-download-sources.json had them, `catalogue` by LoRA name as the merged
-   * seed and admin layers (admin over seed) plus the definitions and Studio's edits.
+   * `sources` as model-download-sources.json had them, `catalogue` by LoRA name as the definitions
+   * with Studio's edits over them.
    */
   function loraView() {
     const current = fresh();
     const catalogue = {};
     for (const key of new Set([
-      ...Object.keys(current.layers.seed),
       ...Object.keys(current.layers.definitions),
-      ...Object.keys(current.layers.admin),
       ...Object.keys(current.edits),
     ])) {
       const { folder, file: name } = splitCatalogueKey(key);
       if (folder !== "loras") continue;
       catalogue[name] = {
-        ...(current.layers.seed[key] || {}),
-        ...(current.layers.admin[key] || {}),
         ...rawFromEdit(current.layers.definitions[key]),
         ...rawFromEdit(current.edits[key]?.fields),
       };
