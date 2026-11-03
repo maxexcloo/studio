@@ -46,10 +46,13 @@ fs.writeFileSync(
     },
   }),
 );
-fs.mkdirSync(path.join(dataDir, "config"), { recursive: true });
+fs.mkdirSync(path.join(dataDir, "library"), { recursive: true });
 fs.writeFileSync(
-  path.join(dataDir, "config", "catalogue.json"),
-  JSON.stringify({ "loras/private-lora.safetensors": { triggers: ["privfx"] } }),
+  path.join(dataDir, "library", "catalogue.json"),
+  JSON.stringify({
+    version: 1,
+    layers: { definitions: { "loras/private-lora.safetensors": { triggers: ["privfx"] } } },
+  }),
 );
 let server;
 let base;

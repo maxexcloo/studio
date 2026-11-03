@@ -8,7 +8,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-info-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { catalogueLoraInfo, familiesFromMetadata, triggersFromMetadata } = await import("./info.js");
+const { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, triggersFromMetadata } =
+  await import("./info.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
 
@@ -74,28 +75,22 @@ test("FLUX.3 Klein provider and training metadata do not fall back to FLUX.1", (
   assert.deepEqual(familiesFromMetadata({ base_model: "Flux.1 Dev" }), ["flux1"]);
 });
 
-test("LoRA details come from the catalogue definitions; a left-over lora-catalogue.json is ignored", () => {
+test("LoRA details come from the catalogue definitions and edits; a left-over lora-catalogue.json is ignored", () => {
   const data = process.env.STUDIO_DATA_DIR;
-  fs.mkdirSync(path.join(data, "config"), { recursive: true });
+  fs.mkdirSync(path.join(data, "library"), { recursive: true });
   fs.writeFileSync(
     path.join(data, "lora-catalogue.json"),
     JSON.stringify({ "a.safetensors": { title: "Ignored" } }),
   );
   fs.writeFileSync(
-    path.join(data, "config", "catalogue.json"),
-    JSON.stringify({ "loras/a.safetensors": { title: "Defined" } }),
-  );
-  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "Defined");
-  fs.writeFileSync(
-    path.join(data, "config", "catalogue.json"),
+    path.join(data, "library", "catalogue.json"),
     JSON.stringify({
-      "loras/a.safetensors": { title: "Defined" },
-      "loras/c.safetensors": { title: "Only Defined" },
+      version: 1,
+      layers: { definitions: { "loras/a.safetensors": { title: "Defined", note: "Low" } } },
     }),
   );
-  assert.equal(
-    catalogueLoraInfo("c.safetensors", { families: [], triggers: [] }).title,
-    "Only Defined",
-    "definition updates still flow",
-  );
+  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "Defined");
+  loraCatalogue().edit("loras/a.safetensors", { title: "Edited" });
+  const info = catalogueLoraInfo("a.safetensors", { families: [], triggers: [] });
+  assert.deepEqual([info.title, info.note], ["Edited", "Low"], "an edit over the definition");
 });

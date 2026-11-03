@@ -4,18 +4,16 @@
  * text encoders, VAEs and CLIP vision), keyed by `folder/file`, with provenance and a hash index:
  * `<data>/library/catalogue.json`.
  *
- * It merges these source files, which stay where they are as backups and are never deleted or
- * written here:
- *   - definitions: `<data>/config/catalogue.json` (model metadata from a Studio export)
+ * It merges these source files, which stay where they are and are never deleted or written here:
  *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
  *   - manifest: the pinned model manifest, `<data>/config/models.json`
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent. Studio's own edits are a layer above all
- * of them. On a conflict the more specific source wins: edits over definitions over provider
- * details over the manifest, except that provider metadata wins for links and hashes. The `seed`
- * and `admin` layers of the retired lora-catalogue.json files are not read; migrate-runtime folds
- * them into the definitions and edits (lora-layers.js).
+ * when the file goes, so the migration is idempotent. The `definitions` layer has no source file:
+ * it holds the model metadata migrate-runtime folded in from the retired lora-catalogue.json
+ * `seed` and `admin` layers (lora-layers.js). Studio's own edits are a layer above all of them.
+ * On a conflict the more specific source wins: edits over definitions over provider details over
+ * the manifest, except that provider metadata wins for links and hashes.
  *
  * This module is the catalogue's only writer; writes are atomic (json-store.js).
  */
@@ -292,7 +290,6 @@ export function createCatalogueStore({
   const manifestPrefix = () =>
     String(environment.STUDIO_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
   const sources = {
-    definitions: () => path.join(dataDir, "config", "catalogue.json"),
     provider: () => path.join(dataDir, "model-download-sources.json"),
     manifest: () => path.join(dataDir, "config", "models.json"),
   };
@@ -326,20 +323,7 @@ export function createCatalogueStore({
   /** One source file's content, as the layer stores it, keyed by catalogue key (provider: by download id). */
   function layerFrom(name, value) {
     const layer = {};
-    if (name === "definitions") {
-      if (!isObject(value)) return null;
-      const current = load();
-      for (const [key, fields] of Object.entries(value)) {
-        const { folder, file: name } = splitCatalogueKey(key);
-        if (!safeKey(folder, name) || !isObject(fields)) continue;
-        // A backup fills missing entries; an existing Studio entry remains authoritative.
-        if (current.entries[key] && !current.layers.definitions[key]) continue;
-        // An export may carry fields Studio no longer keeps; they are dropped.
-        layer[key] = cleanCataloguePatch(
-          Object.fromEntries(Object.entries(fields).filter(([field]) => editableFields.has(field))),
-        );
-      }
-    } else if (name === "provider") {
+    if (name === "provider") {
       if (!isObject(value)) return null;
       for (const [id, spec] of Object.entries(value))
         if (isObject(spec) && safeKey(spec.folder, spec.file) && providerSource({ ...spec, id }))
