@@ -24,6 +24,7 @@ const emptyStore = () => ({
   sessions: [],
   gatewayLinks: [],
   gatewayPending: [],
+  deletedIdentities: [],
 });
 const maxPendingGatewayIdentities = 100;
 const validGatewayIdentity = (value) =>
@@ -50,6 +51,14 @@ const enabledAdministrators = (store) =>
   );
 const lastAdministrator = "Keep at least one enabled administrator account.";
 
+/** Whether this email or provider identity belongs to a deleted account nobody has added again. */
+const wasDeleted = (store, { email = "", issuer = "", subject = "" }) =>
+  store.deletedIdentities.some(
+    (item) =>
+      (email && item.email === usernameKey(email)) ||
+      (subject && item.issuer === issuer && item.subject === subject),
+  );
+
 function readStore() {
   if (cache) return cache;
   try {
@@ -68,6 +77,7 @@ function readStore() {
       sessions: Array.isArray(saved?.sessions) ? saved.sessions : [],
       gatewayLinks: Array.isArray(saved?.gatewayLinks) ? saved.gatewayLinks : [],
       gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : [],
+      deletedIdentities: Array.isArray(saved?.deletedIdentities) ? saved.deletedIdentities : [],
     };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -293,6 +303,8 @@ export async function createLocalAccount({
   if (store.accounts.some((item) => usernameKey(item.username) === key))
     throw new Error("An account with that email already exists.");
   store.accounts.push(account);
+  // Adding the person again lets their single sign-on and chat gateway identities back in.
+  store.deletedIdentities = store.deletedIdentities.filter((item) => item.email !== key);
   saveStore();
   const { password: _secret, ...publicAccount } = account;
   return publicAccount;
@@ -546,7 +558,9 @@ export function setAccountRole(accountId, role, actorId) {
 /**
  * Removes an account with its sessions, MCP token, chat gateway links and preferences. Its gallery
  * files and other saved records stay on disk. Nobody deletes their own account, and the last
- * enabled administrator stays.
+ * enabled administrator stays. Its email and single sign-on identity are remembered so neither
+ * single sign-on nor the chat gateway makes the account again until an administrator adds that
+ * email.
  */
 export function deleteAccount(accountId, actorId) {
   if (accountId === actorId) throw new Error("Ask another administrator to delete your account.");
@@ -562,6 +576,11 @@ export function deleteAccount(accountId, actorId) {
   store.accounts = store.accounts.filter((item) => item.id !== accountId);
   store.sessions = store.sessions.filter((item) => item.accountId !== accountId);
   store.gatewayLinks = store.gatewayLinks.filter((item) => item.accountId !== accountId);
+  store.deletedIdentities.push({
+    email: usernameKey(account.username),
+    ...(account.oidc ? { issuer: account.oidc.issuer, subject: account.oidc.subject } : {}),
+    deletedAt: new Date().toISOString(),
+  });
   saveStore();
   forgetAccountPreferences(accountId);
 }
@@ -622,7 +641,7 @@ function linkGatewayEmail(store, identity, email) {
   let account = store.accounts.find((item) => usernameKey(item.username) === key);
   if (account && (account.role === accountRoles.administrator || account.emailSetBySelf))
     return null;
-  if (!account && validUsername(email)) {
+  if (!account && validUsername(email) && !wasDeleted(store, { email })) {
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username: String(email).trim().normalize("NFKC"),
@@ -737,6 +756,8 @@ export function signInWithOidcIdentity({
       saveStore();
     }
   }
+  if (!account && wasDeleted(store, { email: emailVerified ? email : "", issuer, subject }))
+    return { refused: true };
   if (!account) {
     const base =
       validUsername(email) && emailVerified
