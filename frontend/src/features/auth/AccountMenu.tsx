@@ -49,9 +49,9 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
 export function AccountMenu() {
   return (
     <Menu position="bottom-end" shadow="md" width={240}>
-      <Tooltip label="Account">
+      <Tooltip label="User">
         <Menu.Target>
-          <ActionIcon aria-label="Your Account" variant="subtle" color="gray">
+          <ActionIcon aria-label="User" variant="subtle" color="gray">
             <UserRound size={19} />
           </ActionIcon>
         </Menu.Target>
