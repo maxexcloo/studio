@@ -4,7 +4,6 @@ import crypto from "node:crypto";
 import { dataDir } from "./gallery/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 import { writeJsonFile } from "./json-store.js";
-import { grokEnabled } from "./features.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
 
@@ -455,12 +454,9 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
       });
     }
   }
-  const allowed = items.filter(
-    (workflow) => grokEnabled || (workflow.family !== "grok" && !usesGrokMedia(workflow)),
-  );
-  if (!dedupe) return allowed;
+  if (!dedupe) return items;
   const seen = new Set();
-  return allowed.filter((item) => {
+  return items.filter((item) => {
     if (seen.has(item.id)) return false;
     seen.add(item.id);
     return true;

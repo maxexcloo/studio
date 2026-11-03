@@ -118,7 +118,7 @@ Chat uses the Prompt Assistant account permission. Its gateway is independent of
 
 MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account.
 
-`STUDIO_ENABLE_GROK=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. Both are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
+Values an administrator saves in **Settings › Models** (default profiles, feature switches, the assistant model) live in Studio's database in the data folder and survive restarts. A value set in the deployment's environment wins and shows as locked there. LoRAs and Cloud Models follow each account's group features.
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 

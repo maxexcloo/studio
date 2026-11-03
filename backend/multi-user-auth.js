@@ -34,7 +34,7 @@ import {
   verifyLocalAccount,
 } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
-import { grokEnabled, lorasEnabled, presetsEnabled } from "./features.js";
+import { presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
@@ -540,8 +540,6 @@ export function registerMultiUserAuthRoutes(
       requireApproval: requireApproval(),
       // Features the deployment switched off for everyone; their access-profile options show locked.
       lockedFeatures: {
-        loras: !lorasEnabled,
-        cloudModels: !grokEnabled,
         presets: !presetsEnabled(),
       },
       gateway: { ...listGatewayIdentities(), adminTools: gatewayAdminTools() },
