@@ -71,6 +71,14 @@ test("Animate is admitted only for known themes, with Spicy behind Uncensored Mo
   assert.equal(issue({}, { theme: "custom" }), 400);
   assert.equal(issue({}, { theme: "spicy" }), 403);
   assert.equal(issue({ uncensoredModels: true }, { theme: "spicy" }), undefined);
+  // Dream's Spicy needs it too.
+  const dream = (features) =>
+    writingIssue(writingRequest({ kind: "dream", spicy: true }), {
+      engine,
+      account: user(features),
+    });
+  assert.equal(dream({})?.status, 403);
+  assert.equal(dream({ uncensoredModels: true }), null);
   // A client can't pass off its own text as the written prompt.
   assert.equal(
     writingRequest({ kind: "animate", theme: "living", prompt: "x", thinking: "y" }).prompt,

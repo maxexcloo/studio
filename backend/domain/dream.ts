@@ -410,7 +410,9 @@ export function createDream(options: {
       (item) => item.id === job.input.profileId,
     );
     if (!profile) throw new Error("The model is no longer ready.");
-    const { spicy, source, loras = [], reword, like } = job.input.writing as DreamWriting;
+    const { source, loras = [], reword, like } = job.input.writing as DreamWriting;
+    // Rechecked here: the account may have lost Uncensored Models since the job was queued.
+    const spicy = (job.input.writing as DreamWriting).spicy && access.uncensored;
     const { recent } = read(ownerId);
     const media = kindOf(profile);
     const starred = generations(ownerId)
