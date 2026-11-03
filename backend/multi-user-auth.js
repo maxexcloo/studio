@@ -16,8 +16,6 @@ import {
   createAccountSession,
   createLocalAccount,
   defaultAccessProfileId,
-  requireApproval,
-  setRequireApproval,
   gatewayAdminTools,
   setGatewayAdminTools,
   ensureBuiltInAccessProfile,
@@ -34,7 +32,6 @@ import {
   verifyLocalAccount,
 } from "./account-store.js";
 import { canAdmin, clientOf } from "./access.js";
-import { presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
@@ -405,7 +402,6 @@ export function registerMultiUserAuthRoutes(
       });
       const result = signInWithOidcIdentity(identity);
       if (result.refused) return res.redirect(302, "/?sign-in=refused");
-      if (result.pending) return res.redirect(302, "/?sign-in=pending");
       const session = createAccountSession(result.access.userId);
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
       res.redirect(302, "/");
@@ -537,11 +533,6 @@ export function registerMultiUserAuthRoutes(
       accessProfiles: listAccessProfiles(),
       availableProfiles: profiles,
       defaultAccessProfileId: defaultAccessProfileId(),
-      requireApproval: requireApproval(),
-      // Features the deployment switched off for everyone; their access-profile options show locked.
-      lockedFeatures: {
-        presets: !presetsEnabled(),
-      },
       gateway: { ...listGatewayIdentities(), adminTools: gatewayAdminTools() },
     });
   });
@@ -549,13 +540,9 @@ export function registerMultiUserAuthRoutes(
   post("/api/accounts/default-profile", (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
-      const body = req.body || {};
-      if (typeof body.requireApproval === "boolean") setRequireApproval(body.requireApproval);
-      if (typeof body.accessProfileId === "string") setDefaultAccessProfile(body.accessProfileId);
       res.json({
         ok: true,
-        defaultAccessProfileId: defaultAccessProfileId(),
-        requireApproval: requireApproval(),
+        defaultAccessProfileId: setDefaultAccessProfile(req.body?.accessProfileId),
       });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });

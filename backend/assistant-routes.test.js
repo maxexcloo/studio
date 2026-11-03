@@ -36,7 +36,6 @@ const uncensored = {
 const user = builtInAccessProfile;
 const profiles = {
   user,
-  off: { ...user, id: "off", features: { ...user.features, promptAssistant: false } },
   spicy: {
     ...user,
     id: "spicy",
@@ -46,7 +45,6 @@ const profiles = {
 const accounts = {
   admin: { id: "a1", role: "administrator" },
   user: { id: "u1", role: "user", accessProfileId: "user" },
-  off: { id: "u2", role: "user", accessProfileId: "off" },
   spicy: { id: "u3", role: "user", accessProfileId: "spicy" },
 };
 const encoder = new TextEncoder();
@@ -145,17 +143,11 @@ const post = async (route, body, account, headers = {}) => {
 const get = async (route, account) =>
   (await fetch(base + route, { headers: account ? { "x-test-account": account } : {} })).json();
 
-test("the assistant is behind Prompt Assistant, on for built-ins, and only for profiles the account may use", async () => {
-  assert.deepEqual(await get("/api/assistant", "off"), { ok: true, available: false, presets: [] });
+test("the assistant is for every account, and only for profiles the account may use", async () => {
   const status = await get("/api/assistant", "user");
   assert.deepEqual(
     [status.available, status.spicy, status.loras, status.presets.map((preset) => preset.id)],
     [true, false, false, ["enhance", "photographic", "cinematic", "concise", "candid"]],
-  );
-  assert.equal(
-    (await post("/api/assistant/rewrite", { profileId: plain.id, prompt: "a cabin" }, "off"))
-      .status,
-    403,
   );
   assert.equal(
     (await post("/api/assistant/rewrite", { profileId: uncensored.id, prompt: "a cabin" }, "user"))

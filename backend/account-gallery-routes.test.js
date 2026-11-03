@@ -70,7 +70,7 @@ test("gallery pages and exact job reads return only the signed-in account's reco
       userId: "account-a",
       role: "user",
       authenticated: true,
-      features: { gallery: true },
+      features: {},
     },
     query: {},
   };
@@ -89,25 +89,6 @@ test("gallery pages and exact job reads return only the signed-in account's reco
       await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } })
     ).items.map((record) => record.jobId),
     ["job-a"],
-  );
-});
-
-test("access profiles without gallery permission cannot read pages or exact job outputs", async () => {
-  galleryStore.setGallery([item("account-a", "job-a")]);
-  const request = {
-    studioAccount: {
-      userId: "account-a",
-      role: "user",
-      authenticated: true,
-      generationProfiles: [],
-      features: { gallery: false },
-    },
-    query: {},
-  };
-  assert.deepEqual((await call(routes["/api/gallery"], request)).items, []);
-  assert.deepEqual(
-    (await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } })).items,
-    [],
   );
 });
 
@@ -168,7 +149,7 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
       userId: "account-a",
       role: "user",
       authenticated: true,
-      features: { gallery: true },
+      features: {},
     },
     query: {},
   };
@@ -215,7 +196,7 @@ test("repeated gallery filters match any of their values and combine across filt
       userId: "account-a",
       role: "user",
       authenticated: true,
-      features: { gallery: true },
+      features: {},
     },
     query,
   });
@@ -256,7 +237,7 @@ test("gallery filter options cover the owned gallery without exposing other acco
       userId: "account-a",
       role: "user",
       authenticated: true,
-      features: { gallery: true },
+      features: {},
     },
     query: { type: "image", limit: "60", q: "no-match" },
   };
@@ -265,13 +246,6 @@ test("gallery filter options cover the owned gallery without exposing other acco
   assert.deepEqual(facets.loras, ["detail.safetensors"]);
   assert.equal(facets.sizes[0].value, "up-to-1k");
   assert.equal(facets.aspects.at(-1).value, "other");
-  assert.deepEqual(
-    await call(routes["/api/gallery/filters"], {
-      ...request,
-      studioAccount: { ...request.studioAccount, features: { gallery: false } },
-    }),
-    { ok: false, error: "Gallery access is disabled for this account." },
-  );
 });
 
 test("gallery items carry their Chat, which filters pages and lists as a facet", async () => {
@@ -282,7 +256,7 @@ test("gallery items carry their Chat, which filters pages and lists as a facet",
       userId: "account-a",
       role: "user",
       authenticated: true,
-      features: { gallery: true },
+      features: {},
     },
     query,
   });
@@ -329,7 +303,7 @@ test("search matches an image's caption as well as its prompt, within the accoun
           userId: "account-a",
           role: "user",
           authenticated: true,
-          features: { gallery: true },
+          features: {},
         },
         query: { q },
       })
@@ -361,7 +335,7 @@ test("search adds images that look like it to the text matches, and filters stil
           userId: "account-a",
           role: "user",
           authenticated: true,
-          features: { gallery: true },
+          features: {},
         },
         query,
       })

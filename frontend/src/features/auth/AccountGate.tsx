@@ -37,10 +37,9 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
-/** Whether the account may upscale (Upscale and Finish Starred Images). */
+/** Every account may upscale; MediaActions still asks. */
 export function useMayUpscale() {
-  const { data } = useAccount();
-  return useIsAdmin() || data?.account?.features?.upscale === true;
+  return true;
 }
 export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
@@ -54,11 +53,10 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [outcome] = useState(
     () =>
       ({
-        pending: "An administrator needs to approve this account.",
         refused: "This account is disabled. Ask an administrator.",
         failed: "Single sign-on did not complete. Try again.",
         unavailable: "Single sign-on is unavailable right now.",
-      })[new URLSearchParams(window.location.search).get("sign-in") || ("" as "pending")],
+      })[new URLSearchParams(window.location.search).get("sign-in") || ("" as "refused")],
   );
   useEffect(() => {
     const signOut = () => {

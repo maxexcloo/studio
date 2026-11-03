@@ -33,14 +33,7 @@ const tokens = {
     role: "user",
     authenticated: true,
     generationProfiles: [profile.id],
-    features: { promptAssistant: true, loras: true },
-  },
-  "assistant-token-long-enough-for-the-fixture-0002": {
-    userId: "without",
-    role: "user",
-    authenticated: true,
-    generationProfiles: [profile.id],
-    features: { promptAssistant: false },
+    features: { loras: true },
   },
 };
 
@@ -145,18 +138,11 @@ const data = (result) => {
 };
 const call = (client, name, args) => client.callTool({ name, arguments: args });
 
-test("the assistant tools are only for accounts with Prompt Assistant, and only with a gateway", async (t) => {
+test("the assistant tools are only offered with a gateway", async (t) => {
   const f = await fixture(t);
-  const withFeature = await names(
-    await f.client("assistant-token-long-enough-for-the-fixture-0001"),
-  );
+  const online = await names(await f.client("assistant-token-long-enough-for-the-fixture-0001"));
   for (const name of ["RewritePrompt", "SuggestNegative", "SuggestLoras"])
-    assert.ok(withFeature.includes(name), name);
-  const without = await names(await f.client("assistant-token-long-enough-for-the-fixture-0002"));
-  assert.equal(
-    without.some((name) => ["RewritePrompt", "SuggestNegative", "SuggestLoras"].includes(name)),
-    false,
-  );
+    assert.ok(online.includes(name), name);
   const offline = await fixture(t, {});
   assert.equal(
     (

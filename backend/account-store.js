@@ -105,7 +105,7 @@ export function accountStoreSnapshot() {
   return {
     version: store.version,
     accounts: store.accounts.map(
-      ({ id, username, role, accessProfileId, disabled, createdAt, identity, pending, oidc }) => ({
+      ({ id, username, role, accessProfileId, disabled, createdAt, identity, oidc }) => ({
         id,
         username,
         role,
@@ -113,7 +113,6 @@ export function accountStoreSnapshot() {
         disabled,
         createdAt,
         identity,
-        ...(pending ? { pending: true } : {}),
         ...(oidc ? { signInLinked: true } : {}),
       }),
     ),
@@ -139,8 +138,9 @@ export function listAccessProfiles() {
 
 /**
  * Adds the built-in User access profile where no profile has its ID; an existing one is never
- * changed. Removes the Administrator group earlier versions added, unless it has members or is the
- * default: administrators have full access by role.
+ * changed. Without a default group, User becomes the default. Removes the Administrator group
+ * earlier versions added, unless it has members or is the default: administrators have full access
+ * by role.
  */
 export function ensureBuiltInAccessProfile() {
   const store = readStore();
@@ -155,30 +155,21 @@ export function ensureBuiltInAccessProfile() {
   }
   const added = !store.profiles[builtInAccessProfile.id];
   if (added) store.profiles[builtInAccessProfile.id] = structuredClone(builtInAccessProfile);
+  if (!store.profiles[store.defaultAccessProfileId]) {
+    store.defaultAccessProfileId = builtInAccessProfile.id;
+    changed = true;
+  }
   if (added || changed) saveStore();
   return added;
 }
 
-/** The access profile new ordinary accounts start with, or "" when each one waits for an administrator. */
-export function defaultAccessProfileId() {
-  const store = readStore();
-  const id = store.defaultAccessProfileId;
-  return validAccountKey(id) && store.profiles[id] ? id : "";
-}
-
 /**
- * Whether new single sign-on and chat gateway accounts wait for an administrator even with a
- * default access profile. On unless an administrator turned it off, so an upgrade widens nothing.
+ * The access profile every new ordinary account starts on: single sign-on decides who may sign in,
+ * so a new account is active at once.
  */
-export function requireApproval() {
-  return readStore().requireApproval !== false;
-}
-
-export function setRequireApproval(on) {
-  if (typeof on !== "boolean") throw new Error("Choose on or off.");
-  readStore().requireApproval = on;
-  saveStore();
-  return requireApproval();
+export function defaultAccessProfileId() {
+  ensureBuiltInAccessProfile();
+  return readStore().defaultAccessProfileId;
 }
 
 /**
@@ -197,15 +188,11 @@ export function setGatewayAdminTools(on) {
   return gatewayAdminTools();
 }
 
-/** The default access profile a new self-arriving account starts on now, or "" when it waits. */
-const startingProfileId = () => (requireApproval() ? "" : defaultAccessProfileId());
-
 export function setDefaultAccessProfile(profileId) {
   const store = readStore();
-  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId]))
+  if (!validAccountKey(profileId) || !store.profiles[profileId])
     throw new Error("Choose an existing group");
-  if (profileId) store.defaultAccessProfileId = profileId;
-  else delete store.defaultAccessProfileId;
+  store.defaultAccessProfileId = profileId;
   saveStore();
   return defaultAccessProfileId();
 }
@@ -254,8 +241,6 @@ export function assignAccessProfile(accountId, profileId) {
   if (!validAccountKey(profileId) || !store.profiles[profileId])
     throw new Error("Choose an existing group");
   account.accessProfileId = profileId;
-  // Assigning a profile is how an administrator approves a pending sign-in.
-  delete account.pending;
   saveStore();
   return { id: account.id, accessProfileId: account.accessProfileId };
 }
@@ -536,8 +521,8 @@ export function setAccountDisabled(accountId, disabled) {
  * forwards its own user ID, and optionally the user's email. A link maps that ID
  * to an account: an administrator's, or one made here when the forwarded email is
  * an enabled account's username. Unlinked IDs are remembered so they can be
- * linked, and get nothing. A forwarded email no account has becomes a new account only
- * while a default access profile is set.
+ * linked, and get nothing. A forwarded email no account has becomes a new account on the default
+ * access profile.
  */
 export function gatewayAccountAccess(identity, email = "") {
   if (!validGatewayIdentity(identity)) return null;
@@ -552,40 +537,26 @@ export function gatewayAccountAccess(identity, email = "") {
 }
 
 // The gateway is trusted and its emails come from the shared identity provider, so a matching username is the same person.
-// While a default access profile is set, an email no account has becomes a new account: on the
-// default at once, or waiting for approval (linked already, so approval is all it needs).
+// An email no account has becomes a new account on the default access profile.
 function linkGatewayEmail(store, identity, email) {
   if (!validGatewayIdentity(email) || !email.includes("@")) return null;
   const key = usernameKey(email);
   let account = store.accounts.find((item) => usernameKey(item.username) === key);
-  let created = false;
-  if (!account && defaultAccessProfileId() && validUsername(email)) {
+  if (!account && validUsername(email)) {
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username: String(email).trim().normalize("NFKC"),
       role: accountRoles.user,
-      ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
+      accessProfileId: defaultAccessProfileId(),
       identity: { provider: "gateway" },
       disabled: false,
       createdAt: new Date().toISOString(),
     };
     store.accounts.push(account);
-    created = true;
   }
   if (account?.disabled) return null;
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
-  if (!access?.authenticated) {
-    if (created) {
-      store.gatewayLinks.push({
-        identity,
-        accountId: account.id,
-        linkedAt: new Date().toISOString(),
-      });
-      store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
-      saveStore();
-    }
-    return null;
-  }
+  if (!access?.authenticated) return null;
   store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
   store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
   saveStore();
@@ -656,9 +627,8 @@ export function dismissGatewayIdentity(identity) {
 
 /**
  * A verified provider identity: its linked account, else the account whose
- * username is the identity's verified email, else a new pending account an
- * administrator approves by assigning an access profile. The provider never
- * decides roles or access.
+ * username is the identity's verified email, else a new account on the default
+ * access profile. The provider decides who signs in, never roles or access.
  */
 export function signInWithOidcIdentity({
   issuer,
@@ -699,15 +669,13 @@ export function signInWithOidcIdentity({
       role: accountRoles.user,
       identity: { provider: "pocket-id" },
       oidc: { issuer, subject, linkedAt: new Date().toISOString() },
-      // With a default access profile and approval off it starts on that; otherwise an administrator approves it.
-      ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
+      accessProfileId: defaultAccessProfileId(),
       disabled: false,
       createdAt: new Date().toISOString(),
     };
     store.accounts.push(account);
     saveStore();
   }
-  if (account.disabled) return { refused: true };
   const access = effectiveAccountAccess(account, store.profiles);
-  return access.authenticated ? { access } : { pending: true };
+  return access.authenticated ? { access } : { refused: true };
 }

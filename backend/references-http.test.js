@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 test(
-  "exact reference metadata restores owned uploads and generated aliases while enforcing account features",
+  "exact reference metadata restores owned uploads and generated aliases",
   { timeout: 30_000 },
   async (t) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-reference-http-"));
@@ -61,23 +61,11 @@ test(
       password: "fixture administrator password",
     });
     const administratorCookie = cookie;
-    const features = {
-      imageGeneration: true,
-      videoGeneration: true,
-      imageReferences: true,
-      videoReferences: true,
-      gallery: true,
-    };
-    async function profile(changes = {}) {
-      cookie = administratorCookie;
-      await api("/api/accounts/profiles", "POST", {
-        id: "artists",
-        name: "Artists",
-        allModels: true,
-        features: { ...features, ...changes },
-      });
-    }
-    await profile();
+    await api("/api/accounts/profiles", "POST", {
+      id: "artists",
+      name: "Artists",
+      allModels: true,
+    });
     await api("/api/accounts/users", "POST", {
       username: "artist",
       password: "fixture artist password",
@@ -88,7 +76,6 @@ test(
       username: "artist",
       password: "fixture artist password",
     });
-    const artistCookie = cookie;
     const bytes = await sharp({
       create: { width: 32, height: 16, channels: 3, background: "white" },
     })
@@ -191,25 +178,6 @@ test(
     assert.equal(legacy.url, imageAsset.url);
     assert.equal(legacy.width, imageAsset.width);
     cookie = administratorCookie;
-    for (const id of [upload.id, imageAsset.id, lastFrame.id])
-      assert.equal((await request(`/api/reference-assets/${encodeURIComponent(id)}`)).status, 404);
-    await profile({ gallery: false });
-    cookie = artistCookie;
-    assert.equal((await metadata(upload.id)).asset.id, upload.id);
-    assert.equal(
-      (await request(`/api/reference-assets/${encodeURIComponent(imageAsset.id)}`)).status,
-      404,
-    );
-    assert.equal(
-      (await request(`/api/reference-assets/${encodeURIComponent(lastFrame.id)}`)).status,
-      404,
-    );
-    await profile({ imageReferences: false, videoReferences: true });
-    cookie = artistCookie;
-    assert.equal((await metadata(upload.id)).asset.id, upload.id);
-    assert.equal((await metadata(lastFrame.id)).asset.id, lastFrame.id);
-    await profile({ imageReferences: false, videoReferences: false });
-    cookie = artistCookie;
     for (const id of [upload.id, imageAsset.id, lastFrame.id])
       assert.equal((await request(`/api/reference-assets/${encodeURIComponent(id)}`)).status, 404);
   },

@@ -284,7 +284,6 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     buildProfile: (profile) => profile,
     accountForOwner: () => null,
     mayUseProfile: () => true,
-    mayUseFeature: () => true,
     reference: async () => new Uint8Array(),
     composePrompt: (_mode, prompt) => prompt,
   });

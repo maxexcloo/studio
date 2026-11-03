@@ -35,13 +35,7 @@ const profiles: DreamProfile[] = [
   { id: "qwen", kind: "image", label: "Qwen" },
   { id: "wan", kind: "video", label: "Wan", mediaInputs: [{ id: "start", required: true }] },
 ];
-const everything: DreamAccess = {
-  gallery: true,
-  image: true,
-  video: true,
-  assistant: true,
-  uncensored: false,
-};
+const everything: DreamAccess = { uncensored: false };
 
 /** Dream with fakes for every service; nothing generates and nothing starts on its own. */
 function fixture(t: TestContext) {
@@ -61,7 +55,7 @@ function fixture(t: TestContext) {
         userId,
         { ...everything, account: { userId, role: "user" } },
       ]),
-    ) as Record<string, DreamAccess>,
+    ) as Record<string, DreamAccess | null>,
     online: { text: true, image: true, video: true } as Record<string, boolean | "parked">,
     textBusy: false,
     prompts: 0,
@@ -380,26 +374,27 @@ test("Dream picks the most-starred ready profile and keeps Spicy to accounts wit
   // No uncensored grant: Spicy never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
-  state.access.alice.uncensored = true;
+  state.access.alice!.uncensored = true;
   const spicy = await dreamOnce();
   assert.equal(state.calls[1].model, "writer");
   assert.match(state.calls[1].system, /Spicy/);
   assert.equal(spicy?.dream?.spicy, true);
 });
 
-test("Dream skips accounts without the prompt assistant and offline services, logging each reason once", async (t) => {
+test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
   const { dream, state, dreamJobs } = fixture(t);
   await dream.save("alice", { enabled: true });
-  state.access.alice.assistant = false;
+  const alice = state.access.alice;
+  state.access.alice = null;
   await dream.tick();
   await dream.tick();
   assert.equal(dreamJobs().length, 0);
   assert.deepEqual(dream.status("alice"), {
     status: "unavailable",
-    reason: "The prompt assistant is off for this account.",
+    reason: "This account is unavailable.",
   });
   assert.equal(state.logs.length, 1);
-  state.access.alice.assistant = true;
+  state.access.alice = alice;
   state.online.text = false;
   await dream.tick();
   assert.equal(dream.status("alice").reason, "The text model is offline.");
@@ -521,8 +516,8 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal(variation.input.prompt, "dream 3");
   assert.equal(store.session("alice", variation.sessionId)?.hidden, undefined);
   assert.equal((await request("")).body.unseen.length, 0);
-  // Without gallery access Dream is closed.
-  state.access.alice.gallery = false;
+  // A gone or disabled account's Dream is closed.
+  state.access.alice = null;
   assert.equal((await request("")).status, 403);
 });
 

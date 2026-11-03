@@ -19,23 +19,11 @@ import {
   recordBelongsToAccount,
   recordsForRequest,
 } from "../account-ownership.js";
-import { mayUseFeature } from "../account-policy.js";
 import { galleryAspects, gallerySizeBands, otherAspect } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { requireAdmin } from "../route-access.js";
 
-function requireGalleryAccess(req, res) {
-  if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;
-  res.status(403).json({ ok: false, error: "Gallery access is disabled for this account." });
-  return false;
-}
-
 export function galleryJobResponse(account, id, settings = false) {
-  if (account && !mayUseFeature(account, "gallery"))
-    return {
-      status: 403,
-      payload: { ok: false, error: "Gallery access is disabled for this account.", items: [] },
-    };
   cleanupGalleryState(jobs);
   const items = filterVisibleGallery(
     gallery.filter((item) => item.jobId === id && recordBelongsToAccount(item, account)),
@@ -95,7 +83,6 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
   });
 
   app.get("/api/gallery/filters", (req, res) => {
-    if (!requireGalleryAccess(req, res)) return;
     const type = String(req.query.type || "");
     const items = filterVisibleGallery(recordsForRequest(gallery, req)).filter(
       (item) => !type || item.type === type,
@@ -138,8 +125,6 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
 
   // The newest finished image the account made with each LoRA, shown as its picker preview.
   app.get("/api/loras/previews", (req, res) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
-      return res.json({ previews: {} });
     const newest = {};
     for (const item of filterVisibleGallery(recordsForRequest(gallery, req))) {
       if (item.status !== "done" || !item.thumbnailUrl) continue;
@@ -154,15 +139,6 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
   });
 
   app.get("/api/gallery", async (req, res) => {
-    if (!requireGalleryAccess(req, res))
-      return res.json({
-        items: [],
-        outputs: [],
-        nextCursor: "",
-        hasMore: false,
-        totalApprox: 0,
-        revision: 0,
-      });
     cleanupGalleryState(jobs);
     const type = String(req.query.type || "");
     const limit = Number(req.query.limit || 0);
@@ -201,10 +177,6 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
 /** `starred` hears which of the caller's items changed, for the taste profile. */
 export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
   app.get("/api/gallery/export", (req, res) => {
-    if (!requireGalleryAccess(req, res))
-      return res
-        .status(403)
-        .json({ ok: false, error: "Gallery access is disabled for this account." });
     // `ids` (comma-separated) downloads a selection as one archive.
     const ids = String(req.query.ids || "")
       .split(",")
@@ -223,7 +195,6 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
   /* ------------------------------------------ Favourites, prompts, earlier work */
 
   app.post("/api/gallery/favorite", (req, res) => {
-    if (!requireGalleryAccess(req, res)) return;
     const requested = new Set(
       (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500),
     );
@@ -241,7 +212,6 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
 export function registerGalleryErrorRoutes(app) {
   // `owner` (administrators only) clears another account's failed items, or "all" every account's.
   app.post("/api/gallery/errors/clear", (req, res) => {
-    if (!requireGalleryAccess(req, res)) return;
     const owner = req.body?.owner;
     if (owner !== undefined && !requireAdmin(req, res)) return;
     const owned =
@@ -265,7 +235,6 @@ export function registerGalleryErrorRoutes(app) {
 
 export function registerGalleryDeleteRoute(app) {
   app.delete("/api/gallery/:id", (req, res) => {
-    if (!requireGalleryAccess(req, res)) return;
     // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.
     const id = req.params.id;
     const owned = recordsForRequest(gallery, req);
