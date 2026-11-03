@@ -1957,6 +1957,15 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
     await queueAdapter.settled(job);
   },
 });
+/** A reference image as the text model reads it ({ mime, data }, downscaled), or null. */
+async function assistantImage(account, id) {
+  if (!id) return null;
+  const reference = await bytesForReferenceAccount(account, id);
+  const [image] = await downscaleReferences([
+    `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
+  ]);
+  return image || null;
+}
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -1967,6 +1976,7 @@ const promptStage = createPromptStage({
   profiles: (account) => assistantProfiles({ studioAccount: account }),
   guide: assistantGuide,
   dream: () => dream,
+  frame: assistantImage,
 });
 const generationAdapter = withUpscaleAdapter(
   directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
@@ -2498,10 +2508,7 @@ const sessionChat = new ChatService({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated)
       throw Object.assign(new Error("This account no longer has access."), { status: 403 });
-    const reference = await bytesForReferenceAccount(account, id);
-    const [image] = await downscaleReferences([
-      `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
-    ]);
+    const image = await assistantImage(account, id);
     if (!image)
       throw Object.assign(new Error("This reference image cannot be used by Chat."), {
         status: 400,
