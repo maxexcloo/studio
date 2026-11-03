@@ -1,16 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadEvals, runEvals, scoreLoras, scoreNegative, scoreRewrite } from "./assistant-evals.js";
+import {
+  loadEvals,
+  runEvals,
+  scoreAnimate,
+  scoreLoras,
+  scoreNegative,
+  scoreRewrite,
+} from "./assistant-evals.js";
 
-test("the eval set has about 20 rewrite, 15 LoRA and 5 negative cases with unique ids", () => {
+test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 5 animate cases with unique ids", () => {
   const evals = loadEvals();
   assert.deepEqual(
-    [evals.rewrite.cases.length, evals.loras.cases.length, evals.negative.cases.length],
-    [20, 15, 5],
+    [
+      evals.rewrite.cases.length,
+      evals.loras.cases.length,
+      evals.negative.cases.length,
+      evals.animate.cases.length,
+    ],
+    [20, 15, 5, 5],
   );
-  const ids = [...evals.rewrite.cases, ...evals.loras.cases, ...evals.negative.cases].map(
-    (item) => item.id,
-  );
+  const ids = Object.values(evals).flatMap((set) => set.cases.map((item) => item.id));
   assert.equal(new Set(ids).size, ids.length);
   assert.ok(evals.loras.catalogue.length >= 10, "a frozen catalogue snapshot");
 });
@@ -92,4 +102,22 @@ test("the LoRA and negative scorers check expected, forbidden, unused and subjec
     ).ok,
     false,
   );
+});
+
+test("the animate scorer catches labels on a wrapped profile, missing sections, filler and a replay", () => {
+  const body =
+    "The camera pushes in slowly as she lifts the cup, steam curling past her face with a soft hiss. ".repeat(
+      5,
+    );
+  const failing = (expect, output) =>
+    scoreAnimate({ id: "a", expect }, output)
+      .checks.filter((check) => !check.ok)
+      .map((check) => check.name);
+  assert.deepEqual(failing({ sections: [] }, body), []);
+  assert.deepEqual(failing({ sections: [] }, `overall_soundscape: ${body}`), ["no section labels"]);
+  assert.deepEqual(failing({ sections: ["detailed_description", "overall_soundscape"] }, body), [
+    "every section in order",
+  ]);
+  assert.deepEqual(failing({}, `${body} Smooth, cinematic.`), ["no filler"]);
+  assert.deepEqual(failing({ avoid: ["lifts the cup"] }, body), ['moves on from "lifts the cup"']);
 });

@@ -1492,7 +1492,14 @@ export function registerMcpRoutes(
           if (prompt) plan.args.prompts = [prompt];
           else if (theme) {
             // The viewer's Animate themes: the queue item writes the motion prompt (prompt-animate.js).
-            const write = { animate: { theme, instruction: request || "", source: item.prompt } };
+            const write = {
+              animate: {
+                theme,
+                instruction: request || "",
+                source: item.prompt,
+                ...(item.type === "video" ? { extend: true } : {}),
+              },
+            };
             Object.assign(plan.args, { prompts: [""], write });
             source = "studio";
           }

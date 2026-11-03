@@ -3356,6 +3356,7 @@ test("Reuse animates an image from its first frame with the default first-frame 
     theme: "cinematic",
     instruction: "",
     source: "The heron takes flight",
+    extend: true,
   });
   // mode extend continues a video on its own model; length is seconds on the profile's frame grid.
   data(

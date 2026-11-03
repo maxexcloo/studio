@@ -138,6 +138,8 @@ test("think blocks are stripped from whole replies and from streams split anywhe
     assert.equal(shown, "A warm cabin at dusk.", `chunks of ${size}`);
   }
   assert.equal(cleanPrompt('```\nPrompt: "A cabin at dusk."\n```'), "A cabin at dusk.");
+  // Blank lines between sections stay; runs of them and stray spaces fold.
+  assert.equal(cleanPrompt("a: one  \n\n\n\n b: two\nc"), "a: one\n\nb: two\nc");
 });
 
 test("server-sent events parse across chunk boundaries, skip comments and stop at [DONE]", async () => {

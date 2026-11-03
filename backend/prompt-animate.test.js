@@ -1,7 +1,52 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { writeAnimatePrompt } from "./prompt-animate.js";
+import { animateInstructions, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
+
+// The three shapes Animate writes for, each with its mode's format rule from the merged guide.
+const shapes = {
+  wrapped: {
+    profile: { id: "custom:video-h3-first-frame-fast-comfyui", family: "minimax-h3" },
+    guide: { mode: { id: "keyframe", rules: ["Enter only the body of the description."] } },
+  },
+  sections: {
+    profile: { id: "custom:video-h3-reference-fast-comfyui", family: "minimax_h3" },
+    guide: {
+      mode: {
+        id: "optional-reference",
+        rules: ["With an attached image, enter all six sections."],
+      },
+    },
+  },
+  grok: {
+    profile: { id: "custom:video-grok-imagine-cloud", family: "grok" },
+    guide: { mode: { id: "video", rules: ["Write one detailed paragraph."] } },
+  },
+};
+
+test("each profile shape gets its guide's format, with sound for H3 and Grok", () => {
+  const writing = { theme: "action", source: "A skater" };
+  for (const { profile, guide } of Object.values(shapes)) {
+    const system = animateInstructions({ profile, guide, writing, seconds: 8 });
+    assert.ok(system.includes(guide.mode.rules[0]), profile.id);
+    assert.match(system, /makes sound with the picture/, profile.id);
+    assert.match(system, /three beats that fill the 8-second clip/, profile.id);
+  }
+  const silent = animateInstructions({ profile: { id: "video:wan", family: "wan22" }, writing });
+  assert.match(silent, /makes no sound/);
+  assert.match(silent, /two to four beats/);
+  const extend = animateInstructions({ ...shapes.grok, writing: { ...writing, extend: true } });
+  assert.match(extend, /Don't replay its action: escalate it or turn it/);
+  assert.equal(writingRequest({ kind: "animate", theme: "action", extend: true }).extend, true);
+});
+
+test("the clip's length comes from the control the profile runs on", () => {
+  const frames = { defaults: { frames: 192, fps: 24, duration: 5 } };
+  assert.equal(clipSeconds({}, frames), 8);
+  assert.equal(clipSeconds({ frames: 288 }, frames), 12);
+  assert.equal(clipSeconds({ duration: 10 }, { capabilities: { duration: true } }), 10);
+  assert.equal(clipSeconds({}, {}), 0);
+});
 
 const video = { id: "video:test", label: "Motion", kind: "video" };
 const calls = [];
@@ -49,6 +94,8 @@ test("the writing stage streams the motion prompt and its thinking with room to 
       ownerId: "",
       input: {
         profileId: video.id,
+        frames: 120,
+        fps: 24,
         writing: { kind: "animate", theme: "cinematic", source: "An amber bird" },
       },
     },
@@ -68,6 +115,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     ["prompt", '"The camera slowly pushes in."'],
   ]);
   assert.match(calls[0].messages[0].content, /Cinematic Camera/);
+  assert.match(calls[0].messages[0].content, /5-second clip/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
   const spicy = await writeAnimatePrompt({
     engine,
