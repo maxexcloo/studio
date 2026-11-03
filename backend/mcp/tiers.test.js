@@ -260,11 +260,6 @@ const bento = [
     "flux3_klein",
   ],
   [
-    "custom:bento-image-ideogram4-int8-convrot",
-    "Ideogram 4 · Quality · 20 Steps · JSON Prompt · INT8 ConvRot",
-    "ideogram4",
-  ],
-  [
     "custom:bento-image-klein9b-kv-fp8",
     "FLUX.2 [klein] 9B KV · Fast · 4 Steps · Optional Reference · FP8",
     "flux2_klein_9b",

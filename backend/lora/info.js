@@ -44,7 +44,6 @@ const metadataFamilies = [
   [/wan/, ["wan21", "wan22_14b"]],
   [/hunyuan[-_ ]?video[-_ ]?1[._]?5|hunyuan15/, ["hunyuan15"]],
   [/hidream/, ["hidream"]],
-  [/ideogram[-_ ]?4/, ["ideogram4"]],
   [/lumina|neta/, ["lumina2"]],
   [/krea[-_ ]?2/, ["krea2"]],
   [/anima/, ["anima"]],
