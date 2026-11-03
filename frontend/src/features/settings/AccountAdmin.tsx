@@ -17,7 +17,6 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, UserCog } from "lucide-react";
 import { api, post } from "../../api";
@@ -75,7 +74,6 @@ function GroupEditor({
     onSuccess: (result) => {
       form.setValues(result.profile);
       saved(result.profile);
-      notifications.show({ message: "Access group saved" });
     },
   });
   const ids = [...new Set([...admin.availableProfiles, ...form.values.generationProfiles])].filter(
@@ -154,7 +152,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
     onSuccess: () => {
       form.reset();
       saved();
-      notifications.show({ message: "User account created" });
     },
   });
   return (
@@ -203,8 +200,8 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
     meta: { inlineError: true },
     mutationFn: () => post("/api/accounts/default-profile", form.values),
     onSuccess: () => {
+      form.resetDirty();
       saved();
-      notifications.show({ message: "New account policy saved" });
     },
   });
   return (
@@ -224,9 +221,16 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
           {...form.getInputProps("accessProfileId")}
         />
         {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
-          Save New Account Policy
-        </Button>
+        <Group gap="sm">
+          <Button type="submit" loading={save.isPending}>
+            Save New Account Policy
+          </Button>
+          {save.isSuccess && !form.isDirty() && (
+            <Text size="sm" c="dimmed">
+              Saved
+            </Text>
+          )}
+        </Group>
       </Stack>
     </form>
   );
@@ -501,15 +505,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             }}
           />
         )}
-        {popup === "policy" && (
-          <DefaultPolicy
-            admin={data}
-            saved={() => {
-              setPopup(null);
-              refresh();
-            }}
-          />
-        )}
+        {popup === "policy" && <DefaultPolicy admin={data} saved={refresh} />}
       </Modal>
     </Stack>
   );

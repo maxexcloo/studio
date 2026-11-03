@@ -3,6 +3,7 @@ import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import {
   ArrowLeftRight,
   Camera,
+  Check,
   Eye,
   FastForward,
   Film,
@@ -23,6 +24,7 @@ import {
   Waves,
   Wind,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +35,7 @@ import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
+import { useFlash } from "../../ui/useFlash";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
@@ -60,7 +63,7 @@ import {
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
-import { useVideoEdit } from "./videoEdits";
+import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
@@ -165,19 +168,20 @@ function viewerFrame(item: MediaItem) {
 /** Save Frame as Image: the frame a video is showing (else its last) as an image under Uploads. */
 function useSaveFrame(item: MediaItem): Action {
   const cache = useQueryClient();
+  const [saved, flash] = useFlash();
   const save = useMutation({
     mutationFn: () =>
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
-      notifications.show({ message: "Frame saved to Uploads." });
+      flash(true);
       void cache.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
     id: "save-frame",
-    label: "Save Frame as Image",
-    icon: ImageDown,
+    label: saved ? "Saved to Uploads" : "Save Frame as Image",
+    icon: saved ? Check : ImageDown,
     disabled: save.isPending,
     loading: save.isPending,
     keepOpen: true,
@@ -309,6 +313,21 @@ export function useMediaActions(
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
+  // A video edit's menu stays open while it saves, then its item says so for a moment.
+  const [edited, flashEdited] = useFlash<VideoEdit["kind"]>();
+  const editAction = (
+    id: string,
+    label: string,
+    icon: LucideIcon,
+    kind: Exclude<VideoEdit["kind"], "trim">,
+  ): Action => ({
+    id,
+    label: edited === kind ? "Saved as New Version" : label,
+    icon: edited === kind ? Check : icon,
+    disabled: videoEdit.isPending,
+    keepOpen: true,
+    onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
+  });
   const chat = useChatAction(item, onApplied);
   const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
@@ -444,37 +463,13 @@ export function useMediaActions(
         menu: [
           [
             { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-            {
-              id: "reverse",
-              label: "Reverse",
-              icon: Rewind,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "reverse" }),
-            },
-            {
-              id: "back-and-forth",
-              label: "Back and Forth",
-              icon: ArrowLeftRight,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "loop" }),
-            },
+            editAction("reverse", "Reverse", Rewind, "reverse"),
+            editAction("back-and-forth", "Back and Forth", ArrowLeftRight, "loop"),
           ],
           // Interpolated edits, the slowest to make.
           [
-            {
-              id: "slow-motion",
-              label: "Slow Motion",
-              icon: Snail,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "slow" }),
-            },
-            {
-              id: "smooth-motion",
-              label: "Smooth Motion",
-              icon: Waves,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "smooth" }),
-            },
+            editAction("slow-motion", "Slow Motion", Snail, "slow"),
+            editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
           ],
         ],
       }),

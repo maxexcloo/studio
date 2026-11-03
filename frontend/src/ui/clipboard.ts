@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
 import { notifications } from "@mantine/notifications";
 import { failure } from "../api";
+import { useFlash } from "./useFlash";
 
 /**
  * Copies text from a menu item, which closes with nothing left to show the result, so it reports
@@ -14,16 +14,10 @@ export function copyText(text: string, label: string): Promise<void> {
 
 /** A copy button's copy: `copied` names what it copied last for a moment; failures still report. */
 export function useCopy() {
-  const [copied, setCopied] = useState<string>();
-  const timer = useRef(0);
+  const [copied, flash] = useFlash<string>();
   return {
     copied,
-    copy: (text: string, name = "text") =>
-      void writeText(text).then(() => {
-        setCopied(name);
-        window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => setCopied(undefined), 1500);
-      }, failure),
+    copy: (text: string, name = "text") => void writeText(text).then(() => flash(name), failure),
   };
 }
 /**
