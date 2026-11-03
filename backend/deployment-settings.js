@@ -1,38 +1,58 @@
-import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from "./env.js";
+import fs from "node:fs";
+import { currentDataDir } from "./data-dir.js";
+import { databaseFile, readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
- * Settings a deployment can own. A value from the real environment (compose,
- * Kubernetes, the shell) is the deployment's and locked here; one in Studio's own
- * .env was saved from Settings and stays editable; anything else is the default.
+ * Settings a deployment can own. A value from the environment (compose,
+ * Kubernetes, the shell) is the deployment's and locked here; one saved from
+ * Settings lives in SQLite and stays editable; anything else is the default.
  * Settings show each value with its source, so nothing changes behind the
  * deployment's back and nothing saved here silently loses to it after a restart.
  */
+const dataDir = currentDataDir();
+const documentName = "settings";
+
+function readSaved() {
+  // Reading alone never creates a database (tests import this without a data folder).
+  if (!fs.existsSync(databaseFile(dataDir))) return {};
+  try {
+    return readRuntimeDocument(dataDir, documentName);
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+const saved = readSaved();
+// Saved values fill in what the environment leaves unset; the environment always wins.
+const applied = new Set();
+for (const [key, value] of Object.entries(saved)) {
+  if (process.env[key]) continue;
+  process.env[key] = value;
+  applied.add(key);
+}
+
 export function settingSource(key) {
   const value = process.env[key];
   if (value === undefined || value === "") return { source: "default", locked: false };
-  if (envFileKeys.has(key)) return { source: "studio", locked: false };
+  if (applied.has(key)) return { source: "studio", locked: false };
   return { source: "deployment", locked: true };
 }
 
-const flag = (key, label, description, { defaultOn = true, applies = "now" } = {}) => ({
+const flag = (key, label, description, { defaultOn = true } = {}) => ({
   key,
   label,
   description,
   kind: "flag",
   defaultOn,
-  applies,
 });
 
 /**
- * Catalogue switches: what the generation catalogue offers. Some are read once,
- * at start. LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features;
- * STUDIO_ENABLE_LORAS, STUDIO_ENABLE_GROK and STUDIO_ENABLE_PRESETS stay
- * deployment variables that switch one off for everyone (features.js).
+ * Catalogue switches: what the generation catalogue offers. LoRAs, Cloud Models
+ * and Presets & Civitai Imports are access-profile features; STUDIO_ENABLE_PRESETS
+ * stays a deployment variable that switches presets off for everyone (features.js).
  */
 export const catalogueFlags = [
-  flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", {
-    applies: "restart",
-  }),
   flag(
     "STUDIO_VIDEO_CLOUD_FALLBACK",
     "Video Cloud Fallback",
@@ -63,12 +83,20 @@ export function describeFlag(item) {
   return { ...item, value: flagOn(item), ...settingSource(item.key) };
 }
 
-/** Writes one deployment setting to Studio's .env, unless the deployment owns it. */
+/** Saves one deployment setting in SQLite, unless the deployment owns it; empty clears it. */
 export function saveDeploymentSetting(key, value) {
   if (settingSource(key).locked)
     throw new Error("This setting comes from the deployment configuration. Change it there.");
-  if (value === "" || value === null || value === undefined) removeLocalEnvValue(key);
-  else writeLocalEnvValue(key, String(value));
+  if (value === "" || value === null || value === undefined) {
+    delete saved[key];
+    delete process.env[key];
+    applied.delete(key);
+  } else {
+    saved[key] = String(value);
+    process.env[key] = saved[key];
+    applied.add(key);
+  }
+  writeRuntimeDocument(dataDir, documentName, saved);
   return settingSource(key);
 }
 
