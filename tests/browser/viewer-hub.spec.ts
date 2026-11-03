@@ -672,6 +672,33 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
   await expect(video).toHaveAttribute("controls");
 });
 
+test("An opened video the browser won't play shows its still and its controls", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = () =>
+      Promise.reject(new DOMException("Autoplay is off", "NotAllowedError"));
+  });
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    thumbnailUrl: image,
+    prompt: "A rolling wave",
+    width: 1280,
+    height: 720,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  const video = page.getByRole("dialog", { name: "Generation", exact: true }).locator("video");
+  await expect(video).toHaveAttribute("poster", image);
+  await expect(video).toHaveAttribute("controls");
+});
+
 test("A video tile plays its preview while a mouse is over it", async ({ page }, testInfo) => {
   test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no hover.");
   await page.addInitScript(() => {
