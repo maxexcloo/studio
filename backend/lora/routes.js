@@ -1,6 +1,6 @@
 import { ownerIdForRequest } from "../account-ownership.js";
 import { optionsFor } from "../comfy/comfy.js";
-import { accountMayUseLoras } from "../model/catalogue.js";
+import { accountMayUseLoras, loraAllowed } from "../model/catalogue.js";
 import { requireLocal } from "../route-access.js";
 import { loraInfos } from "./info.js";
 import {
@@ -58,11 +58,14 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
   });
 
   // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
-  app.get("/api/loras/info", async (_req, res) => {
-    if (!accountMayUseLoras(_req)) return res.json({ ok: true, loras: {} });
+  app.get("/api/loras/info", async (req, res) => {
+    if (!accountMayUseLoras(req)) return res.json({ ok: true, loras: {} });
     try {
       const { info } = await loadComfyContext();
-      res.json({ ok: true, loras: await loraInfos(optionsFor(info, "LoraLoader", "lora_name")) });
+      const names = optionsFor(info, "LoraLoader", "lora_name").filter(
+        loraAllowed(req.studioAccount),
+      );
+      res.json({ ok: true, loras: await loraInfos(names) });
     } catch (error) {
       res.status(503).json({ ok: false, loras: {}, error: comfyDownMessage(error?.message) });
     }

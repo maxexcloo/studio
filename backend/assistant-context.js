@@ -3,7 +3,7 @@ import { downscaleReferences } from "./assistant-routes.js";
 import { optionsFor } from "./comfy/comfy.js";
 import { gallery } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
-import { accountMayUseLoras, modelsForAccount } from "./model/catalogue.js";
+import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
 import { canonicalProfileId, livePrompting } from "./profile/store.js";
 import { bytesForReferenceAccount } from "./references.js";
 
@@ -31,7 +31,9 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
   const loras = async (req) => {
     if (!accountMayUseLoras(req)) return [];
     try {
-      const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
+      const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name").filter(
+        loraAllowed(req.studioAccount),
+      );
       const infos = await loraInfos(names);
       return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
     } catch {

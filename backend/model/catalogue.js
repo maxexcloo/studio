@@ -24,6 +24,7 @@ import {
 } from "../workers.js";
 import { primeModelMetadata } from "./families.js";
 import { inferModels, mockModelResult, offlineModelResult } from "./models.js";
+import { uncensoredLoraNames } from "../lora/info.js";
 
 /**
  * The media catalogue across every worker: each worker's ComfyUI context (node list, stats and
@@ -305,9 +306,17 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 
 export function modelsForAccount(models, req) {
   if (!req.studioAccount) return models;
+  const lorasOn = mayUseFeature(req.studioAccount, "loras");
+  const allowed = lorasOn ? loraAllowed(req.studioAccount) : null;
   const profiles = visibleGenerationProfiles(models.profiles || [], req.studioAccount).map(
     (profile) => {
-      if (mayUseFeature(req.studioAccount, "loras")) return profile;
+      if (lorasOn)
+        return Array.isArray(profile.options?.loras)
+          ? {
+              ...profile,
+              options: { ...profile.options, loras: profile.options.loras.filter(allowed) },
+            }
+          : profile;
       return {
         ...profile,
         capabilities: { ...profile.capabilities, lora: false },
@@ -324,7 +333,7 @@ export function modelsForAccount(models, req) {
     : models.features;
   return {
     ...models,
-    loras: mayUseFeature(req.studioAccount, "loras") ? models.loras : [],
+    loras: lorasOn ? (models.loras || []).filter(allowed) : [],
     profiles,
     ...(features ? { features } : {}),
   };
@@ -372,6 +381,16 @@ export function withFailing(models) {
 
 export function accountMayUseLoras(req) {
   return !req.studioAccount || mayUseFeature(req.studioAccount, "loras");
+}
+
+/**
+ * Which LoRA names an account may see and use: one the catalogue marks uncensored needs Uncensored
+ * Models, as an uncensored profile does. Without an account (single-user mode) every LoRA is allowed.
+ */
+export function loraAllowed(access) {
+  if (!access || mayUseFeature(access, "uncensoredModels")) return () => true;
+  const hidden = uncensoredLoraNames();
+  return (name) => !hidden.has(name);
 }
 
 // Every family's display name, from the catalogue that defines the family.
