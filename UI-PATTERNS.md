@@ -130,10 +130,12 @@ primary component reference and verify APIs against the installed version.
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
   few controls (Clear References sits there), then the content; choices apply at
-  once and closing the popup is the only dismissal, with no Use or Done action.
+  once and closing the popup is the only dismissal, with no Use or Done action
+  (a reference pick that fills the last free slot closes References itself).
   Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
   popover never opens a second level on phones. References, LoRAs and Presets share one picker
-  (`Picker.tsx`): tabs, inline search and a filter toggle on one row; a
+  (`Picker.tsx`): tabs, then search, active filter chips and Filter ▾ in one
+  row at the gallery toolbar's compact size; a
   selected tile fades with a check and a second click removes it; saved stacks
   and presets sort, rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.

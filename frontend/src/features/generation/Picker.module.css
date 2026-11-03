@@ -1,4 +1,4 @@
-/* Tabs, search and actions share one row; on narrow phones the search wraps under the tabs. */
+/* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
 .header {
   display: flex;
   flex-direction: column;
@@ -16,9 +16,31 @@
   flex-shrink: 0;
 }
 
-.search {
-  flex: 1 1 12rem;
+/* Search, chips and Filter never wrap apart; the chips scroll sideways as in the gallery. */
+.searchRow {
+  display: flex;
+  flex: 1 1 16rem;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
   min-width: 0;
+}
+
+.search {
+  flex: 1 1 8rem;
+  min-width: 8rem;
+}
+
+.chips {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Phone chips are 44 px touch targets; the search matches them. */
+@media (max-width: 48em) {
+  .search input {
+    height: 44px;
+    min-height: 44px;
+  }
 }
 
 .filters,

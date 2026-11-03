@@ -886,9 +886,10 @@ export async function showUploads(page: Page) {
   await picker.getByRole("button", { name: "Uploads", exact: true }).click();
 }
 
-/** Closes the References popup, leaving the composer open. */
+/** Closes the References popup, leaving the composer open; a pick filling the last slot already did. */
 export async function closeReferences(page: Page) {
-  await closePopup(page, "References");
+  if (await page.getByRole("dialog", { name: "References", exact: true }).isVisible())
+    await closePopup(page, "References");
 }
 
 /** Saves the draft as a named stack or preset from its picker's footer. */
