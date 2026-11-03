@@ -1,6 +1,15 @@
-import { ActionIcon, Divider, Drawer, FocusTrap, Group, Loader, Tooltip } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
-import { useRef, type PointerEvent } from "react";
+import {
+  ActionIcon,
+  Divider,
+  Drawer,
+  FocusTrap,
+  Group,
+  Loader,
+  Popover,
+  Text,
+  Tooltip,
+} from "@mantine/core";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
 import { Link, useLocation } from "react-router";
@@ -8,24 +17,117 @@ import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
+import { popupLayer } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ServiceStatus.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
 
-/** The one header entry to work in progress, Chats and service health on every breakpoint. */
+/**
+ * The one header entry to work in progress, Chats and service health on every breakpoint. Desktop
+ * opens the queue as a dropdown under the icon, also in Chat, whose sidebar lists the Chats; phones
+ * slide in a drawer, with the Chats in Chat.
+ */
 export function StatusAction({ chat }: { chat: boolean }) {
-  const [opened, { open, close }] = useDisclosure(false);
+  const [opened, setOpened] = useState(false);
+  const close = () => setOpened(false);
   const phone = usePhone();
   const admin = useIsAdmin();
   const location = useLocation();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
   const generating = queue.data?.jobs.some((job) => !terminalStatuses.has(job.status));
-  const title = chat ? "Chats" : "Generations";
-  // In Chat it is plainly the Chats list, still coloured by service health.
-  const Icon = chat ? MessagesSquare : Activity;
+  const chats = chat && phone;
+  const title = chats ? "Chats" : "Generations";
+  // In Chat on phones it is plainly the Chats list, still coloured by service health.
+  const Icon = chats ? MessagesSquare : Activity;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const drag = useRef<{ id: number; x: number; y: number; dx: number } | null>(null);
+  const target = useRef<HTMLButtonElement>(null);
+  const dropdown = useRef<HTMLDivElement>(null);
+  // The dropdown closes on Escape or a press outside it, but not in a menu or confirmation it opened.
+  useEffect(() => {
+    if (phone || !opened) return;
+    const elsewhere = (event: Event) => {
+      const layer = (event.target as Element).closest(`${popupLayer}, .mantine-Modal-root`);
+      return !layer || layer === dropdown.current;
+    };
+    const away = (event: globalThis.PointerEvent) => {
+      const pressed = event.target as Element;
+      if (target.current?.contains(pressed) || dropdown.current?.contains(pressed)) return;
+      if (elsewhere(event)) close();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented && elsewhere(event)) close();
+    };
+    document.addEventListener("pointerdown", away, true);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", away, true);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [phone, opened]);
+  const trigger = (
+    <ActionIcon
+      ref={target}
+      aria-label={chats ? "Open Chats" : "Open Status"}
+      aria-description={generating ? "Generating" : summary.label}
+      aria-haspopup="dialog"
+      aria-expanded={opened}
+      variant="subtle"
+      color={generating ? "gray" : summary.colour}
+      onClick={() => setOpened(!opened)}
+    >
+      {generating ? <Loader size={18} color="gray" /> : <Icon size={19} />}
+    </ActionIcon>
+  );
+  const tooltip = [chats && "Chats", generating ? "Generating" : summary.label]
+    .filter(Boolean)
+    .join(" · ");
+  // For administrators the whole status block opens Settings › Workers.
+  const status = (
+    <div className={classes.status}>
+      {admin && (
+        <Link
+          to="/settings#workers"
+          state={{ backgroundLocation: location }}
+          className={classes.statusLink}
+          aria-label="Open Workers"
+          onClick={close}
+        />
+      )}
+      <ServiceHealthSummary />
+    </div>
+  );
+  if (!phone)
+    return (
+      <Popover
+        opened={opened}
+        onChange={setOpened}
+        position="bottom-start"
+        width={400}
+        closeOnClickOutside={false}
+        closeOnEscape={false}
+        returnFocus
+        shadow="md"
+      >
+        <Tooltip label={tooltip} disabled={opened}>
+          <Popover.Target>{trigger}</Popover.Target>
+        </Tooltip>
+        <Popover.Dropdown
+          ref={dropdown}
+          aria-label={title}
+          aria-labelledby=""
+          className={classes.dropdown}
+        >
+          <Text fw={500}>{title}</Text>
+          <div className={classes.list}>
+            <Queue />
+          </div>
+          <Divider />
+          {status}
+        </Popover.Dropdown>
+      </Popover>
+    );
   function release(event: PointerEvent<HTMLElement>) {
     const start = drag.current;
     drag.current = null;
@@ -36,28 +138,12 @@ export function StatusAction({ chat }: { chat: boolean }) {
   }
   return (
     <>
-      <Tooltip
-        label={[chat && "Chats", generating ? "Generating" : summary.label]
-          .filter(Boolean)
-          .join(" · ")}
-      >
-        <ActionIcon
-          aria-label={chat ? "Open Chats" : "Open Status"}
-          aria-description={generating ? "Generating" : summary.label}
-          aria-haspopup="dialog"
-          aria-expanded={opened}
-          variant="subtle"
-          color={generating ? "gray" : summary.colour}
-          onClick={open}
-        >
-          {generating ? <Loader size={18} color="gray" /> : <Icon size={19} />}
-        </ActionIcon>
-      </Tooltip>
+      <Tooltip label={tooltip}>{trigger}</Tooltip>
       <Drawer.Root
         opened={opened}
         onClose={close}
         position="left"
-        size={phone ? "85%" : 400}
+        size="85%"
         classNames={{ content: classes.content }}
       >
         <Drawer.Overlay />
@@ -86,27 +172,15 @@ export function StatusAction({ chat }: { chat: boolean }) {
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Group gap="xs" wrap="nowrap">
-              {chat && <NewChatAction onDone={close} />}
+              {chats && <NewChatAction onDone={close} />}
               <Drawer.CloseButton aria-label={`Close ${title}`} />
             </Group>
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
-            <div className={classes.list}>{chat ? <SessionList close={close} /> : <Queue />}</div>
+            <div className={classes.list}>{chats ? <SessionList close={close} /> : <Queue />}</div>
             <Divider />
-            {/* For administrators the whole status block opens Settings › Workers. */}
-            <div className={classes.status}>
-              {admin && (
-                <Link
-                  to="/settings#workers"
-                  state={{ backgroundLocation: location }}
-                  className={classes.statusLink}
-                  aria-label="Open Workers"
-                  onClick={close}
-                />
-              )}
-              <ServiceHealthSummary />
-            </div>
+            {status}
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>

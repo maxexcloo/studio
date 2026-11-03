@@ -67,9 +67,11 @@ primary component reference and verify APIs against the installed version.
   icon coloured by actual gateway/worker health (partial readiness is yellow;
   cloud configuration alone is not proof of availability). A worker stopped on
   purpose reads Parked in grey wherever it shows, never as failing, with Start
-  for administrators there; one that should run but doesn't stays red. It opens the same
-  slideout everywhere: Chats in Chat, active and failed generations with Stop,
-  Retry and Clear in gallery modes, and the compact service summary at the bottom, which administrators tap to open Settings › Workers.
+  for administrators there; one that should run but doesn't stays red. It opens active
+  and failed generations with Stop, Retry and Clear, and the compact service
+  summary at the bottom, which administrators tap to open Settings › Workers:
+  on desktop a dropdown under the icon, which keeps its queue icon in Chat too
+  (the sidebar lists the Chats); on phones a slideout, listing the Chats in Chat.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Library, Settings,

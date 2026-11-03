@@ -289,13 +289,21 @@ test("Administrator accounts retain worker visibility and attribution", async ({
 
 test("Status summarises service health and opens Workers over the current page", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
   await page.goto("/chat");
-  const status = page.getByRole("button", { name: "Open Chats", exact: true });
+  // Desktop keeps the queue in Chat, beside the Chats sidebar; phones list the Chats.
+  const status = page.getByRole("button", {
+    name: isMobile ? "Open Chats" : "Open Status",
+    exact: true,
+  });
   await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
   await status.click();
-  const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+  const drawer = page.getByRole("dialog", {
+    name: isMobile ? "Chats" : "Generations",
+    exact: true,
+  });
   await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
   // A link covering the whole status block opens Workers.
   const workers = drawer.getByRole("link", { name: "Open Workers", exact: true });
