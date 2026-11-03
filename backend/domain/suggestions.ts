@@ -338,7 +338,7 @@ export function createSuggestions({
      */
     async prepare(source: SuggestionItem, signal: AbortSignal, image: ModelImage | null) {
       const model = writer(source.ownerId || "");
-      if (!model) throw new Error("the prompt assistant is off for this account");
+      if (!model) throw new Error("this account can't use suggestions");
       const answer = await stepsFor(model, source.ownerId || "", source, { signal, image });
       if (answer.reason && !signal.aborted) throw new Error(answer.reason);
     },
@@ -369,7 +369,7 @@ export function createSuggestions({
         if (!source) throw failure("Result not found.", 404);
         if (source.status !== "done") return empty("Changes are offered for finished results.");
         const model = writer(ownerId);
-        if (!model) return empty("The prompt assistant is off for this account.");
+        if (!model) return empty("This account can't use suggestions.");
         try {
           model.settings();
         } catch {
@@ -394,7 +394,7 @@ export function createSuggestions({
           return empty("Next steps are offered for finished images.");
       }
       const model = writer(ownerId);
-      if (!model) return empty("The prompt assistant is off for this account.");
+      if (!model) return empty("This account can't use suggestions.");
       const fresh = body.fresh === true;
       if (source?.nextSteps?.steps.length && !fresh) return { suggestions: source.nextSteps.steps };
       const { known, lines } = tasteContext(ownerId);
