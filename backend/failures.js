@@ -42,7 +42,7 @@ const hints = [
     fix: "rescan",
   },
   {
-    // ComfyUI-GGUF refuses architectures it doesn't know yet (Krea 2, Ideogram 4, MiniMax H3, Qwen-Image 2.1 in Sept 2026).
+    // ComfyUI-GGUF refuses architectures it doesn't know yet (Krea 2, MiniMax H3, Qwen-Image 2.1 in Sept 2026).
     test: /Unexpected (?:text model )?architecture type in GGUF file|This model is not currently supported/i,
     title: "ComfyUI-GGUF can't load this model yet",
     hint: "The installed ComfyUI-GGUF doesn't support this model type yet. Update ComfyUI-GGUF, or use the model's safetensors version.",

@@ -553,29 +553,6 @@ export const modelDownloads = {
     28_577_914_792,
     "edb89340c8a6fbf1a70e76a839ae01eaf7d289f05ea1ebd6b1a3fc6f533826e9",
   ),
-  ideogram4_uncond_fp8: [
-    {
-      file: "ideogram4_unconditional_fp8_scaled.safetensors",
-      fp8: true,
-      url: hf(
-        "Comfy-Org/Ideogram-4",
-        "diffusion_models/ideogram4_unconditional_fp8_scaled.safetensors",
-      ),
-      bytes: 9_280_741_293,
-      sha256: "9b359007dae162cca7591d00868feea733eb7c56e56e3a214a4d5a9a2a07cd60",
-    },
-  ],
-  ideogram4_uncond_int8: [
-    {
-      file: "ideogram4_unconditional_int8_convrot.safetensors",
-      url: hf(
-        "Comfy-Org/Ideogram-4",
-        "diffusion_models/ideogram4_unconditional_int8_convrot.safetensors",
-      ),
-      bytes: 9_583_465_712,
-      sha256: "cd03ed94f244c9cb705e7d30ca0f40b5f5b004bb20674117adff88d16416c23d",
-    },
-  ],
   krea2_turbo_fp8: [
     {
       file: "krea2_turbo_fp8_scaled.safetensors",
@@ -705,7 +682,7 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * them apart), with `detail` saying why when it is missing.
  * vae: accepted VAE kinds (first is the one to download). sampling: "ksampler",
  * "custom" (SamplerCustomAdvanced), "pair" (Wan 2.2 14B), "h3", "sana",
- * "ideogram4" (two models through a dual guider), "mage" (its own encode node).
+ * "mage" (its own encode node).
  * pair: a second model file the family runs next to the picked one (see pairSpec).
  * promptPrefix / negativePrefix: system text the model was trained to see first.
  * t5Padding: { minPadding, minLength } for T5TokenizerOptions, on the family
@@ -1779,53 +1756,6 @@ export const families = {
     ],
     size: [1024, 1024],
   },
-  // Ideogram 4 samples with two models: the main one for your prompt and an
-  // unconditional one for the negative pass, blended by a dual guider whose
-  // CFG eases off for the last 30% of steps. Its scheduler follows the steps:
-  // Comfy-Org's Turbo (12), Default (20) and Quality (48) presets.
-  ideogram4: {
-    label: "Ideogram 4",
-    kind: "image",
-    native: draws2k,
-    sources: ["unet"],
-    slots: [{ slot: "encoder", label: "Qwen3-VL 8B", kinds: ["qwen3vl_8b"] }],
-    clipType: "ideogram4",
-    vae: ["flux2"],
-    latent: "EmptyFlux2LatentImage",
-    sizeStep: 16,
-    negative: "none",
-    sampling: "ideogram4",
-    aspects: square,
-    requiredNodes: [
-      "EmptyFlux2LatentImage",
-      "Ideogram4Scheduler",
-      "DualModelGuider",
-      "CFGOverride",
-      "SamplerCustomAdvanced",
-      "KSamplerSelect",
-      "RandomNoise",
-      "ConditioningZeroOut",
-    ],
-    pair: {
-      owns: /ideogram/i,
-      isPartner: (base) => /uncond/i.test(base),
-      partnerOf: (name) =>
-        name.replace(/ideogram[-_ ]?4[-_ ]?/i, (match) => `${match}unconditional_`),
-      label: "Unconditional model",
-      runsAs: "Ideogram 4 runs this next to its main model.",
-      detail: (base) =>
-        `Ideogram 4 also needs its unconditional model next to ${base} in diffusion_models.`,
-      download: (name) => (/int8/i.test(name) ? "ideogram4_uncond_int8" : "ideogram4_uncond_fp8"),
-    },
-    variants: [
-      {
-        id: "standard",
-        label: "Ideogram 4",
-        defaults: { steps: 20, cfg: 7, sampler: "euler", scheduler: "simple" },
-      },
-    ],
-    size: [1024, 1024],
-  },
   // Mage-Flow encodes prompt and negative in one node that also makes the latent.
   mage_flow: {
     label: "MageFlow",
@@ -2119,7 +2049,6 @@ export function familyFromName(name = "", source = "unet") {
     ["sana", /(^|[^a-z])sana([^a-z]|$)/i],
     ["moss_image", /moss[-_ ]?image/i],
     ["flux3", /flux[-_. ]?3/i],
-    ["ideogram4", /ideogram/i],
     ["mage_flow", /mage[-_ ]?flow/i],
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
     ["lumina2", /lumina|neta[-_ ]?yume|netayume|neta[-_ ]?lumina/i],
