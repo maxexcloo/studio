@@ -31,6 +31,8 @@ export function uploadedGalleryItem(upload) {
     ...(upload.durationMs ? { durationMs: upload.durationMs } : {}),
     size: upload.size,
     hash: upload.hash,
+    // Where an imported upload came from: its post's link and title (gallery/reddit.js).
+    ...(upload.source ? { source: upload.source } : {}),
     createdAt: upload.createdAt,
   };
 }

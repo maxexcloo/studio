@@ -327,8 +327,9 @@ primary component reference and verify APIs against the installed version.
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Image lists share one toolbar row (`GalleryFilters.tsx`): search, the active
   filters as removable chips with Clear All (scrolling sideways, so the row never
-  changes height), then on desktop the result count and the zoom slider, Filter ▾
-  and Select. Phones expand the search from an icon into a full-width focused
+  changes height), then on desktop the result count and the zoom slider, Filter ▾,
+  Upload ▾ (Upload Files…, Upload Folder…, Import from Reddit…; files and
+  folders dropped on the gallery upload too) and Select. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
   a segmented control on its own row; Show, one row of on/off chips (All Versions
