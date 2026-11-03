@@ -788,8 +788,9 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
-/** Opens the selection bar's More menu and returns one of its items. */
+/** A selection action beyond the bulk ones: on the desktop bar, or an item of the phone's More. */
 export async function selectionMenuItem(page: Page, label: string) {
+  if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);
   await selectionAction(page, "More").click();
   return page.getByRole("menuitem", { name: label, exact: true });
 }

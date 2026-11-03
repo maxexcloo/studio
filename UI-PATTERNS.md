@@ -440,10 +440,12 @@ primary component reference and verify APIs against the installed version.
   zoom modes, native transforms, keyboard shortcuts and transient controls.
 - Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
   toolbar's place, sticky under the header on its surface: Clear Selection (✕)
-  and the count, then on desktop icon actions with tooltips (Retry or Stop when
-  they apply, Download, Star, Delete) and More. Phones keep the count bar on top
-  and move the same icons to a full-width bottom toolbar above the safe area. More lists Select All, Select Failed and Select In
-  Progress, then every other shared action; actions for one item at a time show
+  and the count, then on desktop every action as an icon with a tooltip, without
+  a More menu: Select All, Select Failed and Select In Progress (when they
+  apply), then the shared item actions. Phones keep the count bar on top and a
+  full-width bottom toolbar above the safe area with Retry or Stop when they
+  apply, Download, Star, Delete and More, which lists the selects and every
+  other shared action; actions for one item at a time show
   only while one item is selected. Right-click or Shift+F10 opens the same
   actions as a menu; Escape ends selection and Delete asks to delete.
 - Display, thumbnails, sharing and downloads use the saved original/upscale

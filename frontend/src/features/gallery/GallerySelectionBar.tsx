@@ -28,12 +28,12 @@ import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
-// What acts on several items stays on the bar, in this order; everything else is under More.
+// Phones keep what acts on several items on the bar, in this order, and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
  * The contextual selection bar in the toolbar's place: Clear Selection and the count, then on
- * desktop the bulk actions and More as icons; phones keep those on a bottom toolbar. The same actions show
+ * desktop every action as an icon; phones keep the bulk actions and More on a bottom toolbar. The same actions show
  * as a context menu at `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
@@ -222,11 +222,14 @@ export function GallerySelectionBar({
     quick,
     ...actions.map((group) => group.filter((action) => !primaryIds.includes(action.id))),
   ];
-  const bar = (
+  // Desktop shows every action as an icon: the selection's own, then the item actions.
+  const bar = phone ? (
     <ActionBarGroups
       groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
-      menuPosition={phone ? "top-end" : "bottom-end"}
+      menuPosition="top-end"
     />
+  ) : (
+    <ActionBarGroups groups={[quick, ...actions]} menuPosition="bottom-end" />
   );
   return (
     <>

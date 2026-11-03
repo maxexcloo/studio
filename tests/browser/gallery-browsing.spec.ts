@@ -583,19 +583,26 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  // A sole item's own actions are under More; with several they are left out.
+  // A sole item's own actions show (desktop on the bar, phones under More); with several they
+  // are left out.
+  const phone = test.info().project.use.isMobile;
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(await selectionMenuItem(page, "Edit")).toBeEnabled();
-  await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
+  if (phone) await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
+  else await selectionAction(page, "Select All").click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(await selectionMenuItem(page, "Select All")).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toHaveCount(0);
-  await selectionAction(page, "More").click();
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(
+    phone
+      ? page.getByRole("menuitem", { name: "Edit", exact: true })
+      : selectionAction(page, "Edit"),
+  ).toHaveCount(0);
+  if (phone) {
+    await selectionAction(page, "More").click();
+    await expect(page.getByRole("menu")).toBeHidden();
+  } else await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
-  const sharing =
-    test.info().project.use.isMobile &&
-    (await page.evaluate(() => typeof navigator.share === "function"));
+  const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Prepare Share")).toBeEnabled();
   else
     await expect(selectionAction(page, "Download", "link")).toHaveAttribute(
