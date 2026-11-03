@@ -4,9 +4,8 @@ import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 
 /**
- * Where Studio runs from and keeps its state, with no side effects: the dev
- * launcher reads it too (exit-record.js), and must not load .env into its own
- * environment. The server imports it through data-dir.js, which loads .env first (env.js).
+ * Where Studio runs from and keeps its state, with no side effects. The server
+ * imports it through data-dir.js, which loads .env first (env.js).
  */
 
 /** The checkout or image folder Studio runs from. */
