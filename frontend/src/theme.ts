@@ -27,6 +27,7 @@ import {
 } from "@mantine/core";
 import { createElement } from "react";
 import { ChevronDown } from "lucide-react";
+import classes from "./theme.module.css";
 
 const chevron = createElement(ChevronDown, { size: 16 });
 
@@ -181,6 +182,7 @@ export function studioTheme({
       // icons take the glass fill without a backdrop blur of their own: tiles and the viewer show
       // dozens at once, and each blur layer stalls rendering on slow phones.
       ActionIcon: ActionIcon.extend({
+        classNames: { root: classes.actionIcon },
         defaultProps: { size: bar, radius: "xl" },
         vars: (_theme, props) => ({
           root:
@@ -206,6 +208,7 @@ export function studioTheme({
       // their Title Case instead of Mantine's upper case.
       Badge: Badge.extend({ defaultProps: { variant: "light", tt: "none" } }),
       Button: Button.extend({
+        classNames: { root: classes.button },
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
@@ -219,6 +222,7 @@ export function studioTheme({
         styles: { root: { transitionTimingFunction: easing.enter } },
       }),
       Input: Input.extend({
+        classNames: { input: classes.input },
         defaultProps: { size: "md" },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
       }),
