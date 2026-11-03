@@ -32,7 +32,7 @@ import { terminalStatuses } from "../../../../shared/queue";
 
 const operationLabels = {
   image: "New image",
-  refine: "Refine",
+  refine: "Edit",
   animate: "Animate",
   upscale: "Upscale",
 } as const;
@@ -137,7 +137,7 @@ function ResultTile({
 }
 
 /**
- * Refine (or Extend) stages a new card below a single result; Animate ▾ (Extend ▾ on videos) offers
+ * Edit (or Extend) stages a new card below a single result; Animate ▾ (Extend ▾ on videos) offers
  * the viewer's options: motion themes run at once (after the review under Review Prompt First), Custom Animation and the composer stage a card.
  */
 function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string }) {
@@ -167,7 +167,7 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
           disabled={action.isPending}
           onClick={() => action.mutate("refine")}
         >
-          Refine
+          Edit
         </Button>
       )}
       {animate?.menu && (

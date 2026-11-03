@@ -51,7 +51,6 @@ export function SessionsPage() {
 
 const pastTense: Record<string, string> = {
   Edit: "Edited",
-  Refine: "Refined",
   Animate: "Animated",
   Extend: "Extended",
   Recreate: "Recreated",
@@ -70,7 +69,7 @@ function quietLine(message: ChatMessage, jobIndex: Map<string, number>) {
 function stagedAction(operation: string, source: QueueJob | undefined, number: number) {
   const verb =
     operation === "refine"
-      ? "Refine"
+      ? "Edit"
       : operation === "animate"
         ? source?.input.kind === "video"
           ? "Extend"
@@ -103,7 +102,7 @@ function SessionPage() {
   }, [sendingSession, id]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const session = useQuery(sessionQuery(id!));
-  // Each staging (Refine, Animate, Recreate) starts a fresh card form.
+  // Each staging (Edit, Animate, Recreate) starts a fresh card form.
   const stagings = useRef(0);
   const stagedKey = useMemo(() => (staged ? ++stagings.current : 0), [staged]);
   // The chat opens once its jobs and messages are both known, so it lands at the bottom once.

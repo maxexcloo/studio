@@ -43,7 +43,7 @@ export function useSubmitState({
   const assisting = useIsMutating({ mutationKey: ["prompt-assistance"] }) > 0;
   const label =
     operation === "refine"
-      ? "Refine Image"
+      ? "Edit Image"
       : input.kind === "video"
         ? "Generate Video"
         : "Generate Image";

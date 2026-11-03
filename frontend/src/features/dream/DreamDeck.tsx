@@ -235,7 +235,7 @@ const cardLabel = (card: DeckCard, top: boolean) =>
 
 /**
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
- * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Refine, Animate, Star and
+ * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Edit, Animate, Star and
  * More Like This in the compact bar keep the result too. A comparison asks about two results
  * alike but for one thing: ← or a left swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a
  * card (or its View action) opens it in the viewer over the deck, which stays where it was.
@@ -502,7 +502,7 @@ export function DreamDeck({
         ) : (
           <>
             {button("discard", calibrating ? "Pass" : "Skip", <X size={18} />, { hint: "←" })}
-            {button("refine", "Refine", <WandSparkles size={18} />, {
+            {button("refine", "Edit", <WandSparkles size={18} />, {
               disabled: !(image && dream),
             })}
             {button("animate", "Animate", <Clapperboard size={18} />, {

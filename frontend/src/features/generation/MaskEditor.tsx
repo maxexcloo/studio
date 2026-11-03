@@ -192,7 +192,7 @@ export default function MaskEditor({
     <Modal
       opened
       onClose={close}
-      title="Paint the Area to Refine"
+      title="Paint the Area to Edit"
       closeButtonProps={{ "aria-label": "Close Mask Editor" }}
       size="xl"
       removeScrollProps={{ allowPinchZoom: true }}
