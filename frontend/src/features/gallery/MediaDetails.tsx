@@ -336,7 +336,6 @@ export function MediaDetails({
                     variant="default"
                     radius="sm"
                     size="sm"
-                    tt="none"
                     fw={400}
                     style={{ cursor: "pointer" }}
                   >
