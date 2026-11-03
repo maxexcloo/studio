@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
+  DEFAULT_THEME,
   SimpleGrid,
   ColorSwatch,
   Group,
@@ -76,6 +77,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const opaque = useMediaQuery("(prefers-reduced-transparency: reduce)", false, {
     getInitialValueInEffect: false,
   });
+  // usePhone() needs the provider below; the theme keeps Mantine's default breakpoints.
+  const phone = useMediaQuery(`(max-width: ${DEFAULT_THEME.breakpoints.sm})`, false, {
+    getInitialValueInEffect: false,
+  });
   const configured = useMemo(
     () =>
       studioTheme({
@@ -83,9 +88,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         rounding: resolved.rounding,
         background: resolved.background,
         motionDuration: duration,
+        phone,
         transparency: blurs && !opaque,
       }),
-    [resolved.colour, resolved.rounding, resolved.background, duration, opaque],
+    [resolved.colour, resolved.rounding, resolved.background, duration, phone, opaque],
   );
   return (
     <Context.Provider value={{ appearance: resolved, setAppearance }}>
