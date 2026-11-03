@@ -379,6 +379,14 @@ test("Dream picks the most-starred ready profile and keeps Spicy to accounts wit
   assert.equal(state.calls[1].model, "writer");
   assert.match(state.calls[1].system, /Spicy/);
   assert.equal(spicy?.dream?.spicy, true);
+  // Losing the grant after queueing: the job is written safe for work.
+  state.access.alice!.uncensored = false;
+  await dream.write(spicy!, {
+    signal: new AbortController().signal,
+    onThinking() {},
+    onDelta() {},
+  });
+  assert.match(state.calls[2].system, /safe for work/);
 });
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
