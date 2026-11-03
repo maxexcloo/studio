@@ -41,10 +41,10 @@ run = "node backend/commands/assistant-eval.mjs"
 
 # Native bridge checks live with each custom node, outside tests/.
 [tasks."test:python"]
-run = """
+run = '''
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
-"""
+'''
 
 # Offline runtime migration is a dry run unless --apply is supplied.
 [tasks."migrate:runtime"]
