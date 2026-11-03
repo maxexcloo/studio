@@ -84,7 +84,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To find earlier work, call Search. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -1148,6 +1148,66 @@ export function registerMcpRoutes(
           /^\s*all\s*$/i.test(job_id)
             ? media.resultsAll(owner, refs, { signal })
             : media.result(owner, resolve(job_id), wait_seconds, { scope: refs, signal }),
+        { readOnlyHint: true },
+      );
+      tool(
+        server,
+        "Search",
+        "Search Gallery",
+        "Find the user's earlier work by its words or look, with refs for Reuse, Review and Result.",
+        {
+          query: z.string().trim().max(200),
+          kind: z.enum(["image", "video"]).optional(),
+          starred: z.boolean().default(false),
+          limit: z.number().int().min(1).max(24).default(8),
+        },
+        async (args, signal) => {
+          const hits = await media.search(owner, refs, args, { signal });
+          if (!hits.length)
+            return {
+              content: [{ type: "text", text: "Nothing in the gallery matches." }],
+              structuredContent: { results: [] },
+            };
+          const results = hits.map((item) => ({
+            ref: media.refOf(owner, refs, item.jobId),
+            job_id: item.jobId,
+            output_index: item.index,
+            link: media.url(owner, item.jobId, item.index),
+          }));
+          const lines = hits.map((item, position) => {
+            const { ref, output_index, link } = results[position];
+            return [
+              `- [${ref[0].toUpperCase()}${ref.slice(1)}${output_index ? ` output ${output_index}` : ""}](${link})`,
+              item.title && shortPrompt(item.title),
+              item.settings?.modelName || item.model || item.settings?.profileId,
+              String(item.createdAt || "").slice(0, 10),
+              item.prompt && shortPrompt(item.prompt),
+            ]
+              .filter(Boolean)
+              .join(" · ");
+          });
+          // The images as one picture, in the order listed; it is drawn only when opened.
+          const images = hits.filter((item) => item.type === "image");
+          const picture = !images.length
+            ? ""
+            : `\n\n![Matching images in order](${
+                images.length === 1
+                  ? media.previewUrl(owner, images[0].jobId, images[0].index)
+                  : media.sheetUrl(
+                      owner,
+                      images.map((item) => [item.jobId, item.index]),
+                    )
+              })`;
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to Reuse, Review or Result.\n\n${lines.join("\n")}${picture}`,
+              },
+            ],
+            structuredContent: { results },
+          };
+        },
         { readOnlyHint: true },
       );
       if (actor.admin)

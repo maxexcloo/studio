@@ -842,6 +842,31 @@ export class McpMedia {
         }
       : { status: "missing", outputs: [] };
   }
+  /**
+   * The account's finished gallery outputs as its gallery search finds them (GET /api/gallery: the
+   * words, Image Search's "looks like", kind and starred), newest first. Each hit's job joins this
+   * scope's refs, so Reuse, Review and Result take it; a job another MCP owner holds is left out.
+   */
+  async search(owner, scope, { query, kind, starred, limit }, { signal } = {}) {
+    const params = new URLSearchParams({ q: query, includeFailed: "0", limit: "200" });
+    if (kind) params.set("type", kind);
+    if (starred) params.set("favorites", "1");
+    const { items = [] } = await this.request("GET", `/api/gallery?${params}`, undefined, owner, {
+      signal,
+    });
+    const hits = items
+      .filter(
+        (item) =>
+          item.status === "done" &&
+          typeof item.jobId === "string" &&
+          item.jobId &&
+          mcpOutputPath(item.url) &&
+          (!Object.hasOwn(this.state.jobs, item.jobId) || this.state.jobs[item.jobId] === owner),
+      )
+      .slice(0, limit);
+    this.adopt(owner, scope, { jobs: [...new Set(hits.map((item) => item.jobId))] });
+    return hits.map((item) => ({ ...item, index: outputIndex(item) }));
+  }
   /** Scope of a conversation's result numbers: the owner, narrowed by the client's conversation when it sends one. */
   referenceScope(owner, conversation = "") {
     return this.digest(`refs\n${owner}\n${conversation}`).slice(0, 32);

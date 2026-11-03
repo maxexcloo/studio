@@ -38,6 +38,8 @@ function stepLabel({ tool, input }: ChatStep) {
     return input.profile_id ? `Reading ${input.profile_id}` : "Looking up models";
   if (["Status", "Result"].includes(tool)) return `Checking ${ref}`;
   if (tool === "Review") return `Reviewing ${ref}`;
+  if (tool === "Search")
+    return input.query ? `Searching for “${input.query}”` : "Searching the gallery";
   if (tool === "Cancel") return `Cancelling ${ref}`;
   return tool;
 }

@@ -158,6 +158,7 @@ async function fixture(
   app.use("/api", (req, _res, next) => {
     requests.push({
       path: req.path,
+      query: { ...req.query },
       method: req.method,
       body: req.body,
       authorization: req.headers.authorization,
@@ -203,26 +204,46 @@ async function fixture(
     if (job) job.status = "cancelled";
     res.json({ ok: true });
   });
-  app.get("/api/gallery", (_req, res) =>
+  // Like the studio's gallery list, newest first: `type`, `favorites` and every word of `q` in the
+  // title or prompt narrow it, and work still running always shows.
+  app.get("/api/gallery", (req, res) => {
+    const terms = String(req.query.q || "")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
     res.json({
-      items: [...jobs.values()].flatMap(
-        (job) =>
-          job.gallery ??
-          (job.status === "done"
-            ? job.outputs.map((output, index) => ({
-                id: `${job.id}:${index}`,
-                jobId: job.id,
-                index,
-                status: "done",
-                type: job.kind,
-                ...output,
-              }))
-            : []),
-      ),
+      items: [...jobs.values()]
+        .reverse()
+        .flatMap(
+          (job) =>
+            job.gallery ??
+            (job.status === "done"
+              ? job.outputs.map((output, index) => ({
+                  id: `${job.id}:${index}`,
+                  jobId: job.id,
+                  index,
+                  status: "done",
+                  type: job.kind,
+                  prompt: job.settings?.prompt,
+                  ...(job.title ? { title: job.title } : {}),
+                  ...(job.favorite ? { favorite: true } : {}),
+                  ...output,
+                }))
+              : [{ id: `${job.id}:pending`, jobId: job.id, status: "pending", type: job.kind }]),
+        )
+        .filter(
+          (item) =>
+            item.status === "pending" ||
+            ((!req.query.type || item.type === req.query.type) &&
+              (req.query.favorites !== "1" || item.favorite) &&
+              terms.every((term) =>
+                `${item.title || ""} ${item.prompt || ""}`.toLowerCase().includes(term),
+              )),
+        ),
       hasMore: false,
       nextCursor: "",
-    }),
-  );
+    });
+  });
   app.get("/api/gallery/jobs/:id", (req, res) => {
     const job = jobs.get(req.params.id);
     // Like the studio's gallery record: the prompt and generation settings only on request.
@@ -798,6 +819,7 @@ test("media and administrator credentials discover only their own friendly tools
     "Result",
     "Reuse",
     "Review",
+    "Search",
     "Status",
     "Upload",
   ]);
@@ -810,6 +832,7 @@ test("media and administrator credentials discover only their own friendly tools
     Result: "Show Result",
     Reuse: "Reuse Result",
     Review: "Review Image",
+    Search: "Search Gallery",
     Status: "Check Status",
     Upload: "Upload Reference",
   });
@@ -879,8 +902,9 @@ test("media and administrator credentials discover only their own friendly tools
   );
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
-    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes).
-    JSON.stringify(tools).length + media.getInstructions().length < 10200,
+    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
+    // then from 10,200 for Search.
+    JSON.stringify(tools).length + media.getInstructions().length < 10900,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1949,7 +1973,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 9);
+    assert.equal((await client.listTools()).tools.length, 10);
     const [first] = data(await call(client, "Models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];
@@ -1968,6 +1992,8 @@ test(
     const status = data(await call(client, "Status", { job_id: id }));
     assert.ok(["queued", "running", "done"].includes(status.status));
     assert.notEqual((await call(client, "Cancel", { job_id: id })).isError, true);
+    // Search reads the real gallery route through the loopback.
+    assert.ok(Array.isArray(data(await call(client, "Search", { query: "" })).results));
 
     // LibreChat connects afresh for each turn and names its conversation: the turns are one MCP Chat.
     const turn = async (prompt) => {
@@ -3333,6 +3359,93 @@ test("Reuse follow-ups respect ownership", async (t) => {
   for (const mode of ["again", "animate", "reference"])
     await failure(bob, "Reuse", { job_id: id, mode });
   assert.equal(f.submitted.length, submitted);
+});
+
+test("Search finds the account's own finished work through the gallery search, and its refs work with Reuse and Review", async (t) => {
+  const f = await fixture(t);
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  const heron = jobId(
+    data(await call(alice, "Generate", { kind: "image", prompts: ["A red heron"], count: 1 })),
+  );
+  const fox = jobId(
+    data(await call(bob, "Generate", { kind: "image", prompts: ["A red fox"], count: 1 })),
+  );
+  finish(f);
+  // Work made in Studio itself, which no MCP call has named yet, and a run still going.
+  f.jobs.set("studio-lantern", {
+    id: "studio-lantern",
+    status: "done",
+    kind: "image",
+    title: "Red Lantern",
+    outputs: [
+      { url: "/comfy/view?filename=lantern-0.png" },
+      { url: "/comfy/view?filename=lantern-1.png" },
+    ],
+    settings: { prompt: "A red paper lantern at night", profileId: imageProfile.id },
+  });
+  f.jobs.set("studio-waves", {
+    id: "studio-waves",
+    status: "done",
+    kind: "video",
+    favorite: true,
+    outputs: [{ url: "/comfy/view?filename=waves.mp4" }],
+    settings: { prompt: "Red waves rolling in", profileId: videoProfile.id },
+  });
+  f.jobs.set("studio-kite", { id: "studio-kite", status: "running", kind: "image", outputs: [] });
+  const search = async (client, args) => {
+    const result = await call(client, "Search", args);
+    return { result, hits: data(result).results.map((hit) => [hit.job_id, hit.output_index]) };
+  };
+  const { result, hits } = await search(alice, { query: "red" });
+  // The gallery's own search runs it, finished outputs only; another MCP account's job stays out.
+  assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
+    q: "red",
+    includeFailed: "0",
+    limit: "200",
+  });
+  assert.deepEqual(hits, [
+    ["studio-waves", 0],
+    ["studio-lantern", 0],
+    ["studio-lantern", 1],
+    [heron, 0],
+  ]);
+  assert.match(texts(result), /^4 matches, newest first\./);
+  assert.match(
+    texts(result),
+    /- \[Result 3 output 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · /,
+  );
+  assert.match(texts(result), /\[Result 1\]\([^)]+\) · .*A red heron/);
+  // The images come as one contact sheet, drawn when opened.
+  const sheet = /!\[Matching images in order\]\(([^)]+\.jpg)\)/.exec(texts(result))[1];
+  const picture = await fetch(localLink(f, sheet));
+  assert.equal(picture.status, 200);
+  assert.equal(picture.headers.get("content-type"), "image/jpeg");
+  assert.deepEqual((await search(alice, { query: "red", kind: "video" })).hits, [
+    ["studio-waves", 0],
+  ]);
+  assert.deepEqual((await search(alice, { query: "", starred: true })).hits, [["studio-waves", 0]]);
+  assert.deepEqual((await search(alice, { query: "paper lantern", limit: 1 })).hits, [
+    ["studio-lantern", 0],
+  ]);
+  assert.match(texts(await call(alice, "Search", { query: "otter" })), /Nothing in the gallery/);
+  // Refs stay the same across searches and work like a Generate's.
+  assert.equal(
+    (await call(alice, "Review", { job_id: "result 3", output_index: 1 })).isError,
+    undefined,
+  );
+  const before = f.submitted.length;
+  data(await call(alice, "Reuse", { job_id: "result 3", prompt: "A blue paper lantern at night" }));
+  assert.equal(f.submitted.length, before + 1);
+  assert.equal(f.submitted.at(-1).prompt, "A blue paper lantern at night");
+  // Bob sees his own work; what Alice's search found is hers now.
+  assert.deepEqual((await search(bob, { query: "red" })).hits, [[fox, 0]]);
+  await failure(bob, "Review", { job_id: "studio-lantern" });
+  // Studio Chat runs the same tools in process.
+  const chat = await f.mcp.agent({ owner: "chat-owner", session: "chat-1" });
+  t.after(() => chat.close());
+  assert.ok(chat.tools.some((tool) => tool.name === "Search"));
+  assert.match(chat.instructions, /To find earlier work, call Search\./);
 });
 
 // Provider-backed cloud video, shaped like the studio's Grok profiles: an optional image animates the scene.
