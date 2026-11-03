@@ -106,7 +106,7 @@ const mcpAdminRoutes = [
   ["GET", /^\/api\/profiles\/editable$/],
   ["GET", new RegExp(`^/api/profiles/editable/${routeId}(?:/guide|/versions|/versions/\\d+)?$`)],
   ["PUT", new RegExp(`^/api/profiles/editable/${routeId}$`)],
-  ["POST", new RegExp(`^/api/profiles/editable/${routeId}/(?:approve|revert)$`)],
+  ["POST", new RegExp(`^/api/profiles/editable/${routeId}/(?:approve|remove|revert)$`)],
   ["GET", /^\/api\/profiles\/guides$/],
   ["GET", new RegExp(`^/api/profiles/guides/${routeId}(?:/versions|/versions/\\d+)?$`)],
   ["PUT", new RegExp(`^/api/profiles/guides/${routeId}$`)],
