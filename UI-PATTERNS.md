@@ -168,7 +168,7 @@ primary component reference and verify APIs against the installed version.
   (picking the reference for a profile that takes one closes References).
   Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
   popover never opens a second level on phones. References, LoRAs and Presets share one picker
-  (`Picker.tsx`): tabs, then search, active filter chips, Filter ▾ and the
+  (`Picker.tsx`): tabs, then search, Filter ▾, active filter chips and the
   picker's actions (Sort; References' Upload) in one row at the gallery
   toolbar's compact size, Filter ▾ opening the filters in a popup titled Filters
   with Clear, as the gallery's does (a nested popover on desktop); a
@@ -359,11 +359,11 @@ primary component reference and verify APIs against the installed version.
   only, so other accounts and the queue tiers keep their order.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
-- Image lists share one toolbar row (`GalleryFilters.tsx`): search, the active
-  filters as removable chips with Clear All (scrolling sideways, so the row never
-  changes height), then on desktop the result count and the zoom slider, Filter ▾,
-  Upload ▾ (Upload Files… and Upload Folder…; files and folders dropped on the
-  gallery upload too) and Select. A Reddit post's images import from Library ›
+- Image lists share one toolbar row (`GalleryFilters.tsx`): search, Filter ▾
+  right of it, the active filters as removable chips with Clear All (scrolling
+  sideways, so the row never changes height), then on desktop the result count
+  and the zoom slider, and at the end Upload ▾ (Upload Files… and Upload Folder…; files and folders dropped on the
+  gallery upload too) with Select right of it. A Reddit post's images import from Library ›
   Import's link field, which then says how many it added to Uploads. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as

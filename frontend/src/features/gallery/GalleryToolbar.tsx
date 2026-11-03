@@ -20,8 +20,8 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, the active filters as removable chips, the result count,
- * the zoom slider (desktop; phones pinch), Filter ▾ and `actions`. Phones open the search from its
+ * The gallery's one toolbar row: search, Filter ▾, the active filters as removable chips, the result
+ * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones open the search from its
  * icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
 export function GalleryToolbar({
@@ -139,19 +139,12 @@ export function GalleryToolbar({
       ) : (
         search
       )}
-      <FilterChips chips={chips} onClear={clear} />
-      {results && !phone && (
-        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-          {results}
-        </Text>
-      )}
-      {!phone && <ZoomSlider />}
       <ChipPopup
         title="Filters"
         opened={filtering}
         onOpenedChange={setFiltering}
         width={340}
-        position="bottom-end"
+        position="bottom-start"
         headerEnd={
           <>
             {phone && results && (
@@ -181,6 +174,13 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
+      <FilterChips chips={chips} onClear={clear} />
+      {results && !phone && (
+        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+          {results}
+        </Text>
+      )}
+      {!phone && <ZoomSlider />}
       {actions}
     </Group>
   );

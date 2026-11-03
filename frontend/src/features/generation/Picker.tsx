@@ -149,8 +149,8 @@ export function ChipPopup({
 }
 
 /**
- * Tabs, then the search, active filter chips, Filter ▾ and `actions` in one compact row, sized
- * like the gallery toolbar; Filter ▾ opens the filters in a popup, as the gallery's does.
+ * Tabs, then the search, Filter ▾, active filter chips and `actions` in one compact row, in the
+ * gallery toolbar's order and size; Filter ▾ opens the filters in a popup, as the gallery's does.
  */
 export function PickerHeader<Tab extends string>({
   label,
@@ -206,7 +206,6 @@ export function PickerHeader<Tab extends string>({
             onChange={(event) => onQueryChange(event.currentTarget.value)}
             onClear={() => onQueryChange("")}
           />
-          {chips && <div className={classes.chips}>{chips}</div>}
           {filters && (
             <ChipPopup
               title="Filters"
@@ -239,6 +238,7 @@ export function PickerHeader<Tab extends string>({
               {filters}
             </ChipPopup>
           )}
+          {chips && <div className={classes.chips}>{chips}</div>}
           {actions}
         </div>
       </div>
