@@ -543,9 +543,10 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   const strength = z
     .object({
-      default: z.number().finite().min(-5).max(5).optional(),
-      min: z.number().finite().min(-5).max(5).optional(),
-      max: z.number().finite().min(-5).max(5).optional(),
+      default: z.number().finite().optional(),
+      min: z.number().finite().optional(),
+      max: z.number().finite().optional(),
+      step: z.number().finite().positive().optional(),
     })
     .strict();
   const links = z
@@ -559,7 +560,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "CatalogueEdit",
     "Edit Catalogue Entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max}, uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
     {
       key,
       patch: z
