@@ -55,7 +55,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
-    "Text: Healthy · Images: Healthy · Videos: Offline (Video endpoint is offline.)",
+    "Text: Healthy · Images: Healthy · Videos: Offline",
   );
   // Workers listed by the deployment show read-only with where they come from.
   const workers = page.getByRole("region", { name: "Workers", exact: true });
@@ -351,7 +351,7 @@ test("Status summarises service health and opens Workers over the current page",
   const settings = page.getByRole("dialog", { name: /^Settings/ });
   // Observe-only Workers shows the service line and why nothing can be switched.
   await expect(settings.getByRole("region", { name: "Services", exact: true })).toContainText(
-    "Videos: Offline (Video endpoint is offline.)",
+    "Videos: Offline",
   );
   await expect(settings.getByText(/runtime control is not configured/)).toBeVisible();
   await page.keyboard.press("Escape");
