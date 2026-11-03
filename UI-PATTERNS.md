@@ -90,7 +90,8 @@ primary component reference and verify APIs against the installed version.
   Keep the same bounded dimensions and title typography across both workspaces,
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
   Section Select in the phone modal header. Mount sections on first visit and
-  keep visited forms mounted to preserve edits. Navigation items carry an icon;
+  keep visited forms mounted to preserve edits; a section that fails to render
+  shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
   (`SectionHeader`: segmented views, an expanding search, filters in one popover
   and icon actions) at the end of the same row, above compact rows with status
