@@ -107,7 +107,7 @@ function playVideo(media: HTMLVideoElement, refused: () => void) {
 // One key runs a viewer action, as its bar would (Settings › Studio lists them).
 const viewerShortcuts: Record<string, string> = {
   e: "edit",
-  p: "prompt",
+  p: "recreate",
   r: "new-seed",
   u: "upscale",
 };

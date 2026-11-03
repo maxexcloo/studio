@@ -1,18 +1,18 @@
 import { useMutation } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { WandSparkles } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { icons } from "../../ui/icons";
 import type { Action } from "./ActionBar";
 
 /**
- * Prompt › Recreate, for an item made without a prompt (an upload) once its suggested prompt is
+ * Recreate › Edit Prompt for an item made without a prompt (an upload), once its suggested prompt is
  * written: the composer opens on that prompt with the model it has for the item's kind, and the run
  * is one of the item's versions (backend/gallery/recreate.js).
  */
-export function useRecreateAction(item: MediaItem, onApplied: () => void): Action | null {
+export function useRecreateAction(item: MediaItem, onApplied: () => void): Action {
   const { setDraft, changeKind } = useGenerationActions();
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,12 +55,11 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
-  if (item.status !== "done" || !item.suggestedPrompt) return null;
   return {
-    id: "recreate",
-    label: "Recreate",
-    icon: WandSparkles,
-    disabled: recreate.isPending,
+    id: "recreate-upload",
+    label: "Edit Prompt",
+    icon: icons.prompt,
+    disabled: !item.suggestedPrompt || recreate.isPending,
     loading: recreate.isPending,
     onClick: () => recreate.mutate(),
   };

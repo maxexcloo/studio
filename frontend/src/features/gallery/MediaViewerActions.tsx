@@ -15,10 +15,10 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Edit, Animate and Prompt beside their icons; phones keep these and Retry or Stop
-// on the bar, labelled under their icons, and list the rest under More.
-const labelled = ["edit", "animate", "prompt"];
-const primary = ["retry", "stop", ...labelled];
+// Desktop names Animate, Edit, Recreate and Upscale beside their icons; phones keep Retry or Stop,
+// Animate, Edit and Recreate on the bar, labelled under their icons, and list the rest under More.
+const labelled = ["animate", "edit", "recreate", "upscale"];
+const primary = ["retry", "stop", "animate", "edit", "recreate"];
 
 /** The viewer's action bar: the prompt field above the shared item actions. */
 export function MediaViewerActions({

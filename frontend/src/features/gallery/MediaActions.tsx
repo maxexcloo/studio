@@ -65,7 +65,7 @@ import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
   chat: { label: "Continue in Chat", icon: icons.chat },
-  prompt: { label: "Prompt", icon: icons.prompt },
+  recreate: { label: "Recreate", icon: icons.recreate },
   animate: { label: "Animate", icon: icons.animate },
   edit: { label: "Edit", icon: icons.edit },
   retry: { label: "Retry", icon: icons.retry },
@@ -80,13 +80,13 @@ const definitions = {
 };
 export type ItemActionId = keyof typeof definitions;
 /**
- * The sections and order everywhere: Edit, Animate, Prompt | Upscale | Copy, Download | Star,
- * Delete. Retry and Stop lead for unfinished work and Continue in Chat follows Prompt; Compare
- * joins Upscale only in menus and the selection bar; Share takes Download's place where phones share.
+ * The sections and order everywhere: Animate, Edit, Recreate, Upscale | Compare, Continue in Chat |
+ * Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only in
+ * menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
-  ["retry", "stop", "edit", "animate", "prompt", "chat"],
-  ["upscale", "compare"],
+  ["retry", "stop", "animate", "edit", "recreate", "upscale"],
+  ["compare", "chat"],
   ["copy", "download", "share"],
   ["star", "delete"],
 ];
@@ -102,6 +102,22 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
   sections.map((ids) =>
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
+
+/** An action whose options come to one runs that option itself, so no submenu holds just one. */
+function withoutLoneOption(action: Action): Action {
+  const options = action.menu?.flat() ?? [];
+  if (options.length !== 1 || action.note) return action;
+  const [option] = options;
+  return {
+    ...action,
+    menu: undefined,
+    link: option.link,
+    onClick: option.onClick,
+    keepOpen: option.keepOpen,
+    disabled: action.disabled || option.disabled,
+    loading: action.loading || option.loading,
+  };
+}
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
@@ -469,40 +485,42 @@ export function useMediaActions(
         disabled: chat.isPending,
         onClick: () => chat.mutate(),
       }),
-    // Prompt opens the result in the composer (its first option); the others run it again from here.
-    itemAction("prompt", {
+    // Recreate reuses the item's prompt and settings: Edit Prompt opens them in the composer (its
+    // first option) and the others run it again from here. An upload has only its suggested prompt.
+    itemAction("recreate", {
       disabled: action.isPending,
       loading: running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
-      menu: ready
-        ? [
-            [
-              {
-                id: "prompt-composer",
-                label: "Edit",
-                icon: icons.prompt,
-                disabled: action.isPending,
-                onClick: () => action.mutate("image"),
-              },
-              ...(image && reference ? [reference] : []),
-              ...(recreate ? [recreate] : []),
+      menu: !ready
+        ? undefined
+        : item.uploaded
+          ? [[recreate, ...(image && reference ? [reference] : [])]]
+          : [
+              [
+                {
+                  id: "prompt-composer",
+                  label: "Edit Prompt",
+                  icon: icons.prompt,
+                  disabled: action.isPending,
+                  onClick: () => action.mutate("image"),
+                },
+                ...(image && reference ? [reference] : []),
+              ],
+              [
+                {
+                  id: "new-seed",
+                  label: "Run Again",
+                  icon: Shuffle,
+                  onClick: () => run({ kind: "regenerate" }),
+                },
+                {
+                  id: "exact-repeat",
+                  label: "Run Again (Same Seed)",
+                  icon: Repeat,
+                  onClick: () => run({ kind: "repeat" }),
+                },
+              ],
             ],
-            [
-              {
-                id: "new-seed",
-                label: "Run Again",
-                icon: Shuffle,
-                onClick: () => run({ kind: "regenerate" }),
-              },
-              {
-                id: "exact-repeat",
-                label: "Run Again (Same Seed)",
-                icon: Repeat,
-                onClick: () => run({ kind: "repeat" }),
-              },
-            ],
-          ]
-        : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
@@ -639,7 +657,11 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
-  return itemActionGroups(actions.filter((entry) => entry && !omit.includes(entry.id)));
+  return itemActionGroups(
+    actions
+      .filter((entry): entry is Action => !!entry && !omit.includes(entry.id))
+      .map(withoutLoneOption),
+  );
 }
 
 /** The shared actions as menu items, mounted while a menu is open. */

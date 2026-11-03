@@ -58,9 +58,9 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
-/** Prompt › Run Again: queues the same settings with a new seed, without the composer. */
+/** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
@@ -210,10 +210,12 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
   ).toBeVisible();
 });
 
-test("Viewer runs queue into the strip and Prompt opens the composer", async ({ page }) => {
+test("Viewer runs queue into the strip and Recreate › Edit Prompt opens the composer", async ({
+  page,
+}) => {
   const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -226,8 +228,8 @@ test("Viewer runs queue into the strip and Prompt opens the composer", async ({ 
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -266,20 +268,20 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
-test("Run Again and Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
+test("Run Again and Edit Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Prompt's menu queues Run Again and Run Again (Same Seed) at once; Prompt itself loads the composer.
+  // Recreate queues Run Again and Run Again (Same Seed) at once; Edit Prompt loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -323,13 +325,13 @@ const ranOn = (backend: string) => ({
   settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
 });
 
-test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran on", async ({
+test("Run Again (Same Seed) and Edit Prompt keep the backend a combined profile ran on", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -337,8 +339,8 @@ test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran o
     profileBackend: "radiance",
     seed: 1234567,
   });
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
@@ -353,7 +355,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   const { state } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect(
     page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
@@ -1118,8 +1120,8 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   // Phones open the prompt in its own editor, which Done closes.
