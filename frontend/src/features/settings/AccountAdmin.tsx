@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -16,7 +15,6 @@ import {
   Stack,
   Text,
   TextInput,
-  Tooltip,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -252,7 +250,7 @@ const groupFeature = (on: boolean | undefined, label: string) => (
   </Badge>
 );
 
-/** An icon action in a section toolbar, named by its tooltip. */
+/** A labelled action in a section toolbar: account actions are rare enough to spell out. */
 function ToolbarAction({
   label,
   icon,
@@ -263,11 +261,9 @@ function ToolbarAction({
   onClick: () => void;
 }) {
   return (
-    <Tooltip label={label}>
-      <ActionIcon variant="subtle" color="gray" aria-label={label} onClick={onClick}>
-        {icon}
-      </ActionIcon>
-    </Tooltip>
+    <Button variant="subtle" size="compact-sm" leftSection={icon} onClick={onClick}>
+      {label}
+    </Button>
   );
 }
 
@@ -442,15 +438,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                     <Badge miw="max-content" color="gray">
                       Single Sign-On
                     </Badge>
-                  )}
-                  {account.role === "user" && groupOf(account) && (
-                    <>
-                      {groupFeature(groupOf(account)!.features.cloudModels, "Cloud Models")}
-                      {groupFeature(
-                        groupOf(account)!.features.uncensoredModels,
-                        "Uncensored Models",
-                      )}
-                    </>
                   )}
                 </Group>
               </>
