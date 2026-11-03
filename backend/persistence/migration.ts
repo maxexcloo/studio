@@ -228,8 +228,9 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
 
 /**
  * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
- * uploads step's backup (uploads.js) restores the whole reference store it moved aside, and the
- * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote.
+ * uploads step's backup (uploads.js) restores the whole reference store it moved aside, the
+ * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, and the
+ * LoRA layers step's (library/lora-layers.js) the catalogue.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -239,10 +240,19 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
   for (const mapping of manifest.mappings) {
     const store = mapping.source === "reference-assets/index.json";
     const profile = /^workflows\/[a-z0-9][a-z0-9._-]*\.json$/.test(mapping.source);
-    if (!store && !profile && !documents.some((name) => mapping.source === `${name}.json`))
+    const catalogue = mapping.source === "library/catalogue.json";
+    if (
+      !store &&
+      !profile &&
+      !catalogue &&
+      !documents.some((name) => mapping.source === `${name}.json`)
+    )
       throw new Error("Unsupported backup mapping");
-    if (profile)
-      fs.mkdirSync(path.join(destination, "workflows"), { recursive: true, mode: 0o700 });
+    if (profile || catalogue)
+      fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {
+        recursive: true,
+        mode: 0o700,
+      });
     const source = path.join(backup, mapping.source);
     const bytes = fs.readFileSync(source);
     if (digest(bytes) !== mapping.hash)
