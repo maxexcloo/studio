@@ -23,7 +23,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
-        <AccountMenuContent accountFirst>
+        <AccountMenuContent>
           {library.allowed && (
             <Menu.Item
               component={Link}

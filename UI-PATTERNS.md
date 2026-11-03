@@ -72,10 +72,10 @@ primary component reference and verify APIs against the installed version.
   Retry and Clear in gallery modes, and the compact service summary at the bottom, which administrators tap to open Settings › Workers.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
-  placement shown honestly. The phone overflow orders Account, Library,
-  Settings, Theme, a divider, the account name and supported Sign Out. Desktop
-  Library and Settings are followed by Theme and the account icon; the header
-  follows the workspace width. The account menu shows the actual name,
+  placement shown honestly. The phone overflow orders Library, Settings,
+  Theme, a divider, the account name, Account and supported Sign Out. Desktop
+  Library and Settings are followed by Theme and the account icon, each with a
+  tooltip; the header follows the workspace width. The account menu shows the actual name,
   Account and supported Sign Out.
 - Full/Fixed controls the workspace. Chat has a structural desktop sessions
   sidebar, flush below the header through the viewport bottom, with a distinct
