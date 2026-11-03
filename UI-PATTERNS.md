@@ -376,7 +376,10 @@ primary component reference and verify APIs against the installed version.
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
   a segmented control on its own row; Show, a segmented control of All, Starred
-  and Uploads (one at a time); in Grid, the All Versions switch; then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. The reference picker uses the same chips, Filter ▾
+  and Uploads (one at a time); in Grid, the All Versions switch; then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. Models and LoRAs list
+  the composer's names once each, without file names, backend or quantisation, and
+  typing any part of a name finds it; a name filters by every recorded value it
+  covers. The reference picker uses the same chips, Filter ▾
   and panel in the same popup. Search narrows within the filters; filter actions preserve
   the query. Gallery filters and zoom are remembered per account. Every labelled
   control that opens a menu or picker shows ▾; icon-only bar controls do not.

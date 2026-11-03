@@ -622,6 +622,49 @@ test("Uploads stay out of the gallery until its Uploads filter is on", async ({ 
   await expect(tile("made")).toHaveCount(0);
 });
 
+test("Model filters list each clean name once and find it by any part", async ({ page }) => {
+  const state = await fixtures(page);
+  await page.route("**/api/gallery/filters*", (route) =>
+    route.fulfill({
+      json: {
+        models: [
+          "image.safetensors",
+          "image:test",
+          "ideogram-3-fp8.safetensors",
+          "Ideogram_3_ComfyUI.safetensors",
+          "custom:ideogram-turbo",
+        ],
+        loras: [],
+        sizes: [],
+        aspects: [],
+        chats: [],
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const models = page.getByRole("combobox", { name: "Models", exact: true });
+  await models.click();
+  // Files and ids read as the composer's names, without folder, backend or quantisation.
+  await expect(page.getByRole("option")).toHaveText([
+    "Ideogram 3",
+    "Ideogram Turbo",
+    "Image Quality",
+    "Studio Image",
+  ]);
+  await models.fill("ideo");
+  await expect(page.getByRole("option")).toHaveText(["Ideogram 3", "Ideogram Turbo"]);
+  await page.getByRole("option", { name: "Ideogram 3", exact: true }).click();
+  await models.press("Escape");
+  await page.keyboard.press("Escape");
+  const chips = page.getByRole("group", { name: "Active Filters", exact: true });
+  await expect(chips.getByRole("button", { name: /^Remove / })).toHaveText(["Ideogram 3"]);
+  // One name filters by every file it covers.
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("model"))
+    .toEqual(["ideogram-3-fp8.safetensors", "Ideogram_3_ComfyUI.safetensors"]);
+});
+
 test("Gallery filters submit repeated models together with LoRA, size, aspect and date", async ({
   page,
 }) => {
