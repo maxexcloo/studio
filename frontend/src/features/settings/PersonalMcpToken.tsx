@@ -83,7 +83,12 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
         </Text>
       )}
       <Group>
-        <Button loading={busy} disabled={!status.data} onClick={() => void change(false)}>
+        <Button
+          variant="default"
+          loading={busy}
+          disabled={!status.data}
+          onClick={() => void change(false)}
+        >
           {status.data?.enabled ? "Rotate Token" : "Create Token"}
         </Button>
         {status.data?.enabled && (
