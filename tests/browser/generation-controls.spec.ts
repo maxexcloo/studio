@@ -523,7 +523,7 @@ test("Generation actions stay in place while the prompt grows and pickers open",
   expect(state.jobs[0].input.prompt).toBe(long);
 });
 
-test("The chip composer offers supported sizes and settings, follows the output route and Clear ends Refine", async ({
+test("The chip composer offers supported sizes and settings, follows the output route and Clear ends Edit", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -565,7 +565,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await expect(page.getByRole("button", { name: "Refine Image", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
   await expandComposer(page);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await prompt.fill("A wide copper horizon");
@@ -635,7 +635,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Paint the Area to Refine" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Paint the Area to Edit" })).toBeVisible();
   await page.locator("canvas").click({ position: { x: 40, y: 40 } });
   await page.getByRole("button", { name: "Use Mask", exact: true }).click();
   await page.getByRole("button", { name: "Edit Mask", exact: true }).click();
