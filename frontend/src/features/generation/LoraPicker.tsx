@@ -68,7 +68,7 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/** Recommended LoRAs match the profile's family; Favourites are this family's thumbs up; All lists every one. */
+/** Recommended LoRAs match the profile's family; Favourites are this family's thumbs up; All lists every one it can load. */
 type LoraTab = "recommended" | "favourites" | "all" | "stacks";
 /** All's filter for LoRAs without a model family. */
 const unclassified = "unclassified";
@@ -257,7 +257,7 @@ function LoraControls({
       ? available.filter((file) => familiesOf(file).includes(family))
       : tab === "favourites"
         ? compatible.filter((file) => ratings[file] === "up")
-        : available;
+        : compatible;
   const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
   const filters = [...(tab === "all" ? [unclassified] : []), ...types];
   const filter = filters.includes(picker.filter) ? picker.filter : "all";
