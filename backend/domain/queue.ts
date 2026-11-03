@@ -315,12 +315,14 @@ export class GenerationQueue {
     );
     const all = this.store.jobs();
     const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
-    // A started MCP set finishes before anything else on its resource, so its jobs stay contiguous.
+    // A started MCP set finishes before other work of its tier and below, so its jobs stay
+    // contiguous; manual work still goes first.
     const startedSets = new Set(
       all.filter((job) => job.queueSet && isStarted(job)).map((job) => job.queueSet),
     );
     const rank = (job: OwnedJob) =>
-      job.queueSet && startedSets.has(job.queueSet) ? -1 : (job.priority ?? queuePriority.manual);
+      (job.priority ?? queuePriority.manual) -
+      (job.queueSet && startedSets.has(job.queueSet) ? 0.5 : 0);
     this.rebalance(all, occupied, rank, held);
     const groups = new Map<string, OwnedJob[]>();
     for (const job of all.filter(
