@@ -721,9 +721,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "ProfileEdit",
     "Edit Profile or Guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version. edit, draft and revert need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"krea2": {"image": "krea2"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile (not a guide) after a backup, only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
     {
-      action: z.enum(["draft", "edit", "approve", "revert"]),
+      action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
       id: z.string().trim().min(1).max(120).optional(),
       text: z.string().min(2).max(2000000).optional(),
@@ -753,6 +753,11 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         throw new Error(
           "Pass base_hash: the hash from Profiles get, so a change made since is never overwritten.",
         );
+      if (action === "remove") {
+        if (target !== "profile")
+          throw new Error("remove takes a profile, not a guide or the bindings.");
+        return mcpJson(await api("POST", `${base}/remove`, { baseHash: base_hash }, signal));
+      }
       if (action === "revert") {
         if (!version) throw new Error("Pass version: the version to restore (from Profiles get).");
         return reply(await api("POST", `${base}/revert`, { version, baseHash: base_hash }, signal));
