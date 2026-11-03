@@ -53,7 +53,11 @@ import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { pausedReason, terminalStatuses } from "../shared/queue.ts";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import {
+  registerMaintenanceRoutes,
+  registerRewriteRoutes,
+  unconfirmedCancel,
+} from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
@@ -1390,9 +1394,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 app.delete("/api/workflows/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    const result = deleteImportedWorkflow(
-      decodeURIComponent(req.params.id).replace(/^custom:/, ""),
-    );
+    const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
     const preferences = loadWorkflowPreferences();
     preferences.favorites = preferences.favorites.filter(
       (id) => id !== `custom:${result.id}` && id !== result.id,
@@ -2890,7 +2892,14 @@ app.get("/api/jobs/:id", (req, res) => {
 
 app.post("/api/jobs/:id/cancel", async (req, res) => {
   if (store.job(ownerIdForRequest(req), req.params.id)) {
-    await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
+    try {
+      await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
+    } catch {
+      return res.status(503).json({
+        ok: false,
+        error: unconfirmedCancel,
+      });
+    }
     return res.json({ ok: true });
   }
   const job = jobs.get(req.params.id);

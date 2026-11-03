@@ -1,5 +1,5 @@
 import type { QueueMedia } from "../../shared/queue.ts";
-import type { JobObservation, QueueAdapter } from "./queue.ts";
+import { unreachableCancelReason, type JobObservation, type QueueAdapter } from "./queue.ts";
 import { Store, type OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
@@ -148,7 +148,9 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
       if (job.providerJobId) {
         const live = liveJob(job);
         if (live) options.jobs.set(job.id, { ...live, status: "canceling" });
-        await options.cancelPrompt(job.providerJobId, job.backend);
+        const stopped = await options.cancelPrompt(job.providerJobId, job.backend);
+        if (stopped === "unreachable")
+          return { status: "cancelled" as const, reason: unreachableCancelReason };
         if (!running.has(job.id)) launch({ ...job, cancelRequested: true });
       }
       // Without an acknowledgement, cancellation cannot safely release the worker lease.
