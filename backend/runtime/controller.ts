@@ -650,7 +650,11 @@ export class RuntimeController {
         Object.entries(this.pools).some(([pool, capacity]) => this.usage(target, pool) > capacity)
       )
         return;
-      this.begin("apply", this.plan(target, states), "restoring the last placement after an outside stop");
+      this.begin(
+        "apply",
+        this.plan(target, states),
+        "restoring the last placement after an outside stop",
+      );
     } finally {
       this.claimed = false;
     }
