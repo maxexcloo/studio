@@ -19,6 +19,7 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
+import { useRemembered } from "../auth/useRemembered";
 
 const statusQuery = (quality: UpscaleQuality) => ({
   queryKey: ["upscale-status", quality],
@@ -138,8 +139,13 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
 }
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
-/** Upscale's one-click runs at the automatic size, and whether Face Detail can join them. */
+/**
+ * Upscale's menu runs at the automatic size with its remembered quality (Balanced until chosen) and
+ * Face Detail (off until chosen, and only where the worker can run it).
+ */
 export function useQuickUpscale(item: MediaItem, enabled: boolean) {
+  const [quality, setQuality] = useRemembered<UpscaleQuality>("upscale-quality", "balanced");
+  const [face, setFace] = useRemembered<boolean>("upscale-face-detail", false);
   const cache = useQueryClient();
   const status = useQuery({
     ...statusQuery("balanced"),
@@ -160,9 +166,19 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
         ),
       ),
   });
-  const face = status.data?.faceDetail;
-  const faceDetail = Boolean(face?.nodesInstalled && face.detectors.length);
-  return { queue, faceDetail };
+  const detector = status.data?.faceDetail;
+  const faceAvailable =
+    item.type === "image" && Boolean(detector?.nodesInstalled && detector.detectors.length);
+  const faceDetail = face && faceAvailable;
+  return {
+    queue,
+    quality,
+    setQuality,
+    faceAvailable,
+    faceDetail,
+    setFaceDetail: setFace,
+    run: () => queue.mutate({ quality, faceDetail }),
+  };
 }
 /** The same settings for the Upscale item in tile and Chat result menus. */
 export function UpscaleDialog({

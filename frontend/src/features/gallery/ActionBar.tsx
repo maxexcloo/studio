@@ -68,9 +68,16 @@ export function findAction(groups: ActionGroups, id: string): Action | undefined
   }
 }
 
-/** What clicking the action does: its own click, or with options the first one's. */
+/**
+ * A menu's setting rather than an action: a segmented choice, or an on/off option that keeps the
+ * menu open (Review Prompt First, Face Detail).
+ */
+const isSetting = (action: Action) =>
+  Boolean(action.choice || (action.keepOpen && action.checked !== undefined));
+
+/** What clicking the action does: its own click, or with options the first that isn't a setting. */
 export const usualAction = (action: Action): Action | undefined =>
-  action.menu ? shown(action.menu)[0]?.[0] : action;
+  action.menu ? action.menu.flat().find((option) => !isSetting(option)) : action;
 
 const note = (action: Action) =>
   action.note && (

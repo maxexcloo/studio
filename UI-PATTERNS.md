@@ -339,7 +339,7 @@ primary component reference and verify APIs against the installed version.
   `useRemembered` helper (browser storage under `studio-<name>:<account>`): the
   gallery composer's image and video drafts, the Chat draft, gallery view,
   filters and versions, Compare's mode and variants, the last Library and
-  Settings section, Dream's view and tuning, Animate's Fast or Quality and Review Prompt First, and the LoRA picker tab. Transient
+  Settings section, Dream's view and tuning, Animate's Fast or Quality and Review Prompt First, Upscale's quality and Face Detail, and the LoRA picker tab. Transient
   state (open popups, selections, search queries) is never remembered. Keep
   account data and credentials out of browser storage.
 - Account access groups own model grants and Cloud Models/uncensored permissions.
@@ -478,7 +478,8 @@ primary component reference and verify APIs against the installed version.
   names unchanged) at one size and spacing; only the desktop viewer names Animate ▾,
   Edit, Recreate ▾ and Upscale ▾ beside their icons, and only those labelled buttons show
   ▾. There are no split buttons: a control with options opens its menu on click,
-  and its first option is its usual action. Menus share one compact style
+  and its first option that isn't a setting (a segmented choice or a checked
+  option that keeps the menu open) is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
   dividers only between real groups and no explanatory notes, only the reason when
   nothing can run. Options are submenus on desktop and expand in place on phones,
@@ -496,11 +497,12 @@ primary component reference and verify APIs against the installed version.
   Animation, Animate in Composer (a video's themes continue it from its last
   frame, and the result is saved joined onto it; Extend in Composer replaces
   Animate in Composer, and Use Frame as Reference and Save Frame as Image take the
-  frame showing in the viewer, else the last); Upscale › Balanced (at automatic
-  size), Fast, High, Face Detail (Balanced with it; disabled when the worker can't run
-  it), Upscale Options… (quality, size, Face Detail), and once upscaled Show
-  Upscale (switching between it and the original) and Compare Upscale first, then
-  Regenerate Upscale; Copy › Prompt, Details; a video's Download › Video, GIF,
+  frame showing in the viewer, else the last); Upscale › once upscaled Show
+  Upscale (switching between it and the original) and Compare Upscale first, then,
+  set out as Animate's are, Upscale Quality as a small segmented control (Fast, Balanced by default, High)
+  and Face Detail (checked; disabled when the worker can't run it), then Upscale
+  Image (or Video; Regenerate Upscale once upscaled) at those settings and the
+  automatic size, and Upscale Options… (quality, size, Face Detail); Copy › Prompt, Details; a video's Download › Video, GIF,
   Back and Forth (an MP4 played forward then back, looping without a jump). Phones
   that share natively show Share Image in Download's place; desktop has no Share.
   The viewer and gallery selection share one `ActionBarGroups` bar of divided
