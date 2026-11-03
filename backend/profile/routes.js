@@ -14,7 +14,7 @@
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
- *   GET  /api/profiles/guide-bindings               the profile bindings, variants and negatives, with their hash and meta
+ *   GET  /api/profiles/guide-bindings               the family map, profile bindings, variants and negatives, with their hash and meta
  *   PUT  /api/profiles/guide-bindings               {bindings, baseHash, draft?}: saves them as a new version
  *   GET  /api/profiles/guide-bindings/versions      their versions, newest first
  *   GET  /api/profiles/guide-bindings/versions/:n   one version with its bindings
