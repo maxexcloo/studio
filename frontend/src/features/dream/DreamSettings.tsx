@@ -42,7 +42,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
     key: "buffer" | "dailyImages" | "dailyVideos",
     label: string,
     max: number,
-    description?: string,
+    description: string,
   ) => (
     <SettingRow label={label} description={description}>
       <NumberSetting
@@ -58,12 +58,12 @@ function SettingsForm({ dream }: { dream: Dream }) {
   return (
     <Stack gap="xs">
       <div>
-        {toggle("enabled", "Dream", "Make new images in idle time from your taste profile.")}
-        {number("buffer", "Unseen Buffer", 50, "Dream waits once this many results are unseen.")}
-        {number("dailyImages", "Images per Day", 500)}
-        {toggle("videos", "Videos", "Animate kept or starred images too.")}
-        {number("dailyVideos", "Videos per Day", 100)}
+        {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
+        {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+        {number("buffer", "Unseen Buffer", 50, "Dream waits once this many are unseen.")}
+        {toggle("videos", "Videos", "Animate kept or starred images too.")}
+        {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
       </div>
       {save.error && (
         <Alert color="red" title="Couldn’t Save Dream Settings">
@@ -108,7 +108,7 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
       </>
     );
   return (
-    <Popover opened={opened} onChange={setOpened} position="bottom-end" width={320} trapFocus>
+    <Popover opened={opened} onChange={setOpened} position="bottom-end" width={400} trapFocus>
       <Popover.Target>{button}</Popover.Target>
       <Popover.Dropdown aria-label="Dream Settings" role="dialog">
         <SettingsForm dream={dream} />
