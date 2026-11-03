@@ -295,6 +295,11 @@ test("guide bindings are edited, removed, reverted and approved as versions, and
   const moved = store.bindings().bindings;
   assert.deepEqual(moved.profiles, { "custom:kept": { pack: "other" } });
   assert.deepEqual(Object.keys(moved.negatives), ["custom:kept"]);
+  // The family map is edited with the bindings; a section left out keeps its entries.
+  const families = { flux: { image: "other" } };
+  assert.deepEqual(store.saveBindings({ families }).bindings.families, families);
+  assert.deepEqual(store.saveBindings({ profiles: {} }).bindings.families, families);
+  assert.equal(store.resolve({ id: "custom:new", family: "flux", kind: "image" }).packId, "other");
   // Packs list without the bindings' history.
   assert.deepEqual(Object.keys(store.read().packs).sort(), ["krea2", "other"]);
 });

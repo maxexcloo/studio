@@ -641,7 +641,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Profiles",
     "Profiles & Guides",
-    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: which pack, variant and mode each profile (custom:<id>) uses, the variants and each profile's negatives, one document without an id. Read-only.",
+    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id. Read-only.",
     {
       action: z.enum(["list", "get", "diff"]).default("list"),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
