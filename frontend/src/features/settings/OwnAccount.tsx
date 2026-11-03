@@ -1,6 +1,5 @@
-import { Alert, Button, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Button, Group, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
@@ -30,7 +29,6 @@ function AccountForm({ account }: { account: Account }) {
       security.setValues({ username: account.username, currentPassword: "", newPassword: "" });
       void client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["account-admin"] });
-      notifications.show({ message: "Account updated" });
     },
     onSettled: () => security.setValues({ currentPassword: "", newPassword: "" }),
   });
@@ -73,14 +71,16 @@ function AccountForm({ account }: { account: Account }) {
               Changing your password signs out your other browser sessions.
             </Text>
             {save.error && <Alert color="red">{save.error.message}</Alert>}
-            <Button
-              type="submit"
-              disabled={!securityChanged}
-              loading={save.isPending}
-              style={{ alignSelf: "start" }}
-            >
-              Save Email & Password
-            </Button>
+            <Group gap="sm">
+              <Button type="submit" disabled={!securityChanged} loading={save.isPending}>
+                Save Email & Password
+              </Button>
+              {save.isSuccess && !securityChanged && (
+                <Text size="sm" c="dimmed">
+                  Saved
+                </Text>
+              )}
+            </Group>
           </Stack>
         </form>
       ) : (

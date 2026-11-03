@@ -490,6 +490,9 @@ export function SavedList<T extends SavedItem>({
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // Update From Current changes nothing in view, so its row says Updated for a moment.
+  const [updated, setUpdated] = useState<string | null>(null);
+  const timer = useRef(0);
   if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
   return (
     <div className={classes.saved} role="list" aria-label={label}>
@@ -528,9 +531,9 @@ export function SavedList<T extends SavedItem>({
                 <Text size="sm" truncate>
                   {item.name}
                 </Text>
-                {item.detail && (
+                {(updated === item.id || item.detail) && (
                   <Text size="xs" c="dimmed" truncate>
-                    {item.detail}
+                    {updated === item.id ? "Updated" : item.detail}
                   </Text>
                 )}
               </UnstyledButton>
@@ -549,7 +552,16 @@ export function SavedList<T extends SavedItem>({
               <Menu.Dropdown>
                 <Menu.Item onClick={() => setRenaming(item.id)}>Rename {noun}</Menu.Item>
                 {onUpdate && (
-                  <Menu.Item onClick={() => onUpdate(item)}>Update From Current</Menu.Item>
+                  <Menu.Item
+                    onClick={() => {
+                      onUpdate(item);
+                      setUpdated(item.id);
+                      window.clearTimeout(timer.current);
+                      timer.current = window.setTimeout(() => setUpdated(null), 2000);
+                    }}
+                  >
+                    Update From Current
+                  </Menu.Item>
                 )}
                 <Menu.Item color="red" onClick={() => onDelete(item)}>
                   Delete {noun}

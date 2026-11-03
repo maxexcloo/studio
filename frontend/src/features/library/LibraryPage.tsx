@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Alert, SimpleGrid } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, post } from "../../api";
@@ -50,18 +49,19 @@ export function LibraryPage() {
       choice
         ? post<{ available: number }>("/api/library/updates/apply", choice)
         : post<{ available: number }>("/api/library/updates/check"),
-    onSuccess: (result, choice) => {
+    onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["library"] });
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
-      notifications.show({
-        message: choice
-          ? "Update queued. The current file stays until the new one is verified and free."
-          : result.available
-            ? `${result.available} updates available.`
-            : "Everything is up to date.",
-      });
     },
   });
+  // The last check or update's outcome, shown under the catalogue toolbar.
+  const updateNote =
+    update.data &&
+    (update.variables
+      ? "Update queued. The current file stays until the new one is verified and free."
+      : update.data.available
+        ? `${update.data.available} updates available.`
+        : "Everything is up to date.");
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([
@@ -87,6 +87,7 @@ export function LibraryPage() {
         }
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
         checkingUpdates={update.isPending && !update.variables}
+        updateNote={updateNote || undefined}
         onEdit={admin ? setEditing : undefined}
         updatePending={update.isPending}
       />

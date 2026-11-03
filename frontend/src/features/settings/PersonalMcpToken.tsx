@@ -3,7 +3,7 @@ import { Alert, Badge, Button, Group, Stack, Text, TextInput } from "@mantine/co
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, post } from "../../api";
-import { copyText } from "../../ui/clipboard";
+import { useCopy } from "../../ui/clipboard";
 import { ownAccountQuery } from "../auth/AccountGate";
 
 export interface McpTokenStatus {
@@ -21,6 +21,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   const [issuedToken, setIssuedToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const { copied, copy } = useCopy();
   const status = useQuery({
     queryKey: ["personal-mcp-status"],
     queryFn: () => api<McpTokenStatus>("/api/accounts/mcp-token"),
@@ -70,9 +71,9 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
         <Button
           variant="light"
           disabled={!status.data?.endpoint}
-          onClick={() => void copyText(status.data!.endpoint, "Endpoint URL")}
+          onClick={() => copy(status.data!.endpoint, "url")}
         >
-          Copy URL
+          {copied === "url" ? "Copied" : "Copy URL"}
         </Button>
         <Badge color={status.data?.enabled ? "green" : "gray"}>
           {status.data?.enabled ? "Token Active" : "No Token Issued"}
@@ -109,20 +110,17 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
             onFocus={(event) => event.currentTarget.select()}
           />
           <Group gap="xs">
-            <Button variant="light" onClick={() => void copyText(issuedToken, "Token")}>
-              Copy Token
+            <Button variant="light" onClick={() => copy(issuedToken, "token")}>
+              {copied === "token" ? "Copied" : "Copy Token"}
             </Button>
             <Button
               variant="light"
               disabled={!status.data?.endpoint}
               onClick={() =>
-                void copyText(
-                  `${status.data!.endpoint.replace(/\/+$/, "")}/${issuedToken}`,
-                  "URL with Token",
-                )
+                copy(`${status.data!.endpoint.replace(/\/+$/, "")}/${issuedToken}`, "tokenUrl")
               }
             >
-              Copy URL with Token
+              {copied === "tokenUrl" ? "Copied" : "Copy URL with Token"}
             </Button>
           </Group>
         </Stack>

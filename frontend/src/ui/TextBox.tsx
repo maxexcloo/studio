@@ -23,9 +23,9 @@ import {
   useProps,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Check } from "lucide-react";
 import { icons } from "./icons";
-import { copyText } from "./clipboard";
+import { useCopy } from "./clipboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
 
@@ -75,6 +75,7 @@ export function TextBox({
   const content = useRef<HTMLDivElement>(null);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const latest = useRef({ value, onChange });
+  const { copied, copy } = useCopy();
   latest.current = { value, onChange };
   useEffect(() => {
     if (edit && phone) setEditing(true);
@@ -130,16 +131,16 @@ export function TextBox({
     });
   }
   const actions = [
-    <Tooltip key="copy" label={`Copy ${title}`}>
+    <Tooltip key="copy" label={copied ? "Copied" : `Copy ${title}`}>
       <ActionIcon
         aria-label={`Copy ${title}`}
         variant="subtle"
         color="gray"
         disabled={!value}
         onMouseDown={keepFocus}
-        onClick={() => void copyText(value, title)}
+        onClick={() => copy(value)}
       >
-        <icons.copy size={16} />
+        {copied ? <Check size={16} /> : <icons.copy size={16} />}
       </ActionIcon>
     </Tooltip>,
     <Tooltip key="clear" label={`Clear ${title}`}>
