@@ -254,7 +254,7 @@ test("an idle worker takes waiting manual work before background work", async ()
   }
 });
 
-test("a started MCP set stays contiguous and its order survives restart", async () => {
+test("a started MCP set stays ahead of other MCP work but not manual work, across a restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");
   const first = fixture(filename);
@@ -271,7 +271,7 @@ test("a started MCP set stays contiguous and its order survives restart", async 
   const restored = fixture(filename);
   try {
     await drain(restored);
-    assert.deepEqual(restored.submitted, [a2, manual, b1]);
+    assert.deepEqual(restored.submitted, [manual, a2, b1]);
   } finally {
     restored.store.close();
     rmSync(dir, { recursive: true, force: true });
