@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, fork } from "node:child_process";
+import { execFileSync, fork, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import { createRequire } from "node:module";
@@ -39,6 +39,22 @@ try {
     "-pix_fmt",
     "yuv420p",
     path.join(media, "clip.mp4"),
+  ]);
+  // VP9 in WebM: iOS Safari can't be relied on to play it.
+  execFileSync(encoder, [
+    "-loglevel",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc2=size=320x240:rate=24",
+    "-t",
+    "1",
+    "-c:v",
+    "libvpx-vp9",
+    "-deadline",
+    "realtime",
+    path.join(media, "clip.webm"),
   ]);
 } catch {
   canEncode = false;
@@ -171,5 +187,43 @@ test(
       preview.headers.get("cache-control"),
       "private, max-age=604800, stale-while-revalidate=2592000",
     );
+  },
+);
+
+// The top-level MP4 boxes in order, to see whether the index (moov) comes before the media (mdat).
+const boxes = (bytes) => {
+  const names = [];
+  for (let at = 0; at + 8 <= bytes.length; at += bytes.readUInt32BE(at))
+    names.push(bytes.toString("latin1", at + 4, at + 8));
+  return names;
+};
+
+test(
+  "the viewer plays an iOS-safe MP4 with its index first, in byte ranges",
+  { skip: !canEncode },
+  async () => {
+    const original = await fetch(address("view", "clip.mp4"), { headers: { Range: "bytes=0-1" } });
+    assert.equal(original.status, 206, "iOS Safari plays only video it can fetch in ranges");
+    assert.equal(original.headers.get("accept-ranges"), "bytes");
+    assert.equal(original.headers.get("content-type"), "video/mp4");
+    assert.equal((await original.arrayBuffer()).byteLength, 2);
+    for (const name of ["clip.mp4", "clip.webm"]) {
+      const play = address("video-preview", name, "&format=play");
+      const range = await fetch(play, { headers: { Range: "bytes=0-1" } });
+      assert.equal(range.status, 206);
+      assert.equal(range.headers.get("accept-ranges"), "bytes");
+      assert.equal(range.headers.get("content-type"), "video/mp4");
+      assert.equal((await range.arrayBuffer()).byteLength, 2);
+      const bytes = Buffer.from(await (await fetch(play)).arrayBuffer());
+      const order = boxes(bytes);
+      assert.ok(order.indexOf("moov") < order.indexOf("mdat"), `${name}: ${order}`);
+      const file = path.join(dataDir, `played-${name}.mp4`);
+      fs.writeFileSync(file, bytes);
+      const report = spawnSync(encoder, ["-hide_banner", "-i", file], { encoding: "utf8" }).stderr;
+      assert.match(
+        report,
+        /Video: h264 \((?:Constrained Baseline|Baseline|Main|High)\)[^\n]*yuv420p/,
+      );
+    }
   },
 );

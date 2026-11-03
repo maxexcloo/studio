@@ -20,6 +20,16 @@ export function mediaSource(item: MediaItem): {
 }
 
 /**
+ * Where a video plays: Studio's copy that iOS Safari plays (backend getComfyVideoPlayback), the
+ * original itself when it already does. Downloads and shares keep the original's address.
+ */
+export function playbackUrl(url: string) {
+  return url.startsWith("/comfy/view?")
+    ? `${url.replace("/comfy/view?", "/comfy/video-preview?")}&format=play`
+    : url;
+}
+
+/**
  * The listed version of an open item: the same record, or the result that took its pending tile's
  * place (a saved result gets a new ID), so a viewer opened on running work follows it to the result.
  */
