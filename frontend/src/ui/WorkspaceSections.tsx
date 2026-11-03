@@ -3,6 +3,7 @@ import { Box, Divider, Grid, Group, NavLink, Select, Stack, Text } from "@mantin
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { LoadingState } from "./LoadingState";
+import { SectionErrorBoundary } from "./SectionErrorBoundary";
 import { SectionHeading } from "./SectionHeading";
 import classes from "./WorkspaceSections.module.css";
 
@@ -139,9 +140,11 @@ export function WorkspaceSections({
               <Stack>
                 {typeof body !== "function" && heading}
                 {visited.has(section.value) && (
-                  <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
-                    {typeof body === "function" ? body(heading) : body}
-                  </Suspense>
+                  <SectionErrorBoundary label={section.label}>
+                    <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
+                      {typeof body === "function" ? body(heading) : body}
+                    </Suspense>
+                  </SectionErrorBoundary>
                 )}
               </Stack>
             </Box>
