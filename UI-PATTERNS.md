@@ -171,7 +171,7 @@ primary component reference and verify APIs against the installed version.
 - Render assistant Markdown semantically with the shared safe renderer, using
   Mantine typography. Defer parsing streamed changes and keep scroll anchored
   only while the user remains at the bottom.
-- Generation cards are compact: prompt, setting chips, results grid and the
+- Generation cards are compact: prompt, a dimmed settings line, results grid and the
   shared actions. Edit expands the shared editor inline; submitting an edited card
   appends a new iteration at the bottom. Chats can be renamed and deleted; new
   chats get a short LLM title. Deleting a chat offers an unticked per-result

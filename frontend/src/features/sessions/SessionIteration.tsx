@@ -1,16 +1,5 @@
 import { useRef, useState, type CSSProperties } from "react";
-import {
-  Anchor,
-  Badge,
-  Button,
-  Group,
-  Image,
-  Menu,
-  Paper,
-  SimpleGrid,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { ChevronDown, FastForward, Pencil, Play } from "lucide-react";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { isProfile } from "../generation/payload";
@@ -37,7 +26,7 @@ const operationLabels = {
   upscale: "Upscale",
 } as const;
 
-/** The compact card's setting chips: only what the run recorded, without repeating the profile. */
+/** The compact card's settings: only what the run recorded, without repeating the profile. */
 function settingChips(input: QueueJob["input"], profile?: Profile) {
   const name = String(input.profileName || profile?.displayName || profile?.label || "");
   const steps = input.steps && !new RegExp(`\\b${input.steps}\\s*steps?\\b`, "i").test(name);
@@ -312,17 +301,16 @@ export function SessionIteration({
                   />
                 ))}
                 {settingChips(input, profile).map((chip) => (
-                  <Badge
+                  <Text
                     key={chip}
                     role="listitem"
-                    variant="default"
-                    radius="xl"
-                    size="lg"
-                    fw={500}
+                    size="xs"
+                    c="dimmed"
+                    truncate
                     className={classes.chip}
                   >
                     {chip}
-                  </Badge>
+                  </Text>
                 ))}
               </Group>
               {job.operation !== "upscale" && (
