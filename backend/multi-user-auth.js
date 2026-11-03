@@ -34,27 +34,13 @@ import {
   verifyAccountMcpToken,
   verifyLocalAccount,
 } from "./account-store.js";
-import { canAdmin, clientOf } from "./access.js";
+import { accountCookieName, canAdmin, clientOf, cookieToken } from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
 export const multiUserEnabled = process.env.STUDIO_MULTI_USER === "1";
-const accountCookieName = "studio_account";
 const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
-
-function cookieToken(req, name = accountCookieName) {
-  for (const part of String(req?.headers?.cookie || "").split(";")) {
-    const index = part.indexOf("=");
-    if (index < 0 || part.slice(0, index).trim() !== name) continue;
-    try {
-      return decodeURIComponent(part.slice(index + 1).trim());
-    } catch {
-      return "";
-    }
-  }
-  return "";
-}
 
 // Personal MCP tokens reach only the routes MCP itself calls, never account or studio administration.
 const mcpBearerRoutes = [

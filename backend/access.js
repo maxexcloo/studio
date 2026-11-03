@@ -11,10 +11,12 @@ export function clientOf(req) {
   return req.studioClient;
 }
 
-function accountCookie(req) {
+export const accountCookieName = "studio_account";
+
+export function cookieToken(req, name = accountCookieName) {
   for (const part of String(req?.headers?.cookie || "").split(";")) {
     const index = part.indexOf("=");
-    if (index < 0 || part.slice(0, index).trim() !== "studio_account") continue;
+    if (index < 0 || part.slice(0, index).trim() !== name) continue;
     try {
       return decodeURIComponent(part.slice(index + 1).trim());
     } catch {
@@ -30,7 +32,7 @@ function accountCookie(req) {
  */
 export function canAdmin(req) {
   if (process.env.STUDIO_MULTI_USER === "1") {
-    if (!req?.studioAccount && req) req.studioAccount = accountSession(accountCookie(req));
+    if (!req?.studioAccount && req) req.studioAccount = accountSession(cookieToken(req));
     // A personal MCP token never carries administrator authority.
     return (
       req?.studioAccount?.role === "administrator" && req.studioAccount.credential !== "mcp-token"
