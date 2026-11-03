@@ -852,7 +852,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
         {
           request: z
             .string()
@@ -1021,7 +1021,7 @@ export function registerMcpRoutes(
         const jobs = targets.length * (args.prompts?.length || 1) * count;
         if (jobs > maxJobsPerCall)
           throw new Error(
-            `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs} jobs; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
+            `${targets.length} models × ${jobs / targets.length} images each would queue ${jobs}; one call queues at most ${maxJobsPerCall}. Lower count, pass fewer profile_ids, or name a tier.`,
           );
         // A preview's prompts run as shown when the same call follows without preview.
         const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;

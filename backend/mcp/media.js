@@ -72,7 +72,7 @@ export function assertJobCount(prompts = 1, count = 1) {
         ? `For ${prompts} different images, pass the ${prompts} prompts without count, or split them into calls whose prompts × count is at most ${maxJobsPerCall}.`
         : `Pass count ${maxJobsPerCall} or less.`;
     throw new Error(
-      `count is images per prompt, so ${prompts} prompts × count ${count} would queue ${prompts * count} jobs; one call queues at most ${maxJobsPerCall}. ${fix}`,
+      `count is images per prompt, so ${prompts} prompts × count ${count} would queue ${prompts * count} images; one call queues at most ${maxJobsPerCall}. ${fix}`,
     );
   }
 }
@@ -578,6 +578,12 @@ export class McpMedia {
     } else if (face_detail) throw new Error("Choose upscale_quality to enable face_detail.");
     const runs = count;
     assertJobCount(prompts.length, runs);
+    // A profile that batches (as the composer's Count) draws a prompt's images as one job, its model
+    // loaded once; one that can't (no count control) runs a job per image.
+    const batch =
+      (profile.capabilities?.variations ?? profile.kind === "image")
+        ? Math.min(profile.constraints?.count?.max ?? 8, 8)
+        : 1;
     const body = {
       ...profile.defaults,
       // Smart upscale only when the call asked for it, never from a profile default.
@@ -606,7 +612,6 @@ export class McpMedia {
         : {}),
       model: profile.model,
       workflow: profile.workflow,
-      count: 1,
       loras: stack.map((adapter) => ({ ...adapter, enabled: true })),
       referenceAssets: reference_asset_ids.map((id, index) => ({
         slot: slots[index].id,
@@ -642,8 +647,8 @@ export class McpMedia {
     // How long the set should take, asked alongside submission; it never holds up or fails the set.
     const estimate = this.runEstimate(
       owner,
-      { ...body, family: profile.family },
-      prompts.length * runs,
+      { ...body, count: Math.min(batch, runs), family: profile.family },
+      prompts.length * Math.ceil(runs / batch),
     );
     // A call owns the enqueue phase until its whole set is acknowledged, even across MCP clients.
     // Preparation and result waiting remain independent; a refused or uncertain set releases the next.
@@ -656,8 +661,10 @@ export class McpMedia {
     try {
       const queued = [];
       const queueSet = crypto.randomUUID();
+      let images = 0;
       for (const prompt of prompts)
-        for (let variant = 0; variant < runs; variant++) {
+        for (let done = 0; done < runs; done += batch) {
+          const size = Math.min(batch, runs - done);
           const id = crypto.randomUUID();
           // A prompt written in the queue is not known yet; its outputs carry it.
           const ran = writing ? undefined : prompt;
@@ -674,7 +681,8 @@ export class McpMedia {
                 queueSet,
                 prompt: ran ?? "",
                 ...(writing ? { writing } : {}),
-                seed: seed === undefined ? "" : String(seed + queued.length),
+                count: size,
+                seed: seed === undefined ? "" : String(seed + images),
               },
               owner,
             );
@@ -698,6 +706,7 @@ export class McpMedia {
               ...this.handle(owner, scope, result.jobId),
               ...(ran ? { prompt: ran } : {}),
             });
+            images += size;
           } catch (error) {
             if (error.submissionUncertain) {
               queued.push({
@@ -744,6 +753,7 @@ export class McpMedia {
         family: body.family || "",
         width: body.width || 0,
         height: body.height || 0,
+        count: body.count,
         steps: body.steps || 0,
         frames: body.frames || 0,
         refs: body.referenceAssets.length,
