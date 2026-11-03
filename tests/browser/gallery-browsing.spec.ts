@@ -526,6 +526,13 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  // The view (Grid or Runs) sits apart from the on/off filters, which share one row.
+  await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
+  const toggles = ["All Versions", "Starred", "Uploads"].map((name) =>
+    page.getByRole("button", { name, exact: true }),
+  );
+  const tops = await Promise.all(toggles.map(async (toggle) => (await toggle.boundingBox())!.y));
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(4);
   await page.getByRole("button", { name: "Starred", exact: true }).click();
   await expect(page.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
     "aria-pressed",

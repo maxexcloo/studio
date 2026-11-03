@@ -3,7 +3,6 @@ import {
   Alert,
   Button,
   Center,
-  Group,
   Loader,
   SegmentedControl,
   Stack,
@@ -12,7 +11,6 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
-import { icons } from "../../ui/icons";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
@@ -34,7 +32,12 @@ import { useTileCaptions } from "./useGalleryLayout";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
-import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
+import {
+  appendGalleryFilters,
+  emptyGalleryFilters,
+  FilterToggle,
+  galleryFacetsQuery,
+} from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
@@ -230,34 +233,26 @@ export function GalleryPage() {
               : []
           }
           view={
-            <Group gap={6} wrap="nowrap">
-              <SegmentedControl
-                aria-label="Gallery View"
-                size="xs"
-                radius="xl"
-                value={view}
-                onChange={(value) => setView(value as "grid" | "runs")}
-                data={[
-                  {
-                    value: "grid",
-                    label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
-                  },
-                  { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
-                ]}
-              />
-              {view === "grid" && (
-                <Button
-                  {...chipProps}
-                  aria-label="All Versions"
-                  aria-pressed={allVersions}
-                  variant={allVersions ? "light" : "default"}
-                  leftSection={<icons.versions size={15} />}
-                  onClick={() => setAllVersions(!allVersions)}
-                >
-                  All Versions
-                </Button>
-              )}
-            </Group>
+            <SegmentedControl
+              aria-label="Gallery View"
+              fullWidth
+              radius="xl"
+              mt={4}
+              value={view}
+              onChange={(value) => setView(value as "grid" | "runs")}
+              data={[
+                {
+                  value: "grid",
+                  label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
+                },
+                { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
+              ]}
+            />
+          }
+          toggles={
+            view === "grid" && (
+              <FilterToggle label="All Versions" on={allVersions} onChange={setAllVersions} />
+            )
           }
           actions={
             <Tooltip label="Select Items" disabled={!phone}>

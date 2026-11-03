@@ -325,9 +325,10 @@ primary component reference and verify APIs against the installed version.
   changes height), then on desktop the result count and the zoom slider, Filter ▾
   and Select. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
-  stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): the view (Grid or
-  Runs, All Versions), Starred, Uploads, Date, Models, LoRAs, Size, Aspect Ratio
-  and Chats, applying at once. The reference picker uses the same chips, Filter ▾
+  stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
+  a segmented control on its own row; Show, one row of on/off chips (All Versions
+  in Grid, Starred, Uploads), outlined when off and tinted with a check when on;
+  then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. The reference picker uses the same chips, Filter ▾
   and panel, inline. Search narrows within the filters; filter actions preserve
   the query. Gallery filters and zoom are remembered per account. Every labelled
   control that opens a menu or picker shows ▾; icon-only bar controls do not.
