@@ -177,9 +177,13 @@
   transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-.tile[data-row]:hover,
-.tile[data-row][data-selected] {
+.tile[data-row]:hover {
   background: var(--mantine-color-default-hover);
+}
+
+/* A chosen row is tinted like a current saved stack, as well as checked over its picture. */
+.tile[data-row][data-selected] {
+  background: var(--mantine-primary-color-light);
 }
 
 .tile[data-row] .toggle {

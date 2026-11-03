@@ -324,7 +324,8 @@ function LoraControls({
   ) : info.error ? (
     <Alert color="red">{info.error.message}</Alert>
   ) : shown.length ? (
-    // A list on every breakpoint, so names, families and types scan down one column.
+    // A list on every breakpoint, so names, families and types scan down one column; clicking a
+    // row adds or removes its LoRA, and the thumbs beside it rate without toggling it.
     <PickerGrid label="LoRA Choices" rows>
       {shown.map((file) => (
         <PickerTile
@@ -348,15 +349,6 @@ function LoraControls({
           onToggle={() => toggle(file)}
           action={
             <Group gap={4} wrap="nowrap">
-              <Button
-                size="compact-sm"
-                variant={selected.has(file) ? "subtle" : "light"}
-                color={selected.has(file) ? "gray" : undefined}
-                aria-label={`${selected.has(file) ? "Remove" : "Add"} ${title(file)}`}
-                onClick={() => toggle(file)}
-              >
-                {selected.has(file) ? "Remove" : "Add"}
-              </Button>
               {(
                 [
                   ["up", "Thumbs Up", ThumbsUp, "green"],
