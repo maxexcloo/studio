@@ -29,7 +29,7 @@ const settingSections = {
   groups: {
     label: "Groups",
     description:
-      "Which local models, cloud models and uncensored content each group can use; administrators can use everything.",
+      "Which models, uncensored content, Chat and Dream each group can use; administrators can use everything.",
     icon: Shield,
     admin: true,
   },

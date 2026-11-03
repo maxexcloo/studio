@@ -37,6 +37,10 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
+/** A group feature that is on unless the account's group turns it off (Chat, Dream). */
+export function useGroupFeature(feature: "chat" | "dream") {
+  return useAccount().data?.account?.features?.[feature] !== false;
+}
 export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
