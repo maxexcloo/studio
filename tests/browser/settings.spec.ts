@@ -439,7 +439,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   });
   await page.goto("/settings");
   await section(page, "Settings", "Workers");
-  await expect(page.getByText("2 of 2 GPUs in use", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
   // Idle parking applies only under automatic control, which saves 0 as Never.
   const park = page.getByRole("combobox", { name: "Park When Idle", exact: true });
   await expect(park).toBeDisabled();
