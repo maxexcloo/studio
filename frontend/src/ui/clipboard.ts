@@ -17,6 +17,8 @@ function writeText(text: string): Promise<void> {
     (document.activeElement?.closest('[role="dialog"]') || document.body).appendChild(input);
     const previous = document.activeElement as HTMLElement | null;
     input.select();
+    // iOS selects nothing with select() alone.
+    input.setSelectionRange(0, text.length);
     const copied = document.execCommand("copy");
     input.remove();
     previous?.focus({ preventScroll: true });
