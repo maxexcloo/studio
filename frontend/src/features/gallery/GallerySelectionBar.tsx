@@ -8,7 +8,7 @@ import { useQueue, useQueueAction } from "../generation/Queue";
 import { ActionBarGroups, ActionMenuItems, StackedActionBar, type Action } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import {
-  CustomAnimationDialog,
+  AnimateDialog,
   itemAction,
   itemActionGroups,
   useMediaActions,
@@ -22,6 +22,7 @@ import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
+import type { AnimateTheme } from "./useMediaAction";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
@@ -315,13 +316,13 @@ function OneItemActions({
   onChange: (state: string) => void;
 }) {
   const transfer = useMediaTransfer(item, false);
-  const [animating, setAnimating] = useState(false);
+  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const [upscaling, setUpscaling] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const actions = useMediaActions(item, {
     transfer,
     onApplied,
-    onCustomAnimation: () => setAnimating(true),
+    onAnimate: setAnimating,
     // The selection's own Delete covers it.
     onDelete: () => {},
     onTrim: () => setTrimming(true),
@@ -340,7 +341,7 @@ function OneItemActions({
   return (
     <>
       {animating && (
-        <CustomAnimationDialog item={item} opened onClose={() => setAnimating(false)} />
+        <AnimateDialog item={item} theme={animating} onClose={() => setAnimating(null)} />
       )}
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />

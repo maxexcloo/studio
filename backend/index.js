@@ -1361,6 +1361,7 @@ const assistantGuide = (profile) => {
 };
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
+  frame: (req, id) => assistantImage(req.studioAccount, id),
   profiles: assistantProfiles,
   guide: assistantGuide,
   loras: assistantLoras,
