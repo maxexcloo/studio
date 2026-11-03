@@ -62,6 +62,7 @@ import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { accountMayUseLoras, createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
 import { registerStatusRoutes } from "./status-routes.js";
+import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import {
@@ -137,14 +138,14 @@ import {
   root,
   setListeningPort,
 } from "./comfy/comfy.js";
-import { canAdmin, clientOf } from "./access.js";
+import { clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
 import { mcpOutputPath } from "./mcp/media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
+import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
 import { presetsEnabled } from "./features.js";
 import {
   catalogueFlags,
@@ -203,19 +204,7 @@ import { cancelPrompt } from "./comfy/queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
-import {
-  deleteImportedWorkflow,
-  getCustomWorkflow,
-  loadCustomWorkflows,
-  saveImportedWorkflow,
-  userWorkflowsDir,
-} from "./custom-workflows.js";
-import {
-  loadWorkflowPreferences,
-  previewWorkflowImport,
-  saveWorkflowPreferences,
-  workflowSummaries,
-} from "./workflow-catalog.js";
+import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -640,82 +629,7 @@ const library = registerLibraryRoutes(app, {
   schedule: !demoMode,
 });
 
-/** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
-function workflowsForRequest(req, workflows) {
-  if (!req.studioAccount || canAdmin(req)) return workflows;
-  return workflows
-    .filter((item) =>
-      mayUseGenerationProfile(req.studioAccount, {
-        id: item.profileId,
-        family: item.family,
-        uncensored: item.uncensored,
-        aiDrafted: item.aiDrafted,
-      }),
-    )
-    .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
-}
-
-app.get("/api/workflows", async (req, res) => {
-  try {
-    const { info, stats } = await loadComfyContext().catch(() => ({ info: {}, stats: {} }));
-    const models = Object.keys(info || {}).length
-      ? inferModels(info, stats)
-      : demoMode
-        ? mockModelResult()
-        : offlineModelResult(comfyUrl);
-    const preferences = loadWorkflowPreferences();
-    res.json({
-      workflows: workflowsForRequest(
-        req,
-        workflowSummaries({ info, profiles: models.profiles, preferences }),
-      ),
-      preferences,
-    });
-  } catch {
-    const models = demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
-    const preferences = loadWorkflowPreferences();
-    res.json({
-      workflows: workflowsForRequest(
-        req,
-        workflowSummaries({ info: {}, profiles: models.profiles, preferences }),
-      ),
-      preferences,
-    });
-  }
-});
-
-app.post("/api/workflows/import/preview", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const raw = req.body?.workflow || req.body;
-    const { info } = await loadComfyContext().catch(() => ({ info: {} }));
-    res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "", info) });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/workflows/import", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const raw = req.body?.workflow || req.body;
-    const { info } = await loadComfyContext().catch(() => ({ info: {} }));
-    // The review's own notes (the node list, what was guessed) aren't part of the workflow.
-    const { nodes: _nodes, guessed: _guessed, ...metadata } = req.body?.metadata || {};
-    const normalized =
-      (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) || raw?.prompt
-        ? {
-            graph: previewWorkflowImport(raw, req.body?.filename || "", info).graph,
-            studio: metadata,
-          }
-        : raw;
-    const workflow = saveImportedWorkflow(normalized, metadata);
-    const { graph: _graph, ...summary } = workflow;
-    res.json({ ok: true, workflow: summary });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
+registerWorkflowRoutes(app, { loadComfyContext });
 
 const profileObjectInfo = async (kind) =>
   (
@@ -846,22 +760,6 @@ const assistantEngine = registerAssistantRoutes(app, {
       ],
     };
   },
-});
-
-app.delete("/api/workflows/:id", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const result = deleteImportedWorkflow(req.params.id.replace(/^custom:/, ""));
-    const preferences = loadWorkflowPreferences();
-    preferences.favorites = preferences.favorites.filter(
-      (id) => id !== `custom:${result.id}` && id !== result.id,
-    );
-    delete preferences.lastUsed[`custom:${result.id}`];
-    saveWorkflowPreferences(preferences);
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
 });
 
 registerGalleryReadRoutes(app, {
