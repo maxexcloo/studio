@@ -120,7 +120,10 @@ export function WorkspaceSections({
           const body = content[section.value];
           const heading = (
             <div>
-              <SectionHeading>{section.label}</SectionHeading>
+              {/* Phones name the section in the header's Section Select already. */}
+              <Box visibleFrom="sm">
+                <SectionHeading>{section.label}</SectionHeading>
+              </Box>
               <Text size="sm" c="dimmed">
                 {section.description}
               </Text>

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   editDefinition,
   fixtures,
@@ -8,6 +8,14 @@ import {
   serveProfiles,
   signIn,
 } from "./fixtures";
+
+/** Desktop shows the Profiles actions as icons; phones list them under More. */
+async function profileAction(page: Page, name: string) {
+  if ((page.viewportSize()?.width || 1440) < 768) {
+    await page.getByRole("button", { name: "More Profile Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  } else await page.getByRole("button", { name, exact: true }).click();
+}
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
   page,
@@ -258,7 +266,7 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
   await page.goto("/images");
   await openNav(page, "Settings");
   await section(page, "Settings", "Profiles");
-  await page.getByRole("button", { name: "Merge Duplicate Profiles", exact: true }).click();
+  await profileAction(page, "Merge Duplicate Profiles");
   const dialog = page.getByRole("dialog", { name: "Merge Duplicate Profiles", exact: true });
   await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
   await expect(dialog).toContainText("a, b differ in graph");
@@ -368,7 +376,7 @@ test("Combine Backends previews pairs with their differences and combines the pi
   await page.goto("/images");
   await openNav(page, "Settings");
   await section(page, "Settings", "Profiles");
-  await page.getByRole("button", { name: "Combine Backends", exact: true }).click();
+  await profileAction(page, "Combine Backends");
   const dialog = page.getByRole("dialog", { name: "Combine Backends", exact: true });
   await expect(
     dialog.getByRole("table", { name: `Differences for ${pair.name}`, exact: true }),
