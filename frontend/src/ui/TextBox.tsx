@@ -127,7 +127,6 @@ export function TextBox({
         aria-label={`Copy ${title}`}
         variant="subtle"
         color="gray"
-        className={classes.tool}
         disabled={!value}
         onMouseDown={keepFocus}
         onClick={() => void copyText(value, title)}
@@ -140,7 +139,6 @@ export function TextBox({
         aria-label={`Clear ${title}`}
         variant="subtle"
         color="gray"
-        className={classes.tool}
         disabled={!value}
         onMouseDown={keepFocus}
         onClick={clear}

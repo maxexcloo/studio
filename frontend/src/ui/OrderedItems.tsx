@@ -9,7 +9,6 @@ import {
 } from "react";
 import { ActionIcon, Group, Stack, Tooltip } from "@mantine/core";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
-import classes from "./OrderedItems.module.css";
 
 export type OrderedItemsProps<T> = {
   items: T[];
@@ -77,7 +76,6 @@ export function OrderedItemRow({
               ref={handleRef}
               disabled={!handleRef}
               aria-label={`Drag ${label}`}
-              className={classes.control}
               variant="subtle"
               color="gray"
               style={{ cursor: isDragging ? "grabbing" : "grab", touchAction: "none" }}
@@ -88,7 +86,6 @@ export function OrderedItemRow({
           <ActionIcon
             ref={earlier}
             aria-label={`Move ${label} Earlier`}
-            className={classes.control}
             variant="subtle"
             color="gray"
             disabled={index === 0}
@@ -102,7 +99,6 @@ export function OrderedItemRow({
           <ActionIcon
             ref={later}
             aria-label={`Move ${label} Later`}
-            className={classes.control}
             variant="subtle"
             color="gray"
             disabled={index === count - 1}
