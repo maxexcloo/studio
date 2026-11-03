@@ -119,6 +119,7 @@ export function ChatGatewayAccounts({
                     miw={0}
                   />
                   <Button
+                    variant="default"
                     disabled={change.isPending || !choices[row.identity]}
                     aria-label={`Link ${row.identity}`}
                     onClick={() =>
