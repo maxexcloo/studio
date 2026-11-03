@@ -61,6 +61,7 @@
 }
 
 .grid[data-rows] {
+  gap: 2px;
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -166,23 +167,35 @@
   }
 }
 
-/* Phone rows: the picture, then its text, with the corner control at the end. */
+/* Rows: the picture, then its text, with the row's controls at the end. */
+.tile[data-row] {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-md);
+  padding-right: 6px;
+  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.tile[data-row]:hover,
+.tile[data-row][data-selected] {
+  background: var(--mantine-color-default-hover);
+}
+
 .tile[data-row] .toggle {
+  flex: 1;
+  min-width: 0;
   flex-direction: row;
   align-items: center;
   gap: var(--mantine-spacing-sm);
-  min-height: 56px;
-  padding: 6px 52px 6px 6px;
-}
-
-/* Two corner controls, such as a LoRA's thumbs up and down. */
-.tile[data-row]:has(.action button + button) .toggle {
-  padding-right: 84px;
+  min-height: 52px;
+  padding: 4px 6px;
 }
 
 .tile[data-row] .media {
   flex-shrink: 0;
-  width: 44px;
+  width: 40px;
+  aspect-ratio: 1;
 }
 
 .tile[data-row] .check {
@@ -192,9 +205,8 @@
 }
 
 .tile[data-row] .action {
-  top: 50%;
-  right: 6px;
-  translate: 0 -50%;
+  position: static;
+  flex-shrink: 0;
 }
 
 /* Off screen while the browser takes the drag picture. */

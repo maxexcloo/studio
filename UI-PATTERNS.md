@@ -177,7 +177,9 @@ primary component reference and verify APIs against the installed version.
   picker's actions (Sort; References' Upload) in one row at the gallery
   toolbar's compact size, Filter ▾ opening the filters in a popup titled Filters
   with Clear, as the gallery's does (a nested popover on desktop); a
-  selected tile fades with a check and a second click removes it; saved stacks
+  selected tile fades with a check and a second click removes it (References
+  are a grid of pictures; LoRAs a list on every breakpoint, each row a small
+  thumbnail, the name, its family and type, then Add or Remove and the thumbs); saved stacks
   and presets sort (`SortMenu`, as the LoRA choices do), rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom

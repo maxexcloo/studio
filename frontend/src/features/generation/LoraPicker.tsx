@@ -15,6 +15,7 @@ import {
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { icons } from "../../ui/icons";
+import { modelFamilyLabel } from "../../ui/modelFamily";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -323,21 +324,39 @@ function LoraControls({
   ) : info.error ? (
     <Alert color="red">{info.error.message}</Alert>
   ) : shown.length ? (
-    <PickerGrid label="LoRA Choices" rows={phone}>
+    // A list on every breakpoint, so names, families and types scan down one column.
+    <PickerGrid label="LoRA Choices" rows>
       {shown.map((file) => (
         <PickerTile
           key={file}
           label={title(file)}
           title={title(file)}
-          detail={typeNames[typeOf(file)] || typeOf(file) || undefined}
+          detail={
+            [
+              familiesOf(file)
+                .map((key) => modelFamilyLabel(key))
+                .join(", "),
+              typeNames[typeOf(file)] || typeOf(file),
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
           image={previews.data?.previews[file]}
           placeholder={icons.loras}
-          aspect={phone ? "1" : "4 / 3"}
           selected={selected.has(file)}
-          row={phone}
+          row
           onToggle={() => toggle(file)}
           action={
             <Group gap={4} wrap="nowrap">
+              <Button
+                size="compact-sm"
+                variant={selected.has(file) ? "subtle" : "light"}
+                color={selected.has(file) ? "gray" : undefined}
+                aria-label={`${selected.has(file) ? "Remove" : "Add"} ${title(file)}`}
+                onClick={() => toggle(file)}
+              >
+                {selected.has(file) ? "Remove" : "Add"}
+              </Button>
               {(
                 [
                   ["up", "Thumbs Up", ThumbsUp, "green"],
@@ -346,7 +365,7 @@ function LoraControls({
               ).map(([rating, label, Icon, color]) => (
                 <ActionIcon
                   key={rating}
-                  variant={phone ? "subtle" : "default"}
+                  variant="subtle"
                   color="gray"
                   aria-label={`${label} ${title(file)}`}
                   aria-pressed={ratings[file] === rating}

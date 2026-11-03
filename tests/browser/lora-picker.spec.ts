@@ -246,7 +246,11 @@ test("Recommended lists the family's LoRAs; All adds the rest, filtered by type"
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await pickerTab(page, "LoRAs", "Recommended");
-  await choices.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  // Each row adds or removes its LoRA from its own action, as tapping the row does.
+  await choices.getByRole("button", { name: "Add Detail Slider", exact: true }).click();
+  await expect(
+    choices.getByRole("button", { name: "Remove Detail Slider", exact: true }),
+  ).toBeVisible();
   // Without a published default, a new LoRA starts at 1 kept within its range.
   await expect(
     page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
