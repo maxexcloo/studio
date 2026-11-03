@@ -21,7 +21,6 @@ test("Settings follow the settled section order and run maintenance and worker r
   await page.goto("/settings");
   const order = [
     "Account",
-    "Chat Gateway",
     "Groups",
     "Maintenance",
     "Models",

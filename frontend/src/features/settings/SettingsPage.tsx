@@ -7,7 +7,7 @@ import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { SectionHeader } from "../../ui/SectionToolbar";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { AboutStudio } from "./AboutStudio";
-import { ChatGatewayAdmin, GroupsAdmin, UsersAdmin } from "./AccountAdmin";
+import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { ModelSettings } from "./ModelSettings";
 import { OwnAccount } from "./OwnAccount";
@@ -73,7 +73,6 @@ export function SettingsPage() {
             )}
           </Stack>
         ),
-        gateway: <ChatGatewayAdmin />,
         groups: (heading) => <GroupsAdmin heading={heading} />,
         maintenance: <MaintenanceSettings />,
         models: <ModelSettings />,
