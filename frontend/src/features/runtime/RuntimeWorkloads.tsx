@@ -86,7 +86,6 @@ const operationLabel = (status: RuntimeOperation["status"]) =>
     status
   ];
 const holding = (phase: WorkloadPhase) => phase === "running" || phase === "starting";
-const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
@@ -178,7 +177,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   });
   if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { workloads, pools, operation, history, settings } = status.data;
+  const { workloads, operation, history, settings } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
   const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
@@ -189,13 +188,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
   return (
     <Stack gap="md" component="section" aria-label="GPU Workloads">
-      <Group gap="sm" align="baseline">
-        <SectionHeading>GPU Workloads</SectionHeading>
-        <Text size="sm" c="dimmed">
-          {sum(pools.map((pool) => pool.used))} of {sum(pools.map((pool) => pool.capacity))} GPUs in
-          use
-        </Text>
-      </Group>
+      <SectionHeading>GPU Workloads</SectionHeading>
       <AutomaticControl settings={settings} />
       {operation && (
         <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
@@ -331,7 +324,8 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         Accepted work finishes first, then it restarts with the same model and GPUs.
       </ConfirmDialog>
       {!!history.length && (
-        <Stack gap={4} align="flex-start">
+        <Stack gap={4} align="flex-start" component="section" aria-label="History">
+          <SectionHeading>History</SectionHeading>
           <DataTable
             label="Runtime Changes"
             rows={allChanges ? history : history.slice(0, 3)}
