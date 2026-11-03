@@ -123,7 +123,11 @@ test("Escape closes only the innermost reference layer; selection applies at onc
   await page.keyboard.press("Escape");
   await expect(options).toBeHidden();
   await expect(picker).toBeVisible();
+  // Each Escape closes the topmost layer: the filters, then the picker.
   await models.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Filters", exact: true })).toBeHidden();
+  await expect(picker).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(picker).toBeHidden();
   await expect(chip).toBeFocused();
   await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  closePopup,
   closeReferences,
   create,
   fixtures,
@@ -102,15 +103,18 @@ test("Reference browsing keeps its scroll, query and filters, Uploads included, 
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect.poll(() => listing.evaluate((element) => element.scrollTop)).toBe(120);
   await (await referenceSearch(page)).fill("Copper");
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
   await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await references.getByRole("button", { name: "Starred", exact: true }).click();
+  await filters.getByRole("button", { name: "Starred", exact: true }).click();
+  await closePopup(page, "Filters");
   await finishReferences(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await expect(references.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
+  await expect(filters.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await closePopup(page, "Filters");
   await expect(await referenceSearch(page)).toHaveValue("Copper");
   await page
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })

@@ -384,6 +384,7 @@ function LoraControls({
         <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
       }
       filterCount={filter === "all" ? 0 : 1}
+      onClearFilters={() => picker.setFilter("all")}
       filters={
         types.length > 0 && (
           <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>

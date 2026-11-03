@@ -941,7 +941,9 @@ export async function withExpertSettings(page: Page, steps: () => Promise<void>)
 export async function showUploads(page: Page) {
   const picker = page.getByRole("region", { name: "References", exact: true });
   await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await picker.getByRole("button", { name: "Uploads", exact: true }).click();
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  await filters.getByRole("button", { name: "Uploads", exact: true }).click();
+  await closePopup(page, "Filters");
 }
 
 /** Closes the References popup, leaving the composer open; a pick filling the last slot already did. */

@@ -6,11 +6,10 @@ import {
   FileButton,
   getDefaultZIndex,
   Image,
-  Loader,
   ScrollArea,
   Stack,
   Text,
-  UnstyledButton,
+  Tooltip,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { ChevronDown, ImagePlus, Upload } from "lucide-react";
@@ -50,9 +49,8 @@ import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { chipProps } from "./chip";
+import { chipProps, iconChipProps } from "./chip";
 import { ChipPopup, ChipThumbnails, PickerGrid, PickerHeader, PickerTile } from "./Picker";
-import classes from "./ReferencePicker.module.css";
 
 export function ReferencePicker({
   compact = false,
@@ -215,28 +213,24 @@ export function ReferencePicker({
       restoreScroll.current = false;
     }
   }, [viewport, choices.length, browser.scroll]);
-  const uploadTile = (
-    <div role="listitem">
-      <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
-        {(props) => (
-          <UnstyledButton
+  // Uploads go straight into the next slot, so this is an action rather than the gallery's menu.
+  const uploadButton = (
+    <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
+      {(props) => (
+        <Tooltip label="Upload" disabled={!phone}>
+          <Button
             {...props}
-            className={classes.upload}
+            {...(phone ? iconChipProps : chipProps)}
             aria-label="Upload Reference"
+            loading={placement.uploading}
             disabled={!target}
+            leftSection={phone ? undefined : <Upload size={15} />}
           >
-            {placement.uploading ? (
-              <Loader size="sm" />
-            ) : (
-              <Stack gap={4} align="center">
-                <Upload size={20} aria-hidden />
-                <Text size="xs">Upload</Text>
-              </Stack>
-            )}
-          </UnstyledButton>
-        )}
-      </FileButton>
-    </div>
+            {phone ? <Upload size={16} /> : "Upload"}
+          </Button>
+        </Tooltip>
+      )}
+    </FileButton>
   );
   const content = (
     <Stack
@@ -284,6 +278,8 @@ export function ReferencePicker({
         query={query}
         onQueryChange={(query) => browse({ query })}
         filterCount={activeFilters.length}
+        onClearFilters={() => browse({ filters: emptyGalleryFilters })}
+        actions={uploadButton}
         chips={
           activeFilters.length > 0 && (
             <FilterChips
@@ -312,9 +308,8 @@ export function ReferencePicker({
           <LoadingState label="Loading References" />
         ) : listing.error ? (
           <Alert color="red">{listing.error.message}</Alert>
-        ) : choices.length || uploads ? (
+        ) : choices.length ? (
           <PickerGrid label="Reference Choices">
-            {uploads && uploadTile}
             {choices.map((item, index) => (
               <PickerTile
                 key={item.id}
