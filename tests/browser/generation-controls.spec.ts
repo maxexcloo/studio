@@ -9,7 +9,6 @@ import {
   image,
   loadSaved,
   openPresets,
-  pickerTab,
   profiles,
   saveCurrent,
   savedAction,
@@ -277,7 +276,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ];
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await pickerTab(page, "LoRAs", "Stacks");
   await loadSaved(page, "Stack", "Copper Detail");
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
@@ -286,7 +284,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ).toHaveValue("0.35");
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
-  await pickerTab(page, "LoRAs", "Stacks");
   await savedAction(page, "Stack", "Copper Detail", "Update From Current");
   await savedAction(page, "Stack", "Copper Detail", "Rename Stack");
   const name = page.getByRole("textbox", { name: "Stack Name", exact: true });
@@ -304,7 +301,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   expect(state.loraLibrary.snapshots["family:other"][0].name).toBe("Other Family Stack");
   await page.reload();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await pickerTab(page, "LoRAs", "Stacks");
   await loadSaved(page, "Stack", "Copper Detail Refined");
   await closeLoras(page);
   await page
