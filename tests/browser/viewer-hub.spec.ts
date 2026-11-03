@@ -406,6 +406,62 @@ test("Animate runs Fast unless Quality is checked", async ({ page }) => {
   expect(tiers.at(-1)).toBe("quality");
 });
 
+test("Review Prompt First writes the motion prompt for editing, and Run queues exactly that prompt", async ({
+  page,
+}) => {
+  const asked: unknown[] = [];
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route(/\/api\/assistant\/animate$/, (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({
+        json: { ok: true, prompt: "The bird lifts off.", model: "local/text", thinking: "Wings." },
+      });
+    }),
+  );
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  const review = page.getByRole("menuitem", { name: "Review Prompt First", exact: true });
+  await expect(review).toHaveAttribute("aria-checked", "false");
+  await review.click();
+  await expect(review).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Review Prompt", exact: true });
+  const prompt = dialog.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(prompt).toHaveValue("The bird lifts off.");
+  await expect(dialog.getByText("Motion Quality", { exact: true })).toBeVisible();
+  expect(asked).toHaveLength(1);
+  expect(asked[0]).toMatchObject({
+    profileId: "video:test",
+    theme: "living",
+    source: "An amber bird",
+    extend: false,
+    assetId: "asset-hub",
+  });
+  expect(state.jobs).toHaveLength(1);
+  await prompt.fill("The bird lifts off slowly.");
+  await dialog.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    operation: "animate",
+    input: {
+      kind: "video",
+      prompt: "The bird lifts off slowly.",
+      writing: { kind: "animate", prompt: "The bird lifts off slowly.", model: "local/text" },
+      referenceAssets: [{ assetId: "asset-hub", slot: "start" }],
+    },
+  });
+  // The choice is remembered; Cancel queues nothing.
+  await page.reload();
+  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(review).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
+  await expect(prompt).toHaveValue("The bird lifts off.");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(state.jobs).toHaveLength(2);
+});
+
 test("A queue item streams its prompt's thinking; the result keeps it collapsed under the prompt", async ({
   page,
 }, testInfo) => {
@@ -469,6 +525,7 @@ async function offline(page: Page) {
         label: grok.label,
         cloud: true,
         size: { width: 960, height: 960 },
+        tiers: [],
       },
     }),
   );
@@ -570,14 +627,14 @@ test("Details copy the prompt in one click and Copy Settings copies every input"
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async (text: string) => {
-          (window as any).copied = text;
-        },
-      },
-    });
+    // Copying happens within the tap, as iOS Safari needs: the copy command, not the clipboard API.
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    document.execCommand = (command: string) => {
+      const selected = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = selected.value;
+      return true;
+    };
   });
   const { viewer } = await seed(page, {
     negative: "blurry",
@@ -725,8 +782,14 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");
-  // Opened, it also downloads as a GIF.
+  // Opened, it plays the copy iOS Safari plays, and also downloads as a GIF.
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Generation", exact: true }).locator("video"),
+  ).toHaveAttribute(
+    "src",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=play",
+  );
   await viewerAction(page, "Download Options");
   await expect(page.getByRole("menuitem", { name: "Download Video", exact: true })).toHaveAttribute(
     "href",

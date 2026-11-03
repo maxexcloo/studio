@@ -34,7 +34,7 @@ import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
-import { mediaSource } from "./mediaSource";
+import { mediaSource, playbackUrl } from "./mediaSource";
 import { findAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration, type Iteration } from "./useMediaAction";
@@ -502,7 +502,7 @@ export function MediaViewer({
                 <ViewerVideo
                   key={`${item.id}:${source.url}`}
                   id={item.id}
-                  src={source.url}
+                  src={playbackUrl(source.url)}
                   poster={source.thumbnailUrl}
                   width={source.width}
                   height={source.height}

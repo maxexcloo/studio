@@ -52,9 +52,10 @@ export function writingIssue(writing, { engine, account }) {
 /**
  * The stage's writer. `account(ownerId)` is the owner's access (undefined in single-user mode, null
  * once gone), `profiles(account)` the generation profiles it may use, `guide(profile)` a profile's
- * prompting guide and `dream()` Dream.
+ * prompting guide, `dream()` Dream and `frame(account, assetId)` a reference image as the text model
+ * reads it.
  */
-export function createPromptStage({ engine, account, profiles, guide, dream }) {
+export function createPromptStage({ engine, account, profiles, guide, dream, frame }) {
   return async (job, stream) => {
     const { signal, onThinking, onDelta } = stream;
     const writing = job.input.writing;
@@ -71,6 +72,8 @@ export function createPromptStage({ engine, account, profiles, guide, dream }) {
       guide: guide(profile),
       writing,
       seconds: clipSeconds(job.input, profile),
+      // The job's first reference is the frame it animates from.
+      frame: () => frame(access, job.input.referenceAssets?.[0]?.assetId),
       signal,
       onThinking,
       onDelta,

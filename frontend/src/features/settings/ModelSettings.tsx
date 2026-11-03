@@ -20,7 +20,6 @@ interface Deployment {
     key: string;
     label: string;
     description: string;
-    applies: string;
     value: boolean;
   })[];
   integrations: {
@@ -98,7 +97,7 @@ export function ModelSettings() {
             <SettingRow
               key={flag.key}
               label={flag.label}
-              description={`${flag.description} ${sourceNote(flag)}${flag.applies === "restart" ? " · Applies after a restart" : ""}.`}
+              description={`${flag.description} ${sourceNote(flag)}.`}
             >
               <Switch
                 aria-label={flag.label}

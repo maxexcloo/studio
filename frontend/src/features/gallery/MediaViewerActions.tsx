@@ -7,10 +7,10 @@ import {
   StackedActionBar,
   type ActionGroups,
 } from "./ActionBar";
-import { CustomAnimationDialog, useMediaActions } from "./MediaActions";
+import { AnimateDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
-import type { Iteration } from "./useMediaAction";
+import type { AnimateTheme, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
@@ -51,7 +51,7 @@ export function MediaViewerActions({
 }) {
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
-  const [instructing, setInstructing] = useState(false);
+  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const [upscaling, setUpscaling] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const groups = useMediaActions(item, {
@@ -64,7 +64,7 @@ export function MediaViewerActions({
     onCompare,
     // Compare shows in menus and the selection bar, not under the open item.
     omit: ["compare"],
-    onCustomAnimation: () => setInstructing(true),
+    onAnimate: setAnimating,
     onDelete,
     onRetried,
     onTrim: () => setTrimming(true),
@@ -100,13 +100,15 @@ export function MediaViewerActions({
       ) : (
         <ActionBarGroups groups={[primaries, ...rest]} labelled={primary} />
       )}
-      <CustomAnimationDialog
-        item={item}
-        sessionId={sessionId}
-        iterate={iterate}
-        opened={instructing}
-        onClose={() => setInstructing(false)}
-      />
+      {animating && (
+        <AnimateDialog
+          item={item}
+          sessionId={sessionId}
+          iterate={iterate}
+          theme={animating}
+          onClose={() => setAnimating(null)}
+        />
+      )}
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}

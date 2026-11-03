@@ -6,6 +6,7 @@ import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { usePhone } from "../../ui/usePhone";
 import { queueQuery } from "../generation/Queue";
+import { playbackUrl } from "./mediaSource";
 
 /** A video edit backend/gallery/video-edits.js saves as a new version of the clip. */
 export type VideoEdit =
@@ -47,7 +48,7 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
         <Stack>
           <video
             ref={player}
-            src={item.url}
+            src={playbackUrl(item.url)}
             controls
             muted
             playsInline

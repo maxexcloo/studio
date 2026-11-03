@@ -15,12 +15,12 @@ import { ChevronDown, FastForward, Pencil, Play } from "lucide-react";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { isProfile } from "../generation/payload";
 import { ActionMenuItems, findAction } from "../gallery/ActionBar";
-import { CustomAnimationDialog, useMediaActions } from "../gallery/MediaActions";
+import { AnimateDialog, useMediaActions } from "../gallery/MediaActions";
 import { useMediaTransfer } from "../gallery/mediaShare";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaTileActions } from "../gallery/MediaTileActions";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
-import { useMediaAction } from "../gallery/useMediaAction";
+import { useMediaAction, type AnimateTheme } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { WritingStream } from "../generation/PromptWriting";
 import { QueueJobAction } from "../generation/Queue";
@@ -138,17 +138,17 @@ function ResultTile({
 
 /**
  * Refine (or Extend) stages a new card below a single result; Animate ▾ (Extend ▾ on videos) offers
- * the viewer's options: motion themes run at once, Custom Animation and the composer stage a card.
+ * the viewer's options: motion themes run at once (after the review under Review Prompt First), Custom Animation and the composer stage a card.
  */
 function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string }) {
   const action = useMediaAction(item, sessionId);
-  const [custom, setCustom] = useState(false);
+  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const animate = findAction(
     // Only Animate is shown here, so the transfer, delete and trim parts stay idle.
     useMediaActions(item, {
       transfer: useMediaTransfer(item, false),
       sessionId,
-      onCustomAnimation: () => setCustom(true),
+      onAnimate: setAnimating,
       onDelete: () => {},
       onTrim: () => {},
     }),
@@ -191,12 +191,12 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
           </Menu.Dropdown>
         </Menu>
       )}
-      {custom && (
-        <CustomAnimationDialog
+      {animating && (
+        <AnimateDialog
           item={item}
           sessionId={sessionId}
-          opened
-          onClose={() => setCustom(false)}
+          theme={animating}
+          onClose={() => setAnimating(null)}
         />
       )}
     </Group>

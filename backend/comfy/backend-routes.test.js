@@ -54,7 +54,7 @@ fs.writeFileSync(
 let server;
 let base;
 
-async function start(useVideo = true, restrictModels = false, runtimeDir = dataDir) {
+async function start(useVideo = true, runtimeDir = dataDir) {
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
     env: {
@@ -74,7 +74,6 @@ async function start(useVideo = true, restrictModels = false, runtimeDir = dataD
           ? [{ id: "video", name: "Video Worker", url: video.url, capabilities: ["video"] }]
           : []),
       ]),
-      STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -335,28 +334,10 @@ test(
     assert.equal(video.prompts.length, secondaryCount);
     await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
     primary.drop(prompt.id);
-  },
-);
-
-test("SFW instances hide LoRAs on either backend configuration", { timeout: 10000 }, async () => {
-  const before = (await api("/api/models")).body;
-  assert.ok(before.loras.includes("private-lora.safetensors"));
-  try {
-    for (const useVideo of [true, false]) {
-      await stop();
-      await start(useVideo, true);
-      const models = (await api("/api/models")).body;
-      assert.deepEqual(models.loras, []);
-      assert.ok(models.profiles.every((profile) => !profile.capabilities.lora));
-      assert.deepEqual((await api("/api/loras/info")).body.loras, {});
-      assert.equal((await api("/api/loras/library")).body.found, false);
-      assert.deepEqual((await api("/api/loras/saved-profile")).body.loras, []);
-    }
-  } finally {
     await stop();
     await start();
-  }
-});
+  },
+);
 
 test(
   "repeating an acknowledged client job ID does not queue another video",
@@ -481,7 +462,7 @@ test(
     video.url = `http://127.0.0.1:${proxy.address().port}`;
     let jobId;
     try {
-      await start(true, false, isolatedData);
+      await start(true, isolatedData);
       const original = (await api("/api/models")).body;
       const h3 = original.profiles.find((item) => item.family === "minimax_h3");
       assert.ok(h3);

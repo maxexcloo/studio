@@ -8,6 +8,9 @@
  *                                       profiles whose guide takes no negative (noNegative)
  *   POST /api/assistant/rewrite         { profileId, prompt, preset, references?, loras? } → streamed
  *                                       (text/event-stream: delta, done, error) or JSON
+ *   POST /api/assistant/animate         { profileId, theme, instruction?, source, extend?, assetId?,
+ *                                       duration?, frames?, fps? } → { prompt, model, thinking }:
+ *                                       Animate's motion prompt for Review Prompt First
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
  */
@@ -19,6 +22,7 @@ import {
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
+import { animateIssue, animateRequest, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
 import { loadSharp } from "./sharp-loader.js";
 
 const maxReferences = 4;
@@ -155,7 +159,8 @@ export function assistantSettingValue(key, value) {
 /**
  * `profiles(req)`: the generation profiles this account may use (account-scoped). `guide(profile)`:
  * its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
- * profile)`: { examples, loras } from starred results on the same family.
+ * profile)`: { examples, loras } from starred results on the same family. `frame(req, assetId)`: a
+ * reference image the account may use, as the text model reads it.
  */
 export function registerAssistantRoutes(
   app,
@@ -168,6 +173,7 @@ export function registerAssistantRoutes(
     guide = () => null,
     loras = async () => [],
     starred = async () => ({ examples: [], loras: [] }),
+    frame = async () => null,
   } = {},
 ) {
   const fail = (res, error) => {
@@ -295,6 +301,33 @@ export function registerAssistantRoutes(
         res.end();
         return;
       }
+      fail(res, error);
+    }
+  });
+
+  // The queue's writing stage writes the same prompt (prompt-stage.js); this one returns it unqueued.
+  app.post("/api/assistant/animate", async (req, res) => {
+    const signal = disconnectSignal(res);
+    const context = await ready(req, res);
+    if (!context || signal.aborted) return;
+    const writing = animateRequest(req.body);
+    const issue = animateIssue(writing, { allowed: (feature) => allowed(req, feature) });
+    if (issue) return res.status(issue.status).json({ ok: false, error: issue.error });
+    try {
+      const assetId = String(req.body?.assetId || "");
+      res.json({
+        ok: true,
+        ...(await writeAnimatePrompt({
+          ...context,
+          engine,
+          writing,
+          seconds: clipSeconds(req.body, context.profile),
+          frame: () => frame(req, assetId),
+          signal,
+        })),
+      });
+    } catch (error) {
+      if (signal.aborted) return res.end();
       fail(res, error);
     }
   });

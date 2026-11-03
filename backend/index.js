@@ -5,8 +5,6 @@ import "./data-snapshot.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
-import { addProbe, logWarning } from "./crash-log.js";
-import { PORT_IN_USE_CODE, noteAlive, startSession } from "./exit-record.js";
 import {
   galleryJobResponse,
   registerGalleryReadRoutes,
@@ -121,6 +119,7 @@ import {
   workerById,
 } from "./workers.js";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -146,12 +145,11 @@ import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
 import { mcpOutputPath } from "./mcp/media.js";
 import { stripMetadata } from "./metadata-strip.js";
-import { startServers } from "./listen.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
 import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
-import { lorasEnabled, presetsEnabled } from "./features.js";
+import { presetsEnabled } from "./features.js";
 import {
   catalogueFlags,
   describeFlag,
@@ -183,7 +181,7 @@ import {
   storedWritingRecord,
   onGalleryFilesDeleted,
 } from "./gallery/store.js";
-import { buildStats, getThumbnail } from "./thumbnails.js";
+import { getThumbnail } from "./thumbnails.js";
 import {
   clearPromptHistory,
   forgetPrompts,
@@ -197,6 +195,7 @@ import { fillVideoSizes } from "./library/library.js";
 import {
   getComfyVideoGif,
   getComfyVideoLoop,
+  getComfyVideoPlayback,
   getComfyVideoPoster,
   getComfyVideoPreview,
   sendVideoPreview,
@@ -303,9 +302,6 @@ import {
 
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer(), flush: flushPendingGallery });
-
-// Thumbnails building and waiting, in every heartbeat and crash line.
-addProbe("thumbs", () => buildStats());
 
 const app = express();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
@@ -624,7 +620,7 @@ registerMultiUserAuthRoutes(app, {
     (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id),
 });
 
-// How a second start finds out Studio already holds the port (see launch.js).
+// Liveness, for the container health check and the test servers.
 app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "studio", version: appVersion }));
 
 // Readiness: the studio can serve once its data folder is writable. ComfyUI workers may come and go
@@ -739,21 +735,6 @@ app.get("/api/diagnostics", async (_req, res) => {
   const report = diagnostics({ version: appVersion, stats, comfyBusy, comfyLocal: comfyIsLocal() });
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
-
-const serverStartedAt = Date.now();
-// How the last run ended, when it went wrong (exit-record.js), logged at start.
-// Read once listening: a second copy that finds this one running must not take over its record.
-function beginSession() {
-  const previousExit = startSession({ now: serverStartedAt });
-  if (previousExit)
-    logWarning("The last run stopped unexpectedly", {
-      who: previousExit.who,
-      reason: previousExit.reason,
-      code: previousExit.code,
-      signal: previousExit.signal,
-    });
-  setInterval(() => noteAlive(), 60_000).unref();
-}
 
 // Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
@@ -1141,11 +1122,11 @@ const library = registerLibraryRoutes(app, {
   catalogue: loraCatalogue,
   draftProfile: (record, options) => draftCheckpointProfile(record, options),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  loraInfo: (names) => (lorasEnabled ? loraInfos(names) : Promise.resolve({})),
+  loraInfo: (names) => loraInfos(names),
   installed: async () => {
     const { info } = await loadComfyContext();
     return {
-      loras: lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [],
+      loras: optionsFor(info, "LoraLoader", "lora_name"),
       checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
       diffusion_models: unique(
         optionsFor(info, "UNETLoader", "unet_name"),
@@ -1342,7 +1323,7 @@ const assistantProfiles = async (req) => {
   }
 };
 const assistantLoras = async (req) => {
-  if (!accountMayUseLoras(req) || !lorasEnabled) return [];
+  if (!accountMayUseLoras(req)) return [];
   try {
     const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
     const infos = await loraInfos(names);
@@ -1360,6 +1341,7 @@ const assistantGuide = (profile) => {
 };
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
+  frame: (req, id) => assistantImage(req.studioAccount, id),
   profiles: assistantProfiles,
   guide: assistantGuide,
   loras: assistantLoras,
@@ -1429,7 +1411,7 @@ app.delete("/api/loras", (req, res) => {
 app.get("/api/loras/library", (req, res) => {
   if (!accountMayUseLoras(req))
     return res.json({ found: false, library: { strengths: {}, snapshots: {} } });
-  const library = lorasEnabled ? loadLoraLibrary(ownerIdForRequest(req)) : null;
+  const library = loadLoraLibrary(ownerIdForRequest(req));
   res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
 });
 
@@ -1457,7 +1439,6 @@ app.post("/api/loras/library/ops", (req, res) => {
 // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
 app.get("/api/loras/info", async (_req, res) => {
   if (!accountMayUseLoras(_req)) return res.json({ ok: true, loras: {} });
-  if (!lorasEnabled) return res.json({ ok: true, loras: {} });
   try {
     const { info } = await loadComfyContext();
     res.json({ ok: true, loras: await loraInfos(optionsFor(info, "LoraLoader", "lora_name")) });
@@ -1468,7 +1449,7 @@ app.get("/api/loras/info", async (_req, res) => {
 
 app.get("/api/loras/:workflowId", (req, res) => {
   if (!accountMayUseLoras(req)) return res.json({ found: false, loras: [] });
-  const loras = lorasEnabled ? loadLoraStack(req.params.workflowId, ownerIdForRequest(req)) : null;
+  const loras = loadLoraStack(req.params.workflowId, ownerIdForRequest(req));
   res.json({ found: loras !== null, loras: loras || [] });
 });
 
@@ -1688,13 +1669,12 @@ app.post("/api/settings/deployment", (req, res) => {
     if (isCatalogueFlag(key)) {
       if (typeof value !== "boolean") throw new Error("Choose on or off.");
       const item = catalogueFlags.find((entry) => entry.key === key);
-      // Back to the default is no line at all, so a later default change still applies.
+      // Back to the default is no saved value at all, so a later default change still applies.
       res.json({
         ok: true,
         setting: {
           ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"),
           key,
-          applies: item.applies,
         },
       });
       return;
@@ -1705,7 +1685,6 @@ app.post("/api/settings/deployment", (req, res) => {
         setting: {
           ...saveDeploymentSetting(key, assistantSettingValue(key, value)),
           key,
-          applies: "now",
         },
       });
       return;
@@ -1713,7 +1692,7 @@ app.post("/api/settings/deployment", (req, res) => {
     if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
       const id = String(value || "").trim();
       if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
-      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key, applies: "now" } });
+      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
       return;
     }
     res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
@@ -1956,6 +1935,15 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
     await queueAdapter.settled(job);
   },
 });
+/** A reference image as the text model reads it ({ mime, data }, downscaled), or null. */
+async function assistantImage(account, id) {
+  if (!id) return null;
+  const reference = await bytesForReferenceAccount(account, id);
+  const [image] = await downscaleReferences([
+    `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
+  ]);
+  return image || null;
+}
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -1966,6 +1954,7 @@ const promptStage = createPromptStage({
   profiles: (account) => assistantProfiles({ studioAccount: account }),
   guide: assistantGuide,
   dream: () => dream,
+  frame: assistantImage,
 });
 const generationAdapter = withUpscaleAdapter(
   directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
@@ -2202,7 +2191,7 @@ const dream = createDream({
   },
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return null;
+    if (account && !mayUseFeature(account, "loras")) return null;
     return loadLoraLibrary(ownerId);
   },
   // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
@@ -2497,10 +2486,7 @@ const sessionChat = new ChatService({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated)
       throw Object.assign(new Error("This account no longer has access."), { status: 403 });
-    const reference = await bytesForReferenceAccount(account, id);
-    const [image] = await downscaleReferences([
-      `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
-    ]);
+    const image = await assistantImage(account, id);
     if (!image)
       throw Object.assign(new Error("This reference image cannot be used by Chat."), {
         status: 400,
@@ -3023,6 +3009,16 @@ app.get("/comfy/video-preview", async (req, res) => {
         .send(await getComfyVideoLoop(filename, subfolder, type));
       return;
     }
+    // The viewer's copy (getComfyVideoPlayback); a video not kept here plays as ComfyUI has it.
+    if (req.query.format === "play") {
+      const playback = await getComfyVideoPlayback(filename, subfolder, type);
+      if (!playback)
+        res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
+      else if (playback.original)
+        res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
+      else sendVideoPreview(req, res, playback.file, cacheControl);
+      return;
+    }
     // The still comes from the original, ahead of any preview still being encoded.
     if (req.query.poster === "1")
       await sendVideoPoster(
@@ -3257,84 +3253,72 @@ startMediaWarmup();
 
 // dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
 const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);
-const serverStartup = startServers(app, {
-  host,
-  port,
-  onFatal(error) {
-    let message = `\n  Studio couldn’t start: ${error.message}\n`;
-    // Where the running copy answered: this computer, or the one address HOST names.
-    const runningHost =
-      !error.host || error.host === "127.0.0.1"
-        ? "localhost"
-        : error.host.includes(":")
-          ? `[${error.host}]`
-          : error.host;
-    if (error.studioRunning)
-      message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
-    else if (error.code === "EADDRINUSE")
-      message = `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`;
-    console.error(message);
-    // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
-    process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
-  },
-  onListening({ port: listening }) {
-    beginSession();
-    // Phone links in Settings use the bound address.
-    setListeningPort(listening);
-    // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
-    // on a name, never on an address.
-    const shownHost =
-      host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
-    const pagePort = dev ? 5173 : listening;
-    console.log(
-      `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
-    );
-    void (async () => {
-      // Listening beyond this computer: say where a phone can open it.
-      if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
-        const addresses = Object.values(os.networkInterfaces())
-          .flatMap((entries) => entries || [])
-          .filter((entry) => entry.family === "IPv4" && !entry.internal)
-          .map((entry) => `http://${entry.address}:${pagePort}`);
-        for (const address of addresses) console.log(`    ➜  Network   ${address}`);
-      }
-      // No workers is a setup of its own: say so.
-      if (!listWorkers().length) {
-        if (!demoMode)
-          console.log(
-            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
-          );
-        return;
-      }
-      // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
-      const answering = await fetch(`${comfyUrl}/system_stats`, {
-        signal: AbortSignal.timeout(3000),
-      }).then(
-        (response) => response.ok,
-        () => false,
-      );
-      if (!answering && !demoMode)
+// A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
+// request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
+// POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
+const server = http.createServer(app);
+server.keepAliveTimeout = 120_000;
+server.headersTimeout = 121_000;
+server.once("error", (error) => {
+  console.error(
+    error.code === "EADDRINUSE"
+      ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`
+      : `\n  Studio couldn’t start: ${error.message}\n`,
+  );
+  process.exit(1);
+});
+server.listen(Number(port), host, () => {
+  const listening = server.address().port;
+  // Phone links in Settings use the bound address.
+  setListeningPort(listening);
+  // localhost rather than 127.0.0.1: same server, but browsers only allow passkeys
+  // on a name, never on an address.
+  const shownHost =
+    host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
+  const pagePort = dev ? 5173 : listening;
+  console.log(
+    `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
+  );
+  void (async () => {
+    // Listening beyond this computer: say where a phone can open it.
+    if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
+      const addresses = Object.values(os.networkInterfaces())
+        .flatMap((entries) => entries || [])
+        .filter((entry) => entry.family === "IPv4" && !entry.internal)
+        .map((entry) => `http://${entry.address}:${pagePort}`);
+      for (const address of addresses) console.log(`    ➜  Network   ${address}`);
+    }
+    // No workers is a setup of its own: say so.
+    if (!listWorkers().length) {
+      if (!demoMode)
         console.log(
-          `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
+          "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
         );
-    })().catch(() => {});
-    // Tells a parent process (the server tests) where this one listens.
-    process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
-  },
+      return;
+    }
+    // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
+    const answering = await fetch(`${comfyUrl}/system_stats`, {
+      signal: AbortSignal.timeout(3000),
+    }).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (!answering && !demoMode)
+      console.log(
+        `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
+      );
+  })().catch(() => {});
+  // Tells a parent process (the server tests) where this one listens.
+  process.send?.({ type: "ready", version: appVersion, url: `http://${shownHost}:${pagePort}` });
 });
 
 drainServer = async () => {
   // MCP calls waiting inline for images reply with their links instead of outliving the grace.
   mcp?.endWaits();
-  const listening = await serverStartup;
-  const closed = Promise.all(
-    (listening?.servers || []).map(
-      (server) =>
-        new Promise((resolve, reject) => {
-          server.close((error) => (error ? reject(error) : resolve()));
-        }),
-    ),
-  );
+  const closed = new Promise((resolve, reject) => {
+    if (!server.listening) return resolve();
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
   await Promise.all([generationQueue.stop(), closed]);
   await flushGalleryStrict();
   store.close();
