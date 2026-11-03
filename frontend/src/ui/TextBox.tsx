@@ -11,6 +11,7 @@ import {
 import {
   ActionIcon,
   Button,
+  FocusTrap,
   Group,
   Modal,
   Stack,
@@ -80,6 +81,8 @@ export function TextBox({
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!editing || !viewport) return;
+    // iOS scrolls the page to the focused text; the page returns where it was once the editor closes.
+    const scrolled = window.scrollY;
     let lowest = viewport.height;
     const resize = () => {
       lowest = Math.min(lowest, viewport.height);
@@ -97,6 +100,8 @@ export function TextBox({
     return () => {
       viewport.removeEventListener("resize", resize);
       viewport.removeEventListener("scroll", resize);
+      setKeyboard({ top: 0, inset: 0 });
+      if (window.scrollY !== scrolled) window.scrollTo({ top: scrolled });
     };
   }, [editing]);
   function clear() {
@@ -165,8 +170,10 @@ export function TextBox({
         aria-hidden={editing || undefined}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
-        // A phone box only summarises its text, which the editor scrolls instead.
+        // A phone box only summarises its text, which the editor scrolls instead; tapping it opens
+        // the editor without raising the keyboard.
         styles={phone ? { input: { overflowY: "hidden" } } : undefined}
+        inputMode={phone ? "none" : props.inputMode}
         onClick={(event) => {
           onClick?.(event);
           if (phone && !props.readOnly && !props.disabled) setEditing(true);
@@ -218,6 +225,8 @@ export function TextBox({
             }
             onKeyDownCapture={escape}
           >
+            {/* The keyboard waits until the text itself is tapped. */}
+            <FocusTrap.InitialFocus />
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
               <Group gap={4} wrap="nowrap">
@@ -245,7 +254,6 @@ export function TextBox({
             </Modal.Header>
             <Modal.Body>
               <Textarea
-                data-autofocus
                 aria-label={title}
                 placeholder={props.placeholder}
                 maxLength={props.maxLength}
@@ -254,10 +262,6 @@ export function TextBox({
                 classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
                 value={value}
                 onChange={(event) => onChange(event.currentTarget.value)}
-                // Editing carries on from the end of the text.
-                onFocus={(event) =>
-                  event.currentTarget.setSelectionRange(value.length, value.length)
-                }
                 // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page.
                 onBlur={close}
               />

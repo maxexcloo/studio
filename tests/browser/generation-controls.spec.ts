@@ -761,8 +761,20 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
     };
   });
   await page.goto("/");
+  const phone = testInfo.project.use.isMobile;
+  const scrollY = await page.evaluate(() => window.scrollY);
+  const dock = await page.locator("[data-composer-dock]").boundingBox();
   await page.locator("[data-composer-prompt]").click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  if (phone) {
+    // The phone editor opens without the keyboard, which waits for a tap on the text.
+    await expect(editor).toBeVisible();
+    await expect(text).not.toBeFocused();
+    await text.click();
+    await expect(text).toBeFocused();
+  }
   await prompt.fill("A lantern in fog");
   await page.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
@@ -770,16 +782,21 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
   await expect(prompt).toHaveValue("");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A lantern in fog");
-  if (!testInfo.project.use.isMobile) return;
+  if (!phone) return;
   await prompt.click();
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  await text.click();
   await expect(text).toBeFocused();
   await page.keyboard.type(" at dusk");
   await editor.getByRole("button", { name: "Done", exact: true }).click();
   await expect(editor).toBeHidden();
-  await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeVisible();
+  const generate = page.getByRole("dialog", { name: "Generate", exact: true });
+  await expect(generate).toBeVisible();
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
+  // Closing returns the page and its dock where they were.
+  await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
+  await expect(generate).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+  await expect.poll(() => page.locator("[data-composer-dock]").boundingBox()).toEqual(dock);
 });
 
 test("Image presets draw at the chosen resolution within profile constraints", async ({ page }) => {
