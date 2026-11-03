@@ -100,7 +100,7 @@ export function ComparePage() {
         <Stack gap={4}>
           {prompt && (
             <Text size="sm" lineClamp={3}>
-              {prompt}
+              Prompt: {prompt}
             </Text>
           )}
           {negative && (
@@ -160,7 +160,7 @@ export function ComparePage() {
               )}
               {!prompt && item?.prompt && (
                 <Text size="xs" c="dimmed" lineClamp={3}>
-                  {item.prompt}
+                  Prompt: {item.prompt}
                 </Text>
               )}
               {negative === undefined && item?.negative && (

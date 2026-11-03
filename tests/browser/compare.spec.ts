@@ -62,7 +62,7 @@ test("Compare from the composer queues one seeded variant per chosen local profi
     ["Other Image", "image:other", "", [], 1],
   ]);
   await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
-  await expect(page.getByText("A copper fox", { exact: true })).toBeVisible();
+  await expect(page.getByText("Prompt: A copper fox", { exact: true })).toBeVisible();
 
   const star = page.getByRole("button", { name: "Star Image Fast as Winner", exact: true });
   await star.click();
