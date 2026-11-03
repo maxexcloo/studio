@@ -4833,7 +4833,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
       .filter((tool) => tool.annotations?.readOnlyHint)
       .map((tool) => tool.name)
       .sort(),
-    ["Imports", "Library", "Lookup", "Placement", "Profiles"],
+    ["Library", "Lookup", "Placement", "Profiles"],
   );
   // The single-user shared key is never an administrator.
   const single = await fixture(t);

@@ -88,6 +88,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     next();
   });
   const forgotten = [];
+  const store = createImportStore({ dataDir, log: {} });
   registerLibraryRoutes(app, {
     presets: {},
     installed: async () => ({}),
@@ -97,7 +98,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     inspect: async () => ({ status: "missing" }),
     downloads: () => ({ active: null, queued: [], recent: [] }),
     startDownload: async () => ({}),
-    store: createImportStore({ dataDir, log: {} }),
+    store,
     schedule: false,
     pictures: { file: () => "", save: async () => false, copy: async () => false },
     references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
@@ -159,6 +160,19 @@ test("an import from chat goes through the same pipeline, records chat as its or
     ["chat", "chat", "ui"],
     "all show in Library › Import",
   );
+  // Clear Failed removes only failed records; Remove takes one.
+  store.put({ ...store.get(ui.import.id), state: "failed", error: "HTTP 451" });
+  assert.deepEqual(await call("POST", "/api/library/imports/clear-failed"), {
+    ok: true,
+    cleared: 1,
+  });
+  assert.deepEqual(
+    (await call("GET", "/api/library/imports")).imports.map((item) => item.origin).sort(),
+    ["chat", "chat"],
+  );
+  assert.equal(fs.existsSync(path.join(store.dir, `${ui.import.id}.json`)), false);
+  assert.equal((await call("DELETE", `/api/library/imports/${picture.import.id}`)).ok, true);
+  assert.equal((await call("GET", "/api/library/imports")).imports.length, 1);
 
   const edited = await call("PATCH", "/api/library/catalogue", {
     key: "loras/watercolour-v2.safetensors",

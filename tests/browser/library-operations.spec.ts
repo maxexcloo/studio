@@ -325,6 +325,42 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   expect(attempts).toBe(2);
 });
 
+test("Clear Failed removes failed imports and says how many; Remove takes one", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let records = [
+    { id: "imp-failed", name: "Blocked Model", state: "failed", resources: [] },
+    { id: "imp-ready", name: "Kept Model", state: "ready", resources: [] },
+  ];
+  await page.route("**/api/library/imports**", (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname.endsWith("/clear-failed")) {
+      const before = records.length;
+      records = records.filter((record) => record.state !== "failed");
+      return route.fulfill({ json: { ok: true, cleared: before - records.length } });
+    }
+    if (route.request().method() === "DELETE") {
+      records = records.filter((record) => !pathname.endsWith(`/${record.id}`));
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fulfill({ json: { imports: records } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await page.getByRole("button", { name: "Clear Failed", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Clear Failed Imports?" })
+    .getByRole("button", { name: "Clear Failed", exact: true })
+    .click();
+  await expect(page.getByText("1 cleared", { exact: true })).toBeVisible();
+  await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Clear Failed", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+  await expect(page.getByText("No Imports", { exact: true })).toBeVisible();
+});
+
 for (const ordinary of [true, false])
   test(
     ordinary

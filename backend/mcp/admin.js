@@ -373,12 +373,15 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Imports",
     "Library Imports",
-    "Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most 20) waits once for a resolving or downloading import; never poll. Read-only.",
+    "Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most 20) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record when the user asks; downloaded files stay.",
     {
+      action: z.enum(["read", "clear_failed"]).default("read"),
       id: id.optional(),
       wait_seconds: z.number().int().min(0).max(maxWaitSeconds).default(0),
     },
-    async ({ id: wanted, wait_seconds }, signal) => {
+    async ({ action, id: wanted, wait_seconds }, signal) => {
+      if (action === "clear_failed")
+        return mcpJson(await api("POST", "/api/library/imports/clear-failed", {}, signal));
       if (!wanted) {
         const { imports = [] } = await api("GET", "/api/library/imports", undefined, signal);
         return mcpJson({
@@ -404,7 +407,6 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       }
       return mcpJson({ import: importView(record) });
     },
-    { readOnlyHint: true },
   );
 
   tool(

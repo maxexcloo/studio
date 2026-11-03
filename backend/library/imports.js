@@ -112,11 +112,19 @@ export function createImportStore({
   }
 
   const get = (id) => (idPattern.test(String(id || "")) ? load().get(String(id)) || null : null);
+  /** Forgets one record; its downloaded files stay. */
+  function remove(id) {
+    if (!get(id)) return false;
+    index.delete(id);
+    removeJsonFile(path.join(dir, `${id}.json`));
+    return true;
+  }
   return {
     dir,
     list,
     get,
     put,
+    remove,
     reload: () => {
       index = null;
       return load();
