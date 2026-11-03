@@ -55,7 +55,7 @@ export function useLoraStacks(family: string, profileId: string) {
     })),
   );
   const change = useMutation({
-    mutationFn: ({ ops }: { ops: Operation[]; deleted?: StackRecord; message?: string }) =>
+    mutationFn: ({ ops }: { ops: Operation[]; deleted?: StackRecord }) =>
       post<{ library: LoraLibrary }>("/api/loras/library/ops", { ops }),
     onSuccess: ({ library }, request) => {
       cache.setQueryData(loraLibraryQuery.queryKey, { found: true, library });
@@ -74,7 +74,7 @@ export function useLoraStacks(family: string, profileId: string) {
             </Group>
           ),
         });
-      } else if (request.message) notifications.show({ message: request.message });
+      }
     },
   });
   const ready = !library.isPending && !library.isError;
@@ -87,17 +87,13 @@ export function useLoraStacks(family: string, profileId: string) {
         part.toString(16).padStart(2, "0"),
       ).join("");
       const stack = { id, name, loras, savedAt: new Date().toISOString() };
-      change.mutate({
-        ops: [{ op: "stack.add", key: familyKey, stack }],
-        message: "LoRA stack saved",
-      });
+      change.mutate({ ops: [{ op: "stack.add", key: familyKey, stack }] });
     },
     rename: (record: StackRecord, name: string) =>
       change.mutate({ ops: [{ op: "stack.rename", key: record.key, id: record.stack.id, name }] }),
     update: (record: StackRecord, loras: Loras) =>
       change.mutate({
         ops: [{ op: "stack.update", key: record.key, id: record.stack.id, loras }],
-        message: "LoRA stack updated",
       }),
     remove: (record: StackRecord) =>
       change.mutate({
