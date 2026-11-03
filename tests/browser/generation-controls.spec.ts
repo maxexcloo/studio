@@ -772,7 +772,12 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
   await prompt.click();
   const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
   const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  // The keyboard waits until the text itself is tapped.
+  await expect(editor).toBeVisible();
+  await expect(text).not.toBeFocused();
+  await text.click();
   await expect(text).toBeFocused();
+  await page.keyboard.press("End");
   await page.keyboard.type(" at dusk");
   await editor.getByRole("button", { name: "Done", exact: true }).click();
   await expect(editor).toBeHidden();
