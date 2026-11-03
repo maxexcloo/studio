@@ -93,8 +93,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
     const viewport = window.visualViewport;
-    // Phones type in the full-screen editor instead, so the dock stays put there.
-    if (!viewport || phone) return;
+    if (!viewport) return;
     // Only typing in the dock lifts it above the keyboard; scrolling and the address bar never move it.
     const resize = () => {
       const field = document.activeElement;
@@ -109,7 +108,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
       viewport.removeEventListener("resize", resize);
       viewport.removeEventListener("scroll", resize);
     };
-  }, [phone]);
+  }, []);
   useEffect(() => {
     if (main && params.get("compose") === "1") open();
   }, [params, open, main]);
