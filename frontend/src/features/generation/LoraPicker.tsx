@@ -38,6 +38,7 @@ import {
   SavedList,
   SortMenu,
   savedItems,
+  savedSortLabels,
   type SavedSort,
 } from "./Picker";
 import classes from "./LoraPicker.module.css";
@@ -84,6 +85,13 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
   });
 
 const ratingOrder = (rating?: LoraRating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+/** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
+type LoraSort = "rating" | "name-asc" | "name-desc";
+const loraSortLabels: Record<LoraSort, string> = {
+  rating: "Rating",
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
+};
 /** Every LoRA list's order: thumbs up, then unrated, then thumbs down, each by title. */
 export const byRating =
   (ratings: Record<string, LoraRating>, title: (file: string) => string) =>
@@ -96,6 +104,7 @@ export function useLoraPicker() {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "recommended");
   const [sort, setSort] = useState<SavedSort>("name-asc");
+  const [loraSort, setLoraSort] = useState<LoraSort>("rating");
   const controlsId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLDivElement>(null);
@@ -122,6 +131,8 @@ export function useLoraPicker() {
     setTab,
     sort,
     setSort,
+    loraSort,
+    setLoraSort,
     controlsId,
     trigger,
     controls,
@@ -272,7 +283,11 @@ function LoraControls({
             .toLowerCase()
             .includes(terms)),
     )
-    .sort(byRating(ratings, title));
+    .sort(
+      picker.loraSort === "rating"
+        ? byRating(ratings, title)
+        : (a, b) => (picker.loraSort === "name-asc" ? 1 : -1) * title(a).localeCompare(title(b)),
+    );
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>
     update(
@@ -384,7 +399,11 @@ function LoraControls({
       query={picker.query}
       onQueryChange={picker.setQuery}
       actions={
-        picker.tab === "stacks" && <SortMenu value={picker.sort} onChange={picker.setSort} />
+        picker.tab === "stacks" ? (
+          <SortMenu labels={savedSortLabels} value={picker.sort} onChange={picker.setSort} />
+        ) : (
+          <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
+        )
       }
       filterCount={filter === "all" ? 0 : 1}
       filters={
