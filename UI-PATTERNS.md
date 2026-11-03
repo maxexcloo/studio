@@ -364,9 +364,9 @@ primary component reference and verify APIs against the installed version.
   started (Resume releases it); for administrators of a multi-user Studio it
   holds every account's. Held
   work keeps its place and reads Paused wherever its waiting reason shows (the
-  queue, MCP Result); started work finishes. Each waiting row's Move menu (Move
-  to Top, Move Up, Move Down) reorders it among the account's own waiting work
-  only, so other accounts and the queue tiers keep their order.
+  queue, MCP Result); started work finishes. Waiting rows drag by their handle
+  (pointer, touch or keyboard) to a new place among the account's own waiting
+  work only, so other accounts and the queue tiers keep their order.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Image lists share one toolbar row (`GalleryFilters.tsx`): search, Filter ▾

@@ -24,6 +24,20 @@ function SortableItem({
   );
 }
 
+type PluginsProp = NonNullable<ComponentProps<typeof DragDropProvider>["plugins"]>;
+/** Drop and keyboard moves animate at the motion duration, and not at all with motion off. */
+export const feedbackAt =
+  (duration: number): Extract<PluginsProp, (...args: never[]) => unknown> =>
+  (defaults) =>
+    defaults.map((plugin) =>
+      plugin === Feedback
+        ? Feedback.configure({
+            dropAnimation: duration ? { duration } : null,
+            keyboardTransition: duration ? { duration } : null,
+          })
+        : plugin,
+    );
+
 export default function SortableOrderedItems<T>({
   items,
   identity,
@@ -39,16 +53,7 @@ export default function SortableOrderedItems<T>({
   }
   return (
     <DragDropProvider
-      plugins={(defaults) =>
-        defaults.map((plugin) =>
-          plugin === Feedback
-            ? Feedback.configure({
-                dropAnimation: duration ? { duration } : null,
-                keyboardTransition: duration ? { duration } : null,
-              })
-            : plugin,
-        )
-      }
+      plugins={feedbackAt(duration)}
       onDragEnd={(event) => {
         if (event.canceled) return;
         const { source } = event.operation;

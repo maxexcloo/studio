@@ -23,8 +23,6 @@ export interface QueuePause {
   mine: boolean;
   all: boolean;
 }
-/** Where a queue move takes one of the account's pending items among its other pending items. */
-export type QueueMove = "top" | "up" | "down";
 export type GenerationOperation = "image" | "refine" | "animate" | "upscale";
 export type GenerationInput = Record<string, unknown>;
 /**

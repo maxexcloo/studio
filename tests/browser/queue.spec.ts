@@ -40,16 +40,26 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await expect(queue.getByRole("button", { name: "Pause Queue", exact: true })).toBeVisible();
   expect(state.queuePause).toEqual({ mine: false, all: false });
 
-  // Only waiting items move; the first can't go up and the last can't go down.
-  const move = (index: number) =>
-    queue.getByRole("button", { name: "Move", exact: true }).nth(index);
-  await expect(queue.getByRole("button", { name: "Move", exact: true })).toHaveCount(3);
-  await move(2).click();
-  await expect(page.getByRole("menuitem", { name: "Move Down", exact: true })).toBeDisabled();
-  await page.getByRole("menuitem", { name: "Move to Top", exact: true }).click();
+  // Only waiting items drag, by their handles: with the pointer, then the keyboard.
+  const handles = queue.getByRole("button", { name: "Drag to Reorder", exact: true });
+  await expect(handles).toHaveCount(3);
+  await expect(handles.first()).toBeEnabled();
+  const centre = async (index: number) => {
+    const box = (await handles.nth(index).boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  const [from, to] = [await centre(2), await centre(0)];
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y - 8, { steps: 12 });
+  await page.mouse.up();
   await expect.poll(order).toEqual(["running-job", "third", "first", "second"]);
-  await move(0).click();
-  await expect(page.getByRole("menuitem", { name: "Move Up", exact: true })).toBeDisabled();
-  await page.getByRole("menuitem", { name: "Move Down", exact: true }).click();
+  await expect
+    .poll(() => state.jobs.map((job) => job.id))
+    .toEqual(["running-job", "third", "first", "second"]);
+  await handles.first().focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
   await expect.poll(order).toEqual(["running-job", "first", "third", "second"]);
 });

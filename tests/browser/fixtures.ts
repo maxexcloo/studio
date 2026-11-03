@@ -485,10 +485,7 @@ export async function fixtures(page: Page) {
       const waiting = jobs.filter((job) => ["writing", "queued", "waiting"].includes(job.status));
       const job = jobs.find((j) => j.id === path.split("/")[3]);
       const from = waiting.indexOf(job);
-      const to =
-        body.to === "top"
-          ? 0
-          : Math.max(0, Math.min(waiting.length - 1, from + (body.to === "up" ? -1 : 1)));
+      const to = Math.min(waiting.length - 1, body.to);
       const slots = waiting.map((item) => jobs.indexOf(item));
       waiting.splice(to, 0, ...waiting.splice(from, 1));
       slots.forEach((slot, index) => (jobs[slot] = waiting[index]));

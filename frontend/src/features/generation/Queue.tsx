@@ -4,7 +4,6 @@ import {
   Button,
   Group,
   Loader,
-  Menu,
   RingProgress,
   Stack,
   Text,
@@ -17,17 +16,9 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useState } from "react";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpToLine,
-  CircleAlert,
-  Image,
-  ListOrdered,
-  Video,
-  type LucideIcon,
-} from "lucide-react";
+import { arrayMove } from "@dnd-kit/helpers";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { CircleAlert, GripVertical, Image, Video, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
@@ -39,7 +30,8 @@ import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useGenerationActions } from "./GenerationProvider";
 import { isProfile, profileName } from "./payload";
 import { WritingStream } from "./PromptWriting";
-import { terminalStatuses, type QueueMove, type QueuePause } from "../../../../shared/queue";
+import type { QueueRowDrag } from "./SortableQueue";
+import { terminalStatuses, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
@@ -66,8 +58,8 @@ type QueueAction = {
     | "resume"
     | "pause-all"
     | "resume-all";
-  /** Where `move` takes the item among the account's waiting items. */
-  to?: QueueMove;
+  /** The place (from 0) `move` takes the item to among the account's waiting items. */
+  to?: number;
 };
 export function useQueueAction(jobId?: string) {
   const client = useQueryClient();
@@ -81,7 +73,7 @@ export function useQueueAction(jobId?: string) {
     mutationFn: ({ id, action, to }: QueueAction) =>
       post<{ job?: QueueJob }>(
         id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`,
-        to && { to },
+        to === undefined ? undefined : { to },
       ),
     onSuccess: () =>
       Promise.all([
@@ -157,41 +149,20 @@ export const statusLabels: Record<QueueJob["status"], string> = {
 /** A generation's progress as a percentage, or 0 while it has no steps to count. */
 export const progressPercent = (progress: QueueJob["progress"]) =>
   progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
-/** Not yet started: the items a pause holds and Move reorders. */
+/** Not yet started: the items a pause holds and dragging reorders. */
 const waiting = (job: QueueJob) => ["writing", "queued", "waiting"].includes(job.status);
-const moves = [
-  { to: "top", label: "Move to Top", Icon: ArrowUpToLine },
-  { to: "up", label: "Move Up", Icon: ArrowUp },
-  { to: "down", label: "Move Down", Icon: ArrowDown },
-] as const;
-/** Moves a waiting item among the account's other waiting items; other accounts keep their places. */
-function MoveJob({ job, first, last }: { job: QueueJob; first: boolean; last: boolean }) {
-  const action = useQueueAction(job.id);
-  return (
-    <Menu position="bottom-end">
-      <Tooltip label="Move">
-        <Menu.Target>
-          <ActionIcon aria-label="Move" variant="subtle" color="gray" loading={action.isPending}>
-            <ListOrdered size={16} />
-          </ActionIcon>
-        </Menu.Target>
-      </Tooltip>
-      <Menu.Dropdown>
-        {moves.map(({ to, label, Icon }) => (
-          <Menu.Item
-            key={to}
-            leftSection={<Icon size={16} />}
-            disabled={to === "down" ? last : first}
-            onClick={() => action.mutate({ id: job.id, action: "move", to })}
-          >
-            {label}
-          </Menu.Item>
-        ))}
-      </Menu.Dropdown>
-    </Menu>
-  );
-}
-function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; last: boolean } }) {
+const loadSortable = () => import("./SortableQueue");
+const SortableQueue = lazy(loadSortable);
+function QueueRow({
+  job,
+  sortable,
+  drag,
+}: {
+  job: QueueJob;
+  /** Shows its drag handle, which works once `drag` arrives with the sortable list. */
+  sortable: boolean;
+  drag?: QueueRowDrag;
+}) {
   const failed = job.status === "failed";
   const { progress } = job;
   const percent = progressPercent(progress);
@@ -201,7 +172,21 @@ function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; las
     isProfile(entry, job.input?.profileId),
   );
   return (
-    <Group wrap="nowrap" gap="sm" py="xs" className={classes.row}>
+    <Group ref={drag?.elementRef} wrap="nowrap" gap="sm" py="xs" className={classes.row}>
+      {sortable && (
+        <Tooltip label="Drag to Reorder">
+          <ActionIcon
+            ref={drag?.handleRef}
+            disabled={!drag}
+            aria-label="Drag to Reorder"
+            variant="subtle"
+            color="gray"
+            style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
+          >
+            <GripVertical size={16} />
+          </ActionIcon>
+        </Tooltip>
+      )}
       <Kind
         size={18}
         aria-hidden
@@ -232,7 +217,6 @@ function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; las
         ) : (
           <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
         ))}
-      {place && <MoveJob job={job} {...place} />}
       <QueueJobAction job={job} compact />
       {failed && <ClearJob job={job} />}
     </Group>
@@ -349,6 +333,9 @@ export function Queue() {
   const queue = useQueue();
   const action = useQueueAction();
   const everyone = usePausesEveryone();
+  const client = useQueryClient();
+  // Loads dragging ahead of a second waiting item, so the rows aren't replaced when it arrives.
+  useEffect(() => void loadSortable(), []);
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
   if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
   const { paused } = queue.data;
@@ -376,6 +363,26 @@ export function Queue() {
     );
   }
   const movable = jobs.filter(waiting);
+  const sortable = movable.length > 1;
+  const row = (job: QueueJob, drag?: QueueRowDrag) => (
+    <QueueRow key={job.id} job={job} sortable={sortable && waiting(job)} drag={drag} />
+  );
+  // The new order shows at once; the refetch after the move settles it, a failed one included.
+  function move(job: QueueJob, to: number) {
+    client.setQueryData(queueQuery.queryKey, (data) => {
+      if (!data) return data;
+      const pending = data.jobs.filter(waiting);
+      const slots = pending.map((item) => data.jobs.indexOf(item));
+      const jobs = [...data.jobs];
+      arrayMove(pending, pending.indexOf(job), to).forEach((item, index) => {
+        jobs[slots[index]] = item;
+      });
+      return { ...data, jobs };
+    });
+    void action
+      .mutateAsync({ id: job.id, action: "move", to })
+      .catch(() => client.invalidateQueries({ queryKey: queueQuery.queryKey }));
+  }
   return (
     <Stack gap={0} aria-label="Queue">
       {paused.all && !everyone && (
@@ -383,17 +390,13 @@ export function Queue() {
           An administrator has paused the queue.
         </Text>
       )}
-      {jobs.map((job) => (
-        <QueueRow
-          key={job.id}
-          job={job}
-          place={
-            movable.length > 1 && waiting(job)
-              ? { first: job === movable[0], last: job === movable.at(-1) }
-              : undefined
-          }
-        />
-      ))}
+      {sortable ? (
+        <Suspense fallback={jobs.map((job) => row(job))}>
+          <SortableQueue jobs={jobs} movable={movable} row={row} onMove={move} />
+        </Suspense>
+      ) : (
+        jobs.map((job) => row(job))
+      )}
     </Stack>
   );
 }
