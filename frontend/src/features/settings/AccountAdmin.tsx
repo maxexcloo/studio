@@ -467,22 +467,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           }
         />
       </SectionHeader>
-      <SettingGroup title="New Accounts">
-        <SettingRow
-          wide
-          label="Default Group"
-          description="New accounts, including first single sign-on and chat gateway accounts, start in this group."
-        >
-          <Select
-            aria-label="Default Group"
-            data={groups}
-            value={data.defaultAccessProfileId}
-            allowDeselect={false}
-            w={{ base: "100%", sm: 240 }}
-            onChange={(value) => value && policy.mutate(value)}
-          />
-        </SettingRow>
-      </SettingGroup>
       <DataTable
         label="User Accounts"
         rows={data.accounts}
@@ -600,6 +584,22 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         }}
       />
       <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
+      <SettingGroup title="New Accounts">
+        <SettingRow
+          wide
+          label="Default Group"
+          description="New accounts, including first single sign-on and chat gateway accounts, start in this group."
+        >
+          <Select
+            aria-label="Default Group"
+            data={groups}
+            value={data.defaultAccessProfileId}
+            allowDeselect={false}
+            w={{ base: "100%", sm: 240 }}
+            onChange={(value) => value && policy.mutate(value)}
+          />
+        </SettingRow>
+      </SettingGroup>
       <Modal opened={creating} onClose={() => setCreating(false)} title="New User">
         <FocusTrap.InitialFocus />
         {creating && (
