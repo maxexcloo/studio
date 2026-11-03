@@ -103,9 +103,8 @@ export const nodePacks = {
     nodes: ["CheckpointLoaderNF4"],
     note: "bitsandbytes runs on NVIDIA GPUs only.",
   },
-  // OpenMOSS's own MOSS-Image loaders (Comfy Registry "moss-image", publisher mosi). Its model
-  // supports the layer skip MOSS-Image's makers sample with; ComfyUI's built-in one doesn't yet.
-  // Loads the official Diffusers folder; needs a ComfyUI with Qwen3.5 (0.38 or newer).
+  // OpenMOSS's own MOSS-Image loaders (Comfy Registry "moss-image", publisher mosi), for the
+  // official Diffusers folder; needs a ComfyUI with Qwen3.5 (0.38 or newer).
   moss_image: {
     name: "MOSS-Image",
     repository: "https://github.com/OpenMOSS/MOSS-Image.git",
