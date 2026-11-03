@@ -374,8 +374,33 @@ export function PickerTile({
   );
 }
 
+/**
+ * A picker chip's content: its icon and name, or once items are chosen their thumbnails, laid over
+ * each other in one cell so the chip keeps one width as items come and go.
+ */
+export function ChipContent({
+  label,
+  icon: Icon,
+  items,
+}: {
+  label: string;
+  icon: LucideIcon;
+  items: { key: string; label: string; src?: string; off?: boolean }[];
+}) {
+  const chosen = items.length > 0;
+  return (
+    <span className={classes.chipContent}>
+      <span className={classes.chipName} data-hidden={chosen || undefined} aria-hidden={chosen}>
+        <Icon size={16} />
+        {label}
+      </span>
+      <ChipThumbnails items={items} placeholder={Icon} />
+    </span>
+  );
+}
+
 /** Thumbnails for a chip: overlapping like a stack, the first few and then a count. */
-export function ChipThumbnails({
+function ChipThumbnails({
   items,
   placeholder: Placeholder,
   max = 3,
