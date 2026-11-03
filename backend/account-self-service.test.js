@@ -203,3 +203,30 @@ test("single sign-on accounts can't change their email or password here", async 
     /single sign-on/,
   );
 });
+
+test("an email an account set itself, or an administrator's, never links a sign-in or chat gateway", async () => {
+  const created = await store.createLocalAccount({
+    username: "claimer@example.test",
+    password: secret("claim"),
+    accessProfileId: "artists",
+  });
+  await store.updateOwnAccount(created.id, {
+    username: "victim@example.test",
+    currentPassword: secret("claim"),
+  });
+  const sso = store.signInWithOidcIdentity({
+    issuer: "https://id.example.test",
+    subject: "sub-victim",
+    email: "victim@example.test",
+    emailVerified: true,
+  });
+  assert.notEqual(sso.access.userId, created.id);
+  assert.equal(store.gatewayAccountAccess("chat-victim", "victim@example.test"), null);
+
+  await store.createLocalAccount({
+    username: "boss@example.test",
+    password: secret("boss"),
+    role: "administrator",
+  });
+  assert.equal(store.gatewayAccountAccess("chat-boss", "boss@example.test"), null);
+});
