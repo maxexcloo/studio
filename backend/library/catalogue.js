@@ -8,8 +8,7 @@
  * written here:
  *   - definitions: `<data>/config/catalogue.json` (model metadata from a Studio export)
  *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
- *   - manifest: the restore manifest (an imported `<data>/model-manifest.json`, else
- *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
+ *   - manifest: the pinned model manifest, `<data>/config/models.json`
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
  * when the file goes, so the migration is idempotent. Studio's own edits are a layer above all
@@ -295,13 +294,7 @@ export function createCatalogueStore({
   const sources = {
     definitions: () => path.join(dataDir, "config", "catalogue.json"),
     provider: () => path.join(dataDir, "model-download-sources.json"),
-    manifest: () => {
-      const imported = path.join(dataDir, "model-manifest.json");
-      if (fs.existsSync(imported)) return imported;
-      return environment.STUDIO_MODEL_MANIFEST
-        ? path.resolve(environment.STUDIO_MODEL_MANIFEST)
-        : path.join(dataDir, "config", "models.json");
-    },
+    manifest: () => path.join(dataDir, "config", "models.json"),
   };
   let state = null;
   let hashIndex = null;

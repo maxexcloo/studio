@@ -67,9 +67,9 @@ remain in Studio; downloads stream directly to the worker and resume against
 their recorded source, size and SHA-256 checksum. See
 [Studio Worker Node](worker/comfyui/studio_worker/README.md).
 
-`STUDIO_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to ComfyUI's model folder; when the manifest's paths start with a deployment folder instead (such as `models/comfyui/`), set `STUDIO_MODEL_MANIFEST_PREFIX` to strip it.
+`<STUDIO_DATA_DIR>/config/models.json` is the pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to ComfyUI's model folder; when the manifest's paths start with a deployment folder instead (such as `models/comfyui/`), set `STUDIO_MODEL_MANIFEST_PREFIX` to strip it.
 
-The catalogue reads this deployment-owned metadata; manage the manifest in the deployment repository. Administrators manage model downloads in **Library › Downloads**. Downloads verify their recorded checksums and retain explicit filename conflicts.
+The catalogue reads the manifest's hashes, sizes and links. Administrators manage model downloads in **Library › Downloads**. Downloads verify their recorded checksums and retain explicit filename conflicts.
 
 ## Studio Media Storage (ComfyUI as a Worker)
 
