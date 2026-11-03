@@ -87,7 +87,9 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
         <StatusAction chat={chat} />
       </Group>
       <ModeSwitcher mode={mode} />
+      {/* Appearance, Library, Settings, User: alphabetical. */}
       <Group gap="xs" visibleFrom="sm">
+        <AppearanceMenu />
         {navigation
           .filter((item) => item.to !== "/library" || library.pending || library.allowed)
           .map((item) => {
@@ -111,7 +113,6 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
               </Tooltip>
             );
           })}
-        <AppearanceMenu />
         <AccountMenu />
       </Group>
       <Group hiddenFrom="sm">

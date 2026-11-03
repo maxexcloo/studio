@@ -255,9 +255,9 @@ export function AppearanceControls() {
 export function AppearanceMenu() {
   return (
     <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
-      <Tooltip label="Theme">
+      <Tooltip label="Appearance">
         <Popover.Target>
-          <ActionIcon aria-label="Change Theme" variant="subtle" color="gray" size="lg" radius="xl">
+          <ActionIcon aria-label="Appearance" variant="subtle" color="gray" size="lg" radius="xl">
             <Palette size={19} />
           </ActionIcon>
         </Popover.Target>

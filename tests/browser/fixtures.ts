@@ -752,14 +752,14 @@ export async function openNav(page: Page, label: string) {
 }
 
 export async function openTheme(page: Page) {
-  const theme = page.getByRole("button", { name: "Change Theme", exact: true });
+  const theme = page.getByRole("button", { name: "Appearance", exact: true });
   await expect(
     theme.or(page.getByRole("button", { name: "More Options", exact: true })),
   ).toBeVisible();
   if (await theme.isVisible()) await theme.click();
   else {
     await page.getByRole("button", { name: "More Options", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Theme", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Appearance", exact: true }).click();
   }
 }
 
