@@ -26,7 +26,7 @@ export function registerDeploymentRoutes(
 ) {
   /**
    * What the deployment decides, for Settings: each value with its source
-   * (deployment, this studio's .env, or the default) and whether it is locked.
+   * (the deployment, saved from Settings, or the default) and whether it is locked.
    */
   app.get("/api/settings/deployment", async (req, res) => {
     if (!requireAdmin(req, res)) return;
