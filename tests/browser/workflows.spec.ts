@@ -9,7 +9,7 @@ import {
   expectNoChatOpen,
 } from "./fixtures";
 
-test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
+test("Image → Edit → Animate retains one session and can reopen saved work", async ({ page }) => {
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
@@ -19,18 +19,18 @@ test("Image → Refine → Animate retains one session and can reopen saved work
   await expect(page.getByRole("button", { name: "Open image: An amber bird" })).toBeVisible();
   await page
     .getByRole("article", { name: "Iteration 1", exact: true })
-    .getByRole("button", { name: "Refine", exact: true })
+    .getByRole("button", { name: "Edit", exact: true })
     .click();
-  // Refine and Animate stage their own card; the Chat composer keeps its references.
-  const refine = page.getByRole("region", { name: "Refine Iteration 1", exact: true });
-  await refine
+  // Edit and Animate stage their own card; the Chat composer keeps its references.
+  const edit = page.getByRole("region", { name: "Edit Iteration 1", exact: true });
+  await edit
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("An amber bird with silver wings");
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(1);
-  await refine.getByRole("button", { name: "Refine Image", exact: true }).click();
+  await edit.getByRole("button", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
-  await expect(refine).toBeHidden();
-  await expect(page.getByText("Refined iteration 1", { exact: true })).toBeVisible();
+  await expect(edit).toBeHidden();
+  await expect(page.getByText("Edited iteration 1", { exact: true })).toBeVisible();
   await page
     .getByRole("article", { name: "Iteration 2", exact: true })
     .getByRole("button", { name: "Animate", exact: true })
@@ -51,7 +51,7 @@ test("Image → Refine → Animate retains one session and can reopen saved work
     page.getByRole("button", { name: "Open video: The bird spreads its wings" }),
   ).toBeVisible();
   await openNav(page, "Images");
-  // The refined image is a version of the first; Grid shows both until All Versions is off.
+  // The edited image is a version of the first; Grid shows both until All Versions is off.
   await expect(page.getByRole("button", { name: /^Open image: / })).toHaveCount(2);
 });
 

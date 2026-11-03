@@ -15,7 +15,7 @@ test("Mask zoom and Hand pan preserve painting history and saved masks", async (
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
   await closeReferences(page);
   await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Paint the Area to Refine", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Paint the Area to Edit", exact: true });
   const canvas = dialog.locator('canvas[aria-label="Mask Painting"]');
   const pixels = () =>
     canvas.evaluate((node: HTMLCanvasElement) => {

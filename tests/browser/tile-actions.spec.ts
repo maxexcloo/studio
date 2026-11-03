@@ -146,7 +146,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", {
-        name: operation === "Animate" ? "Generate Video" : "Refine Image",
+        name: operation === "Animate" ? "Generate Video" : "Edit Image",
         exact: true,
       }),
     ).toBeVisible();
@@ -174,7 +174,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expandComposer(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
-  await page.getByRole("button", { name: "Refine Image", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     operation: "refine",

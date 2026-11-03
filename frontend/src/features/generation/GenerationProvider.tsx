@@ -109,7 +109,7 @@ function savedDrafts(key: string): Record<MediaKind, Draft> {
   return { image: restore("image"), video: restore("video") };
 }
 function useGenerationState(workspace: Workspace, remember: boolean) {
-  // A Chat card staged by Refine, Animate or Recreate keeps its own input beside the composer's.
+  // A Chat card staged by Edit, Animate or Recreate keeps its own input beside the composer's.
   const [staged, setStaged] = useState<Draft | null>(null);
   // The gallery composer's drafts survive a reload, remembered as they change.
   const rememberedKey = useRememberedKey("composer-draft");
