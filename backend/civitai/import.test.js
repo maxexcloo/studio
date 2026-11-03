@@ -182,7 +182,7 @@ test("Civitai authentication stays on its API origin through CDN redirects", asy
   );
   assert.equal(await response.text(), "weights");
   assert.deepEqual(calls, [
-    { host: "civitai.red", token: "Bearer test-token" },
+    { host: "civitai.com", token: "Bearer test-token" },
     { host: "files.civitai.com", token: null },
   ]);
   await assert.rejects(
