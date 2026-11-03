@@ -281,7 +281,8 @@ export async function publicGalleryBuffer(item) {
   const media = mediaParams(item.url);
   if (media) {
     const file = mediaFile(media.filename, media.subfolder);
-    if (!file) throw new Error("That image is no longer in the gallery.");
+    if (!file)
+      throw Object.assign(new Error("That image is no longer in the gallery."), { status: 404 });
     return {
       buffer: fs.readFileSync(file),
       mime: mimeFromName(file),

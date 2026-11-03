@@ -84,3 +84,36 @@ test("idle work reads finished images once and search matches those that look al
   enabled = false;
   assert.equal(await search.near("dog"), null, "off in Settings");
 });
+
+test("images whose files are gone fail alone and never stall the pass", async () => {
+  const items = [...["gone1", "gone2", "gone3", "gone4"].map((id) => item(id)), item("cat")];
+  const read: string[] = [];
+  const search = createImageSearch({
+    enabled: () => true,
+    encoder: {
+      unavailable: () => "",
+      downloaded: () => true,
+      embedImage: async (bytes) => {
+        read.push(new TextDecoder().decode(bytes));
+        return along(0);
+      },
+      embedText: async () => along(0),
+    },
+    vectors: createImageVectors(new DatabaseSync(":memory:"), "v1"),
+    idle: () => true,
+    items: () => items,
+    visible: () => true,
+    image: async (record) => {
+      if (record.id.startsWith("gone"))
+        throw Object.assign(new Error("Comfy 404: Not Found"), { status: 404 });
+      return new TextEncoder().encode(record.id);
+    },
+    load: () => null,
+    persist: () => {},
+    log: { info: () => {} },
+  });
+  search.startPass("outdated");
+  await search.settled();
+  assert.deepEqual(read, ["cat"]);
+  assert.doesNotMatch((await search.status()).unavailable || "", /keeps failing/);
+});
