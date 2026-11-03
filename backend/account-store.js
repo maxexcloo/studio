@@ -485,7 +485,11 @@ export async function updateOwnAccount(accountId, changes = {}, { keepSessionTok
     )
   )
     throw new Error("An account with that email already exists.");
-  if (emailChanges) account.username = nextUsername;
+  if (emailChanges) {
+    account.username = nextUsername;
+    // An email the account chose itself is unverified: sign-in by email never links to it.
+    account.emailSetBySelf = true;
+  }
   if (hashed) {
     account.password = hashed;
     const keep = keepSessionToken ? tokenHash(keepSessionToken) : "";
@@ -608,12 +612,16 @@ export function gatewayAccountAccess(identity, email = "") {
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
-// The gateway is trusted and its emails come from the shared identity provider, so a matching username is the same person.
-// An email no account has becomes a new account on the default access profile.
+// The gateway is trusted and its emails come from the shared identity provider, so a matching
+// username an administrator or the provider set is the same person. Never an administrator, as with
+// single sign-on, nor an email the account set itself. An email no account has becomes a new account
+// on the default access profile.
 function linkGatewayEmail(store, identity, email) {
   if (!validGatewayIdentity(email) || !email.includes("@")) return null;
   const key = usernameKey(email);
   let account = store.accounts.find((item) => usernameKey(item.username) === key);
+  if (account && (account.role === accountRoles.administrator || account.emailSetBySelf))
+    return null;
   if (!account && validUsername(email)) {
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
@@ -717,7 +725,13 @@ export function signInWithOidcIdentity({
     const key = usernameKey(email);
     const match = store.accounts.find((item) => usernameKey(item.username) === key);
     // Never an administrator: whoever controls a matching email at the provider would become one.
-    if (match && !match.oidc && match.role !== accountRoles.administrator) {
+    // Nor an email the account set itself, which nobody verified.
+    if (
+      match &&
+      !match.oidc &&
+      match.role !== accountRoles.administrator &&
+      !match.emailSetBySelf
+    ) {
       match.oidc = { issuer, subject, linkedAt: new Date().toISOString() };
       account = match;
       saveStore();
