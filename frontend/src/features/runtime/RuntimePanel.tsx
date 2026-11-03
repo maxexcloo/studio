@@ -195,17 +195,21 @@ export function RuntimePanel() {
       .filter((endpoint) => endpoint.state !== "healthy" && endpoint.state !== "parked")
       .flatMap((endpoint) => (endpoint.workloads ?? []).map((id) => [id, endpoint.reason])),
   );
+  const shown = services.filter(({ kind }) => observed[kind]);
   return (
     <Stack gap="lg" aria-label="Runtime">
       <Text size="sm" component="section" aria-label="Services">
-        {services
-          .filter(({ kind }) => observed[kind])
-          .map(({ kind, label }) => {
-            const { state, reason } = observed[kind]!;
-            const healthy = state === "healthy" || state === "parked";
-            return `${label}: ${healthLabel(state)}${healthy ? "" : ` (${reason})`}`;
-          })
-          .join(" · ") || "No Services"}
+        {/* A service's reason is its tooltip; the workloads table carries the detail. */}
+        {shown.length
+          ? shown.map(({ kind, label }, index) => (
+              <span key={kind}>
+                {index > 0 && " · "}
+                <span title={observed[kind]!.reason}>
+                  {`${label}: ${healthLabel(observed[kind]!.state)}`}
+                </span>
+              </span>
+            ))
+          : "No Services"}
       </Text>
       {runtime.configured ? (
         <RuntimeWorkloads reasons={reasons} />
