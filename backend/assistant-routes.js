@@ -114,7 +114,7 @@ export function assistantRecord(value, loras = []) {
 }
 
 /**
- * Settings › Models › Integrations: the assistant's gateway, chosen model and vision, and the models
+ * Settings › Integrations: the assistant's gateway, chosen model and vision, and the models
  * to choose from: the gateway's and those of Studio's text workloads (`workloadModels`).
  */
 export async function assistantIntegration({

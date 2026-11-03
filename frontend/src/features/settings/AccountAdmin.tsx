@@ -18,15 +18,20 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, UserCog } from "lucide-react";
+import { Plus } from "lucide-react";
 import { api, post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import type { Account } from "../../types";
+import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { isCloudProfile } from "../generation/payload";
 import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
+
 const featureLabels = {
   chat: "Chat",
   cloudModels: "Cloud Models",
@@ -192,49 +197,7 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
     </form>
   );
 }
-function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => void }) {
-  const form = useForm({
-    initialValues: { accessProfileId: admin.defaultAccessProfileId },
-  });
-  const save = useMutation({
-    meta: { inlineError: true },
-    mutationFn: () => post("/api/accounts/default-profile", form.values),
-    onSuccess: () => {
-      form.resetDirty();
-      saved();
-    },
-  });
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        save.mutate();
-      }}
-    >
-      <Stack>
-        <Select
-          label="Default Access Group"
-          description="New accounts, including first single sign-on, start in this group."
-          data={admin.accessProfiles.map((group) => ({ value: group.id, label: group.name }))}
-          required
-          allowDeselect={false}
-          {...form.getInputProps("accessProfileId")}
-        />
-        {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <Group gap="sm">
-          <Button type="submit" loading={save.isPending}>
-            Save New Account Policy
-          </Button>
-          {save.isSuccess && !form.isDirty() && (
-            <Text size="sm" c="dimmed">
-              Saved
-            </Text>
-          )}
-        </Group>
-      </Stack>
-    </form>
-  );
-}
+
 export const accountAdminQuery = queryOptions({
   queryKey: ["account-admin"],
   queryFn: () => api<Administration>("/api/accounts/admin"),
@@ -259,6 +222,13 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const { admin, refresh } = useAdministration();
   const [editing, setEditing] = useState<AccessGroup | "new" | null>(null);
+  const [deleting, setDeleting] = useState<AccessGroup | null>(null);
+  const remove = useMutation({
+    mutationFn: (group: AccessGroup) =>
+      api(`/api/accounts/profiles/${encodeURIComponent(group.id)}`, { method: "DELETE" }),
+    onSuccess: () => setDeleting(null),
+    onSettled: refresh,
+  });
   if (admin.isPending) return <LoadingState label="Loading Groups" />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
@@ -318,8 +288,31 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
             ),
           },
         ]}
-        rowActions={(group) => <Menu.Item onClick={() => setEditing(group)}>Edit Group</Menu.Item>}
+        rowActions={(group) => (
+          <>
+            <Menu.Item onClick={() => setEditing(group)}>Edit Group</Menu.Item>
+            {/* The server refuses too: a group in use or the default stays. */}
+            <Menu.Item
+              color="red"
+              leftSection={<icons.delete size={16} />}
+              disabled={users(group) > 0 || group.id === data.defaultAccessProfileId}
+              onClick={() => setDeleting(group)}
+            >
+              Delete Group
+            </Menu.Item>
+          </>
+        )}
       />
+      <ConfirmDialog
+        opened={!!deleting}
+        title="Delete Group"
+        action="Delete"
+        pending={remove.isPending}
+        onConfirm={() => deleting && remove.mutate(deleting)}
+        onClose={() => setDeleting(null)}
+      >
+        Delete {deleting?.name}? Only a group nobody belongs to that isn’t the default can go.
+      </ConfirmDialog>
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
@@ -354,27 +347,110 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-/** Settings › Users: accounts, their groups, linked chat identities and the new-account policy. */
+type UserAction = "delete" | "disable" | "password" | "role";
+
+/** Reset Password: an administrator sets a new one, which ends the account's sessions. */
+function ResetPassword({ account, saved }: { account: Account; saved: () => void }) {
+  const [password, setPassword] = useState("");
+  const reset = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () =>
+      api(`/api/accounts/users/${encodeURIComponent(account.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ password }),
+      }),
+    onSuccess: saved,
+  });
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        reset.mutate();
+      }}
+    >
+      <Stack>
+        <Text size="sm">
+          Set a new password for {account.username}. It signs them out everywhere; tell them the new
+          one yourself.
+        </Text>
+        <PasswordInput
+          label="New Password"
+          autoComplete="new-password"
+          minLength={8}
+          required
+          value={password}
+          onChange={(event) => setPassword(event.currentTarget.value)}
+        />
+        {reset.error && <Alert color="red">{reset.error.message}</Alert>}
+        <Button
+          type="submit"
+          loading={reset.isPending}
+          disabled={password.length < 8}
+          style={{ alignSelf: "start" }}
+        >
+          Reset Password
+        </Button>
+      </Stack>
+    </form>
+  );
+}
+
+/** Settings › Users: accounts, their roles and groups, linked chat identities and the default group. */
 export function UsersAdmin({ heading }: { heading: ReactNode }) {
+  const client = useQueryClient();
+  const self = useAccount().data?.account?.id;
   const { admin, refresh } = useAdministration();
   const gatewayChange = useGatewayChange();
   const [query, setQuery] = useState("");
-  const [popup, setPopup] = useState<"new" | "policy" | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [acting, setActing] = useState<{ action: UserAction; account: Account } | null>(null);
+  // Changes show at once; the saved list (or, after a failure, the refetched one) settles them.
+  const optimistic = (apply: (data: Administration) => Administration) => {
+    void client.cancelQueries({ queryKey: accountAdminQuery.queryKey });
+    client.setQueryData<Administration>(accountAdminQuery.queryKey, (data) => data && apply(data));
+  };
   const change = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Account> }) =>
       api(`/api/accounts/users/${encodeURIComponent(id)}`, {
         method: "PATCH",
         body: JSON.stringify(patch),
       }),
-    onSuccess: refresh,
+    onMutate: ({ id, patch }) =>
+      optimistic((data) => ({
+        ...data,
+        accounts: data.accounts.map((account) =>
+          account.id === id ? { ...account, ...patch } : account,
+        ),
+      })),
+    onSuccess: () => setActing(null),
+    onSettled: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      api(`/api/accounts/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: () => setActing(null),
+    onSettled: refresh,
+  });
+  const policy = useMutation({
+    mutationFn: (accessProfileId: string) =>
+      post("/api/accounts/default-profile", { accessProfileId }),
+    onMutate: (accessProfileId) =>
+      optimistic((data) => ({ ...data, defaultAccessProfileId: accessProfileId })),
+    onSettled: refresh,
   });
   if (admin.isPending) return <LoadingState label="Loading Users" />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
+  const groups = data.accessProfiles.map((group) => ({ value: group.id, label: group.name }));
   const groupOf = (account: Account) =>
     data.accessProfiles.find((group) => group.id === account.accessProfileId);
   const identitiesOf = (account: Account) =>
     (data.gateway?.links || []).filter((link) => link.accountId === account.id);
+  const defaultGroup = data.accessProfiles.find(
+    (group) => group.id === data.defaultAccessProfileId,
+  );
+  const target = acting?.account;
+  const promote = target?.role === "user";
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -383,21 +459,30 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={setQuery}
           actions={
-            <>
-              <ToolbarAction
-                label="New Account Policy"
-                icon={<UserCog size={18} />}
-                onClick={() => setPopup("policy")}
-              />
-              <ToolbarAction
-                label="New User"
-                icon={<Plus size={18} />}
-                onClick={() => setPopup("new")}
-              />
-            </>
+            <ToolbarAction
+              label="New User"
+              icon={<Plus size={18} />}
+              onClick={() => setCreating(true)}
+            />
           }
         />
       </SectionHeader>
+      <SettingGroup title="New Accounts">
+        <SettingRow
+          wide
+          label="Default Group"
+          description="New accounts, including first single sign-on and chat gateway accounts, start in this group."
+        >
+          <Select
+            aria-label="Default Group"
+            data={groups}
+            value={data.defaultAccessProfileId}
+            allowDeselect={false}
+            w={{ base: "100%", sm: 240 }}
+            onChange={(value) => value && policy.mutate(value)}
+          />
+        </SettingRow>
+      </SettingGroup>
       <DataTable
         label="User Accounts"
         rows={data.accounts}
@@ -447,16 +532,14 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               account.role === "user" ? (
                 <Select
                   aria-label={`Access Group for ${account.username}`}
+                  size="xs"
                   value={account.accessProfileId || null}
                   placeholder="Choose Group"
-                  data={data.accessProfiles.map((group) => ({
-                    value: group.id,
-                    label: group.name,
-                  }))}
+                  data={groups}
                   allowDeselect={false}
                   w={{ base: 140, sm: 200 }}
                   onChange={(accessProfileId) =>
-                    change.mutate({ id: account.id, patch: { accessProfileId } })
+                    accessProfileId && change.mutate({ id: account.id, patch: { accessProfileId } })
                   }
                 />
               ) : (
@@ -466,47 +549,119 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               ),
           },
         ]}
-        rowActions={(account) => (
-          <>
-            {identitiesOf(account).map(({ identity }) => (
-              <Menu.Item
-                key={identity}
-                disabled={gatewayChange.isPending}
-                onClick={() => gatewayChange.mutate({ kind: "link", identity })}
-              >
-                Unlink {identity}
-              </Menu.Item>
-            ))}
-            <Menu.Item
-              color={account.disabled ? undefined : "red"}
-              disabled={change.isPending}
-              onClick={() =>
-                change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
-              }
-            >
-              {account.disabled ? "Enable Account" : "Disable Account"}
-            </Menu.Item>
-          </>
-        )}
+        rowActions={(account) => {
+          const act = (action: UserAction) => () => setActing({ action, account });
+          const own = account.id === self;
+          // Your own role, status and record change only through another administrator.
+          if (own && !identitiesOf(account).length && !account.passwordSignIn) return null;
+          return (
+            <>
+              {identitiesOf(account).map(({ identity }) => (
+                <Menu.Item
+                  key={identity}
+                  disabled={gatewayChange.isPending}
+                  onClick={() => gatewayChange.mutate({ kind: "link", identity })}
+                >
+                  Unlink {identity}
+                </Menu.Item>
+              ))}
+              {!own && (
+                <Menu.Item onClick={act("role")}>
+                  {account.role === "user" ? "Make Administrator" : "Make User"}
+                </Menu.Item>
+              )}
+              {account.passwordSignIn && (
+                <Menu.Item onClick={act("password")}>Reset Password</Menu.Item>
+              )}
+              {account.disabled ? (
+                <Menu.Item
+                  onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
+                >
+                  Enable Account
+                </Menu.Item>
+              ) : (
+                !own && (
+                  <Menu.Item color="red" onClick={act("disable")}>
+                    Disable Account
+                  </Menu.Item>
+                )
+              )}
+              {!own && (
+                <Menu.Item
+                  color="red"
+                  leftSection={<icons.delete size={16} />}
+                  onClick={act("delete")}
+                >
+                  Delete Account
+                </Menu.Item>
+              )}
+            </>
+          );
+        }}
       />
       <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
-      <Modal
-        opened={popup !== null}
-        onClose={() => setPopup(null)}
-        title={popup === "policy" ? "New Account Policy" : "New User"}
-      >
+      <Modal opened={creating} onClose={() => setCreating(false)} title="New User">
         <FocusTrap.InitialFocus />
-        {popup === "new" && (
+        {creating && (
           <NewAccount
             admin={data}
             saved={() => {
-              setPopup(null);
+              setCreating(false);
               refresh();
             }}
           />
         )}
-        {popup === "policy" && <DefaultPolicy admin={data} saved={refresh} />}
       </Modal>
+      <Modal
+        opened={acting?.action === "password"}
+        onClose={() => setActing(null)}
+        title="Reset Password"
+      >
+        <FocusTrap.InitialFocus />
+        {target && acting?.action === "password" && (
+          <ResetPassword key={target.id} account={target} saved={() => setActing(null)} />
+        )}
+      </Modal>
+      <ConfirmDialog
+        opened={acting?.action === "role"}
+        title={promote ? "Make Administrator" : "Make User"}
+        action={promote ? "Make Administrator" : "Make User"}
+        pending={change.isPending}
+        onConfirm={() =>
+          target &&
+          change.mutate({
+            id: target.id,
+            patch: { role: promote ? "administrator" : "user" },
+          })
+        }
+        onClose={() => setActing(null)}
+      >
+        {promote
+          ? `Make ${target?.username} an administrator? They can use and change everything, including other accounts.`
+          : `Make ${target?.username} an ordinary user? They join ${defaultGroup?.name || "the default group"} and lose administration.`}
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={acting?.action === "disable"}
+        title="Disable Account"
+        action="Disable"
+        pending={change.isPending}
+        onConfirm={() => target && change.mutate({ id: target.id, patch: { disabled: true } })}
+        onClose={() => setActing(null)}
+      >
+        Disable {target?.username}? They are signed out everywhere and can’t sign in until you
+        enable the account again.
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={acting?.action === "delete"}
+        title="Delete Account"
+        action="Delete"
+        pending={remove.isPending}
+        onConfirm={() => target && remove.mutate(target.id)}
+        onClose={() => setActing(null)}
+      >
+        Delete {target?.username}? Their account, sign-ins and MCP token are removed for good. Their
+        images and videos stay on disk but no longer show in Studio.
+      </ConfirmDialog>
     </Stack>
   );
 }

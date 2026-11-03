@@ -4,6 +4,7 @@ import { CircleDot } from "lucide-react";
 import type { ServiceHealth, ServiceStatus, ServicesStatus } from "../../../../shared/services";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useIsAdmin } from "../auth/AccountGate";
 import { RuntimeWorkloads } from "./RuntimeWorkloads";
 import { useWorkloadStart } from "./WorkloadStart";
@@ -59,6 +60,46 @@ function ParkedStart({ label, workloads }: { label: string; workloads: string[] 
       )}
       {runtime.dialog}
     </Stack>
+  );
+}
+/** The deployment's workers (backend/workers.js), which Studio lists but never edits. */
+export const workersQuery = queryOptions({
+  queryKey: ["workers"],
+  queryFn: () =>
+    api<{
+      source: "STUDIO_WORKERS" | "Kubernetes";
+      workers: { id: string; name: string; url: string; capabilities: string[] }[];
+    }>("/api/workers"),
+});
+const capabilityLabels: Record<string, string> = {
+  image: "Images",
+  models: "Model Library",
+  upscale: "Upscale",
+  video: "Videos",
+};
+
+/**
+ * The workers a deployment lists in STUDIO_WORKERS, read-only; Kubernetes workloads show in the GPU
+ * Workloads table instead.
+ */
+function WorkerList({ runtimeConfigured }: { runtimeConfigured: boolean }) {
+  const list = useQuery(workersQuery).data;
+  if (!list || (runtimeConfigured && list.source !== "STUDIO_WORKERS")) return null;
+  return (
+    <SettingGroup title="Workers">
+      <Text size="xs" c="dimmed">
+        {list.workers.length
+          ? `Listed by the deployment${list.source === "STUDIO_WORKERS" ? " in STUDIO_WORKERS" : ""}. Studio doesn’t edit them.`
+          : "The deployment lists no workers, so Studio can’t generate."}
+      </Text>
+      {list.workers.map((worker) => (
+        <SettingRow
+          key={worker.id}
+          label={worker.name}
+          description={`${worker.capabilities.map((id) => capabilityLabels[id] || id).join(", ")} · ${worker.url}`}
+        />
+      ))}
+    </SettingGroup>
   );
 }
 export const servicesStatusQuery = queryOptions({
@@ -173,6 +214,7 @@ export function RuntimePanel() {
           {runtime.reason}
         </Text>
       )}
+      <WorkerList runtimeConfigured={runtime.configured} />
     </Stack>
   );
 }

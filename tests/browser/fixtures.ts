@@ -172,6 +172,12 @@ export async function fixtures(page: Page) {
     defaultAccessProfileId: "users",
   };
 
+  const preferences = {
+    preferences: { cloudModels: true, tileCaptions: false, uncensoredModels: true },
+    saved: [] as string[],
+    grants: { cloudModels: false, uncensoredModels: false },
+  };
+
   await page.route("**/api/**", async (route) => {
     const request = route.request(),
       url = new URL(request.url()),
@@ -189,6 +195,65 @@ export async function fixtures(page: Page) {
       return respond({ account: ownAccount });
     }
     if (path === "/api/accounts/admin") return respond(administration);
+    if (path === "/api/preferences") {
+      if (method === "PATCH") {
+        Object.assign(preferences.preferences, body);
+        preferences.saved = [...new Set([...preferences.saved, ...Object.keys(body)])];
+      }
+      return respond(preferences);
+    }
+    if (path === "/api/settings/deployment") {
+      const setting = (key: string) => ({
+        key,
+        configured: "",
+        effective: "",
+        source: "default",
+        locked: false,
+      });
+      return respond({
+        defaults: {
+          image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
+          video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          profiles: [],
+        },
+        catalogue: [],
+        integrations: {
+          civitai: { token: { set: false }, presets: false },
+          huggingFace: { token: { set: false } },
+          assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
+        },
+      });
+    }
+    if (path === "/api/workers")
+      return respond({
+        source: "STUDIO_WORKERS",
+        workers: [
+          {
+            id: "primary",
+            name: "Image Worker",
+            url: "http://comfyui-image:8188",
+            capabilities: ["image", "upscale", "models"],
+          },
+          {
+            id: "video",
+            name: "Video Worker",
+            url: "http://comfyui-video:8188",
+            capabilities: ["video"],
+          },
+        ],
+      });
+    if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {
+      administration.accessProfiles = administration.accessProfiles.filter(
+        (group) => group.id !== decodeURIComponent(path.split("/")[4]),
+      );
+      return respond({ ok: true });
+    }
+    if (path.match(/^\/api\/accounts\/users\/[^/]+$/) && method === "DELETE") {
+      administration.accounts = administration.accounts.filter(
+        (account) => account.id !== path.split("/")[4],
+      );
+      return respond({ ok: true });
+    }
     if (path === "/api/accounts/profiles") {
       administration.accessProfiles = administration.accessProfiles.filter(
         (group) => group.id !== body.id,
@@ -695,6 +760,7 @@ export async function fixtures(page: Page) {
     gallery,
     administration,
     ownAccount,
+    preferences,
     messages,
     chatRequests,
     referenceRequests,

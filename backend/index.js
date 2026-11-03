@@ -56,6 +56,7 @@ import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-req
 import { registerUpscaleRoutes } from "./upscale-routes.js";
 import { registerJobRoutes } from "./job-routes.js";
 import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
+import { registerPreferenceRoutes } from "./preference-routes.js";
 import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { registerLoraRoutes } from "./lora/routes.js";
@@ -524,6 +525,7 @@ registerGalleryHistoryRoutes(app, {
   },
 });
 
+registerPreferenceRoutes(app);
 registerPromptHistoryRoutes(app);
 
 // An upload is searchable at once, like a finished generation.
@@ -666,7 +668,7 @@ const suggestions = createSuggestions({
 });
 registerSuggestionRoutes(app, { suggestions });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
-// It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
+// It only queues work; it never places GPU workloads, and cloud profiles never take part.
 const dream = createDream({
   dataDir,
   store,

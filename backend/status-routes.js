@@ -13,7 +13,7 @@ import { galleryStats, profileStats } from "./stats.js";
 import { generationEstimate, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { upscalePlan, upscaleQualities } from "./upscale.js";
-import { capabilityForProfile } from "./workers.js";
+import { capabilityForProfile, listWorkers, workerSource } from "./workers.js";
 
 // Whether ComfyUI runs on this machine, for the bug report.
 const comfyIsLocal = () => {
@@ -43,6 +43,13 @@ export function registerStatusRoutes(app, { observeServices, store }) {
         waitingWorkers,
       }),
     );
+  });
+
+  // Settings › Workers: the deployment's workers and where they come from; Studio never edits them.
+  app.get("/api/workers", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ source: workerSource(), workers: listWorkers() });
   });
 
   // Liveness, for the container health check and the test servers.

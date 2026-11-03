@@ -884,17 +884,18 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Accounts",
     "Accounts & Groups",
-    "Manage accounts' groups as Settings › Accounts does, only when asked. list returns accounts, groups, the default group and the profiles a group can grant; save_group creates or replaces a group (group: id, name, generationProfiles, allModels and features, each feature set explicitly since an unsaved one is off); set_default makes group_id the group new accounts start in (\"\" for none); delete_group removes an empty group that isn't the default; set_user moves an ordinary account (account_id) to group_id or sets disabled.",
+    "Manage accounts and groups as Settings › Users and Groups do, only when asked. list returns accounts, groups, the default group and the profiles a group can grant; save_group creates or replaces a group (group: id, name, generationProfiles, allModels and features, each feature set explicitly since an unsaved one is off); set_default makes group_id the group new accounts start in (\"\" for none); delete_group removes an empty group that isn't the default; set_user moves an ordinary account (account_id) to group_id, sets disabled, or sets role (administrator or user; a new user joins the default group); delete_user removes an account (account_id) with its sessions and MCP token, keeping its gallery files. Neither changes the caller's own account or the last enabled administrator.",
     {
       action: z
-        .enum(["list", "save_group", "set_default", "delete_group", "set_user"])
+        .enum(["list", "save_group", "set_default", "delete_group", "set_user", "delete_user"])
         .default("list"),
       group: z.record(z.string(), z.unknown()).optional(),
       group_id: z.string().trim().max(200).optional(),
       account_id: id.optional(),
       disabled: z.boolean().optional(),
+      role: z.enum(["administrator", "user"]).optional(),
     },
-    async ({ action, group, group_id, account_id, disabled }, signal) => {
+    async ({ action, group, group_id, account_id, disabled, role }, signal) => {
       if (action === "list") {
         const { gateway: _gateway, ...admin } = await api(
           "GET",
@@ -919,11 +920,15 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         return mcpJson(await api("DELETE", route, undefined, signal));
       }
       if (!account_id) throw new Error("Pass account_id from Accounts list.");
-      if (Boolean(group_id) === (disabled !== undefined))
-        throw new Error("Pass one of group_id or disabled.");
       const route = `/api/accounts/users/${encodeURIComponent(account_id)}`;
-      const body = group_id ? { accessProfileId: group_id } : { disabled };
-      return mcpJson(await api("PATCH", route, body, signal));
+      if (action === "delete_user") return mcpJson(await api("DELETE", route, undefined, signal));
+      const changes = [
+        group_id && { accessProfileId: group_id },
+        disabled !== undefined && { disabled },
+        role && { role },
+      ].filter(Boolean);
+      if (changes.length !== 1) throw new Error("Pass one of group_id, disabled or role.");
+      return mcpJson(await api("PATCH", route, changes[0], signal));
     },
   );
 }

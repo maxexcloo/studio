@@ -71,7 +71,7 @@ type ImageVectors = ReturnType<typeof createImageVectors>;
  * `near`, which matches a search against them. Images never leave Studio, so every owner's are read.
  */
 export function createImageSearch(options: {
-  /** The Settings › Models switch (STUDIO_IMAGE_SEARCH). */
+  /** The Settings › Generation switch (STUDIO_IMAGE_SEARCH). */
   enabled(): boolean;
   encoder: ImageEncoder;
   vectors: ImageVectors;
@@ -89,7 +89,7 @@ export function createImageSearch(options: {
   const work = createIdleWork<IdleItem>({
     ...options,
     name: "Image search",
-    off: "Image Search is off in Settings › Models.",
+    off: "Image Search is off in Settings › Generation.",
     allowed: () => true,
     unavailable: async () => encoder.unavailable(),
     wanted: (item) => pictured(item) && !vectors.has(item),

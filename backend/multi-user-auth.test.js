@@ -256,13 +256,13 @@ test("ordinary accounts keep stored profile grants and explicit administration c
     body: { disabled: false },
   });
 
-  // Administrators no longer reset passwords; the account changes its own in Settings › Account.
+  // An administrator's new password ends the account's sessions.
   const reset = await call(routes["PATCH /api/accounts/users/:id"], {
     ...admin,
     params: { id: artist.id },
     body: { password: "a replacement password" },
   });
-  assert.equal(reset.statusCode, 400);
+  assert.equal(reset.statusCode, 200);
 
   // Saving while discovery is degraded keeps existing grants but adds no new unknown ones.
   const { saveAccessProfile } = await import("./account-store.js");

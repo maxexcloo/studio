@@ -91,7 +91,7 @@ export interface QueueCancelAllResponse {
   outcomes: { job: QueueJob; cancelRequested: boolean; error?: string }[];
 }
 
-/** Settings › Maintenance › Unfinished Items: any account's job that has not finished. */
+/** Settings › Generation › Unfinished Items: any account's job that has not finished. */
 export interface UnfinishedJob extends QueueJob {
   ownerId: string;
   /** Dream's background work, outside the person's queue. */

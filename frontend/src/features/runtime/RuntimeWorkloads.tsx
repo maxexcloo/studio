@@ -25,7 +25,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeading } from "../../ui/SectionHeading";
-import { SettingRow } from "../settings/SettingRows";
+import { SettingRow } from "../../ui/SettingRows";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
