@@ -173,6 +173,10 @@ function workloadWorkers(kubernetes) {
 let cache = null;
 const listeners = new Set();
 
+/** Where the workers come from: the STUDIO_WORKERS list, else the Kubernetes workloads found at start. */
+export const workerSource = () =>
+  String(process.env.STUDIO_WORKERS || "").trim() ? "STUDIO_WORKERS" : "Kubernetes";
+
 /** Every worker in list order. */
 export function listWorkers() {
   if (!cache) cache = deploymentWorkers();

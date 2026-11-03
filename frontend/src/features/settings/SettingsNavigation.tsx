@@ -1,14 +1,32 @@
-import { Boxes, FileCog, Info, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
+import { Boxes, FileCog, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
-import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
+import {
+  WorkspaceSectionSelect,
+  useWorkspaceSection,
+  visibleSections,
+} from "../../ui/WorkspaceSections";
 
-// Alphabetical, with About apart at the end.
+// Personal sections, then administration, each alphabetical, with About apart at the end.
 const settingSections = {
   account: {
     label: "Account",
-    description: "Your role, sign-in details and personal MCP access.",
+    description: "Your sign-in details and personal MCP access.",
     icon: UserRound,
+    group: "Personal",
+  },
+  preferences: {
+    label: "Preferences",
+    description: "How Studio works for you, saved with your account.",
+    icon: icons.settings,
+    group: "Personal",
+  },
+  generation: {
+    label: "Generation",
+    description: "Default profiles, catalogue features and gallery passes for everyone.",
+    icon: Boxes,
+    admin: true,
+    group: "Administration",
   },
   groups: {
     label: "Groups",
@@ -16,45 +34,39 @@ const settingSections = {
       "Which models, uncensored content, Chat and Dream each group can use; administrators can use everything.",
     icon: Shield,
     admin: true,
+    group: "Administration",
   },
-  maintenance: {
-    label: "Maintenance",
-    description: "Clean up the gallery and gather details for a bug report.",
-    icon: Wrench,
-  },
-  models: {
-    label: "Models",
-    description: "Default profiles, catalogue features and integrations.",
-    icon: Boxes,
+  integrations: {
+    label: "Integrations",
+    description: "Civitai, Hugging Face and the prompt assistant.",
+    icon: Plug,
     admin: true,
+    group: "Administration",
   },
   profiles: {
     label: "Profiles",
     description: "Generation profiles and prompting guides. Every saved version is kept.",
     icon: FileCog,
     admin: true,
-  },
-  studio: {
-    label: "Studio",
-    description: "How Studio works for you.",
-    icon: icons.settings,
+    group: "Administration",
   },
   users: {
     label: "Users",
-    description:
-      "Accounts, their access groups, linked chat identities and the new-account policy.",
+    description: "Accounts, their roles and groups, linked chat identities and the default group.",
     icon: UsersRound,
     admin: true,
+    group: "Administration",
   },
   workers: {
     label: "Workers",
     description: "Text, image and video services and their current status.",
     icon: Server,
     admin: true,
+    group: "Administration",
   },
   about: {
     label: "About",
-    description: "Version, licences and credits.",
+    description: "Version, help, licences and credits.",
     icon: Info,
     apart: true,
   },
@@ -68,6 +80,12 @@ export function useSettingsNavigation() {
     multi,
     options: visibleSections(settingSections, admin, (key) => multi || !multiUserOnly.has(key)),
   };
+}
+/** The open Settings section, or "" outside Settings. */
+export function useSettingsSection() {
+  const { options } = useSettingsNavigation();
+  const { location, active } = useWorkspaceSection(options);
+  return location.pathname === "/settings" ? active : "";
 }
 export function SettingsTitle() {
   const { options } = useSettingsNavigation();

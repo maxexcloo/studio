@@ -2,11 +2,22 @@ import type { ReactNode } from "react";
 import { Group, Stack, Text } from "@mantine/core";
 import classes from "./SettingRows.module.css";
 
-/** A titled run of setting rows, divided like the rest of Settings. */
-export function SettingGroup({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * A titled run of setting rows, divided like the rest of Settings. `danger` titles a section's last
+ * group, Danger Zone, whose actions always confirm first.
+ */
+export function SettingGroup({
+  title,
+  danger = false,
+  children,
+}: {
+  title: string;
+  danger?: boolean;
+  children: ReactNode;
+}) {
   return (
     <Stack gap={4} component="section" aria-label={title}>
-      <Text size="sm" fw={600} c="dimmed">
+      <Text size="sm" fw={600} c={danger ? "red" : "dimmed"}>
         {title}
       </Text>
       <div>{children}</div>

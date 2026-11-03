@@ -9,6 +9,9 @@
  * A generation profile marked `uncensored` needs the Uncensored Models feature on top of its
  * grant. The prompt assistant's Spicy preset needs Uncensored Models too, whatever profile is selected.
  * `allModels` grants every local profile, including ones added later.
+ *
+ * An ordinary account may turn its group's Cloud Models and Uncensored Models off for itself
+ * (account-preferences.js); its effective features are then off everywhere they apply.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
 import { canonicalProfileId } from "./profile/store.js";
@@ -66,7 +69,15 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
   };
 }
 
-export function effectiveAccountAccess(account, profiles, availableProfiles = null) {
+/** Features an account has turned off for itself, among those its group may grant. */
+const personalFeatures = ["cloudModels", "uncensoredModels"];
+
+export function effectiveAccountAccess(
+  account,
+  profiles,
+  availableProfiles = null,
+  preferences = {},
+) {
   if (!account || account.disabled === true)
     return { authenticated: false, reason: account ? "disabled" : "anonymous" };
   if (account.role === accountRoles.administrator) {
@@ -97,7 +108,15 @@ export function effectiveAccountAccess(account, profiles, availableProfiles = nu
     role: accountRoles.user,
     generationProfiles: safe.generationProfiles,
     allModels: safe.allModels,
-    features: safe.features,
+    features: {
+      ...safe.features,
+      ...Object.fromEntries(
+        personalFeatures.map((feature) => [
+          feature,
+          safe.features[feature] && preferences[feature] !== false,
+        ]),
+      ),
+    },
   };
 }
 

@@ -19,13 +19,14 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
+  // Personal, then Administration, each alphabetical, with About apart.
   const order = [
     "Account",
+    "Preferences",
+    "Generation",
     "Groups",
-    "Maintenance",
-    "Models",
+    "Integrations",
     "Profiles",
-    "Studio",
     "Users",
     "Workers",
     "About",
@@ -38,25 +39,35 @@ test("Settings follow the settled section order and run maintenance and worker r
     await expect(
       page.getByRole("navigation", { name: "Settings Sections", exact: true }).getByRole("link"),
     ).toHaveText(order);
-  await section(page, "Settings", "Maintenance");
-  await page.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
+  if ((page.viewportSize()?.width || 1440) >= 768)
+    await expect(
+      page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
+    ).toHaveText(order.slice(2, 8));
+  await section(page, "Settings", "Preferences");
+  const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
+  await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
   await page.getByRole("option", { name: "member@example.test", exact: true }).click();
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await danger.getByRole("button", { name: "Delete", exact: true }).click();
   const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
   await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByText("2 deleted", { exact: true })).toBeVisible();
+  await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
     "Text: Healthy · Images: Healthy · Videos: Offline (Video endpoint is offline.)",
   );
+  // Workers listed by the deployment show read-only with where they come from.
+  const workers = page.getByRole("region", { name: "Workers", exact: true });
+  await expect(workers).toContainText("Listed by the deployment in STUDIO_WORKERS");
+  await expect(workers).toContainText("Image Worker");
+  await expect(workers).toContainText("Images, Upscale, Model Library · http://comfyui-image:8188");
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);
 });
 
-test("Caption Gallery in Settings › Maintenance starts a pass, shows its progress and stops", async ({
+test("Caption Gallery in Settings › Generation starts a pass, shows its progress and stops", async ({
   page,
 }) => {
   await fixtures(page);
@@ -94,8 +105,8 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
     if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
     return route.fulfill({ json: status });
   });
-  await page.goto("/settings#maintenance");
-  const row = page.getByRole("region", { name: "Clean Up", exact: true });
+  await page.goto("/settings#generation");
+  const row = page.getByRole("region", { name: "Gallery", exact: true });
   await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
   await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
   await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
@@ -118,7 +129,7 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
   ]);
 });
 
-test("Unfinished Items in Settings › Maintenance retry and delete any account's stuck jobs", async ({
+test("Unfinished Items in Settings › Generation retry and delete any account's stuck jobs", async ({
   page,
 }) => {
   await fixtures(page);
@@ -148,8 +159,8 @@ test("Unfinished Items in Settings › Maintenance retry and delete any account'
     jobs = jobs.filter((entry) => entry.id !== body.id);
     return route.fulfill({ json: { job: jobs[0] } });
   });
-  await page.goto("/settings#maintenance");
-  const row = page.getByRole("region", { name: "Clean Up", exact: true });
+  await page.goto("/settings#generation");
+  const row = page.getByRole("region", { name: "Gallery", exact: true });
   await expect(row.getByText(/2 now\.$/)).toBeVisible();
   await row.getByRole("button", { name: "Review", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Unfinished Items", exact: true });
@@ -170,7 +181,9 @@ test("Unfinished Items in Settings › Maintenance retry and delete any account'
   ]);
 });
 
-test("Tile Captions in Settings › Studio pin phone tile captions", async ({ page }, testInfo) => {
+test("Tile Captions in Settings › Preferences pin phone tile captions", async ({
+  page,
+}, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Desktop shows captions on hover.");
   const state = await fixtures(page);
   state.gallery.push({
@@ -188,14 +201,40 @@ test("Tile Captions in Settings › Studio pin phone tile captions", async ({ pa
     page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }),
   ).toBeVisible();
   await expect(caption).toHaveCount(0);
-  await page.goto("/settings#studio");
+  await page.goto("/settings#preferences");
   // The unlabelled track sits over the input; the row's accessible name is on the input.
-  await page.getByRole("switch", { name: "Tile Captions", exact: true }).check({ force: true });
+  const toggle = page.getByRole("switch", { name: "Tile Captions", exact: true });
+  await toggle.click({ force: true });
+  await expect(toggle).toBeChecked();
   await page.getByRole("button", { name: "Close Settings", exact: true }).click();
   await expect(caption).toBeVisible();
+  expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("Finish Starred Images in Settings › Studio saves its switch, quality and face detail", async ({
+test("A device's earlier Tile Captions choice moves to the account once", async ({ page }) => {
+  const state = await fixtures(page);
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("seeded")) {
+      sessionStorage.setItem("seeded", "1");
+      localStorage.setItem("studio-tile-captions", "true");
+    }
+  });
+  await page.goto("/settings#preferences");
+  const toggle = page.getByRole("switch", { name: "Tile Captions", exact: true });
+  await expect(toggle).toBeChecked();
+  expect(state.preferences.saved).toEqual(["tileCaptions"]);
+  expect(await page.evaluate(() => localStorage.getItem("studio-tile-captions"))).toBeNull();
+  // The account's own choice wins over a device value left behind afterwards.
+  await toggle.click({ force: true });
+  await expect(toggle).not.toBeChecked();
+  await expect.poll(() => state.preferences.preferences.tileCaptions).toBe(false);
+  await page.evaluate(() => localStorage.setItem("studio-tile-captions", "true"));
+  await page.reload();
+  await expect(toggle).not.toBeChecked();
+  expect(state.preferences.preferences.tileCaptions).toBe(false);
+});
+
+test("Finish Starred Images in Settings › Preferences saves its switch, quality and face detail", async ({
   page,
 }) => {
   await fixtures(page);
@@ -213,7 +252,7 @@ test("Finish Starred Images in Settings › Studio saves its switch, quality and
     }
     return route.fulfill({ json: status });
   });
-  await page.goto("/settings#studio");
+  await page.goto("/settings#preferences");
   const toggle = page.getByRole("switch", { name: "Finish Starred Images", exact: true });
   await expect(toggle).not.toBeChecked();
   await expect(page.getByRole("combobox", { name: "Finishing Quality", exact: true })).toHaveCount(
@@ -508,7 +547,7 @@ test("A parked service reads as parked, and administrators start it from Status"
   expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
 });
 
-test("Settings › Models picks the assistant model from the gateway's and text workloads' models", async ({
+test("Settings › Integrations picks the assistant model from the gateway's and text workloads' models", async ({
   page,
 }) => {
   await fixtures(page);
@@ -550,7 +589,7 @@ test("Settings › Models picks the assistant model from the gateway's and text 
     });
   });
   await page.goto("/settings");
-  await section(page, "Settings", "Models");
+  await section(page, "Settings", "Integrations");
   const select = page.getByRole("combobox", { name: "Assistant Model", exact: true });
   await expect(select).toHaveValue("Automatic");
   await select.click();
@@ -563,4 +602,63 @@ test("Settings › Models picks the assistant model from the gateway's and text 
   await page.getByRole("option", { name: "local/stopped", exact: true }).click();
   await expect(select).toHaveValue("local/stopped");
   expect(saved).toEqual([{ key: "STUDIO_ASSISTANT_MODEL", value: "local/stopped" }]);
+});
+
+test("Settings › Generation switches follow at once and settle back after a failed save", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const setting = (key: string) => ({
+    key,
+    configured: "",
+    effective: "",
+    source: "default",
+    locked: false,
+  });
+  const captions = true;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/settings/deployment", async (route) => {
+    if (route.request().method() === "POST") {
+      await held;
+      return route.fulfill({ status: 500, json: { error: "The setting could not be saved" } });
+    }
+    return route.fulfill({
+      json: {
+        defaults: {
+          image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
+          video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          profiles: [],
+        },
+        catalogue: [
+          {
+            key: "STUDIO_GALLERY_CAPTIONS",
+            label: "Gallery Captions",
+            description: "Caption images for search.",
+            value: captions,
+            source: "default",
+            locked: false,
+          },
+        ],
+        integrations: {
+          civitai: { token: { set: false }, presets: false },
+          huggingFace: { token: { set: false } },
+          assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
+        },
+      },
+    });
+  });
+  await page.goto("/settings#generation");
+  const toggle = page.getByRole("switch", { name: "Gallery Captions", exact: true });
+  await expect(toggle).toBeChecked();
+  await toggle.click({ force: true });
+  // The switch moves before the server answers, and nothing else in the section locks.
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByRole("combobox", { name: "Default Image Profile" })).toBeEnabled();
+  release();
+  await expect(page.getByText("The setting could not be saved")).toBeVisible();
+  await expect(toggle).toBeChecked();
 });
