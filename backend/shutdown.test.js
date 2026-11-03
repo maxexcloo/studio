@@ -15,12 +15,10 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       // that boundary without requiring a privileged container in the source checks.
       const source = `
       import { installShutdown } from './backend/shutdown.js';
-      import { startSession } from './backend/exit-record.js';
       import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
       import http from 'node:http';
       const kill = process.kill.bind(process);
       process.kill = (pid, signal) => pid === process.pid ? true : kill(pid, signal);
-      startSession();
       setGallery([{ id: 'shutdown-pending', jobId: 'shutdown-pending', type: 'image', status: 'pending', prompt: 'Saved before stop' }]);
       const server = http.createServer((_req, res) => { res.writeHead(200); res.write('stream open'); });
       installShutdown({
@@ -64,10 +62,6 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       assert.equal(gallery[0].id, "shutdown-pending");
       assert.equal(gallery[0].status, "done");
       assert.equal(gallery[0].prompt, "Saved after draining");
-      const record = JSON.parse(fs.readFileSync(path.join(data, "logs/last-exit.json"), "utf8"));
-      assert.equal(record.clean, true);
-      assert.equal(record.code, 0);
-      assert.equal(record.signal, signal);
     },
   );
 }
@@ -82,10 +76,8 @@ test("an uncaught exception logs its cause and synchronously saves pending galle
         "--eval",
         `
       import { installShutdown } from './backend/shutdown.js';
-      import { startSession } from './backend/exit-record.js';
       import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
       installShutdown({ flush: flushPendingGallery });
-      startSession();
       setGallery([{ id: 'crash-pending', type: 'image', status: 'pending' }]);
       setImmediate(() => { throw new Error('Fixture crash'); });
     `,
@@ -99,18 +91,7 @@ test("an uncaught exception logs its cause and synchronously saves pending galle
     assert.equal(result.status, 1);
     const gallery = JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8"));
     assert.equal(gallery[0].id, "crash-pending");
-    const record = JSON.parse(fs.readFileSync(path.join(data, "logs/last-exit.json"), "utf8"));
-    assert.deepEqual(
-      [record.clean, record.code, record.reason],
-      [false, 1, "The server crashed: Fixture crash"],
-    );
-    const log = fs
-      .readdirSync(path.join(data, "logs"))
-      .find((name) => /^studio-.*\.log$/.test(name));
-    assert.match(
-      fs.readFileSync(path.join(data, "logs", log), "utf8"),
-      /Crashed: uncaught exception.*Fixture crash/,
-    );
+    assert.match(result.stderr, /Crashed: uncaught exception.*Fixture crash/);
   } finally {
     fs.rmSync(data, { recursive: true, force: true });
   }
@@ -123,9 +104,7 @@ test(
     const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-stalled-shutdown-"));
     const source = `
     import { installShutdown } from './backend/shutdown.js';
-    import { startSession } from './backend/exit-record.js';
     import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
-    startSession();
     setGallery([{ id: 'still-accepted', type: 'image', status: 'pending' }]);
     installShutdown({ flush: flushPendingGallery, drain: () => new Promise(() => {}), graceMs: 25 });
     process.send({ ready: true });
@@ -150,8 +129,5 @@ test(
     assert.deepEqual(await exited, { code: 1, signal: null });
     const gallery = JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8"));
     assert.deepEqual([gallery[0].id, gallery[0].status], ["still-accepted", "pending"]);
-    const record = JSON.parse(fs.readFileSync(path.join(data, "logs/last-exit.json"), "utf8"));
-    assert.equal(record.clean, false);
-    assert.match(record.reason, /Shutdown timed out/);
   },
 );
