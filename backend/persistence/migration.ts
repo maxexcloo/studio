@@ -15,6 +15,8 @@ const documents = legacyFiles.map((file) => path.basename(file, ".json"));
 // What the legacy records step (legacy-records.js) backs up beside account LoRA stacks: files, and
 // the rows it rewrites as JSON lists.
 const legacyRecordFiles = ["lora-stacks", "model-types", "studio_gallery", "studio_chat_messages"];
+// What the env settings step (env-settings.js) backs up: the env file and the settings document.
+const envSettingsFiles = [".env", "settings.json"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
@@ -236,7 +238,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
  * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, the
  * LoRA layers step's (library/lora-layers.js) the catalogue, the account access step's
  * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
- * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists.
+ * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists, and the
+ * env settings step's (env-settings.js) the env file and the settings document as `settings.json`.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -253,6 +256,7 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
       !profile &&
       !catalogue &&
       !stacks &&
+      !envSettingsFiles.includes(mapping.source) &&
       ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
     )
       throw new Error("Unsupported backup mapping");
