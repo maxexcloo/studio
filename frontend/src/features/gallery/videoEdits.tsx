@@ -21,7 +21,6 @@ export function useVideoEdit(item: MediaItem, { inlineError = false } = {}) {
     mutationFn: (edit: VideoEdit) =>
       post<{ id: string }>("/api/gallery/video-edit", { galleryItemId: item.id, ...edit }),
     onSuccess: () => {
-      notifications.show({ message: "Saved as a new version." });
       void cache.invalidateQueries({ queryKey: ["gallery"] });
       void cache.invalidateQueries({ queryKey: queueQuery.queryKey });
     },
@@ -42,7 +41,16 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          save.mutate({ kind: "trim", start: range[0], end: range[1] }, { onSuccess: onClose });
+          // The dialog closes, leaving nowhere in place to say so.
+          save.mutate(
+            { kind: "trim", start: range[0], end: range[1] },
+            {
+              onSuccess: () => {
+                notifications.show({ message: "Saved as a new version." });
+                onClose();
+              },
+            },
+          );
         }}
       >
         <Stack>
