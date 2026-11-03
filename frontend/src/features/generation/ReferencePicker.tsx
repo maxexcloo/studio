@@ -50,7 +50,7 @@ import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowse
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { chipProps, iconChipProps } from "./chip";
-import { ChipPopup, ChipThumbnails, PickerGrid, PickerHeader, PickerTile } from "./Picker";
+import { ChipPopup, ChipContent, PickerGrid, PickerHeader, PickerTile } from "./Picker";
 
 export function ReferencePicker({
   compact = false,
@@ -395,22 +395,18 @@ export function ReferencePicker({
       aria-expanded={opened}
       color={missing ? "yellow" : undefined}
       variant={missing ? "outline" : chipProps.variant}
-      leftSection={references.length ? undefined : <ImagePlus size={16} />}
       rightSection={<ChevronDown size={14} />}
       onClick={() => setOpened(!opened)}
     >
-      {references.length ? (
-        <ChipThumbnails
-          placeholder={ImagePlus}
-          items={references.map((asset, index) => ({
-            key: referenceKey(asset),
-            label: referenceLabel(asset, index, profile),
-            src: asset.thumbnailUrl || asset.url,
-          }))}
-        />
-      ) : (
-        "References"
-      )}
+      <ChipContent
+        label="References"
+        icon={ImagePlus}
+        items={references.map((asset, index) => ({
+          key: referenceKey(asset),
+          label: referenceLabel(asset, index, profile),
+          src: asset.thumbnailUrl || asset.url,
+        }))}
+      />
     </Button>
   );
   return (

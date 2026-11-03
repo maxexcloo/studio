@@ -214,14 +214,15 @@ export function GenerationEditor({
     />
   );
   const expert = { opened: expertOpen, onOpenedChange: setExpertOpen };
-  const mask =
-    primary && profile?.capabilities?.inpaint
-      ? {
-          painted: !!input.inpaint,
-          onPaint: () => setMaskOpen(true),
-          onRemove: () => onChange({ inpaint: null }),
-        }
-      : undefined;
+  const mask = profile?.capabilities?.inpaint
+    ? {
+        painted: !!input.inpaint,
+        // Paint Mask stays in place, disabled until there is a first reference to paint on.
+        disabled: !primary,
+        onPaint: () => setMaskOpen(true),
+        onRemove: () => onChange({ inpaint: null }),
+      }
+    : undefined;
   return (
     <>
       <form

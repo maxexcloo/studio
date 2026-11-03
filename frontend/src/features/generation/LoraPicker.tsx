@@ -30,7 +30,7 @@ import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 import {
   ChipPopup,
-  ChipThumbnails,
+  ChipContent,
   PickerFooter,
   PickerGrid,
   PickerHeader,
@@ -171,25 +171,21 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
       aria-label="Choose LoRAs"
       aria-expanded={picker.opened}
       aria-controls={picker.controlsId}
-      leftSection={input.loras.length ? undefined : <icons.loras size={15} />}
       rightSection={<ChevronDown size={14} />}
       onPointerEnter={warm}
       onFocus={warm}
       onClick={() => picker.setOpened(!picker.opened)}
     >
-      {input.loras.length ? (
-        <ChipThumbnails
-          placeholder={icons.loras}
-          items={input.loras.map((lora) => ({
-            key: lora.name,
-            label: loraTitle(info.data?.loras[lora.name], lora.name),
-            src: previews.data?.previews[lora.name],
-            off: lora.enabled === false,
-          }))}
-        />
-      ) : (
-        "LoRAs"
-      )}
+      <ChipContent
+        label="LoRAs"
+        icon={icons.loras}
+        items={input.loras.map((lora) => ({
+          key: lora.name,
+          label: loraTitle(info.data?.loras[lora.name], lora.name),
+          src: previews.data?.previews[lora.name],
+          off: lora.enabled === false,
+        }))}
+      />
     </Button>
   );
   return (
@@ -505,12 +501,15 @@ function LoraControls({
       }
     />
   );
+  // Phones list the choices in a fixed-height pane above the stack, so adding one never moves them.
   if (phone)
     return (
       <>
-        <Stack gap="xs">{stack}</Stack>
         {header}
-        {choices}
+        <ScrollArea h="45dvh" offsetScrollbars="present">
+          {choices}
+        </ScrollArea>
+        <Stack gap="xs">{stack}</Stack>
         {footer}
       </>
     );
