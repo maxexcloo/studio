@@ -23,7 +23,7 @@ import { Plus, UserCog } from "lucide-react";
 import { api, post } from "../../api";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { isCloudProfile } from "../generation/payload";
@@ -249,23 +249,6 @@ const groupFeature = (on: boolean | undefined, label: string) => (
     {label} {on ? "On" : "Off"}
   </Badge>
 );
-
-/** A labelled action in a section toolbar: account actions are rare enough to spell out. */
-function ToolbarAction({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <Button variant="subtle" size="compact-sm" leftSection={icon} onClick={onClick}>
-      {label}
-    </Button>
-  );
-}
 
 /** Settings › Groups: what each access group may use. */
 export function GroupsAdmin({ heading }: { heading: ReactNode }) {

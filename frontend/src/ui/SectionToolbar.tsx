@@ -26,6 +26,31 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
   );
 }
 
+/** A section's create or primary action, labelled; its other actions are icons with tooltips. */
+export function ToolbarAction({
+  label,
+  icon,
+  loading,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  loading?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Button
+      variant="subtle"
+      size="compact-sm"
+      leftSection={icon}
+      loading={loading}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
 /**
  * Library and Settings lists share one toolbar: segmented views on the left, then an expanding
  * search, one filter popover and the section's own actions. Escape closes search, keeping the query,
