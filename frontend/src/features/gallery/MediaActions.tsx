@@ -361,8 +361,6 @@ export function useMediaActions(
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
   const quick = useQuickUpscale(item, ready);
   const upscaleBusy = upscaling(item) || quick.queue.isPending;
-  const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
-    quick.queue.mutate({ quality, faceDetail });
   const themeItems = (disabled: boolean) =>
     assistant.data?.available
       ? themes.map((theme) => ({
@@ -521,8 +519,9 @@ export function useMediaActions(
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     ready &&
       itemAction("upscale", {
-        // Its first option is the usual click: with an upscale, switching between it and the
-        // original; otherwise Balanced.
+        // Laid out like Animate: with an upscale, switching between it and the original comes
+        // first; then the remembered settings, then the runs. The usual click is the first run
+        // option: Show Upscale, else Upscale at the chosen settings.
         label: upscaling(item) ? "Upscaling…" : "Upscale",
         pressed: upscaled && Boolean(item.upscaleActive),
         loading: upscaleBusy && !upscaled,
@@ -552,34 +551,51 @@ export function useMediaActions(
               ]
             : [],
           [
-            ...(upscaled
-              ? [
-                  {
-                    id: "upscale-again",
-                    label: "Regenerate Upscale",
-                    icon: icons.retry,
-                    disabled: upscaleBusy,
-                    onClick: () => queueUpscale("balanced"),
-                  },
-                ]
-              : (["balanced", "fast", "high"] as const).map((quality) => ({
-                  id: `upscale-${quality}`,
-                  label: quality[0].toUpperCase() + quality.slice(1),
-                  icon: icons.upscale,
-                  disabled: upscaleBusy,
-                  onClick: () => queueUpscale(quality),
-                }))),
+            {
+              id: "upscale-quality",
+              label: "Upscale Quality",
+              icon: icons.upscale,
+              choice: {
+                value: quick.quality,
+                options: [
+                  { value: "fast", label: "Fast" },
+                  { value: "balanced", label: "Balanced" },
+                  { value: "high", label: "High" },
+                ],
+                onChange: (value: string) => quick.setQuality(value as typeof quick.quality),
+              },
+            },
+            // Face Detail joins every run from here once checked; disabled where the worker can't.
             ...(image
               ? [
                   {
                     id: "upscale-face",
                     label: "Face Detail",
                     icon: ScanFace,
-                    disabled: upscaleBusy || !quick.faceDetail,
-                    onClick: () => queueUpscale("balanced", true),
+                    checked: quick.faceDetail,
+                    disabled: !quick.faceAvailable,
+                    keepOpen: true,
+                    onClick: () => quick.setFaceDetail(!quick.faceDetail),
                   },
                 ]
               : []),
+          ],
+          [
+            upscaled
+              ? {
+                  id: "upscale-again",
+                  label: "Regenerate Upscale",
+                  icon: icons.retry,
+                  disabled: upscaleBusy,
+                  onClick: quick.run,
+                }
+              : {
+                  id: "upscale-run",
+                  label: image ? "Upscale Image" : "Upscale Video",
+                  icon: icons.upscale,
+                  disabled: upscaleBusy,
+                  onClick: quick.run,
+                },
             {
               id: "upscale-options",
               label: "Upscale Options…",
