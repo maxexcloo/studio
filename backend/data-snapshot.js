@@ -7,9 +7,10 @@
  * data/.backups/<from>-to-<to>-<time>/, so going back to the previous version
  * is a matter of stopping Studio and copying them back (TROUBLESHOOTING.md).
  *
- * Only the small state files are copied. Thumbnails, reference images and
- * the backups in data/backups stay where they are: no update rewrites them,
- * and copying them could take gigabytes. Snapshots are readable by this user
+ * Only the small state files are copied. Media, thumbnails, video previews,
+ * the image search index, reference images and the backups in data/backups
+ * stay where they are: no update rewrites them, and copying them takes
+ * gigabytes. Snapshots are readable by this user
  * only and go after 14 days (3 at most).
  *
  * Imported first by backend/index.js, so it runs before any store loads.
@@ -31,8 +32,11 @@ const keepCount = 3;
 // Large, or never rewritten by an update, or not ours to keep.
 const skipped = new Set([
   ".thumbnails",
+  ".video-previews",
   backupsName,
   "backups",
+  "image-search",
+  "media",
   "reference-assets",
   "setup-demo",
   trashFolderName,
