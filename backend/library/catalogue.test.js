@@ -10,8 +10,8 @@ const quiet = { info: () => {}, warn: () => {} };
 const families = ({ base_model: base }) => (/krea/i.test(base) ? ["krea2"] : []);
 
 /**
- * A data folder holding every source file, a catalogue whose seed and admin layers came from the
- * retired lora-catalogue.json files, and one such file left behind, which is ignored.
+ * A data folder holding every source file, a catalogue with saved definitions and an
+ * administrator's edit, and a retired lora-catalogue.json left behind, which is ignored.
  */
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-catalogue-"));
@@ -23,22 +23,25 @@ function fixture(t) {
   write("library/catalogue.json", {
     version: 1,
     layers: {
-      seed: {
+      definitions: {
         "loras/style.safetensors": {
           title: "Seed Style",
           baseModel: "Krea 2",
           triggers: ["seedword"],
           note: "Strength 0.7",
-          sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
+          links: { civitaiCom: "https://civitai.com/models/1?modelVersionId=2" },
           tags: ["a", "b"],
         },
         "loras/seed-only.safetensors": { title: "Seed Only", baseModel: "Krea 2" },
       },
-      admin: {
-        "loras/style.safetensors": {
-          title: "Admin Style",
-          strengthRange: { min: 0, max: 2, step: 0.1, default: 0.9 },
-        },
+    },
+    edits: {
+      "loras/style.safetensors": {
+        fields: { title: "Admin Style", strength: { default: 0.9, min: 0, max: 2, step: 0.1 } },
+        origin: "admin",
+        by: "",
+        editedAt: "2026-10-23T00:00:00.000Z",
+        history: [],
       },
     },
   });
@@ -113,9 +116,9 @@ test("the migration merges every source by folder/file with provenance, the more
   assert.deepEqual(
     [style.kind, style.title, style.origin, style.baseModel, style.families],
     ["lora", "Admin Style", "admin", "Krea 2", ["krea2"]],
-    "the admin layer over the seed layer",
+    "the edit over the definitions",
   );
-  assert.deepEqual(style.triggers, ["seedword"], "catalogue triggers over provider trained words");
+  assert.deepEqual(style.triggers, ["seedword"], "definition triggers over provider trained words");
   assert.deepEqual(style.strength, { default: 0.9, min: 0, max: 2, step: 0.1 });
   assert.deepEqual(
     [style.sha256, style.bytes, style.version],
@@ -217,7 +220,12 @@ test("edits are validated, recorded with who made them, undoable and reviewable"
     ],
     ["Drafted", ["newword"], true, "Use low", "ai", true, "assistant"],
   );
-  assert.deepEqual(previous, { title: null, triggers: null, uncensored: null, note: null });
+  assert.deepEqual(previous, {
+    title: "Admin Style",
+    triggers: null,
+    uncensored: null,
+    note: null,
+  });
   store.edit("loras/style.safetensors", { title: "Reviewed" }, { by: "admin-1" });
   assert.equal(
     store.entry("loras/style.safetensors").aiDrafted,
