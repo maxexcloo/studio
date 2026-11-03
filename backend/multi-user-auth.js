@@ -92,6 +92,7 @@ const mcpAdminRoutes = [
   ["GET", /^\/api\/library\/imports$/],
   ["POST", /^\/api\/library\/imports$/],
   ["POST", /^\/api\/library\/imports\/image$/],
+  ["POST", /^\/api\/library\/imports\/clear-failed$/],
   ["GET", new RegExp(`^/api/library/imports/${routeId}$`)],
   ["POST", new RegExp(`^/api/library/imports/${routeId}/(?:download|describe|draft-profile)$`)],
   ["POST", /^\/api\/library\/lookup$/],
