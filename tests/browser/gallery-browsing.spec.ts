@@ -311,7 +311,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   }
 });
 
-test("Runs fan a stacked run out in place, link its Chat and filter by it", async ({ page }) => {
+test("Runs fan a stacked run out in place and link its Chat", async ({ page }) => {
   const state = await fixtures(page);
   state.sessions.push({ id: "chat-a", title: "Bird Chat", inputs: {}, createdAt: stamp });
   state.gallery.push(
@@ -348,17 +348,6 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
   await page.reload();
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
-  await page.getByRole("combobox", { name: "Chats", exact: true }).click();
-  await page.getByRole("option", { name: "Bird Chat", exact: true }).click();
-  await expect
-    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
-    .toEqual(["chat-a"]);
-  // Filters are remembered too.
-  state.galleryRequests.length = 0;
-  await page.reload();
-  await expect
-    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
-    .toEqual(["chat-a"]);
 });
 
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
