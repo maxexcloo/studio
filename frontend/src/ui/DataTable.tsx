@@ -103,6 +103,8 @@ export function DataTable<T>({
                 key={column.key}
                 visibleFrom={column.visibleFrom}
                 w={column.width}
+                // A header stays on one line; the main column gives up the width instead.
+                style={{ whiteSpace: "nowrap" }}
                 aria-sort={
                   column.sortValue
                     ? active

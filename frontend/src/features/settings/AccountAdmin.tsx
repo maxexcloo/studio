@@ -527,7 +527,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   }
                 />
               ) : (
-                <Text size="sm" c="dimmed">
+                <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
                   All Groups
                 </Text>
               ),
