@@ -1,6 +1,7 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -75,19 +76,25 @@ function nearControl(event: React.MouseEvent<HTMLElement>) {
 
 /**
  * Plays each opened video, muted if the browser refuses sound, pauses it while the tab is hidden
- * and releases the player when it leaves. The keyed element gets a fresh call per source.
+ * and releases the player when it leaves. The keyed element gets a fresh call per source. Should
+ * the browser refuse to play it at all, `refused` shows its controls so a tap can start it.
  */
-function playVideo(media: HTMLVideoElement | null) {
-  if (!media) return;
+function playVideo(media: HTMLVideoElement, refused: () => void) {
   const pause = () => {
     if (document.hidden) media.pause();
   };
   document.addEventListener("visibilitychange", pause);
-  media.play().catch((error: DOMException) => {
-    if (error.name !== "NotAllowedError" || media.muted) return;
-    media.muted = true;
-    void media.play().catch(() => {});
-  });
+  media
+    .play()
+    .catch(() => {
+      // A player already released stays stopped.
+      if (!media.isConnected || media.muted) throw new Error("Not played");
+      media.muted = true;
+      return media.play();
+    })
+    .catch(() => {
+      if (media.isConnected) refused();
+    });
   return () => {
     document.removeEventListener("visibilitychange", pause);
     media.pause();
@@ -108,6 +115,7 @@ const viewerShortcuts: Record<string, string> = {
 function ViewerVideo({
   id,
   src,
+  poster,
   width,
   height,
   swipe,
@@ -115,11 +123,19 @@ function ViewerVideo({
   /** The item's id, so Use Frame as Reference finds the frame showing. */
   id: string;
   src: string;
+  /** Its still, shown until the first frame plays (iOS shows nothing before then). */
+  poster?: string;
   width?: number;
   height?: number;
   swipe: ReturnType<typeof useTouchSwipe>;
 }) {
   const [controls, setControls] = useState(false);
+  const [refused, setRefused] = useState(false);
+  const play = useCallback(
+    (media: HTMLVideoElement | null) =>
+      media ? playVideo(media, () => setRefused(true)) : undefined,
+    [],
+  );
   const hide = useRef(0);
   useEffect(() => () => clearTimeout(hide.current), []);
   const reveal = () => {
@@ -129,12 +145,13 @@ function ViewerVideo({
   };
   return (
     <video
-      ref={playVideo}
+      ref={play}
       data-media-id={id}
       src={src}
+      poster={poster}
       width={width}
       height={height}
-      controls={controls}
+      controls={controls || refused}
       // Generated clips are short, so they repeat like a live photo.
       loop
       playsInline
@@ -486,6 +503,7 @@ export function MediaViewer({
                   key={`${item.id}:${source.url}`}
                   id={item.id}
                   src={source.url}
+                  poster={source.thumbnailUrl}
                   width={source.width}
                   height={source.height}
                   swipe={touchSwipe}
