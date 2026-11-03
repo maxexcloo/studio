@@ -142,7 +142,10 @@ export function ChipPopup({
   );
 }
 
-/** Tabs, an inline search and a filter toggle on one row; the filters open inline below it. */
+/**
+ * Tabs, then the search, active filter chips and filter toggle in one compact row, sized like the
+ * gallery toolbar; the filters open inline below it.
+ */
 export function PickerHeader<Tab extends string>({
   label,
   searched = label,
@@ -185,24 +188,28 @@ export function PickerHeader<Tab extends string>({
             data={tabs}
           />
         )}
-        <SearchInput
-          className={classes.search}
-          data-autofocus
-          aria-label={`Search ${searched}`}
-          value={query}
-          onChange={(event) => onQueryChange(event.currentTarget.value)}
-          onClear={() => onQueryChange("")}
-        />
-        {actions}
-        {chips}
-        {filters && (
-          <FilterButton
-            label={`Filter ${searched}`}
-            count={filterCount}
-            opened={open}
-            onClick={() => setFiltering(!open)}
+        <div className={classes.searchRow}>
+          <SearchInput
+            className={classes.search}
+            data-autofocus
+            aria-label={`Search ${searched}`}
+            size="sm"
+            radius="xl"
+            value={query}
+            onChange={(event) => onQueryChange(event.currentTarget.value)}
+            onClear={() => onQueryChange("")}
           />
-        )}
+          {actions}
+          {chips && <div className={classes.chips}>{chips}</div>}
+          {filters && (
+            <FilterButton
+              label={`Filter ${searched}`}
+              count={filterCount}
+              opened={open}
+              onClick={() => setFiltering(!open)}
+            />
+          )}
+        </div>
       </div>
       {open && (
         <div className={classes.filters} role="group" aria-label={`${searched} Filters`}>
