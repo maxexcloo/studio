@@ -1,23 +1,14 @@
 import { useState, type ReactNode } from "react";
-import {
-  ActionIcon,
-  Alert,
-  Badge,
-  FileButton,
-  Group,
-  Menu,
-  Select,
-  Stack,
-  Text,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Alert, Badge, Group, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Combine, FileDown, Merge, Plus, Upload } from "lucide-react";
+import { Combine, Ellipsis, FileDown, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { usePhone } from "../../ui/usePhone";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
@@ -37,6 +28,57 @@ interface DefinitionRow {
 }
 const nouns = { profile: "Profile", guide: "Guide" } as const;
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
+
+interface SectionAction {
+  label: string;
+  icon: LucideIcon;
+  loading?: boolean;
+  onClick?: () => void;
+  /** A download link instead of a click. */
+  href?: string;
+}
+
+/** Icons with tooltips on desktop; phones, which show no tooltips, list them by name under More. */
+function SectionActions({ actions }: { actions: SectionAction[] }) {
+  const phone = usePhone();
+  const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
+  if (phone)
+    return (
+      <Menu position="bottom-end">
+        <Menu.Target>
+          <ActionIcon variant="subtle" color="gray" aria-label="More Profile Actions">
+            <Ellipsis size={18} />
+          </ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown>
+          {actions.map(({ label, icon: Icon, onClick, href }) => (
+            <Menu.Item
+              key={label}
+              leftSection={<Icon size={16} />}
+              onClick={onClick}
+              {...link(href)}
+            >
+              {label}
+            </Menu.Item>
+          ))}
+        </Menu.Dropdown>
+      </Menu>
+    );
+  return actions.map(({ label, icon: Icon, loading, onClick, href }) => (
+    <Tooltip key={label} label={label}>
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label={label}
+        loading={loading}
+        onClick={onClick}
+        {...link(href)}
+      >
+        <Icon size={18} />
+      </ActionIcon>
+    </Tooltip>
+  ));
+}
 
 /** Settings › Profiles: generation profiles and prompting guides, each with saved versions. */
 interface ProfileStats {
@@ -144,6 +186,37 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     setSelected(null);
     setCreating(null);
   };
+  const workflowFile = useFileDialog({
+    accept: "application/json,.json",
+    multiple: false,
+    onChange: (files) => {
+      if (files?.[0]) importing.mutate(files[0]);
+    },
+  });
+  const actions: SectionAction[] = [
+    kind === "profile"
+      ? {
+          label: "Import Workflow",
+          icon: Upload,
+          loading: importing.isPending,
+          onClick: workflowFile.open,
+        }
+      : {
+          label: "New Guide",
+          icon: Plus,
+          onClick: () => {
+            setSelected("");
+            setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
+          },
+        },
+    ...(kind === "profile"
+      ? [
+          { label: "Merge Duplicate Profiles", icon: Merge, onClick: () => setMerging(true) },
+          { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
+        ]
+      : []),
+    { label: "Export Definitions", icon: FileDown, href: "/api/profiles/export" },
+  ];
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -176,82 +249,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           }
           filterCount={Number(!!family)}
           onResetFilters={() => setFamily(null)}
-          actions={
-            <>
-              {kind === "profile" ? (
-                <FileButton
-                  accept="application/json,.json"
-                  onChange={(file) => {
-                    if (file) importing.mutate(file);
-                  }}
-                >
-                  {(props) => (
-                    <Tooltip label="Import Workflow">
-                      <ActionIcon
-                        {...props}
-                        variant="subtle"
-                        color="gray"
-                        aria-label="Import Workflow"
-                        loading={importing.isPending}
-                      >
-                        <Upload size={18} />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </FileButton>
-              ) : (
-                <Tooltip label="New Guide">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label="New Guide"
-                    onClick={() => {
-                      setSelected("");
-                      setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
-                    }}
-                  >
-                    <Plus size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              {kind === "profile" && (
-                <Tooltip label="Merge Duplicate Profiles">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label="Merge Duplicate Profiles"
-                    onClick={() => setMerging(true)}
-                  >
-                    <Merge size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              {kind === "profile" && (
-                <Tooltip label="Combine Backends">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label="Combine Backends"
-                    onClick={() => setCombining(true)}
-                  >
-                    <Combine size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              <Tooltip label="Export Definitions">
-                <ActionIcon
-                  component="a"
-                  href="/api/profiles/export"
-                  download
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Export Definitions"
-                >
-                  <FileDown size={18} />
-                </ActionIcon>
-              </Tooltip>
-            </>
-          }
+          actions={<SectionActions actions={actions} />}
         />
       </SectionHeader>
       {importing.error && <Alert color="red">{importing.error.message}</Alert>}
