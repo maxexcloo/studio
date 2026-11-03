@@ -6,7 +6,7 @@ import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, StackedActionBar, type Action } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, menuWidth, type Action } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import {
   AnimateDialog,
@@ -33,7 +33,7 @@ const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
  * The contextual selection bar in the toolbar's place: Clear Selection and the count, then on
- * desktop the bulk actions and More; phones keep those on a bottom toolbar. The same actions show
+ * desktop the bulk actions and More as icons; phones keep those on a bottom toolbar. The same actions show
  * as a context menu at `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
@@ -222,10 +222,16 @@ export function GallerySelectionBar({
     quick,
     ...actions.map((group) => group.filter((action) => !primaryIds.includes(action.id))),
   ];
+  const bar = (
+    <ActionBarGroups
+      groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
+      menuPosition={phone ? "top-end" : "bottom-end"}
+    />
+  );
   return (
     <>
       <div className={classes.header} role="group" aria-label="Gallery Selection">
-        <Tooltip label="Clear Selection" disabled={phone}>
+        <Tooltip label="Clear Selection">
           <ActionIcon
             variant="subtle"
             color="gray"
@@ -241,10 +247,7 @@ export function GallerySelectionBar({
         </Text>
         {!phone && (
           <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
-            <ActionBarGroups
-              groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
-              menuPosition="bottom-end"
-            />
+            {bar}
           </div>
         )}
       </div>
@@ -258,10 +261,14 @@ export function GallerySelectionBar({
           position={{ left: 0, right: 0, bottom: 0 }}
           transitionProps={{ transition: "slide-up" }}
         >
-          <StackedActionBar primary={primary} more={more} />
+          {bar}
         </ActionBar>
       )}
-      <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>
+      <Menu
+        opened={menu !== null}
+        onChange={(opened) => !opened && onMenuClose()}
+        width={menuWidth}
+      >
         <Menu.Target>
           <div
             aria-hidden

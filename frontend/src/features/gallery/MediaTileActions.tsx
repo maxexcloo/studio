@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
+import { menuWidth } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { AnimateDialog, MediaActionMenu } from "./MediaActions";
 import type { AnimateTheme } from "./useMediaAction";
@@ -71,7 +72,7 @@ export function MediaTileActions({
             </ActionIcon>
           </Tooltip>
         )}
-        <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={210}>
+        <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={menuWidth}>
           <Menu.Target>
             <ActionIcon
               className={`${classes.control} ${classes.more}`}

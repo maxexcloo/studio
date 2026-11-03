@@ -1,5 +1,7 @@
 import {
   Blend,
+  CirclePause,
+  CirclePlay,
   Columns2,
   Copy,
   Download,
@@ -50,8 +52,11 @@ export const icons = {
   loras: Puzzle,
   more: Ellipsis,
   moreLikeThis: Wand,
+  /** Holding and releasing work: the queue and Dream. */
+  pause: CirclePause,
   /** Prompt and the composer's settings. */
   prompt: SlidersHorizontal,
+  resume: CirclePlay,
   retry: RotateCw,
   settings: Settings,
   share: Share,

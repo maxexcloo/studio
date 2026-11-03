@@ -26,6 +26,7 @@ import {
   Image,
   ListOrdered,
   Video,
+  type LucideIcon,
 } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -262,11 +263,13 @@ function ClearJob({ job }: { job: QueueJob }) {
 const bulk = {
   "cancel-all": {
     label: "Stop All",
+    icon: icons.stop,
     title: "Stop All Generations?",
     text: "Studio stops every active generation. Results already saving are kept.",
   },
   "clear-failed": {
     label: "Clear Failed",
+    icon: icons.clear,
     title: "Clear Failed Generations?",
     text: "Failed generations leave the queue. Their chat cards stay and can still be retried.",
   },
@@ -293,6 +296,20 @@ export function Queue() {
         ? { key: "resume-all", label: "Resume All" }
         : { key: "pause-all", label: "Pause All" },
     );
+  // The queue's own actions, as icons like each row's.
+  const queueAction = (label: string, Icon: LucideIcon, onClick: () => void) => (
+    <Tooltip key={label} label={label}>
+      <ActionIcon
+        aria-label={label}
+        variant="subtle"
+        color="gray"
+        disabled={action.isPending}
+        onClick={onClick}
+      >
+        <Icon size={16} />
+      </ActionIcon>
+    </Tooltip>
+  );
   if (!jobs.length) {
     // An empty queue still offers the one action that lets work start again.
     const resume = pauses.find(({ key }) => key.startsWith("resume"));
@@ -323,31 +340,15 @@ export function Queue() {
   const movable = jobs.filter(waiting);
   return (
     <Stack gap={0} aria-label="Queue">
-      <Group gap="xs" justify="flex-end">
-        {pauses.map(({ key, label }) => (
-          <Button
-            key={key}
-            variant="subtle"
-            color="gray"
-            size="compact-sm"
-            disabled={action.isPending}
-            onClick={() => action.mutate({ id: "", action: key })}
-          >
-            {label}
-          </Button>
-        ))}
-        {available.map((key) => (
-          <Button
-            key={key}
-            variant="subtle"
-            color="gray"
-            size="compact-sm"
-            disabled={action.isPending}
-            onClick={() => setConfirming(key)}
-          >
-            {bulk[key].label}
-          </Button>
-        ))}
+      <Group gap={4} justify="flex-end">
+        {pauses.map(({ key, label }) =>
+          queueAction(label, key.startsWith("resume") ? icons.resume : icons.pause, () =>
+            action.mutate({ id: "", action: key }),
+          ),
+        )}
+        {available.map((key) =>
+          queueAction(bulk[key].label, bulk[key].icon, () => setConfirming(key)),
+        )}
       </Group>
       {paused.all && !everyone && (
         <Text size="xs" c="dimmed" py="xs">

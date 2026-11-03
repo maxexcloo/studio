@@ -306,6 +306,8 @@ primary component reference and verify APIs against the installed version.
   editable, the video model and Fast or Quality shown, and Run, which queues exactly that prompt, or Cancel.
 - The status panel shows compact active rows with a muted spinner and Stop;
   completed/cancelled work leaves the list, failed work retains Retry and Clear.
+  The queue's own actions (Pause Queue or Resume, Stop All, Clear Failed) sit
+  above the rows as icons like theirs, Stop and Clear with the rows' icons.
   Stop All and Clear Failed use `ConfirmDialog`. Stop All requests cancellation
   of owned active jobs; accepted work may remain active until the provider
   confirms cancellation or outputs are safely saved. Clearing only takes failed
@@ -327,8 +329,8 @@ primary component reference and verify APIs against the installed version.
   Runs, All Versions), Starred, Uploads, Date, Models, LoRAs, Size, Aspect Ratio
   and Chats, applying at once. The reference picker uses the same chips, Filter ▾
   and panel, inline. Search narrows within the filters; filter actions preserve
-  the query. Gallery filters and zoom are remembered per account. Every control
-  that opens a menu or picker shows ▾.
+  the query. Gallery filters and zoom are remembered per account. Every labelled
+  control that opens a menu or picker shows ▾; icon-only bar controls do not.
 - Grid and Runs zoom between column counts (1–4 on phones, 2–8 wider) by
   pinching on phones, or Ctrl/Cmd+scroll and the slider on desktop, holding the
   tile under the fingers, pointer or view centre in place.
@@ -362,7 +364,7 @@ primary component reference and verify APIs against the installed version.
   Delete); Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
-  every input in run order with Copy Prompt and Copy Settings beside its title;
+  every input in run order (the bar's Copy ▾ copies its prompt or settings);
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
@@ -398,23 +400,39 @@ primary component reference and verify APIs against the installed version.
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Item actions have one definition (`gallery/MediaActions.tsx`): Continue in Chat, Prompt ▾
-  | Animate, Edit | Upscale | Copy ▾, Download | Star, Delete, Continue in Chat and Prompt
-  first, Delete last and the rest alphabetical within each section, in every menu and action
-  bar (the viewer's bar leads with its labelled primaries). Compare joins Upscale's section in menus (the tile and right-click menu
-  and the selection's More), never the viewer's bar. Options are submenus in menus
-  and split buttons or menus in bars: Prompt (opens the composer) › Edit,
-  Use as Reference (images), Recreate (an upload with a suggested prompt; the run is
-  its version), Run Again (new seed), Run Again (Same Seed); Edit
-  opens the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
-  Fast or Quality (checked; Fast by default, shown when they run different video profiles, for the themes and the composer), Review Prompt First (checked), themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
-  automatic size; with an upscale, switches between it and the original) ›
-  Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
-  Detail (listed even when the worker can't run it, saying why), Upscale
-  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download Video, Download as GIF, Download Back and Forth (an MP4 played forward then back, looping without a jump). Phones that share natively show
-  Share Image in Download's place; desktop has no Share. The viewer and gallery
-  selection share one `ActionBarGroups` bar of divided groups that scrolls
-  sideways when it overflows.
+- Item actions have one definition (`gallery/MediaActions.tsx`) and one order in
+  every bar and menu (viewer, tile ⋯, right-click and phone More): Edit, Animate,
+  Prompt | Upscale | Copy, Download | Star, Delete. Retry or Stop lead for
+  unfinished work, Continue in Chat follows Prompt, Compare joins Upscale's section
+  in menus (the tile and right-click menu and the selection's More, never the
+  viewer's bar) and Delete is last. Bars are icons with tooltips (their accessible
+  names unchanged) at one size and spacing; only the desktop viewer names Edit,
+  Animate ▾ and Prompt ▾ beside their icons, and only those labelled buttons show
+  ▾. There are no split buttons: a control with options opens its menu on click,
+  and its first option is its usual action. Menus share one compact style
+  (`ActionMenuItems`): one width, row height and icon size, short labels,
+  dividers only between real groups and no explanatory notes, only the reason when
+  nothing can run. Options are submenus on desktop and expand in place on phones,
+  never as a second floating layer. The options: Prompt (opens the composer) ›
+  Edit, Use as Reference (images), Recreate (an upload with a suggested prompt;
+  the run is its version), Run Again (new seed), Run Again (Same Seed); Edit opens
+  the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
+  Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
+  original kept); Animate › Fast or Quality as a small segmented control at the
+  top (Fast by default, shown when they run different video profiles, for the
+  themes and the composer), Review Prompt First (checked), themes, Custom
+  Animation, Animate in Composer (a video's themes continue it from its last
+  frame, and the result is saved joined onto it; Extend in Composer replaces
+  Animate in Composer, and Use Frame as Reference and Save Frame as Image take the
+  frame showing in the viewer, else the last); Upscale › Balanced (at automatic
+  size), Fast, High, Face Detail (Balanced with it; disabled when the worker can't run
+  it), Upscale Options… (quality, size, Face Detail), and once upscaled Show
+  Upscale (switching between it and the original) and Compare Upscale first, then
+  Regenerate Upscale; Copy › Prompt, Details; a video's Download › Video, GIF,
+  Back and Forth (an MP4 played forward then back, looping without a jump). Phones
+  that share natively show Share Image in Download's place; desktop has no Share.
+  The viewer and gallery selection share one `ActionBarGroups` bar of divided
+  groups that scrolls sideways when it overflows.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
   Image viewing and original/upscale comparison share `MediaZoom` for named
@@ -423,8 +441,7 @@ primary component reference and verify APIs against the installed version.
   toolbar's place, sticky under the header on its surface: Clear Selection (✕)
   and the count, then on desktop icon actions with tooltips (Retry or Stop when
   they apply, Download, Star, Delete) and More. Phones keep the count bar on top
-  and move the actions to a full-width bottom toolbar, labelled under their
-  icons, above the safe area. More lists Select All, Select Failed and Select In
+  and move the same icons to a full-width bottom toolbar above the safe area. More lists Select All, Select Failed and Select In
   Progress, then every other shared action; actions for one item at a time show
   only while one item is selected. Right-click or Shift+F10 opens the same
   actions as a menu; Escape ends selection and Delete asks to delete.
