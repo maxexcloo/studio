@@ -1,6 +1,5 @@
 import { Fragment } from "react";
 import { Group, Kbd, Stack, Switch, Text } from "@mantine/core";
-import { useAccount, useIsAdmin, useMayUpscale } from "../auth/AccountGate";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
 import { usePhone } from "../../ui/usePhone";
@@ -26,12 +25,7 @@ const shortcuts: { keys: string[][]; action: string }[] = [
 
 /** Settings › Studio: preferences that change how Studio behaves for you. */
 export function StudioPreferences() {
-  const account = useAccount();
-  const admin = useIsAdmin();
-  const historyAllowed = admin || account.data?.account?.features?.promptHistory === true;
-  const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
-  const mayUpscale = useMayUpscale();
-  const keep = useKeepRecentPrompts(historyAllowed);
+  const keep = useKeepRecentPrompts(true);
   const [tileCaptions, setTileCaptions] = useTileCaptions();
   // Phones have no keyboard to use shortcuts with.
   const phone = usePhone();
@@ -48,24 +42,22 @@ export function StudioPreferences() {
             onChange={(event) => setTileCaptions(event.currentTarget.checked)}
           />
         </SettingRow>
-        {galleryAllowed && mayUpscale && <FinishStarredImages />}
+        <FinishStarredImages />
       </SettingGroup>
       <SettingGroup title="Generation">
-        {historyAllowed && (
-          <SettingRow
-            label="Keep Recent Prompts"
-            description="Offer your recent prompts in the composer’s history. Pinned prompts stay either way."
-          >
-            <Switch
-              // Remounts once loaded so the saved state appears without the thumb sliding.
-              key={keep.history.data ? "loaded" : "loading"}
-              aria-label="Keep Recent Prompts"
-              checked={!!keep.history.data?.enabled}
-              disabled={!keep.history.data}
-              onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-            />
-          </SettingRow>
-        )}
+        <SettingRow
+          label="Keep Recent Prompts"
+          description="Offer your recent prompts in the composer’s history. Pinned prompts stay either way."
+        >
+          <Switch
+            // Remounts once loaded so the saved state appears without the thumb sliding.
+            key={keep.history.data ? "loaded" : "loading"}
+            aria-label="Keep Recent Prompts"
+            checked={!!keep.history.data?.enabled}
+            disabled={!keep.history.data}
+            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+          />
+        </SettingRow>
       </SettingGroup>
       {phone || (
         <SettingGroup title="Keyboard Shortcuts">

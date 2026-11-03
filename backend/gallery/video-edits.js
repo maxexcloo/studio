@@ -2,7 +2,6 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { recordsForRequest } from "../account-ownership.js";
-import { mayUseFeature } from "../account-policy.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
 import { requireLocal } from "../route-access.js";
 import { editClip, probeVideo, videoEditKinds } from "../video-previews.js";
@@ -15,10 +14,6 @@ import { addGalleryItems, gallery } from "./store.js";
  */
 export function registerVideoEditRoutes(app, { store }) {
   app.post("/api/gallery/video-edit", async (req, res) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
-      return res
-        .status(403)
-        .json({ ok: false, error: "The gallery is disabled for this account." });
     if (!req.studioAccount && !requireLocal(req, res)) return;
     const { galleryItemId, kind, start, end } = req.body || {};
     if (!videoEditKinds.includes(kind))

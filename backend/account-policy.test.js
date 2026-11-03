@@ -26,7 +26,7 @@ test("direct provider profiles enforce Cloud Models and uncensored grants even w
         id: "artists",
         name: "Artists",
         allModels: true,
-        features: { cloudModels, uncensoredModels, imageGeneration: true },
+        features: { cloudModels, uncensoredModels },
       },
     });
   assert.equal(mayUseGenerationProfile(access(false, true), profile), false);
@@ -64,54 +64,19 @@ test("access profiles contain only currently available generation profiles and k
       name: "Artists",
       generationProfiles: ["image-fast"],
       allModels: false,
-      features: {
-        loras: true,
-        imageGeneration: false,
-        videoGeneration: false,
-        imageReferences: false,
-        videoReferences: false,
-        gallery: false,
-        promptHistory: false,
-        cloudModels: false,
-        uncensoredModels: false,
-        presets: false,
-        promptAssistant: false,
-        upscale: false,
-      },
+      features: { cloudModels: false, loras: true, uncensoredModels: false },
     },
   );
 });
 
-test("Prompt Assistant is on for built-ins and follows each stored profile", () => {
-  assert.equal(builtInAccessProfile.features.promptAssistant, true);
-  assert.equal(builtInAccessProfile.features.upscale, true);
-  const stored = {
-    id: "artists",
-    name: "Artists",
-    generationProfiles: [],
-    features: { imageGeneration: true },
-  };
-  const user = { id: "u1", role: "user", accessProfileId: "artists" };
-  assert.equal(
-    mayUseFeature(effectiveAccountAccess(user, { artists: stored }), "promptAssistant"),
-    false,
-  );
-  assert.equal(
-    mayUseFeature(
-      effectiveAccountAccess(user, {
-        artists: { ...stored, features: { ...stored.features, promptAssistant: true } },
-      }),
-      "promptAssistant",
-    ),
-    true,
-  );
-  assert.equal(
-    mayUseFeature(
-      effectiveAccountAccess({ id: "a1", role: "administrator" }, {}),
-      "promptAssistant",
-    ),
-    true,
-  );
+test("the built-in User group has no cloud models, LoRAs or uncensored models, and administrators have every feature", () => {
+  assert.deepEqual(builtInAccessProfile.features, {
+    cloudModels: false,
+    loras: false,
+    uncensoredModels: false,
+  });
+  const admin = effectiveAccountAccess({ id: "a1", role: "administrator" }, {});
+  assert.equal(mayUseFeature(admin, "loras"), true);
 });
 
 test("administrators receive current full access and ordinary users receive one assigned profile", () => {
@@ -119,7 +84,7 @@ test("administrators receive current full access and ordinary users receive one 
     artists: {
       name: "Artists",
       generationProfiles: ["image-fast"],
-      features: { loras: true, gallery: true },
+      features: { loras: true },
     },
   };
   const admin = effectiveAccountAccess({ id: "admin", role: "administrator" }, profiles, available);
@@ -162,12 +127,12 @@ test("cloud profiles follow the Cloud Models feature, never a grant of their own
     on: {
       name: "On",
       generationProfiles: ["image-fast"],
-      features: { imageGeneration: true, cloudModels: true },
+      features: { cloudModels: true },
     },
     off: {
       name: "Off",
       generationProfiles: ["image-fast", "custom:grok-video"],
-      features: { imageGeneration: true, cloudModels: false },
+      features: { cloudModels: false },
     },
   };
   const on = effectiveAccountAccess({ id: "a", role: "user", accessProfileId: "on" }, profiles);

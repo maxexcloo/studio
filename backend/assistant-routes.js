@@ -193,10 +193,6 @@ export function registerAssistantRoutes(
       res.status(503).json({ ok: false, error: "The prompt assistant is not configured." });
       return null;
     }
-    if (!allowed(req, "promptAssistant")) {
-      res.status(403).json({ ok: false, error: "The prompt assistant is off for this account." });
-      return null;
-    }
     const id = String(req.body?.profileId || "");
     if (!id && !profileRequired) return { profile: {}, guide: null };
     const profile = (await profiles(req)).find((item) => item.id === id);
@@ -220,8 +216,7 @@ export function registerAssistantRoutes(
 
   app.get("/api/assistant", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!engine || !allowed(req, "promptAssistant"))
-      return res.json({ ok: true, available: false, presets: [] });
+    if (!engine) return res.json({ ok: true, available: false, presets: [] });
     try {
       const spicy = allowed(req, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.

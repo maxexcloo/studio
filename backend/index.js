@@ -287,7 +287,6 @@ import {
 import {
   isCloudProfile,
   mayUseFeature,
-  upscaleOffMessage,
   mayUseGenerationProfile,
   visibleGenerationProfiles,
 } from "./account-policy.js";
@@ -310,7 +309,7 @@ app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ network: networkListening }));
 async function resolveSignedMcpResult(owner, jobId, index) {
-  if (!mayUseFeature(accountAccessForId(owner), "gallery")) return null;
+  if (!accountAccessForId(owner)?.authenticated) return null;
   const item = gallery.find(
     (entry) =>
       entry.ownerId === owner &&
@@ -411,7 +410,6 @@ const directCloud =
     buildProfile,
     accountForOwner: accountAccessForId,
     mayUseProfile: mayUseGenerationProfile,
-    mayUseFeature,
     composePrompt: composeWorkflowPrompt,
     reference: async (account, id) =>
       (await bytesForReferenceAccount(account || undefined, id)).buffer,
@@ -583,11 +581,6 @@ const observeServices = createServicesObserver({
   controller: runtime?.controller,
 });
 app.get("/api/services/status", async (req, res) => {
-  const allowed = [
-    ...(!req.studioAccount || mayUseFeature(req.studioAccount, "imageGeneration") ? ["image"] : []),
-    ...(!req.studioAccount || mayUseFeature(req.studioAccount, "videoGeneration") ? ["video"] : []),
-    ...(!req.studioAccount || mayUseFeature(req.studioAccount, "promptAssistant") ? ["text"] : []),
-  ];
   res.setHeader("Cache-Control", "no-store");
   const waitingWorkers = store
     .jobs(ownerIdForRequest(req))
@@ -596,7 +589,7 @@ app.get("/api/services/status", async (req, res) => {
     .filter(Boolean);
   res.json(
     await observeServices({
-      allowed,
+      allowed: ["image", "video", "text"],
       administrator: !req.studioAccount || canAdmin(req),
       waitingWorkers,
     }),
@@ -1466,13 +1459,9 @@ app.put("/api/loras/:workflowId", (req, res) => {
 });
 
 // Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
-// Like Chat, accounts without the prompt assistant never send their prompts to the text model.
-const tasteWriter = (ownerId) => {
-  const account = ownerId ? accountAccessForId(ownerId) : undefined;
-  return ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant"))
-    ? null
-    : assistantEngine;
-};
+// A gone or disabled account's prompts never reach the text model.
+const tasteWriter = (ownerId) =>
+  ownerId && !accountAccessForId(ownerId)?.authenticated ? null : assistantEngine;
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
@@ -1526,8 +1515,6 @@ registerGalleryHistoryRoutes(app, {
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res.json({ prompts: [], enabled: false });
   const ownerId = ownerIdForRequest(req);
   res.json({
     prompts: listPrompts(req.query.kind, ownerId),
@@ -1536,20 +1523,12 @@ app.get("/api/prompts", (req, res) => {
 });
 
 app.post("/api/prompts/enabled", (req, res) => {
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res
-      .status(403)
-      .json({ ok: false, error: "Prompt history is disabled for this account." });
   const ownerId = ownerIdForRequest(req);
   const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
   res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
 });
 
 app.post("/api/prompts/pin", (req, res) => {
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res
-      .status(403)
-      .json({ ok: false, error: "Prompt history is disabled for this account." });
   res.json({
     ok: true,
     prompts: setPromptPinned(
@@ -1563,10 +1542,6 @@ app.post("/api/prompts/pin", (req, res) => {
 
 // The prompt assistant keeps the text it replaced (a rewrite, a written negative), so History can bring it back.
 app.post("/api/prompts/record", (req, res) => {
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res
-      .status(403)
-      .json({ ok: false, error: "Prompt history is disabled for this account." });
   const kind = req.body?.kind === "negative" ? "negative" : "positive";
   const ownerId = ownerIdForRequest(req);
   recordPrompt(String(req.body?.text || "").slice(0, 8000), kind, ownerId);
@@ -1574,10 +1549,6 @@ app.post("/api/prompts/record", (req, res) => {
 });
 
 app.post("/api/prompts/forget", (req, res) => {
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res
-      .status(403)
-      .json({ ok: false, error: "Prompt history is disabled for this account." });
   res.json({
     ok: true,
     prompts: forgetPrompts(
@@ -1590,10 +1561,6 @@ app.post("/api/prompts/forget", (req, res) => {
 });
 
 app.post("/api/prompts/clear", (req, res) => {
-  if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptHistory"))
-    return res
-      .status(403)
-      .json({ ok: false, error: "Prompt history is disabled for this account." });
   res.json({
     ok: true,
     prompts: clearPromptHistory(
@@ -2038,12 +2005,7 @@ async function validateGeneration(input, account) {
 }
 // Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
 function chatTitle(account, sessionId, prompt) {
-  return sessionChat.title(
-    account?.userId || "",
-    sessionId,
-    prompt,
-    !account || mayUseFeature(account, "promptAssistant") ? undefined : null,
-  );
+  return sessionChat.title(account?.userId || "", sessionId, prompt);
 }
 registerRewriteRoutes(app, {
   store,
@@ -2086,10 +2048,7 @@ registerCompareRoutes(app, {
     }
   },
   write: (records) => writeJsonFile(comparisonsFile, records),
-  gallery: (req) =>
-    !req.studioAccount || mayUseFeature(req.studioAccount, "gallery")
-      ? recordsForRequest(filterVisibleGallery(gallery), req)
-      : null,
+  gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
   pendingItems: makePendingItems,
   voted: (ownerId, jobId, others) => {
     const values = (id) => {
@@ -2146,15 +2105,7 @@ const dream = createDream({
   access: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated) return null;
-    const may = (feature) => !account || mayUseFeature(account, feature);
-    return {
-      account,
-      gallery: may("gallery"),
-      image: may("imageGeneration"),
-      video: may("videoGeneration"),
-      assistant: may("promptAssistant"),
-      uncensored: may("uncensoredModels"),
-    };
+    return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
   catalogue: async (_ownerId, account) => {
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
@@ -2226,11 +2177,7 @@ const finishing = createFinishing({
   allowed: (ownerId) => {
     if (!ownerId) return !multiUserEnabled;
     const account = accountAccessForId(ownerId);
-    return Boolean(
-      account?.authenticated &&
-      mayUseFeature(account, "gallery") &&
-      mayUseFeature(account, "upscale"),
-    );
+    return Boolean(account?.authenticated);
   },
   item: (ownerId, itemId) =>
     gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
@@ -2256,11 +2203,10 @@ const finishing = createFinishing({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerFinishingRoutes(app, { finishing });
-// Like Chat, accounts without the prompt assistant never send their gallery to the text model.
+// A gone or disabled account's gallery never reaches the text model.
 function promptAssistantOwner(ownerId) {
   if (!multiUserEnabled) return true;
-  const account = ownerId ? accountAccessForId(ownerId) : undefined;
-  return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
+  return Boolean(ownerId && accountAccessForId(ownerId)?.authenticated);
 }
 /** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
 async function smallImage(item) {
@@ -2435,10 +2381,8 @@ const sessionChat = new ChatService({
     if (!source || source.sessionId !== sessionId)
       throw Object.assign(new Error("Source generation not found."), { status: 404 });
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
-      throw Object.assign(new Error("The prompt assistant is off for this account."), {
-        status: 403,
-      });
+    if (ownerId && !account?.authenticated)
+      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
     const kind = revision.operation === "animate" ? "video" : "image";
     if (revision.input.kind && revision.input.kind !== kind)
       throw Object.assign(new Error("The selected operation does not match the media kind."), {
@@ -2495,10 +2439,8 @@ const sessionChat = new ChatService({
   // A card revision, already checked by `revision`, runs exactly as submitted.
   admit: async ({ ownerId, sessionId, turnId, draft }) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
-      throw Object.assign(new Error("The prompt assistant is off for this account."), {
-        status: 403,
-      });
+    if (ownerId && !account?.authenticated)
+      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
     const result = await admitGeneration(
       {
         ...draft.input,
@@ -2516,16 +2458,7 @@ const sessionChat = new ChatService({
     return { job: publicJob(store.job(ownerId, result.payload.jobId)) };
   },
 });
-app.use(
-  "/api",
-  createChatRouter(sessionChat, (req) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptAssistant"))
-      throw Object.assign(new Error("The prompt assistant is off for this account."), {
-        status: 403,
-      });
-    return ownerIdForRequest(req);
-  }),
-);
+app.use("/api", createChatRouter(sessionChat, ownerIdForRequest));
 
 // Only generation and its owned results use direct domain calls; other MCP tools retain their transport.
 async function mcpGenerationRequest(method, route, input, owner) {
@@ -2652,8 +2585,6 @@ app.get(
  * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Starred Images).
  */
 async function queueUpscale(account, request, origin) {
-  if (account && !mayUseFeature(account, "upscale"))
-    return { status: 403, payload: { ok: false, error: upscaleOffMessage } };
   const worker = routeJob("upscale");
   if (!worker) return noUpscaleWorker();
   return withComfyBackend(worker.id, () => queueUpscaleOnWorker(account, request, origin));
@@ -2836,9 +2767,6 @@ app.post("/api/upscale/toggle", (req, res) => {
 });
 
 function generationJobResponse(account, id) {
-  if (account && !mayUseFeature(account, "gallery")) {
-    return { status: "missing" };
-  }
   const queued = store.job(account?.userId || "", id);
   if (queued && !jobs.has(id)) {
     const status =
@@ -2975,9 +2903,7 @@ app.get("/comfy/video-preview", async (req, res) => {
   const type = String(req.query.type || "output");
   if (
     req.studioAccount &&
-    (!mayUseFeature(req.studioAccount, "gallery") ||
-      !ownerMediaTypes.has(type) ||
-      !outputFilenameBelongsToRequest(filename, subfolder, req))
+    (!ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))
   ) {
     res.status(404).end();
     return;
@@ -3048,9 +2974,7 @@ app.get("/comfy/thumb", async (req, res) => {
   }
   if (
     req.studioAccount &&
-    (!mayUseFeature(req.studioAccount, "gallery") ||
-      !ownerMediaTypes.has(type) ||
-      !outputFilenameBelongsToRequest(filename, subfolder, req))
+    (!ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))
   ) {
     res.status(404).json({ ok: false, error: "Not an output." });
     return;
@@ -3144,8 +3068,7 @@ app.get("/comfy/*path", async (req, res) => {
     const filename = String(req.query.filename || "");
     if (
       req.studioAccount &&
-      (!mayUseFeature(req.studioAccount, "gallery") ||
-        proxyPath !== "view" ||
+      (proxyPath !== "view" ||
         !ownerMediaTypes.has(String(req.query.type || "output")) ||
         !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))
     ) {

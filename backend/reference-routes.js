@@ -1,5 +1,4 @@
 import { ownerIdForRequest } from "./account-ownership.js";
-import { mayUseFeature } from "./account-policy.js";
 import { clientOf } from "./access.js";
 import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
@@ -14,11 +13,7 @@ import { requireLocal } from "./route-access.js";
 /** `uploaded(item)` hears of each new upload's gallery item, for image search. */
 export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   app.post("/api/reference-assets/upload", async (req, res) => {
-    const canReference =
-      req.studioAccount &&
-      (mayUseFeature(req.studioAccount, "imageReferences") ||
-        mayUseFeature(req.studioAccount, "videoReferences"));
-    if (!canReference && !requireLocal(req, res)) return;
+    if (!req.studioAccount && !requireLocal(req, res)) return;
     try {
       const { item, asset } = await saveUpload(
         await readMultipartUpload(req),
@@ -40,10 +35,7 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     const allowed =
       site !== "cross-site" &&
       site !== "same-site" &&
-      (multiUserEnabled
-        ? account &&
-          (mayUseFeature(account, "imageReferences") || mayUseFeature(account, "videoReferences"))
-        : clientOf(req).thisComputer);
+      (multiUserEnabled ? Boolean(account) : clientOf(req).thisComputer);
     if (!allowed) return res.redirect(303, "/images");
     req.studioAccount = account;
     try {
@@ -60,10 +52,6 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
 
   // A video's frame (milliseconds in, or "last") kept as an image of its own, listed under Uploads.
   app.post("/api/gallery/frame", async (req, res) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
-      return res
-        .status(403)
-        .json({ ok: false, error: "The gallery is disabled for this account." });
     if (!req.studioAccount && !requireLocal(req, res)) return;
     const frame = req.body?.frame;
     try {
@@ -82,15 +70,7 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   });
 
   app.post("/api/reference-assets/from-gallery", (req, res) => {
-    const canReference =
-      req.studioAccount &&
-      (mayUseFeature(req.studioAccount, "imageReferences") ||
-        mayUseFeature(req.studioAccount, "videoReferences"));
-    if (req.studioAccount && (!canReference || !mayUseFeature(req.studioAccount, "gallery")))
-      return res
-        .status(403)
-        .json({ ok: false, error: "Gallery references are disabled for this account." });
-    if (!canReference && !requireLocal(req, res)) return;
+    if (!req.studioAccount && !requireLocal(req, res)) return;
     try {
       const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
         // A video's last frame, or the one at a time in milliseconds.
@@ -105,27 +85,11 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     }
   });
 
-  /**
-   * The caller's own reference, or a throw. Accounts without the gallery reach their uploads but
-   * not their generations.
-   */
-  function ownedReference(account, id) {
-    if (
-      account &&
-      !mayUseFeature(account, "imageReferences") &&
-      !mayUseFeature(account, "videoReferences")
-    )
-      throw new Error("References are off for this account.");
-    const asset = referenceAssetMetadataForAccount(account, id);
-    if (account && asset.source === "generation" && !mayUseFeature(account, "gallery"))
-      throw new Error("The gallery is off for this account.");
-    return asset;
-  }
   const gone = (res) => res.status(404).json({ ok: false, error: "That reference image is gone." });
 
   app.get("/api/reference-assets/:id", (req, res) => {
     try {
-      res.json({ asset: ownedReference(req.studioAccount, req.params.id) });
+      res.json({ asset: referenceAssetMetadataForAccount(req.studioAccount, req.params.id) });
     } catch {
       gone(res);
     }
@@ -134,7 +98,7 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   // The bytes a run would get for the reference, for the prompt assistant and MCP tools.
   app.get("/api/reference-assets/:id/media", async (req, res) => {
     try {
-      ownedReference(req.studioAccount, req.params.id);
+      referenceAssetMetadataForAccount(req.studioAccount, req.params.id);
       const { buffer, mime } = await bytesForReferenceAccount(req.studioAccount, req.params.id);
       res.type(mime).setHeader("Cache-Control", "private, max-age=3600");
       res.send(buffer);
@@ -146,7 +110,10 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   // Saved reference details carry this address; it leads to the reference's gallery thumbnail.
   app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
     try {
-      res.redirect(302, ownedReference(req.studioAccount, req.params.id).thumbnailUrl);
+      res.redirect(
+        302,
+        referenceAssetMetadataForAccount(req.studioAccount, req.params.id).thumbnailUrl,
+      );
     } catch {
       gone(res);
     }

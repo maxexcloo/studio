@@ -15,7 +15,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
-const store = await import("./account-store.js");
 
 let identity = null;
 const routes = {};
@@ -85,7 +84,7 @@ const browser = (cookie = "", query = {}) => ({
   query,
 });
 
-test("single sign-on sets a Lax state cookie, then signs approved identities in", async () => {
+test("single sign-on sets a Lax state cookie, then signs new identities straight in", async () => {
   assert.deepEqual((await call(routes["GET /api/accounts/status"], browser())).body.oidc, {
     label: "Pocket ID",
   });
@@ -107,32 +106,13 @@ test("single sign-on sets a Lax state cookie, then signs approved identities in"
     browser("", { code: "c", state: "s1" }),
   );
   assert.equal(elsewhere.location, "/?sign-in=failed");
-  const pending = await call(
+  const signedIn = await call(
     routes["GET /api/accounts/oidc/callback"],
     browser(cookie, { code: "c", state: "s1" }),
   );
-  assert.equal(pending.location, "/?sign-in=pending");
-  assert.equal(
-    []
-      .concat(pending.headers["Set-Cookie"])
-      .some(
-        (value) => value.startsWith("studio_account=") && !value.startsWith("studio_account=;"),
-      ),
-    false,
-  );
-
-  store.saveAccessProfile(
-    { id: "artists", name: "Artists", generationProfiles: [], features: { gallery: true } },
-    [],
-  );
-  store.assignAccessProfile(store.listAccounts().find((account) => account.pending).id, "artists");
-  const approved = await call(
-    routes["GET /api/accounts/oidc/callback"],
-    browser(cookie, { code: "c", state: "s1" }),
-  );
-  assert.equal(approved.location, "/");
+  assert.equal(signedIn.location, "/");
   const session = []
-    .concat(approved.headers["Set-Cookie"])
+    .concat(signedIn.headers["Set-Cookie"])
     .find((value) => value.startsWith("studio_account=") && !value.startsWith("studio_account=;"));
   assert.match(session, /SameSite=Strict/);
   assert.equal(

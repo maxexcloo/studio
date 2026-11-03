@@ -306,16 +306,8 @@ test(
       `${serviceUrl("text", "text", workerUrl)}/health`,
     );
     assert.equal(admin.runtime.configured, true);
-    const profile = async (promptAssistant: boolean) => {
-      cookie = administratorCookie;
-      await api("/api/accounts/profiles", "POST", {
-        id: "observer",
-        name: "Observer",
-        allModels: true,
-        features: { promptAssistant, imageGeneration: false, videoGeneration: false },
-      });
-    };
-    await profile(true);
+    cookie = administratorCookie;
+    await api("/api/accounts/profiles", "POST", { id: "observer", name: "Observer" });
     await api("/api/accounts/users", "POST", {
       username: "observer",
       password: "fixture observer password",
@@ -326,15 +318,10 @@ test(
       username: "observer",
       password: "fixture observer password",
     });
-    const observerCookie = cookie;
     const observed: ServicesStatus = await api("/api/services/status");
-    assert.deepEqual(Object.keys(observed.services), ["text"]);
+    assert.deepEqual(Object.keys(observed.services).sort(), Object.keys(admin.services).sort());
     assert.equal(observed.services.text?.state, "healthy");
     assert.equal(observed.services.text?.endpoints[0].endpoint, undefined);
-    await profile(false);
-    cookie = observerCookie;
-    const denied: ServicesStatus = await api("/api/services/status");
-    assert.deepEqual(denied.services, {});
     assert.equal(
       healthCalls,
       1,

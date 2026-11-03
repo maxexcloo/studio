@@ -1,5 +1,4 @@
 import { recordsForRequest } from "../account-ownership.js";
-import { mayUseFeature } from "../account-policy.js";
 import { requireLocal } from "../route-access.js";
 import { gallery } from "./store.js";
 
@@ -11,10 +10,6 @@ import { gallery } from "./store.js";
  */
 export function registerRecreateRoute(app, { store }) {
   app.post("/api/gallery/recreate", (req, res) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
-      return res
-        .status(403)
-        .json({ ok: false, error: "The gallery is disabled for this account." });
     if (!req.studioAccount && !requireLocal(req, res)) return;
     const item = recordsForRequest(gallery, req).find(
       (entry) => entry.id === req.body?.galleryItemId && entry.status === "done" && entry.url,

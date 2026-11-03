@@ -9,7 +9,8 @@ import { combinedProfiles } from "../combined-profiles.js";
 import { dreamOwnership } from "../dream-ownership.js";
 import { loraLayers } from "../library/lora-layers.js";
 import { loraRatings } from "../lora/ratings.js";
-import { uncensoredMarker, upscaleFeature } from "../uncensored-marker.js";
+import { accountAccess } from "../account-migration.js";
+import { uncensoredMarker } from "../uncensored-marker.js";
 import { profilePrompting } from "../profile/prompting-migration.js";
 import { migrateUploads } from "../uploads.js";
 import { versionSources } from "../version-sources.js";
@@ -40,7 +41,7 @@ else {
     uploads: migrateUploads(dataDir, { apply: values.apply }),
     combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
     uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
-    upscaleFeature: upscaleFeature(dataDir, { apply: values.apply }),
+    accountAccess: accountAccess(dataDir, { apply: values.apply }),
     loraRatings: loraRatings(dataDir, { apply: values.apply }),
     versionSources: versionSources(dataDir, { apply: values.apply }),
     profilePrompting: profilePrompting(dataDir, { apply: values.apply }),

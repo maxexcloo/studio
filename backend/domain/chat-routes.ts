@@ -3,7 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { ChatInput } from "../../shared/chat.ts";
 import { ChatService } from "./chat.ts";
 
-/** Mount after account authentication. Policy callback applies the existing assistant/model gates. */
+/** Mount after account authentication. `authorize` names the request's owner, or throws to refuse it. */
 export function createChatRouter(
   service: ChatService,
   authorize: (request: Request) => string | Promise<string>,
