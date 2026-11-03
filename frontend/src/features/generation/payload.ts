@@ -1,5 +1,5 @@
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import { profileBackendLabels } from "../../../../shared/profiles";
+import { profileBackendLabels, profileNameParts } from "../../../../shared/profiles";
 import { withResolution } from "../../../../shared/resolution";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */
@@ -16,6 +16,11 @@ export const usesNegative = (profile?: Profile) =>
 
 /** A combined profile's backend by name ("Radiance"). */
 export const backendLabel = (id: string) => profileBackendLabels[id] || id;
+
+/** A profile name as lists show it, without a backend segment such as "· ComfyUI". */
+export const shownProfileName = (name: string) => profileNameParts(name).join(" · ") || name;
+export const profileName = (profile: Pick<Profile, "displayName" | "label">) =>
+  shownProfileName(profile.displayName || profile.label);
 
 export function referenceDetails(
   references: ReferenceAsset[],

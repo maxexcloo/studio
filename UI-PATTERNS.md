@@ -241,7 +241,8 @@ primary component reference and verify APIs against the installed version.
   names such as Flux 2. Each option is a complete profile, titled with its name and
   its description beneath; preserve exact profile IDs. A combined profile's backend
   (ComfyUI, Radiance) shows only on the composer's Backend chip, where it is switched,
-  never in profile lists. The LoRA picker's tabs choose which LoRAs it lists,
+  never in profile lists; a single-backend profile's name drops its "· ComfyUI" or
+  "· Radiance" segment wherever it shows. The LoRA picker's tabs choose which LoRAs it lists,
   narrowest first: Recommended (the default: LoRAs for the profile's family),
   Favourites (this family's thumbs up) and All (every LoRA the profile can load,
   so another family's copy of a series never shows); type filters follow the

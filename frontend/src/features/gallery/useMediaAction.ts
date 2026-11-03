@@ -9,7 +9,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
-import { backendLabel, generationInput, isProfile } from "../generation/payload";
+import { backendLabel, generationInput, isProfile, profileName } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -141,7 +141,7 @@ export async function mediaDraft(
     rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined;
   const note =
     rerun && !profileBackend
-      ? `${profile.displayName || profile.label} no longer runs on ${backendLabel(ran)}, so this run uses ${backendLabel(profile.backend!)}.`
+      ? `${profileName(profile)} no longer runs on ${backendLabel(ran)}, so this run uses ${backendLabel(profile.backend!)}.`
       : undefined;
   return {
     profile,
@@ -382,7 +382,7 @@ export function useAnimateWriter(item: MediaItem, sessionId?: string) {
         prompt: written.prompt,
         model: written.model,
         thinking: written.thinking,
-        profileLabel: profile.displayName || profile.label,
+        profileLabel: profileName(profile),
         tier: choice && choice.tiers.length > 1 ? tier : undefined,
       };
     },

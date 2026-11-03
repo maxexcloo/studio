@@ -29,6 +29,7 @@ import {
   userWorkflowsDir,
 } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
+import { profileNameParts } from "../../shared/profiles.ts";
 import { writeJsonFile } from "../json-store.js";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
@@ -53,13 +54,8 @@ function graphBackend(raw) {
  * Reference" suggest "Krea 2 Turbo · Fast · 8 Steps"; the backend and what differs are left out.
  */
 function sharedName(radiance, comfyui) {
-  const parts = (name) =>
-    String(name)
-      .split("·")
-      .map((part) => part.trim())
-      .filter((part) => part && !/^(radiance|comfyui)$/i.test(part));
-  const other = new Set(parts(radiance).map((part) => part.toLowerCase()));
-  const [model, ...rest] = parts(comfyui);
+  const other = new Set(profileNameParts(radiance).map((part) => part.toLowerCase()));
+  const [model, ...rest] = profileNameParts(comfyui);
   return [model, ...rest.filter((part) => other.has(part.toLowerCase()))].join(" · ");
 }
 
