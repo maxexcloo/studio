@@ -15,8 +15,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImageUp } from "lucide-react";
 import { api, post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { icons } from "../../ui/icons";
 import { SectionToolbar } from "../../ui/SectionToolbar";
+import { useFlash } from "../../ui/useFlash";
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
 const gradeColours: Record<string, string> = { Exact: "green", Close: "yellow", Partial: "orange" };
@@ -46,6 +49,8 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [view, setView] = useState("all");
   const [query, setQuery] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [cleared, flashCleared] = useFlash<number>();
   const imports = useQuery({
     queryKey: ["imports"],
     queryFn: () => api<{ imports: ImportRecord[]; vision?: ImportVision }>("/api/library/imports"),
@@ -86,6 +91,20 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
   });
   const download = useMutation({
     mutationFn: (id: string) => post(`/api/library/imports/${id}/download`),
+    onSuccess: refresh,
+  });
+  const clearFailed = useMutation({
+    mutationFn: () => post<{ cleared: number }>("/api/library/imports/clear-failed"),
+    onSuccess: (result) => {
+      setConfirming(false);
+      flashCleared(result.cleared);
+      refresh();
+    },
+  });
+  // Downloaded files stay; only the record goes.
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      api(`/api/library/imports/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: refresh,
   });
   if (reviewId)
@@ -156,7 +175,26 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
           onViewChange={setView}
           query={query}
           onQueryChange={setQuery}
+          actions={
+            records.some((record) => record.state === "failed") && (
+              <Tooltip label="Clear Failed">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Clear Failed"
+                  onClick={() => setConfirming(true)}
+                >
+                  <icons.clear size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )
+          }
         />
+      )}
+      {cleared !== undefined && (
+        <Text c="dimmed" size="xs">
+          {cleared} cleared
+        </Text>
       )}
       {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
@@ -219,10 +257,27 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
                   Download Missing
                 </Menu.Item>
               )}
+              <Menu.Item
+                color="red"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(record.id)}
+              >
+                Remove
+              </Menu.Item>
             </>
           )}
         />
       )}
+      <ConfirmDialog
+        opened={confirming}
+        title="Clear Failed Imports?"
+        action="Clear Failed"
+        pending={clearFailed.isPending}
+        onConfirm={() => clearFailed.mutate()}
+        onClose={() => setConfirming(false)}
+      >
+        Failed imports leave Library › Import. Downloaded files stay.
+      </ConfirmDialog>
     </Stack>
   );
 }

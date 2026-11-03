@@ -5,6 +5,8 @@
  *   GET  /api/library/imports                 import history, newest first
  *   POST /api/library/imports {url}           import a Civitai image or model link, or a Hugging Face link
  *   GET  /api/library/imports/:id             one import, its files checked in full
+ *   DELETE /api/library/imports/:id           remove one import record (its downloaded files stay)
+ *   POST /api/library/imports/clear-failed    remove every failed import record: {cleared}
  *   POST /api/library/imports/:id/download    Download Missing ({indices} for chosen files)
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
  *   POST /api/library/imports/:id/draft-profile  {index?}: draft a checkpoint's profile and guide (again, after a failure)
@@ -614,6 +616,30 @@ export function registerLibraryRoutes(
       });
       // A failed resolve is still a record (with its reason), so it answers like any other.
       res.json({ ok: true, import: publicImport(record) });
+    }),
+  );
+  /** Forgets a record and its picture; downloaded model files stay. */
+  const forgetImport = (id) => {
+    if (!store.remove(id)) return false;
+    const picture = pictures.file(id);
+    if (picture) fs.rmSync(picture, { force: true });
+    return true;
+  };
+  app.post(
+    "/api/library/imports/clear-failed",
+    route(async (_req, res) => {
+      const failed = store.list().filter((record) => record.state === "failed");
+      res.json({ ok: true, cleared: failed.filter((record) => forgetImport(record.id)).length });
+    }),
+  );
+  app.delete(
+    "/api/library/imports/:id",
+    route(async (req, res) => {
+      if (!forgetImport(req.params.id)) {
+        res.status(404).json({ ok: false, error: "That import is gone." });
+        return;
+      }
+      res.json({ ok: true });
     }),
   );
   app.get(
