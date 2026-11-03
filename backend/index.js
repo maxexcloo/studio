@@ -6,7 +6,6 @@ import "./data-snapshot.js";
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
 import {
-  galleryJobResponse,
   registerGalleryReadRoutes,
   registerGalleryHistoryRoutes,
   registerGalleryErrorRoutes,
@@ -58,9 +57,10 @@ import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { accountMayUseLoras, createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
 import { registerStatusRoutes } from "./status-routes.js";
+import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
 import { registerUpscaleRoutes } from "./upscale-routes.js";
 import { registerJobRoutes } from "./job-routes.js";
-import { ownerMediaTypes, registerComfyMediaRoutes } from "./comfy/media-routes.js";
+import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
 import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
 import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { registerLoraRoutes } from "./lora/routes.js";
@@ -119,8 +119,6 @@ import {
   networkListening,
   demoMode,
   comfy,
-  inDotFolder,
-  localOutputFile,
   comfyUrl,
   host,
   optionsFor,
@@ -131,7 +129,6 @@ import {
 import { clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
-import { mcpOutputPath } from "./mcp/media.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
 import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
@@ -177,13 +174,7 @@ import {
 } from "./references.js";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { compressJson, serveApp } from "./http-assets.js";
-import {
-  isMediaUrl,
-  mediaRoot,
-  mediaSubfolder,
-  mediaType,
-  outputMediaPattern,
-} from "./media-paths.js";
+import { isMediaUrl, mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
 import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
@@ -196,7 +187,6 @@ import {
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import {
   ownerIdForRequest,
-  outputFilenameBelongsToRequest,
   recordBelongsToRequest,
   recordsForRequest,
 } from "./account-ownership.js";
@@ -219,58 +209,6 @@ const app = express();
 app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ network: networkListening }));
-async function resolveSignedMcpResult(owner, jobId, index) {
-  if (!accountAccessForId(owner)?.authenticated) return null;
-  const item = gallery.find(
-    (entry) =>
-      entry.ownerId === owner &&
-      entry.jobId === jobId &&
-      entry.index === index &&
-      entry.status === "done",
-  );
-  if (!item || !mcpOutputPath(item.url)) return null;
-  const source = new URL(item.url, "http://localhost");
-  const filename = source.searchParams.get("filename") || "";
-  const subfolder = source.searchParams.get("subfolder") || "";
-  const type = source.searchParams.get("type") || "output";
-  const request = { studioAccount: { userId: owner } };
-  if (
-    !ownerMediaTypes.has(type) ||
-    !outputMediaPattern.test(filename) ||
-    inDotFolder(subfolder) ||
-    !outputFilenameBelongsToRequest(filename, subfolder, request)
-  )
-    return null;
-  try {
-    const backend = item.settings?.comfyBackend || defaultWorkerId();
-    // Studio media is read from its folder only, whichever worker made it.
-    const file = localOutputFile(filename, subfolder, type);
-    if (type === mediaType && !file) return null;
-    const bytes = file
-      ? await fs.promises.readFile(file)
-      : await withComfyBackend(backend, () =>
-          comfy(
-            `/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`,
-            { timeout: 120000 },
-          ),
-        );
-    const extension = path.extname(filename).toLowerCase();
-    const mime = {
-      ".jpeg": "image/jpeg",
-      ".jpg": "image/jpeg",
-      ".m4v": "video/mp4",
-      ".mkv": "video/x-matroska",
-      ".mov": "video/quicktime",
-      ".mp4": "video/mp4",
-      ".png": "image/png",
-      ".webm": "video/webm",
-      ".webp": "image/webp",
-    }[extension];
-    return mime ? { content: Buffer.from(bytes), mime } : null;
-  } catch {
-    return null;
-  }
-}
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue
 // and profile stores take in what the older files hold, which stay where they are
 // (profile/seed.js, library/catalogue.js, profile/store.js).
@@ -304,7 +242,7 @@ const mcp = registerMcpRoutes(app, {
   noteGatewayIdentity,
   internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
-  domainRequest: mcpGenerationRequest,
+  domainRequest: (...args) => mcpDomainRequest(...args),
   cloudVideoFailures: (since) =>
     store
       .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
@@ -1544,51 +1482,6 @@ const sessionChat = new ChatService({
 });
 app.use("/api", createChatRouter(sessionChat, ownerIdForRequest));
 
-// Only generation and its owned results use direct domain calls; other MCP tools retain their transport.
-async function mcpGenerationRequest(method, route, input, owner) {
-  const url = new URL(route, "http://localhost");
-  const jobMatch = method === "GET" && url.pathname.match(/^\/api\/jobs\/([^/]+)$/);
-  const galleryMatch = method === "GET" && url.pathname.match(/^\/api\/gallery\/jobs\/([^/]+)$/);
-  if (!(method === "POST" && url.pathname === "/api/generate") && !jobMatch && !galleryMatch)
-    return undefined;
-  const account = multiUserEnabled ? accountAccessForId(owner) : undefined;
-  if (multiUserEnabled && !account?.authenticated)
-    return { status: 401, payload: { ok: false, error: "This account no longer has access." } };
-  if (jobMatch)
-    return {
-      status: 200,
-      payload: generationJobResponse(account, decodeURIComponent(jobMatch[1])),
-    };
-  if (galleryMatch)
-    return galleryJobResponse(
-      account,
-      decodeURIComponent(galleryMatch[1]),
-      url.searchParams.get("settings") === "1",
-    );
-  const { queueSet, studioSession, ...body } = input || {};
-  // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
-  if (studioSession) {
-    const parent = studioSession.parent && store.job(owner, studioSession.parent);
-    const parentJobId = parent?.sessionId === studioSession.id ? parent.id : undefined;
-    return admitGeneration(
-      body,
-      account,
-      {
-        sessionId: studioSession.id,
-        operation:
-          body.kind === "video"
-            ? "animate"
-            : parentJobId && body.referenceAssets?.length
-              ? "refine"
-              : "image",
-        parentJobId,
-      },
-      { priority: queuePriority.manual, queueSet },
-    );
-  }
-  // External chat work queues after manual Studio requests; its set keeps it together once started.
-  return admitGeneration(body, account, undefined, { priority: queuePriority.mcp, queueSet });
-}
 generationQueue.start();
 dream.start();
 finishing.start();
@@ -1606,6 +1499,12 @@ const upscale = registerUpscaleRoutes(app, {
 });
 
 const { generationJobResponse } = registerJobRoutes(app, { store, queue: generationQueue });
+// MCP's generation and its owned results go straight to the domain (mcp/studio-requests.js).
+const mcpDomainRequest = createMcpDomainRequest({
+  admit: admitGeneration,
+  jobResponse: generationJobResponse,
+  store,
+});
 registerGalleryErrorRoutes(app);
 
 registerGalleryDeleteRoute(app);
