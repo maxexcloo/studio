@@ -98,7 +98,7 @@ test("taste routes read, edit and forget only the caller's own profile", async (
   });
   const refresh = await request("POST", {});
   assert.equal(refresh.status, 403);
-  assert.match(refresh.body.error, /prompt assistant is off/);
+  assert.match(refresh.body.error, /Taste can.t refresh/);
   assert.equal((await request("PUT", { summary: "x".repeat(1001) })).status, 400);
   const saved = await request("PUT", { summary: "  Moody harbours at dusk.  " });
   assert.equal(saved.body.summary, "Moody harbours at dusk.");
