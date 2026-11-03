@@ -21,6 +21,8 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   await page.goto("/images");
 
   await page.getByRole("button", { name: "Upload", exact: true }).click();
+  // Reddit posts import from Library › Import, not this menu.
+  await expect(page.getByRole("menuitem")).toHaveText(["Upload Files…", "Upload Folder…"]);
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("menuitem", { name: "Upload Files…", exact: true }).click();
   await (await chooser).setFiles([png("one.png"), png("broken.png"), png("two.png")]);
