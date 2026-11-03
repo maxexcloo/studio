@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Settings › Profiles › Export: Studio's live profiles, guides and catalogue as one archive in the
- * seed repository's layout (`ai/`), so a person can unpack it there, review the diff and commit
- * it. Studio never writes Git itself.
+ * Settings › Profiles › Export: Studio's live profiles, guides and model manifest as one archive
+ * in the seed repository's layout (`ai/`), so a person can unpack it there, review the diff and
+ * commit it. Studio never writes Git itself.
  *
  *   profiles/<id>.json    every profile file Studio holds, exactly as on disk
  *   profile-aliases.json  merged profile ids and the profile each became, when there are any
  *   prompting.json        the guide store without its `meta`
- *   catalogue.json        editable metadata for every model file, keyed by folder/file
  *   models.json           the restore manifest, when there is one
  *   EXPORT.json           what changed, each item's origin and the unreviewed AI drafts
  *
@@ -27,14 +26,12 @@ const sorted = (value) =>
 
 /**
  * The bundle's files and summary, without writing anything. `profiles` and `guides` are the
- * profile/store.js stores, `catalogue` the library catalogue (or null), `manifestFile` the
- * restore manifest's path (or '').
+ * profile/store.js stores, `manifestFile` the restore manifest's path (or '').
  */
 export function buildExport({
   workflowsDir,
   profiles,
   guides,
-  catalogue = null,
   manifestFile = "",
   by = "",
   studioVersion = "",
@@ -105,11 +102,6 @@ export function buildExport({
         hash,
       });
     }
-  }
-  if (catalogue?.definitions) {
-    const definitions = catalogue.definitions();
-    if (Object.keys(definitions).length)
-      files.push({ name: "catalogue.json", body: json(sorted(definitions)), date: now });
   }
   if (manifestFile) {
     try {

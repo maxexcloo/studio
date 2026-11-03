@@ -70,7 +70,6 @@ async function serve(t) {
     exportOptions: () => ({
       dataDir: dir,
       workflowsDir: userWorkflowsDir,
-      catalogue: null,
       manifestFile: "",
       studioVersion: "0.0.0-test",
     }),
@@ -298,30 +297,19 @@ test("the export bundle says what changed and lists unreviewed drafts", async (t
   assert.deepEqual(again.changed, { profiles: [], guides: [] });
 });
 
-test("the catalogue and manifest join the bundle when there are any", (t) => {
+test("the manifest joins the bundle when there is one", (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-export-"));
   t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
   fs.mkdirSync(path.join(scratch, "workflows"));
   const manifest = path.join(scratch, "models.json");
   fs.writeFileSync(manifest, '[{"path":"loras/a.safetensors","sha256":"x"}]\n');
-  const catalogue = {
-    definitions: () => ({
-      "loras/b.safetensors": { title: "B" },
-      "loras/a.safetensors": { title: "A" },
-    }),
-  };
   const built = buildExport({
     workflowsDir: path.join(scratch, "workflows"),
     profiles: createProfileStore({ dataDir: scratch, log: {} }),
     guides: { read: () => null },
-    catalogue,
     manifestFile: manifest,
   });
   const names = Object.fromEntries(built.files.map((file) => [file.name, file.body]));
-  assert.deepEqual(Object.keys(JSON.parse(names["catalogue.json"])), [
-    "loras/a.safetensors",
-    "loras/b.safetensors",
-  ]);
   assert.equal(names["models.json"], fs.readFileSync(manifest, "utf8"));
   assert.equal(names["prompting.json"], undefined);
 });

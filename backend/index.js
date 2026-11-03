@@ -436,7 +436,6 @@ registerProfileRoutes(app, {
   exportOptions: () => ({
     dataDir,
     workflowsDir: userWorkflowsDir,
-    catalogue: loraCatalogue(),
     manifestFile: loraCatalogue().manifestFile?.() || "",
     studioVersion: appVersion,
   }),
