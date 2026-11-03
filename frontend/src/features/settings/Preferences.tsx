@@ -92,7 +92,7 @@ function DeleteFailedItems() {
   );
 }
 
-/** Cloud Models and Uncensored Models, which an account turns off for itself where its group grants them. */
+/** Cloud Models and Uncensored Models, which an account turns off for itself where its role or group grants them. */
 function ModelChoices() {
   const status = useQuery(preferencesQuery).data;
   const save = useSavePreferences();
@@ -112,12 +112,12 @@ function ModelChoices() {
       {choice(
         "cloudModels",
         "Cloud Models",
-        "Offer the cloud models your group grants. Off hides them here, in Chat and over MCP.",
+        "Offer the cloud models you have access to. Off hides them here, in Chat and over MCP.",
       )}
       {choice(
         "uncensoredModels",
         "Uncensored Models",
-        "Offer the uncensored models and themes your group grants. Off hides them everywhere.",
+        "Offer the uncensored models and themes you have access to. Off hides them everywhere.",
       )}
     </SettingGroup>
   );

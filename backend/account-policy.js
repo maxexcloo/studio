@@ -10,8 +10,10 @@
  * grant. The prompt assistant's Spicy preset needs Uncensored Models too, whatever profile is selected.
  * `allModels` grants every local profile, including ones added later.
  *
- * An ordinary account may turn its group's Cloud Models and Uncensored Models off for itself
- * (account-preferences.js); its effective features are then off everywhere they apply.
+ * Any account may turn the Cloud Models and Uncensored Models it has off for itself
+ * (account-preferences.js); its effective features are then off everywhere they apply. For an
+ * administrator this narrows only its own use: administration (profile and catalogue editing, the
+ * Library) does not go through these checks.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
 import { canonicalProfileId } from "./profile/store.js";
@@ -69,8 +71,17 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
   };
 }
 
-/** Features an account has turned off for itself, among those its group may grant. */
+/** Features an account may turn off for itself, among those its role or group grants. */
 const personalFeatures = ["cloudModels", "uncensoredModels"];
+const narrowed = (features, preferences) => ({
+  ...features,
+  ...Object.fromEntries(
+    personalFeatures.map((feature) => [
+      feature,
+      features[feature] && preferences[feature] !== false,
+    ]),
+  ),
+});
 
 export function effectiveAccountAccess(
   account,
@@ -86,7 +97,10 @@ export function effectiveAccountAccess(
       userId: account.id,
       role: accountRoles.administrator,
       generationProfiles: [...new Set(availableProfiles || [])],
-      features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
+      features: narrowed(
+        Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
+        preferences,
+      ),
     };
   }
   const profile = profiles?.[account.accessProfileId];
@@ -108,15 +122,7 @@ export function effectiveAccountAccess(
     role: accountRoles.user,
     generationProfiles: safe.generationProfiles,
     allModels: safe.allModels,
-    features: {
-      ...safe.features,
-      ...Object.fromEntries(
-        personalFeatures.map((feature) => [
-          feature,
-          safe.features[feature] && preferences[feature] !== false,
-        ]),
-      ),
-    },
+    features: narrowed(safe.features, preferences),
   };
 }
 
@@ -126,7 +132,6 @@ export function effectiveAccountAccess(
  */
 export function mayUseGenerationProfile(access, profile) {
   if (!access?.authenticated) return false;
-  if (access.role === accountRoles.administrator) return true;
   const id = typeof profile === "string" ? profile : profile?.id;
   if (
     typeof profile === "object" &&
@@ -134,23 +139,28 @@ export function mayUseGenerationProfile(access, profile) {
     access.features.uncensoredModels !== true
   )
     return false;
+  const cloud = isCloudProfile(typeof profile === "string" ? { id: profile } : profile);
+  if (access.role === accountRoles.administrator) return !cloud || access.features.cloudModels;
   // An AI-drafted profile is live for administrators only until one approves it.
   if (typeof profile === "object" && profile?.aiDrafted === true) return false;
-  if (isCloudProfile(typeof profile === "string" ? { id: profile } : profile))
-    return access.features.cloudModels === true;
+  if (cloud) return access.features.cloudModels === true;
   return access.allModels === true || access.generationProfiles.includes(id);
 }
 
-export function mayUseFeature(access, feature) {
-  return Boolean(
-    access?.authenticated &&
-    (access.role === accountRoles.administrator || access.features[feature] === true),
+/** An administrator that hasn't turned anything off for itself, so every profile check would pass. */
+export function hasFullAccess(access) {
+  return (
+    access?.role === accountRoles.administrator &&
+    accessFeatures.every((feature) => access.features?.[feature] === true)
   );
+}
+
+export function mayUseFeature(access, feature) {
+  return Boolean(access?.authenticated && access.features?.[feature] === true);
 }
 
 export function visibleGenerationProfiles(profiles, access) {
   if (!access?.authenticated) return [];
-  if (access.role === accountRoles.administrator) return profiles;
   return profiles.filter((profile) => mayUseGenerationProfile(access, profile));
 }
 
