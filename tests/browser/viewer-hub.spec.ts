@@ -725,8 +725,14 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");
-  // Opened, it also downloads as a GIF.
+  // Opened, it plays the copy iOS Safari plays, and also downloads as a GIF.
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Generation", exact: true }).locator("video"),
+  ).toHaveAttribute(
+    "src",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=play",
+  );
   await viewerAction(page, "Download Options");
   await expect(page.getByRole("menuitem", { name: "Download Video", exact: true })).toHaveAttribute(
     "href",
