@@ -9,7 +9,6 @@ import { backendLabel, controlRange } from "./payload";
 import { ChipPopup } from "./Picker";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
-import { usePhone } from "../../ui/usePhone";
 import classes from "./GenerationInputControls.module.css";
 
 /** A chip's dropdown of a few fixed choices, such as Count or Reference Role. */
@@ -111,7 +110,6 @@ export function GenerationInputControls({
   /** Opens Compare from this draft; the gallery composer passes it. */
   onCompare?: () => void;
 }) {
-  const phone = usePhone();
   const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
   const backends = profile?.backendOptions || [];
@@ -180,7 +178,7 @@ export function GenerationInputControls({
       )}
       <ExpertSettings input={input} profile={profile} onChange={onChange} {...expert} />
       {onCompare && input.kind === "image" && (
-        <Tooltip label="Compare" disabled={phone}>
+        <Tooltip label="Compare">
           <Button {...iconChipProps} aria-label="Compare" onClick={onCompare}>
             <Columns3 size={16} />
           </Button>

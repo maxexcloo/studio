@@ -306,8 +306,9 @@ export function studioTheme({
           track: { borderColor: "var(--mantine-color-default-border)" },
         },
       }),
+      // A tapped tooltip lingers on touch, so phones show none unless a call enables its own.
       Tooltip: Tooltip.extend({
-        defaultProps: { transitionProps },
+        defaultProps: { transitionProps, disabled: phone },
         styles: {
           tooltip: {
             ...glass,

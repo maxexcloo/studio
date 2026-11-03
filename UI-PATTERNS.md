@@ -434,7 +434,8 @@ primary component reference and verify APIs against the installed version.
   Download also sit on the tile. Desktop
   reveals quick controls on hover/focus; phones keep More visible and show a
   persistent star for favourites. Selection replaces these controls.
-- Use semantic buttons/links and accessible names for icons. Preserve drafts
+- Use semantic buttons/links and accessible names for icons. Phones show no
+  tooltips by default (a tapped one lingers), so phone icons need visible names. Preserve drafts
   and keyboard focus through expansion. Honour the phone keyboard and safe
   areas. Failed images must not expose broken-image icons.
 - Phones fit each view on screen and scroll only content that needs it. The
