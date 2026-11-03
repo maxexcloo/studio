@@ -4179,7 +4179,7 @@ test("the Generate wait is one shared deadline for every job of the call", async
   assert.ok(elapsed >= 1900 && elapsed < 4500, `${Math.round(elapsed)} ms`);
 });
 
-test("each conversation gets a profile guide once, compact, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
+test("each conversation gets a profile guide once, whole, for tier, fuzzy and exact picks, even from concurrent calls", async (t) => {
   const f = await fixture(t);
   const long = {
     id: "long-guide",
@@ -4203,8 +4203,7 @@ test("each conversation gets a profile guide once, compact, for tier, fuzzy and 
   );
   const guided = replies.filter((reply) => guideOf(reply));
   assert.equal(guided.length, 1, "concurrent calls attach the guide once");
-  assert.ok(guideOf(guided[0]).length <= 1200);
-  assert.ok(texts(guided[0]).length < 1870, `${texts(guided[0]).length} characters`);
+  assert.match(guideOf(guided[0]), /Rule 40 explains/, "the whole guide, not a gist");
   assert.equal(texts(guided[0]).includes("example.test/guide"), false);
   for (const reply of replies.filter((reply) => !guideOf(reply)))
     assert.ok(texts(reply).length < 570, `${texts(reply).length} characters`);

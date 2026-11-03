@@ -130,13 +130,14 @@ const promptListText = z.string().transform((text) => {
     return [text];
   }
 });
-// A prompting guide and a LoRA library are long; chat gets their essentials (lora_query finds the rest).
-const maxGuideCharacters = 1200;
 // Models shows a guide's gist; a model's first Generate sends the whole guide for the chat to write to.
 const maxShownGuideCharacters = 500;
 const maxListedLoras = 30;
-/** A profile guide's essentials as one capped paragraph: summary, rules and pitfalls, without sources or examples. */
-function compactGuide(guide, max = maxGuideCharacters) {
+/**
+ * A profile guide as one paragraph: the family's summary, rules, pitfalls and example, then its
+ * mode's and variant's, without sources; `max` caps it for a preview.
+ */
+function compactGuide(guide, max = Infinity) {
   if (!guide || typeof guide !== "object") return "";
   const parts = [];
   const add = (value) => {
@@ -148,6 +149,10 @@ function compactGuide(guide, max = maxGuideCharacters) {
       add(source.summary);
       add(source.rules);
       add(source.pitfalls);
+      if (source.example)
+        add(
+          `Example: ${typeof source.example === "string" ? source.example : JSON.stringify(source.example)}`,
+        );
     }
   const textValue = parts.join(" ");
   return textValue.length > max ? `${textValue.slice(0, max - 1)}…` : textValue;
