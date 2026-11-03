@@ -102,8 +102,8 @@ test("the public generation page supplies exact associations only for the reques
   assert.equal((await civitaiGenerationData(source.id, { request })).resources.length, 2);
   assert.equal(await civitaiGenerationData(42, { request }), null);
   assert.deepEqual(calls, [
-    `https://civitai.com/images/${source.id}`,
-    "https://civitai.com/images/42",
+    `https://civitai.red/images/${source.id}`,
+    "https://civitai.red/images/42",
   ]);
 });
 
