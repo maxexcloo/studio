@@ -36,13 +36,6 @@ function SettingsForm({ dream }: { dream: Dream }) {
         checked={settings.enabled}
         onChange={(event) => save.mutate({ enabled: event.currentTarget.checked })}
       />
-      <Switch
-        label="Pause"
-        description="Stop making new results; the deck stays."
-        checked={settings.paused}
-        disabled={!settings.enabled}
-        onChange={(event) => save.mutate({ paused: event.currentTarget.checked })}
-      />
       <NumberSetting
         label="Unseen Buffer"
         description="Dream waits once this many results are unseen."
