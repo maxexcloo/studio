@@ -408,8 +408,9 @@ primary component reference and verify APIs against the installed version.
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
-  prompts and the caption sit on the same subtle surface aligned with the
-  column and scroll within a bounded height, the caption starting expanded
+  prompts and the caption sit in boxes framed like the composer's text box,
+  inside the column (never bleeding past its edges), wrapping long words and
+  scrolling within a bounded height, the caption starting expanded
   until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
   sections run Prompt, Caption, From, Derived, Model, LoRAs, References,
   Settings, Output and Timing, each a heading over its content, and an
