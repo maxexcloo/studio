@@ -35,6 +35,7 @@ import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
+import { loraAllowed } from "./model/catalogue.js";
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
@@ -124,6 +125,15 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           return {
             status: 403,
             payload: { ok: false, error: "LoRAs are not enabled for this account." },
+          };
+        const allowed = loraAllowed(account);
+        const refused = (Array.isArray(input?.loras) ? input.loras : []).find(
+          (item) => item?.enabled !== false && !allowed(String(item?.name || "")),
+        );
+        if (refused)
+          return {
+            status: 403,
+            payload: { ok: false, error: `This account cannot use the LoRA “${refused.name}”.` },
           };
       }
       if (demoMode && !workers.length) return { backend: currentComfyBackend() };
