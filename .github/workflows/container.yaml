@@ -204,24 +204,34 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          docker buildx imagetools create --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
-          # The worker image is published only by main commits that change it. It gets a version only
-          # when it changed since the last release, so a deployment's GPU workers restart only for that.
+          # The worker gets a version only when it changed since the last release, so a deployment's
+          # GPU workers restart only for that. Nothing is tagged until both images are known, so a
+          # failed run never leaves a version behind for the next run to reuse.
           worker_paths=(.dockerignore .github/workflows/worker.yaml LICENSE worker)
           worker_commit="$(git log -1 --first-parent --format=%H -- "${worker_paths[@]}")"
           latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
-          if [ -n "$latest" ] && [ "$worker_commit" = "$(git log -1 --first-parent --format=%H "$latest" -- "${worker_paths[@]}")" ]; then
+          worker=""
+          if [ -z "$latest" ] || [ "$worker_commit" != "$(git log -1 --first-parent --format=%H "$latest" -- "${worker_paths[@]}")" ]; then
+            # The Worker workflow builds only the last commit of a push, which may come after the
+            # commit that changed the worker; any of them has the same worker. It can still be building.
+            candidates="$(git log --first-parent --format=%H "$worker_commit^..HEAD")"
+            for _ in $(seq 1 100); do
+              for commit in $candidates; do
+                if docker buildx imagetools inspect "$IMAGE_NAME-worker:sha-$commit" >/dev/null 2>&1; then
+                  worker="$IMAGE_NAME-worker:sha-$commit"
+                  break 2
+                fi
+              done
+              sleep 30
+            done
+            [ -n "$worker" ] || { echo "::error::No worker image for $worker_commit or a later commit; run the Worker workflow on main, then rerun this job."; exit 1; }
+          else
             echo "::notice::The worker is unchanged since $latest."
-            exit 0
           fi
-          worker="$IMAGE_NAME-worker:sha-$worker_commit"
-          # The Worker workflow starts alongside this run and can take longer.
-          for _ in $(seq 1 100); do
-            if docker buildx imagetools inspect "$worker" >/dev/null 2>&1; then break; fi
-            sleep 30
-          done
-          docker buildx imagetools inspect "$worker" >/dev/null || { echo "::error::$worker is missing; run the Worker workflow on main, then rerun this job."; exit 1; }
-          docker buildx imagetools create --tag "$IMAGE_NAME-worker:$VERSION" --tag "$IMAGE_NAME-worker:latest" "$worker"
+          docker buildx imagetools create --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
+          if [ -n "$worker" ]; then
+            docker buildx imagetools create --tag "$IMAGE_NAME-worker:$VERSION" --tag "$IMAGE_NAME-worker:latest" "$worker"
+          fi
       - name: Publish Release
         if: steps.version.outputs.version
         env:
