@@ -274,7 +274,10 @@ export function createTaste({
     const model = writer(ownerId);
     if (!model)
       return Promise.reject(
-        failure("The prompt assistant is off for this account or not configured.", 403),
+        failure(
+          "Taste can't refresh: no assistant is configured, or this account can't use it.",
+          403,
+        ),
       );
     let job = running.get(ownerId);
     if (!job) {
