@@ -141,6 +141,7 @@
 .prompt {
   align-self: stretch;
   padding-block: 7px;
+  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .prompt textarea {
@@ -148,26 +149,13 @@
   line-height: 1.45;
 }
 
-/* A proposed change sits above the field it came from, until it runs or is dismissed. */
-.change {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 2px 2px 4px;
-  padding: var(--mantine-spacing-xs);
-  border: 1px solid var(--studio-glass-border);
-  border-radius: var(--mantine-radius-md);
-  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.changeAction {
-  flex-shrink: 0;
-}
-
-.changeText {
-  flex: 1;
-  min-width: 0;
+/* A proposed change replaces the field's text in place, tinted until it runs or is undone; the
+   shadow extends the tint past the text without moving it. */
+.proposed {
+  --proposed-tint: color-mix(in srgb, var(--mantine-primary-color-filled) 22%, transparent);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--proposed-tint);
+  box-shadow: 0 0 0 4px var(--proposed-tint);
 }
 
 .variation {

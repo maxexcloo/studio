@@ -357,14 +357,16 @@ primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub. One glass action bar (`ViewerPrompt` over
   the shared item actions) holds the item's prompt in a field: editing it and
   pressing Enter or Generate runs it with the item's settings (a video's
-  animates again). Its chat icon switches the field to asking for a change in
-  plain words ("make it night"); the prompt assistant picks Edit, Recreate,
-  Animate or Upscale (`/api/suggestions`, surface `change`) and the proposal
-  shows its action and rewritten prompt above the field until Run or dismiss,
-  the one review pause before a written prompt runs. Continue in Chat (in the
+  animates again). Its Ask action (Sparkles, Ask for a Change) sends the field's
+  text as a change in plain words ("make it night"); the prompt assistant picks
+  Edit, Recreate, Animate or Upscale (`/api/suggestions`, surface `change`) and
+  its prompt replaces the text in place, tinted, with the action's name, Undo
+  (restoring what was typed) and Run at its end (on phones Run is the editor's
+  send arrow), the one review pause before a written prompt runs; there is no
+  panel above the field. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached
-  as its reference, its settings as the input, any change typed as the
-  message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
+  as its reference, its settings as the input, any change typed over the
+  prompt as the message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
   viewer queue as usual into a strip of the item's versions, grouped as the grid
   groups them (`gallery/versions.ts`); choosing one makes it current. Under the
   field come the labelled primaries Animate ▾, Edit, Recreate ▾ and Upscale ▾,
@@ -381,7 +383,7 @@ primary component reference and verify APIs against the installed version.
   upscale's Output adds the Original Size the model drew beside its
   Dimensions. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Animate, Edit, Recreate and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
+  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, with Ask beside its send arrow) over Animate, Edit, Recreate and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
   swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Edit Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,

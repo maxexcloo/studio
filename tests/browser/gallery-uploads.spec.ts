@@ -91,8 +91,7 @@ test("Recreate on several uploads queues each suggested prompt as its version an
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   for (const id of ["a", "b", "c"])
     await page.getByRole("button", { name: `Select image: Upload ${id}`, exact: true }).click();
-  await (await selectionMenuItem(page, "Prompt")).click();
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await (await selectionMenuItem(page, "Recreate")).click();
   await expect(
     page.getByText("Queued 2 recreations. 1 upload has no suggested prompt yet.", { exact: true }),
   ).toBeVisible();
