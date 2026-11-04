@@ -136,7 +136,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
     await page.getByRole("combobox", { name: /^Upscale Size/ }).click();
     await page.getByRole("option", { name: "4K · 4096px Long Edge", exact: true }).click();
     await page.getByRole("switch", { name: /^Face Detail/ }).check();
-    const queue = page.getByRole("button", { name: "Queue Upscale", exact: true });
+    const queue = page.getByRole("button", { name: "Upscale Image", exact: true });
     await expect(queue).toBeEnabled();
     await queue.click();
     await expect.poll(() => submitted.length).toBe(1);
@@ -208,7 +208,7 @@ test("Offline workers and unavailable upscale models explain why submission is d
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
   await upscaleOptions(page);
   await expect(page.getByRole("alert")).toContainText("The selected upscale worker is offline.");
-  const queue = page.getByRole("button", { name: "Queue Upscale", exact: true });
+  const queue = page.getByRole("button", { name: "Upscale Image", exact: true });
   await expect(queue).toBeDisabled();
   offline = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();

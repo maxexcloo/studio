@@ -352,13 +352,13 @@ const bulk = {
   "cancel-all": {
     label: "Stop All",
     icon: icons.stop,
-    title: "Stop All Generations?",
+    title: "Stop All Generations",
     text: "Studio stops every active generation. Results already saving are kept.",
   },
   "clear-failed": {
     label: "Clear Failed",
     icon: icons.clear,
-    title: "Clear Failed Generations?",
+    title: "Clear Failed Generations",
     text: "Failed generations leave the queue. Their chat cards stay and can still be retried.",
   },
 } as const;

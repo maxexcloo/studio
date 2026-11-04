@@ -93,7 +93,7 @@ export function ProfilePicker({
         name="Profile"
         target={{ "data-profile-picker": true }}
         searchable
-        nothingFoundMessage="No Matching Profiles"
+        nothingFoundMessage="No Matches"
         data={profileOptions(available)}
         value={selected?.id ?? null}
         renderOption={({ option, checked }) => {

@@ -53,7 +53,7 @@ function ChatModelPicker({
         name="Chat Model"
         target={{ disabled: !models.length || disabled }}
         searchable={models.length > 8}
-        nothingFoundMessage="No Matching Models"
+        nothingFoundMessage="No Matches"
         data={models.map((model) => ({
           value: model.id,
           label: model.label,

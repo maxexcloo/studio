@@ -36,7 +36,7 @@ test("Saving and updating a preset never submits a generation", async ({ page })
   await closePresets(page);
   await prompt.fill("A copper bird with blue wings");
   await openPresets(page);
-  await savedAction(page, "Preset", "Copper Study", "Update From Current");
+  await savedAction(page, "Preset", "Copper Study", "Update from Current");
   await expect.poll(() => state.presets[0].input.prompt).toBe("A copper bird with blue wings");
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);

@@ -58,7 +58,7 @@ export function IntegrationSettings() {
               disabled={model.locked}
               allowDeselect={false}
               searchable
-              nothingFoundMessage="No Matching Models"
+              nothingFoundMessage="No Matches"
               w={{ base: "100%", sm: 240 }}
             />
           </SettingRow>

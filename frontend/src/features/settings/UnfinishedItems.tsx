@@ -113,17 +113,18 @@ export function UnfinishedItems() {
           rowActions={(job) => (
             <>
               <Menu.Item
+                leftSection={<icons.retry size={16} />}
+                onClick={() => act.mutate({ action: "retry", job })}
+              >
+                Retry
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item
                 leftSection={<icons.delete size={16} />}
                 color="red"
                 onClick={() => setDeleting(job)}
               >
                 Delete
-              </Menu.Item>
-              <Menu.Item
-                leftSection={<icons.retry size={16} />}
-                onClick={() => act.mutate({ action: "retry", job })}
-              >
-                Retry
               </Menu.Item>
             </>
           )}

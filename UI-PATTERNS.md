@@ -112,14 +112,19 @@ primary component reference and verify APIs against the installed version.
   keep visited forms mounted to preserve edits; a section that fails to render
   shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
-  (`SectionHeader`: segmented views, an expanding search, filters in one popover,
-  then the actions, a vertical `ToolbarDivider` before each group of them: the
-  rest as icons with tooltips, A–Z, then the create or primary action at the far
+  (`SectionHeader`: segmented views, an expanding search, filters in one popover
+  titled Filters with Clear, as the gallery's, then the actions, `SectionToolbar`
+  putting a vertical `ToolbarDivider` before each group of them: the
+  rest as icons with tooltips, A–Z (`more`, which phones fold into More), then
+  the create or primary action at the far
   right as a labelled compact subtle button (`ToolbarAction`: New User, New
-  Group, New Guide, and New Profile, a menu of Duplicate Profile… and Import
-  Workflow…); phones may fold a crowded toolbar's icon actions into More) at the end of the same row, above compact rows with status
+  Group, New Guide, and New Profile ▾, a menu of Duplicate Profile… and Import
+  Workflow…)) at the end of the same row, above compact rows with status
   badges and row menus, in Library as in Settings (Models, LoRAs and Imports
-  as Users and Workers). A section with several lists shows its main list under
+  as Users and Workers). Row menus share the item menus' style: an icon on every
+  item, one width (`menuWidth`) and the theme's row height, the usual action
+  first and a divider before the destructive item, which is last (Delete,
+  never Remove, for what deleting removes for good). A section with several lists shows its main list under
   the section's own toolbar and gives each further list a `SettingGroup`
   heading with its own toolbar beside it, the create action at its far right;
   every other part of a section, such as an import review's Files, is a
@@ -148,8 +153,10 @@ primary component reference and verify APIs against the installed version.
   Choices are Selects 240 px wide on desktop; row actions are `compact-sm`
   default buttons; number fields commit on blur or Enter. Creating or editing a
   record, anything that asks for a password, and free text open a dialog with
-  Save. Consequential actions sit in a red Danger Zone group, last in their
-  section, or a row menu, and always confirm with `ConfirmDialog`. Preferences
+  Save. Every dialog ends in one right-aligned footer (`DialogFooter`): Cancel,
+  then its primary action. Consequential actions sit in a red Danger Zone group, last in their
+  section, or a row menu, and always confirm with `ConfirmDialog`, titled with
+  the action and no question mark. Preferences
   follow the account, never the device.
 - A click outside or Escape closes only the topmost open layer (popover, menu,
   dropdown, dialog, drawer or sheet); nothing beneath reacts while it is open,
@@ -174,7 +181,8 @@ primary component reference and verify APIs against the installed version.
   Case line with no title, explanation or decorative card, and at most the one
   action that fills the view (Turn On, Resume, Chats on phones). Use the exact empty copy
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
-  the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
+  the unselected conversation area, Empty Queue, and No Matches when a search
+  or filter leaves nothing. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.
   Both centre horizontally and vertically in the space they take: where the
   container has a height (a picker's pane, a page) they take its place with

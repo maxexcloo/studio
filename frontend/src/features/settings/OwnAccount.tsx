@@ -13,6 +13,7 @@ import {
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import type { Account } from "../../types";
@@ -20,7 +21,15 @@ import { ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 
 /** The Email & Password dialog: both need the current password. */
-function AccountForm({ account, saved }: { account: Account; saved: () => void }) {
+function AccountForm({
+  account,
+  saved,
+  onCancel,
+}: {
+  account: Account;
+  saved: () => void;
+  onCancel: () => void;
+}) {
   const client = useQueryClient();
   const security = useForm({
     initialValues: { username: account.username, currentPassword: "", newPassword: "" },
@@ -79,14 +88,11 @@ function AccountForm({ account, saved }: { account: Account; saved: () => void }
           />
         )}
         {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <Button
-          type="submit"
-          disabled={!changed}
-          loading={save.isPending}
-          style={{ alignSelf: "start" }}
-        >
-          Save Email & Password
-        </Button>
+        <DialogFooter pending={save.isPending} onCancel={onCancel}>
+          <Button type="submit" disabled={!changed} loading={save.isPending}>
+            Save Email & Password
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
@@ -145,7 +151,14 @@ export function OwnAccount() {
       <PersonalMcpToken initial={account.data.mcp} />
       <Modal opened={editing} onClose={() => setEditing(false)} title="Email & Password">
         <FocusTrap.InitialFocus />
-        {editing && <AccountForm key={own.id} account={own} saved={() => setEditing(false)} />}
+        {editing && (
+          <AccountForm
+            key={own.id}
+            account={own}
+            saved={() => setEditing(false)}
+            onCancel={() => setEditing(false)}
+          />
+        )}
       </Modal>
     </Stack>
   );
