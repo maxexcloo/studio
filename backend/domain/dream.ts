@@ -12,6 +12,7 @@ import type { DomainResponse, GenerationAccount, GenerationScope } from "./admis
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
 import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
 import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
+import { logFailure } from "./log-failure.ts";
 import { contentRule, writerGuide } from "./writing-standard.ts";
 
 /** One account's Dream settings. Dream is off until the person turns it on. */
@@ -1188,6 +1189,7 @@ export function createDream(options: {
   let ticking = false;
   let next = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
+  const tickFailed = logFailure("Dream");
   async function tick() {
     if (ticking) return;
     ticking = true;
@@ -1289,7 +1291,7 @@ export function createDream(options: {
     tick,
     write: writeJob,
     start() {
-      timer ||= setInterval(() => void tick().catch(() => undefined), tickMs);
+      timer ||= setInterval(() => void tick().catch(tickFailed), tickMs);
       timer.unref();
     },
     stop() {
@@ -1373,7 +1375,7 @@ export function createDream(options: {
         states.delete(ownerId);
         await stopWaiting(ownerId);
       }
-      if (timer) void tick().catch(() => undefined);
+      if (timer) void tick().catch(tickFailed);
       return record.settings;
     },
     /** Random older gallery images to judge without the GPU, those not judged yet first. */

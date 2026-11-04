@@ -101,7 +101,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
         }
         options.admitted?.(job);
       }
-      void options.queue.tick().catch(() => undefined);
+      void options.queue.tick();
       const items = job.items.length
         ? job.items
         : options.pendingItems(job.id, { ...job.input, ownerId, createdAt: job.createdAt });
