@@ -107,9 +107,16 @@ function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
         label="Automatic Control"
         description="Start image and video workers for queued work; text stays manual."
       >
-        <Text size="sm" c="dimmed" opacity={settings.automatic ? 1 : 0.4}>
-          Park When Idle
-        </Text>
+        <Switch
+          aria-label="Automatic Control"
+          checked={settings.automatic}
+          onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Park When Idle"
+        description="Stop an idle image or video worker after this long, under Automatic Control."
+      >
         <Select
           aria-label="Park When Idle"
           w={110}
@@ -121,11 +128,6 @@ function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
           allowDeselect={false}
           disabled={!settings.automatic}
           onChange={(value) => value && save.mutate({ parkIdleMinutes: Number(value) })}
-        />
-        <Switch
-          aria-label="Automatic Control"
-          checked={settings.automatic}
-          onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
         />
       </SettingRow>
       {save.error && (
@@ -187,144 +189,142 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
   return (
     <>
-      <SettingGroup title="GPU Workloads">
-        <Stack gap="md">
-          <AutomaticControl settings={settings} />
-          {operation && (
-            <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
-              {operation.progress}
-            </Alert>
-          )}
-          <DataTable
-            label="GPU Workloads"
-            rows={workloads}
-            rowKey={(item) => item.id}
-            rowName={(item) => item.label}
-            empty="No GPU Workloads"
-            columns={[
-              {
-                key: "run",
-                header: "Run",
-                width: 44,
-                cell: (item) => (
-                  <Checkbox
-                    aria-label={`Run ${item.label}`}
-                    checked={chosen.includes(item.id)}
-                    disabled={Boolean(operation)}
-                    onChange={(event) =>
-                      setSelection(
-                        event.currentTarget.checked
-                          ? [...chosen, item.id]
-                          : chosen.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                ),
-              },
-              {
-                key: "workload",
-                header: "Workload",
-                main: true,
-                sortValue: (item) => item.label,
-                cell: (item) => {
-                  const note =
-                    item.reason ||
-                    reasons[item.id] ||
-                    (item.acceptedOperations > 0 &&
-                      `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
-                  return (
-                    <>
-                      <Text size="sm" fw={500}>
-                        {item.label}
+      <Stack gap="md">
+        <AutomaticControl settings={settings} />
+        {operation && (
+          <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
+            {operation.progress}
+          </Alert>
+        )}
+        <DataTable
+          label="GPU Workloads"
+          rows={workloads}
+          rowKey={(item) => item.id}
+          rowName={(item) => item.label}
+          empty="No GPU Workloads"
+          columns={[
+            {
+              key: "run",
+              header: "Run",
+              width: 44,
+              cell: (item) => (
+                <Checkbox
+                  aria-label={`Run ${item.label}`}
+                  checked={chosen.includes(item.id)}
+                  disabled={Boolean(operation)}
+                  onChange={(event) =>
+                    setSelection(
+                      event.currentTarget.checked
+                        ? [...chosen, item.id]
+                        : chosen.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+              ),
+            },
+            {
+              key: "workload",
+              header: "Workload",
+              main: true,
+              sortValue: (item) => item.label,
+              cell: (item) => {
+                const note =
+                  item.reason ||
+                  reasons[item.id] ||
+                  (item.acceptedOperations > 0 &&
+                    `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+                return (
+                  <>
+                    <Text size="sm" fw={500}>
+                      {item.label}
+                    </Text>
+                    {note && (
+                      <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                        {note}
                       </Text>
-                      {note && (
-                        <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                          {note}
-                        </Text>
-                      )}
-                    </>
-                  );
-                },
+                    )}
+                  </>
+                );
               },
-              {
-                key: "gpus",
-                header: "GPUs",
-                visibleFrom: "sm",
-                sortValue: (item) => item.gpus,
-                cell: (item) => <Text size="sm">{item.gpus}</Text>,
-              },
-              {
-                key: "state",
-                header: "State",
-                sortValue: (item) => phaseLabel(item.phase),
-                cell: (item) => (
-                  <Badge color={phaseColour(item.phase)} miw="max-content">
-                    {phaseLabel(item.phase)}
-                  </Badge>
-                ),
-              },
-            ]}
-            rowActions={(item) =>
-              item.phase === "parked" || item.phase === "down" ? (
-                <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
-                  Start
-                </Menu.Item>
-              ) : (
-                <Menu.Item
-                  disabled={Boolean(operation) || item.phase !== "running"}
-                  onClick={() => setRestarting(item.id)}
-                >
-                  Restart
-                </Menu.Item>
-              )
-            }
-          />
-          <Group justify="flex-end" gap="xs">
-            <Button
-              variant="default"
-              disabled={!selection || sameSet(chosen, running)}
-              onClick={() => setSelection(null)}
-            >
-              Reset
-            </Button>
-            <Button
-              disabled={Boolean(operation) || sameSet(chosen, running)}
-              loading={previewing.isPending}
-              onClick={() => previewing.mutate(chosen)}
-            >
-              Preview Changes
-            </Button>
-          </Group>
-          <ConfirmDialog
-            opened={Boolean(preview)}
-            title="Apply GPU Placement"
-            action="Apply"
-            pending={applying.isPending}
-            error={applying.error?.message}
-            onConfirm={() => applying.mutate(preview!)}
-            onClose={() => {
-              setPreview(null);
-              applying.reset();
-            }}
+            },
+            {
+              key: "gpus",
+              header: "GPUs",
+              visibleFrom: "sm",
+              sortValue: (item) => item.gpus,
+              cell: (item) => <Text size="sm">{item.gpus}</Text>,
+            },
+            {
+              key: "state",
+              header: "State",
+              sortValue: (item) => phaseLabel(item.phase),
+              cell: (item) => (
+                <Badge color={phaseColour(item.phase)} miw="max-content">
+                  {phaseLabel(item.phase)}
+                </Badge>
+              ),
+            },
+          ]}
+          rowActions={(item) =>
+            item.phase === "parked" || item.phase === "down" ? (
+              <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
+                Start
+              </Menu.Item>
+            ) : (
+              <Menu.Item
+                disabled={Boolean(operation) || item.phase !== "running"}
+                onClick={() => setRestarting(item.id)}
+              >
+                Restart
+              </Menu.Item>
+            )
+          }
+        />
+        <Group justify="flex-end" gap="xs">
+          <Button
+            variant="default"
+            disabled={!selection || sameSet(chosen, running)}
+            onClick={() => setSelection(null)}
           >
-            {preview && <PlacementChanges preview={preview} label={label} />}
-          </ConfirmDialog>
-          <ConfirmDialog
-            opened={Boolean(restarting)}
-            title={`Restart ${restarting ? label(restarting) : ""}`}
-            action="Restart"
-            pending={restart.isPending}
-            error={restart.error?.message}
-            onConfirm={() => restart.mutate(restarting!)}
-            onClose={() => {
-              setRestarting(null);
-              restart.reset();
-            }}
+            Reset
+          </Button>
+          <Button
+            disabled={Boolean(operation) || sameSet(chosen, running)}
+            loading={previewing.isPending}
+            onClick={() => previewing.mutate(chosen)}
           >
-            Accepted work finishes first, then it restarts with the same model and GPUs.
-          </ConfirmDialog>
-        </Stack>
-      </SettingGroup>
+            Preview Changes
+          </Button>
+        </Group>
+        <ConfirmDialog
+          opened={Boolean(preview)}
+          title="Apply GPU Placement"
+          action="Apply"
+          pending={applying.isPending}
+          error={applying.error?.message}
+          onConfirm={() => applying.mutate(preview!)}
+          onClose={() => {
+            setPreview(null);
+            applying.reset();
+          }}
+        >
+          {preview && <PlacementChanges preview={preview} label={label} />}
+        </ConfirmDialog>
+        <ConfirmDialog
+          opened={Boolean(restarting)}
+          title={`Restart ${restarting ? label(restarting) : ""}`}
+          action="Restart"
+          pending={restart.isPending}
+          error={restart.error?.message}
+          onConfirm={() => restart.mutate(restarting!)}
+          onClose={() => {
+            setRestarting(null);
+            restart.reset();
+          }}
+        >
+          Accepted work finishes first, then it restarts with the same model and GPUs.
+        </ConfirmDialog>
+      </Stack>
       {!!history.length && (
         <SettingGroup title="History">
           <Stack gap={4} align="flex-start">
