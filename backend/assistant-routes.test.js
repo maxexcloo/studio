@@ -147,7 +147,12 @@ test("the assistant is for every account, and only for profiles the account may 
   const status = await get("/api/assistant", "user");
   assert.deepEqual(
     [status.available, status.spicy, status.loras, status.presets.map((preset) => preset.id)],
-    [true, false, false, ["enhance", "photographic", "cinematic", "concise", "candid"]],
+    [
+      true,
+      false,
+      false,
+      ["candid", "cinematic", "concise", "enhance", "illustration", "portrait", "product"],
+    ],
   );
   assert.equal(
     (await post("/api/assistant/rewrite", { profileId: uncensored.id, prompt: "a cabin" }, "user"))

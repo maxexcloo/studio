@@ -173,19 +173,13 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
     profile,
     guide: { summary: "Lead with the light.", sources: ["https://x.invalid"] },
     prompt: "secret cabin",
-    preset: "photographic",
+    preset: "portrait",
     onDelta: (text) => deltas.push(text),
   });
   assert.equal(deltas.join(""), "A secret cabin at dusk, warm window light.");
   assert.deepEqual(
     [result.prompt, result.source, result.preset, result.model, result.referencesRead],
-    [
-      "A secret cabin at dusk, warm window light.",
-      "assistant",
-      "photographic",
-      "cloud/auto",
-      false,
-    ],
+    ["A secret cabin at dusk, warm window light.", "assistant", "portrait", "cloud/auto", false],
   );
   const [{ body, authorization, url }] = calls;
   assert.equal(url, "http://litellm.invalid:4000/v1/chat/completions");
@@ -193,7 +187,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   assert.equal(body.stream, true);
   assert.match(
     body.messages[0].content,
-    /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Photographic: write it as a real photograph/,
+    /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Portrait: make the person the clear focus/,
   );
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
   assert.equal(body.messages[1].content, "secret cabin");
