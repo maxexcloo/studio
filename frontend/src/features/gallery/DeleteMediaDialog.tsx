@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api";
+import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { post } from "../../api";
+import type { MediaItem } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+
+type Pages = InfiniteData<{ items: MediaItem[] }>;
 
 export function DeleteMediaDialog({
   opened,
@@ -15,33 +18,39 @@ export function DeleteMediaDialog({
   onDeleted: (deleted: string[], failed: string[]) => void;
 }) {
   const cache = useQueryClient();
-  // Why the last attempt failed: how many items, and the server's reasons.
-  const [failure, setFailure] = useState<{ count: number; reasons: string[] } | null>(null);
+  // Why the last attempt failed: how many items, and the server's reason.
+  const [failure, setFailure] = useState<{ count: number; reason: string } | null>(null);
+  // One request for every item, so a large selection costs one store change and one refresh.
   const deletion = useMutation({
-    mutationFn: async (selected: string[]) => {
-      const deleted: string[] = [],
-        failed: string[] = [],
-        reasons = new Set<string>();
-      for (const id of selected) {
-        try {
-          await api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" });
-          deleted.push(id);
-        } catch (error) {
-          failed.push(id);
-          if (error instanceof Error) reasons.add(error.message);
-        }
-      }
-      return { deleted, failed, reasons: [...reasons] };
-    },
-    onSuccess: async ({ deleted, failed, reasons }) => {
-      await Promise.all([
-        cache.invalidateQueries({ queryKey: ["gallery"] }),
-        cache.invalidateQueries({ queryKey: ["gallery-filters"] }),
-        cache.invalidateQueries({ queryKey: ["session"] }),
-      ]);
-      setFailure(failed.length ? { count: failed.length, reasons } : null);
-      onDeleted(deleted, failed);
+    meta: { inlineError: true },
+    mutationFn: (selected: string[]) =>
+      post<{ removed: string[] }>("/api/gallery/delete", { ids: selected }),
+    onSuccess: ({ removed }, selected) => {
+      const gone = new Set(removed);
+      // The gallery drops them at once; the refresh below brings counts and neighbours up to date.
+      cache.setQueriesData<Pages>({ queryKey: ["gallery"] }, (data) =>
+        data
+          ? {
+              ...data,
+              pages: data.pages.map((page) => ({
+                ...page,
+                items: page.items.filter((item) => !gone.has(item.id)),
+              })),
+            }
+          : data,
+      );
+      const failed = selected.filter((id) => !gone.has(id));
+      setFailure(failed.length ? { count: failed.length, reason: "" } : null);
+      onDeleted(removed, failed);
       if (!failed.length) close();
+    },
+    onError: (error, selected) => {
+      setFailure({ count: selected.length, reason: error.message });
+      onDeleted([], selected);
+    },
+    onSettled: () => {
+      for (const key of ["gallery", "gallery-filters", "session"])
+        void cache.invalidateQueries({ queryKey: [key] });
     },
   });
   return (
@@ -58,7 +67,7 @@ export function DeleteMediaDialog({
       onConfirm={() => deletion.mutate(ids)}
       error={
         failure &&
-        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn’t be deleted. ${failure.reasons.join(" ") || "Try again."}`
+        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn’t be deleted. ${failure.reason || "Try again."}`
       }
     >
       Delete {ids.length} {ids.length === 1 ? "item and its file" : "items and their files"}?

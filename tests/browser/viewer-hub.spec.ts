@@ -1225,7 +1225,7 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
   const removed = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/gallery/delete-study", async (route) => {
+  await page.route("**/api/gallery/delete", async (route) => {
     if (++attempts === 1)
       return route.fulfill({ status: 503, json: { error: "Storage is temporarily unavailable." } });
     await removed;
