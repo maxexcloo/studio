@@ -258,7 +258,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     modelName: String(input.modelName || customWorkflow?.defaults?.model || ""),
     textEncoder: String(input.textEncoder || ""),
     vae: String(input.vae || ""),
-    clipType: String(input.clipType || "wan"),
+    clipType: String(input.clipType || ""),
     weightDtype: String(input.weightDtype || "default"),
     width: snapInteger(input.width, fallback("width", widthRange), widthRange),
     height: snapInteger(input.height, fallback("height", heightRange), heightRange),
