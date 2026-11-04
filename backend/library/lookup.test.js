@@ -77,7 +77,22 @@ test("a lookup lists a Civitai model’s versions and files with availability, l
 });
 
 test("a search lists Civitai models with each version’s availability", async () => {
-  const found = await lookupLibrary({ query: "watercolour" }, deps);
+  const asked = [];
+  const found = await lookupLibrary(
+    { query: "watercolour", type: "lora", baseModel: "Flux.1 D" },
+    { ...deps, json: (pathname) => (asked.push(pathname), json(pathname)) },
+  );
+  // Civitai narrows the search by type and base model, and each version links what Import takes.
+  assert.deepEqual(Object.fromEntries(new URLSearchParams(asked[0].split("?")[1])), {
+    limit: "5",
+    query: "watercolour",
+    types: "LORA",
+    baseModels: "Flux.1 D",
+  });
+  assert.equal(
+    found.results[0].versions[0].links.civitaiCom,
+    `https://civitai.com/models/${model.id}?modelVersionId=20`,
+  );
   assert.equal(found.results.length, 1);
   assert.deepEqual(
     found.results[0].versions.map((version) => [version.versionId, version.available]),

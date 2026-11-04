@@ -10,7 +10,7 @@
  *   POST /api/library/imports/:id/download    Download Missing ({indices} for chosen files)
  *   POST /api/library/imports/:id/folder      {index, folder}: where a Hugging Face file goes
  *   POST /api/library/imports/:id/draft-profile  {index?}: draft a checkpoint's profile and guide (again, after a failure)
- *   POST /api/library/lookup {url|query}      a link's versions and files, or a Civitai search, without importing
+ *   POST /api/library/lookup {url|query, type?, baseModel?}  a link's versions and files, or a Civitai search (type lora or checkpoint), without importing
  *   GET  /api/library/placement?key=          where model files live, and where one file sits
  *   PATCH /api/library/catalogue {key, patch} edit one catalogue entry; the reply has the previous values
  *   POST /api/library/catalogue/undo {key}    undo its newest change (recorded as a change of its own)
@@ -727,7 +727,12 @@ export function registerLibraryRoutes(
     route(
       async (req, res) => {
         const found = await lookupLibrary(
-          { url: String(req.body?.url || "").trim(), query: String(req.body?.query || "") },
+          {
+            url: String(req.body?.url || "").trim(),
+            query: String(req.body?.query || ""),
+            type: ["lora", "checkpoint"].includes(req.body?.type) ? req.body.type : "",
+            baseModel: String(req.body?.baseModel || ""),
+          },
           { json, hfRequest, inspect, families, profiles: readyProfiles },
         );
         res.json({ ok: true, lookup: found });

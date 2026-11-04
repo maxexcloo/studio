@@ -4784,6 +4784,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "Export",
     "Placement",
     "Accounts",
+    "Maintenance",
   ]);
   const direct = await toolNames(await f.client("", adminToken));
   assert.deepEqual(
@@ -4829,13 +4830,13 @@ test("admin tools register only for an administrator’s own token, and for a ga
     instructions,
     /only CombineBackends apply removes files \(the profiles it combines, after a backup\), and no tool touches GPUs/,
   );
-  // Every admin tool is non-destructive; the read-only ones say so.
+  // Only Maintenance, which can end another account's job, is destructive; the read-only ones say so.
   const tools = (await (await f.client("", adminToken)).listTools()).tools.filter((tool) =>
     adminToolNames.includes(tool.name),
   );
-  assert.equal(
-    tools.some((tool) => tool.annotations?.destructiveHint),
-    false,
+  assert.deepEqual(
+    tools.filter((tool) => tool.annotations?.destructiveHint).map((tool) => tool.name),
+    ["Maintenance"],
   );
   assert.deepEqual(
     tools
@@ -5693,4 +5694,161 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "up" }],
   });
   assert.ok(seen.every((entry) => /^Bearer /.test(entry.authorization)));
+});
+
+test("admin tools chain a Library search, a one-call install and a named update check, and Maintenance stays with administrators", async (t) => {
+  const f = await fixture(t, {
+    accountMode: true,
+    enabled: false,
+    authenticateAccountToken: (value) =>
+      value === adminToken ? adminAccount : value === userToken ? plainAccount : null,
+  });
+  const seen = [];
+  const record = (reply) => (req, res) => {
+    seen.push({ method: req.method, path: req.path, body: req.body });
+    res.json(typeof reply === "function" ? reply(req) : reply);
+  };
+  const imported = {
+    id: "imp-glow",
+    input: { kind: "civitai-model", url: "https://civitai.com/models/1?modelVersionId=2" },
+    state: "needs-files",
+    grade: { value: "exact", reasons: [] },
+    resources: [
+      { role: "lora", want: { file: "glow.safetensors", folder: "loras" }, status: "missing" },
+    ],
+  };
+  f.app.post("/api/library/lookup", record({ ok: true, lookup: { query: "glow", results: [] } }));
+  f.app.post("/api/library/imports", record({ ok: true, import: imported }));
+  f.app.post(
+    "/api/library/imports/:id/download",
+    record({ ok: true, import: { ...imported, state: "downloading" }, queued: 1 }),
+  );
+  f.app.delete("/api/library/imports/:id", record({ ok: true }));
+  f.app.post(
+    "/api/gallery/import/reddit",
+    record({ ok: true, title: "A post", imported: 2, failed: [] }),
+  );
+  f.app.get("/api/library/items", (_req, res) =>
+    res.json({
+      ok: true,
+      items: [
+        { key: "loras/glow.safetensors", title: "Glow", kind: "lora", origin: "civitai" },
+        { key: "loras/other.safetensors", title: "Other", kind: "lora", origin: "civitai" },
+      ],
+    }),
+  );
+  f.app.post(
+    "/api/library/updates/check",
+    record({
+      ok: true,
+      checkedAt: "2026-11-04T00:00:00.000Z",
+      available: 0,
+      byEntry: {
+        "loras/glow.safetensors": { state: "current" },
+        "loras/other.safetensors": { state: "available" },
+      },
+    }),
+  );
+  f.app.post(
+    "/api/maintenance/migrations",
+    record((req) => ({ ok: true, apply: req.body.apply, steps: {} })),
+  );
+  f.app.get("/api/maintenance/unfinished", (_req, res) =>
+    res.json({
+      jobs: [
+        {
+          id: "stuck",
+          ownerId: "stable-user",
+          status: "running",
+          input: { kind: "video" },
+          createdAt: "",
+        },
+      ],
+    }),
+  );
+  f.app.post(
+    "/api/maintenance/unfinished/:action",
+    record({ job: { id: "stuck", status: "cancelled" } }),
+  );
+  f.app.post("/api/queue/pause-all", record({ ok: true }));
+  f.app.get("/api/profiles/duplicates", (_req, res) =>
+    res.json({ ok: true, hash: "dup-hash", merges: [] }),
+  );
+  f.app.post("/api/profiles/duplicates/merge", record({ ok: true, merged: [], backup: "b.zip" }));
+  const admin = await f.client("", adminToken);
+
+  // Search Civitai for a LoRA by base model, install a found version in one call, check it by name.
+  await call(admin, "Lookup", { query: "glow", type: "lora", base_model: "Flux.1 D" });
+  assert.deepEqual(seen.at(-1).body, { query: "glow", type: "lora", baseModel: "Flux.1 D" });
+  await failure(admin, "Lookup", { url: "https://civitai.com/models/1", type: "lora" });
+  const installed = data(
+    await call(admin, "Import", {
+      url: "https://civitai.com/models/1?modelVersionId=2",
+      install: true,
+    }),
+  );
+  assert.equal(installed.queued, 1);
+  assert.deepEqual(
+    seen.slice(-2).map((entry) => entry.path),
+    ["/api/library/imports", "/api/library/imports/imp-glow/download"],
+  );
+  const updates = data(await call(admin, "Updates", { action: "check", query: "glow" }));
+  assert.deepEqual(seen.at(-1).body, { keys: ["loras/glow.safetensors"] });
+  assert.deepEqual(updates.updates, [{ key: "loras/glow.safetensors", state: "current" }]);
+  await failure(admin, "Updates", { action: "check", query: "nothing like it" });
+  // A Reddit post becomes uploads, as Library › Import does; one import record goes.
+  assert.equal(
+    data(
+      await call(admin, "Import", { url: "https://www.reddit.com/r/pics/comments/abc123/a_post/" }),
+    ).imported,
+    2,
+  );
+  assert.equal(seen.at(-1).path, "/api/gallery/import/reddit");
+  await call(admin, "Imports", { action: "remove", id: "imp-glow" });
+  assert.deepEqual(
+    [seen.at(-1).method, seen.at(-1).path],
+    ["DELETE", "/api/library/imports/imp-glow"],
+  );
+
+  // Maintenance: a migration dry run unless apply, unfinished jobs, the global pause and duplicates.
+  assert.equal(data(await call(admin, "Maintenance", { action: "migrations" })).apply, false);
+  assert.equal(
+    data(await call(admin, "Maintenance", { action: "migrations", apply: true })).apply,
+    true,
+  );
+  assert.deepEqual(data(await call(admin, "Maintenance", { action: "unfinished" })).jobs[0], {
+    owner_id: "stable-user",
+    job_id: "stuck",
+    status: "running",
+    kind: "video",
+    created_at: "",
+  });
+  await call(admin, "Maintenance", {
+    action: "delete_unfinished",
+    owner_id: "stable-user",
+    job_id: "stuck",
+  });
+  assert.deepEqual(
+    [seen.at(-1).path, seen.at(-1).body],
+    ["/api/maintenance/unfinished/delete", { ownerId: "stable-user", id: "stuck" }],
+  );
+  await call(admin, "Maintenance", { action: "pause_all" });
+  assert.equal(seen.at(-1).path, "/api/queue/pause-all");
+  assert.equal(data(await call(admin, "Maintenance", { action: "duplicates" })).hash, "dup-hash");
+  await call(admin, "Maintenance", { action: "merge_duplicates", hash: "dup-hash" });
+  assert.deepEqual(seen.at(-1).body, { hash: "dup-hash" });
+  await failure(admin, "Maintenance", { action: "pause_all", apply: true });
+
+  // An ordinary account's token has none of these and reaches none of their routes.
+  const user = await f.client("", userToken);
+  const before = seen.length;
+  assert.equal((await toolNames(user)).includes("Maintenance"), false);
+  for (const [name, args] of [
+    ["Maintenance", { action: "migrations", apply: true }],
+    ["Import", { url: "https://civitai.com/models/1", install: true }],
+    ["Imports", { action: "remove", id: "imp-glow" }],
+    ["Updates", { action: "check", query: "glow" }],
+  ])
+    await failure(user, name, args);
+  assert.equal(seen.length, before);
 });

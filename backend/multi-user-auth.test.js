@@ -601,6 +601,22 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
       false,
     );
   }
+  // Maintenance and import removal stay with administrators.
+  for (const [method, routePath] of [
+    ["POST", "/api/maintenance/migrations"],
+    ["POST", "/api/maintenance/unfinished/delete"],
+    ["POST", "/api/queue/pause-all"],
+    ["POST", "/api/profiles/duplicates/merge"],
+    ["DELETE", "/api/library/imports/imp-1"],
+    ["POST", "/api/gallery/import/reddit"],
+  ]) {
+    assert.equal(accountForRequest(bearer(artistToken, method, routePath)), null);
+    assert.equal(
+      accountForRequest(bearer(adminToken, method, routePath))?.credential,
+      "mcp-admin",
+      `${method} ${routePath}`,
+    );
+  }
 
   // The switch is off by default: a gateway-linked administrator's loopback calls stay out.
   assert.equal(

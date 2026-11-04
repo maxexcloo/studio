@@ -11,12 +11,15 @@
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
  * Backends backs up the profiles it replaces, only an empty group can be deleted, and no tool
- * deletes a model file or touches a GPU.
+ * deletes a model file or touches a GPU. Maintenance runs Settings' upkeep: migrations and Merge
+ * Duplicate Profiles back up what they change, and ending another account's unfinished job is the
+ * one step that cannot be undone, so that tool alone is marked destructive.
  */
 import { z } from "zod";
 import { mcpJson } from "./media.js";
 import { lineDiff } from "../line-diff.js";
 import { imageMimes } from "../reference-names.js";
+import { redditPostPath } from "../gallery/reddit.js";
 
 export const adminToolNames = Object.freeze([
   "Library",
@@ -32,9 +35,10 @@ export const adminToolNames = Object.freeze([
   "Export",
   "Placement",
   "Accounts",
+  "Maintenance",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles, guides and accounts' groups only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
@@ -137,6 +141,26 @@ function importView(record) {
     ...(record.error ? { error: record.error } : {}),
   };
 }
+
+/** Whether a Library entry has every word of `query` in its key, title, base model, triggers or families. */
+const matching = (query) => {
+  const words = String(query || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  return (item) => {
+    const text = [
+      item.key,
+      item.title,
+      item.baseModel,
+      ...(item.triggers || []),
+      ...(item.families || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return words.every((word) => text.includes(word));
+  };
+};
 
 const importRow = (record) => {
   const view = importView(record);
@@ -258,23 +282,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           view === "installed" ? item.installed : Boolean(item.origin || item.source),
         );
       if (kind) listed = listed.filter((item) => item.kind === kind);
-      const words = String(query || "")
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean);
-      if (words.length)
-        listed = listed.filter((item) => {
-          const text = [
-            item.key,
-            item.title,
-            item.baseModel,
-            ...(item.triggers || []),
-            ...(item.families || []),
-          ]
-            .join(" ")
-            .toLowerCase();
-          return words.every((word) => text.includes(word));
-        });
+      listed = listed.filter(matching(query));
       return mcpJson({
         view,
         total: listed.length,
@@ -288,17 +296,20 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Lookup",
     "Look Up a Model",
-    "Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai instead. Read-only.",
+    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url Import takes. Read-only.',
     {
       url: z.string().trim().url().max(2000).optional(),
       query: z.string().trim().min(2).max(120).optional(),
+      type: z.enum(["lora", "checkpoint"]).optional(),
+      base_model: z.string().trim().min(1).max(80).optional(),
     },
-    async ({ url, query }, signal) => {
+    async ({ url, query, type, base_model }, signal) => {
       if (Boolean(url) === Boolean(query)) throw new Error("Pass url or query, not both.");
+      if (url && (type || base_model)) throw new Error("type and base_model narrow a query.");
       const { lookup } = await api(
         "POST",
         "/api/library/lookup",
-        url ? { url } : { query },
+        url ? { url } : { query, type, baseModel: base_model },
         signal,
       );
       return mcpJson(lookup);
@@ -310,18 +321,37 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Import",
     "Import to Library",
-    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from Upload (upload_id) or a result (job_id). Returns the import’s grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. Nothing downloads: call Downloads start for that. describe has the vision model describe an image without settings.",
+    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from Upload (upload_id) or a result (job_id). Returns the import’s grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
     {
       url: z.string().trim().url().max(2000).optional(),
       upload_id: id.optional(),
       job_id: id.optional().describe("A result ref or job_id."),
       output_index: z.number().int().min(0).max(999).default(0),
       describe: z.boolean().default(false),
+      install: z.boolean().default(false),
     },
-    async ({ url, upload_id, job_id, output_index, describe }, signal) => {
+    async ({ url, upload_id, job_id, output_index, describe, install }, signal) => {
       if ([url, upload_id, job_id].filter(Boolean).length !== 1)
         throw new Error("Pass one of url, upload_id or job_id.");
       if (url && describe) throw new Error("describe is for images: pass upload_id or job_id.");
+      if (install && !url) throw new Error("install is for a Civitai or Hugging Face url.");
+      let reddit = Boolean(url);
+      try {
+        if (url) redditPostPath(url);
+      } catch {
+        reddit = false;
+      }
+      // Library › Import sends a Reddit post's images to the gallery as uploads, not to an import.
+      if (reddit) {
+        if (install) throw new Error("A Reddit post has nothing to install.");
+        const saved = await api("POST", "/api/gallery/import/reddit", { url }, signal);
+        return mcpJson({
+          title: saved.title,
+          imported: saved.imported,
+          ...(saved.failed?.length ? { failed: saved.failed } : {}),
+          note: "Saved as uploads; Search with uploads finds them.",
+        });
+      }
       let record;
       if (url) ({ import: record } = await api("POST", "/api/library/imports", { url }, signal));
       else {
@@ -362,6 +392,20 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
             signal,
           ).catch(later("Described imports")));
       }
+      if (install && record?.id) {
+        const result = await api(
+          "POST",
+          `/api/library/imports/${encodeURIComponent(record.id)}/download`,
+          {},
+          signal,
+        );
+        return mcpJson({
+          import: importView(result.import),
+          queued: result.queued,
+          ...(result.failures?.length ? { failures: result.failures } : {}),
+          note: "Shown in Library › Import. Downloads status with this import_id follows the files.",
+        });
+      }
       return mcpJson({
         import: importView(record),
         note: "Shown in Library › Import. Call Downloads start with this import_id to fetch the missing files when the user asks.",
@@ -373,15 +417,25 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Imports",
     "Library Imports",
-    "Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most 20) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record when the user asks; downloaded files stay.",
+    "Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most 20) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record and remove one import record (id), when the user asks; downloaded files stay.",
     {
-      action: z.enum(["read", "clear_failed"]).default("read"),
+      action: z.enum(["read", "clear_failed", "remove"]).default("read"),
       id: id.optional(),
       wait_seconds: z.number().int().min(0).max(maxWaitSeconds).default(0),
     },
     async ({ action, id: wanted, wait_seconds }, signal) => {
       if (action === "clear_failed")
         return mcpJson(await api("POST", "/api/library/imports/clear-failed", {}, signal));
+      if (action === "remove") {
+        if (!wanted) throw new Error("Pass id: the import to remove.");
+        await api(
+          "DELETE",
+          `/api/library/imports/${encodeURIComponent(wanted)}`,
+          undefined,
+          signal,
+        );
+        return mcpJson({ removed: wanted, note: "Its downloaded files stay." });
+      }
       if (!wanted) {
         const { imports = [] } = await api("GET", "/api/library/imports", undefined, signal);
         return mcpJson({
@@ -492,19 +546,27 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Updates",
     "Library Updates",
-    "Updates for catalogued LoRAs and models from Civitai or Hugging Face, only when asked. list shows the last check, check checks now (keys narrows it), apply downloads the new file of each key under its own name (alternative picks the free version offered). The old file stays until the new one verifies and nothing uses it. Never applies on its own.",
+    'Updates for catalogued LoRAs and models from Civitai or Hugging Face, only when asked. list shows the last check, check checks now (keys or query narrows it), apply downloads the new file of each key under its own name (alternative picks the free version offered). query names entries as Library search does ("glow lora"). The old file stays until the new one verifies and nothing uses it. Never applies on its own.',
     {
       action: z.enum(["list", "check", "apply"]).default("list"),
       keys: z.array(key).max(50).optional(),
+      query: z.string().trim().min(1).max(200).optional(),
       alternative: z.boolean().default(false),
     },
-    async ({ action, keys, alternative }, signal) => {
+    async ({ action, keys: named, query, alternative }, signal) => {
+      let keys = named;
+      if (query) {
+        const { items = [] } = await api("GET", "/api/library/items", undefined, signal);
+        const found = items.filter((item) => item.origin || item.source).filter(matching(query));
+        if (!found.length) throw new Error(`No catalogued entry matches “${query}”.`);
+        keys = [...new Set([...(named || []), ...found.slice(0, 50).map((item) => item.key)])];
+      }
       const unavailable = later("Update checks");
       const summary = (state) => ({
         checked_at: state.checkedAt || null,
         available: state.available || 0,
         updates: Object.entries(state.byEntry || {})
-          .filter(([, update]) => update?.state !== "current")
+          .filter(([name, update]) => (query ? keys.includes(name) : update?.state !== "current"))
           .map(([name, update]) => ({ key: name, ...update }))
           .slice(0, maxListed),
       });
@@ -929,5 +991,68 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       if (changes.length !== 1) throw new Error("Pass one of group_id, disabled or role.");
       return mcpJson(await api("PATCH", route, changes[0], signal));
     },
+  );
+
+  tool(
+    server,
+    "Maintenance",
+    "Studio Maintenance",
+    "Look after the studio as Settings does, only when asked. migrations previews the runtime data migrations (dry run); with apply: true it applies the steps safe while Studio runs, each writing a backup, and names those that need Studio stopped. unfinished lists every account's unfinished jobs (owner_id, job_id); retry_unfinished ends one and queues it again, delete_unfinished ends it and takes it out of the queue. pause_all holds every account's queue (Dream's too) and resume_all releases it. duplicates previews Merge Duplicate Profiles with a hash; merge_duplicates merges that preview after a backup.",
+    {
+      action: z.enum([
+        "migrations",
+        "unfinished",
+        "retry_unfinished",
+        "delete_unfinished",
+        "pause_all",
+        "resume_all",
+        "duplicates",
+        "merge_duplicates",
+      ]),
+      apply: z.boolean().default(false),
+      owner_id: id.optional(),
+      job_id: id.optional(),
+      hash: z.string().trim().min(1).max(200).optional(),
+    },
+    async ({ action, apply, owner_id, job_id, hash }, signal) => {
+      if (apply && action !== "migrations") throw new Error("apply is for migrations.");
+      if (action === "migrations")
+        return mcpJson(await api("POST", "/api/maintenance/migrations", { apply }, signal));
+      if (action === "unfinished") {
+        const { jobs = [] } = await api("GET", "/api/maintenance/unfinished", undefined, signal);
+        return mcpJson({
+          total: jobs.length,
+          jobs: jobs.slice(0, maxListed).map((job) => ({
+            owner_id: job.ownerId,
+            job_id: job.id,
+            status: job.status,
+            kind: job.input?.kind || "image",
+            ...(job.dream ? { dream: true } : {}),
+            ...(job.reason ? { reason: job.reason } : {}),
+            created_at: job.createdAt,
+          })),
+        });
+      }
+      if (action === "retry_unfinished" || action === "delete_unfinished") {
+        if (!owner_id || !job_id) throw new Error("Pass owner_id and job_id from unfinished.");
+        const route = `/api/maintenance/unfinished/${action === "retry_unfinished" ? "retry" : "delete"}`;
+        const { job } = await api("POST", route, { ownerId: owner_id, id: job_id }, signal);
+        return mcpJson({ owner_id, job_id: job?.id || job_id, status: job?.status });
+      }
+      if (action === "pause_all" || action === "resume_all")
+        return mcpJson(
+          await api(
+            "POST",
+            `/api/queue/${action === "pause_all" ? "pause-all" : "resume-all"}`,
+            {},
+            signal,
+          ),
+        );
+      if (action === "duplicates")
+        return mcpJson(await api("GET", "/api/profiles/duplicates", undefined, signal));
+      if (!hash) throw new Error("Pass hash from Maintenance duplicates.");
+      return mcpJson(await api("POST", "/api/profiles/duplicates/merge", { hash }, signal));
+    },
+    { destructiveHint: true },
   );
 }

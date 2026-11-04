@@ -145,6 +145,17 @@ const mcpAdminRoutes = [
   ["POST", /^\/api\/accounts\/default-profile$/],
   ["DELETE", new RegExp(`^/api/accounts/profiles/${routeId}$`)],
   ["PATCH", new RegExp(`^/api/accounts/users/${routeId}$`)],
+  // Removing one import record (its files stay) and Library › Import's Reddit posts.
+  ["DELETE", new RegExp(`^/api/library/imports/${routeId}$`)],
+  ["POST", /^\/api\/gallery\/import\/reddit$/],
+  // The Maintenance tool: migrations (each writes a backup), unfinished jobs, the global pause and
+  // Merge Duplicate Profiles (after a backup).
+  ["POST", /^\/api\/maintenance\/migrations$/],
+  ["GET", /^\/api\/maintenance\/unfinished$/],
+  ["POST", /^\/api\/maintenance\/unfinished\/(?:retry|delete)$/],
+  ["POST", /^\/api\/queue\/(?:pause|resume)-all$/],
+  ["GET", /^\/api\/profiles\/duplicates$/],
+  ["POST", /^\/api\/profiles\/duplicates\/merge$/],
 ];
 
 export function mcpAdminRouteAllowed(method, routePath) {
