@@ -11,6 +11,7 @@ import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { queueQuery } from "../generation/Queue";
+import { LoraThumbs, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 import { dreamChoices, viewerChoices, type Choice, type Verdict } from "./choices";
 import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
 import { PairContent, sideNames } from "./PairCard";
@@ -187,6 +188,11 @@ const dreamed = (card: DeckCard) =>
   card.kind === "dream" ? 1 : card.kind === "pair" && card.pairId ? 2 : 0;
 
 function Caption({ item }: { item: DreamItem }) {
+  const info = useQuery(loraInfoQuery);
+  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's favourites.
+  const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
+    .filter((lora) => lora?.name && lora.enabled !== false)
+    .map((lora) => String(lora.name));
   return (
     <div className={classes.caption}>
       {item.dream?.why && (
@@ -197,6 +203,17 @@ function Caption({ item }: { item: DreamItem }) {
       <Text size="xs" c="dimmed" lineClamp={2}>
         {item.prompt || item.dream?.prompt}
       </Text>
+      {loras.map((file) => {
+        const title = loraTitle(info.data?.loras[file], file);
+        return (
+          <Group key={file} gap="xs" wrap="nowrap" justify="space-between">
+            <Text size="xs" truncate>
+              LoRA: {title}
+            </Text>
+            <LoraThumbs file={file} title={title} />
+          </Group>
+        );
+      })}
     </div>
   );
 }
