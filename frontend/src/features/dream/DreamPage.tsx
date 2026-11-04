@@ -131,11 +131,12 @@ export function DreamPage() {
             </Text>
           )}
         </div>
-        <Group gap="sm" wrap="nowrap" ml="auto">
+        <Group gap={4} wrap="nowrap" ml="auto">
           {data?.settings.enabled && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
               <ActionIcon
-                variant="default"
+                variant="subtle"
+                color="gray"
                 aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
                 loading={save.isPending}
                 onClick={() => save.mutate({ paused: !data.settings.paused })}
@@ -146,7 +147,8 @@ export function DreamPage() {
           )}
           <Tooltip label="Taste">
             <ActionIcon
-              variant={view === "taste" ? "filled" : "default"}
+              variant={view === "taste" ? "light" : "subtle"}
+              color={view === "taste" ? undefined : "gray"}
               aria-label="Taste"
               aria-pressed={view === "taste"}
               onClick={() => setView(view === "taste" ? "deck" : "taste")}

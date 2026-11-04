@@ -140,7 +140,7 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   const job = queue.data?.jobs.find((job) => job.id === item.jobId);
   if (queue.error)
     return itemAction("retry", {
-      label: "Reload Generation Status",
+      label: "Reload Status",
       onClick: () => void queue.refetch(),
     });
   if (!job)
@@ -428,6 +428,7 @@ export function useMediaActions(
     ready &&
       item.type === "video" &&
       itemAction("animate", {
+        label: "Extend",
         loading: running === "animate" || action.isPending,
         // A theme continues the clip from its last frame at once; the composer shows it first.
         menu: [

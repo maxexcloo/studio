@@ -25,7 +25,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
       <Menu.Dropdown>
         <AccountMenuContent>
           <Menu.Item
-            leftSection={<Palette size={18} />}
+            leftSection={<Palette size={16} />}
             onClick={() => {
               setOpened(false);
               onStyle();
@@ -38,7 +38,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
               component={Link}
               to="/library"
               state={{ backgroundLocation: location }}
-              leftSection={<Library size={18} />}
+              leftSection={<Library size={16} />}
             >
               Library
             </Menu.Item>
@@ -47,7 +47,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
             component={Link}
             to="/settings"
             state={{ backgroundLocation: location }}
-            leftSection={<icons.settings size={18} />}
+            leftSection={<icons.settings size={16} />}
           >
             Settings
           </Menu.Item>

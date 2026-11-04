@@ -123,7 +123,7 @@ export function AppearanceControls() {
             Animations
           </Text>
           <SegmentedControl
-            aria-label="Animation Speed"
+            aria-label="Animations"
             fullWidth
             value={appearance.motion}
             onChange={(motion) =>
@@ -231,7 +231,7 @@ export function AppearanceControls() {
             Corners
           </Text>
           <SegmentedControl
-            aria-label="Corner Radius"
+            aria-label="Corners"
             fullWidth
             value={appearance.rounding}
             onChange={(rounding) =>
@@ -252,7 +252,7 @@ export function AppearanceControls() {
             Layout
           </Text>
           <SegmentedControl
-            aria-label="Page Width"
+            aria-label="Layout"
             fullWidth
             value={appearance.layout}
             onChange={(layout) =>

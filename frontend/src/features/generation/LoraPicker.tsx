@@ -13,7 +13,7 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -593,7 +593,7 @@ function StackEntry({
           onChange={(event) => onChange({ enabled: event.currentTarget.checked })}
         />
         <ActionIcon variant="subtle" color="gray" aria-label={`Remove ${title}`} onClick={onRemove}>
-          <X size={16} />
+          <icons.clear size={16} />
         </ActionIcon>
       </Group>
       <Stack gap={6} className={classes.details}>
