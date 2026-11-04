@@ -3,9 +3,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import {
+  createGalleryTable,
+  readGalleryRows,
+  writeGalleryRows,
+} from "./persistence/gallery-rows.ts";
 import { openDatabase } from "./persistence/runtime.ts";
 import { Store } from "./domain/store.ts";
-import { versionSources } from "./version-sources.js";
+import { gallerySources, versionSources } from "./version-sources.js";
 import { isVersion, versionPromptOverlap } from "../shared/versions.ts";
 
 const source = { input: { profileId: "sdxl", prompt: "a red fox in the snow at dawn" } };
@@ -58,4 +63,75 @@ test("versions regroup by recorded source after a dry run, with a backup, once",
   assert.equal(after.job("", edit.id).parentItemId, "fox");
   after.db.close();
   assert.deepEqual(versionSources(dataDir).recorded, []);
+});
+
+test("gallery results take their run's source after a dry run, with a backup, once", (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-sources-"));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  const store = new Store(openDatabase(path.join(dataDir, "studio.sqlite")));
+  const chat = store.createSession("alice", "Chat", {});
+  const bobChat = store.createSession("bob", "Chat", {});
+  const fromFox = { parentItemId: "/media/fox.png" };
+  const run = (ownerId, input, operation, origin) =>
+    store.enqueue(
+      ownerId,
+      ownerId === "alice" ? chat.id : bobChat.id,
+      input,
+      operation,
+      undefined,
+      undefined,
+      undefined,
+      origin,
+    );
+  const fox = `gallery:${Buffer.from("/media/fox.png").toString("base64url")}`;
+  const first = run("alice", source.input, "image");
+  // A Prompt run from the fox outside its Chat that kept it and one that changed it all, an edit
+  // from before runs recorded their source, which names the fox only as its reference, and Bob's
+  // edit naming Alice's fox, which is never his source.
+  const prompt = run("alice", source.input, "image", fromFox);
+  const castle = run("alice", { profileId: "sdxl", prompt: "a castle" }, "image", fromFox);
+  const edit = run("alice", { prompt: "night", referenceAssets: [{ assetId: fox }] }, "refine");
+  const foreign = run("bob", { prompt: "mine", referenceAssets: [{ assetId: fox }] }, "refine");
+  const item = (url, job) => ({
+    id: url,
+    url,
+    jobId: job.id,
+    ownerId: job.ownerId,
+    prompt: job.input.prompt,
+    settings: { profileId: job.input.profileId },
+  });
+  store.db.exec(createGalleryTable);
+  writeGalleryRows(store.db, [
+    item("/media/fox.png", first),
+    item("/media/prompt.png", prompt),
+    item("/media/castle.png", castle),
+    item("/media/edit.png", edit),
+    item("/media/foreign.png", foreign),
+  ]);
+  store.db.close();
+
+  const plan = gallerySources(dataDir);
+  assert.equal(plan.applied, false);
+  assert.deepEqual(
+    plan.filled.map(({ key, ...fields }) => [key, fields]),
+    [
+      ["/media/prompt.png", fromFox],
+      ["/media/castle.png", { ...fromFox, derived: true }],
+      ["/media/edit.png", fromFox],
+    ],
+  );
+  assert.equal(plan.referenced, 1);
+
+  const result = gallerySources(dataDir, { apply: true });
+  const backup = JSON.parse(
+    fs.readFileSync(path.join(result.backup, "studio_gallery.json"), "utf8"),
+  );
+  assert.equal(backup.length, 3);
+  const db = openDatabase(path.join(dataDir, "studio.sqlite"));
+  const rows = new Map(readGalleryRows(db).map((row) => [row.id, row]));
+  db.close();
+  assert.equal(rows.get("/media/edit.png").parentItemId, "/media/fox.png");
+  assert.equal(rows.get("/media/castle.png").derived, true);
+  assert.equal(rows.get("/media/foreign.png").parentItemId, undefined);
+  assert.deepEqual(gallerySources(dataDir).filled, []);
 });

@@ -251,7 +251,7 @@ export class Store {
       backend,
       sessionId,
       parentJobId,
-      ...(parentJobId && origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
+      ...(origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
       operation,
       priority: origin.priority ?? queuePriority.manual,
       queueSet: origin.queueSet,
@@ -303,9 +303,8 @@ export class Store {
       ownerId,
       resource: "studio",
       sessionId,
-      ...(origin.parentJobId
-        ? { parentJobId: origin.parentJobId, parentItemId: origin.parentItemId }
-        : {}),
+      ...(origin.parentJobId ? { parentJobId: origin.parentJobId } : {}),
+      ...(origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
       operation: origin.operation ?? "animate",
       status: "completed",
       reason: "",

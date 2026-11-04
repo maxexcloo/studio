@@ -145,6 +145,51 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
   }
 });
 
+test("A run from an item records it as its source, only when the item is the owner's", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const chat = store.createSession("alice");
+  const items = new Map([
+    ["/media/alice.png", "alice"],
+    ["/media/bob.png", "bob"],
+  ]);
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+    ownsItem: (ownerId, id) => items.get(id) === ownerId,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const run = (parentItemId: string) =>
+    fetch(
+      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${chat.id}/generations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: "Again", parentItemId }),
+      },
+    );
+  try {
+    // Made outside the item's Chat, so with no parent run: the item alone is its source.
+    const response = await run("/media/alice.png");
+    assert.equal(response.status, 202);
+    const { jobId } = (await response.json()) as { jobId: string };
+    assert.equal(store.job("alice", jobId)?.parentItemId, "/media/alice.png");
+    assert.equal(store.job("alice", jobId)?.parentJobId, undefined);
+    assert.equal((await run("/media/bob.png")).status, 400);
+    assert.equal(store.jobs("alice").length, 1);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
 test("Deleting a chat is owner scoped, waits for active work and deletes only chosen results", async () => {
   const store = new Store(openDatabase(":memory:"));
   const chat = store.createSession("alice"),

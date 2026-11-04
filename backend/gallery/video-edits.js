@@ -57,12 +57,14 @@ export function registerVideoEditRoutes(app, { store }) {
       },
     );
     const size = await probeVideo(output);
-    // The original's prompt, settings and title carry over; its star, upscale, caption and
-    // generation time do not.
+    // The original's prompt, settings and title carry over; its star, upscale, caption, generation
+    // time and source do not: the edit is a version of the original.
     const {
       caption: _caption,
+      derived: _derived,
       durationMs: _durationMs,
       favorite: _favorite,
+      parentJobId: _parentJobId,
       timing: _timing,
       upscale: _upscale,
       upscaleActive: _upscaleActive,
@@ -73,6 +75,8 @@ export function registerVideoEditRoutes(app, { store }) {
       ...urls,
       id: urls.url,
       jobId: job.id,
+      parentItemId: item.id,
+      ...(parent ? { parentJobId: parent.id } : {}),
       outputName: name,
       index: 0,
       width: size?.width || item.width,

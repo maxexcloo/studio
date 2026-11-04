@@ -28,6 +28,7 @@ import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { runUpscaleJob } from "./upscale-jobs.js";
+import { resultSource } from "./version-sources.js";
 import { capabilityForProfile, defaultWorkerId, workerById } from "./workers.js";
 
 /**
@@ -285,6 +286,17 @@ export function createGenerationQueue({
       settled: async (job) => {
         await generationAdapter.settled(job);
         if (job.status !== "completed") return;
+        // Its results keep the result it was made from, once the run has left the queue too.
+        if (job.parentItemId)
+          updateGalleryJob(
+            job.id,
+            resultSource(job, job.parentItemId, {
+              parent: job.parentJobId ? store.job(job.ownerId, job.parentJobId) : undefined,
+              source: gallery.find(
+                (item) => item.id === job.parentItemId && (item.ownerId || "") === job.ownerId,
+              ),
+            }),
+          );
         const items = gallery.filter(
           (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
         );
