@@ -466,7 +466,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
           stop: ["text"],
           start: ["text"],
           progress: "Done.",
-          steps: [],
+          steps: id === "first" ? [{ at: stamp, message: "Stopping Text." }] : [],
         })),
         workloads: [
           workload("image", "Image", "running"),
@@ -515,6 +515,17 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(3);
   await page.getByRole("button", { name: "Show All", exact: true }).click();
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(4);
+  // Each change's row menu opens its log: the steps, then how it ended.
+  await changes
+    .getByRole("button", { name: "Actions for Restart Text", exact: true })
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: "View Log", exact: true }).click();
+  const log = page.getByRole("dialog", { name: "Runtime Log", exact: true });
+  await expect(log.getByLabel("Steps", { exact: true })).toContainText(/Stopping Text\.\n.*Done\./);
+  await page.keyboard.press("Escape");
+  await expect(log).toBeHidden();
+  await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
   await table.getByRole("checkbox", { name: "Run Image", exact: true }).click();
   await table.getByRole("checkbox", { name: "Run Video", exact: true }).click();
   await page.getByRole("button", { name: "Preview Changes", exact: true }).click();

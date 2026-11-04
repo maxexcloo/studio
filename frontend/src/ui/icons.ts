@@ -21,6 +21,7 @@ import {
   Puzzle,
   RefreshCw,
   RotateCw,
+  ScrollText,
   Settings,
   Share,
   SlidersHorizontal,
@@ -59,6 +60,8 @@ export const icons = {
   edit: Pencil,
   filter: ListFilter,
   keep: Heart,
+  /** A record's timestamped steps: a runtime change's log. */
+  log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
   moreLikeThis: Wand,
