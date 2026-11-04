@@ -189,6 +189,8 @@ export function GalleryToolbar({
 /** Tile size: right makes tiles larger (fewer columns), holding the centre of the view in place. */
 function ZoomSlider() {
   const { columns, min, max, zoomTo } = useGalleryColumns();
+  // The thumb follows the drag; the gallery re-lays out once, on release, so the view doesn't jump.
+  const [dragging, setDragging] = useState<number | null>(null);
   return (
     <Group gap={6} wrap="nowrap" c="dimmed">
       <ActionIcon
@@ -207,8 +209,12 @@ function ZoomSlider() {
         min={min}
         max={max}
         step={1}
-        value={max + min - columns}
-        onChange={(value) => zoomTo(max + min - value)}
+        value={dragging ?? max + min - columns}
+        onChange={setDragging}
+        onChangeEnd={(value) => {
+          setDragging(null);
+          zoomTo(max + min - value);
+        }}
         label={null}
         thumbLabel="Tile Size"
         aria-valuetext={`${columns} Columns`}
