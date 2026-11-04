@@ -155,3 +155,19 @@ test("a profile's graph inpaints the crop at its working size, stitches it back 
   assert.equal(linked(stitch.inputs.mask).inputs.image, "stitch.png");
   assert.equal(linked(linked(stitch.inputs.source).inputs.image).class_type, "VAEDecodeTiled");
 });
+
+test("a request without CFG (a distilled profile) keeps the graph's own CFG", async () => {
+  const request = {
+    workflow: "custom:flux2-real-dream-image-edit",
+    prompt: "Remove the hat",
+    width: 1024,
+    height: 1024,
+    steps: 2,
+    seed: 42,
+  };
+  const cfgOf = (graph) =>
+    Object.values(graph).find((node) => typeof node.inputs?.cfg === "number")?.inputs.cfg;
+  const own = cfgOf(await customWorkflowGraph(request));
+  assert.ok(own > 0, "the graph keeps a usable CFG");
+  assert.equal(cfgOf(await customWorkflowGraph({ ...request, cfg: own + 1 })), own + 1);
+});
