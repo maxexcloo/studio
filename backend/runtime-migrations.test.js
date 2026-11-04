@@ -11,7 +11,7 @@ const { registerMigrationRoutes } = await import("./runtime-migrations.js");
 
 const spec = (id, file) => ({ id, file, folder: "loras", label: file });
 
-test("the migrations route plans, then applies online-safe steps into the running catalogue", (t) => {
+test("the migrations route plans, then applies online-safe steps into the running catalogue", async (t) => {
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const file = (name) => path.join(dataDir, name);
   const write = (name, value) => {
@@ -37,13 +37,13 @@ test("the migrations route plans, then applies online-safe steps into the runnin
     { post: (route, handler) => (routes[route] = handler) },
     { dataDir, requireAdmin: () => true, log: { info: (line) => lines.push(line) } },
   );
-  const post = (body) => {
+  const post = async (body) => {
     const res = { json: (value) => (res.body = value), status: () => res };
-    routes["/api/maintenance/migrations"]({ body }, res);
+    await routes["/api/maintenance/migrations"]({ body }, res);
     return res.body;
   };
 
-  const plan = post({});
+  const plan = await post({});
   assert.equal(plan.apply, false);
   assert.deepEqual(plan.steps.downloadSources.added, ["civitai:2:2"]);
   assert.equal(
@@ -53,7 +53,7 @@ test("the migrations route plans, then applies online-safe steps into the runnin
   );
   assert.equal(fs.existsSync(file(".backups")), false);
 
-  const applied = post({ apply: true });
+  const applied = await post({ apply: true });
   const { backup } = applied.steps.downloadSources;
   assert.equal(applied.steps.downloadSources.applied, true);
   assert.equal(fs.existsSync(path.join(backup, "model-download-sources.json")), true);
@@ -72,7 +72,7 @@ test("the migrations route plans, then applies online-safe steps into the runnin
   );
   assert.ok(lines[1].includes(`downloadSources: 1 applied, backup ${backup}`), lines[1]);
 
-  const again = post({ apply: true });
+  const again = await post({ apply: true });
   assert.deepEqual(again.steps.downloadSources, {
     applied: false,
     backup: "",
