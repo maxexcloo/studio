@@ -17,7 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useMatch, useNavigate } from "react-router";
-import { api } from "../../api";
+import { api, post } from "../../api";
 import type { Session } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -87,7 +87,116 @@ export function ChatRename({ session, onDone }: { session: Session; onDone: () =
   );
 }
 
-/** Rename and Delete for one chat, shared by the Chats list and the open chat's title. */
+/** Archives or unarchives chats in one request, moving them between the Chats list's views at once. */
+export function useArchiveChats() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, archived }: { ids: string[]; archived: boolean }) =>
+      post<{ ids: string[] }>("/api/sessions/archive", { ids, archived }),
+    onMutate: ({ ids, archived }) => {
+      const chosen = new Set(ids);
+      // The list and any search of it.
+      client.setQueriesData<{ sessions: Session[] }>(
+        { queryKey: sessionsQuery.queryKey },
+        (data) =>
+          data && {
+            sessions: data.sessions.map((entry) =>
+              chosen.has(entry.id) ? { ...entry, archived: archived || undefined } : entry,
+            ),
+          },
+      );
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: sessionsQuery.queryKey }),
+  });
+}
+
+/** Forgets deleted chats: drafts and staged cards that pointed at them, their caches, and the open one. */
+function useForgetChats() {
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const current = useMatch("/chat/:id")?.params.id;
+  const { setDraft, setStaged } = useGenerationActions();
+  return (ids: string[]) => {
+    const gone = new Set(ids);
+    const forget = (previous: { sessionId: string; parentJobId?: string }) =>
+      gone.has(previous.sessionId)
+        ? { ...previous, sessionId: "", parentJobId: undefined, parentItemId: undefined }
+        : previous;
+    setDraft((previous) => ({ ...previous, ...forget(previous) }), "chat");
+    setDraft((previous) => ({ ...previous, ...forget(previous) }), "gallery");
+    setStaged((staged) => (staged && gone.has(staged.sessionId) ? null : staged));
+    if (current && gone.has(current)) void navigate("/chat", { replace: true });
+    client.setQueriesData<{ sessions: Session[] }>(
+      { queryKey: sessionsQuery.queryKey },
+      (data) => data && { sessions: data.sessions.filter((entry) => !gone.has(entry.id)) },
+    );
+    for (const id of ids) {
+      client.removeQueries({ queryKey: sessionQuery(id).queryKey });
+      client.removeQueries({ queryKey: ["chat", id] });
+    }
+    for (const queryKey of [sessionsQuery.queryKey, ["gallery"], ["gallery-filters"]])
+      void client.invalidateQueries({ queryKey });
+    void client.invalidateQueries({ queryKey: queueQuery.queryKey });
+  };
+}
+
+/**
+ * Deletes several chats in one request after confirming; their results stay in the gallery.
+ * `onDone` hears the IDs it could not delete (still running), which stay selected.
+ */
+export function DeleteChatsDialog({
+  opened,
+  ids,
+  onClose,
+  onDone,
+}: {
+  opened: boolean;
+  ids: string[];
+  onClose: () => void;
+  onDone: (failed: string[]) => void;
+}) {
+  const forget = useForgetChats();
+  const [failure, setFailure] = useState("");
+  const remove = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (chosen: string[]) =>
+      post<{ removed: string[]; failed: { id: string; error: string }[] }>("/api/sessions/delete", {
+        ids: chosen,
+      }),
+    onSuccess: ({ removed, failed }) => {
+      if (removed.length) forget(removed);
+      onDone(failed.map((entry) => entry.id));
+      if (!failed.length) return close();
+      const reasons = [...new Set(failed.map((entry) => entry.error))].join(" ");
+      setFailure(
+        `${failed.length} ${failed.length === 1 ? "chat" : "chats"} couldn’t be deleted. ${reasons}`,
+      );
+    },
+  });
+  function close() {
+    setFailure("");
+    remove.reset();
+    onClose();
+  }
+  const count = ids.length;
+  return (
+    <ConfirmDialog
+      opened={opened}
+      title={count === 1 ? "Delete Chat" : "Delete Chats"}
+      action="Delete"
+      pending={remove.isPending}
+      disabled={!count}
+      error={remove.error?.message || failure}
+      onConfirm={() => remove.mutate(ids)}
+      onClose={close}
+    >
+      Delete {count} {count === 1 ? "chat and its messages" : "chats and their messages"}? Their
+      results stay in your gallery.
+    </ConfirmDialog>
+  );
+}
+
+/** Rename, Archive or Unarchive, and Delete for one chat, in the Chats list and the open chat's title. */
 export function ChatMenu({
   session,
   onRename,
@@ -98,6 +207,7 @@ export function ChatMenu({
   className?: string;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const archive = useArchiveChats();
   const title = chatTitle(session);
   return (
     <>
@@ -118,6 +228,15 @@ export function ChatMenu({
           </Menu.Item>
           <Menu.Item
             h={36}
+            leftSection={
+              session.archived ? <icons.unarchive size={16} /> : <icons.archive size={16} />
+            }
+            onClick={() => archive.mutate({ ids: [session.id], archived: !session.archived })}
+          >
+            {session.archived ? "Unarchive" : "Archive"}
+          </Menu.Item>
+          <Menu.Item
+            h={36}
             color="red"
             leftSection={<icons.delete size={16} />}
             onClick={() => setDeleting(true)}
@@ -133,10 +252,7 @@ export function ChatMenu({
 
 /** Deletes a chat; its results stay in the gallery unless ticked in the checklist. */
 function DeleteChatDialog({ session, onClose }: { session: Session; onClose: () => void }) {
-  const client = useQueryClient();
-  const navigate = useNavigate();
-  const current = useMatch("/chat/:id")?.params.id;
-  const { setDraft, setStaged } = useGenerationActions();
+  const forget = useForgetChats();
   const detail = useQuery(sessionQuery(session.id));
   const results = (detail.data?.jobs || []).flatMap((job, index) =>
     jobResults(job)
@@ -152,22 +268,7 @@ function DeleteChatDialog({ session, onClose }: { session: Session; onClose: () 
         { method: "DELETE", body: JSON.stringify({ mediaIds: [...selected] }) },
       ),
     onSuccess: ({ media }) => {
-      const forget = (previous: { sessionId: string; parentJobId?: string }) =>
-        previous.sessionId === session.id
-          ? { ...previous, sessionId: "", parentJobId: undefined, parentItemId: undefined }
-          : previous;
-      setDraft((previous) => ({ ...previous, ...forget(previous) }), "chat");
-      setDraft((previous) => ({ ...previous, ...forget(previous) }), "gallery");
-      setStaged((staged) => (staged?.sessionId === session.id ? null : staged));
-      if (current === session.id) navigate("/chat", { replace: true });
-      client.setQueryData(sessionsQuery.queryKey, (data) =>
-        data ? { sessions: data.sessions.filter((entry) => entry.id !== session.id) } : data,
-      );
-      client.removeQueries({ queryKey: sessionQuery(session.id).queryKey });
-      client.removeQueries({ queryKey: ["chat", session.id] });
-      for (const queryKey of [sessionsQuery.queryKey, ["gallery"], ["gallery-filters"]])
-        void client.invalidateQueries({ queryKey });
-      void client.invalidateQueries({ queryKey: queueQuery.queryKey });
+      forget([session.id]);
       if (media.failed.length)
         notifications.show({
           color: "yellow",

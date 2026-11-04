@@ -13,6 +13,7 @@ import { everyone, publicJob, queuePriority, Store, type OwnedJob } from "./stor
 interface Request {
   studioAccount?: { userId: string; role?: string };
   params: Record<string, string>;
+  query?: Record<string, unknown>;
   body?: Record<string, unknown>;
 }
 interface Response {
@@ -38,6 +39,13 @@ const missing = (res: Response) => res.status(404).json({ error: "Not found." })
 // A cancel the worker could not confirm yet (busy, or a proxy answering for it); recovery finishes it.
 export const unconfirmedCancel =
   "Cancellation could not be confirmed. The recorded job remains available for recovery.";
+const idList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((id) => typeof id === "string");
+/** Why a chat with work still running cannot be deleted yet. */
+const busyChat = {
+  "active-jobs": "This chat has generations in progress. Cancel them before deleting the chat.",
+  "active-chat": "This chat is still responding. Stop it before deleting the chat.",
+};
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 
@@ -109,7 +117,36 @@ export function registerRewriteRoutes(
     });
     return preset ? res.json({ preset }) : missing(res);
   });
-  app.get("/api/sessions", (req, res) => res.json({ sessions: store.sessions(owner(req)) }));
+  app.get("/api/sessions", (req, res) =>
+    res.json({
+      sessions: store.sessions(
+        owner(req),
+        typeof req.query?.q === "string" ? req.query.q.trim() : "",
+      ),
+    }),
+  );
+  // Many chats in one request each, like the gallery's; another account's chats are never touched.
+  app.post("/api/sessions/archive", (req, res) => {
+    if (!idList(req.body?.ids) || typeof req.body.archived !== "boolean")
+      return res.status(400).json({ error: "Chat IDs and archived are required." });
+    return res.json({ ids: store.archiveSessions(owner(req), req.body.ids, req.body.archived) });
+  });
+  // Deletes each chat that has nothing running; their results stay in the gallery.
+  app.post("/api/sessions/delete", (req, res) => {
+    if (!idList(req.body?.ids)) return res.status(400).json({ error: "Chat IDs are required." });
+    const ownerId = owner(req);
+    const removed: string[] = [],
+      failed: { id: string; reason?: string; error: string }[] = [];
+    for (const id of new Set(req.body.ids)) {
+      const outcome = store.session(ownerId, id)?.hidden
+        ? "missing"
+        : store.deleteSession(ownerId, id);
+      if (outcome === "deleted") removed.push(id);
+      else if (outcome === "missing") failed.push({ id, error: "That chat was not found." });
+      else failed.push({ id, reason: outcome, error: busyChat[outcome] });
+    }
+    return res.json({ removed, failed });
+  });
   app.post("/api/sessions", (req, res) => {
     if (req.body?.inputs !== undefined && !object(req.body.inputs))
       return res.status(400).json({ error: "Inputs must be an object." });
@@ -142,17 +179,10 @@ export function registerRewriteRoutes(
     const ownerId = owner(req);
     if (!store.session(ownerId, req.params.id)) return missing(res);
     const requested = req.body?.mediaIds ?? [];
-    if (!Array.isArray(requested) || requested.some((id) => typeof id !== "string"))
+    if (!idList(requested))
       return res.status(400).json({ error: "Media IDs must be a list of result IDs." });
-    const busy = (reason: string | undefined) =>
-      reason &&
-      res.status(409).json({
-        reason,
-        error:
-          reason === "active-jobs"
-            ? "This chat has generations in progress. Cancel them before deleting the chat."
-            : "This chat is still responding. Stop it before deleting the chat.",
-      });
+    const busy = (reason: keyof typeof busyChat | undefined) =>
+      reason && res.status(409).json({ reason, error: busyChat[reason] });
     const refused = busy(store.sessionActivity(ownerId, req.params.id));
     if (refused) return refused;
     const results = new Set(

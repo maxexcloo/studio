@@ -85,7 +85,14 @@ primary component reference and verify APIs against the installed version.
   Yesterday, Previous 7 Days, Previous 30 Days, Older), under a Chats heading
   with a small New Chat icon. Phones list the Chats in place of No Chat
   Selected, and the status action (a Chats icon in Chat) opens them as a Drawer
-  whose header carries New Chat beside Close. With no chat selected, the
+  whose header carries New Chat beside Close. Every Chats list has the shared
+  `SectionToolbar` (search of titles and messages, Filter with Show: All or
+  Archived, then Select, and New Chat last in the sidebar). Archived chats leave
+  All and keep everything. Select replaces the toolbar with the gallery's
+  selection pattern on one row everywhere: the count, All, Archive (Unarchive
+  among archived chats) and Delete, named on phones, then Clear Selection; rows
+  become checkboxes, Escape ends it and Delete asks to delete. Row menus and the
+  open chat's title offer Rename, Archive or Unarchive, and Delete. With no chat selected, the
   message box starts one; an open chat's heading ends with a close cross back to
   No Chat Selected (the list on phones). There is no other New Chat button. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in

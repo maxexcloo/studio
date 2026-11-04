@@ -27,7 +27,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(sessions(\/[\w-]+)?|queue|user-presets)$/],
   [
     "POST",
-    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry)|cancel-pending|cancel-all|clear-failed|pause|resume)|user-presets)$/,
+    /^\/api\/(sessions(\/(archive|delete)|\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry)|cancel-pending|cancel-all|clear-failed|pause|resume)|user-presets)$/,
   ],
   ["PATCH", /^\/api\/(sessions|user-presets)\/[\w-]+$/],
   ["DELETE", /^\/api\/(sessions|user-presets)\/[\w-]+$/],

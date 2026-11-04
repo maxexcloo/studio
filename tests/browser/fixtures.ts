@@ -525,7 +525,49 @@ export async function fixtures(page: Page) {
       job.status = "cancelled";
       return respond({ job });
     }
-    if (path === "/api/sessions" && method === "GET") return respond({ sessions });
+    if (path === "/api/sessions" && method === "GET") {
+      const query = (url.searchParams.get("q") || "").toLowerCase();
+      return respond({
+        sessions: sessions.filter(
+          (session) =>
+            !query ||
+            session.title.toLowerCase().includes(query) ||
+            messages.some(
+              (message) =>
+                message.sessionId === session.id && message.content.toLowerCase().includes(query),
+            ),
+        ),
+      });
+    }
+    if (path === "/api/sessions/archive") {
+      const chosen = sessions.filter((session) => body.ids.includes(session.id));
+      for (const session of chosen)
+        if (body.archived) session.archived = true;
+        else delete session.archived;
+      return respond({ ids: chosen.map((session) => session.id) });
+    }
+    if (path === "/api/sessions/delete") {
+      const removed: string[] = [],
+        failed: any[] = [];
+      for (const id of body.ids) {
+        const owned = jobs.filter((job) => job.sessionId === id);
+        if (owned.some((job) => !["completed", "failed", "cancelled"].includes(job.status)))
+          failed.push({
+            id,
+            reason: "active-jobs",
+            error: "This chat has generations in progress. Cancel them before deleting the chat.",
+          });
+        else {
+          sessions.splice(
+            sessions.findIndex((session) => session.id === id),
+            1,
+          );
+          for (const job of owned) jobs.splice(jobs.indexOf(job), 1);
+          removed.push(id);
+        }
+      }
+      return respond({ removed, failed });
+    }
     if (path === "/api/sessions" && method === "POST") {
       const session = {
         id: `session-${sessions.length + 1}`,

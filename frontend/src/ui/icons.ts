@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   Blend,
   CirclePause,
   CirclePlay,
@@ -36,6 +38,8 @@ import {
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
   animate: Play,
+  /** Archiving a chat keeps it out of the Chats list; Unarchive brings it back. */
+  archive: Archive,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
   chat: MessageSquareShare,
@@ -69,6 +73,7 @@ export const icons = {
   stop: Square,
   /** Short changes offered for an image or draft. */
   suggestions: Lightbulb,
+  unarchive: ArchiveRestore,
   undo: Undo2,
   upscale: ImageUpscale,
   versions: Layers,
