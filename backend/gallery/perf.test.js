@@ -17,7 +17,6 @@ const {
   flushGallery,
   flushGalleryStrict,
   galleryRevisionValue,
-  markGalleryReset,
   pageGallery,
   saveGallery,
   setGallery,
@@ -47,12 +46,6 @@ test("an output deleted outside the app drops out of the gallery", async () => {
     filterVisibleGallery(items).map((item) => item.id),
     ["keep.png"],
   );
-});
-
-test("a grouping change moves the gallery revision on", () => {
-  const before = galleryRevisionValue();
-  markGalleryReset();
-  assert.ok(galleryRevisionValue() > before);
 });
 
 // Not Comfy outputs (no /comfy/view URL), so no file checks: this measures the list work alone.

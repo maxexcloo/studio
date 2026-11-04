@@ -59,7 +59,3 @@ export function forgetAccountPreferences(ownerId) {
   deleteRuntimeDocument(dataDir, documentName(ownerId));
   cache.delete(ownerId);
 }
-
-export function resetAccountPreferencesForTests() {
-  cache.clear();
-}

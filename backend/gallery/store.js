@@ -136,11 +136,6 @@ function bumpRevision() {
   return galleryRevision;
 }
 
-/** Something the item diff cannot see changed (run grouping): the revision moves on. */
-export function markGalleryReset() {
-  return bumpRevision();
-}
-
 function withoutPreview({ preview, ...rest }) {
   return rest;
 }
