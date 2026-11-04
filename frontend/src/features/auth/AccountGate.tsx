@@ -146,7 +146,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                   <Button component="a" href="/api/accounts/oidc/start" variant="default" fullWidth>
                     Sign In With {status.data.oidc.label}
                   </Button>
-                  <Divider label="Or Continue With Email" labelPosition="center" />
+                  <Divider label="Or Continue with Email" labelPosition="center" />
                 </>
               )}
               <form

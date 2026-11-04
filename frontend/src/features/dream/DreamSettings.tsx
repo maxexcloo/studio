@@ -82,7 +82,8 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
   const button = (
     <Tooltip label="Dream Settings">
       <ActionIcon
-        variant="default"
+        variant={opened ? "light" : "subtle"}
+        color={opened ? undefined : "gray"}
         aria-label="Dream Settings"
         aria-expanded={opened}
         onClick={() => setOpened((open) => !open)}

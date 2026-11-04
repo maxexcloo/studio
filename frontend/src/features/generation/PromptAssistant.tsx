@@ -359,11 +359,6 @@ export function usePromptAssistant({
             Write Negative
           </Menu.Item>
         )}
-        {!!references.length && info.vision && (
-          <Text size="xs" c="dimmed" px="sm" py={6}>
-            The assistant sees your selected references.
-          </Text>
-        )}
       </Menu.Dropdown>
     </Menu>
   );

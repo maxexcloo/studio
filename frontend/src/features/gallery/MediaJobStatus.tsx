@@ -86,7 +86,7 @@ export function MediaJobStatus({
         </Alert>
       ) : !job && !loading ? (
         <Text size="sm" c="dimmed" ta="center">
-          Nothing to retry. Use Prompt to run this item’s settings again.
+          Nothing to retry. Recreate runs this item’s settings again.
         </Text>
       ) : null}
       {job && (

@@ -187,9 +187,9 @@ test("Guide editing and restoring an earlier version create distinct saved revis
     "Original guidance.",
   );
   // A guide that profiles still use stays, and the confirmation says why.
-  await editor.getByRole("button", { name: "Remove Guide", exact: true }).click();
-  const confirm = page.getByRole("dialog", { name: "Remove Guide", exact: true });
-  await confirm.getByRole("button", { name: "Remove", exact: true }).click();
+  await editor.getByRole("button", { name: "Delete Guide", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete Guide", exact: true });
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(confirm).toContainText("This guide is still used by custom:fixture.");
 });
 
