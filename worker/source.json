@@ -1,6 +1,6 @@
 {
-  "reference": "v0.43.0",
+  "reference": "v0.44.0",
   "repository": "Comfy-Org/ComfyUI",
-  "revision": "426f5eea52a7ece1dd599fff4cb6cd1f352ddd24",
+  "revision": "2c75dc1b379a59e0880619d029607af5169a62ef",
   "architectures": ["amd64"]
 }
