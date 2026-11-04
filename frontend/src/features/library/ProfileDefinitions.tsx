@@ -27,7 +27,6 @@ import {
   ToolbarAction,
   ToolbarDivider,
 } from "../../ui/SectionToolbar";
-import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import {
   DefinitionEditor,
@@ -245,20 +244,12 @@ interface Editing {
 }
 
 /**
- * Settings › Profiles: generation profiles under the section's own toolbar, then the prompting
- * guides they use as a group with its own toolbar; each keeps its saved versions.
+ * The profiles and guides with the guide each profile uses, shared by Library › Profiles and
+ * Library › Guides; every editor save refreshes them under "definition-list".
  */
-export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
-  const [profileQuery, setProfileQuery] = useState("");
-  const [guideQuery, setGuideQuery] = useState("");
-  const [family, setFamily] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Editing | null>(null);
-  const [merging, setMerging] = useState(false);
-  const [combining, setCombining] = useState(false);
-  const [duplicating, setDuplicating] = useState(false);
+function useDefinitions() {
   // Family names come with the models list; following it re-labels once they arrive.
   useQuery(modelsQuery);
-  // Under "definition-list", which every editor save refreshes.
   const profileList = useQuery({
     queryKey: ["definition-list", "profile"],
     queryFn: () => api<{ profiles: ProfileRow[] }>("/api/profiles/editable"),
@@ -271,18 +262,9 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     queryKey: ["definition-list", "guide-bindings"],
     queryFn: () => api<{ bindings: GuideBindings }>("/api/profiles/guide-bindings"),
   }).data?.bindings;
-  const stats = useQuery({
-    queryKey: ["profile-stats"],
-    queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
-  }).data?.profiles;
   const profiles = profileList.data?.profiles || [];
   const guides = guideList.data?.packs || [];
-  const families = [
-    ...new Set(profiles.flatMap((entry) => (entry.family ? [entry.family] : []))),
-  ].sort((a, b) => modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)));
-  const profileRows = family ? profiles.filter((entry) => entry.family === family) : profiles;
-  // Runs and guide bindings record the runtime id, `custom:` plus the definition's id.
-  const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];
+  // Guide bindings record the runtime id, `custom:` plus the definition's id.
   const guideIdOf = (entry: ProfileRow) =>
     bindings?.profiles[`custom:${entry.id}`]?.pack ??
     (entry.family ? bindings?.families[entry.family]?.[entry.kind || "image"] : undefined);
@@ -296,6 +278,45 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     const guide = guideIdOf(entry);
     if (guide) users.set(guide, (users.get(guide) || 0) + 1);
   }
+  return { profileList, guideList, profiles, guides, guideOf, users };
+}
+
+/** A profile's or guide's row menu: edit, copy its ID or download it as JSON. */
+function rowMenu(edit: (editing: Editing) => void, kind: DefinitionKind, noun: string, id: string) {
+  return (
+    <>
+      <Menu.Item onClick={() => edit({ kind, id })}>Edit {noun}</Menu.Item>
+      <Menu.Item onClick={() => void copyText(id, `${noun} ID`)}>Copy {noun} ID</Menu.Item>
+      <Menu.Item
+        component="a"
+        href={`${definitionPath(kind, id)}/download`}
+        download={`${id}.json`}
+      >
+        Download {noun}
+      </Menu.Item>
+    </>
+  );
+}
+
+/** Library › Profiles: generation profiles under the section's toolbar; each keeps its saved versions. */
+export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
+  const [profileQuery, setProfileQuery] = useState("");
+  const [family, setFamily] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [combining, setCombining] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
+  const { profileList, profiles, guideOf } = useDefinitions();
+  const stats = useQuery({
+    queryKey: ["profile-stats"],
+    queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
+  }).data?.profiles;
+  const families = [
+    ...new Set(profiles.flatMap((entry) => (entry.family ? [entry.family] : []))),
+  ].sort((a, b) => modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)));
+  const profileRows = family ? profiles.filter((entry) => entry.family === family) : profiles;
+  // Runs record the runtime id, `custom:` plus the definition's id.
+  const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];
   const importing = useMutation({
     meta: { inlineError: true },
     mutationFn: async (file: File) => {
@@ -331,19 +352,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
       if (files?.[0]) importing.mutate(files[0]);
     },
   });
-  const rowMenu = (kind: DefinitionKind, noun: string, id: string) => (
-    <>
-      <Menu.Item onClick={() => setEditing({ kind, id })}>Edit {noun}</Menu.Item>
-      <Menu.Item onClick={() => void copyText(id, `${noun} ID`)}>Copy {noun} ID</Menu.Item>
-      <Menu.Item
-        component="a"
-        href={`${definitionPath(kind, id)}/download`}
-        download={`${id}.json`}
-      >
-        Download {noun}
-      </Menu.Item>
-    </>
-  );
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -476,84 +484,10 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
               },
             ]}
-            rowActions={(entry) => rowMenu("profile", "Profile", entry.id)}
+            rowActions={(entry) => rowMenu(setEditing, "profile", "Profile", entry.id)}
           />
         )}
       </Stack>
-      <SettingGroup
-        title="Guides"
-        toolbar={
-          <SectionToolbar
-            label="Guides"
-            query={guideQuery}
-            onQueryChange={setGuideQuery}
-            actions={
-              <GroupActions noun="Guide">
-                <ToolbarAction
-                  label="New Guide"
-                  icon={<Plus size={18} />}
-                  onClick={() =>
-                    setEditing({
-                      kind: "guide",
-                      id: "",
-                      creating: { pack: { name: "", summary: "", rules: [] }, hash: "" },
-                    })
-                  }
-                />
-              </GroupActions>
-            }
-          />
-        }
-      >
-        {guideList.error ? (
-          <Alert color="red">{guideList.error.message}</Alert>
-        ) : (
-          <DataTable
-            label="Editable Guides"
-            rows={guides}
-            rowKey={(entry) => entry.packId}
-            rowName={(entry) => entry.name}
-            loading={guideList.isPending && "Loading Guides"}
-            query={guideQuery}
-            searchText={(entry) => [entry.name, entry.packId]}
-            initialSort={{ key: "name", descending: false }}
-            empty={guides.length ? "No Matches" : "No Guides"}
-            columns={[
-              {
-                key: "name",
-                header: "Name",
-                main: true,
-                sortValue: (entry) => entry.name,
-                // Copy ID has the exact ID.
-                cell: (entry) => (
-                  <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                    {entry.name}
-                  </Text>
-                ),
-              },
-              {
-                key: "profiles",
-                header: "Used By",
-                sortValue: (entry) => users.get(entry.packId) || 0,
-                cell: (entry) => (
-                  <Text size="sm" c={users.has(entry.packId) ? undefined : "dimmed"}>
-                    {users.has(entry.packId)
-                      ? plural(users.get(entry.packId)!, "Profile")
-                      : "No Profiles"}
-                  </Text>
-                ),
-              },
-              {
-                key: "version",
-                header: "Version",
-                sortValue: (entry) => entry.version,
-                cell: (entry) => <Version {...entry} />,
-              },
-            ]}
-            rowActions={(entry) => rowMenu("guide", "Guide", entry.packId)}
-          />
-        )}
-      </SettingGroup>
       <Modal opened={duplicating} onClose={() => setDuplicating(false)} title="Duplicate Profile">
         <FocusTrap.InitialFocus />
         {duplicating && (
@@ -574,11 +508,97 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           id={editing.id}
           close={() => setEditing(null)}
           creating={editing.creating}
-          existingIds={
-            editing.kind === "profile"
-              ? profiles.map((entry) => entry.id)
-              : guides.map((entry) => entry.packId)
+          existingIds={profiles.map((entry) => entry.id)}
+        />
+      )}
+    </Stack>
+  );
+}
+
+/** Library › Guides: the prompting guides profiles use, under the section's toolbar; each keeps its saved versions. */
+export function GuideDefinitions({ heading }: { heading: ReactNode }) {
+  const [guideQuery, setGuideQuery] = useState("");
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const { guideList, guides, users } = useDefinitions();
+  return (
+    <Stack gap="md">
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Guides"
+          query={guideQuery}
+          onQueryChange={setGuideQuery}
+          actions={
+            <GroupActions noun="Guide">
+              <ToolbarAction
+                label="New Guide"
+                icon={<Plus size={18} />}
+                onClick={() =>
+                  setEditing({
+                    kind: "guide",
+                    id: "",
+                    creating: { pack: { name: "", summary: "", rules: [] }, hash: "" },
+                  })
+                }
+              />
+            </GroupActions>
           }
+        />
+      </SectionHeader>
+      {guideList.error ? (
+        <Alert color="red">{guideList.error.message}</Alert>
+      ) : (
+        <DataTable
+          label="Editable Guides"
+          rows={guides}
+          rowKey={(entry) => entry.packId}
+          rowName={(entry) => entry.name}
+          loading={guideList.isPending && "Loading Guides"}
+          query={guideQuery}
+          searchText={(entry) => [entry.name, entry.packId]}
+          initialSort={{ key: "name", descending: false }}
+          empty={guides.length ? "No Matches" : "No Guides"}
+          columns={[
+            {
+              key: "name",
+              header: "Name",
+              main: true,
+              sortValue: (entry) => entry.name,
+              // Copy ID has the exact ID.
+              cell: (entry) => (
+                <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
+                  {entry.name}
+                </Text>
+              ),
+            },
+            {
+              key: "profiles",
+              header: "Used By",
+              sortValue: (entry) => users.get(entry.packId) || 0,
+              cell: (entry) => (
+                <Text size="sm" c={users.has(entry.packId) ? undefined : "dimmed"}>
+                  {users.has(entry.packId)
+                    ? plural(users.get(entry.packId)!, "Profile")
+                    : "No Profiles"}
+                </Text>
+              ),
+            },
+            {
+              key: "version",
+              header: "Version",
+              sortValue: (entry) => entry.version,
+              cell: (entry) => <Version {...entry} />,
+            },
+          ]}
+          rowActions={(entry) => rowMenu(setEditing, "guide", "Guide", entry.packId)}
+        />
+      )}
+      {editing && (
+        <DefinitionEditor
+          kind={editing.kind}
+          id={editing.id}
+          close={() => setEditing(null)}
+          creating={editing.creating}
+          existingIds={guides.map((entry) => entry.packId)}
         />
       )}
     </Stack>

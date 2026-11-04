@@ -785,7 +785,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "ProfileEdit",
     "Edit Profile or Guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"krea2": {"image": "krea2"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"krea2": {"image": "krea2"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
     {
       action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -866,7 +866,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "CombineBackends",
     "Combine Backends",
-    "Combine a model’s Radiance and ComfyUI profiles into one, as Settings › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
+    "Combine a model’s Radiance and ComfyUI profiles into one, as Library › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
     {
       action: z.enum(["preview", "apply"]).default("preview"),
       hash: z.string().trim().min(1).max(200).optional(),
@@ -897,7 +897,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Export",
     "Export Profiles",
-    "Build the export bundle as a backup (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Settings › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
+    "Build the export bundle as a backup (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Library › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
     {},
     async (_args, signal) => {
       const response = await media.response("GET", "/api/profiles/export", undefined, owner, {

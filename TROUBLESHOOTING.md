@@ -76,7 +76,7 @@ Check that the workflow ends in an output node such as Save Image. If the provid
 
 ### Needs a separate part
 
-The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in **Settings › Profiles**.
+The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in **Library › Profiles**.
 
 ### Generation failed
 

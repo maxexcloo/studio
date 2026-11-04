@@ -229,7 +229,7 @@ export function LibraryImportReview({
           )}
           {record.results?.profileId && (
             <Text size="sm" c="dimmed">
-              Profile drafted. Review it in Settings › Profiles.
+              Profile drafted. Review it in Library › Profiles.
             </Text>
           )}
           {record.grade?.reasons.map((reason) => (

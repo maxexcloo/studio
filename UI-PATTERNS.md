@@ -117,15 +117,18 @@ primary component reference and verify APIs against the installed version.
   badges and row menus, in Library as in Settings (Models, LoRAs and Imports
   as Users and Workers). A section with several lists shows its main list under
   the section's own toolbar and gives each further list a `SettingGroup`
-  heading with its own toolbar beside it, the create action at its far right
-  (Settings › Profiles: the profiles, then Guides, each row showing how they
-  link and its menu downloading that one as JSON; Download All takes every
-  profile and guide in one archive);
+  heading with its own toolbar beside it, the create action at its far right;
   every other part of a section, such as an import review's Files, is a
   `SettingGroup` too, never a second section heading. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
-  each run alphabetical, in the desktop navigation and the phone Section Select. No accordions:
+  and the Library its What You Have sections (Guides, LoRAs, Models, Profiles)
+  and then its Getting More ones (Downloads, Imports, Inspiration), each run
+  alphabetical, in the desktop navigation and the phone Section Select. The
+  Library opens on Models. Profiles and Guides live in the Library, each row
+  showing how they link and its menu downloading that one as JSON; Download All
+  in Profiles takes every profile and guide in one archive. Every section shows
+  `LoadingState` while its data first loads, and cached data at once after. No accordions:
   headings group a section's parts, and creating or configuring a record opens
   a popup. Dense records use the shared `DataTable` on Mantine Table
   (sortable headers, the toolbar query, one empty line, loading and the row menu;
