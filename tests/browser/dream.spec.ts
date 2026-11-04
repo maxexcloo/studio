@@ -155,7 +155,8 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   // Tapping a side opens it in the viewer; closing it returns to the same comparison.
   await pair.locator("[data-side='1']").click();
   const viewer = page.getByRole("dialog");
-  await expect(viewer).toBeVisible();
+  // Keys reach the viewer once its focus trap has taken focus.
+  await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await expect(pair).toContainText("A · 20 Steps");
@@ -194,4 +195,62 @@ test("Discarded Dream results stay listed and can be kept after all", async ({ p
   await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
   await expect(page.getByText("No Discards", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual(["POST /api/dream/gone/keep"]);
+});
+
+test("Full screen switches between a comparison's sides and judges from its bar", async ({
+  page,
+}, info) => {
+  await fixtures(page);
+  const side = (id: string, index: 0 | 1, label: string) =>
+    dreamItem(id, {
+      prompt: `Side ${label}`,
+      dream: {
+        prompt: "Dream prompt fox",
+        why: "",
+        at: "",
+        state: "unseen",
+        pair: { id: "steps", side: index, question: "Which Steps?", label },
+      },
+    });
+  const dream = await serveDream(page, {
+    unseen: [side("sa", 0, "20 Steps"), side("sb", 1, "40 Steps"), dreamItem("solo")],
+  });
+  await page.goto("/dream");
+  await page
+    .getByRole("group", { name: "Which Steps?", exact: true })
+    .locator("[data-side='0']")
+    .click();
+  const viewer = page.getByRole("dialog");
+  const shown = viewer.getByRole("radiogroup", { name: "Shown Image" });
+  await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
+  await expect(shown.getByRole("radio", { name: "A · 20 Steps" })).toBeChecked();
+  await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeVisible();
+  // Arrow keys and the choice above the picture switch sides.
+  await page.keyboard.press("ArrowRight");
+  await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
+  await expect(viewer.getByRole("img", { name: "Side 40 Steps" })).toBeVisible();
+  await shown.getByText("A · 20 Steps", { exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "Side 20 Steps" })).toBeVisible();
+  if (info.project.name === "desktop") {
+    await shown.locator("label").filter({ hasText: "Side by Side" }).click();
+    await expect(viewer.getByRole("button", { name: /^Show . · \d+ Steps Alone$/ })).toHaveCount(2);
+    await viewer.getByRole("button", { name: "Show B · 40 Steps Alone" }).click();
+    await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
+  }
+
+  // Answering moves full screen on to the next card; a verdict on the last card closes it.
+  const answers = viewer.getByRole("group", { name: "Comparison Answers" });
+  await answers.getByRole("button", { name: "Neither", exact: true }).click();
+  const actions = viewer.getByRole("group", { name: "Dream Actions" });
+  await expect(actions).toBeVisible();
+  await expect(viewer.getByRole("img", { name: "Dream prompt solo" })).toBeVisible();
+  await expect(shown).toBeHidden();
+  await actions.getByRole("button", { name: "Keep", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  expect(verdicts(dream)).toEqual([
+    "POST /api/dream/pairs/steps/answer",
+    "POST /api/dream/solo/keep",
+  ]);
+  expect(dream.requests[0].body).toEqual({ answer: "neither" });
 });

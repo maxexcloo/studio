@@ -16,9 +16,11 @@ import {
   Group,
   Modal,
   ScrollArea,
+  SegmentedControl,
   Stack,
   Text,
   Tooltip,
+  UnstyledButton,
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
@@ -34,10 +36,10 @@ import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
-import { MediaViewerActions } from "./MediaViewerActions";
+import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource, playbackUrl } from "./mediaSource";
-import { findAction, usualAction, type ActionGroups } from "./ActionBar";
+import { ActionBarSurface, findAction, usualAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -225,6 +227,9 @@ export function MediaViewer({
   items = [item],
   navigate,
   onReturnFocus,
+  actions,
+  itemLabel,
+  sideBySide = false,
 }: {
   item: MediaItem;
   close: () => void;
@@ -232,8 +237,15 @@ export function MediaViewer({
   items?: MediaItem[];
   navigate?: (item: MediaItem) => void;
   onReturnFocus?: (item: MediaItem) => void;
+  /** The opening surface's own actions, in place of the item's prompt field and actions. */
+  actions?: ViewerActions;
+  /** Names each item: the items become a segmented choice in place of the position badge. */
+  itemLabel?: (item: MediaItem) => string;
+  /** Offers the items side by side on desktop, as a last option in that choice. */
+  sideBySide?: boolean;
 }) {
   const phone = usePhone();
+  const [together, setTogether] = useState(false);
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
@@ -242,6 +254,7 @@ export function MediaViewer({
   const viewable = items.filter((candidate) => candidate.url || candidate.id === item.id);
   const currentIndex = viewable.findIndex((candidate) => candidate.id === item.id);
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
+  const showTogether = together && sideBySide && canNavigate && !phone;
   useNeighbourPrefetch(viewable, currentIndex);
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
@@ -360,7 +373,7 @@ export function MediaViewer({
             !event.nativeEvent.isComposing &&
             !deleting &&
             event.currentTarget.contains(target) &&
-            !target.closest("input,textarea,select,[aria-haspopup]")
+            !target.closest('input:not([type="radio"]),textarea,select,[aria-haspopup]')
           ) {
             event.preventDefault();
             close();
@@ -385,13 +398,18 @@ export function MediaViewer({
             event.ctrlKey ||
             event.metaKey ||
             event.shiftKey ||
+            // The shown item's choice is a radio group, whose arrows move between items as ours do.
             (event.target as Element).closest(
-              'input,textarea,select,video,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"]',
+              'input:not([type="radio"]),textarea,select,video,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"]',
             )
           )
             return;
-          const shortcut = viewerShortcuts[event.key.toLowerCase()];
-          const found = shortcut && findAction(shortcutActions.current, shortcut);
+          // A surface's own actions take F for their Star and leave Delete alone.
+          const shortcut = (actions ? { ...viewerShortcuts, f: "star" } : viewerShortcuts)[
+            event.key.toLowerCase()
+          ];
+          const found =
+            shortcut && findAction(actions?.groups ?? shortcutActions.current, shortcut);
           if (found) {
             event.preventDefault();
             // A control with options runs its first, as a click on it would.
@@ -404,10 +422,15 @@ export function MediaViewer({
               !event.repeat
             )
               action.onClick();
-          } else if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
+          } else if (
+            !actions &&
+            event.key.toLowerCase() === "f" &&
+            item.status === "done" &&
+            item.url
+          ) {
             event.preventDefault();
             if (!favorite.isPending && !event.repeat) favorite.mutate();
-          } else if (event.key === "Delete") {
+          } else if (!actions && event.key === "Delete") {
             event.preventDefault();
             setDeleting(true);
           } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
@@ -435,7 +458,42 @@ export function MediaViewer({
               wrap="nowrap"
               onClick={(event) => event.stopPropagation()}
             >
-              {canNavigate ? (
+              {canNavigate && itemLabel ? (
+                <SegmentedControl
+                  size="sm"
+                  radius="xl"
+                  style={glass}
+                  aria-label="Shown Image"
+                  value={together ? "together" : item.id}
+                  onChange={(value) => {
+                    setTogether(value === "together");
+                    const next = viewable.find((candidate) => candidate.id === value);
+                    if (next && next.id !== item.id) {
+                      setCompare(false);
+                      navigate!(next);
+                    }
+                  }}
+                  data={[
+                    ...viewable.map((candidate) => ({
+                      value: candidate.id,
+                      label: itemLabel(candidate),
+                    })),
+                    ...(sideBySide && !phone
+                      ? [
+                          {
+                            value: "together",
+                            label: (
+                              <Group gap={6} wrap="nowrap">
+                                <icons.compareSideBySide size={16} />
+                                Side by Side
+                              </Group>
+                            ),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
                   {currentIndex + 1} / {viewable.length}
                 </Badge>
@@ -445,6 +503,8 @@ export function MediaViewer({
               <Group gap={6} wrap="nowrap">
                 <Tooltip label={phone ? "Details" : details ? "Hide Details" : "Show Details"}>
                   <ActionIcon
+                    // Focus starts here rather than in the shown item's choice before it.
+                    data-autofocus
                     variant="default"
                     aria-label="Generation Details"
                     aria-expanded={phone ? sheet : details}
@@ -461,78 +521,121 @@ export function MediaViewer({
               </Group>
             </Group>
             <div className={classes.stage}>
-              {/* Phones swipe between items instead. */}
-              {canNavigate && !phone && (
-                <Group className={classes.navigation} justify="space-between" wrap="nowrap">
-                  <Tooltip label="Previous Generation (←)">
-                    <ActionIcon
-                      aria-label="Previous Generation"
-                      variant="default"
-                      // Stays focusable at an end, so arrow keys keep working.
-                      data-disabled={currentIndex === 0 || undefined}
-                      aria-disabled={currentIndex === 0 || undefined}
+              {showTogether ? (
+                // Each side opens alone; the current one, whose details show, is outlined.
+                <div className={classes.together}>
+                  {viewable.map((candidate) => (
+                    <UnstyledButton
+                      key={candidate.id}
+                      className={classes.side}
+                      aria-current={candidate.id === item.id || undefined}
+                      aria-label={`Show ${itemLabel?.(candidate) ?? "Item"} Alone`}
                       onClick={(event) => {
                         event.stopPropagation();
-                        move(-1);
+                        setTogether(false);
+                        if (candidate.id !== item.id) navigate!(candidate);
                       }}
                     >
-                      <ChevronLeft size={20} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Next Generation (→)">
-                    <ActionIcon
-                      aria-label="Next Generation"
-                      variant="default"
-                      data-disabled={currentIndex === viewable.length - 1 || undefined}
-                      aria-disabled={currentIndex === viewable.length - 1 || undefined}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        move(1);
-                      }}
-                    >
-                      <ChevronRight size={20} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Group>
-              )}
-              {!item.url ? (
-                <div className={classes.status} {...touchSwipe}>
-                  <MediaJobStatus item={item} onRetried={setReplacement} />
-                </div>
-              ) : item.type === "video" ? (
-                <ViewerVideo
-                  key={`${item.id}:${source.url}`}
-                  id={item.id}
-                  src={playbackUrl(source.url)}
-                  poster={source.thumbnailUrl}
-                  width={source.width}
-                  height={source.height}
-                  swipe={touchSwipe}
-                />
-              ) : compare && item.upscale?.url ? (
-                <div className={classes.comparison}>
-                  <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
-                    <MediaComparison
-                      original={item.url}
-                      upscale={item.upscale.url}
-                      width={item.width}
-                      height={item.height}
-                    />
-                  </Suspense>
+                      <img
+                        src={
+                          candidate.type === "video"
+                            ? mediaSource(candidate).thumbnailUrl
+                            : mediaSource(candidate).url
+                        }
+                        alt={candidate.prompt || "Generated Image"}
+                        draggable={false}
+                      />
+                      {itemLabel && (
+                        <Badge
+                          className={classes.sideLabel}
+                          variant="default"
+                          size="lg"
+                          radius="xl"
+                          style={glass}
+                          fw={500}
+                        >
+                          {itemLabel(candidate)}
+                        </Badge>
+                      )}
+                    </UnstyledButton>
+                  ))}
                 </div>
               ) : (
-                <Suspense fallback={<LoadingState label="Loading Image" fill />}>
-                  <ZoomImage
-                    key={item.id}
-                    src={source.url}
-                    alt={item.prompt || "Generated Image"}
-                    placeholder={source.thumbnailUrl}
-                    width={source.width}
-                    height={source.height}
-                    swipe={swipe}
-                    arrive={arrival?.id === item.id ? arrival.from : undefined}
-                  />
-                </Suspense>
+                <>
+                  {/* Phones swipe between items instead. */}
+                  {canNavigate && !phone && (
+                    <Group className={classes.navigation} justify="space-between" wrap="nowrap">
+                      <Tooltip label="Previous Generation (←)">
+                        <ActionIcon
+                          aria-label="Previous Generation"
+                          variant="default"
+                          // Stays focusable at an end, so arrow keys keep working.
+                          data-disabled={currentIndex === 0 || undefined}
+                          aria-disabled={currentIndex === 0 || undefined}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            move(-1);
+                          }}
+                        >
+                          <ChevronLeft size={20} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Next Generation (→)">
+                        <ActionIcon
+                          aria-label="Next Generation"
+                          variant="default"
+                          data-disabled={currentIndex === viewable.length - 1 || undefined}
+                          aria-disabled={currentIndex === viewable.length - 1 || undefined}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            move(1);
+                          }}
+                        >
+                          <ChevronRight size={20} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  )}
+                  {!item.url ? (
+                    <div className={classes.status} {...touchSwipe}>
+                      <MediaJobStatus item={item} onRetried={setReplacement} />
+                    </div>
+                  ) : item.type === "video" ? (
+                    <ViewerVideo
+                      key={`${item.id}:${source.url}`}
+                      id={item.id}
+                      src={playbackUrl(source.url)}
+                      poster={source.thumbnailUrl}
+                      width={source.width}
+                      height={source.height}
+                      swipe={touchSwipe}
+                    />
+                  ) : compare && item.upscale?.url ? (
+                    <div className={classes.comparison}>
+                      <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
+                        <MediaComparison
+                          original={item.url}
+                          upscale={item.upscale.url}
+                          width={item.width}
+                          height={item.height}
+                        />
+                      </Suspense>
+                    </div>
+                  ) : (
+                    <Suspense fallback={<LoadingState label="Loading Image" fill />}>
+                      <ZoomImage
+                        key={item.id}
+                        src={source.url}
+                        alt={item.prompt || "Generated Image"}
+                        placeholder={source.thumbnailUrl}
+                        width={source.width}
+                        height={source.height}
+                        swipe={swipe}
+                        arrive={arrival?.id === item.id ? arrival.from : undefined}
+                      />
+                    </Suspense>
+                  )}
+                </>
               )}
             </div>
             <MediaViewerDock
@@ -545,24 +648,37 @@ export function MediaViewer({
               }}
               iterate={iterate}
               pending={pending}
+              steps={!actions}
               actions={
-                <MediaViewerActions
-                  item={displayed}
-                  sessionId={sessionId}
-                  compare={compare}
-                  iterate={iterate}
-                  pending={pending}
-                  onCompare={() => setCompare((value) => !value)}
-                  onDelete={() => setDeleting(true)}
-                  onRetried={setReplacement}
-                  onVersionChange={(id, active) => setVersion({ id, active })}
-                  shortcuts={shortcutActions}
-                  ref={bar}
-                  onApplied={() => {
-                    restoreFocus.current = false;
-                    close();
-                  }}
-                />
+                actions ? (
+                  <ActionBarSurface
+                    ref={bar}
+                    aria-label={actions.label}
+                    radius="lg"
+                    className={classes.actions}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <ViewerActionGroups {...actions} />
+                  </ActionBarSurface>
+                ) : (
+                  <MediaViewerActions
+                    item={displayed}
+                    sessionId={sessionId}
+                    compare={compare}
+                    iterate={iterate}
+                    pending={pending}
+                    onCompare={() => setCompare((value) => !value)}
+                    onDelete={() => setDeleting(true)}
+                    onRetried={setReplacement}
+                    onVersionChange={(id, active) => setVersion({ id, active })}
+                    shortcuts={shortcutActions}
+                    ref={bar}
+                    onApplied={() => {
+                      restoreFocus.current = false;
+                      close();
+                    }}
+                  />
+                )
               }
             />
           </div>

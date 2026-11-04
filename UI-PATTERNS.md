@@ -309,14 +309,19 @@ primary component reference and verify APIs against the installed version.
   card offers Skip, Edit, Animate, Star, More Like This and Keep (phones: icons with short names under them, More Like This as Similar); Edit and
   Animate keep the result and stage it in the composer, Star keeps it too and
   More Like This keeps it and steers the next ideas toward it. Tapping a card,
-  or its View action, opens it in the viewer over the deck; closing returns to
-  the same card. Dream results stay in their own pool until kept;
+  or its View action, opens it in the viewer over the deck, whose bar holds the
+  card's choices in place of the item actions (desktop names all but Star; phones
+  keep Skip, Edit, Animate and Keep, with Star, Variations and More Like This
+  under More). A choice there moves the viewer on to the next card, and closing
+  returns to the deck where it is. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
 - A comparison is one swipe card of two images, side by side (stacked on
   phones), named A and B by what differs, under its question (Which Model?,
   Which LoRA Strength?, Which Wording?…). Swipe or press left for A, right for
   B, up for Both and down for Neither, or use the bar's A, Both, Neither and B;
-  dragging toward a side fades the other.
+  dragging toward a side fades the other. Opened full screen, a segmented choice
+  of the two sides (plus Side by Side on desktop) replaces the position badge,
+  arrows and swipes switch sides as they move between items, and the bar answers.
 - Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.

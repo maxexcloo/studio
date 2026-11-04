@@ -159,6 +159,7 @@ export function MediaViewerDock({
   iterate,
   pending,
   actions,
+  steps = true,
 }: {
   item: MediaItem;
   /** The next item, whose next steps load once this item's have. */
@@ -169,6 +170,8 @@ export function MediaViewerDock({
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
   actions: React.ReactNode;
+  /** Whether to offer next steps, which iterate on the item. */
+  steps?: boolean;
 }) {
   const assistant = useQuery(assistantQuery);
   // Only variations that arrive while this family is shown animate in, not those present on open.
@@ -227,7 +230,7 @@ export function MediaViewerDock({
         </ScrollArea>
       )}
       {actions}
-      {steppable(item, Boolean(assistant.data?.available)) && (
+      {steps && steppable(item, Boolean(assistant.data?.available)) && (
         <NextSteps
           key={item.jobId}
           item={item}
