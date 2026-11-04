@@ -24,8 +24,22 @@ interface AdmissionOptions {
   resourceFor(input: GenerationInput, priority?: number): Promise<string>;
   pendingItems(id: string, input: GenerationInput): QueueMedia[];
   revision(): number;
+  /** Whether a request's profile can't batch images, so its Count becomes separate runs. */
+  separateRuns?(input: GenerationInput): boolean;
   /** Hears each newly queued job, for the taste profile; must not throw. */
   admitted?(job: OwnedJob): void;
+}
+
+/** One copy of a request per image where its profile can't batch, each with its own seed. */
+export function splitRuns(input: GenerationInput, separate?: boolean): GenerationInput[] {
+  const count = Math.min(8, Math.max(1, Math.round(Number(input.count) || 1)));
+  if (!separate || count < 2) return [input];
+  const seed = Number(input.seed);
+  return Array.from({ length: count }, (_, index) => ({
+    ...input,
+    count: 1,
+    seed: input.seed && Number.isFinite(seed) ? String(seed + index) : "",
+  }));
 }
 
 /** HTTP and MCP share durable admission, identity, validation and idempotency. */
@@ -76,20 +90,31 @@ export function createGenerationAdmission(options: AdmissionOptions) {
               )
             : options.store.createSession(ownerId, title, input));
         try {
-          job = options.store.enqueue(
-            ownerId,
-            session.id,
-            input,
-            scope?.operation || (input.kind === "video" ? "animate" : "image"),
-            scope?.parentJobId,
-            await options.resourceFor(input, origin?.priority),
-            clientId || undefined,
-            {
-              ...origin,
-              // A Chat run is made from its parent's result only when it uses it as its reference.
-              parentItemId: parent && referencedResult(input, parent),
-            },
-          );
+          // A profile that can't batch makes Count separate runs of one request: seed, seed+1, …
+          // or fresh random seeds, queued together as one set.
+          const copies = splitRuns(input, options.separateRuns?.(input));
+          const queueSet = copies.length > 1 ? origin?.queueSet || crypto.randomUUID() : undefined;
+          let first: OwnedJob | undefined;
+          for (const [index, copy] of copies.entries()) {
+            const queued = options.store.enqueue(
+              ownerId,
+              session.id,
+              copy,
+              scope?.operation || (input.kind === "video" ? "animate" : "image"),
+              scope?.parentJobId,
+              await options.resourceFor(copy, origin?.priority),
+              clientId ? (index ? `${clientId}-${index + 1}` : clientId) : undefined,
+              {
+                ...origin,
+                ...(queueSet ? { queueSet } : {}),
+                // A Chat run is made from its parent's result only when it uses it as its reference.
+                parentItemId: parent && referencedResult(input, parent),
+              },
+            );
+            first ??= queued;
+            if (index) options.admitted?.(queued);
+          }
+          job = first!;
         } catch (error) {
           const failure = error as Error & { code?: string };
           if (String(failure.code || "").startsWith("ERR_SQLITE"))
