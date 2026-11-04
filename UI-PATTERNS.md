@@ -364,7 +364,7 @@ primary component reference and verify APIs against the installed version.
   A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
   in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
   the thinking collapsed under the prompt. The exceptions are the viewer's plain-language change and
-  Animate's Review Prompt First (checked in Animate ▾, off by default): a theme or Custom Animation
+  Animate's Review Prompt First (checked in Animate ▾, off by default): a theme or Custom
   then writes the prompt into a compact dialog (a full-screen sheet on phones) with the prompt
   editable, the video model and Fast or Quality shown, and Run, which queues exactly that prompt, or Cancel.
 - The status panel shows compact active rows with a muted spinner and Stop;
@@ -447,7 +447,7 @@ primary component reference and verify APIs against the installed version.
   then the other shared actions as icons with tooltips (Copy, Download, Star,
   Delete); Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
-  Models, Custom Animation, Animate in Composer). Details lists
+  Models, Custom, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
   prompts and the caption sit in boxes framed like the composer's text box,
   inside the column (never bleeding past its edges), wrapping long words and
