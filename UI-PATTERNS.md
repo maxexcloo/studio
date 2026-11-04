@@ -546,7 +546,8 @@ primary component reference and verify APIs against the installed version.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
   Image viewing and original/upscale comparison share `MediaZoom` for named
-  zoom modes, native transforms, keyboard shortcuts and transient controls.
+  zoom modes, native transforms, keyboard shortcuts and transient controls in
+  the bottom-right corner of the media, above the action bar.
 - Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
   toolbar's place, sticky under the header on its surface: Clear Selection (✕)
   and the count, then on desktop every action as an icon with a tooltip, without
