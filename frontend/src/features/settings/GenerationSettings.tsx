@@ -16,7 +16,7 @@ import { UnfinishedItems } from "./UnfinishedItems";
 export function GenerationSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Generation" />;
+  if (deployment.isPending) return <LoadingState label="Loading Generation" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { defaults, catalogue } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {

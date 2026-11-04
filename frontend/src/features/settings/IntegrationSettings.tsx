@@ -14,7 +14,7 @@ const status = (on: boolean, label: string) => (
 export function IntegrationSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
-  if (deployment.isPending) return <LoadingState label="Loading Integrations" />;
+  if (deployment.isPending) return <LoadingState label="Loading Integrations" fill />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
   const { civitai, huggingFace, assistant } = deployment.data.integrations;
   const { model, models } = assistant;
