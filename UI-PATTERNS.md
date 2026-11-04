@@ -358,7 +358,8 @@ primary component reference and verify APIs against the installed version.
   editable, the video model and Fast or Quality shown, and Run, which queues exactly that prompt, or Cancel.
 - The status panel shows compact active rows with a muted spinner and Stop;
   completed/cancelled work leaves the list, failed work retains Retry and Clear.
-  The queue's own actions (Pause Queue or Resume, Stop All, Clear Failed) sit
+  Tapping a row expands its inputs under it (prompt, negative, settings, LoRAs
+  and reference thumbnails); tapping again collapses them. The queue's own actions (Pause Queue or Resume, Stop All, Clear Failed) sit
   on the Generations heading's row (beside Close on phones) as icons like the
   rows', Stop and Clear with the rows' icons.
   Stop All and Clear Failed use `ConfirmDialog`. Stop All requests cancellation

@@ -1,3 +1,19 @@
 .row + .row {
   border-top: 1px solid var(--mantine-color-default-border);
 }
+
+.toggle {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* Under the row's text, past its kind icon (18 px) and the gap after it. */
+.details {
+  padding-left: calc(18px + var(--mantine-spacing-sm));
+}
+
+.text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

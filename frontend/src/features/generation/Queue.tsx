@@ -2,12 +2,15 @@ import {
   ActionIcon,
   Alert,
   Button,
+  Collapse,
   Group,
+  Image as Thumbnail,
   Loader,
   RingProgress,
   Stack,
   Text,
   Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
 import {
   queryOptions,
@@ -17,7 +20,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { arrayMove } from "@dnd-kit/helpers";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 import { CircleAlert, GripVertical, Image, Video, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -25,10 +28,13 @@ import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import classes from "./Queue.module.css";
 import { api, post } from "../../api";
-import type { QueueJob } from "../../types";
+import type { Profile, QueueJob, ReferenceAsset } from "../../types";
+import { useMotionDuration } from "../../ui/Appearance";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useGenerationActions } from "./GenerationProvider";
-import { isProfile, profileName } from "./payload";
+import { loraInfoQuery, loraTitle } from "./LoraPicker";
+import { isProfile, profileName, shownProfileName } from "./payload";
+import { referenceLabel } from "./references";
 import { WritingStream } from "./PromptWriting";
 import type { QueueRowDrag } from "./SortableQueue";
 import { terminalStatuses, type QueuePause } from "../../../../shared/queue";
@@ -154,6 +160,80 @@ export const progressPercent = (progress: QueueJob["progress"]) =>
 const waiting = (job: QueueJob) => ["writing", "queued", "waiting"].includes(job.status);
 const loadSortable = () => import("./SortableQueue");
 const SortableQueue = lazy(loadSortable);
+/**
+ * A run's recorded settings in short: the profile, size, length, steps, seed, LoRAs and outputs.
+ * `loraName` lists each LoRA by name with its strength instead of counting them.
+ */
+export function settingChips(
+  input: QueueJob["input"],
+  profile?: Profile,
+  loraName?: (file: string) => string,
+) {
+  const name = shownProfileName(
+    String(input.profileName || profile?.displayName || profile?.label || ""),
+  );
+  const steps = input.steps && !new RegExp(`\\b${input.steps}\\s*steps?\\b`, "i").test(name);
+  const loras = Array.isArray(input.loras)
+    ? input.loras.filter((lora: { enabled?: boolean }) => lora.enabled !== false)
+    : [];
+  const seconds = Number(input.duration) || Number(input.frames) / Number(input.fps) || 0;
+  return [
+    name,
+    input.width && input.height ? `${input.width} × ${input.height}` : "",
+    input.kind === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "",
+    steps ? `${input.steps} Steps` : "",
+    input.seed !== undefined && input.seed !== "" ? `Seed ${input.seed}` : "",
+    ...(loraName
+      ? loras.map((lora) => `${loraName(lora.name)} ${Number(lora.strength ?? 1).toFixed(2)}`)
+      : [loras.length ? `${loras.length} ${loras.length === 1 ? "LoRA" : "LoRAs"}` : ""]),
+    Number(input.count) > 1 ? `${input.count} Outputs` : "",
+  ].filter(Boolean);
+}
+
+/** What a queue item runs with, shown under its row once opened. */
+function QueueJobDetails({ job, profile }: { job: QueueJob; profile?: Profile }) {
+  const { input } = job;
+  const info = useQuery(loraInfoQuery);
+  const references = Array.isArray(input.referenceDetails)
+    ? (input.referenceDetails as ReferenceAsset[])
+    : [];
+  const prompt = String(input.prompt || "").trim();
+  const negative = String(input.negative || "").trim();
+  return (
+    <Stack gap={6} pb="xs" className={classes.details}>
+      {prompt && (
+        <Text size="sm" className={classes.text}>
+          {prompt}
+        </Text>
+      )}
+      {negative && (
+        <Text size="xs" c="dimmed" className={classes.text}>
+          Negative: {negative}
+        </Text>
+      )}
+      <Text size="xs" c="dimmed">
+        {settingChips(input, profile, (file) => loraTitle(info.data?.loras[file], file)).join(
+          " · ",
+        )}
+      </Text>
+      {references.length > 0 && (
+        <Group gap={6}>
+          {references.map((asset, position) => (
+            <Thumbnail
+              key={`${asset.slot}:${asset.id}`}
+              src={asset.thumbnailUrl || asset.url}
+              alt={referenceLabel(asset, position, profile)}
+              h={40}
+              w={40}
+              radius="sm"
+            />
+          ))}
+        </Group>
+      )}
+    </Stack>
+  );
+}
+
 function QueueRow({
   job,
   sortable,
@@ -164,6 +244,9 @@ function QueueRow({
   sortable: boolean;
   drag?: QueueRowDrag;
 }) {
+  const [opened, setOpened] = useState(false);
+  const detailsId = useId();
+  const duration = useMotionDuration();
   const failed = job.status === "failed";
   const { progress } = job;
   const percent = progressPercent(progress);
@@ -173,55 +256,79 @@ function QueueRow({
     isProfile(entry, job.input?.profileId),
   );
   return (
-    <Group ref={drag?.elementRef} wrap="nowrap" gap="sm" py="xs" className={classes.row}>
-      <Kind
-        size={18}
-        aria-hidden
-        color={failed ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"}
-        style={{ flexShrink: 0 }}
-      />
-      <Stack gap={2} flex={1} miw={0}>
-        <Text size="sm" lineClamp={1}>
-          {String(job.input?.prompt || "Generation")}
-        </Text>
-        <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
-          {[profile && profileName(profile), statusLabels[job.status], progress?.phase, job.reason]
-            .filter(Boolean)
-            .join(" · ")}
-        </Text>
-        {job.status === "writing" && <WritingStream progress={progress} />}
-      </Stack>
-      {/* Trailing, so waiting rows' text lines up with the others' and Stop keeps its column. */}
-      {sortable && (
-        <Tooltip label="Drag to Reorder">
-          <ActionIcon
-            ref={drag?.handleRef}
-            disabled={!drag}
-            aria-label="Drag to Reorder"
-            variant="subtle"
-            color="gray"
-            style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
-          >
-            <GripVertical size={16} />
-          </ActionIcon>
-        </Tooltip>
+    <div ref={drag?.elementRef} className={classes.row}>
+      <Group wrap="nowrap" gap="sm" py="xs">
+        {/* Opens the inputs below; only the handle drags, so a tap here never moves the row. */}
+        <UnstyledButton
+          className={classes.toggle}
+          aria-expanded={opened}
+          aria-controls={detailsId}
+          onClick={() => setOpened((open) => !open)}
+        >
+          <Group wrap="nowrap" gap="sm">
+            <Kind
+              size={18}
+              aria-hidden
+              color={failed ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"}
+              style={{ flexShrink: 0 }}
+            />
+            <Stack gap={2} flex={1} miw={0}>
+              <Text size="sm" lineClamp={1}>
+                {String(job.input?.prompt || "Generation")}
+              </Text>
+              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
+                {[
+                  profile && profileName(profile),
+                  statusLabels[job.status],
+                  progress?.phase,
+                  job.reason,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </Stack>
+          </Group>
+        </UnstyledButton>
+        {/* Trailing, so waiting rows' text lines up with the others' and Stop keeps its column. */}
+        {sortable && (
+          <Tooltip label="Drag to Reorder">
+            <ActionIcon
+              ref={drag?.handleRef}
+              disabled={!drag}
+              aria-label="Drag to Reorder"
+              variant="subtle"
+              color="gray"
+              style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
+            >
+              <GripVertical size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+        {!terminalStatuses.has(job.status) &&
+          (percent ? (
+            <RingProgress
+              size={28}
+              thickness={3}
+              roundCaps
+              rootColor="var(--mantine-color-default-border)"
+              sections={[{ value: percent, color: "var(--mantine-color-dimmed)" }]}
+              aria-label={`${Math.round(percent)}% Complete`}
+            />
+          ) : (
+            <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
+          ))}
+        <QueueJobAction job={job} compact />
+        {failed && <ClearJob job={job} />}
+      </Group>
+      {job.status === "writing" && (
+        <div className={classes.details}>
+          <WritingStream progress={progress} />
+        </div>
       )}
-      {!terminalStatuses.has(job.status) &&
-        (percent ? (
-          <RingProgress
-            size={28}
-            thickness={3}
-            roundCaps
-            rootColor="var(--mantine-color-default-border)"
-            sections={[{ value: percent, color: "var(--mantine-color-dimmed)" }]}
-            aria-label={`${Math.round(percent)}% Complete`}
-          />
-        ) : (
-          <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
-        ))}
-      <QueueJobAction job={job} compact />
-      {failed && <ClearJob job={job} />}
-    </Group>
+      <Collapse id={detailsId} expanded={opened} keepMounted={false} transitionDuration={duration}>
+        <QueueJobDetails job={job} profile={profile} />
+      </Collapse>
+    </div>
   );
 }
 function ClearJob({ job }: { job: QueueJob }) {
