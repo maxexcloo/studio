@@ -21,18 +21,28 @@ export const localUnlessAsked = (profiles, { request, name } = {}) =>
   asksForCloud(request) || namesCloud(name)
     ? profiles
     : profiles.filter((profile) => !isCloudProfile(profile));
-/**
- * What MCP says while the local video worker is down and the account has no cloud profile to go to.
- * A parked worker was stopped on purpose, so the user hears that, not that it failed.
- */
+// The services as Settings › Workers names them, and their states as it shows them.
+const serviceLabels = { image: "Images", video: "Videos" };
+/** A service's live state from the catalogue's `backends`, in the UI's words: Running, Stopped, Offline or Not Configured. */
+export const serviceState = (backend) =>
+  !backend?.configured
+    ? "Not Configured"
+    : backend.available
+      ? "Running"
+      : backend.parked
+        ? "Stopped"
+        : "Offline";
+/** What MCP says about stopped local services: stopped on purpose, so an administrator can start them. */
+export const stoppedServices = (kinds) =>
+  `${[kinds]
+    .flat()
+    .map((kind) => serviceLabels[kind] || kind)
+    .join(" and ")} are Stopped; an administrator can start them in Settings › Workers.`;
+/** What MCP says while local video isn't running and the account has no cloud profile to go to. */
 export const localVideoUnavailable = (parked = false) =>
-  `Local video is unavailable right now: ${parked ? `${parkedWorker("video")} Tell the user.` : "the video worker is offline. Tell the user to try again later."}`;
-/** What MCP says about a parked local worker: it is stopped on purpose, not broken. */
-export const parkedWorker = (kinds) => {
-  const list = [kinds].flat();
-  const [it, worker] = list.length > 1 ? ["them", "workers are"] : ["it", "worker is"];
-  return `the ${list.join(" and ")} ${worker} stopped (on purpose; an administrator can start ${it} in Settings › Workers).`;
-};
+  parked
+    ? `${stoppedServices("video")} Tell the user.`
+    : "Videos are Offline: the video worker isn't answering. Tell the user to try again later.";
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 const preferredTiers = ["fast", "turbo", "standard", "quality"];
 const labels = { "super fast": "turbo", fast: "fast", quality: "quality", standard: "standard" };

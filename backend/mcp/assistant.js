@@ -130,11 +130,19 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     server,
     "RewritePrompt",
     "Rewrite Prompt",
-    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; Spicy needs uncensored access), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
+    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; spicy needs Uncensored Models, which Models lists among the account's features), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
     {
       prompt,
       profile_id: profileId,
-      preset: z.enum(presetIds).default(defaultPreset),
+      // A free string checked here, so a preset this deployment doesn't have gets the current list.
+      preset: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine((value) => presetIds.includes(value), {
+          message: `Use one of ${presetIds.join(", ")}`,
+        })
+        .default(defaultPreset),
       reference_asset_ids: z.array(z.string().min(1)).max(maxReferences).optional(),
     },
     async ({ prompt: text, profile_id, preset, reference_asset_ids = [] }, signal) => {

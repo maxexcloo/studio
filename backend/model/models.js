@@ -282,10 +282,13 @@ export function inferModels(
     // A combined profile lists while any of its backends could run here; its own backend not being
     // ready shows as Needs Setup with the reason, never as a quiet switch to the other one.
     const backendOptions = (workflow.backendIds || []).map((id) => {
-      const reason = configuredOnly ? "" : unready(workflowOnBackend(listed, id));
+      const own = workflowOnBackend(listed, id);
+      const reason = configuredOnly ? "" : unready(own);
       return {
         id,
         label: profileBackendLabels[id] || id,
+        // Each backend's graph may take a different number of references.
+        references: own.mediaInputs?.length || 0,
         ...(configuredOnly ? {} : { ready: !reason }),
         ...(reason ? { reason } : {}),
       };
