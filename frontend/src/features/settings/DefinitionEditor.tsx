@@ -199,7 +199,7 @@ function DefinitionForm({
           <Text size="sm" c="dimmed">
             {creating ? "New Definition" : `Version ${meta?.version || 0}`}
           </Text>
-          {meta?.aiDrafted && <Badge color="orange">AI-Drafted</Badge>}
+          {meta?.aiDrafted && <Badge color="orange">AI</Badge>}
         </Group>
         <TextInput
           label="Definition ID"
@@ -451,7 +451,7 @@ function DefinitionForm({
                       cell: (entry) => (
                         <Group gap="xs" wrap="nowrap">
                           <Text size="sm">{entry.version}</Text>
-                          {entry.aiDrafted && <Badge color="orange">AI-Drafted</Badge>}
+                          {entry.aiDrafted && <Badge color="orange">AI</Badge>}
                         </Group>
                       ),
                     },
