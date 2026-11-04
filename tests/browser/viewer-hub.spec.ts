@@ -752,6 +752,7 @@ test("Copy ▾ copies the prompt first and Details copies every input", async ({
         "Negative Prompt: blurry",
         "Profile: Image Quality",
         "CFG: 4",
+        "Mode: Generate",
         "Sampler: euler",
         "Seed: 1234567",
         "Steps: 28",

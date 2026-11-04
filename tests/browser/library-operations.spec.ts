@@ -485,12 +485,12 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
   await page
-    .getByRole("dialog", { name: "Models Filters", exact: true })
+    .getByRole("dialog", { name: "Filter Models", exact: true })
     .getByRole("button", { name: "Clear", exact: true })
     .click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Models", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Models Filters", exact: true })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Filter Models", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Search Models", exact: true }).click();
   await page.getByRole("textbox", { name: "Search Models", exact: true }).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
