@@ -666,6 +666,7 @@ const suggestions = createSuggestions({
     filterVisibleGallery(
       gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
     )[0],
+  image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
   // The viewer asks by job, so every result of the run keeps the same steps.
   save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
 });

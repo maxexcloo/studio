@@ -15,6 +15,7 @@ function fixture(
     reply?: (system: string) => string;
     writer?: (owner: string) => boolean;
     online?: boolean;
+    image?: boolean;
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -52,6 +53,7 @@ function fixture(
       width: 1024,
       height: 768,
       settings: { profileName: "Flux 2", loras: [{ name: "film", enabled: true }] },
+      caption: { text: "Fishing boats moored in pale fog." },
     },
     "alice:job-video": { type: "video", status: "done", prompt: "Waves" },
     "bob:job-b": { type: "image", status: "done", prompt: "A sultry portrait" },
@@ -71,6 +73,7 @@ function fixture(
     online: async () => options.online ?? true,
     uncensored: (owner) => owner === "bob",
     item: (owner, jobId) => items[`${owner}:${jobId}`],
+    image: async () => (options.image ? { mime: "image/jpeg", data: "AAAA" } : null),
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     now: () => clock,
   });
@@ -165,6 +168,8 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   ]);
   assert.match(calls[0][1].content, /Prompt: A harbour at dawn/);
   assert.match(calls[0][1].content, /Model: Flux 2\nSize: 1024 × 768\nLoRAs: film/);
+  assert.match(calls[0][1].content, /What it shows: Fishing boats moored in pale fog\./);
+  assert.equal(calls[0][1].images, 0);
   assert.deepEqual(await suggestions.suggest("alice", { surface: "viewer", jobId: "job-video" }), {
     suggestions: [],
     reason: "Next steps are offered for finished images.",
@@ -174,6 +179,13 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   // An account with Uncensored Models gets steps that keep an explicit image explicit.
   await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
   assert.match(calls[1][0].content, /may make uncensored images[^\n]*never refuse/);
+});
+
+test("viewer next steps read the image itself where the text model can", async () => {
+  const { calls, suggestions } = fixture({ image: true });
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  assert.equal(calls[0][1].images, 1);
+  assert.match(calls[0][0].content, /what the attached image shows/);
 });
 
 test("an image's next steps are kept with it, and More asks for different ones", async () => {
