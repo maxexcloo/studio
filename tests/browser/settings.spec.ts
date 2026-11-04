@@ -208,6 +208,8 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   await page.goto("/settings#preferences");
   // The unlabelled track sits over the input; the row's accessible name is on the input.
   const toggle = page.getByRole("switch", { name: "Tile Captions", exact: true });
+  // Force skips the wait for the switch to enable once the account's preferences load.
+  await expect(toggle).toBeEnabled();
   await toggle.click({ force: true });
   await expect(toggle).toBeChecked();
   await page.getByRole("button", { name: "Close Settings", exact: true }).click();
