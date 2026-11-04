@@ -62,6 +62,9 @@ async function lookupFile(resource, inspect) {
   };
 }
 
+/** A search's `type`, as Civitai's model types name it. */
+const civitaiTypes = { lora: "LORA", checkpoint: "Checkpoint" };
+
 /** Profiles here whose family the base model names. */
 const fitting = (families, profiles) =>
   profiles
@@ -78,7 +81,7 @@ const fitting = (families, profiles) =>
  *   profiles()              ready profiles [{id, family}]
  */
 export async function lookupLibrary(
-  { url = "", query = "" } = {},
+  { url = "", query = "", type = "", baseModel = "" } = {},
   { json, hfRequest, inspect, families = () => [], profiles = async () => [] },
 ) {
   const ready = await profiles().catch(() => []);
@@ -91,7 +94,11 @@ export async function lookupLibrary(
       .trim()
       .slice(0, 120);
     if (!words) throw new Error("Pass a Civitai or Hugging Face link, or a query.");
-    const found = await json(`models?limit=${maxSearchResults}&query=${encodeURIComponent(words)}`);
+    // Civitai narrows a search by model type (LORA, Checkpoint) and base model (such as "Flux.1 D").
+    const search = new URLSearchParams({ limit: String(maxSearchResults), query: words });
+    if (type) search.set("types", civitaiTypes[type]);
+    if (baseModel) search.set("baseModels", String(baseModel).trim().slice(0, 80));
+    const found = await json(`models?${search}`);
     const models = (Array.isArray(found?.items) ? found.items : []).slice(0, maxSearchResults);
     return {
       query: words,
@@ -111,6 +118,8 @@ export async function lookupLibrary(
               versionId: version.id,
               name: String(version.name || version.id),
               baseModel: String(version.baseModel || ""),
+              // The version's own link, which Import takes.
+              links: civitaiLinks(model.id, version.id),
               available: availability.available,
               ...(availability.available
                 ? {}

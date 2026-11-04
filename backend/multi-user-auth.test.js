@@ -189,6 +189,11 @@ test("only an authenticated administrator can create profiles and ordinary accou
     accountForRequest(bearer("GET", "/api/models")).userId,
     accountForRequest(admin).userId,
   );
+  // Search reads the account's own gallery.
+  assert.equal(
+    accountForRequest(bearer("GET", "/api/gallery")).userId,
+    accountForRequest(admin).userId,
+  );
   // A personal MCP token is not a general API or administrator credential.
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/gateway-admin")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
@@ -573,6 +578,45 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   );
   const artistToken = rotateAccountMcpToken(artist.id).token;
   assert.equal(accountForRequest(bearer(artistToken, "POST", "/api/library/imports")), null);
+  // The account's own gallery, queue, Dream and taste take any account's token, never as an administrator.
+  for (const [method, routePath] of [
+    ["POST", "/api/gallery/delete"],
+    ["POST", "/api/gallery/favorite"],
+    ["GET", "/api/queue"],
+    ["POST", "/api/queue/pause"],
+    ["POST", "/api/queue/job-1/retry"],
+    ["GET", "/api/dream"],
+    ["POST", "/api/dream/item-1/keep"],
+    ["PUT", "/api/taste"],
+    ["POST", "/api/loras/library/ops"],
+    ["POST", "/api/upscale"],
+  ]) {
+    assert.equal(
+      accountForRequest(bearer(artistToken, method, routePath))?.credential,
+      "mcp-token",
+      `${method} ${routePath}`,
+    );
+    assert.equal(
+      canAdmin({ studioAccount: accountForRequest(bearer(adminToken, method, routePath)) }),
+      false,
+    );
+  }
+  // Maintenance and import removal stay with administrators.
+  for (const [method, routePath] of [
+    ["POST", "/api/maintenance/migrations"],
+    ["POST", "/api/maintenance/unfinished/delete"],
+    ["POST", "/api/queue/pause-all"],
+    ["POST", "/api/profiles/duplicates/merge"],
+    ["DELETE", "/api/library/imports/imp-1"],
+    ["POST", "/api/gallery/import/reddit"],
+  ]) {
+    assert.equal(accountForRequest(bearer(artistToken, method, routePath)), null);
+    assert.equal(
+      accountForRequest(bearer(adminToken, method, routePath))?.credential,
+      "mcp-admin",
+      `${method} ${routePath}`,
+    );
+  }
 
   // The switch is off by default: a gateway-linked administrator's loopback calls stay out.
   assert.equal(

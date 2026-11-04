@@ -112,6 +112,34 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Administrators can edit and approve runtime-owned catalogue, profile and guide definitions through the retained mutation tools, and manage accounts and groups with the Accounts tool (list, save, set the default or delete an empty non-default group, move an account, disable it, change its role or delete it; passwords are reset only in Settings). Personal MCP tokens remain distinct from browser administrator credentials.
 
+#### MCP & UI Parity
+
+Every MCP action calls the route its UI action calls, with the caller's own credential, so ownership, group features and administrator checks apply as in the app. Media tools work on the caller's own results only: a ref or job ID another MCP identity holds is refused before any request.
+
+| UI action                                                                       | MCP tool and action                                                  |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Composer generation, variations, sizes, LoRAs, references                       | Generate (Models to look up), Upload, UploadLink                     |
+| Recreate, Run Again (Same Seed), Animate, Extend, Use as Reference              | Reuse `again` (`preserve_seed`), `animate`, `extend`, `reference`    |
+| Upscale                                                                         | Reuse `upscale`                                                      |
+| Compare models side by side                                                     | Generate with several profiles (a comparison page)                   |
+| Gallery search, Starred, uploads                                                | Search                                                               |
+| Star, unstar, delete, bulk delete, clear failed                                 | Gallery `star`, `unstar`, `delete`, `clear_failed`                   |
+| Status, Stop                                                                    | Status, Result, Cancel                                               |
+| Queue pause, resume, cancel all, clear failed, retry, clear, reorder            | Queue                                                                |
+| Dream keep, discard, more, variations, pair answers, settings, discarded        | Dream (Dream feature)                                                |
+| Taste profile edit, refresh, reset; LoRA thumbs up and down                     | Taste (`rate_lora` needs LoRAs)                                      |
+| Prompt assistant presets, negatives, LoRA suggestions                           | RewritePrompt, SuggestNegative, SuggestLoras                         |
+| Library browse and update view; catalogue edits, undo, remove                   | Library, CatalogueEdit (administrators, as for every row below)      |
+| Library › Import: Civitai, Hugging Face, Reddit, images; history, clear, remove | Lookup (search by `type`, `base_model`), Import (`install`), Imports |
+| Downloads start, retry, cancel; updates check, apply                            | Downloads, Updates (`query` names entries)                           |
+| Profiles and guides: edit, draft, approve, revert, remove; bindings; export     | Profiles, ProfileEdit, Export, Placement                             |
+| Combine Backends, Merge Duplicate Profiles                                      | CombineBackends, Maintenance `duplicates`, `merge_duplicates`        |
+| Unfinished Items, Pause All; runtime migrations (no UI)                         | Maintenance                                                          |
+| Users and Groups                                                                | Accounts                                                             |
+| Settings › Workers, GPU placement, restarts                                     | The control key's GPU tools only                                     |
+
+UI-only by design: signing in, passwords, email, MCP tokens, single sign-on and Chat Gateway links (credentials stay in the browser); workflow imports, raw ComfyUI and diagnostics (see [Security](SECURITY.md)); downloads, exports, sharing and GIFs (files for a browser; chats get result links); mask painting and viewer zoom (pointer work). Not in MCP yet: prompt history, personal presets, saved LoRA stacks, reference management, Preferences, comparison votes, video edits and the instance settings in Settings › Generation and Integrations.
+
 Studio's Chat tab uses the assistant's text gateway (`STUDIO_ASSISTANT_URL` and `STUDIO_ASSISTANT_KEY`, below) with its own model list:
 
 - `STUDIO_CHAT_MODELS`: comma-separated permitted model IDs or prefixes ending in `*`, such as `local/auto,cloud/*`. Missing or empty configuration leaves Chat unavailable. Chat offers the models this gateway's catalogue returns, plus permitted models of Studio's text workloads while they are stopped (the gateway lists only running ones); the first permitted model is the default. Selected models are checked again for every message.
@@ -277,7 +305,7 @@ It moves what older versions' Settings wrote into the data folder's `.env` (the 
 
 With `--dream-owner <account id>`, naming the one account that has used Dream, it also clears Dream answers left on other accounts' records (`backend/dream-ownership.js`): Dream marks on gallery items another account owns, and that account's calibration answers and Dream taste signals about those items. Its own marks, answers and taste summary stay. The dry run reports the counts under `dreamOwnership`; `--apply` writes them with Studio stopped, without a backup.
 
-An administrator can run the same steps (`backend/runtime-migrations.js`, without the Dream ownership step) against the running Studio's data folder with `POST /api/maintenance/migrations`. With `{}` it returns every step's dry run under `steps.<name>`, as the command prints them; with `{ "apply": true }` it applies the steps that are safe while Studio runs, `accountAccess`, `loraRatings`, `loraLayers` and `downloadSources`, writing the same backups and reloading the accounts store and the catalogue, so no restart is needed. Every other step with work to do is left unapplied and carries `refused`: it needs Studio stopped and the command. The server log records each run's steps, change counts, outcomes and backup folders.
+An administrator can run the same steps (`backend/runtime-migrations.js`, without the Dream ownership step) against the running Studio's data folder with `POST /api/maintenance/migrations`. With `{}` it returns every step's dry run under `steps.<name>`, as the command prints them; with `{ "apply": true }` it applies the steps that are safe while Studio runs, `accountAccess`, `loraRatings`, `loraLayers` and `downloadSources`, writing the same backups and reloading the accounts store and the catalogue, so no restart is needed. Every other step with work to do is left unapplied and carries `refused`: it needs Studio stopped and the command. The server log records each run's steps, change counts, outcomes and backup folders. The admin MCP tool **Maintenance** runs it: `migrations` is the dry run and `apply: true` applies.
 
 ## Queue, Sessions & Runtime Control
 
