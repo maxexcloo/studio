@@ -12,6 +12,7 @@ import {
   createDream,
   registerDreamRoutes,
   type DreamAccess,
+  type DreamInspiration,
   type DreamItem,
   type DreamLoraLibrary,
   type DreamProfile,
@@ -62,6 +63,9 @@ function fixture(t: TestContext, catalogue = profiles) {
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
     loras: {} as Record<string, DreamLoraLibrary>,
+    inspiration: [] as DreamInspiration[],
+    /** Rolls for the next chance draws (out of 100); every other draw is 0. */
+    rolls: [] as number[],
   };
   let dream: ReturnType<typeof createDream>;
   const admission = createGenerationAdmission({
@@ -115,6 +119,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
     // As the LoRA policy would: klein.safetensors is for another model family.
     fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
+    inspiration: () => state.inspiration,
     reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
     // carries its written prompt and mark from the queue record.
@@ -148,7 +153,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     cancel: async (ownerId, jobId) =>
       store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
     now: () => state.clock,
-    random: () => 0,
+    random: (size) => (size === 100 && state.rolls.length ? state.rolls.shift()! : 0),
     log: { info: (message) => state.logs.push(message) },
   });
   /** Finishes a job and its tile, as saving its outputs would. */
@@ -390,6 +395,39 @@ test("Dream picks a ready profile by its stars and keeps Spicy to accounts with 
     onDelta() {},
   });
   assert.match(state.calls[2].system, /safe for work/);
+  // A share of ideas goes to the profile used least, here one never used.
+  state.rolls = [99];
+  const explored = await dreamOnce();
+  assert.equal(explored?.input.profileId, "flux");
+  assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You star foxes.");
+  // Another share starts from a Library import, on its profile with its LoRAs, for Uncensored
+  // Models only, since imports carry no content rating.
+  state.access.alice!.uncensored = true;
+  state.loras.alice = { ratings: { "ink.safetensors": "down" }, strengths: {} };
+  state.inspiration = [
+    {
+      prompt: "a lighthouse in a storm",
+      profileId: "flux",
+      loras: [
+        { name: "fox.safetensors", strength: 0.7 },
+        { name: "ink.safetensors", strength: 1 },
+        { name: "missing.safetensors", strength: 1 },
+      ],
+    },
+  ];
+  state.rolls = [99];
+  const inspired = await dreamOnce();
+  assert.equal(inspired?.input.profileId, "flux");
+  assert.deepEqual(inspired?.input.loras, [
+    { name: "fox.safetensors", strength: 0.7, enabled: true },
+  ]);
+  assert.match(state.calls.at(-1)!.user, /Inspiration prompt: a lighthouse in a storm/);
+  assert.match(state.calls.at(-1)!.system, /Start from the inspiration prompt/);
+  assert.equal(inspired?.dream?.why, "Inspired by an import · You star foxes.");
+  state.access.alice!.uncensored = false;
+  state.rolls = [99];
+  await dreamOnce();
+  assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
 });
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
@@ -656,18 +694,27 @@ test("Dream loads one of the account's thumbs-up LoRAs the profile can use", asy
       "film.safetensors": "up",
       "ink.safetensors": "down",
     },
-    strengths: { "family:flux": { "fox.safetensors": 0.6 } },
+    strengths: { "family:flux": { "film.safetensors": 0.6 } },
   };
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
   const loras = store.job("alice", job.id)!.input.loras as { name: string; strength: number }[];
   assert.deepEqual(
     loras.map((lora) => [lora.name, lora.strength]),
-    [["fox.safetensors", 0.6]],
+    [["film.safetensors", 0.6]],
   );
   state.loras.alice.ratings["ink.safetensors"] = "up";
   assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 1);
-  assert.match(state.calls.at(-1)!.user, /favourite LoRA: /);
+  assert.match(state.calls.at(-1)!.user, /loads these LoRAs: /);
+  // A share of LoRA ideas tries an unrated one instead, and the why line says so.
+  delete state.loras.alice.ratings["ink.safetensors"];
+  state.rolls = [0, 0, 99];
+  const tried = (await dreamOnce())!;
+  assert.deepEqual(
+    (tried.input.loras as { name: string }[]).map((lora) => lora.name),
+    ["ink.safetensors"],
+  );
+  assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
   state.loras = {};
   const next = (await dreamOnce())!;
