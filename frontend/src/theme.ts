@@ -285,9 +285,12 @@ export function studioTheme({
       ScrollAreaAutosize: ScrollArea.Autosize.extend({
         defaultProps: { scrollbars: "y", type: "never" },
       }),
+      // The sliding indicator alone marks the choice; separators between items flicker and fade
+      // unevenly beside it.
       SegmentedControl: SegmentedControl.extend({
         defaultProps: {
           size: "sm",
+          withItemsBorders: false,
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,
         },
