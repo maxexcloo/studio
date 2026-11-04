@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
 import { RefreshCw } from "lucide-react";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 
 export interface LibraryItem {
   key: string;
@@ -104,6 +104,7 @@ const views = [
 
 /** Models and LoRAs share one compact catalogue: views, search, filters and row actions. */
 export function LibraryCatalogueTable({
+  heading,
   items,
   label,
   onUpdate,
@@ -113,6 +114,7 @@ export function LibraryCatalogueTable({
   onEdit,
   updatePending = false,
 }: {
+  heading: ReactNode;
   items: LibraryItem[];
   label: "Models" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
@@ -146,78 +148,80 @@ export function LibraryCatalogueTable({
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;
   return (
     <Stack gap="md">
-      <SectionToolbar
-        label={label}
-        views={views}
-        view={view}
-        onViewChange={setView}
-        query={query}
-        onQueryChange={setQuery}
-        filters={
-          <>
-            <Select
-              label="Family"
-              placeholder="All Families"
-              data={unique(items.flatMap(familiesOf))}
-              value={family}
-              onChange={setFamily}
-              clearable
-              searchable
-              openOnFocus={false}
-              comboboxProps={{ withinPortal: false }}
-              data-mantine-stop-propagation
-            />
-            <Select
-              label="Type"
-              placeholder="All Types"
-              data={unique(items.map(resourceType))}
-              value={type}
-              onChange={setType}
-              clearable
-              comboboxProps={{ withinPortal: false }}
-              data-mantine-stop-propagation
-            />
-            {withModelType && (
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label={label}
+          views={views}
+          view={view}
+          onViewChange={setView}
+          query={query}
+          onQueryChange={setQuery}
+          filters={
+            <>
               <Select
-                label="Model Type"
-                placeholder="All Model Types"
-                data={[
-                  { value: "original", label: "Original" },
-                  { value: "finetune", label: "Finetune" },
-                  { value: "unclassified", label: "Unclassified" },
-                ]}
-                value={modelType}
-                onChange={setModelType}
+                label="Family"
+                placeholder="All Families"
+                data={unique(items.flatMap(familiesOf))}
+                value={family}
+                onChange={setFamily}
+                clearable
+                searchable
+                openOnFocus={false}
+                comboboxProps={{ withinPortal: false }}
+                data-mantine-stop-propagation
+              />
+              <Select
+                label="Type"
+                placeholder="All Types"
+                data={unique(items.map(resourceType))}
+                value={type}
+                onChange={setType}
                 clearable
                 comboboxProps={{ withinPortal: false }}
                 data-mantine-stop-propagation
               />
-            )}
-          </>
-        }
-        filterCount={filterCount}
-        onResetFilters={() => {
-          setFamily(null);
-          setType(null);
-          setModelType(null);
-        }}
-        actions={
-          onCheckUpdates && (
-            <Tooltip label="Check Updates">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label="Check Updates"
-                loading={checkingUpdates}
-                disabled={updatePending}
-                onClick={onCheckUpdates}
-              >
-                <RefreshCw size={18} />
-              </ActionIcon>
-            </Tooltip>
-          )
-        }
-      />
+              {withModelType && (
+                <Select
+                  label="Model Type"
+                  placeholder="All Model Types"
+                  data={[
+                    { value: "original", label: "Original" },
+                    { value: "finetune", label: "Finetune" },
+                    { value: "unclassified", label: "Unclassified" },
+                  ]}
+                  value={modelType}
+                  onChange={setModelType}
+                  clearable
+                  comboboxProps={{ withinPortal: false }}
+                  data-mantine-stop-propagation
+                />
+              )}
+            </>
+          }
+          filterCount={filterCount}
+          onResetFilters={() => {
+            setFamily(null);
+            setType(null);
+            setModelType(null);
+          }}
+          actions={
+            onCheckUpdates && (
+              <Tooltip label="Check Updates">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Check Updates"
+                  loading={checkingUpdates}
+                  disabled={updatePending}
+                  onClick={onCheckUpdates}
+                >
+                  <RefreshCw size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )
+          }
+        />
+      </SectionHeader>
       {updateNote && (
         <Text c="dimmed" size="xs">
           {updateNote}
