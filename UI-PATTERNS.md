@@ -188,24 +188,30 @@ primary component reference and verify APIs against the installed version.
   and presets sort (`SortMenu`, as the LoRA choices do), rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
-  collapse controls. Phones open a full-height Drawer titled Generate upward with
-  a short transition and the standard accessible close action; tapping the
-  collapsed bar's prompt summary opens the full-screen prompt editor over it in
-  one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
+  collapse controls. Tapping the collapsed bar on a phone opens a Drawer titled
+  Generate upward with a short transition and the standard accessible close
+  action. It is exactly the screen and never scrolls: the prompt fills the top
+  with its tools column beside it and the negative prompt under it, and a bottom
+  bar at the safe bottom holds the chips in one row that scrolls sideways, then
+  Image/Video, Clear and Generate. Opening it leaves the keyboard down; tapping
+  the prompt types in place, with no separate editor or Done. While the keyboard
+  is up the bar sits just above it with only its actions, and the prompt shrinks
+  to the room left.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
-  offers Undo in its notification. On desktop the prompt's tools (Recent Prompts,
-  Prompt Assistance, Copy, Clear) stand in one icon column right of the text,
-  which keeps the full height; the one-row negative keeps them inside its box. On phones a text box is a summary of its
-  text; tapping it (prompt, negative, Chat message, profile and guide editors and
-  the rest) opens it full screen, without the keyboard until the text is tapped,
-  with the same actions as the inline box (the
-  prompt's Recent Prompts and Prompt Assistance, Copy, Clear) and Done, with
-  prompt ideas and assistant suggestions under its text; Done, Escape or
-  dismissing the keyboard returns to the page. Desktop edits in place.
+  offers Undo in its notification. The prompt's tools (Recent Prompts, Prompt
+  Assistance with Ask for a Change, Copy, Clear) stand in one icon column right
+  of the text, which keeps the full height; the one-row negative keeps them
+  inside its box. The composer's boxes edit in place on every breakpoint (the
+  phone Generate Drawer is already full screen). Elsewhere on phones a text box
+  is a summary of its text; tapping it (Chat message, profile and guide editors
+  and the rest) opens it full screen, without the keyboard until the text is
+  tapped, with the same actions as the inline box and Done, with assistant
+  suggestions under its text; Done, Escape or dismissing the keyboard returns to
+  the page. Desktop edits in place.
 - Keep expanded generation actions reachable while fields scroll. Desktop
-  panels bound the fields above their action row; the phone Drawer owns scrolling
-  with a sticky action row at the safe bottom. Avoid nested form scroll owners.
+  panels bound the fields above their action row; the phone Drawer scrolls only
+  the prompt's own text. Avoid nested form scroll owners.
   While the phone Drawer is open, notifications sit over the prompt text, below
   its header and the prompt's actions, never over the chips or action row.
 - The Chat composer is the gallery's compact prompt bar: one row of the
@@ -555,9 +561,9 @@ primary component reference and verify APIs against the installed version.
   keyboard and address bar never move the layout: the viewport meta sets
   `interactive-widget=resizes-visual`, so `dvh` and bottom-aligned bars stay put
   while the keyboard overlays the page. Only a surface being typed into follows
-  the visual viewport: the phone `TextBox` editor (an opaque full-screen surface
-  whose text stops above the keyboard) and the desktop composer dock while one of
-  its fields has focus.
+  the visual viewport (`useKeyboard`): the phone `TextBox` editor (an opaque
+  full-screen surface whose text stops above the keyboard), the phone Generate
+  Drawer and the desktop composer dock while one of its fields has focus.
 - The shared gallery toolbar opens search with `/` or Ctrl/Cmd+F only in its
   active surface, without capturing typing, composition or another overlay.
   Viewer F toggles Star and Delete opens the standard confirmation, including

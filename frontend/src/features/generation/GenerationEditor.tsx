@@ -134,7 +134,6 @@ export function GenerationEditor({
   onCompare,
   autoFocusPrompt = false,
   focusPrompt = false,
-  editPrompt = false,
   fill = false,
   ideas: offerIdeas = false,
 }: {
@@ -161,9 +160,10 @@ export function GenerationEditor({
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount. */
   focusPrompt?: boolean;
-  /** Opens the phone's full-screen prompt editor. */
-  editPrompt?: boolean;
-  /** Fills a phone Drawer that owns scrolling, keeping the actions at its safe bottom. */
+  /**
+   * Fills the phone Generate sheet without scrolling: the prompt takes the room above a bottom bar
+   * of the chips and actions.
+   */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
   ideas?: boolean;
@@ -238,6 +238,27 @@ export function GenerationEditor({
         onRemove: () => onChange({ inpaint: null }),
       }
     : undefined;
+  const inputs = (
+    <GenerationInputControls
+      loraPicker={loraPicker}
+      input={input}
+      profile={profile}
+      onChange={onChange}
+      references={supportsReferences ? referencePicker : undefined}
+      hasReferences={!!details.length}
+      mask={mask}
+      presets={
+        presets && {
+          opened: presetsOpen,
+          onOpenedChange: setPresetsOpen,
+          content: presets(() => setPresetsOpen(false)),
+        }
+      }
+      expert={expert}
+      onCompare={onCompare}
+      row={fill}
+    />
+  );
   return (
     <>
       <form
@@ -268,35 +289,17 @@ export function GenerationEditor({
             assistantScope={assistantScope}
             negative={usesNegative(profile)}
             autoFocus={autoFocusPrompt}
-            edit={editPrompt}
             fill={fill}
             ideas={offerIdeas}
             ask={onOperationChange && ask}
-            submit={{ label, disabled: !!blockedReason || pending, onSubmit }}
           />
-          <GenerationInputControls
-            loraPicker={loraPicker}
-            input={input}
-            profile={profile}
-            onChange={onChange}
-            references={supportsReferences ? referencePicker : undefined}
-            hasReferences={!!details.length}
-            mask={mask}
-            presets={
-              presets && {
-                opened: presetsOpen,
-                onOpenedChange: setPresetsOpen,
-                content: presets(() => setPresetsOpen(false)),
-              }
-            }
-            expert={expert}
-            onCompare={onCompare}
-          />
+          {!fill && inputs}
           {!!error && (
             <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>
           )}
         </div>
-        <div className={classes.footer} data-sticky={fill || undefined}>
+        <div className={classes.footer}>
+          {fill && inputs}
           <Group justify="space-between" gap="xs">
             <SegmentedControl
               aria-label="Generation Output"
