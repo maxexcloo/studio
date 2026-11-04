@@ -1,4 +1,5 @@
 import { animateProfile } from "../animate-profile.js";
+import { demoMode } from "../comfy/comfy.js";
 import { familyLabels, modelsForAccount, withFailing, withProfileAliases } from "./catalogue.js";
 
 /** The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is model/catalogue.js. */
@@ -11,7 +12,13 @@ export function registerModelRoutes(app, { catalogue }) {
         ...withFailing(withProfileAliases(modelsForAccount(models, req))),
         familyLabels,
       });
-    } catch {
+    } catch (error) {
+      // Workers that do not answer are part of the catalogue; only no worker at all (or demo mode
+      // without one) falls back here. Anything else is a bug, not an offline worker.
+      if (!error?.noWorker && !demoMode) {
+        console.error("[Studio] Models catalogue failed:", error);
+        return res.status(500).json({ ok: false, error: error.message });
+      }
       res.json({
         ...withFailing(withProfileAliases(modelsForAccount(catalogue.unavailableModels(), req))),
         familyLabels,
