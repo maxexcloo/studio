@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { ServiceKind } from "../../shared/services.ts";
 import type {
   RuntimeOperation,
+  RuntimePodLog,
   RuntimePreview,
   RuntimeSettings,
   RuntimeStatus,
@@ -33,6 +34,7 @@ export interface Workload {
 interface RuntimeEngine {
   state(workload: Workload): Promise<DeploymentState>;
   scale(workload: Workload, replicas: number): Promise<void>;
+  logs(workload: Workload, lines: number): Promise<RuntimePodLog[]>;
 }
 
 export class RuntimeUnavailable extends Error {
@@ -194,6 +196,11 @@ export class RuntimeController {
       kind: workload.kind,
       acceptedOperations: this.active.get(workload.id) ?? 0,
     }));
+  }
+
+  /** The tail of each of a workload's pods' logs, read only. */
+  async logs(id: string, lines: number) {
+    return { pods: await this.engine.logs(this.workload(id), lines) };
   }
 
   /** The workloads of a kind the cluster has scaled up (replicas > 0), ready or not. */
