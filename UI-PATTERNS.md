@@ -77,7 +77,12 @@ primary component reference and verify APIs against the installed version.
   on desktop a dropdown under the icon, which keeps its queue icon in Chat too
   (the sidebar lists the Chats); on phones a slideout, listing the Chats in Chat.
   Full runtime controls live in Settings › Workers, not
-  in the header. Readiness comes from actual text/media endpoints, with unknown
+  in the header. A change in progress shows quietly where it happens, never in a
+  coloured box: each affected workload's badge reads Stopping or Starting with a
+  small loader, and one line beside the table's actions reads Switching to
+  Video… (or why the last change didn't finish, in red, with the rows it left
+  short marked). That line and each History row's menu offer View Log, the
+  change's timestamped steps in a monospace dialog with Copy. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Appearance, Library,
   Settings (16 px icons), a divider, the account name, Account and supported
   Sign Out. Desktop shows Appearance, Library, Settings and Account as icons,
