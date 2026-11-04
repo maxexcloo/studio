@@ -44,8 +44,8 @@
 .statusLink:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
 }
-/* The desktop dropdown sizes the list to its rows (Empty Queue is one line), bounded above the
-   service summary, with even gaps around the divider. */
+/* The desktop dropdown sizes the list to its rows, bounded above the service summary, with even
+   gaps around the divider; an empty queue keeps a small minimum height with Empty Queue centred. */
 .dropdown {
   display: flex;
   flex-direction: column;
@@ -53,5 +53,8 @@
 }
 .dropdown .list {
   flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 6rem;
   max-height: min(60dvh, 32rem);
 }
