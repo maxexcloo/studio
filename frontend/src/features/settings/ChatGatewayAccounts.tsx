@@ -85,6 +85,7 @@ export function ChatGateway({
             />
             <Button
               variant="default"
+              size="compact-sm"
               disabled={change.isPending || !choices[identity]}
               aria-label={`Link ${identity}`}
               onClick={() =>
@@ -96,6 +97,7 @@ export function ChatGateway({
             <Button
               variant="subtle"
               color="gray"
+              size="compact-sm"
               disabled={change.isPending}
               aria-label={`Dismiss ${identity}`}
               onClick={() => change.mutate({ kind: "dismiss", identity })}
