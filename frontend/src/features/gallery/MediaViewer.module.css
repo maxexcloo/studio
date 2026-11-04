@@ -259,7 +259,8 @@
 .promptText {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-md);
-  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  /* The text's line height adds about xs's difference above the first line, so the sides take md. */
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
   background: var(--mantine-color-default);
   overflow-wrap: anywhere;
 }
