@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Group, Slider, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Group, Slider, Text, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { Search, SquareMinus, SquarePlus } from "lucide-react";
 import { layerAbove } from "../../ui/popupClicks";
@@ -191,7 +191,16 @@ function ZoomSlider() {
   const { columns, min, max, zoomTo } = useGalleryColumns();
   return (
     <Group gap={6} wrap="nowrap" c="dimmed">
-      <SquareMinus size={15} aria-hidden />
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        size="sm"
+        aria-label="Smaller Tiles"
+        disabled={columns >= max}
+        onClick={() => zoomTo(columns + 1)}
+      >
+        <SquareMinus size={15} />
+      </ActionIcon>
       <Slider
         className={classes.slider}
         size="xs"
@@ -204,7 +213,16 @@ function ZoomSlider() {
         thumbLabel="Tile Size"
         aria-valuetext={`${columns} Columns`}
       />
-      <SquarePlus size={15} aria-hidden />
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        size="sm"
+        aria-label="Larger Tiles"
+        disabled={columns <= min}
+        onClick={() => zoomTo(columns - 1)}
+      >
+        <SquarePlus size={15} />
+      </ActionIcon>
     </Group>
   );
 }
