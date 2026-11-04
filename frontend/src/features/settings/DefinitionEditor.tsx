@@ -132,8 +132,9 @@ function DefinitionForm({
       if (!form.values.id.trim()) throw new Error("Choose a definition ID.");
       if (creating && existingIds.includes(form.values.id))
         throw new Error("That ID already exists. Edit the existing definition or choose a new ID.");
+      // The whole block, so a duplicated combined profile keeps every backend.
       if (creating && kind === "profile")
-        return post("/api/workflows/import", { workflow: raw, metadata });
+        return post("/api/workflows/import", { workflow: raw, metadata: block });
       return api(path, {
         method: "PUT",
         body: JSON.stringify(

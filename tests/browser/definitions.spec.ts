@@ -440,14 +440,68 @@ test("The Profiles toolbar groups search and filter, the other actions A–Z, th
     (page.viewportSize()?.width || 1440) < 768
       ? ["More Profile Actions"]
       : ["Combine Backends", "Download All", "Merge Duplicate Profiles"];
-  expect(items).toEqual([
-    "Search Profiles",
-    "Filter Profiles",
-    "|",
-    ...middle,
-    "|",
-    "Import Workflow",
-  ]);
+  expect(items).toEqual(["Search Profiles", "Filter Profiles", "|", ...middle, "|", "New Profile"]);
+});
+
+test("New Profile imports a workflow or duplicates a profile under a new ID", async ({ page }) => {
+  await fixtures(page);
+  const original = {
+    studio: { id: "owned", name: "Owned Profile", kind: "image", family: "flux2" },
+    graph: { 1: { class_type: "CLIPTextEncode", inputs: { text: "" } } },
+  };
+  const created: { workflow: unknown; metadata: unknown }[] = [];
+  await page.route("**/api/profiles/editable**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/profiles/editable")
+      return route.fulfill({
+        json: { profiles: [{ id: "owned", name: "Owned Profile", version: 1 }] },
+      });
+    return route.fulfill({ json: { id: "owned", text: JSON.stringify(original), hash: "h" } });
+  });
+  await page.route("**/api/workflows/import/preview", (route) =>
+    route.fulfill({
+      json: { preview: { graph: original.graph, detected: { kind: "image" } } },
+    }),
+  );
+  await page.route("**/api/workflows/import", (route) => {
+    created.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true, workflow: { id: "owned-copy" } } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  const newProfile = async (item: string) => {
+    await page.getByRole("button", { name: "New Profile", exact: true }).click();
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+  };
+  const editor = page.getByRole("dialog", { name: "Create Profile", exact: true });
+  const chooser = page.waitForEvent("filechooser");
+  await newProfile("Import Workflow…");
+  await (
+    await chooser
+  ).setFiles({
+    name: "workflow.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ prompt: original.graph })),
+  });
+  await expect(editor.getByRole("textbox", { name: "Definition ID", exact: true })).toHaveValue("");
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await newProfile("Duplicate Profile…");
+  const dialog = page.getByRole("dialog", { name: "Duplicate Profile", exact: true });
+  await dialog.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await page.getByRole("option", { name: "Owned Profile", exact: true }).click();
+  await dialog.getByRole("button", { name: "Duplicate Profile", exact: true }).click();
+  await expect(editor.getByRole("textbox", { name: "Definition ID", exact: true })).toHaveValue(
+    "owned-copy",
+  );
+  await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
+    "Owned Profile Copy",
+  );
+  await editor.getByRole("button", { name: "Create Profile", exact: true }).click();
+  await expect(editor).toBeHidden();
+  const studio = { ...original.studio, id: "owned-copy", name: "Owned Profile Copy" };
+  expect(created).toEqual([{ workflow: { ...original, studio }, metadata: studio }]);
 });
 
 test("Each profile and guide downloads as its own JSON file from its row menu", async ({
