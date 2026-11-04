@@ -106,7 +106,9 @@ primary component reference and verify APIs against the installed version.
   button (`ToolbarAction`: New User, New Group, New Guide, Import Workflow), the
   rest icons with tooltips; phones may fold a crowded toolbar's actions into
   More) at the end of the same row, above compact rows with status
-  badges and row menus. Sections are alphabetical, About apart at the end, and
+  badges and row menus. A section with several lists gives each a `SettingGroup`
+  heading with its own toolbar beside it, the create action at its far right
+  (Settings › Profiles: Profiles, then Guides, each row showing how they link). Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
   each run alphabetical, in the desktop navigation and the phone Section Select. No accordions:
