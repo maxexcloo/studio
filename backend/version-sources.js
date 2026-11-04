@@ -92,13 +92,15 @@ const firstReference = (input) => {
 /**
  * The migrate-runtime step that gives each gallery result the source its run recorded
  * (`resultSource`). A run that recorded none but edited or animated one of its owner's results
- * (its first reference) gets that result, counted as `referenced`. Plans by default; `apply` copies
- * the changed rows to a `.backups/gallery-sources-*` folder and then writes them. Online-safe: the
- * running server then takes the written fields into its gallery (runtime-migrations.js). A second
- * run finds nothing to fill.
+ * (its first reference) gets that result, counted as `referenced`. A result marked `derived` that
+ * `isVersion` now counts as a version loses the mark (`versions`); `derived` is only ever on a
+ * fresh image run, so that is the run it judges once its run has left the queue. Plans by default;
+ * `apply` copies the changed rows to a `.backups/gallery-sources-*` folder and then writes them.
+ * Online-safe: the running server then takes the written fields into its gallery
+ * (runtime-migrations.js). A second run finds nothing to change.
  */
 export function gallerySources(dataDir, { apply = false } = {}) {
-  const empty = { filled: [], referenced: 0, applied: false, backup: "" };
+  const empty = { filled: [], referenced: 0, versions: [], applied: false, backup: "" };
   if (!fs.existsSync(databaseFile(dataDir))) return empty;
   const db = runtimeDatabase(dataDir);
   const tables = new Set(
@@ -122,8 +124,19 @@ export function gallerySources(dataDir, { apply = false } = {}) {
   const items = new Map();
   for (const { key, item } of rows) items.set(key, item).set(String(item.id || key), item);
   const filled = [];
+  const versions = [];
   let referenced = 0;
   for (const { key, item } of rows) {
+    if (item.derived) {
+      const job = jobs.get(item.jobId);
+      const parent = jobs.get(item.parentJobId);
+      const source = items.get(item.parentItemId);
+      const from = parent && owner(parent) === owner(item) ? parent : undefined;
+      if (!from && (!source || owner(source) !== owner(item))) continue;
+      const run = { operation: "image", input: job?.input || resultInput(item) };
+      if (isVersion(run, from || { input: resultInput(source) })) versions.push(key);
+      continue;
+    }
     const job = item.jobId && !item.parentItemId ? jobs.get(item.jobId) : undefined;
     if (!job || owner(job) !== owner(item)) continue;
     let source = job.parentItemId ? items.get(job.parentItemId) : undefined;
@@ -142,10 +155,14 @@ export function gallerySources(dataDir, { apply = false } = {}) {
       }),
     });
   }
-  const plan = { filled, referenced };
-  if (!apply || !filled.length) return { ...plan, applied: false, backup: "" };
+  const plan = { filled, referenced, versions };
+  if (!apply || !(filled.length || versions.length)) return { ...plan, applied: false, backup: "" };
 
-  const changed = new Map(filled.map(({ key, ...fields }) => [key, fields]));
+  const changed = new Map([
+    ...filled.map(({ key, ...fields }) => [key, fields]),
+    // An undefined field is left out of the written row.
+    ...versions.map((key) => [key, { derived: undefined }]),
+  ]);
   const bytes = Buffer.from(
     JSON.stringify(
       rows.filter((row) => changed.has(row.key)).map(({ key, value }) => ({ key, value })),
