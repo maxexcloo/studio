@@ -146,7 +146,7 @@ function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean 
   return (
     <Group gap="xs" wrap="nowrap">
       <Text size="sm">{version}</Text>
-      {aiDrafted && <Badge color="orange">AI-Drafted</Badge>}
+      {aiDrafted && <Badge color="orange">AI</Badge>}
     </Group>
   );
 }
