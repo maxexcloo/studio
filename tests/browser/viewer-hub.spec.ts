@@ -959,6 +959,65 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
   await expect(viewer).toBeHidden();
 });
 
+test("A double tap zooms in at the tapped point and back to Fit; a click still cycles", async ({
+  page,
+}, testInfo) => {
+  const { viewer } = await seed(page);
+  const picture = viewer.getByRole("img", { name: "An amber bird", exact: true });
+  const zoom = viewer.locator("[data-zoom-mode]");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeGreaterThan(0);
+  const box = (await picture.boundingBox())!;
+  const x = box.x + box.width * 0.3;
+  const y = box.y + box.height * 0.3;
+  if (!testInfo.project.use.isMobile) {
+    // A mouse double-click is two clicks, each cycling the zoom.
+    await picture.dblclick();
+    await expect(zoom).toHaveAttribute("data-zoom-mode", "Actual Size");
+    return;
+  }
+  const webkit = testInfo.project.use.browserName === "webkit";
+  const touch = webkit ? undefined : await page.context().newCDPSession(page);
+  // Chromium taps like a finger: held briefly and wobbling a few pixels.
+  async function tap() {
+    if (!touch) return page.touchscreen.tap(x, y);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x + 7, y }],
+    });
+    await page.waitForTimeout(150);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  }
+  const fitScale = Number(await zoom.getAttribute("data-zoom-scale"));
+  // A single tap leaves the zoom and the viewer as they are.
+  await tap();
+  await page.waitForTimeout(400);
+  await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
+  await expect(viewer).toBeVisible();
+  await tap();
+  await page.waitForTimeout(100);
+  await tap();
+  await expect(zoom).toHaveAttribute("data-zoom-mode", "Custom");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeCloseTo(fitScale * 2.5);
+  // The tapped point stays under the finger.
+  const zoomed = (await picture.boundingBox())!;
+  expect((x - zoomed.x) / zoomed.width).toBeCloseTo(0.3, 1);
+  expect((y - zoomed.y) / zoomed.height).toBeCloseTo(0.3, 1);
+  await page.waitForTimeout(400);
+  await tap();
+  await page.waitForTimeout(100);
+  await tap();
+  await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeCloseTo(fitScale);
+  await expect(viewer).toBeVisible();
+});
+
 test("Work still generating and videos take the same swipes as a picture", async ({
   page,
 }, testInfo) => {
