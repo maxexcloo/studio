@@ -6,3 +6,29 @@
   background: var(--proposed-tint);
   box-shadow: 0 0 0 4px var(--proposed-tint);
 }
+
+/* Two actions to a row, as the composer's prompt tools stand beside its text. */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px;
+  justify-content: end;
+  align-content: start;
+}
+
+/* The send ends the last row. */
+.send {
+  grid-column: 2;
+}
+
+/* A one-line field, and the phone editor's header, line them up in one row. */
+.actions[data-row],
+:global(.mantine-Modal-header) .actions {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+}
+
+.actions[data-row] .send,
+:global(.mantine-Modal-header) .send {
+  grid-column: auto;
+}

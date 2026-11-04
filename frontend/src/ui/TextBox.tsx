@@ -254,6 +254,7 @@ export function TextBox({
             <Modal.Body>
               <Textarea
                 aria-label={title}
+                description={props.description}
                 placeholder={props.placeholder}
                 maxLength={props.maxLength}
                 spellCheck={props.spellCheck}
