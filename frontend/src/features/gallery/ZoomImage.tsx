@@ -41,6 +41,7 @@ export function ZoomImage({
   const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
   const gesture = useRef<{
     id: number;
+    at: number;
     x: number;
     y: number;
     touch: boolean;
@@ -110,6 +111,7 @@ export function ZoomImage({
     }
     gesture.current = {
       id: event.pointerId,
+      at: event.timeStamp,
       x: event.clientX,
       y: event.clientY,
       touch: event.pointerType === "touch",
@@ -123,7 +125,8 @@ export function ZoomImage({
     if (!start || start.id !== event.pointerId) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.hypot(dx, dy) > 5) suppressClick.current = true;
+    // A finger wobbles further than a mouse within a tap.
+    if (Math.hypot(dx, dy) > (start.touch ? 10 : 5)) suppressClick.current = true;
     if (!swipe || !start.touch || start.multiple || !start.fit || zoom.modeRef.current !== "Fit")
       return;
     start.drag ??=
@@ -155,13 +158,14 @@ export function ZoomImage({
       swipe(direction);
       return;
     }
-    // A double tap on the picture zooms in at that point, or back to Fit.
+    // A double tap on the picture zooms in at that point, or back to Fit. The gap is timed from
+    // the first tap's release to the second's touch, so a slow second press still counts.
     if (!start.image || suppressClick.current) return;
     const previous = lastTap.current;
     lastTap.current = { at: event.timeStamp, x: event.clientX, y: event.clientY };
     if (
       previous &&
-      event.timeStamp - previous.at < 320 &&
+      start.at - previous.at < 300 &&
       Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 32
     ) {
       lastTap.current = null;
@@ -178,6 +182,11 @@ export function ZoomImage({
       onPointerMoveCapture={move}
       onPointerUpCapture={up}
       onPointerCancelCapture={up}
+      // The mousedown a browser emulates after a tap would start the library's mouse pan, which
+      // cancels the zoom a double tap has just started.
+      onMouseDownCapture={(event) => {
+        if (touched.current) event.stopPropagation();
+      }}
       onClickCapture={(event) => {
         if (suppressClick.current && event.detail !== 0) {
           event.preventDefault();
