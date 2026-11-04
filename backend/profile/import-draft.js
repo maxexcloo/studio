@@ -1,6 +1,6 @@
 import { draftedProfile } from "../assistant.js";
 import { catalogDownloadsForFile } from "../catalog-downloads.js";
-import { familyFromName } from "../family-catalog.js";
+import { familyFromName, refinedFamily } from "../family-catalog.js";
 import { familiesFromMetadata } from "../lora/info.js";
 import { draftProfileFromImport } from "./drafts.js";
 import {
@@ -32,7 +32,11 @@ export async function draftCheckpointProfile(record, options, { engine, info }) 
         })
         .filter(Boolean),
     info,
-    families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
+    // A base model's families as the file's name narrows them (P-H3-Image from MiniMax H3).
+    families: (baseModel, file) =>
+      familiesFromMetadata({ base_model: String(baseModel || "") }).map((id) =>
+        refinedFamily(id, file),
+      ),
     familyFromName: (file) => familyFromName(file),
     taken: profileIdTaken,
     downloadsFor: catalogDownloadsForFile,
