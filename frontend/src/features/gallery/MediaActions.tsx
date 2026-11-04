@@ -28,7 +28,8 @@ import {
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate } from "react-router";
+import { useOpenComposer } from "../generation/openComposer";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
@@ -197,7 +198,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   const { profile } = useGeneration();
   const reference = useGalleryReference();
   const location = useLocation();
-  const [params, setParams] = useSearchParams();
+  const openComposer = useOpenComposer();
   if (
     !(
       profile?.mediaInputs?.length ||
@@ -219,11 +220,8 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
         {
           onSuccess: () => {
             onApplied();
-            if (["/images", "/video"].includes(location.pathname)) {
-              const next = new URLSearchParams(params);
-              next.set("compose", "1");
-              setParams(next, { replace: true });
-            }
+            if (["/images", "/video"].includes(location.pathname))
+              openComposer(location.pathname === "/video" ? "video" : "image");
           },
         },
       );

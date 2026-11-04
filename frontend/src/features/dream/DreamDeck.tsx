@@ -3,7 +3,7 @@ import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
 import { Maximize2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useOpenComposer } from "../generation/openComposer";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -124,7 +124,7 @@ type Judgement =
 /** Sends a verdict: Dream results move to the gallery or discards; gallery images only teach. */
 function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
-  const navigate = useNavigate();
+  const openComposer = useOpenComposer();
   const { profiles, setDraft } = useGenerationActions();
   const star = (item: MediaItem) =>
     post("/api/gallery/favorite", { ids: [item.id], favorite: true });
@@ -167,7 +167,7 @@ function useJudge(onFailed: (card: DeckCard) => void) {
       if (verdict === "animate" || verdict === "refine") {
         const { draft } = await mediaDraft(item, verdict, profiles, client);
         setDraft(draft);
-        navigate(`${verdict === "animate" ? "/video" : "/images"}?compose=1`);
+        openComposer(verdict === "animate" ? "video" : "image");
       }
     },
     onError: (_error, { card }) => onFailed(card),
