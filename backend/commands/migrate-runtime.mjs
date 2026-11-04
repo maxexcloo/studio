@@ -22,7 +22,7 @@ let result;
 if (values.restore)
   result = restoreRuntimeBackup(path.resolve(values.restore), path.resolve(values.destination));
 else
-  result = runtimeMigrations(path.resolve(values["data-dir"]), {
+  result = await runtimeMigrations(path.resolve(values["data-dir"]), {
     apply: values.apply,
     dreamOwner: values["dream-owner"],
   });

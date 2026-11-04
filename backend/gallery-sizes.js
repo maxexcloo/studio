@@ -3,21 +3,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { mediaParams, mediaRootFor } from "./media-paths.js";
 import { isInside } from "./paths.js";
-import { readPngInfo } from "./png-text.js";
+import { outputFileSize } from "./gallery/store.js";
 import { verifiedBackup } from "./persistence/migration.ts";
 import { databaseFile, runtimeDatabase } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step that gives each finished gallery image the size of its file. Images
  * saved before Studio read that size kept the one asked for, which an edit drawing at its
- * reference's size does not match, so their tiles cropped them. It reads each PNG's header;
+ * reference's size does not match, so their tiles cropped them. It reads each image's size with sharp, whatever its format;
  * videos were already measured from their files. Plans by default, reporting the `corrected`
- * count, a few `examples` and the images it could not read (`unread`: missing or not a PNG);
+ * count, a few `examples` and the images it could not read (`unread`: missing or not an image);
  * `apply` copies the changed rows to a `.backups/gallery-sizes-*` folder with a `mapping.json`
  * and then writes them. Online-safe: the running server then takes the written sizes into its
  * gallery (runtime-migrations.js). A second run finds nothing to change.
  */
-export function gallerySizes(dataDir, { apply = false } = {}) {
+export async function gallerySizes(dataDir, { apply = false } = {}) {
   const empty = { corrected: 0, examples: [], unread: 0, applied: false, backup: "" };
   if (!fs.existsSync(databaseFile(dataDir))) return empty;
   const db = runtimeDatabase(dataDir);
@@ -34,7 +34,7 @@ export function gallerySizes(dataDir, { apply = false } = {}) {
     const params = item.status === "done" && item.type === "image" && mediaParams(item.url);
     if (!params) continue;
     const file = path.resolve(root, params.subfolder, params.filename);
-    const info = isInside(root, file) ? readPngInfo(file) : null;
+    const info = isInside(root, file) ? await outputFileSize(file, "image") : null;
     if (!info?.width || !info.height) {
       unread += 1;
       continue;

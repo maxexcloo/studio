@@ -143,7 +143,7 @@ const stopped =
  * plan with `refused`. `dreamOwner` adds the Dream ownership step (the command's --dream-owner).
  * `reload` maps a step's name to what makes the running server read what that step applied.
  */
-export function runtimeMigrations(
+export async function runtimeMigrations(
   dataDir,
   { apply = false, online = false, dreamOwner = "", reload = {} } = {},
 ) {
@@ -160,11 +160,11 @@ export function runtimeMigrations(
   for (const step of list) {
     try {
       if (apply && online && !step.online) {
-        const plan = step.run(dataDir);
+        const plan = await step.run(dataDir);
         results[step.name] = step.changes?.(plan) ? { ...plan, refused: stopped } : plan;
         continue;
       }
-      results[step.name] = step.run(dataDir, { apply });
+      results[step.name] = await step.run(dataDir, { apply });
       if (apply && results[step.name].applied) {
         step.reload?.(dataDir);
         reload[step.name]?.();
@@ -199,11 +199,11 @@ function summary(results, apply) {
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
 export function registerMigrationRoutes(app, { dataDir, requireAdmin, reload, log = console }) {
-  app.post("/api/maintenance/migrations", (req, res) => {
+  app.post("/api/maintenance/migrations", async (req, res) => {
     if (!requireAdmin(req, res)) return;
     const apply = req.body?.apply === true;
     try {
-      const results = runtimeMigrations(dataDir, { apply, online: true, reload });
+      const results = await runtimeMigrations(dataDir, { apply, online: true, reload });
       log.info?.(`[migrations] ${apply ? "Apply" : "Dry run"}: ${summary(results, apply)}`);
       return res.json({ ok: true, apply, steps: results });
     } catch (error) {
