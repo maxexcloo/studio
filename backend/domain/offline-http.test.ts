@@ -330,7 +330,7 @@ test(
         outputs: { 8: { images: [{ filename: "own.png", type: "output", subfolder: "" }] } },
       });
       const saved = await waitFor(accepted.jobId, (job) => job.status === "completed");
-      assert.equal(new URL(saved.outputs[0].url!, base).searchParams.get("type"), "media");
+      assert.equal(new URL(saved.items[0].url!, base).searchParams.get("type"), "media");
       assert.equal(chosen.prompts.length, 1);
       await stop();
       chosen.setDown(true);
