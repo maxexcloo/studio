@@ -221,7 +221,7 @@ test("a rewrite streams as server-sent events: deltas, then the final result", a
   );
 });
 
-test("Spicy needs Uncensored Models, whatever the profile, and runs on the assistant model", async () => {
+test("Spicy needs Uncensored Models, whatever the profile, and runs on the uncensored alias", async () => {
   assert.equal(
     (
       await post(
@@ -243,7 +243,7 @@ test("Spicy needs Uncensored Models, whatever the profile, and runs on the assis
     "spicy",
   );
   assert.equal(spicy.status, 200, "an unmarked profile is fine with Uncensored Models");
-  assert.equal(calls.at(-1).model, "cloud/auto");
+  assert.equal(calls.at(-1).model, "cloud/uncensored");
 });
 
 test("Custom needs an instruction and keeps it non-explicit without Uncensored Models", async () => {
