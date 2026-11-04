@@ -36,10 +36,11 @@ const gatewayKeys = [
 export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
+// One rule for every title: a gallery item's from its prompt, a chat's from its first message.
 const titleInstructions =
-  "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
-// The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer, and
-// null (the model's default) where it writes prose.
+  "Title what the text below describes: the prompt that made an image or video, or the first message of a chat. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
+// The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
+// few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {
   animate: null,
   caption: "none",
@@ -52,7 +53,7 @@ export const reasoningEfforts = {
   rewrite: null,
   suggestions: "none",
   taste: null,
-  title: null,
+  title: "none",
 };
 const maxCandidates = 20;
 const maxExamples = 6;

@@ -15,7 +15,7 @@ export function promptWords(prompt: unknown) {
   );
 }
 
-/** The model's reply as a title: its first line, at most six words, without quotes or a label. */
+/** The model’s reply as a title: its first line, at most five words, without quotes or a label. */
 export function replyTitle(reply: unknown) {
   return capitalised(
     String(reply || "")
@@ -25,7 +25,7 @@ export function replyTitle(reply: unknown) {
       .replace(/["'“”‘’*_`#]/g, "")
       .replace(/[\s.,;:!?-]+$/, "")
       .split(/\s+/)
-      .slice(0, 6)
+      .slice(0, 5)
       .join(" ")
       .slice(0, 64),
   );

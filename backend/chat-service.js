@@ -62,6 +62,9 @@ export function createSessionChat({
     taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
     session: (ownerId, id) => store.session(ownerId, id),
     titles: () => flagEnabled("STUDIO_CHAT_TITLES"),
+    // The assistant's own title call, so chats and gallery items follow one title rule.
+    writeTitle: async (ownerId, text) =>
+      (await tasteWriter(ownerId)?.title({ prompt: text }))?.title,
     // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
     agent: (ownerId, sessionId, owned) =>
       mcp.agent({

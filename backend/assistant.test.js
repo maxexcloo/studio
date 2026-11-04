@@ -601,16 +601,16 @@ test("caption sends the image and reads the description and tags, or plain text 
   });
 });
 
-test("title summarises the prompt in a few words, leaving the model room to think", async () => {
+test("title summarises the prompt in a few words, with reasoning off", async () => {
   const seen = fakeGateway(() =>
     json('<think>A barn, so…</think>Title: "Red Barn at Golden Hour Over Wheat Fields".'),
   );
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   assert.deepEqual(await engine.title({ prompt: "a red barn, golden hour, wheat" }), {
-    title: "Red Barn at Golden Hour Over",
+    title: "Red Barn at Golden Hour",
     model: "cloud/auto",
   });
-  assert.ok(seen.calls[0].body.max_tokens >= 1000);
+  assert.equal(seen.calls[0].body.reasoning_effort, "none");
   assert.equal(seen.calls[0].body.messages[1].content, "a red barn, golden hour, wheat");
   const empty = createAssistant(gateway(), {
     fetchImpl: fakeGateway(() => json("<think>…</think>")).fetchImpl,
