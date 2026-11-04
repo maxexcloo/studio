@@ -105,3 +105,18 @@ test("required reference slots are enforced for image-edit workflows", () => {
   assert.equal(body.count, 1);
   assert.deepEqual(body.promptPolicy, { policy: "preserve-source-v1", version: 1 });
 });
+
+test("omitted settings take the profile's defaults, not ComfyUI's node defaults", () => {
+  const generic = structuredClone(exact);
+  Object.assign(generic.KSampler.input.required, {
+    steps: ["INT", { default: 20, min: 1, max: 100 }],
+    cfg: ["FLOAT", { default: 8, min: 0, max: 100, step: 0.1 }],
+  });
+  const { steps, cfg, width, height, ...rest } = request;
+  const body = sanitizeGenerateBody(
+    { ...rest, referenceAssets: [{ slot: "reference", assetId: "upload-id" }] },
+    generic,
+    {},
+  );
+  assert.deepEqual([body.steps, body.cfg, body.width, body.height], [2, 1, 1216, 1536]);
+});

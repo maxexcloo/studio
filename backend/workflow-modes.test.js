@@ -135,6 +135,20 @@ test("a fixed-step profile sends no steps, so its graph keeps its own", () => {
   assert.equal(body.steps, undefined);
 });
 
+test("an omitted denoise on a reference run keeps the reference mode's own", () => {
+  const body = sanitizeGenerateBody(
+    {
+      kind: "image",
+      workflow: "custom:mode-test",
+      model: "custom:mode-test",
+      prompt: "A scene",
+      referenceAssets: [{ slot: "reference", assetId: "image" }],
+    },
+    info,
+  );
+  assert.equal(body.denoise, 0.65);
+});
+
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
   const { optionalLoraIssue } = await import("./lora/catalogue.js");
   const prepared = structuredClone(raw);

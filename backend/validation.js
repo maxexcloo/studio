@@ -171,7 +171,19 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     (item) => item.kind === kind && item.workflow === workflow && item.model === input.model,
   );
   const selected = available?.imageModes?.[hasReferenceImage(input) ? "reference" : "generate"];
-  const profile = available && { ...available, ...selected };
+  // A mode leaves out (undefined or "") what its graph lacks, so the profile's own default shows through.
+  const profile = available && {
+    ...available,
+    ...selected,
+    defaults: {
+      ...available.defaults,
+      ...Object.fromEntries(
+        Object.entries(selected?.defaults || {}).filter(
+          ([, value]) => value !== undefined && value !== "",
+        ),
+      ),
+    },
+  };
   if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
   if (
     customWorkflow?.controls?.model?.node &&
@@ -226,6 +238,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     max: 100,
   });
   const denoiseRange = nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1 });
+  // A missing value takes the profile's default, never ComfyUI's generic node default (CFG 8, denoise 1).
+  const fallback = (key, range) => profile.defaults[key] ?? range.default;
 
   const resolutions = profile.options.resolutions || [];
   const resolution = profile.capabilities.resolution
@@ -246,19 +260,19 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     vae: String(input.vae || ""),
     clipType: String(input.clipType || "wan"),
     weightDtype: String(input.weightDtype || "default"),
-    width: snapInteger(input.width, widthRange.default, widthRange),
-    height: snapInteger(input.height, heightRange.default, heightRange),
+    width: snapInteger(input.width, fallback("width", widthRange), widthRange),
+    height: snapInteger(input.height, fallback("height", heightRange), heightRange),
     // A fixed-step profile (capabilities.steps false) keeps its graph's own steps, as with CFG.
     steps:
       profile.capabilities?.steps === false
         ? undefined
-        : snapInteger(input.steps, stepsRange.default, stepsRange),
+        : snapInteger(input.steps, fallback("steps", stepsRange), stepsRange),
     // A profile without CFG (distilled; capabilities.cfg false) keeps its graph's own guidance, so none is taken or recorded.
     cfg:
       profile.capabilities?.cfg === false
         ? undefined
-        : snapNumber(input.cfg, cfgRange.default, cfgRange),
-    denoise: snapNumber(input.denoise, denoiseRange.default, denoiseRange),
+        : snapNumber(input.cfg, fallback("cfg", cfgRange), cfgRange),
+    denoise: snapNumber(input.denoise, fallback("denoise", denoiseRange), denoiseRange),
     sampler: String(input.sampler || ""),
     scheduler: String(input.scheduler || ""),
     seed: String(input.seed || ""),
