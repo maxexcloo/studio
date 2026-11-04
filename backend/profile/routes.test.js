@@ -311,6 +311,24 @@ test("the export bundle says what changed and lists unreviewed drafts", async (t
   assert.deepEqual(again.changed, { profiles: [], guides: [] });
 });
 
+test("one profile or guide downloads as its own JSON file", async (t) => {
+  const { call } = await serve(t);
+  const profileFile = await call("GET", "/api/profiles/editable/krea-test/download");
+  assert.equal(profileFile.status, 200);
+  assert.equal(
+    profileFile.headers.get("content-disposition"),
+    "attachment; filename=krea-test.json",
+  );
+  assert.deepEqual(
+    profileFile.body,
+    JSON.parse(fs.readFileSync(path.join(userWorkflowsDir, "krea-test.json"), "utf8")),
+  );
+  const guideFile = await call("GET", "/api/profiles/guides/krea2/download");
+  assert.equal(guideFile.headers.get("content-disposition"), "attachment; filename=krea2.json");
+  assert.deepEqual(guideFile.body, guideStore().pack("krea2").pack);
+  assert.equal((await call("GET", "/api/profiles/editable/missing/download")).status, 404);
+});
+
 test("the manifest joins the bundle when there is one", (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-export-"));
   t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));

@@ -7,10 +7,12 @@
  *   POST /api/profiles/editable/:id/revert          {version, baseHash}: that version again, as a new version
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
  *   POST /api/profiles/editable/:id/remove          {baseHash}: removes the profile, with a backup (profile/remove.js)
+ *   GET  /api/profiles/editable/:id/download        the profile file exactly as on disk, as `<id>.json`
  *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, and its own fields over it
  *   GET  /api/profiles/guides                       every guide pack with its name, version and AI-Drafted state
  *   GET  /api/profiles/guides/:packId               one pack with its hash (an edit's base) and meta
  *   PUT  /api/profiles/guides/:packId               {pack, baseHash, draft?}: saves a guide pack as a new version
+ *   GET  /api/profiles/guides/:packId/download      the pack as `<packId>.json`
  *   GET  /api/profiles/guides/:packId/versions      the pack's versions, newest first
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
@@ -95,6 +97,13 @@ export function registerProfileRoutes(
         versions: profiles().versions(req.params.id),
         meta: profiles().meta(req.params.id),
       });
+    }),
+  );
+  app.get(
+    "/api/profiles/editable/:id/download",
+    route((req, res) => {
+      const { id, text } = readEditableProfile(req.params.id);
+      res.attachment(`${id}.json`).type("application/json").send(text);
     }),
   );
   app.get(
@@ -217,6 +226,16 @@ export function registerProfileRoutes(
     "/api/profiles/guides/:packId",
     route((req, res) => {
       res.json({ ok: true, ...guides().pack(req.params.packId) });
+    }),
+  );
+  app.get(
+    "/api/profiles/guides/:packId/download",
+    route((req, res) => {
+      const { packId, pack } = guides().pack(req.params.packId);
+      res
+        .attachment(`${packId}.json`)
+        .type("application/json")
+        .send(`${JSON.stringify(pack, null, 2)}\n`);
     }),
   );
   app.put(
