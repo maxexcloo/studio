@@ -74,7 +74,7 @@ export function LibraryPage() {
         {catalogue.error ? (
           <Alert color="red">{catalogue.error.message}</Alert>
         ) : (
-          <LoadingState label={`Loading ${librarySections[section].label}`} />
+          <LoadingState label={`Loading ${librarySections[section].label}`} fill />
         )}
       </>
     ) : (
@@ -110,7 +110,7 @@ export function LibraryPage() {
             />
           ),
           presets: presets.isPending ? (
-            <LoadingState label="Loading Inspiration" />
+            <LoadingState label="Loading Inspiration" fill />
           ) : presets.error ? (
             <Alert color="red">{presets.error.message}</Alert>
           ) : !presets.data.presets.length ? (

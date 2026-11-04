@@ -268,7 +268,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
     onSuccess: () => setDeleting(null),
     onSettled: refresh,
   });
-  if (admin.isPending) return <LoadingState label="Loading Groups" />;
+  if (admin.isPending) return <LoadingState label="Loading Groups" fill />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
   const users = (group: AccessGroup) =>
@@ -487,7 +487,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       optimistic((data) => ({ ...data, defaultAccessProfileId: accessProfileId })),
     onSettled: refresh,
   });
-  if (admin.isPending) return <LoadingState label="Loading Users" />;
+  if (admin.isPending) return <LoadingState label="Loading Users" fill />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
   const groups = data.accessProfiles.map((group) => ({ value: group.id, label: group.name }));
