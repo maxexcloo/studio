@@ -45,6 +45,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
   const target = useRef<HTMLButtonElement>(null);
   const dropdown = useRef<HTMLDivElement>(null);
   // The dropdown closes on Escape or a press outside it, but not in a menu or confirmation it opened.
+  // Escape is caught on the way down: an open tooltip stops it on its focused button to close itself.
   useEffect(() => {
     if (phone || !opened) return;
     const away = (event: globalThis.PointerEvent) => {
@@ -57,10 +58,10 @@ export function StatusAction({ chat }: { chat: boolean }) {
         close();
     };
     document.addEventListener("pointerdown", away, true);
-    document.addEventListener("keydown", escape);
+    document.addEventListener("keydown", escape, true);
     return () => {
       document.removeEventListener("pointerdown", away, true);
-      document.removeEventListener("keydown", escape);
+      document.removeEventListener("keydown", escape, true);
     };
   }, [phone, opened]);
   const trigger = (
