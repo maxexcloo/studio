@@ -216,6 +216,57 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
+test("Ask for a Change rewrites the draft's prompt in place, for Generate to run or Undo to restore", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const asked: any[] = [];
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "draft") return route.fallback();
+    asked.push(body);
+    return route.fulfill({
+      json: {
+        suggestions: [
+          {
+            action: "recreate",
+            label: "Night",
+            request: body.request,
+            prompt: "A castle at night",
+          },
+        ],
+      },
+    });
+  });
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("A castle at noon");
+  await assist(page, "Ask for a Change");
+  const request = page.getByRole("textbox", { name: "Change", exact: true });
+  await request.fill("make it night");
+  await page.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await expect(prompt).toHaveValue("A castle at night");
+  await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
+  expect(asked).toEqual([
+    {
+      surface: "draft",
+      kind: "image",
+      prompt: "A castle at noon",
+      request: "make it night",
+      actions: ["recreate"],
+    },
+  ]);
+  // Undo restores the draft and reopens the request.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("A castle at noon");
+  await expect(request).toHaveValue("make it night");
+  await request.press("Enter");
+  await expect(prompt).toHaveValue("A castle at night");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.prompt).toBe("A castle at night");
+});
+
 test("Prompt history reuses positive and negative prompts independently and persists pinning", async ({
   page,
 }) => {

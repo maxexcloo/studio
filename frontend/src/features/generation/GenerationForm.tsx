@@ -189,6 +189,7 @@ export function GenerationForm({
       }
       onSubmit={() => submit.mutate()}
       operation={draft.operation}
+      onOperationChange={(operation) => setDraft((value) => ({ ...value, operation }))}
       pending={submit.isPending}
       error={submit.error}
       assistantScope={JSON.stringify([
