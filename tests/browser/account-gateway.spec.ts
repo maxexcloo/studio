@@ -227,7 +227,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "LoRAs", exact: true }).check();
-  await page.getByRole("button", { name: "Save Access Group", exact: true }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect
     .poll(
       () =>
