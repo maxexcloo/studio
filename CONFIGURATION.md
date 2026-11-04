@@ -275,6 +275,8 @@ It moves what older versions' Settings wrote into the data folder's `.env` (the 
 
 With `--dream-owner <account id>`, naming the one account that has used Dream, it also clears Dream answers left on other accounts' records (`backend/dream-ownership.js`): Dream marks on gallery items another account owns, and that account's calibration answers and Dream taste signals about those items. Its own marks, answers and taste summary stay. The dry run reports the counts under `dreamOwnership`; `--apply` writes them with Studio stopped, without a backup.
 
+An administrator can run the same steps (`backend/runtime-migrations.js`, without the Dream ownership step) against the running Studio's data folder with `POST /api/maintenance/migrations`. With `{}` it returns every step's dry run under `steps.<name>`, as the command prints them; with `{ "apply": true }` it applies the steps that are safe while Studio runs, `accountAccess`, `loraRatings`, `loraLayers` and `downloadSources`, writing the same backups and reloading the accounts store and the catalogue, so no restart is needed. Every other step with work to do is left unapplied and carries `refused`: it needs Studio stopped and the command. The server log records each run's steps, change counts, outcomes and backup folders.
+
 ## Queue, Sessions & Runtime Control
 
 `/api/sessions` stores generation inputs and result relationships; `/api/queue` exposes writing, queued, waiting, starting, running, saving, completed, failed and cancelled operations.

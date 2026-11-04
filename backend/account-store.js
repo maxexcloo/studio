@@ -95,7 +95,8 @@ function saveStore() {
   writeRuntimeDocument(dataDir, "accounts", store);
 }
 
-export function resetAccountStoreForTests() {
+/** Forgets the cached store, so the next read takes the saved document (runtime-migrations.js). */
+export function reloadAccountStore() {
   cache = null;
 }
 

@@ -654,10 +654,18 @@ export function createCatalogueStore({
     return { sources: current.layers.provider, catalogue };
   }
 
+  /** Forgets what it read, so the next read takes the file as it is now (runtime-migrations.js). */
+  function reload() {
+    state = null;
+    hashIndex = null;
+    checkedAt = 0;
+  }
+
   return {
     file,
     sync,
     migrate,
+    reload,
     entries,
     entry,
     byHash,
@@ -678,4 +686,9 @@ export function catalogueStore(options = {}) {
   const dir = options.dataDir || currentDataDir();
   if (!stores.has(dir)) stores.set(dir, createCatalogueStore({ ...options, dataDir: dir }));
   return stores.get(dir);
+}
+
+/** Reloads a data folder's shared store from disk, when one is open. */
+export function reloadCatalogue(dataDir) {
+  stores.get(dataDir)?.reload();
 }

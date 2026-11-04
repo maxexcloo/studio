@@ -41,6 +41,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
@@ -596,6 +597,7 @@ registerRewriteRoutes(app, {
   admitted: jobAdmitted,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
+registerMigrationRoutes(app, { dataDir, requireAdmin });
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
