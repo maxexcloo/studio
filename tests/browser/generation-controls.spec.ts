@@ -684,14 +684,8 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   await expect(prompt).toHaveValue("Keep this direction");
   await prompt.fill("Keep this direction, in soft daylight");
   await prompt.press("Escape");
-  if (testInfo.project.use.isMobile) {
-    // Escape closes only the topmost layer: the prompt editor lands in Generate, and a second closes it.
-    const generate = page.getByRole("dialog", { name: "Generate", exact: true });
-    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeHidden();
-    await expect(generate).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(generate).toBeHidden();
-  }
+  if (testInfo.project.use.isMobile)
+    await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
   const controls = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(controls).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -707,7 +701,7 @@ test("Generation controls preserve the draft and return keyboard focus with redu
 test("Typing straight after clicking the collapsed prompt keeps every keystroke", async ({
   page,
 }, testInfo) => {
-  // Phones type in the full-screen editor, which the collapsed prompt opens instead.
+  // Phones open the Generate sheet, whose prompt waits for a tap to raise the keyboard.
   test.skip(!!testInfo.project.use.isMobile, "Desktop only");
   await fixtures(page);
   await page.goto("/");
@@ -742,7 +736,7 @@ test("Clicking out of the open composer closes it without opening what lies unde
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 
-test("Prompt boxes copy and undoably clear, and open full screen on phones", async ({
+test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
@@ -760,14 +754,13 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
   const dock = await page.locator("[data-composer-dock]").boundingBox();
   await page.locator("[data-composer-prompt]").click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  const generate = page.getByRole("dialog", { name: "Generate", exact: true });
   if (phone) {
-    // The phone editor opens without the keyboard, which waits for a tap on the text.
-    await expect(editor).toBeVisible();
-    await expect(text).not.toBeFocused();
-    await text.click();
-    await expect(text).toBeFocused();
+    // The Generate sheet opens without the keyboard, which waits for a tap on the text.
+    await expect(generate).toBeVisible();
+    await expect(prompt).not.toBeFocused();
+    await prompt.click();
+    await expect(prompt).toBeFocused();
   }
   await prompt.fill("A lantern in fog");
   await page.getByRole("button", { name: "Copy Prompt", exact: true }).click();
@@ -778,13 +771,10 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
   await expect(prompt).toHaveValue("A lantern in fog");
   if (!phone) return;
   await prompt.click();
-  await text.click();
-  await expect(text).toBeFocused();
+  await prompt.evaluate((text: HTMLTextAreaElement) =>
+    text.setSelectionRange(text.value.length, text.value.length),
+  );
   await page.keyboard.type(" at dusk");
-  await editor.getByRole("button", { name: "Done", exact: true }).click();
-  await expect(editor).toBeHidden();
-  const generate = page.getByRole("dialog", { name: "Generate", exact: true });
-  await expect(generate).toBeVisible();
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
   // Closing returns the page and its dock where they were.
   await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
@@ -877,43 +867,54 @@ test("The composer's draft survives a reload", async ({ page }) => {
   await expect(prompt).toHaveValue("A copper bird at dusk");
 });
 
-test("The phone composer opens its prompt editor in one tap and fits the screen with a long prompt", async ({
+test("The phone Generate sheet fits the screen and keeps Generate above the keyboard", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Phones only");
-  await fixtures(page);
-  await page.goto("/");
+  const state = await fixtures(page);
+  await page.goto("/images");
   await page.locator("[data-composer-prompt]").click();
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  await expect(editor.getByRole("button", { name: "Recent Prompts", exact: true })).toBeVisible();
-  await editor
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
-  await editor.getByRole("button", { name: "Done", exact: true }).click();
-  const scroller = page.getByLabel("Generate Scroll Area");
+  const sheet = page.getByRole("dialog", { name: "Generate", exact: true });
+  const prompt = sheet.getByRole("textbox", { name: "Prompt", exact: true });
+  const generate = sheet.getByRole("button", { name: "Generate Image", exact: true });
+  // Opening the sheet leaves the keyboard down until the prompt is tapped.
+  await expect(prompt).not.toBeFocused();
+  await prompt.click();
+  await expect(prompt).toBeFocused();
+  await prompt.fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
+  // Only the prompt's own text scrolls, and Generate sits at the bottom of the screen.
+  const scrolls = () =>
+    sheet.evaluate((root) =>
+      [root, ...root.querySelectorAll<HTMLElement>("*")].some(
+        (element) =>
+          element.tagName !== "TEXTAREA" &&
+          ["auto", "scroll"].includes(getComputedStyle(element).overflowY) &&
+          element.scrollHeight > element.clientHeight,
+      ),
+    );
+  const generateBottom = async () => {
+    const box = (await generate.boundingBox())!;
+    return box.y + box.height;
+  };
   for (const [width, height] of [
     [375, 667],
     [390, 844],
     [430, 932],
   ]) {
     await page.setViewportSize({ width, height });
-    await expect
-      .poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight))
-      .toBeLessThanOrEqual(0);
+    await expect.poll(scrolls).toBe(false);
+    await expect.poll(generateBottom).toBeGreaterThan(height - 40);
   }
-});
-
-test("On phones the prompt editor sends the run itself", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.use.isMobile, "Only phones open the prompt in its own editor.");
-  const state = await fixtures(page);
-  await page.goto("/images");
-  await page.locator("[data-composer-prompt]").click();
-  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-  await editor
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("A quiet harbour at dawn");
-  await editor.getByRole("button", { name: "Generate Image", exact: true }).click();
+  // The keyboard shortens the visual viewport and lifts the bar with Generate above it.
+  await page.evaluate(() => {
+    const height = window.innerHeight - 300;
+    Object.defineProperty(window.visualViewport, "height", { get: () => height });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect.poll(generateBottom).toBeLessThanOrEqual(932 - 300);
+  await expect.poll(scrolls).toBe(false);
+  await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.prompt).toBe("A quiet harbour at dawn");
-  await expect(editor).toBeHidden();
+  expect(state.jobs[0].input.prompt).toContain("A copper fox");
+  await expect(sheet).toBeHidden();
 });

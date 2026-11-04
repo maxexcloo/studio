@@ -798,14 +798,9 @@ export async function create(page: Page) {
   await page.goto("/images?compose=1");
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 }
-/** Expands the collapsed composer; phones open the prompt editor first, which Done closes. */
+/** Expands the collapsed composer (on phones, the Generate sheet). */
 export async function expandComposer(page: Page) {
   await page.locator("[data-composer-prompt]").click();
-  if (page.viewportSize()!.width < 768)
-    await page
-      .getByRole("dialog", { name: "Prompt", exact: true })
-      .getByRole("button", { name: "Done", exact: true })
-      .click();
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
 }
 export async function openNav(page: Page, label: string) {

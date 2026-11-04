@@ -24,7 +24,7 @@
   text-overflow: ellipsis;
 }
 
-/* Tall prompts (the phone editor) stack the ideas and let each wrap to two lines. */
+/* Tall prompts (the phone Generate sheet) stack the ideas and let each wrap to two lines. */
 .ideas[data-stacked] {
   flex-direction: column;
   align-items: stretch;

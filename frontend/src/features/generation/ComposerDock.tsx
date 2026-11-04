@@ -1,13 +1,6 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import {
-  Drawer,
-  FocusTrap,
-  Paper,
-  ScrollArea,
-  type ScrollAreaProps,
-  Transition,
-} from "@mantine/core";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
@@ -15,17 +8,9 @@ import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
+import { useKeyboard } from "../../ui/useKeyboard";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
-function GenerationScrollArea(props: ScrollAreaProps) {
-  return (
-    <ScrollArea
-      {...props}
-      viewportProps={{ "aria-label": "Generate Scroll Area" }}
-      styles={{ content: { display: "flex", flexDirection: "column", minHeight: "100%" } }}
-    />
-  );
-}
 const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
 export function ComposerDock({ chat }: { chat?: ReactNode }) {
@@ -45,8 +30,6 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const returningFocus = useRef(false);
   const tabbing = useRef(false);
   const focusIntent = useRef("[data-profile-picker]");
-  // On phones, tapping the collapsed bar opens the full-screen prompt editor once Generate is up.
-  const [editOnOpen, setEditOnOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const reference = useGalleryReference();
   const placement = useReferenceFiles();
@@ -90,10 +73,11 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     }
   }
   const controlsId = useId();
+  const keyboard = useKeyboard(!chat && phone && opened);
   const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
     const viewport = window.visualViewport;
-    // Phones type in the full-screen editor instead, so the dock stays put there.
+    // Phones type in the Generate sheet instead, so the dock stays put there.
     if (!viewport || phone) return;
     // Only typing in the dock lifts it above the keyboard; scrolling and the address bar never move it.
     const resize = () => {
@@ -126,7 +110,6 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
-    setEditOnOpen(false);
     close();
     setExpanded(false);
     if (main && params.has("compose")) {
@@ -257,7 +240,6 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               )
                 return;
               focusIntent.current = "[data-expanded-prompt]";
-              setEditOnOpen(phone);
               open();
             }}
           >
@@ -303,14 +285,17 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           onPaste={pasteReferences}
           onDragOver={dragReferences}
           onDrop={dropReferences}
-          scrollAreaComponent={GenerationScrollArea}
+          classNames={{ content: classes.sheet, body: classes.sheetBody }}
           styles={{
-            body: {
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              paddingBottom: 0,
-            },
+            // Opaque, like the phone text editor, so the page never shows through the prompt; it
+            // follows the visible viewport, so the keyboard lifts its bottom bar.
+            content: {
+              background: "var(--mantine-color-body)",
+              backdropFilter: "none",
+              WebkitBackdropFilter: "none",
+              translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
+              "--keyboard-inset": `${keyboard.inset}px`,
+            } as CSSProperties,
           }}
           id="generate"
           opened={opened}
@@ -324,15 +309,16 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           onEnterTransitionEnd={() => setExpanded(true)}
           onExitTransitionEnd={focusCompact}
         >
-          {/* Initial focus lands here rather than on Close; the prompt opens in its own editor. */}
+          {/* Initial focus lands here rather than on Close or the prompt, so the keyboard waits for a tap. */}
           <FocusTrap.InitialFocus />
           <div
             className={classes.panel}
             data-generate-drawer
+            data-typing={keyboard.inset > 0 || undefined}
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
           >
-            <GenerationForm fill onSubmitted={submitted} editPrompt={editOnOpen && expanded} />
+            <GenerationForm fill onSubmitted={submitted} />
           </div>
         </Drawer>
       )}

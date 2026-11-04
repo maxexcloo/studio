@@ -141,7 +141,7 @@ function ReferenceRole({
 }
 
 /**
- * The wrapping chip rail shared by the gallery composer and timeline cards, in one order on
+ * The chip rail shared by the gallery composer and timeline cards, in one order on
  * every breakpoint: what runs (Profile), what it starts from (References, then their role and
  * mask as one group), what shapes it (LoRAs), what comes out (Aspect, Count, a video's Length,
  * a set Seed), then the settings (Backend when the profile has several, Expert) and the tools
@@ -158,6 +158,7 @@ export function GenerationInputControls({
   loraPicker,
   expert,
   onCompare,
+  row = false,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -176,6 +177,8 @@ export function GenerationInputControls({
   expert: { opened: boolean; onOpenedChange: (opened: boolean) => void };
   /** Opens Compare from this draft; the gallery composer passes it. */
   onCompare?: () => void;
+  /** Keeps the chips in one row that scrolls sideways, for the phone Generate sheet's bottom bar. */
+  row?: boolean;
 }) {
   const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
@@ -184,7 +187,12 @@ export function GenerationInputControls({
   const length = lengthChoices(input, profile);
   const phone = usePhone();
   return (
-    <div className={classes.rail} role="group" aria-label="Generation Inputs">
+    <div
+      className={classes.rail}
+      data-row={row || undefined}
+      role="group"
+      aria-label="Generation Inputs"
+    >
       <ProfilePicker value={input} onChange={onChange} startParked />
       {references}
       {references && (hasReferences || !phone) && (
