@@ -894,7 +894,7 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
       .click();
 }
 
-/** Opens a Settings › Profiles view and the editor of its first listed definition. */
+/** Opens Settings › Profiles and the editor of the first listed profile or guide. */
 export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
   const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
   const table = page.getByRole("table", { name: `Editable ${kind}s`, exact: true });
@@ -902,7 +902,6 @@ export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
     await page.goto("/images");
     await openNav(page, "Settings");
     await section(page, "Settings", "Profiles");
-    if (kind === "Guide") await chooseView(page, "Profiles", "Guides");
   }
   await table
     .getByRole("button", { name: /^Actions for / })
