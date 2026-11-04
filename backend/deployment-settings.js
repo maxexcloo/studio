@@ -122,7 +122,10 @@ export function describeFlag(item) {
 /** Saves one deployment setting in SQLite, unless the deployment owns it; empty clears it. */
 export function saveDeploymentSetting(key, value) {
   if (settingSource(key).locked)
-    throw new Error("This setting comes from the deployment configuration. Change it there.");
+    throw Object.assign(
+      new Error("This setting comes from the deployment configuration. Change it there."),
+      { status: 409 },
+    );
   if (value === "" || value === null || value === undefined) {
     delete saved[key];
     delete process.env[key];
