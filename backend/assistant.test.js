@@ -79,8 +79,16 @@ test("settings read the gateway, whose model is the cloud model", async () => {
     [await engine.model("title"), await engine.supportsVision()],
     ["local/auto", false],
   );
+  assert.deepEqual(
+    [await engine.model("rewrite", true), await engine.model("rewrite", false)],
+    ["local/uncensored", "local/auto"],
+  );
+  local = null;
+  assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
+  environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
+  assert.equal(await engine.model("rewrite", true), "cloud/vision");
   environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
-  assert.equal(await engine.model("rewrite"), "cloud/vision");
+  assert.equal(await engine.model("rewrite", true), "cloud/vision");
   assert.equal(createAssistant({}), null);
 });
 

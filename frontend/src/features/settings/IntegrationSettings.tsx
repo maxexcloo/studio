@@ -42,7 +42,7 @@ export function IntegrationSettings() {
           <SettingRow
             wide
             label="Model"
-            description={`The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model.${lockedNote(model)}`}
+            description={`The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model; uncensored accounts get the uncensored one.${lockedNote(model)}`}
           >
             <Select
               aria-label="Prompt Assistant Model"
