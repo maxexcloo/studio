@@ -9,7 +9,7 @@ import {
   scoreRewrite,
 } from "./assistant-evals.js";
 
-test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 5 animate cases with unique ids", () => {
+test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 6 animate cases with unique ids", () => {
   const evals = loadEvals();
   assert.deepEqual(
     [
@@ -18,7 +18,7 @@ test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 5 animate cases with 
       evals.negative.cases.length,
       evals.animate.cases.length,
     ],
-    [20, 15, 5, 5],
+    [20, 15, 5, 6],
   );
   const ids = Object.values(evals).flatMap((set) => set.cases.map((item) => item.id));
   assert.equal(new Set(ids).size, ids.length);
@@ -111,7 +111,7 @@ test("the LoRA and negative scorers check expected, forbidden, unused and subjec
   );
 });
 
-test("the animate scorer catches labels on a wrapped profile, missing sections, filler and a replay", () => {
+test("the animate scorer catches labels on a wrapped profile, missing sections, filler, a replay and speech on a silent model", () => {
   const body =
     "The camera pushes in slowly as she lifts the cup, steam curling past her face with a soft hiss. ".repeat(
       5,
@@ -127,4 +127,5 @@ test("the animate scorer catches labels on a wrapped profile, missing sections, 
   ]);
   assert.deepEqual(failing({}, `${body} Smooth, cinematic.`), ["no filler"]);
   assert.deepEqual(failing({ avoid: ["lifts the cup"] }, body), ['moves on from "lifts the cup"']);
+  assert.deepEqual(failing({ silent: true }, `${body} She says, "Morning."`), ["no dialogue"]);
 });

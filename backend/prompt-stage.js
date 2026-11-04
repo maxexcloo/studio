@@ -13,7 +13,7 @@
  */
 import { mayUseFeature } from "./account-policy.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { animateIssue, animateRequest, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
+import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 
 const text = (value, limit = maxPromptCharacters) =>
   String(typeof value === "string" ? value : "")
@@ -52,10 +52,18 @@ export function writingIssue(writing, { engine, account }) {
 /**
  * The stage's writer. `account(ownerId)` is the owner's access (undefined in single-user mode, null
  * once gone), `profiles(account)` the generation profiles it may use, `guide(profile)` a profile's
- * prompting guide, `dream()` Dream and `frame(account, assetId)` a reference image as the text model
- * reads it.
+ * prompting guide, `dream()` Dream, `frame(account, assetId)` a reference image as the text model
+ * reads it and `caption(account, assetId)` what it shows in words.
  */
-export function createPromptStage({ engine, account, profiles, guide, dream, frame }) {
+export function createPromptStage({
+  engine,
+  account,
+  profiles,
+  guide,
+  dream,
+  frame,
+  caption = () => "",
+}) {
   return async (job, stream) => {
     const { signal, onThinking, onDelta } = stream;
     const writing = job.input.writing;
@@ -66,14 +74,16 @@ export function createPromptStage({ engine, account, profiles, guide, dream, fra
     if (issue) throw new Error(issue.error);
     const profile = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!profile) throw new Error("The model is no longer available to this account.");
+    // The job's first reference is the frame it animates from.
+    const start = job.input.referenceAssets?.[0]?.assetId;
     return writeAnimatePrompt({
       engine,
       profile,
       guide: guide(profile),
       writing,
-      seconds: clipSeconds(job.input, profile),
-      // The job's first reference is the frame it animates from.
-      frame: () => frame(access, job.input.referenceAssets?.[0]?.assetId),
+      clip: animateClip(job.input, profile),
+      frame: () => frame(access, start),
+      caption: () => caption(access, start),
       signal,
       onThinking,
       onDelta,

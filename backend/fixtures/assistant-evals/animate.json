@@ -1,6 +1,36 @@
 {
-  "about": "Animate and Extend cases, one per profile shape (wrapped H3, H3 with complete sections, Grok): the guide's format, beats with sound and dialogue, a camera move, no filler. Guides are trimmed snapshots of the live H3 and Grok packs.",
+  "about": "Animate and Extend cases, one per profile shape (wrapped H3, H3 with complete sections, Grok, silent Wan): the guide's format, beats with sound and dialogue (none on a silent model), a camera move, no filler. A `caption` stands in for the frame for a writer that can't see it. Guides are trimmed snapshots of the live H3, Grok and Wan packs.",
   "cases": [
+    {
+      "id": "wan-caption-cinematic",
+      "profile": {
+        "id": "custom:video-wan22-i2v-comfyui",
+        "label": "Wan 2.2 Image to Video",
+        "kind": "video",
+        "family": "wan22_14b_i2v"
+      },
+      "guide": {
+        "summary": "Wan 2.2 image-to-video: describe the motion and the camera, not the still image.",
+        "rules": [
+          "Lead with the subject's motion, then the camera movement, in plain sentences. Name camera moves explicitly: push in, pull back, pan left, tilt up, orbit, static.",
+          "Wan makes no sound; keep motion moderate at 16 fps."
+        ]
+      },
+      "writing": {
+        "theme": "cinematic",
+        "source": "Lighthouse keeper on a rocky headland at dusk, storm clouds, moody."
+      },
+      "caption": "A wide photo of an older man in a yellow oilskin coat standing on dark rocks below a white lighthouse at dusk. Waves break against the rocks to the left; heavy grey clouds fill the sky, with a thin band of orange light on the horizon. He faces the sea, his back three-quarters to the camera, holding a lantern at his side.",
+      "seconds": 5,
+      "fps": 16,
+      "expect": {
+        "keep": ["lantern", "lighthouse"],
+        "sections": [],
+        "silent": true,
+        "avoid": ["says"]
+      },
+      "recorded": "The keeper in the yellow oilskin stands steady on the dark rocks as a wave breaks to the left and white spray rises and falls back over the stones. The camera cranes up slowly from behind his shoulder, rising past the lantern swinging gently at his side until the white lighthouse fills the top of the frame. Its beam sweeps on and passes over him, lighting the wet rocks and the folds of his coat for a moment. The clouds roll low and fast overhead while the thin orange band on the horizon fades toward grey, and he lifts the lantern a little higher toward the sea."
+    },
     {
       "id": "h3-wrapped-cinematic",
       "profile": {
