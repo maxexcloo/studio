@@ -12,11 +12,13 @@ export const closingPopup = () => closing;
 
 // Select keeps its dropdown mounted but hidden, and a closing layer fades towards opacity 0. A
 // popover's trigger (Mantine gives it the dropdown's id less `-dropdown`) reports it collapsed a
-// frame before the fade starts, so its dropdown is closing too.
-const shown = (layer: HTMLElement) =>
-  layer.getClientRects().length &&
-  layer.style.opacity !== "0" &&
-  document.getElementById(layer.id.replace(/-dropdown$/, ""))?.ariaExpanded !== "false";
+// frame before the fade starts, and expanded while it still waits at opacity 0 to fade in, so the
+// trigger decides where there is one.
+const shown = (layer: HTMLElement) => {
+  if (!layer.getClientRects().length) return false;
+  const expanded = document.getElementById(layer.id.replace(/-dropdown$/, ""))?.ariaExpanded;
+  return expanded ? expanded === "true" : layer.style.opacity !== "0";
+};
 const popupOpen = () => [...document.querySelectorAll<HTMLElement>(popupLayer)].some(shown);
 const openLayers = () =>
   [
