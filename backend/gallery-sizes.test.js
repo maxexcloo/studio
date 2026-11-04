@@ -41,13 +41,13 @@ test("gallery images take their file's size after a dry run, with a restorable b
   ]);
   db.close();
 
-  const plan = gallerySizes(dataDir);
+  const plan = await gallerySizes(dataDir);
   assert.deepEqual(
     { ...plan, examples: plan.examples.map(({ from, to }) => [from, to]) },
     { corrected: 1, examples: [["1368×768", "1000×1000"]], unread: 1, applied: false, backup: "" },
   );
 
-  const result = gallerySizes(dataDir, { apply: true });
+  const result = await gallerySizes(dataDir, { apply: true });
   const sizes = () => {
     const after = openDatabase(path.join(dataDir, "studio.sqlite"));
     const rows = readGalleryRows(after).map((row) => [
@@ -67,5 +67,5 @@ test("gallery images take their file's size after a dry run, with a restorable b
   restoreRuntimeBackup(result.backup, restored);
   const [row] = JSON.parse(fs.readFileSync(path.join(restored, "studio_gallery.json"), "utf8"));
   assert.equal(JSON.parse(row.value).width, 1368);
-  assert.equal(gallerySizes(dataDir).corrected, 0);
+  assert.equal((await gallerySizes(dataDir)).corrected, 0);
 });
