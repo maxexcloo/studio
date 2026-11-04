@@ -15,6 +15,7 @@ import {
 } from "./LibraryCatalogueTable";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
+import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 
 export function LibraryPage() {
@@ -121,8 +122,10 @@ export function LibraryPage() {
               ))}
             </SimpleGrid>
           ),
-          models: catalogueSection("models"),
+          guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
+          models: catalogueSection("models"),
+          profiles: (heading) => <ProfileDefinitions heading={heading} />,
           downloads: <LibraryDownloads active={activeSection === "downloads"} />,
         }}
       />

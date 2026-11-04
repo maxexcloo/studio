@@ -11,6 +11,30 @@ import {
   serveProfiles,
 } from "./fixtures";
 
+test("The Library groups what you have and getting more, A–Z, and opens on Models", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/library");
+  const order = ["Guides", "LoRAs", "Models", "Profiles", "Downloads", "Imports", "Inspiration"];
+  if ((page.viewportSize()?.width || 1440) < 768) {
+    const select = page.getByRole("combobox", { name: "Library Section", exact: true });
+    await expect(select).toHaveValue("Models");
+    await select.click();
+    await expect(page.getByRole("option")).toHaveText(order);
+  } else {
+    const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
+    await expect(nav.getByRole("link", { name: "Models", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(nav.getByRole("link")).toHaveText(order);
+    await expect(
+      nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
+    ).toHaveText(order.slice(4));
+  }
+});
+
 test("Model downloads cancel only the chosen file and explicitly resume or retry", async ({
   page,
 }) => {
@@ -318,7 +342,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   const previousReads = modelReads;
   await button.click();
   await expect(
-    page.getByText("Profile drafted. Review it in Settings › Profiles.", { exact: true }).first(),
+    page.getByText("Profile drafted. Review it in Library › Profiles.", { exact: true }).first(),
   ).toBeVisible();
   await expect(button).toBeHidden();
   await expect.poll(() => modelReads).toBeGreaterThan(previousReads);

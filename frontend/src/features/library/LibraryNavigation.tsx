@@ -1,4 +1,4 @@
-import { Boxes, HardDriveDownload, Lightbulb } from "lucide-react";
+import { BookOpen, Boxes, FileCog, HardDriveDownload, Lightbulb } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -6,6 +6,13 @@ import { useLibraryAccess } from "./useLibraryAccess";
 
 // What the studio has, then where more comes from, each alphabetical; the Library opens on Models.
 export const librarySections = {
+  guides: {
+    label: "Guides",
+    description: "Prompting guides for profiles and families. Every saved version is kept.",
+    icon: BookOpen,
+    admin: true,
+    group: "What You Have",
+  },
   loras: {
     label: "LoRAs",
     description: "Style and subject adapters for compatible models.",
@@ -18,6 +25,13 @@ export const librarySections = {
     icon: Boxes,
     group: "What You Have",
     initial: true,
+  },
+  profiles: {
+    label: "Profiles",
+    description: "Generation profiles and their workflows. Every saved version is kept.",
+    icon: FileCog,
+    admin: true,
+    group: "What You Have",
   },
   downloads: {
     label: "Downloads",

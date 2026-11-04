@@ -162,7 +162,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await editor.getByRole("button", { name: "Save Guide", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(saved[1]).toEqual({ ...original, summary: "Updated guidance." });
-  // The Guides group lists a guide by its name.
+  // Library › Guides lists a guide by its name.
   await expect(page.getByRole("table", { name: "Editable Guides", exact: true })).toContainText(
     "Owned Guide",
   );
@@ -279,8 +279,8 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
     });
   });
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
   await profileAction(page, "Merge Duplicate Profiles");
   const dialog = page.getByRole("dialog", { name: "Merge Duplicate Profiles", exact: true });
   await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
@@ -340,8 +340,8 @@ test("A combined profile's Backend select is a saved edit that switches what the
     });
   });
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
   const table = page.getByRole("table", { name: "Editable Profiles", exact: true });
   await expect(table).toContainText("Krea 2 Turbo · Fast");
   const editor = await editDefinition(page, "Profile");
@@ -389,8 +389,8 @@ test("Combine Backends previews pairs with their differences and combines the pi
     return route.fulfill({ json: { hash: "plan-1", pairs: combined ? [] : [pair] } });
   });
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
   await profileAction(page, "Combine Backends");
   const dialog = page.getByRole("dialog", { name: "Combine Backends", exact: true });
   await expect(
@@ -424,8 +424,8 @@ test("The Profiles toolbar groups search and filter, the other actions A–Z, th
 }) => {
   await fixtures(page);
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
   const toolbar = page
     .getByRole("button", { name: "Search Profiles", exact: true })
     .locator("xpath=..");
@@ -468,8 +468,8 @@ test("New Profile imports a workflow or duplicates a profile under a new ID", as
     return route.fulfill({ json: { ok: true, workflow: { id: "owned-copy" } } });
   });
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
   const newProfile = async (item: string) => {
     await page.getByRole("button", { name: "New Profile", exact: true }).click();
     await page.getByRole("menuitem", { name: item, exact: true }).click();
@@ -523,12 +523,13 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
     });
   });
   await page.goto("/images");
-  await openNav(page, "Settings");
-  await section(page, "Settings", "Profiles");
-  for (const [row, item, file] of [
-    ["Owned Profile", "Download Profile", "owned.json"],
-    ["Krea 2", "Download Guide", "krea2.json"],
+  await openNav(page, "Library");
+  await section(page, "Library", "Profiles");
+  for (const [part, row, item, file] of [
+    ["Profiles", "Owned Profile", "Download Profile", "owned.json"],
+    ["Guides", "Krea 2", "Download Guide", "krea2.json"],
   ]) {
+    await section(page, "Library", part);
     await page.getByRole("button", { name: `Actions for ${row}`, exact: true }).click();
     const download = page.waitForEvent("download");
     await page.getByRole("menuitem", { name: item, exact: true }).click();

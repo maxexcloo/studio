@@ -440,7 +440,7 @@ registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (req) => req.studioAccount?.userId || "",
 });
-// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
+// Library › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),

@@ -901,14 +901,14 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
       .click();
 }
 
-/** Opens Settings › Profiles and the editor of the first listed profile or guide. */
+/** Opens Library › Profiles or Guides and the editor of the first listed profile or guide. */
 export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
   const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
   const table = page.getByRole("table", { name: `Editable ${kind}s`, exact: true });
   if (!(await table.isVisible())) {
     await page.goto("/images");
-    await openNav(page, "Settings");
-    await section(page, "Settings", "Profiles");
+    await openNav(page, "Library");
+    await section(page, "Library", `${kind}s`);
   }
   await table
     .getByRole("button", { name: /^Actions for / })

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Settings › Profiles beyond the JSON editor (profile/editor.js), administrators only:
+ * Library › Profiles beyond the JSON editor (profile/editor.js), administrators only:
  *
  *   GET  /api/profiles/editable/:id/versions        the profile's versions, newest first, and its current marker
  *   GET  /api/profiles/editable/:id/versions/:n     one version with its text
