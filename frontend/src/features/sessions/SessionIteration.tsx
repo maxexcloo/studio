@@ -2,8 +2,8 @@ import { useRef, useState, type CSSProperties } from "react";
 import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { ChevronDown, FastForward } from "lucide-react";
 import { icons } from "../../ui/icons";
-import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
-import { isProfile, shownProfileName } from "../generation/payload";
+import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
+import { isProfile } from "../generation/payload";
 import { ActionMenuItems, findAction } from "../gallery/ActionBar";
 import { AnimateDialog, useMediaActions } from "../gallery/MediaActions";
 import { useMediaTransfer } from "../gallery/mediaShare";
@@ -13,7 +13,7 @@ import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useMediaAction, type AnimateTheme } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { WritingStream } from "../generation/PromptWriting";
-import { QueueJobAction } from "../generation/Queue";
+import { QueueJobAction, settingChips } from "../generation/Queue";
 import { referenceLabel } from "../generation/references";
 import { GenerationCard } from "./GenerationCard";
 import { jobResults } from "./queries";
@@ -26,27 +26,6 @@ const operationLabels = {
   animate: "Animate",
   upscale: "Upscale",
 } as const;
-
-/** The compact card's settings: only what the run recorded, without repeating the profile. */
-function settingChips(input: QueueJob["input"], profile?: Profile) {
-  const name = shownProfileName(
-    String(input.profileName || profile?.displayName || profile?.label || ""),
-  );
-  const steps = input.steps && !new RegExp(`\\b${input.steps}\\s*steps?\\b`, "i").test(name);
-  const loras = Array.isArray(input.loras)
-    ? input.loras.filter((lora: { enabled?: boolean }) => lora.enabled !== false)
-    : [];
-  const seconds = Number(input.duration) || Number(input.frames) / Number(input.fps) || 0;
-  return [
-    name,
-    input.width && input.height ? `${input.width} × ${input.height}` : "",
-    input.kind === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "",
-    steps ? `${input.steps} Steps` : "",
-    input.seed !== undefined && input.seed !== "" ? `Seed ${input.seed}` : "",
-    loras.length ? `${loras.length} ${loras.length === 1 ? "LoRA" : "LoRAs"}` : "",
-    Number(input.count) > 1 ? `${input.count} Outputs` : "",
-  ].filter(Boolean);
-}
 
 /**
  * Saved results, then placeholders for outputs still generating or a run that failed. Each carries
