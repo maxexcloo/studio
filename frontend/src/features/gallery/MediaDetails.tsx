@@ -363,17 +363,20 @@ function Related({
 
 /**
  * Details › Caption (with its tags), From, Prompt, Negative Prompt, Source, Derived, Model, LoRAs,
- * References, Settings, Output and Timing for one result; `open` shows a related result in the
+ * References, Settings, Output and Timing for one result; From and Derived look among the `loaded`
+ * items too, and `open` shows a related result in the
  * viewer.
  */
 export function MediaDetails({
   item,
+  related: loaded,
   open,
 }: {
   item: MediaItem;
+  related?: MediaItem[];
   open?: (item: MediaItem) => void;
 }) {
-  const related = useDerivations(item);
+  const related = useDerivations(item, loaded);
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);

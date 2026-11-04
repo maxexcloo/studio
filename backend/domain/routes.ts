@@ -58,6 +58,7 @@ export function registerRewriteRoutes(
     validate,
     deleteMedia,
     media,
+    ownsItem,
     title,
     admitted,
   }: {
@@ -79,6 +80,8 @@ export function registerRewriteRoutes(
      * gallery's records instead: each with its prompt, settings, title and star.
      */
     media?: (ownerId: string) => Map<string, QueueMedia[]>;
+    /** Whether the owner has this gallery item, which a run may then be made from. */
+    ownsItem?: (ownerId: string, id: string) => boolean;
     /** Titles a chat started by its first generation; must not reject. */
     title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
     /** Hears each newly queued job, for the taste profile; must not throw. */
@@ -217,14 +220,23 @@ export function registerRewriteRoutes(
     const { operation = "image", parentJobId, parentItemId, ...input } = req.body || {};
     if (!["image", "refine", "animate"].includes(String(operation)))
       return res.status(400).json({ error: "Unknown generation operation." });
-    if (
-      parentJobId !== undefined &&
-      (typeof parentJobId !== "string" ||
-        !store.jobs(owner(req), req.params.id).some((job) => job.id === parentJobId))
-    )
+    const parent =
+      typeof parentJobId === "string"
+        ? store.jobs(owner(req), req.params.id).find((job) => job.id === parentJobId)
+        : undefined;
+    if (parentJobId !== undefined && !parent)
       return res.status(400).json({ error: "Parent generation must belong to this chat." });
-    if (parentItemId !== undefined && typeof parentItemId !== "string")
-      return res.status(400).json({ error: "Parent result must be an item ID." });
+    // The result a run is made from is the owner's: one of the parent's results or a gallery item.
+    if (
+      parentItemId !== undefined &&
+      (typeof parentItemId !== "string" ||
+        !(
+          [...(parent?.items || []), ...(parent?.outputs || [])].some(
+            (item) => item.id === parentItemId,
+          ) || ownsItem?.(owner(req), parentItemId)
+        ))
+    )
+      return res.status(400).json({ error: "Parent result must be one of your items." });
     const checked = await validate?.(input, req.studioAccount);
     if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);
     const job = store.enqueue(

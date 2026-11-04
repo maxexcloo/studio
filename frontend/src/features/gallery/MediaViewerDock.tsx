@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Play } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
 import { queueQuery } from "../generation/Queue";
-import { derivation, versionGroups } from "./versions";
+import { derivation, knownResults, versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
 
@@ -15,16 +15,19 @@ interface Entry {
 
 /**
  * The item's versions, oldest first: its version group (`versionGroups`, as the grid groups them)
- * and the runs this viewer queued without a parent. Work still queued from one of them shows as
- * placeholders.
+ * among the owner's jobs' results and the `related` items loaded with it, and the runs this viewer
+ * queued without a parent. Work still queued from one of them shows as placeholders.
  */
-export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
+export function useRunFamily(item: MediaItem, extra: string[], related: MediaItem[]): Entry[] {
   const jobs = useQuery(queueQuery).data?.jobs;
   return useMemo(() => {
     const all = [...(jobs ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const results = (job: QueueJob) => (job.items?.length ? job.items : job.outputs || []);
-    const loaded = all.flatMap(results);
-    if (!loaded.some((result) => result.id === item.id)) loaded.push(item);
+    const known = knownResults([...related, item], all);
+    // Newest first, as versionGroups takes them; work without a time yet is the newest.
+    const loaded = [...known.values()].sort((a, b) =>
+      (b.createdAt || "~").localeCompare(a.createdAt || "~"),
+    );
     const group = versionGroups(loaded, all).find((versions) =>
       versions.some((version) => version.id === item.id),
     )!;
@@ -36,7 +39,7 @@ export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
     const ids = new Set(versions.map((version) => version.id));
     const byJob = new Map(all.map((job) => [job.id, job]));
     const from = (job: QueueJob) => {
-      const made = derivation(job, byJob);
+      const made = derivation(job, byJob, known);
       return Boolean(made?.version && ids.has(made.source));
     };
     const waiting = all
@@ -53,7 +56,7 @@ export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
         })),
       );
     return [...versions.map((version) => ({ key: version.id, item: version })), ...waiting];
-  }, [jobs, item, extra]);
+  }, [jobs, item, extra, related]);
 }
 
 /** The version strip and the actions under the viewer image. */

@@ -153,7 +153,8 @@ export async function mediaDraft(
       sessionId: sourceSession,
       operation: (operation === "extend" ? "animate" : operation) as "image" | "refine" | "animate",
       parentJobId: sourceSession ? item.jobId : undefined,
-      parentItemId: sourceSession ? item.id : undefined,
+      // Every run from the item records it, also outside its Chat, so its results stay versions.
+      parentItemId: item.id,
       references: preparedReferences,
       input: {
         ...initialInput,
