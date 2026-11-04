@@ -443,14 +443,23 @@ primary component reference and verify APIs against the installed version.
   offered in the viewer's field and the composer's prompt (not in Details): it
   sends a change in plain words ("make it
   night") and the prompt assistant picks the action and writes its prompt, which
-  replaces the text in place, tinted, with the action's name and Undo (restoring
-  what was there), the one review pause before a written prompt runs; there is no
-  panel above the field. The viewer's field is itself the request: Ask sends its
-  text, the assistant picks Edit, Recreate, Animate or Upscale
-  (`/api/suggestions`, surface `change`) and Run sits at the field's end (on
-  phones Run is the editor's send arrow). The composer's prompt (first in its
-  Prompt Assistance menu) opens a request line under the prompt instead, and
-  Undo reopens it; the composer's draft (surface `draft`)
+  replaces the text in place, tinted, with the action's name in a small label
+  over the field and Undo (restoring what was there), the one review pause
+  before a written prompt runs; there is no panel above the field. Its actions
+  are icons with tooltips, two to a row beside the field like the composer's
+  prompt tools (one row in the phone viewer's short field and editor header),
+  showing only those that apply: Ask for a Change, Suggestions,
+  Undo and the send (Generate or Run) ending the last row; text buttons never
+  sit in the field, where they would be cut off. Suggestions (Lightbulb) opens a
+  menu of short changes that fit the image (its next steps) or the draft
+  (surface `draft` without a request), loaded when it opens and cached per item
+  or prompt; picking one fills the request and asks at once, and an empty or
+  failed answer says No Suggestions. The viewer's field is itself the request:
+  Ask sends its text, the assistant picks Edit, Recreate, Animate or Upscale
+  (`/api/suggestions`, surface `change`) and Run runs it (phones keep the
+  editor's send arrow for Generate). The composer's prompt (first in its Prompt
+  Assistance menu) opens a request line under the prompt instead, which stays
+  open with Undo while the proposal shows; the composer's draft (surface `draft`)
   rewrites its prompt and, with a reference attached, picks Edit or a fresh run
   (setting Edit Image or Generate), which the composer's Generate then runs. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached

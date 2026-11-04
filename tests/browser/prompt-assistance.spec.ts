@@ -262,7 +262,7 @@ test("Improve Prompt lists its styles A–Z with Custom… last, which asks for 
   ]);
 });
 
-test("Ask for a Change rewrites the draft's prompt in place, for Generate to run or Undo to restore", async ({
+test("Ask for a Change rewrites the draft's prompt in place, for Generate to run or Undo to restore, and suggests changes", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -271,6 +271,12 @@ test("Ask for a Change rewrites the draft's prompt in place, for Generate to run
     const body = route.request().postDataJSON();
     if (body.surface !== "draft") return route.fallback();
     asked.push(body);
+    if (body.request === undefined)
+      return route.fulfill({
+        json: {
+          suggestions: [{ label: "Add Rain", request: "add rain", prompt: "A castle in rain" }],
+        },
+      });
     return route.fulfill({
       json: {
         suggestions: [
@@ -302,12 +308,27 @@ test("Ask for a Change rewrites the draft's prompt in place, for Generate to run
       actions: ["recreate"],
     },
   ]);
-  // Undo restores the draft and reopens the request.
+  // Undo restores the draft and keeps the request.
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
+  // A suggestion fits the draft as it was before the proposal, fills the request and asks at once.
+  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  await expect(request).toHaveValue("add rain");
+  await expect.poll(() => asked.length).toBe(4);
+  expect(asked.slice(2)).toEqual([
+    { surface: "draft", kind: "image", prompt: "A castle at noon" },
+    {
+      surface: "draft",
+      kind: "image",
+      prompt: "A castle at noon",
+      request: "add rain",
+      actions: ["recreate"],
+    },
+  ]);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toBe("A castle at night");
