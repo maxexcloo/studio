@@ -90,15 +90,23 @@ export function useAskChange<T>({
  * `row` lines them up in one row instead, for a short phone field such as the viewer's, where the
  * column would stand taller than the text.
  */
-export function ChangeActions({ row = false, children }: { row?: boolean; children: ReactNode }) {
+export function ChangeActions({
+  row = false,
+  grid = false,
+  children,
+}: {
+  row?: boolean;
+  grid?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className={classes.actions} data-row={row || undefined}>
+    <div className={classes.actions} data-row={row || undefined} data-grid={grid || undefined}>
       {children}
     </div>
   );
 }
 
-/** Text box props that keep a field's text at least as tall as its column of `count` actions. */
+/** Text box props that keep a field's text at least as tall as `count` rows of actions. */
 export const fitActions = (count: number) => ({
   classNames: { input: classes.fit },
   style: { "--change-actions": count } as CSSProperties,

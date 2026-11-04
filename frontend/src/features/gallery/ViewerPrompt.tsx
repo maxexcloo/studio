@@ -149,6 +149,7 @@ export function ViewerPrompt({
       />
     ),
   ].filter(Boolean);
+  const grid = !phone && actions.length >= 4;
   return (
     <TextBox
       ref={field}
@@ -157,8 +158,8 @@ export function ViewerPrompt({
       variant="unstyled"
       autosize
       minRows={1}
-      // The text grows to the height of its column of actions.
-      {...(phone ? {} : fitActions(actions.length))}
+      // The text grows to the height of its actions, in two columns from four of them.
+      {...(phone ? {} : fitActions(grid ? Math.ceil(actions.length / 2) : actions.length))}
       maxRows={phone ? 2 : 4}
       className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
       description={change && <ProposalLabel proposal={change} />}
@@ -167,9 +168,14 @@ export function ViewerPrompt({
       onChange={setPrompt}
       onKeyDown={keys}
       // Phones list Continue in Chat under More.
-      rightSection={<ChangeActions row={phone}>{actions}</ChangeActions>}
-      // Phones line the actions up in one row (at most three); desktop stands them in one column.
-      rightSectionWidth={phone ? actions.length * 44 : 40}
+      rightSection={
+        <ChangeActions row={phone} grid={grid}>
+          {actions}
+        </ChangeActions>
+      }
+      // Phones line the actions up in one row (at most three); desktop stands them in one column,
+      // or a 2×2 grid from four.
+      rightSectionWidth={phone ? actions.length * 44 : grid ? 76 : 40}
       rightSectionPointerEvents="all"
       rightSectionProps={{ style: { alignItems: "flex-start" } }}
       submit={change ? undefined : submit}
