@@ -5,7 +5,8 @@
  * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
- * (`model()`): the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
+ * (`model()`): the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL;
+ * for an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and its effort.
  * Settings are read on every call, so a model chosen in Settings applies at once.
@@ -440,6 +441,11 @@ function rewriteInstructions({
     .join("\n");
 }
 
+// Bifrost's local/ and cloud/ routers define both `auto` and `uncensored`; any other model is kept.
+function uncensoredAlias(model, explicit) {
+  return explicit && model.endsWith("/auto") ? model.replace(/\/auto$/, "/uncensored") : model;
+}
+
 /**
  * The engine, or null while the gateway is unset. Pass `environment` as a live object (process.env)
  * so model choices saved in Settings apply at once.
@@ -471,9 +477,9 @@ export function createAssistant(
     return (await localText()) || { model: settings().cloud, vision: true };
   }
 
-  /** The Bifrost model calls ask for: the administrator's choice, otherwise the route's. */
-  async function modelFor() {
-    return settings().chosen || (await route()).model;
+  /** The Bifrost model calls ask for: the administrator's choice, otherwise the route's, uncensored when `explicit`. */
+  async function modelFor(task, explicit = false) {
+    return settings().chosen || uncensoredAlias((await route()).model, explicit);
   }
 
   /** Whether the route the calls take reads images. */
@@ -709,7 +715,7 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const model = await modelFor("rewrite");
+    const model = await modelFor("rewrite", explicit);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
     const vision = images.length ? await supportsVision() : false;
@@ -919,7 +925,7 @@ export function createAssistant(
     loras = [],
     signal,
   } = {}) {
-    const model = await modelFor("describe");
+    const model = await modelFor("describe", explicit);
     const started = now();
     const pictures = images.filter((image) => image?.data);
     const vision = pictures.length ? await supportsVision() : false;
