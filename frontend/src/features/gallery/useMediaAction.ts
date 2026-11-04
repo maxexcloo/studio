@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { useLocation, useNavigate } from "react-router";
+import { useOpenComposer } from "../generation/openComposer";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
 import { useRemembered } from "../auth/useRemembered";
@@ -197,6 +198,7 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
   const location = useLocation();
   const client = useQueryClient();
   const [tier] = useAnimateTier();
+  const openComposer = useOpenComposer();
   return useMutation({
     mutationFn: async (operation: Operation) => {
       const { draft, note } = await mediaDraft(item, operation, profiles, client, sessionId, tier);
@@ -207,17 +209,10 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
       prepared?.();
       // The gallery composer opens on the page for the draft's kind (an Animate draft lands in
       // Videos); elsewhere a Chat result returns to its Chat.
-      const page = draft.input.kind === "video" ? "/video" : "/images";
       const gallery = ["/images", "/video"].includes(location.pathname);
-      if (gallery || !draft.sessionId) {
-        if (location.pathname !== page) navigate(`${page}?compose=1`);
-      } else if (location.pathname !== `/chat/${draft.sessionId}`)
+      if (gallery || !draft.sessionId) openComposer(draft.input.kind);
+      else if (location.pathname !== `/chat/${draft.sessionId}`)
         navigate(`/chat/${draft.sessionId}`);
-      requestAnimationFrame(() =>
-        document
-          .querySelector<HTMLTextAreaElement>("[data-composer-prompt]")
-          ?.focus({ preventScroll: true }),
-      );
     },
   });
 }

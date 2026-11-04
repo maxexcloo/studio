@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { useOpenComposer } from "../generation/openComposer";
 import { icons } from "../../ui/icons";
 import type { Action } from "./ActionBar";
 
@@ -14,9 +14,7 @@ import type { Action } from "./ActionBar";
  */
 export function useRecreateAction(item: MediaItem, onApplied: () => void): Action {
   const { setDraft, changeKind } = useGenerationActions();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [params, setParams] = useSearchParams();
+  const openComposer = useOpenComposer();
   const recreate = useMutation({
     mutationFn: () =>
       post<{ sessionId: string; jobId: string }>("/api/gallery/recreate", {
@@ -45,13 +43,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
         "gallery",
       );
       onApplied();
-      const page = item.type === "video" ? "/video" : "/images";
-      if (location.pathname !== page) navigate(`${page}?compose=1`);
-      else {
-        const next = new URLSearchParams(params);
-        next.set("compose", "1");
-        setParams(next, { replace: true });
-      }
+      openComposer(item.type);
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });

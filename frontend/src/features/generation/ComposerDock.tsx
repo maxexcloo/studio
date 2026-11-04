@@ -2,7 +2,8 @@ import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
+import type { OpenComposerState } from "./openComposer";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { api, failure } from "../../api";
@@ -97,6 +98,21 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   useEffect(() => {
     if (main && params.get("compose") === "1") open();
   }, [params, open, main]);
+  // An action staging a draft (`useOpenComposer`) opens the composer with its prompt focused, even
+  // when it is already open; phones bring up the sheet and leave the keyboard down.
+  const location = useLocation();
+  useEffect(() => {
+    if (!main || !(location.state as OpenComposerState | null)?.openComposer) return;
+    focusIntent.current = "[data-expanded-prompt]";
+    open();
+    if (phone) return;
+    const frame = requestAnimationFrame(() =>
+      dock.current
+        ?.querySelector<HTMLElement>("[data-expanded-prompt]")
+        ?.focus({ preventScroll: true }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [location.key, main]);
   // An image shared to the installed app (POST /share) arrives as a reference to place.
   const shared = main ? params.get("shared") || "" : "";
   useEffect(() => {

@@ -218,6 +218,12 @@ primary component reference and verify APIs against the installed version.
   tapped, with the same actions as the inline box and Done, with assistant
   suggestions under its text; Done, Escape or dismissing the keyboard returns to
   the page. Desktop edits in place.
+- Every action that stages a draft in the gallery composer (Edit, Animate in
+  Composer, Edit Prompt, Use as Reference, Dream's Edit and Animate, an inspiration's
+  Use Prompt or Use Settings) opens it through `useOpenComposer`: what it came
+  from (viewer, menu, Library or Settings) closes, then the composer opens on the
+  draft's page with its prompt focused; phones bring up the Generate sheet with
+  the keyboard down.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer scrolls only
   the prompt's own text. Avoid nested form scroll owners.
