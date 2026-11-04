@@ -174,20 +174,6 @@ function QueueRow({
   );
   return (
     <Group ref={drag?.elementRef} wrap="nowrap" gap="sm" py="xs" className={classes.row}>
-      {sortable && (
-        <Tooltip label="Drag to Reorder">
-          <ActionIcon
-            ref={drag?.handleRef}
-            disabled={!drag}
-            aria-label="Drag to Reorder"
-            variant="subtle"
-            color="gray"
-            style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
-          >
-            <GripVertical size={16} />
-          </ActionIcon>
-        </Tooltip>
-      )}
       <Kind
         size={18}
         aria-hidden
@@ -205,6 +191,21 @@ function QueueRow({
         </Text>
         {job.status === "writing" && <WritingStream progress={progress} />}
       </Stack>
+      {/* Trailing, so waiting rows' text lines up with the others' and Stop keeps its column. */}
+      {sortable && (
+        <Tooltip label="Drag to Reorder">
+          <ActionIcon
+            ref={drag?.handleRef}
+            disabled={!drag}
+            aria-label="Drag to Reorder"
+            variant="subtle"
+            color="gray"
+            style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
+          >
+            <GripVertical size={16} />
+          </ActionIcon>
+        </Tooltip>
+      )}
       {!terminalStatuses.has(job.status) &&
         (percent ? (
           <RingProgress
