@@ -6,7 +6,7 @@ import type {
   QueueJob,
   StudioSession,
 } from "../../shared/queue.ts";
-import { awaitsWriting } from "../../shared/queue.ts";
+import { awaitsWriting, terminalStatuses } from "../../shared/queue.ts";
 import type { DreamOrigin } from "./dream.ts";
 
 /** Queue tiers on one resource, lower first; Dream's and finishing's background work run below MCP. */
@@ -40,6 +40,8 @@ const now = () => new Date().toISOString();
 export const everyone = "*";
 /** Not yet handed to a provider: the work a pause holds and a move reorders. */
 export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued", "waiting"]);
+/** Not yet done: pending, or handed to a provider. */
+const openStatuses = [...pendingStatuses, "starting", "running", "saving"];
 
 export class Store {
   readonly db: DatabaseSync;
@@ -342,6 +344,52 @@ export class Store {
       )
       .all(...values)
       .map((row) => JSON.parse(row.record as string));
+  }
+
+  /**
+   * What a scheduler tick weighs, in queue order: every unfinished job, and the finished ones it
+   * still counts, which are those created since the oldest unfinished job (overtakes) and those in
+   * an unfinished job's set (a started set keeps its place). Read through the status index.
+   */
+  schedulable(): OwnedJob[] {
+    const open = `status IN (${openStatuses.map(() => "?").join(", ")})`;
+    const finished = `status IN (${[...terminalStatuses].map(() => "?").join(", ")})`;
+    const rows = this.db
+      .prepare(
+        `SELECT rowid, created_at, record FROM studio_queue WHERE ${open}
+        UNION SELECT rowid, created_at, record FROM studio_queue WHERE ${finished}
+          AND created_at >= (SELECT MIN(created_at) FROM studio_queue WHERE ${open})`,
+      )
+      .all(...openStatuses, ...terminalStatuses, ...openStatuses);
+    const jobs = new Map(rows.map((row) => [row, JSON.parse(row.record as string) as OwnedJob]));
+    const sets = [
+      ...new Set(
+        [...jobs.values()]
+          .filter((job) => job.queueSet && !terminalStatuses.has(job.status))
+          .map((job) => job.queueSet!),
+      ),
+    ];
+    if (sets.length) {
+      const listed = new Set([...jobs.values()].map((job) => job.id));
+      for (const row of this.db
+        .prepare(
+          `SELECT rowid, created_at, record FROM studio_queue WHERE ${finished}
+          AND json_extract(record, '$.queueSet') IN (${sets.map(() => "?").join(", ")})`,
+        )
+        .all(...terminalStatuses, ...sets)) {
+        const job = JSON.parse(row.record as string) as OwnedJob;
+        if (!listed.has(job.id)) jobs.set(row, job);
+      }
+    }
+    return [...jobs]
+      .sort(([a], [b]) =>
+        a.created_at === b.created_at
+          ? Number(a.rowid) - Number(b.rowid)
+          : String(a.created_at) < String(b.created_at)
+            ? -1
+            : 1,
+      )
+      .map(([, job]) => job);
   }
 
   /**
