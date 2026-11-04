@@ -59,8 +59,9 @@ function SettingsForm({ dream }: { dream: Dream }) {
     <Stack gap="xs">
       <div>
         {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
-        {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
+        {/* Spicy sits under the main switch; the rest run A–Z. */}
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+        {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
         {number("buffer", "Unseen Buffer", 50, "Dream waits once this many are unseen.")}
         {toggle("videos", "Videos", "Animate kept or starred images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
