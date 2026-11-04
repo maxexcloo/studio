@@ -5,6 +5,7 @@ import {
   type QueueMedia,
   type QueueStatus,
 } from "../../shared/queue.ts";
+import { logFailure } from "./log-failure.ts";
 import { everyone, pendingStatuses, queuePriority, Store, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
@@ -122,6 +123,7 @@ export class GenerationQueue {
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
   private stopped = false;
+  private readonly tickFailed = logFailure("The queue");
   readonly store: Store;
   readonly adapter: QueueAdapter;
   readonly writer?: PromptWriter;
@@ -143,9 +145,9 @@ export class GenerationQueue {
   start() {
     this.stopped = false;
     if (!this.timer) {
-      this.timer = setInterval(() => void this.tick().catch(() => undefined), 1000);
+      this.timer = setInterval(() => void this.tick(), 1000);
       this.timer.unref();
-      void this.tick().catch(() => undefined);
+      void this.tick();
     }
   }
 
@@ -210,7 +212,7 @@ export class GenerationQueue {
       } finally {
         this.writing.delete(initial.id);
         // The written job queues for its worker, and the freed slot starts the next write.
-        void this.tick().catch(() => undefined);
+        void this.tick();
       }
     })()
       .catch(() => undefined)
@@ -218,11 +220,14 @@ export class GenerationQueue {
     this.runs.add(run);
   }
 
+  /** One scheduling pass; a failure is logged, never thrown, so callers can start one freely. */
   tick(): Promise<void> {
     if (this.stopped) return Promise.resolve();
-    const run = this.run().finally(() => {
-      this.runs.delete(run);
-    });
+    const run = this.run()
+      .catch(this.tickFailed)
+      .finally(() => {
+        this.runs.delete(run);
+      });
     this.runs.add(run);
     return run;
   }

@@ -249,7 +249,7 @@ export function registerRewriteRoutes(
     );
     admitted?.(job);
     // The scheduler is also driven by its timer; responses acknowledge durable acceptance.
-    void queue.tick().catch(() => undefined);
+    void queue.tick();
     if (
       title &&
       typeof input.prompt === "string" &&
@@ -279,7 +279,7 @@ export function registerRewriteRoutes(
   ] as const)
     app.post(`/api/queue/${action}`, (req, res) => {
       store.setPaused(owner(req), paused);
-      void queue.tick().catch(() => undefined);
+      void queue.tick();
       return res.json({ ok: true });
     });
   app.post("/api/queue/:id/move", (req, res) => {
@@ -347,7 +347,7 @@ export function registerRewriteRoutes(
     if (!store.job(owner(req), req.params.id)) return missing(res);
     const job = queue.retry(owner(req), req.params.id);
     if (!job) return res.status(409).json({ error: "Only failed generations can be retried." });
-    void queue.tick().catch(() => undefined);
+    void queue.tick();
     return res.status(202).json({ job: publicJob(job) });
   });
 }
@@ -383,7 +383,7 @@ export function registerMaintenanceRoutes(
     app.post(`/api/queue/${action}`, (req, res) => {
       if (!requireAdmin(req, res)) return;
       store.setPaused(everyone, paused);
-      void queue.tick().catch(() => undefined);
+      void queue.tick();
       return res.json({ ok: true });
     });
   app.get("/api/maintenance/unfinished", (req, res) => {
@@ -404,7 +404,7 @@ export function registerMaintenanceRoutes(
     if (!job) return missing(res);
     await end(job);
     const retried = queue.requeue(job);
-    void queue.tick().catch(() => undefined);
+    void queue.tick();
     return res.status(202).json({ job: publicJob(retried) });
   });
   app.post("/api/maintenance/unfinished/delete", async (req, res) => {

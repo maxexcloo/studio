@@ -254,7 +254,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
       upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
     });
     finishing.admitted(queued);
-    void queue.tick().catch(() => undefined);
+    void queue.tick();
     return {
       status: 200,
       payload: { ok: true, jobId: queued.id, plan, revision: galleryRevisionValue() },

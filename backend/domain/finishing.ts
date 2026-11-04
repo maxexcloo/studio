@@ -1,6 +1,7 @@
 import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../shared/upscale.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse } from "./admission.ts";
+import { logFailure } from "./log-failure.ts";
 import { queuePriority, type OwnedJob, type Store } from "./store.ts";
 
 export interface FinishingItem {
@@ -106,6 +107,7 @@ export function createFinishing(options: {
   let ticking = false;
   let next = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
+  const tickFailed = logFailure("Finish Starred Images");
   async function tick() {
     if (ticking || !options.idle()) return;
     ticking = true;
@@ -168,7 +170,7 @@ export function createFinishing(options: {
     read,
     tick,
     start() {
-      timer ||= setInterval(() => void tick().catch(() => undefined), tickMs);
+      timer ||= setInterval(() => void tick().catch(tickFailed), tickMs);
       timer.unref();
     },
     stop() {
@@ -204,7 +206,7 @@ export function createFinishing(options: {
           ]
         : record.waiting.filter((id) => !itemIds.includes(id));
       write(ownerId, { ...record, waiting: [...new Set(ids)] });
-      if (favorite && timer) void tick().catch(() => undefined);
+      if (favorite && timer) void tick().catch(tickFailed);
     },
   };
 }
