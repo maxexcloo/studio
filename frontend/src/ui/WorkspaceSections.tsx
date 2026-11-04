@@ -19,8 +19,8 @@ import classes from "./WorkspaceSections.module.css";
 
 /**
  * One Library or Settings section; `admin` sections are hidden from other accounts, `group` names the
- * run of sections it belongs to (Personal, Administration) and `apart` sections (About) follow a
- * divider in the desktop navigation.
+ * run of sections it belongs to (Personal, Administration), `apart` sections (About) follow a
+ * divider in the desktop navigation and the `initial` one opens first instead of the first listed.
  */
 interface SectionDefinition {
   label: string;
@@ -29,6 +29,7 @@ interface SectionDefinition {
   admin?: boolean;
   apart?: boolean;
   group?: string;
+  initial?: boolean;
 }
 type WorkspaceSection = SectionDefinition & { value: string };
 
@@ -42,11 +43,14 @@ export function visibleSections<Key extends string>(
     .filter(([key, section]) => (admin || !section.admin) && available(key))
     .map(([value, section]) => ({ value, ...section }));
 }
-/** The section open in the current route; an unknown or missing hash opens the first. */
+/** The section open in the current route; an unknown or missing hash opens the initial one. */
 export function useWorkspaceSection(sections: WorkspaceSection[]) {
   const location = useLocation();
-  const active =
-    sections.find((section) => `#${section.value}` === location.hash)?.value || sections[0].value;
+  const active = (
+    sections.find((section) => `#${section.value}` === location.hash) ||
+    sections.find((section) => section.initial) ||
+    sections[0]
+  ).value;
   return { location, active };
 }
 

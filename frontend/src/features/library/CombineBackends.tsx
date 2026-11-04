@@ -100,7 +100,7 @@ function PairRow({
 }
 
 /**
- * Settings › Profiles › Combine Backends: previews a model's Radiance and ComfyUI profiles, then
+ * Library › Profiles › Combine Backends: previews a model's Radiance and ComfyUI profiles, then
  * makes each picked pair one profile with both backends, keeping the old ids as aliases that run
  * on their own backend (profile/backends.js).
  */

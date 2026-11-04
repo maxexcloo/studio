@@ -11,6 +11,30 @@ import {
   serveProfiles,
 } from "./fixtures";
 
+test("The Library groups what you have and getting more, A–Z, and opens on Models", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/library");
+  const order = ["Guides", "LoRAs", "Models", "Profiles", "Downloads", "Imports", "Inspiration"];
+  if ((page.viewportSize()?.width || 1440) < 768) {
+    const select = page.getByRole("combobox", { name: "Library Section", exact: true });
+    await expect(select).toHaveValue("Models");
+    await select.click();
+    await expect(page.getByRole("option")).toHaveText(order);
+  } else {
+    const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
+    await expect(nav.getByRole("link", { name: "Models", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(nav.getByRole("link")).toHaveText(order);
+    await expect(
+      nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
+    ).toHaveText(order.slice(4));
+  }
+});
+
 test("Model downloads cancel only the chosen file and explicitly resume or retry", async ({
   page,
 }) => {
@@ -306,6 +330,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Actions for Imported Checkpoint", exact: true }).click();
   await page.getByRole("menuitem", { name: "Review Import", exact: true }).click();
   const button = page.getByRole("button", { name: "Draft Profile", exact: true });
@@ -317,7 +342,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   const previousReads = modelReads;
   await button.click();
   await expect(
-    page.getByText("Profile drafted. Review it in Settings › Profiles.", { exact: true }).first(),
+    page.getByText("Profile drafted. Review it in Library › Profiles.", { exact: true }).first(),
   ).toBeVisible();
   await expect(button).toBeHidden();
   await expect.poll(() => modelReads).toBeGreaterThan(previousReads);
@@ -347,6 +372,7 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Clear Failed", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Clear Failed Imports?" })
@@ -370,6 +396,7 @@ test("A Reddit link in Library › Import adds the post's images to Uploads", as
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit URL" });
   await link.fill("https://www.reddit.com/r/birds/comments/abc/birds/");
   await page.getByRole("button", { name: "Import", exact: true }).click();
@@ -508,6 +535,7 @@ test("Library shows import grades and reuses compatible inspiration settings", a
   if (await close.isVisible()) await close.click();
   else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
   await section(page, "Library", "Inspiration");

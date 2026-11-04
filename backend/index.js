@@ -252,6 +252,7 @@ const catalogue = createModelCatalogue({ store, runtime, directCloud });
 const {
   catalogueModels,
   comfyDownMessage,
+  latestComfyContext,
   loadComfyContext,
   mediaModels,
   presetModels,
@@ -371,6 +372,21 @@ const presetRoutes = registerPresetRoutes(app, { models: presetModels });
 const unique = (...lists) => [
   ...new Set(lists.flat().filter((name) => typeof name === "string" && name)),
 ];
+/** The model files a ComfyUI node list offers, by folder. */
+const installedFiles = (info) => ({
+  loras: optionsFor(info, "LoraLoader", "lora_name"),
+  checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
+  diffusion_models: unique(
+    optionsFor(info, "UNETLoader", "unet_name"),
+    optionsFor(info, "UnetLoaderGGUF", "unet_name"),
+  ),
+  text_encoders: unique(
+    optionsFor(info, "CLIPLoader", "clip_name"),
+    optionsFor(info, "CLIPLoaderGGUF", "clip_name"),
+  ),
+  vae: optionsFor(info, "VAELoader", "vae_name"),
+  clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
+});
 const library = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
@@ -380,23 +396,12 @@ const library = registerLibraryRoutes(app, {
       info: () => profileObjectInfo("image"),
     }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  loraInfo: (names) => loraInfos(names),
-  installed: async () => {
-    const { info } = await loadComfyContext();
-    return {
-      loras: optionsFor(info, "LoraLoader", "lora_name"),
-      checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
-      diffusion_models: unique(
-        optionsFor(info, "UNETLoader", "unet_name"),
-        optionsFor(info, "UnetLoaderGGUF", "unet_name"),
-      ),
-      text_encoders: unique(
-        optionsFor(info, "CLIPLoader", "clip_name"),
-        optionsFor(info, "CLIPLoaderGGUF", "clip_name"),
-      ),
-      vae: optionsFor(info, "VAELoader", "vae_name"),
-      clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
-    };
+  loraInfo: (names, options) => loraInfos(names, options),
+  installed: async () => installedFiles((await loadComfyContext()).info),
+  // The Library's list: the worker's last known files at once, refreshed in the background.
+  latestInstalled: async () => {
+    const { info, current } = await latestComfyContext();
+    return { files: installedFiles(info), current };
   },
   // Lookup says which ready profiles a link's base model fits.
   readyProfiles: async () =>
@@ -435,7 +440,7 @@ registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (req) => req.studioAccount?.userId || "",
 });
-// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
+// Library › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),

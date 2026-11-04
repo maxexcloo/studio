@@ -575,7 +575,7 @@ export function createImportEngine({
     if (!draftProfile) throw new Error("Profile drafts are unavailable here.");
     if (record.state === "failed") throw new Error("This import failed. Import the link again.");
     if (record.results?.profileId)
-      throw new Error("This import already drafted a profile. Review it in Settings › Profiles.");
+      throw new Error("This import already drafted a profile. Review it in Library › Profiles.");
     try {
       await draftInto(record, { by, index, rethrow: true });
     } finally {

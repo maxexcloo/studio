@@ -343,6 +343,8 @@ export function registerLibraryRoutes(
   {
     presets,
     installed,
+    /** {files, current}: the files `installed` lists as last known, without waiting on the worker. */
+    latestInstalled = async () => ({ files: await installed(), current: true }),
     loraInfo,
     catalogue,
     json = civitaiJson,
@@ -697,9 +699,13 @@ export function registerLibraryRoutes(
     "/api/library/items",
     route(
       async (_req, res) => {
-        const files = await installed().catch(() => ({}));
+        const { files, current } = await latestInstalled().catch(() => ({
+          files: {},
+          current: false,
+        }));
         const [info, definitions] = await Promise.all([
-          loraInfo(files.loras || []).catch(() => ({})),
+          // A worker that isn't answering is not asked for each LoRA's metadata.
+          loraInfo(files.loras || [], { remote: current }).catch(() => ({})),
           profileDefinitions().catch(() => []),
         ]);
         const state = await updates.settle().catch(() => updates.summary());
