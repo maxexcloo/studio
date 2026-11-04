@@ -12,6 +12,7 @@ import { mediaFile, mediaParams, mediaPath, mediaUrls, videoPattern } from "../m
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { loadSharp } from "../sharp-loader.js";
 import { localOutputFile } from "../comfy/comfy.js";
 import { defaultWorkerId } from "../workers.js";
 import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from "./order.js";
@@ -1104,12 +1105,9 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   const completed = await Promise.all(
     outputs.map(async (output, index) => {
       let item = output;
-      let videoSize = null;
-      if (
-        item.type === "video" &&
-        typeof item.url === "string" &&
-        item.url.startsWith("/comfy/view?")
-      ) {
+      // The saved file's own size: a graph can draw at its reference's size rather than the one asked for.
+      let size = null;
+      if (typeof item.url === "string" && item.url.startsWith("/comfy/view?")) {
         const params = new URLSearchParams(item.url.slice(item.url.indexOf("?") + 1));
         const subfolder = params.get("subfolder") || "";
         let file = localOutputFile(
@@ -1117,7 +1115,14 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
           subfolder,
           params.get("type") || "output",
         );
-        if (file) {
+        if (file && item.type === "image") {
+          const sharp = await loadSharp();
+          size = sharp
+            ? await sharp(file)
+                .metadata()
+                .catch(() => null)
+            : null;
+        } else if (file) {
           const { joinClips, probeVideo } = await import("../video-previews.js");
           // An Extend (a run started from a video's frame) is kept joined onto that video. Only the
           // first reference is what the run was made from (shared/versions.ts). The extension's own
@@ -1137,7 +1142,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
               console.warn(`[Studio] Keeping an extension unjoined: ${error.message}`);
             }
           }
-          videoSize = await probeVideo(file);
+          size = await probeVideo(file);
         }
       }
       return {
@@ -1154,8 +1159,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         // How long ComfyUI itself took, without waiting in its queue.
         ...(job.timing ? { timing: job.timing } : {}),
         // An inpaint result is the whole original picture, whatever size the crop sampled at.
-        width: Number(videoSize?.width || body.inpaint?.image?.width || body.width || 0),
-        height: Number(videoSize?.height || body.inpaint?.image?.height || body.height || 0),
+        width: Number(size?.width || body.inpaint?.image?.width || body.width || 0),
+        height: Number(size?.height || body.inpaint?.image?.height || body.height || 0),
         model: body.model || "",
         settings: generationSettings(body),
         ...(body.assistant ? { assistant: body.assistant } : {}),

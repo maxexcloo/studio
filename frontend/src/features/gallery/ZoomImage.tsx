@@ -91,6 +91,25 @@ export function ZoomImage({
   useLayoutEffect(() => {
     if (image.current?.complete && image.current.naturalWidth) loaded(image.current);
   }, []);
+  // The placeholder takes its own shape (the gallery has it decoded already), so a recorded size
+  // that differs from the picture never stretches it before the image loads.
+  useLayoutEffect(() => {
+    if (!placeholder) return;
+    const thumbnail = new window.Image();
+    const adopt = () => {
+      const { naturalWidth: w, naturalHeight: h } = thumbnail;
+      if (!w || !h || image.current?.naturalWidth) return;
+      if (width && height && Math.abs(width / height - w / h) < 0.01) return;
+      const scale = Math.max(width || 0, height || 0) / Math.max(w, h) || 1;
+      setSize({ width: Math.round(w * scale), height: Math.round(h * scale) });
+    };
+    thumbnail.onload = adopt;
+    thumbnail.src = placeholder;
+    if (thumbnail.complete) adopt();
+    return () => {
+      thumbnail.onload = null;
+    };
+  }, []);
 
   // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
   // At Fit the picture follows a swiping finger, then slides back if the swipe goes nowhere.

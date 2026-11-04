@@ -173,6 +173,28 @@ test("a video that cannot be probed still completes with its requested dimension
   assert.equal(completed.settings.steps, 8);
 });
 
+test("a finished image records the size its file came out at, not the size asked for", async () => {
+  const { loadSharp } = await import("../sharp-loader.js");
+  const sharp = await loadSharp();
+  if (!sharp) return;
+  const filename = "reference-framed.png";
+  const square = { width: 40, height: 40, channels: 3, background: "white" };
+  fs.writeFileSync(
+    path.join(outputDir, filename),
+    await sharp({ create: square }).png().toBuffer(),
+  );
+  // A graph that draws at its reference's size ignores the 16:9 size the composer sent.
+  const body = { kind: "image", prompt: "A mural", width: 1368, height: 768 };
+  const [completed] = await replaceGalleryJob(
+    "reference-framed",
+    [{ url: url(filename), filename, type: "image" }],
+    body,
+    new Map(),
+  );
+  assert.equal(completed.width, 40);
+  assert.equal(completed.height, 40);
+});
+
 test("a result keeps the prompt the queue wrote with its model and thinking, not the request", async () => {
   const filename = "written-prompt.png";
   fs.writeFileSync(path.join(outputDir, filename), "png");
