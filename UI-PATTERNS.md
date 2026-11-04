@@ -558,11 +558,12 @@ primary component reference and verify APIs against the installed version.
   zoom modes, native transforms, keyboard shortcuts and transient controls in
   the bottom-right corner of the media, above the action bar.
 - Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
-  toolbar's place, sticky under the header on its surface: Clear Selection (✕)
-  and the count, then on desktop every action as an icon with a tooltip, without
-  a More menu: Select All, Select Failed and Select In Progress (when they
-  apply), then the shared item actions. Phones keep the count bar on top, with
-  the selects named All, Failed and In Progress at its end, and a full-width
+  toolbar's place, sticky under the header on its surface. Desktop shows the
+  count, a divider and compact text buttons Select All, Select Failed and Select
+  In Progress (when they apply), then every action as an icon with a tooltip,
+  without a More menu, and, after a divider, Clear Selection (✕) last. Phones
+  keep the count bar on top, with the selects named All, Failed and In Progress
+  and Clear Selection at its end, and a full-width
   bottom toolbar above the safe area with Retry or Stop when they apply,
   Download, Star, Delete and, when any apply, More with the other shared actions;
   actions for one item at a time show

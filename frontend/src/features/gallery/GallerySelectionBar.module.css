@@ -29,8 +29,16 @@
   margin-left: auto;
 }
 
-/* Phones' All, Failed and In Progress keep their names, scrolling sideways on a narrow screen. */
+/* Desktop: the count, quick selects, actions and Clear Selection divided like the bars' groups. */
+.divider {
+  align-self: stretch;
+  flex-shrink: 0;
+  margin-block: 10px;
+}
+
+/* The quick selects keep their names, scrolling sideways on a narrow screen. */
 .quick {
+  display: flex;
   overflow-x: auto;
   scrollbar-width: none;
 }
