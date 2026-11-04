@@ -162,7 +162,14 @@ export function DreamPage() {
       {view === "discarded" ? (
         <DiscardedDreams />
       ) : view === "taste" ? (
-        <ScrollArea flex={1} mih={0} w="100%" maw={760} mx="auto">
+        <ScrollArea
+          flex={1}
+          mih={0}
+          w="100%"
+          maw={760}
+          mx="auto"
+          classNames={{ viewport: classes.taste }}
+        >
           <TasteProfile />
         </ScrollArea>
       ) : dream.isPending ? (
