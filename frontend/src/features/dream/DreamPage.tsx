@@ -13,6 +13,7 @@ import { icons } from "../../ui/icons";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
@@ -93,6 +94,7 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
 
 /** Dream: the deck with its status, pause and settings, the discards or the taste profile. */
 export function DreamPage() {
+  const phone = usePhone();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
   const [view, setView] = useRemembered<"deck" | "discarded" | "taste">("dream-view", "deck");
@@ -101,7 +103,8 @@ export function DreamPage() {
   const status = data && statusLine(data);
   return (
     <div className={classes.page}>
-      <Group className={classes.toolbar} gap="sm" wrap="nowrap">
+      {/* Phones give the status its own line under the views and actions. */}
+      <Group className={classes.toolbar} gap="sm" wrap={phone ? "wrap" : "nowrap"}>
         <SegmentedControl
           radius="xl"
           aria-label="Dream View"
@@ -115,10 +118,10 @@ export function DreamPage() {
         />
         <div className={classes.status} role="status" aria-label="Dream Status">
           {status && (
-            <Text size="sm" truncate>
+            <Text size={phone ? "xs" : "sm"} truncate>
               {status.label}
               {status.detail && (
-                <Text span c="dimmed" size="sm">
+                <Text span c="dimmed" inherit>
                   {" · "}
                   {status.detail}
                 </Text>
@@ -126,19 +129,21 @@ export function DreamPage() {
             </Text>
           )}
         </div>
-        {data?.settings.enabled && (
-          <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
-            <ActionIcon
-              variant="default"
-              aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
-              loading={save.isPending}
-              onClick={() => save.mutate({ paused: !data.settings.paused })}
-            >
-              {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
-            </ActionIcon>
-          </Tooltip>
-        )}
-        {data && <DreamSettingsButton dream={data} />}
+        <Group gap="sm" wrap="nowrap" ml="auto">
+          {data?.settings.enabled && (
+            <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
+              <ActionIcon
+                variant="default"
+                aria-label={data.settings.paused ? "Resume Dream" : "Pause Dream"}
+                loading={save.isPending}
+                onClick={() => save.mutate({ paused: !data.settings.paused })}
+              >
+                {data.settings.paused ? <icons.resume size={18} /> : <icons.pause size={18} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {data && <DreamSettingsButton dream={data} />}
+        </Group>
       </Group>
       {view === "discarded" ? (
         <DiscardedDreams />
