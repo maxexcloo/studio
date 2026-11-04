@@ -2,7 +2,7 @@ import { Alert, Badge, Select, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { deploymentQuery, sourceNote, useDeploymentSetting } from "./deployment";
+import { deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
 
 const status = (on: boolean, label: string) => (
   <Badge color={on ? "green" : "gray"} miw="max-content">
@@ -42,7 +42,7 @@ export function IntegrationSettings() {
           <SettingRow
             wide
             label="Model"
-            description={`${sourceNote(model)} · The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model.`}
+            description={`The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model.${lockedNote(model)}`}
           >
             <Select
               aria-label="Prompt Assistant Model"

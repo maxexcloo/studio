@@ -26,8 +26,8 @@ export const deploymentQuery = queryOptions({
   queryKey: ["settings-deployment"],
   queryFn: () => api<Deployment>("/api/settings/deployment"),
 });
-export const sourceNote = (setting: Source) =>
-  setting.locked ? "Set by the deployment" : setting.source === "studio" ? "Saved" : "Default";
+/** A locked setting's description ends saying so; others need no note. */
+export const lockedNote = (setting: Source) => (setting.locked ? " Set by the deployment." : "");
 
 type Change = { key: string; value: string | boolean };
 const applied = (data: Deployment, { key, value }: Change): Deployment => {
