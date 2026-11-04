@@ -837,28 +837,36 @@ test("media and administrator credentials discover only their own friendly tools
   const tools = (await media.listTools()).tools;
   assert.deepEqual(tools.map((tool) => tool.name).sort(), [
     "Cancel",
+    "Dream",
+    "Gallery",
     "Generate",
     "Handover",
     "Models",
+    "Queue",
     "Result",
     "Reuse",
     "Review",
     "Search",
     "Status",
+    "Taste",
     "Upload",
     "UploadLink",
   ]);
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
     Cancel: "Cancel",
+    Dream: "Dream",
+    Gallery: "Manage Gallery",
     Generate: "Generate",
     Handover: "Copy Chat Summary",
     Models: "Find Models",
+    Queue: "Manage Queue",
     Result: "Show Result",
     Reuse: "Reuse Result",
     Review: "Review Image",
     Search: "Search Gallery",
     Status: "Check Status",
+    Taste: "Taste & LoRA Ratings",
     Upload: "Upload Reference",
     UploadLink: "Upload Link",
   });
@@ -907,6 +915,7 @@ test("media and administrator credentials discover only their own friendly tools
     "animate",
     "extend",
     "reference",
+    "upscale",
   ]);
   // Schemas state the per-call limit their descriptions give.
   const generateSchema = tools.find((tool) => tool.name === "Generate").inputSchema.properties;
@@ -929,8 +938,8 @@ test("media and administrator credentials discover only their own friendly tools
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
-    // then from 10,200 for Search.
-    JSON.stringify(tools).length + media.getInstructions().length < 10900,
+    // then from 10,200 for Search and from 10,900 for Gallery, Queue, Dream and Taste.
+    JSON.stringify(tools).length + media.getInstructions().length < 14500,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2003,7 +2012,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 11);
+    assert.equal((await client.listTools()).tools.length, 15);
     const [first] = data(await call(client, "Models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];
@@ -4775,6 +4784,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "Export",
     "Placement",
     "Accounts",
+    "Maintenance",
   ]);
   const direct = await toolNames(await f.client("", adminToken));
   assert.deepEqual(
@@ -4820,13 +4830,13 @@ test("admin tools register only for an administrator’s own token, and for a ga
     instructions,
     /only CombineBackends apply removes files \(the profiles it combines, after a backup\), and no tool touches GPUs/,
   );
-  // Every admin tool is non-destructive; the read-only ones say so.
+  // Only Maintenance, which can end another account's job, is destructive; the read-only ones say so.
   const tools = (await (await f.client("", adminToken)).listTools()).tools.filter((tool) =>
     adminToolNames.includes(tool.name),
   );
-  assert.equal(
-    tools.some((tool) => tool.annotations?.destructiveHint),
-    false,
+  assert.deepEqual(
+    tools.filter((tool) => tool.annotations?.destructiveHint).map((tool) => tool.name),
+    ["Maintenance"],
   );
   assert.deepEqual(
     tools
@@ -5458,4 +5468,387 @@ test("an older gallery record without an output index still counts as a finished
   assert.notEqual(result.isError, true);
   // Both outputs count, shown on one contact sheet.
   assert.match(texts(result), /Result 1 \(2 images\)/);
+});
+
+test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own work through the UI's routes, never another account's", async (t) => {
+  const otherToken = "other-user-mcp-token-long-enough-for-the-fixture";
+  const otherAccount = { ...plainAccount, userId: "stable-other" };
+  const f = await fixture(t, {
+    accountMode: true,
+    enabled: false,
+    authenticateAccountToken: (value) =>
+      value === userToken ? plainAccount : value === otherToken ? otherAccount : null,
+  });
+  const seen = [];
+  const record = (name, reply) => (req, res) => {
+    seen.push({
+      name,
+      method: req.method,
+      path: req.path,
+      body: req.body,
+      authorization: req.headers.authorization,
+    });
+    res.json(typeof reply === "function" ? reply(req) : reply);
+  };
+  f.app.post("/api/gallery/favorite", record("favorite", { ok: true, items: [] }));
+  f.app.post(
+    "/api/gallery/delete",
+    record("delete", (req) => ({ ok: true, removed: req.body.ids })),
+  );
+  f.app.post("/api/gallery/errors/clear", record("clear", { ok: true, cleared: 2, outputs: [] }));
+  f.app.post("/api/upscale", record("upscale", { ok: true, jobId: "upscale-1", plan: {} }));
+  const mine = await f.client("", userToken);
+  const other = await f.client("", otherToken);
+  const id = jobId(await generate(mine));
+  Object.assign(f.jobs.get(id), {
+    status: "done",
+    outputs: [{ url: "/comfy/view?filename=a.png" }, { url: "/comfy/view?filename=b.png" }],
+  });
+
+  // Gallery: star one output, delete both, clear failed items; each with the caller's own credential.
+  assert.deepEqual(
+    data(await call(mine, "Gallery", { action: "star", results: ["result 1"], output_index: 1 })),
+    { starred: 1, results: ["result 1"] },
+  );
+  assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], favorite: true });
+  assert.equal(seen.at(-1).authorization, `Bearer ${userToken}`);
+  assert.equal(data(await call(mine, "Gallery", { action: "delete", results: [id] })).deleted, 2);
+  assert.deepEqual(data(await call(mine, "Gallery", { action: "clear_failed" })), { cleared: 2 });
+  // Reuse upscale enlarges a finished output by its gallery item.
+  const upscaled = data(
+    await call(mine, "Reuse", { job_id: id, mode: "upscale", upscale_quality: "high" }),
+  );
+  assert.equal(upscaled.upscaling, true);
+  assert.deepEqual(seen.at(-1).body, { galleryItemId: `${id}-0`, quality: "high" });
+  await failure(mine, "Reuse", { job_id: id, mode: "again", upscale_quality: "high" });
+
+  // Another account can't name these results, so nothing reaches the studio.
+  const before = seen.length;
+  for (const [name, args] of [
+    ["Gallery", { action: "delete", results: [id] }],
+    ["Gallery", { action: "star", results: [id] }],
+    ["Queue", { action: "retry", job_id: id }],
+    ["Reuse", { job_id: id, mode: "upscale" }],
+  ])
+    await failure(other, name, args);
+  assert.equal(seen.length, before);
+
+  // Queue: list unfinished and failed work with refs, then act on one job or the whole queue.
+  f.app.get("/api/queue", (_req, res) =>
+    res.json({
+      jobs: [
+        {
+          id,
+          status: "failed",
+          reason: "Out of memory",
+          input: { kind: "image", prompt: "A landscape" },
+          createdAt: "2026-11-04T00:00:00.000Z",
+        },
+        {
+          id: "composer-job",
+          status: "queued",
+          input: { kind: "image", prompt: "From the composer" },
+          createdAt: "2026-11-04T00:01:00.000Z",
+        },
+        { id: "finished-job", status: "completed", input: {}, createdAt: "" },
+      ],
+      paused: { mine: true, all: false },
+    }),
+  );
+  f.app.post(
+    "/api/queue/:action",
+    record("queue", (req) =>
+      req.params.action === "cancel-all"
+        ? { outcomes: [{ job: { id: "composer-job" }, cancelRequested: true }] }
+        : { ok: true },
+    ),
+  );
+  f.app.post(
+    "/api/queue/:id/:action",
+    record("queue-job", (req) =>
+      req.params.action === "retry"
+        ? { job: { id: "retried-job", status: "queued" } }
+        : { ok: true },
+    ),
+  );
+  const listed = data(await call(mine, "Queue", { action: "list" }));
+  assert.equal(listed.paused, true);
+  assert.deepEqual(
+    listed.jobs.map((job) => [job.ref, job.job_id, job.status]),
+    [
+      ["result 1", id, "failed"],
+      ["result 2", "composer-job", "queued"],
+    ],
+  );
+  await call(mine, "Queue", { action: "move", job_id: "result 2", position: 0 });
+  assert.deepEqual(
+    [seen.at(-1).path, seen.at(-1).body],
+    ["/api/queue/composer-job/move", { to: 0 }],
+  );
+  const retried = data(await call(mine, "Queue", { action: "retry", job_id: id }));
+  assert.equal(retried.job_id, "retried-job");
+  assert.equal(retried.ref, "result 3");
+  await call(mine, "Queue", { action: "pause" });
+  assert.equal(seen.at(-1).path, "/api/queue/pause");
+  assert.deepEqual(data(await call(mine, "Queue", { action: "cancel_all" })), { cancelled: 1 });
+  await failure(mine, "Queue", { action: "move", job_id: "composer-job" });
+  // Another account's list never adopts a job this account already holds.
+  await call(other, "Queue", { action: "list" });
+  await failure(other, "Queue", { action: "clear", job_id: "composer-job" });
+
+  // Dream follows the account's group: the route's refusal reaches the chat.
+  f.app.get("/api/dream", (req, res) =>
+    req.headers.authorization === `Bearer ${otherToken}`
+      ? res.status(403).json({ ok: false, error: "Dream is unavailable for this account." })
+      : res.json({
+          status: "waiting",
+          settings: { enabled: true },
+          today: { images: 1 },
+          spicyAvailable: false,
+          unseen: [
+            {
+              id: "dream-item",
+              jobId: "dream-job",
+              index: 0,
+              type: "image",
+              prompt: "A dreamy lake",
+              dream: { state: "unseen" },
+            },
+            {
+              id: "pair-item",
+              jobId: "pair-job",
+              index: 0,
+              type: "image",
+              prompt: "Warm light",
+              dream: { state: "unseen", pair: { id: "pair-1", side: 0, label: "Warm" } },
+            },
+          ],
+        }),
+  );
+  f.app.put(
+    "/api/dream/settings",
+    record("dream-settings", (req) => ({ settings: req.body })),
+  );
+  f.app.post(
+    "/api/dream/pairs/:pair/answer",
+    record("dream-answer", { items: [{ id: "pair-item", dream: { state: "kept" } }] }),
+  );
+  f.app.post(
+    "/api/dream/:item/:verdict",
+    record("dream-verdict", (req) =>
+      req.params.verdict === "variations" ? { item: {}, jobId: "variation-job" } : { item: {} },
+    ),
+  );
+  const dream = data(await call(mine, "Dream", { action: "status" }));
+  assert.deepEqual(
+    dream.items.map((item) => [item.item_id, item.ref, item.pair_id]),
+    [
+      ["dream-item", "result 4", undefined],
+      ["pair-item", "result 5", "pair-1"],
+    ],
+  );
+  assert.match(dream.items[0].link, /^https:\/\/studio\.example\.test\/mcp\/results\//);
+  assert.match(
+    texts(await call(other, "Dream", { action: "status" })),
+    /Dream is unavailable for this account/,
+  );
+  await call(mine, "Dream", { action: "keep", item_id: "dream-item" });
+  assert.equal(seen.at(-1).path, "/api/dream/dream-item/keep");
+  assert.deepEqual(
+    data(await call(mine, "Dream", { action: "answer", pair_id: "pair-1", answer: "a" })),
+    { kept: ["pair-item"] },
+  );
+  assert.deepEqual(seen.at(-1).body, { answer: "a" });
+  const varied = data(
+    await call(mine, "Dream", { action: "variations", item_id: "dream-item", count: 2 }),
+  );
+  assert.equal(varied.job_id, "variation-job");
+  assert.deepEqual(seen.at(-1).body, { count: 2 });
+  await call(mine, "Dream", { action: "settings", settings: { paused: true, dailyImages: 5 } });
+  assert.deepEqual(seen.at(-1).body, { paused: true, dailyImages: 5 });
+
+  // Taste: the profile and a LoRA's rating.
+  f.app.get("/api/taste", (_req, res) => res.json({ summary: "Moody light", signals: 3 }));
+  f.app.put(
+    "/api/taste",
+    record("taste", (req) => ({ summary: req.body.summary, signals: 3 })),
+  );
+  f.app.post(
+    "/api/loras/library/ops",
+    record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "up" } } }),
+  );
+  assert.equal(data(await call(mine, "Taste")).summary, "Moody light");
+  await call(mine, "Taste", { action: "save", summary: "Soft pastels" });
+  assert.deepEqual(seen.at(-1).body, { summary: "Soft pastels" });
+  assert.deepEqual(
+    data(
+      await call(mine, "Taste", {
+        action: "rate_lora",
+        lora: "fixture-effect.safetensors",
+        rating: "up",
+      }),
+    ),
+    { lora: "fixture-effect.safetensors", rating: "up" },
+  );
+  assert.deepEqual(seen.at(-1).body, {
+    ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "up" }],
+  });
+  assert.ok(seen.every((entry) => /^Bearer /.test(entry.authorization)));
+});
+
+test("admin tools chain a Library search, a one-call install and a named update check, and Maintenance stays with administrators", async (t) => {
+  const f = await fixture(t, {
+    accountMode: true,
+    enabled: false,
+    authenticateAccountToken: (value) =>
+      value === adminToken ? adminAccount : value === userToken ? plainAccount : null,
+  });
+  const seen = [];
+  const record = (reply) => (req, res) => {
+    seen.push({ method: req.method, path: req.path, body: req.body });
+    res.json(typeof reply === "function" ? reply(req) : reply);
+  };
+  const imported = {
+    id: "imp-glow",
+    input: { kind: "civitai-model", url: "https://civitai.com/models/1?modelVersionId=2" },
+    state: "needs-files",
+    grade: { value: "exact", reasons: [] },
+    resources: [
+      { role: "lora", want: { file: "glow.safetensors", folder: "loras" }, status: "missing" },
+    ],
+  };
+  f.app.post("/api/library/lookup", record({ ok: true, lookup: { query: "glow", results: [] } }));
+  f.app.post("/api/library/imports", record({ ok: true, import: imported }));
+  f.app.post(
+    "/api/library/imports/:id/download",
+    record({ ok: true, import: { ...imported, state: "downloading" }, queued: 1 }),
+  );
+  f.app.delete("/api/library/imports/:id", record({ ok: true }));
+  f.app.post(
+    "/api/gallery/import/reddit",
+    record({ ok: true, title: "A post", imported: 2, failed: [] }),
+  );
+  f.app.get("/api/library/items", (_req, res) =>
+    res.json({
+      ok: true,
+      items: [
+        { key: "loras/glow.safetensors", title: "Glow", kind: "lora", origin: "civitai" },
+        { key: "loras/other.safetensors", title: "Other", kind: "lora", origin: "civitai" },
+      ],
+    }),
+  );
+  f.app.post(
+    "/api/library/updates/check",
+    record({
+      ok: true,
+      checkedAt: "2026-11-04T00:00:00.000Z",
+      available: 0,
+      byEntry: {
+        "loras/glow.safetensors": { state: "current" },
+        "loras/other.safetensors": { state: "available" },
+      },
+    }),
+  );
+  f.app.post(
+    "/api/maintenance/migrations",
+    record((req) => ({ ok: true, apply: req.body.apply, steps: {} })),
+  );
+  f.app.get("/api/maintenance/unfinished", (_req, res) =>
+    res.json({
+      jobs: [
+        {
+          id: "stuck",
+          ownerId: "stable-user",
+          status: "running",
+          input: { kind: "video" },
+          createdAt: "",
+        },
+      ],
+    }),
+  );
+  f.app.post(
+    "/api/maintenance/unfinished/:action",
+    record({ job: { id: "stuck", status: "cancelled" } }),
+  );
+  f.app.post("/api/queue/pause-all", record({ ok: true }));
+  f.app.get("/api/profiles/duplicates", (_req, res) =>
+    res.json({ ok: true, hash: "dup-hash", merges: [] }),
+  );
+  f.app.post("/api/profiles/duplicates/merge", record({ ok: true, merged: [], backup: "b.zip" }));
+  const admin = await f.client("", adminToken);
+
+  // Search Civitai for a LoRA by base model, install a found version in one call, check it by name.
+  await call(admin, "Lookup", { query: "glow", type: "lora", base_model: "Flux.1 D" });
+  assert.deepEqual(seen.at(-1).body, { query: "glow", type: "lora", baseModel: "Flux.1 D" });
+  await failure(admin, "Lookup", { url: "https://civitai.com/models/1", type: "lora" });
+  const installed = data(
+    await call(admin, "Import", {
+      url: "https://civitai.com/models/1?modelVersionId=2",
+      install: true,
+    }),
+  );
+  assert.equal(installed.queued, 1);
+  assert.deepEqual(
+    seen.slice(-2).map((entry) => entry.path),
+    ["/api/library/imports", "/api/library/imports/imp-glow/download"],
+  );
+  const updates = data(await call(admin, "Updates", { action: "check", query: "glow" }));
+  assert.deepEqual(seen.at(-1).body, { keys: ["loras/glow.safetensors"] });
+  assert.deepEqual(updates.updates, [{ key: "loras/glow.safetensors", state: "current" }]);
+  await failure(admin, "Updates", { action: "check", query: "nothing like it" });
+  // A Reddit post becomes uploads, as Library › Import does; one import record goes.
+  assert.equal(
+    data(
+      await call(admin, "Import", { url: "https://www.reddit.com/r/pics/comments/abc123/a_post/" }),
+    ).imported,
+    2,
+  );
+  assert.equal(seen.at(-1).path, "/api/gallery/import/reddit");
+  await call(admin, "Imports", { action: "remove", id: "imp-glow" });
+  assert.deepEqual(
+    [seen.at(-1).method, seen.at(-1).path],
+    ["DELETE", "/api/library/imports/imp-glow"],
+  );
+
+  // Maintenance: a migration dry run unless apply, unfinished jobs, the global pause and duplicates.
+  assert.equal(data(await call(admin, "Maintenance", { action: "migrations" })).apply, false);
+  assert.equal(
+    data(await call(admin, "Maintenance", { action: "migrations", apply: true })).apply,
+    true,
+  );
+  assert.deepEqual(data(await call(admin, "Maintenance", { action: "unfinished" })).jobs[0], {
+    owner_id: "stable-user",
+    job_id: "stuck",
+    status: "running",
+    kind: "video",
+    created_at: "",
+  });
+  await call(admin, "Maintenance", {
+    action: "delete_unfinished",
+    owner_id: "stable-user",
+    job_id: "stuck",
+  });
+  assert.deepEqual(
+    [seen.at(-1).path, seen.at(-1).body],
+    ["/api/maintenance/unfinished/delete", { ownerId: "stable-user", id: "stuck" }],
+  );
+  await call(admin, "Maintenance", { action: "pause_all" });
+  assert.equal(seen.at(-1).path, "/api/queue/pause-all");
+  assert.equal(data(await call(admin, "Maintenance", { action: "duplicates" })).hash, "dup-hash");
+  await call(admin, "Maintenance", { action: "merge_duplicates", hash: "dup-hash" });
+  assert.deepEqual(seen.at(-1).body, { hash: "dup-hash" });
+  await failure(admin, "Maintenance", { action: "pause_all", apply: true });
+
+  // An ordinary account's token has none of these and reaches none of their routes.
+  const user = await f.client("", userToken);
+  const before = seen.length;
+  assert.equal((await toolNames(user)).includes("Maintenance"), false);
+  for (const [name, args] of [
+    ["Maintenance", { action: "migrations", apply: true }],
+    ["Import", { url: "https://civitai.com/models/1", install: true }],
+    ["Imports", { action: "remove", id: "imp-glow" }],
+    ["Updates", { action: "check", query: "glow" }],
+  ])
+    await failure(user, name, args);
+  assert.equal(seen.length, before);
 });

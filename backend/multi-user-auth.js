@@ -69,6 +69,8 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
+  // Search: the account's own gallery search.
+  ["GET", /^\/api\/gallery$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
   // Reuse's Extend: a video result's last frame as the next video's first.
   ["POST", /^\/api\/reference-assets\/from-gallery$/],
@@ -77,6 +79,20 @@ const mcpBearerRoutes = [
   // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],
+  // The account's own gallery, queue, Dream and taste (mcp/manage.js) and Reuse's upscale, as the
+  // UI calls them; each route scopes to the account and checks its group's features.
+  ["POST", /^\/api\/gallery\/(?:delete|favorite|errors\/clear)$/],
+  ["GET", /^\/api\/queue$/],
+  ["POST", /^\/api\/queue\/(?:pause|resume|cancel-all|clear-failed|[\w-]+\/(?:clear|move|retry))$/],
+  ["GET", /^\/api\/dream(?:\/discarded)?$/],
+  ["PUT", /^\/api\/dream\/settings$/],
+  ["POST", /^\/api\/dream\/(?:[^/]+\/(?:keep|discard|more|variations)|pairs\/[^/]+\/answer)$/],
+  ["GET", /^\/api\/taste$/],
+  ["PUT", /^\/api\/taste$/],
+  ["DELETE", /^\/api\/taste$/],
+  ["POST", /^\/api\/taste\/refresh$/],
+  ["POST", /^\/api\/loras\/library\/ops$/],
+  ["POST", /^\/api\/upscale$/],
 ];
 
 function mcpBearerRouteAllowed(method, routePath) {
@@ -129,6 +145,17 @@ const mcpAdminRoutes = [
   ["POST", /^\/api\/accounts\/default-profile$/],
   ["DELETE", new RegExp(`^/api/accounts/profiles/${routeId}$`)],
   ["PATCH", new RegExp(`^/api/accounts/users/${routeId}$`)],
+  // Removing one import record (its files stay) and Library › Import's Reddit posts.
+  ["DELETE", new RegExp(`^/api/library/imports/${routeId}$`)],
+  ["POST", /^\/api\/gallery\/import\/reddit$/],
+  // The Maintenance tool: migrations (each writes a backup), unfinished jobs, the global pause and
+  // Merge Duplicate Profiles (after a backup).
+  ["POST", /^\/api\/maintenance\/migrations$/],
+  ["GET", /^\/api\/maintenance\/unfinished$/],
+  ["POST", /^\/api\/maintenance\/unfinished\/(?:retry|delete)$/],
+  ["POST", /^\/api\/queue\/(?:pause|resume)-all$/],
+  ["GET", /^\/api\/profiles\/duplicates$/],
+  ["POST", /^\/api\/profiles\/duplicates\/merge$/],
 ];
 
 export function mcpAdminRouteAllowed(method, routePath) {
