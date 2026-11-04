@@ -285,6 +285,9 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
   await savedAction(page, "Stack", "Copper Detail", "Update from Current");
+  await expect
+    .poll(() => state.loraOperations.map((operation) => operation.op))
+    .toEqual(["stack.update"]);
   await savedAction(page, "Stack", "Copper Detail", "Rename Stack");
   const name = page.getByRole("textbox", { name: "Stack Name", exact: true });
   await name.fill("Copper Detail Refined");
