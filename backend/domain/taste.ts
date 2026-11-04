@@ -188,16 +188,19 @@ function tasteChoice(jobId: unknown, values: ChoiceValues = {}): TasteChoice {
 /**
  * Per-account taste records in the runtime document store, as `taste:<ownerId>`. The text model
  * rewrites the summary after every few signals (at most every ten minutes, never while text is
- * offline) and on request. `writer` is null where the account may not send prompts to it.
+ * offline, and only while `updates` allows: the Settings › Generation switch STUDIO_TASTE_UPDATES)
+ * and on request. `writer` is null where the account may not send prompts to it.
  */
 export function createTaste({
   dataDir,
   writer = () => null,
   online = async () => true,
+  updates = () => true,
   now = Date.now,
 }: {
   dataDir: string;
   writer?: (ownerId: string) => TasteWriter | null;
+  updates?: () => boolean;
   online?: () => Promise<boolean>;
   now?: () => number;
 }) {
@@ -309,6 +312,7 @@ export function createTaste({
           record.since >= rewriteAfter &&
           !running.has(ownerId) &&
           now() - (attempted.get(ownerId) ?? -Infinity) >= rewriteGapMs &&
+          updates() &&
           writer(ownerId)
         )
           void refresh(ownerId).catch(() => undefined);

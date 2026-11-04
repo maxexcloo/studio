@@ -14,8 +14,9 @@ const item = (id: string, extra: Partial<TitleItem> = {}): TitleItem => ({
 
 /** A titler over fakes: no model is called. */
 function fixture(items: TitleItem[]) {
-  const state = { items, idle: true, sent: [] as string[] };
+  const state = { items, idle: true, enabled: true, sent: [] as string[] };
   const titler = createTitler({
+    enabled: () => state.enabled,
     writer: {
       title: async ({ prompt }) => {
         state.sent.push(prompt);
@@ -64,4 +65,13 @@ test("the rest are backfilled while idle, newest first and flat out, skipping ti
     ["Title of a,", "Kept", undefined, "Title of video,", undefined],
   );
   assert.equal(state.sent.length, 2);
+});
+
+test("switched off, nothing is titled and the model is never asked", async () => {
+  const { state, titler } = fixture([item("a")]);
+  state.enabled = false;
+  await titler.completed(state.items);
+  assert.equal(await titler.tick(), "off");
+  assert.deepEqual(state.sent, []);
+  assert.equal(state.items[0].title, undefined);
 });

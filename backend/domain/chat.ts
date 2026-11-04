@@ -68,6 +68,8 @@ interface ChatOptions {
   results?: (ownerId: string, sessionId: string) => ChatResult[];
   /** The owner's taste summary, or "" where there is none or the account may not share it. */
   taste?: (ownerId: string) => string;
+  /** Whether new chats are titled by the text model (STUDIO_CHAT_TITLES); on without it. */
+  titles?: () => boolean;
   fetchImpl?: typeof fetch;
 }
 /** Model calls one reply may make: tool rounds, then a last answer without tools. */
@@ -267,12 +269,12 @@ export class ChatService {
   }
   /**
    * Titles a new chat from its first request. A user rename always wins; while the text model is
-   * unavailable the chat stays New Chat, and nothing here rejects.
+   * unavailable or `titles` is off the chat stays New Chat, and nothing here rejects.
    */
   async title(ownerId: string, sessionId: string, text: string, modelId?: string) {
     try {
       const session = this.options.session(ownerId, sessionId) as { titleSource?: string };
-      if (!session || session.titleSource) return;
+      if (!session || session.titleSource || this.options.titles?.() === false) return;
       let title = "";
       const settings = this.options.settings();
       if (settings) {

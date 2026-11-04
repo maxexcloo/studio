@@ -12,7 +12,7 @@ import {
 import { GalleryPass } from "./GalleryPass";
 import { UnfinishedItems } from "./UnfinishedItems";
 
-/** Settings › Generation: default profiles, catalogue switches and gallery passes, for everyone. */
+/** Settings › Generation: default profiles, Background AI switches and gallery passes. */
 export function GenerationSettings() {
   const deployment = useQuery(deploymentQuery);
   const save = useDeploymentSetting();
@@ -63,14 +63,17 @@ export function GenerationSettings() {
   );
   // The gallery passes' switch sits with them under Gallery.
   const whileBusy = catalogue.find((flag) => flag.key === "STUDIO_GALLERY_WHILE_BUSY");
-  const features = catalogue.filter((flag) => flag !== whileBusy);
+  // The rest are Background AI, A–Z as deployment-settings.js lists them.
+  const background = catalogue.filter((flag) => flag !== whileBusy);
   return (
     <Stack gap="lg">
+      {background.length > 0 && (
+        <SettingGroup title="Background AI">{background.map(flagRow)}</SettingGroup>
+      )}
       <SettingGroup title="Defaults">
         {profileSelect("image", defaults.image)}
         {profileSelect("video", defaults.video)}
       </SettingGroup>
-      {features.length > 0 && <SettingGroup title="Features">{features.map(flagRow)}</SettingGroup>}
       <SettingGroup title="Gallery">
         <GalleryPass
           route="/api/gallery/captions"

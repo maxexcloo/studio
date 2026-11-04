@@ -16,6 +16,8 @@ export interface TitleWriter {
  * `allowed` to use the prompt assistant, and never with cloud.
  */
 export function createTitler(options: {
+  /** The Settings › Generation switch (STUDIO_GALLERY_TITLES). */
+  enabled(): boolean;
   writer: TitleWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
@@ -30,7 +32,7 @@ export function createTitler(options: {
     ...options,
     name: "Gallery titles",
     continuous: true,
-    enabled: () => Boolean(writer),
+    enabled: () => Boolean(writer) && options.enabled(),
     unavailable: async () => "",
     wanted: (item) =>
       (item.type === "image" || item.type === "video") && !item.title && Boolean(item.prompt),

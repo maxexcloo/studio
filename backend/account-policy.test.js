@@ -251,6 +251,8 @@ test("suggestions are worded explicitly only with Spicy Prompts on and Uncensore
     item: () => undefined,
     image: async () => null,
     save: () => {},
+    ideas: () => true,
+    nextSteps: () => true,
   });
   const draft = (owner) =>
     suggestions.suggest(owner, { surface: "draft", kind: "image", prompt: "A sultry portrait" });
