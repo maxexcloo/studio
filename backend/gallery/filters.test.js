@@ -41,7 +41,7 @@ test("pending jobs remain visible while filtering completed media", () => {
   );
 });
 
-test("size bands follow the long edge without overlap, and aspect ratios snap within 4%", async () => {
+test("size bands follow the long edge without overlap, and aspects are orientations with a square tolerance", async () => {
   const { aspectOf, matchesGalleryFilters, sizeBandOf } = await import("./filters.js");
   const item = (width, height, extra = {}) => ({ status: "done", width, height, ...extra });
   assert.deepEqual(
@@ -52,13 +52,13 @@ test("size bands follow the long edge without overlap, and aspect ratios snap wi
   assert.deepEqual(
     [
       [1024, 1024],
+      [1024, 1000],
+      [1000, 1024],
       [1344, 768],
       [768, 1344],
-      [1216, 832],
-      [2560, 1080],
       [1000, 300],
     ].map(([w, h]) => aspectOf(item(w, h))),
-    ["1:1", "16:9", "9:16", "3:2", "21:9", "other"],
+    ["square", "square", "square", "landscape", "portrait", "landscape"],
   );
 
   // Unknown sizes stay unless a size or aspect filter is on; pending jobs always stay.
@@ -66,10 +66,13 @@ test("size bands follow the long edge without overlap, and aspect ratios snap wi
   assert.equal(matchesGalleryFilters(unknown, {}), true);
   assert.equal(matchesGalleryFilters(unknown, { size: "up-to-1k" }), false);
   assert.equal(
-    matchesGalleryFilters({ status: "pending" }, { size: "over-2k", aspect: "1:1" }),
+    matchesGalleryFilters({ status: "pending" }, { size: "over-2k", aspect: "square" }),
     true,
   );
-  assert.equal(matchesGalleryFilters(item(2048, 2048), { size: "1.5k-2k", aspect: "1:1" }), true);
+  assert.equal(
+    matchesGalleryFilters(item(2048, 2048), { size: "1.5k-2k", aspect: "square" }),
+    true,
+  );
   assert.equal(matchesGalleryFilters(item(2048, 2048), { size: "over-2k" }), false);
 });
 
@@ -89,13 +92,16 @@ test("a filter with several values matches any of them, and filters still combin
   assert.equal(matchesGalleryFilters(item, { model: [] }), true, "an empty list is no filter");
   const square = { status: "done", width: 1024, height: 1024 };
   assert.equal(
-    matchesGalleryFilters(square, { size: ["over-2k", "up-to-1k"], aspect: ["16:9", "1:1"] }),
+    matchesGalleryFilters(square, {
+      size: ["over-2k", "up-to-1k"],
+      aspect: ["landscape", "square"],
+    }),
     true,
   );
   assert.equal(matchesGalleryFilters(square, { size: ["over-2k", "1.5k-2k"] }), false);
-  assert.equal(matchesGalleryFilters(square, { aspect: ["16:9", "9:16"] }), false);
+  assert.equal(matchesGalleryFilters(square, { aspect: ["landscape", "portrait"] }), false);
   assert.deepEqual(filterValues([" a ", "", null, "b"]), ["a", "b"]);
   assert.deepEqual(filterValues("x"), ["x"]);
   assert.equal(hasGalleryFilters({ model: [], size: "" }), false);
-  assert.equal(hasGalleryFilters({ aspect: ["1:1"] }), true);
+  assert.equal(hasGalleryFilters({ aspect: ["square"] }), true);
 });

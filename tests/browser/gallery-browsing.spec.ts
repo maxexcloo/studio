@@ -679,7 +679,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   await pick("Models", "Motion Quality");
   await pick("LoRAs", "Detail Slider");
   await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
-  await page.getByRole("button", { name: "1:1", exact: true }).click();
+  await page.getByRole("button", { name: "Square", exact: true }).click();
   await page.getByText("Week", { exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(filter).toHaveAttribute("aria-expanded", "false");
@@ -687,7 +687,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   const chips = page.getByRole("group", { name: "Active Filters", exact: true });
   const removable = chips.getByRole("button", { name: /^Remove / });
   await expect(removable).toHaveCount(6);
-  await chips.getByRole("button", { name: "Remove 1:1 Filter", exact: true }).click();
+  await chips.getByRole("button", { name: "Remove Square Filter", exact: true }).click();
   await expect(removable).toHaveCount(5);
   // The search narrows within them.
   const search = await gallerySearch(page);
