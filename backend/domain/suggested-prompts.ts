@@ -28,6 +28,8 @@ export interface PromptDescriber {
  * prompt assistant.
  */
 export function createPromptSuggester(options: {
+  /** The Settings › Generation switch (STUDIO_SUGGESTED_PROMPTS). */
+  enabled(): boolean;
   writer: PromptDescriber | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
@@ -46,7 +48,7 @@ export function createPromptSuggester(options: {
     ...options,
     name: "Suggested prompts",
     continuous: true,
-    enabled: () => Boolean(writer),
+    enabled: () => Boolean(writer) && options.enabled(),
     async unavailable() {
       vision = await writer!.supportsVision();
       return "";

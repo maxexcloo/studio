@@ -1,6 +1,7 @@
 import { accountAccessForId } from "./account-store.js";
 import { createAssistant } from "./assistant.js";
 import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
+import { flagEnabled } from "./deployment-settings.js";
 import { ChatService } from "./domain/chat.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { publicJob } from "./domain/store.ts";
@@ -60,6 +61,7 @@ export function createSessionChat({
     // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
     taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
     session: (ownerId, id) => store.session(ownerId, id),
+    titles: () => flagEnabled("STUDIO_CHAT_TITLES"),
     // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
     agent: (ownerId, sessionId, owned) =>
       mcp.agent({

@@ -708,7 +708,9 @@ test("Settings › Generation switches follow at once and settle back after a fa
     });
   });
   await page.goto("/settings#generation");
-  const toggle = page.getByRole("switch", { name: "Gallery Captions", exact: true });
+  const toggle = page
+    .getByRole("region", { name: "Background AI", exact: true })
+    .getByRole("switch", { name: "Gallery Captions", exact: true });
   await expect(toggle).toBeChecked();
   await toggle.click({ force: true });
   // The switch moves before the server answers, and nothing else in the section locks.
