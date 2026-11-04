@@ -370,7 +370,9 @@ def cancel_fetch(root, folder, filename):
         fetch["cancel"] = True
 
 
-def start_fetch(root, folder, filename, repo, revision, path, size, sha256, note, token):
+def start_fetch(
+    root, folder, filename, repo, revision, path, size, sha256, note, token
+):
     """Starts a Hugging Face download (hf_hub_download, hf_xet when available) in the background.
 
     Studio polls `state` for progress. A transfer already running is left alone, and a partial one
@@ -386,7 +388,9 @@ def start_fetch(root, folder, filename, repo, revision, path, size, sha256, note
         or not path
         or any(not part or part.startswith(".") for part in path.split("/"))
     ):
-        raise ValueError("A Hugging Face file, size and published SHA-256 are required.")
+        raise ValueError(
+            "A Hugging Face file, size and published SHA-256 are required."
+        )
     if file.exists():
         return {"already": True}
     if (FETCHES.get(str(file)) or {}).get("done") is False:
