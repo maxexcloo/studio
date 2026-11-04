@@ -102,14 +102,18 @@ primary component reference and verify APIs against the installed version.
   shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
   (`SectionHeader`: segmented views, an expanding search, filters in one popover,
-  then the actions: a create or primary action as a labelled compact subtle
-  button (`ToolbarAction`: New User, New Group, New Guide, Import Workflow), the
-  rest icons with tooltips; phones may fold a crowded toolbar's actions into
-  More) at the end of the same row, above compact rows with status
+  then the actions, a vertical `ToolbarDivider` before each group of them: the
+  rest as icons with tooltips, A–Z, then the create or primary action at the far
+  right as a labelled compact subtle button (`ToolbarAction`: New User, New
+  Group, New Guide, Import Workflow); phones may fold a crowded toolbar's icon
+  actions into More) at the end of the same row, above compact rows with status
   badges and row menus, in Library as in Settings (Models, LoRAs and Imports
-  as Users and Workers). A section with several lists gives each a `SettingGroup`
+  as Users and Workers). A section with several lists shows its main list under
+  the section's own toolbar and gives each further list a `SettingGroup`
   heading with its own toolbar beside it, the create action at its far right
-  (Settings › Profiles: Profiles, then Guides, each row showing how they link);
+  (Settings › Profiles: the profiles, then Guides, each row showing how they
+  link and its menu downloading that one as JSON; Download All takes every
+  profile and guide in one archive);
   every other part of a section, such as an import review's Files, is a
   `SettingGroup` too, never a second section heading. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels

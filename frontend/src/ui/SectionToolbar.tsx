@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import {
   ActionIcon,
   Badge,
   Button,
+  Divider,
   Group,
   Popover,
   ScrollArea,
@@ -26,32 +27,28 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
   );
 }
 
-/** A section's create or primary action, labelled; its other actions are icons with tooltips. */
+/**
+ * A section's create or primary action, labelled; its other actions are icons with tooltips. It
+ * passes other props on, so it can be a menu's target.
+ */
 export function ToolbarAction({
   label,
   icon,
-  loading,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  loading?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
+  ...props
+}: { label: string; icon: ReactNode } & Omit<
+  ComponentPropsWithRef<typeof Button<"button">>,
+  "children"
+>) {
   return (
-    <Button
-      variant="subtle"
-      size="compact-sm"
-      leftSection={icon}
-      loading={loading}
-      disabled={disabled}
-      onClick={onClick}
-    >
+    <Button variant="subtle" size="compact-sm" leftSection={icon} {...props}>
       {label}
     </Button>
   );
+}
+
+/** Separates a toolbar's groups of actions, as in the viewer and selection bars. */
+export function ToolbarDivider() {
+  return <Divider orientation="vertical" className={classes.divider} />;
 }
 
 /**

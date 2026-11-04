@@ -419,6 +419,37 @@ test("Combine Backends previews pairs with their differences and combines the pi
   await expect(dialog).not.toContainText(pair.radiance.id);
 });
 
+test("The Profiles toolbar groups search and filter, the other actions A–Z, then creating", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  const toolbar = page
+    .getByRole("button", { name: "Search Profiles", exact: true })
+    .locator("xpath=..");
+  const items = await toolbar.evaluate((group) =>
+    [...group.children].map((item) =>
+      item.getAttribute("role") === "separator"
+        ? "|"
+        : item.getAttribute("aria-label") || item.textContent?.trim(),
+    ),
+  );
+  const middle =
+    (page.viewportSize()?.width || 1440) < 768
+      ? ["More Profile Actions"]
+      : ["Combine Backends", "Download All", "Merge Duplicate Profiles"];
+  expect(items).toEqual([
+    "Search Profiles",
+    "Filter Profiles",
+    "|",
+    ...middle,
+    "|",
+    "Import Workflow",
+  ]);
+});
+
 test("Each profile and guide downloads as its own JSON file from its row menu", async ({
   page,
 }) => {

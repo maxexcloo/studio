@@ -1749,7 +1749,7 @@ export function registerMcpRoutes(
       );
     }
   }
-  // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
+  // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Download All wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, "exports") : "";
   function signExport(name, now = Date.now()) {
     const expiresAt = new Date(now + exportLinkMs).toISOString();
