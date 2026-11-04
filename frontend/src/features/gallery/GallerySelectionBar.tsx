@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
+import { ActionBar, ActionIcon, Button, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -202,23 +202,32 @@ export function GallerySelectionBar({
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
+  // Phones name them by what they select (All, Failed, In Progress) in the top bar.
   const quick = [
-    { id: "select-all", label: "Select All", icon: SquareCheck, items: selection.items },
+    {
+      id: "select-all",
+      label: "Select All",
+      short: "All",
+      icon: SquareCheck,
+      items: selection.items,
+    },
     {
       id: "select-failed",
       label: "Select Failed",
+      short: "Failed",
       icon: TriangleAlert,
       items: selection.items.filter((item) => item.status === "error"),
     },
     {
       id: "select-running",
       label: "Select In Progress",
+      short: "In Progress",
       icon: LoaderCircle,
       items: selection.items.filter((item) => !finished(item)),
     },
   ]
     .filter(({ id, items }) => id === "select-all" || items.length > 0)
-    .map(({ items, ...action }): Action => ({
+    .map(({ items, ...action }) => ({
       ...action,
       disabled: !items.length || pending,
       onClick: () => {
@@ -227,14 +236,16 @@ export function GallerySelectionBar({
       },
     }));
   const primary = primaryIds.flatMap((id) => actions.flat().filter((action) => action.id === id));
-  const more = [
-    quick,
-    ...actions.map((group) => group.filter((action) => !primaryIds.includes(action.id))),
-  ];
+  const more = actions.map((group) => group.filter((action) => !primaryIds.includes(action.id)));
   // Desktop shows every action as an icon: the selection's own, then the item actions.
   const bar = phone ? (
     <ActionBarGroups
-      groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
+      groups={[
+        // More shows only while it has something to list.
+        more.some((group) => group.length)
+          ? [...primary, { id: "more", label: "More", icon: icons.more, menu: more }]
+          : primary,
+      ]}
       menuPosition="top-end"
     />
   ) : (
@@ -257,7 +268,27 @@ export function GallerySelectionBar({
         <Text size="sm" fw={500} role="status" className={classes.count}>
           {selected.length} Selected
         </Text>
-        {!phone && (
+        {phone ? (
+          <div
+            role="group"
+            aria-label="Quick Select"
+            className={`${classes.actions} ${classes.quick}`}
+          >
+            {quick.map((action) => (
+              <Button
+                key={action.id}
+                size="compact-sm"
+                variant="subtle"
+                color="gray"
+                aria-label={action.label}
+                disabled={action.disabled}
+                onClick={action.onClick}
+              >
+                {action.short}
+              </Button>
+            ))}
+          </div>
+        ) : (
           <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
             {bar}
           </div>

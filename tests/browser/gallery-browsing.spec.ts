@@ -282,7 +282,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await (await selectionMenuItem(page, "Select All")).click();
+    await page.getByRole("button", { name: "Select All", exact: true }).click();
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     await expect(selection.getByRole("status")).toHaveText("4 Selected");
     const retry = selectionAction(page, "Retry");
@@ -448,11 +448,11 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .getByRole("button", { name: "Select image: Browse Result 2", exact: true })
     .click({ modifiers: ["Shift"] });
   await expect(status).toHaveText("3 Selected");
-  await (await selectionMenuItem(page, "Select In Progress")).click();
+  await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
   await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await (await selectionMenuItem(page, "Select Failed")).click();
+  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
   await page
     .getByRole("button", { name: "Select image: Browse Result 3", exact: true })
@@ -572,19 +572,17 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   const phone = test.info().project.use.isMobile;
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(await selectionMenuItem(page, "Edit")).toBeEnabled();
-  if (phone) await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
-  else await selectionAction(page, "Select All").click();
-  await expect(page.getByRole("status")).toHaveText("3 Selected");
-  await expect(await selectionMenuItem(page, "Select All")).toBeVisible();
-  await expect(
-    phone
-      ? page.getByRole("menuitem", { name: "Edit", exact: true })
-      : selectionAction(page, "Edit"),
-  ).toHaveCount(0);
+  // Phones close More again: the selects sit in the top bar, named by what they select.
   if (phone) {
     await selectionAction(page, "More").click();
     await expect(page.getByRole("menu")).toBeHidden();
-  } else await expect(selectionAction(page, "More")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText("All");
+  }
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("3 Selected");
+  // Nothing else applies to all three, so neither shows Edit or More.
+  await expect(selectionAction(page, "Edit")).toHaveCount(0);
+  await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Prepare Share")).toBeEnabled();
