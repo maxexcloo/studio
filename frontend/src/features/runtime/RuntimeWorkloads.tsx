@@ -508,11 +508,16 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
           rowActions={(item) => (
             <>
               {item.phase === "parked" || item.phase === "down" ? (
-                <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
+                <Menu.Item
+                  leftSection={<icons.resume size={16} />}
+                  disabled={Boolean(operation)}
+                  onClick={() => starting.mutate(item.id)}
+                >
                   Start
                 </Menu.Item>
               ) : (
                 <Menu.Item
+                  leftSection={<icons.retry size={16} />}
                   disabled={Boolean(operation) || item.phase !== "running"}
                   onClick={() => setRestarting(item.id)}
                 >
