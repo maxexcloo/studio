@@ -54,7 +54,7 @@ interface Check {
   errors: string[];
   warnings: string[];
 }
-const definitionPath = (kind: DefinitionKind, id: string) =>
+export const definitionPath = (kind: DefinitionKind, id: string) =>
   `/api/profiles/${kind === "profile" ? "editable" : "guides"}/${encodeURIComponent(id)}`;
 const pretty = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 function object(value: unknown): value is Record<string, unknown> {

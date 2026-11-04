@@ -418,3 +418,35 @@ test("Combine Backends previews pairs with their differences and combines the pi
   ]);
   await expect(dialog).not.toContainText(pair.radiance.id);
 });
+
+test("Each profile and guide downloads as its own JSON file from its row menu", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.route("**/api/profiles/editable", (route) =>
+    route.fulfill({ json: { profiles: [{ id: "owned", name: "Owned Profile", version: 1 }] } }),
+  );
+  await page.route("**/api/profiles/guides", (route) =>
+    route.fulfill({ json: { packs: [{ packId: "krea2", name: "Krea 2", version: 1 }] } }),
+  );
+  await page.route("**/download", (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-2);
+    return route.fulfill({
+      contentType: "application/json",
+      headers: { "Content-Disposition": `attachment; filename="${id}.json"` },
+      body: "{}\n",
+    });
+  });
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  for (const [row, item, file] of [
+    ["Owned Profile", "Download Profile", "owned.json"],
+    ["Krea 2", "Download Guide", "krea2.json"],
+  ]) {
+    await page.getByRole("button", { name: `Actions for ${row}`, exact: true }).click();
+    const download = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+    expect((await download).suggestedFilename()).toBe(file);
+  }
+});
