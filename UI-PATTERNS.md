@@ -468,7 +468,7 @@ primary component reference and verify APIs against the installed version.
   inside the column (never bleeding past its edges), wrapping long words and
   scrolling within a bounded height, the caption starting expanded
   until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
-  sections run Prompt, Caption, From, Derived, Model, LoRAs, References,
+  sections run Caption, Prompt, Source, From, Derived, Model, LoRAs, References,
   Settings, Output and Timing, each a heading over its content, and an
   upscale's Output adds the Original Size the model drew beside its
   Dimensions. The
