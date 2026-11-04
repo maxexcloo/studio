@@ -231,6 +231,15 @@ export function ReferencePicker({
       )}
     </FileButton>
   );
+  const more = listing.hasNextPage && (
+    <Button
+      variant="subtle"
+      loading={listing.isFetchingNextPage}
+      onClick={() => void listing.fetchNextPage()}
+    >
+      Load More
+    </Button>
+  );
   const content = (
     <Stack
       component="section"
@@ -287,19 +296,36 @@ export function ReferencePicker({
           />
         }
       />
-      <ScrollArea.Autosize
-        style={{ flex: 1, minHeight: 0 }}
-        offsetScrollbars="present"
-        viewportRef={setViewport}
-        onScrollPositionChange={({ y }) => {
-          if (!restoreScroll.current) browser.scroll.current = y;
-        }}
-      >
-        {listing.isPending ? (
-          <LoadingState label="Loading References" />
-        ) : listing.error ? (
-          <Alert color="red">{listing.error.message}</Alert>
-        ) : choices.length ? (
+      {/* Loading and empty states fill the space under the header, centred in it. */}
+      {listing.isPending ? (
+        <LoadingState fill label="Loading References" />
+      ) : listing.error ? (
+        <Alert color="red">{listing.error.message}</Alert>
+      ) : !choices.length ? (
+        <EmptyState
+          fill
+          action={
+            <>
+              {uploads && (
+                <Text size="xs">
+                  {search ? "No matching uploads." : "Upload, paste or drop images."}
+                </Text>
+              )}
+              {more}
+            </>
+          }
+        >
+          {search ? "No Matches" : "No Images"}
+        </EmptyState>
+      ) : (
+        <ScrollArea.Autosize
+          style={{ flex: 1, minHeight: 0 }}
+          offsetScrollbars="present"
+          viewportRef={setViewport}
+          onScrollPositionChange={({ y }) => {
+            if (!restoreScroll.current) browser.scroll.current = y;
+          }}
+        >
           <PickerGrid label="Reference Choices">
             {choices.map((item, index) => (
               <PickerTile
@@ -335,24 +361,9 @@ export function ReferencePicker({
               />
             ))}
           </PickerGrid>
-        ) : (
-          <EmptyState fill>{search ? "No Matching Images" : "No Images"}</EmptyState>
-        )}
-        {uploads && !choices.length && !listing.isPending && (
-          <Text size="xs" c="dimmed" ta="center" mt="sm">
-            {search ? "No matching uploads." : "Upload, paste or drop images."}
-          </Text>
-        )}
-        {listing.hasNextPage && (
-          <Button
-            variant="subtle"
-            loading={listing.isFetchingNextPage}
-            onClick={() => void listing.fetchNextPage()}
-          >
-            Load More
-          </Button>
-        )}
-      </ScrollArea.Autosize>
+          {more}
+        </ScrollArea.Autosize>
+      )}
     </Stack>
   );
   const missing = profile?.mediaInputs?.some(
