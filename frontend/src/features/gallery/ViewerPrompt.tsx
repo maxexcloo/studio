@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ActionIcon, Tooltip } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -89,6 +90,11 @@ export function ViewerPrompt({
   const typed = prompt.trim() !== original.trim() ? prompt.trim() : undefined;
   // Next steps, which Suggestions offers, are written for images.
   const offered = ask.available && item.type === "image";
+  // Suggestions start loading in the background as the image opens, so the menu is ready.
+  const client = useQueryClient();
+  useEffect(() => {
+    if (offered && item.jobId) void client.prefetchQuery(nextStepsQuery(item.jobId));
+  }, [client, offered, item.jobId]);
   const actions = [
     done && chatOn && !phone && (
       <Tooltip key="chat" label={continueInChat.label}>
