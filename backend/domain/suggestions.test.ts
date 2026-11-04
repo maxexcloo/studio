@@ -294,6 +294,26 @@ test("a change to the composer's draft rewrites its prompt and can't upscale", a
   await assert.rejects(ask("alice", ["upscale"]), { status: 400 });
 });
 
+test("a draft without a request gets change ideas for its prompt, explicit where the account may", async () => {
+  const { calls, suggestions } = fixture();
+  const ask = (owner: string, prompt: string) =>
+    suggestions.suggest(owner, { surface: "draft", kind: "image", prompt });
+  const result = await ask("carol", "A harbour at dawn");
+  assert.equal(result.suggestions.length, 2);
+  assert.equal((result.suggestions[0] as { request: string }).request, "make the light warmer");
+  const [system, user] = calls[0];
+  assert.match(system.content, /draft prompt of an image[\s\S]*"steps"/);
+  assert.doesNotMatch(system.content, /uncensored/);
+  assert.match(user.content, /The draft prompt: A harbour at dawn/);
+  await ask("bob", "A sultry portrait");
+  assert.match(calls[1][0].content, /uncensored/);
+  assert.deepEqual(await ask("alice", " "), {
+    suggestions: [],
+    reason: "Write a prompt to change first.",
+  });
+  assert.equal(calls.length, 2);
+});
+
 test("chat context is one paragraph from the taste profile", async () => {
   const { suggestions } = fixture();
   assert.deepEqual(await suggestions.suggest("bob", { surface: "chat" }), {

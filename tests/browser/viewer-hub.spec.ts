@@ -196,6 +196,55 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
+test("Suggestions offers the image's next steps as changes, and picking one asks at once", async ({
+  page,
+}) => {
+  const asked: any[] = [];
+  const { viewer } = await seed(page, {}, (page) =>
+    page.route("**/api/suggestions", (route) => {
+      const body = route.request().postDataJSON();
+      asked.push(body);
+      if (body.surface === "viewer")
+        return route.fulfill({
+          json: {
+            suggestions: [
+              { label: "Night Version", request: "make it night", prompt: "A night bird" },
+              { label: "Add Rain", request: "add rain", prompt: "A rainy bird" },
+            ],
+          },
+        });
+      return route.fulfill({
+        json: {
+          suggestions: [
+            {
+              action: "edit",
+              label: "Rain",
+              request: body.request,
+              prompt: "An amber bird in rain",
+            },
+          ],
+        },
+      });
+    }),
+  );
+  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(field).toHaveValue("An amber bird in rain");
+  await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
+  expect(asked.filter((body) => body.surface === "change")).toEqual([
+    {
+      surface: "change",
+      jobId: "job-hub",
+      request: "add rain",
+      actions: ["edit", "recreate", "animate", "upscale"],
+    },
+  ]);
+  // Undo returns the request the suggestion filled in.
+  await viewer.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(field).toHaveValue("add rain");
+});
+
 test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
   page,
 }) => {

@@ -26,6 +26,15 @@ export const nextStepsQuery = (jobId: string) =>
     ...cached,
   });
 
+/** Short changes to offer for the composer's draft prompt, as an image's next steps are offered. */
+export const draftStepsQuery = (kind: MediaKind, prompt: string) =>
+  queryOptions({
+    queryKey: ["suggestions", "draft", kind, prompt],
+    queryFn: () =>
+      post<Suggestions<NextStep>>("/api/suggestions", { surface: "draft", kind, prompt }),
+    ...cached,
+  });
+
 /** The action and prompt for a change to a result asked for in plain words, chosen from `actions`. */
 export const askChange = (jobId: string, request: string, actions: ChangeAction[]) =>
   post<Suggestions<Change>>("/api/suggestions", { surface: "change", jobId, request, actions });

@@ -121,7 +121,8 @@ function describeItem(item: SuggestionItem) {
  * chips for a finished image in the viewer (from its prompt, settings, caption and, where the
  * running text model reads images, the image itself), a paragraph of taste context for Chat, and the action
  * and prompt for a change asked for in plain words to a finished result (`change`) or to the
- * composer's draft (`draft`), never cached or saved. Answers are
+ * composer's draft (`draft`), never cached or saved; a `draft` without a request gets change ideas
+ * for its prompt, as an image gets next steps. Answers are
  * cached per owner and input for ten minutes, and an image's next steps are saved with it (most
  * written ahead of time by `createNextStepWork`), so the viewer shows them at once; `fresh` asks
  * for different ones. An account without the prompt assistant, or while text is offline, gets
@@ -166,7 +167,7 @@ export function createSuggestions({
 
   async function write(
     model: Writer,
-    surface: Exclude<SuggestionSurface, "change" | "draft">,
+    surface: Exclude<SuggestionSurface, "change">,
     kind: "image" | "video",
     context: string,
     {
@@ -181,6 +182,15 @@ export function createSuggestions({
         `Write three varied, standalone ${kind} prompts of at most ${maxIdea} characters each that they would likely enjoy: not copies of the prompts they liked.`,
         data,
         'Reply with JSON only: {"ideas": ["<prompt>", "<prompt>", "<prompt>"]}.',
+      ],
+      // A draft without a request asks for changes to offer, as the viewer's next steps do.
+      draft: [
+        `You suggest changes to the draft prompt of ${kind === "video" ? "a video" : "an image"} a person is about to make in a media studio, drawn from the prompt and their taste profile.`,
+        `Suggest three or four distinct changes, such as ${kind === "video" ? "motion, camera, pace or mood" : "lighting, framing, time of day, mood or style"}.`,
+        spicy ? spicyNextSteps : "",
+        'Each has a label of at most four words in Title Case (such as "Warmer Light", "Closer Crop" or "Night Version"), the change in a few plain words, and the full prompt rewritten with only that change applied, in the same style and language.',
+        data,
+        'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>", "prompt": "<the rewritten prompt>"}]}.',
       ],
       viewer: [
         `You suggest next steps for an image a person just made in a media studio, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
@@ -398,7 +408,7 @@ export function createSuggestions({
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
       )
         throw failure(`Keep the prompt to ${maxPromptCharacters} characters.`, 400);
-      if (surface === "change" || surface === "draft") {
+      if (surface === "change" || (surface === "draft" && body.request !== undefined)) {
         const request = clean(body.request, maxRequest);
         // A draft has nothing to upscale yet.
         const actions = changeActions.filter(
@@ -434,7 +444,11 @@ export function createSuggestions({
         if (!(await online())) return empty("The text model is offline.");
         return change(model, ownerId, source, request, actions);
       }
-      if (surface === "composer" && body.kind !== "image" && body.kind !== "video")
+      if (
+        (surface === "composer" || surface === "draft") &&
+        body.kind !== "image" &&
+        body.kind !== "video"
+      )
         throw failure("Choose image or video ideas.", 400);
       let source: SuggestionItem | undefined;
       if (surface === "viewer") {
@@ -449,10 +463,12 @@ export function createSuggestions({
       const fresh = body.fresh === true;
       if (source?.nextSteps?.steps.length && !fresh) return { suggestions: source.nextSteps.steps };
       const { known, lines } = tasteContext(ownerId);
-      if (surface !== "viewer" && !known)
+      const drafted = surface === "composer" || surface === "draft";
+      const kind = drafted ? (body.kind as "image" | "video") : "image";
+      const prompt = drafted ? clean(body.prompt, maxPromptCharacters) : "";
+      if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
+      if ((surface === "composer" || surface === "chat") && !known)
         return empty("Star a few results so Studio learns your taste.");
-      const kind = surface === "composer" ? (body.kind as "image" | "video") : "image";
-      const prompt = surface === "composer" ? clean(body.prompt, maxPromptCharacters) : "";
       const key = JSON.stringify([ownerId, surface, kind, prompt, body.jobId ?? ""]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh) return cached.value;
@@ -470,9 +486,15 @@ export function createSuggestions({
           });
         const context = [
           ...lines,
-          ...(prompt ? ["", `They have started this prompt: ${prompt}`] : []),
+          ...(surface === "draft"
+            ? ["", `The draft prompt: ${prompt}`]
+            : prompt
+              ? ["", `They have started this prompt: ${prompt}`]
+              : []),
         ].join("\n");
-        return write(model, surface, kind, context);
+        return write(model, surface, kind, context, {
+          spicy: surface === "draft" && uncensored(ownerId),
+        });
       })();
       remember(key, answer);
       return answer;

@@ -191,6 +191,11 @@
   line-height: 1.45;
 }
 
+/* Two rows of field actions (two 32 px desktop bar icons and their gap) keep the text as tall. */
+.prompt[data-action-rows="2"] textarea {
+  min-height: 68px;
+}
+
 .variation {
   position: relative;
   display: grid;

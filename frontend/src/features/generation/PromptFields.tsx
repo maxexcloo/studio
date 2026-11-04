@@ -1,11 +1,16 @@
 import type { Ref } from "react";
-import { Group } from "@mantine/core";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { askDraftChange } from "../taste/suggestions";
-import { ChangeRequest, ProposalControls, proposedClass, useAskChange } from "./AskChange";
+import { askDraftChange, draftStepsQuery } from "../taste/suggestions";
+import {
+  ChangeRequest,
+  ChangeSuggestions,
+  ProposalLabel,
+  proposedClass,
+  useAskChange,
+} from "./AskChange";
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptIdeas } from "./PromptIdeas";
@@ -35,14 +40,14 @@ export function useDraftChange({
   onOperationChange: (operation: Operation) => void;
 }) {
   const ask = useAskChange<{ prompt: string; operation: Operation }>({
-    ask: (request) => {
+    ask: (request, typed) => {
       const actions: ChangeAction[] =
         input.kind === "video"
           ? ["animate"]
           : references.length
             ? ["edit", "recreate"]
             : ["recreate"];
-      return askDraftChange(input.kind, input.prompt, request, actions);
+      return askDraftChange(input.kind, typed.prompt, request, actions);
     },
     show: ({ action, prompt }) => {
       onChange({ prompt });
@@ -56,8 +61,8 @@ export function useDraftChange({
   });
   return {
     ...ask,
-    /** Sends the request line, keeping the draft's prompt and operation for Undo. */
-    sendRequest: () => ask.send(ask.request ?? "", { prompt: input.prompt, operation }),
+    /** Asks for `request`, keeping the draft's prompt and operation for Undo. */
+    sendRequest: (request: string) => ask.send(request, { prompt: input.prompt, operation }),
   };
 }
 export type DraftChange = ReturnType<typeof useDraftChange>;
@@ -106,17 +111,8 @@ export function PromptFields({
     onAsk: ask?.available ? () => ask.setRequest("") : undefined,
   });
   const proposal = ask?.proposal;
-  // The proposal's action rides with Undo under the prompt; Generate runs it.
-  const below = (assistant.suggestions || proposal) && (
-    <>
-      {assistant.suggestions}
-      {proposal && (
-        <Group gap="xs" mt={4}>
-          <ProposalControls proposal={proposal} labels={draftLabels} onUndo={ask.undo} />
-        </Group>
-      )}
-    </>
-  );
+  // Suggestions change the prompt as it was before any proposal.
+  const base = ask?.typed?.prompt ?? input.prompt;
   const ideas = usePromptIdeas({
     kind: input.kind,
     empty: !input.prompt.trim(),
@@ -173,10 +169,27 @@ export function PromptFields({
               }
             }}
             overlay={offerIdeas && ideas.ideas}
-            below={below}
+            below={assistant.suggestions}
           />
         </div>
-        {ask && <ChangeRequest ask={ask} onSend={ask.sendRequest} />}
+        {ask && (
+          <ChangeRequest
+            ask={ask}
+            onSend={ask.sendRequest}
+            // The proposal's action names it over the request; Generate runs it.
+            label={proposal && <ProposalLabel proposal={proposal} labels={draftLabels} />}
+            suggestions={
+              <ChangeSuggestions
+                query={draftStepsQuery(input.kind, base.trim())}
+                disabled={!base.trim() || ask.pending}
+                onPick={(request) => {
+                  ask.setRequest(request);
+                  ask.sendRequest(request);
+                }}
+              />
+            }
+          />
+        )}
       </div>
       {negative && (
         <TextBox
