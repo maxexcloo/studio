@@ -42,7 +42,7 @@ const quotedText = (value) =>
 
 // Words that show a preset's tone; a rewrite needs at least one (cases may give their own).
 const tones = {
-  photographic: ["photo", "photograph", "lens", "mm", "camera", "shot", "aperture", "exposure"],
+  candid: ["candid", "unposed", "everyday", "natural light", "daylight", "window light", "mid-"],
   cinematic: [
     "film",
     "cinematic",
@@ -54,7 +54,18 @@ const tones = {
     "anamorphic",
     "widescreen",
   ],
-  candid: ["candid", "snapshot", "phone", "unposed", "everyday", "mid-", "natural light", "casual"],
+  illustration: [
+    "illustration",
+    "illustrated",
+    "watercolour",
+    "ink",
+    "gouache",
+    "vector",
+    "painted",
+    "linework",
+  ],
+  portrait: ["portrait", "close-up", "face", "expression", "eyes", "lens", "depth of field"],
+  product: ["product", "studio", "backdrop", "softbox", "key light", "rim light", "surface"],
   spicy: ["sensual", "sultry", "bare", "intimate", "lingerie", "seductive", "skin"],
 };
 

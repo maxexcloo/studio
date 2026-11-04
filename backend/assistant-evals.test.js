@@ -45,29 +45,36 @@ test("the scorer catches dropped subjects and quotes, setting words, missing ton
   const item = {
     id: "x",
     prompt: 'a sign reading "Open Late" on a bar',
-    preset: "photographic",
+    preset: "portrait",
     expect: { keep: ["bar"] },
   };
   const failing = (output) =>
     scoreRewrite(item, output)
       .checks.filter((check) => !check.ok)
       .map((check) => check.name);
-  assert.deepEqual(failing('Photograph of a bar with a sign reading "Open Late", 35mm lens.'), []);
-  assert.deepEqual(failing('Photograph of a pub with a sign reading "Open Late", 35mm lens.'), [
-    'keeps "bar"',
-  ]);
-  assert.deepEqual(failing('Photograph of a bar with a sign reading "OPEN LATE", 35mm lens.'), [
-    'quotes "Open Late" exactly',
-  ]);
-  assert.deepEqual(failing('Photograph of a bar, sign reading "Open Late", 16:9, 4K, turbo.'), [
-    "no setting words",
-  ]);
+  assert.deepEqual(
+    failing('Portrait of a man at a bar with a sign reading "Open Late", 35mm lens.'),
+    [],
+  );
+  assert.deepEqual(
+    failing('Portrait of a man at a pub with a sign reading "Open Late", 35mm lens.'),
+    ['keeps "bar"'],
+  );
+  assert.deepEqual(
+    failing('Portrait of a man at a bar with a sign reading "OPEN LATE", 35mm lens.'),
+    ['quotes "Open Late" exactly'],
+  );
+  assert.deepEqual(
+    failing('Portrait of a man at a bar, sign reading "Open Late", 16:9, 4K, turbo.'),
+    ["no setting words"],
+  );
   assert.deepEqual(failing('A painting of a bar with a sign reading "Open Late".'), [
-    "photographic tone",
+    "portrait tone",
   ]);
-  assert.deepEqual(failing('Here is a photograph of a bar with a sign reading "Open Late".'), [
-    "no preamble",
-  ]);
+  assert.deepEqual(
+    failing('Here is a portrait of a man at a bar with a sign reading "Open Late".'),
+    ["no preamble"],
+  );
   assert.deepEqual(
     scoreRewrite({ id: "c", prompt: "a cat", preset: "concise" }, "cat ".repeat(50))
       .checks.filter((check) => !check.ok)
