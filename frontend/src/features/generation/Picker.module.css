@@ -16,7 +16,7 @@
   flex-shrink: 0;
 }
 
-/* Search, chips and Filter never wrap apart; the chips scroll sideways as in the gallery. */
+/* Search, Filter and the actions never wrap apart. */
 .searchRow {
   display: flex;
   flex: 1 1 16rem;
@@ -28,11 +28,6 @@
 .search {
   flex: 1 1 8rem;
   min-width: 8rem;
-}
-
-.chips {
-  flex: 0 1 auto;
-  min-width: 0;
 }
 
 /* Phone chips are 44 px touch targets; the search matches them. */

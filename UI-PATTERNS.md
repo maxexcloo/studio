@@ -182,7 +182,8 @@ primary component reference and verify APIs against the installed version.
   (picking the reference for a profile that takes one closes References).
   Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
   popover never opens a second level on phones. References, LoRAs and Presets share one picker
-  (`Picker.tsx`): tabs, then search, Filter ▾, active filter chips and the
+  (`Picker.tsx`): tabs, then search, Filter ▾ (badged with how many filters
+  apply, with no filter chips, so choosing filters never reflows the row) and the
   picker's actions (Sort; References' Upload) in one row at the gallery
   toolbar's compact size, Filter ▾ opening the filters in a popup titled Filters
   with Clear, as the gallery's does (a nested popover on desktop); a
@@ -404,8 +405,8 @@ primary component reference and verify APIs against the installed version.
   and Uploads (one at a time); in Grid, the All Versions switch; then Date, Models, LoRAs, Size, Aspect Ratio and Chats, applying at once. Models and LoRAs list
   the composer's names once each, without file names, backend or quantisation, and
   typing any part of a name finds it; a name filters by every recorded value it
-  covers. The reference picker uses the same chips, Filter ▾
-  and panel in the same popup. Search narrows within the filters; filter actions preserve
+  covers. The reference picker uses the same Filter ▾ (its count badge, which the
+  gallery's shows too) and panel in the same fixed-width popup. Search narrows within the filters; filter actions preserve
   the query. Gallery filters and zoom are remembered per account. Every labelled
   control that opens a menu or picker shows ▾; icon-only bar controls do not.
 - Grid and Runs zoom between column counts (1–4 on phones, 2–8 wider) by

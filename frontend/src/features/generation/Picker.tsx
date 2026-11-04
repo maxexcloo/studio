@@ -149,8 +149,9 @@ export function ChipPopup({
 }
 
 /**
- * Tabs, then the search, Filter ▾, active filter chips and `actions` in one compact row, in the
- * gallery toolbar's order and size; Filter ▾ opens the filters in a popup, as the gallery's does.
+ * Tabs, then the search, Filter ▾ and `actions` in one compact row, in the gallery toolbar's order
+ * and size; Filter ▾ opens the filters in a popup, as the gallery's does, and counts those applied
+ * so choosing them never reflows the row.
  */
 export function PickerHeader<Tab extends string>({
   label,
@@ -163,11 +164,8 @@ export function PickerHeader<Tab extends string>({
   filters,
   filterCount = 0,
   onClearFilters,
-  chips,
   actions,
 }: {
-  /** The active filters as removable chips, beside the search. */
-  chips?: ReactNode;
   /** Names the picker, such as "References" or "LoRAs". */
   label: string;
   /** What the search and filters cover, such as the current tab's "Gallery". */
@@ -238,7 +236,6 @@ export function PickerHeader<Tab extends string>({
               {filters}
             </ChipPopup>
           )}
-          {chips && <div className={classes.chips}>{chips}</div>}
           {actions}
         </div>
       </div>
