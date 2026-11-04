@@ -20,9 +20,9 @@ const healthColour = (state: ServiceHealth) =>
   ];
 const healthLabel = (state: ServiceHealth) =>
   ({
-    healthy: "Healthy",
+    healthy: "Running",
     offline: "Offline",
-    parked: "Parked",
+    parked: "Stopped",
     unknown: "Unknown",
     waiting: "Waiting",
   })[state];
@@ -116,11 +116,11 @@ export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) 
   const states = all.filter((state) => state !== "parked");
   if (error) return { colour: "yellow", label: "Service Status Unavailable" };
   if (!all.length) return { colour: "gray", label: "Checking Services" };
-  if (!states.length) return { colour: "gray", label: "Services Parked" };
+  if (!states.length) return { colour: "gray", label: "Services Stopped" };
   if (states.every((state) => state === "healthy"))
     return {
       colour: "green",
-      label: states.length < all.length ? "Services Healthy · Some Parked" : "Services Healthy",
+      label: states.length < all.length ? "Services Running · Some Stopped" : "Services Running",
     };
   if (states.every((state) => state === "offline" || state === "unknown"))
     return { colour: "red", label: "Services Unavailable" };

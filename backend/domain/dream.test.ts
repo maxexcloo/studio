@@ -455,7 +455,7 @@ test("Dream skips unavailable accounts and offline services, logging each reason
   await dream.tick();
   assert.match(
     dream.status("alice").reason!,
-    /^The image worker is parked: it was stopped on purpose/,
+    /^The image worker is stopped: an administrator can start it/,
   );
   assert.equal(state.logs.length, 4);
   assert.equal(state.calls.length, 0);
@@ -471,7 +471,7 @@ test("Dream skips unavailable accounts and offline services, logging each reason
     dreamJobs("alice").map((job) => job.status),
     ["cancelled"],
   );
-  assert.match(dream.status("alice").reason!, /^The image worker is parked/);
+  assert.match(dream.status("alice").reason!, /^The image worker is stopped/);
   state.online.image = true;
   await dream.tick();
   assert.equal(dreamJobs("alice").filter((job) => job.status === "queued").length, 1);

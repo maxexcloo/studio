@@ -54,7 +54,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
-    "Text: Healthy · Images: Healthy · Videos: Offline",
+    "Text: Running · Images: Running · Videos: Offline",
   );
   // Workers listed by the deployment show read-only with where they come from.
   const workers = page.getByRole("region", { name: "Workers", exact: true });
@@ -371,7 +371,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Services", exact: true })).toContainText(
-    "Images: Healthy",
+    "Images: Running",
   );
   await section(page, "Settings", "About");
   await expect(page.getByText("Development", { exact: true })).toBeVisible();
@@ -528,7 +528,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   expect(applied).toEqual([{ workloads: ["text", "video"], signature: "fixture" }]);
   // A parked workload's own Start previews starting it beside what runs.
   const video = table.getByRole("row", { name: "Video", exact: true });
-  await expect(video).toContainText("Parked");
+  await expect(video).toContainText("Stopped");
   await video.getByRole("button", { name: "Actions for Video", exact: true }).click();
   await page.getByRole("menuitem", { name: "Start", exact: true }).click();
   await expect(dialog).toContainText("Start: Video");
@@ -550,13 +550,13 @@ test("A parked service reads as parked, and administrators start it from Status"
           },
           video: {
             state: "parked",
-            reason: "Parked: stopped on purpose. An administrator can start it.",
+            reason: "Stopped on purpose. An administrator can start it.",
             endpoints: [
               {
                 id: "video",
                 label: "Video",
                 state: "parked",
-                reason: "Parked: stopped on purpose. An administrator can start it.",
+                reason: "Stopped on purpose. An administrator can start it.",
                 workloads: ["video"],
               },
             ],
@@ -593,10 +593,10 @@ test("A parked service reads as parked, and administrators start it from Status"
   );
   await page.goto("/images");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
-  await expect(status).toHaveAttribute("aria-description", "Services Healthy · Some Parked");
+  await expect(status).toHaveAttribute("aria-description", "Services Running · Some Stopped");
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
-  await expect(drawer.getByLabel("Videos: Parked", { exact: true })).toBeVisible();
+  await expect(drawer.getByLabel("Videos: Stopped", { exact: true })).toBeVisible();
   // Nothing stops, so choosing Start is the request itself.
   await drawer.getByRole("button", { name: "Start Videos", exact: true }).click();
   await expect(drawer.getByText("Starting Video.", { exact: true })).toBeVisible();

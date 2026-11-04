@@ -133,7 +133,7 @@ interface DreamWriting {
 type Reach = "online" | "offline" | "parked";
 const unreachable = (what: string, reach: Reach) =>
   reach === "parked"
-    ? `${what} is parked: it was stopped on purpose. An administrator can start it in Settings › Workers.`
+    ? `${what} is stopped: an administrator can start it in Settings › Workers.`
     : `${what} is offline.`;
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 interface DreamRecord {
