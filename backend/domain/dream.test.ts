@@ -100,7 +100,7 @@ function fixture(t: TestContext, catalogue = profiles) {
           text: JSON.stringify({
             prompt: `dream ${state.prompts}`,
             why: "You star foxes.",
-            title: "Fox Dream",
+            title: `Fox Dream ${state.prompts}`,
           }),
         };
       },
@@ -251,7 +251,7 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   assert.equal(job.input.prompt, "dream 1");
   assert.equal(job.input.allowFallback, false);
   // The title written with the prompt goes to the result (gallery/store.js).
-  assert.equal((job.input.writing as { title?: string }).title, "Fox Dream");
+  assert.equal((job.input.writing as { title?: string }).title, "Fox Dream 1");
   assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {
     prompt: "dream 1",
     why: "You star foxes.",
@@ -326,8 +326,8 @@ test("Dream stops at the unseen buffer and today's cap per kind, and animates ke
   });
   const [first, second] = dream.unseen("alice");
   assert.deepEqual([first.prompt, second.prompt], ["dream 1", "dream 2"]);
-  // The writer saw the recent Dream prompts so it can avoid them.
-  assert.match(state.calls[1].user, /- dream 1/);
+  // The writer saw the recent Dream ideas so it can avoid them.
+  assert.match(state.calls[1].user, /- Fox Dream 1/);
   dream.discard("alice", String(first.id));
   assert.ok(await dreamOnce());
   dream.keep("alice", String(second.id));
@@ -352,7 +352,7 @@ test("Dream stops at the unseen buffer and today's cap per kind, and animates ke
   assert.equal(live().length, 0);
 });
 
-test("Dream picks the most-starred ready profile and keeps Spicy to accounts with Uncensored Models", async (t) => {
+test("Dream picks a ready profile by its stars and keeps Spicy to accounts with Uncensored Models", async (t) => {
   const { dream, state, dreamOnce, generated } = fixture(t);
   const starred = (id: string, profileId: string, days = 1) =>
     generated({
@@ -373,7 +373,7 @@ test("Dream picks the most-starred ready profile and keeps Spicy to accounts wit
   await dream.save("alice", { enabled: true, spicy: true });
   const job = await dreamOnce();
   assert.equal(job?.input.profileId, "qwen");
-  assert.match(state.calls[0].user, /- starred a/);
+  assert.match(state.calls[0].user, /- starred [abc]/);
   // No uncensored grant: Spicy never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
@@ -642,7 +642,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   );
 });
 
-test("Dream loads up to two of the account's thumbs-up LoRAs the profile can use", async (t) => {
+test("Dream loads one of the account's thumbs-up LoRAs the profile can use", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   // A LoRA for another family is left out; the run goes ahead without it.
   state.loras.alice = { ratings: { "klein.safetensors": "up" }, strengths: {} };
@@ -661,13 +661,13 @@ test("Dream loads up to two of the account's thumbs-up LoRAs the profile can use
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
   const loras = store.job("alice", job.id)!.input.loras as { name: string; strength: number }[];
-  assert.deepEqual(loras.map((lora) => [lora.name, lora.strength]).sort(), [
-    ["film.safetensors", 1],
-    ["fox.safetensors", 0.6],
-  ]);
+  assert.deepEqual(
+    loras.map((lora) => [lora.name, lora.strength]),
+    [["fox.safetensors", 0.6]],
+  );
   state.loras.alice.ratings["ink.safetensors"] = "up";
-  assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 2);
-  assert.match(state.calls.at(-1)!.user, /favourite LoRAs: /);
+  assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 1);
+  assert.match(state.calls.at(-1)!.user, /favourite LoRA: /);
   // Without LoRA access nothing is added.
   state.loras = {};
   const next = (await dreamOnce())!;
@@ -782,5 +782,5 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   const steered = (await dreamOnce())!;
   assert.equal((steered.input.writing as { like?: string }).like, next.prompt);
   assert.match(state.calls.at(-1)!.user, new RegExp(`More like this one: ${next.prompt}`));
-  assert.equal(dream.read("alice").steer?.remaining, 3);
+  assert.equal(dream.read("alice").steer?.remaining, 1);
 });
