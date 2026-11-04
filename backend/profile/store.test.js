@@ -223,6 +223,28 @@ test("guide packs save as versions: a stale edit is refused, an AI draft waits f
   assert.throws(() => store.save("broken", "text"), /JSON object/);
 });
 
+test("a guide is removed only when nothing uses it, and its last version restores it", (t) => {
+  const store = guidesIn(scratch(t));
+  const other = store.pack("other");
+  assert.throws(() => store.remove("other", { baseHash: "stale" }), /changed since you opened it/);
+  assert.throws(
+    () => store.remove("other", { baseHash: other.hash }),
+    /still used by custom:fixture\./,
+  );
+  assert.throws(
+    () => store.remove("krea2", { baseHash: store.pack("krea2").hash }),
+    /still used by the krea2 family \(image\)\./,
+  );
+  store.saveBindings({ profiles: {} });
+  assert.deepEqual(store.remove("other", { by: "admin-1", baseHash: other.hash }), {
+    removed: "other",
+  });
+  assert.throws(() => store.pack("other"), /not found/);
+  assert.equal(store.versions("other")[0].note, "Before removing");
+  store.revert("other", 1, { by: "admin-1" });
+  assert.deepEqual(store.pack("other").pack, other.pack);
+});
+
 test("a guide resolves per profile, binds to a drafted profile and records its export", (t) => {
   const dir = scratch(t);
   const store = guidesIn(dir);

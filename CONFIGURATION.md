@@ -198,6 +198,8 @@ Settings › Profiles › Merge Duplicate Profiles is an explicit administrator 
 
 Settings › Profiles › Remove Profile (in a profile's editor, or the ProfileEdit admin MCP tool's `remove`) removes one profile after a confirmation: it copies the file to `backups/profile-removals/<time>/`, records it as the profile's last version so its history stays and its id is never reused, then removes the file and its guide binding and negatives. Records that name the id stay as they are and report the profile as missing; to restore it, save the backed-up file as a new profile.
 
+Settings › Profiles › Remove Guide (in a guide's editor, or ProfileEdit's `remove` with `target: guide`) removes a guide pack after a confirmation. It refuses while a profile binding or the family map still uses the pack; bind those to another guide first. The pack's versions stay, the last one holding it, so reverting to that version (`POST /api/profiles/guides/<id>/revert`) brings it back.
+
 ### Profile Backends
 
 A profile can run one model on Radiance or ComfyUI. Its `studio` block then holds the shared fields (`id`, `name`, `kind`, `family`, `uncensored`, `prompting`; the guide binding and negatives follow the profile id), the backend it runs on and each backend's own block with its graph:

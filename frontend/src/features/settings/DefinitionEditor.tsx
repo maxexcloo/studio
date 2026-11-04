@@ -184,6 +184,7 @@ function DefinitionForm({
     onSuccess: ({ version }) => setVersionText(version.text || pretty(version.pack)),
   });
   const meta = loaded.version || loaded.meta;
+  const noun = kind === "profile" ? "Profile" : "Guide";
   const busy = save.isPending || action.isPending || remove.isPending;
   const collision = creating && existingIds.includes(form.values.id);
   return (
@@ -416,7 +417,7 @@ function DefinitionForm({
                 everything else.
               </Text>
               <TextBox
-                label={kind === "profile" ? "Profile JSON" : "Guide JSON"}
+                label={`${noun} JSON`}
                 autosize
                 minRows={14}
                 maxRows={28}
@@ -535,14 +536,14 @@ function DefinitionForm({
                 Approve Draft
               </Button>
             )}
-            {kind === "profile" && !creating && (
+            {!creating && (
               <Button
                 variant="default"
                 leftSection={<icons.delete size={16} />}
                 disabled={busy}
                 onClick={() => setRemoving(true)}
               >
-                Remove Profile
+                Remove {noun}
               </Button>
             )}
           </Group>
@@ -555,21 +556,23 @@ function DefinitionForm({
               loading={save.isPending}
               disabled={!!error || collision || busy || (!creating && !form.isDirty())}
             >
-              {creating ? "Create" : "Save"} {kind === "profile" ? "Profile" : "Guide"}
+              {creating ? "Create" : "Save"} {noun}
             </Button>
           </Group>
         </Group>
       </Stack>
       <ConfirmDialog
         opened={removing}
-        title="Remove Profile"
+        title={`Remove ${noun}`}
         action="Remove"
         pending={remove.isPending}
         error={remove.error?.message}
         onConfirm={() => remove.mutate()}
         onClose={() => setRemoving(false)}
       >
-        Remove {id}? Studio keeps a backup and its version history; gallery items made with it stay.
+        {kind === "profile"
+          ? `Remove ${id}? Studio keeps a backup and its version history; gallery items made with it stay.`
+          : `Remove ${id}? Studio keeps its version history. A guide that profiles still use stays until they use another.`}
       </ConfirmDialog>
     </form>
   );
