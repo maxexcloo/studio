@@ -1,22 +1,7 @@
 import { parseArgs } from "node:util";
 import path from "node:path";
-import {
-  migrateGalleryRows,
-  migrateRuntime,
-  restoreRuntimeBackup,
-} from "../persistence/migration.ts";
-import { combinedProfiles } from "../combined-profiles.js";
-import { dreamOwnership } from "../dream-ownership.js";
-import { downloadSources } from "../library/download-sources.js";
-import { loraLayers } from "../library/lora-layers.js";
-import { loraRatings } from "../lora/ratings.js";
-import { accountAccess } from "../account-migration.js";
-import { uncensoredMarker } from "../uncensored-marker.js";
-import { profilePrompting } from "../profile/prompting-migration.js";
-import { migrateUploads } from "../uploads.js";
-import { versionSources } from "../version-sources.js";
-import { legacyRecords } from "../legacy-records.js";
-import { envSettings } from "../env-settings.js";
+import { restoreRuntimeBackup } from "../persistence/migration.ts";
+import { runtimeMigrations } from "../runtime-migrations.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -36,32 +21,11 @@ if (values.restore && !values.destination)
 let result;
 if (values.restore)
   result = restoreRuntimeBackup(path.resolve(values.restore), path.resolve(values.destination));
-else {
-  const dataDir = path.resolve(values["data-dir"]);
-  result = {
-    runtime: migrateRuntime(dataDir, { apply: values.apply }),
-    galleryRows: migrateGalleryRows(dataDir, { apply: values.apply }),
-    uploads: migrateUploads(dataDir, { apply: values.apply }),
-    combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
-    uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
-    accountAccess: accountAccess(dataDir, { apply: values.apply }),
-    loraRatings: loraRatings(dataDir, { apply: values.apply }),
-    versionSources: versionSources(dataDir, { apply: values.apply }),
-    profilePrompting: profilePrompting(dataDir, { apply: values.apply }),
-    loraLayers: loraLayers(dataDir, { apply: values.apply }),
-    downloadSources: downloadSources(dataDir, { apply: values.apply }),
-    legacyRecords: legacyRecords(dataDir, { apply: values.apply }),
-    envSettings: envSettings(dataDir, { apply: values.apply }),
-    ...(values["dream-owner"]
-      ? {
-          dreamOwnership: dreamOwnership(dataDir, {
-            owner: values["dream-owner"],
-            apply: values.apply,
-          }),
-        }
-      : {}),
-  };
-}
+else
+  result = runtimeMigrations(path.resolve(values["data-dir"]), {
+    apply: values.apply,
+    dreamOwner: values["dream-owner"],
+  });
 console.log(JSON.stringify(result, null, 2));
 if (
   result.conflicts?.length ||

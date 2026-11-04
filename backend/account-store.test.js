@@ -125,7 +125,7 @@ test("the built-in User profile is added only where its ID is free, and an empty
   };
   saved.profiles.administrator = { id: "administrator", name: "Administrator", allModels: true };
   writeRuntimeDocument(dataDir, "accounts", saved);
-  store.resetAccountStoreForTests();
+  store.reloadAccountStore();
   assert.equal(store.ensureBuiltInAccessProfile(), false);
   const profiles = store.listAccessProfiles();
   assert.equal(
