@@ -32,12 +32,12 @@ function statusLine(dream: Dream) {
       : ""
   } today`;
   const label = {
-    off: "Dream is off",
+    off: "Off",
     paused: "Paused",
     generating: "Dreaming…",
     waiting: "Waiting for idle time",
     capped: "Today’s limit reached",
-    unavailable: "Dream can’t run",
+    unavailable: "Can’t run",
   }[dream.status];
   return {
     label,
