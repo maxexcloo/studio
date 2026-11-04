@@ -64,6 +64,8 @@ import { registerLoraRoutes } from "./lora/routes.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
+import { importStore } from "./library/imports.js";
+import { presetsEnabled } from "./features.js";
 import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { seedSamples } from "./profile/seed.js";
@@ -118,6 +120,7 @@ import {
   makePendingItems,
   gallery,
   dataDir,
+  importedImageFile,
   recordsFromComfyHistory,
   setGallery,
   cleanupGalleryState,
@@ -155,6 +158,7 @@ import {
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
+  accountRoles,
   explicitWording,
   isCloudProfile,
   mayUseFeature,
@@ -763,6 +767,44 @@ const dream = createDream({
         ? []
         : [{ ...lora, strength }];
     }),
+  // Library › Imports and Inspiration are administration, shared across Studio and on only where
+  // the deployment enables them (preset-routes.js, library/routes.js), so only an administrator's
+  // Dream, or single-user mode's, draws on them. A saved Civitai image is listed once, by its gallery
+  // copy; files that are not installed drop out where Dream fits the LoRAs to the profile.
+  inspiration: (account) => {
+    if (!presetsEnabled() || (account && account.role !== accountRoles.administrator)) return [];
+    const saved = filterVisibleGallery(gallery)
+      .filter((item) => item.civitai && importedImageFile(item) && item.type !== "video")
+      .map((item) => ({
+        prompt: item.prompt || "",
+        profileId: item.settings?.profileId || "",
+        loras: item.settings?.loras || [],
+      }));
+    const imported = importStore()
+      .list()
+      .filter(
+        (record) =>
+          ["ready", "needs-files"].includes(record.state) && record.input?.kind !== "civitai-image",
+      )
+      .map((record) => ({
+        prompt: record.preset?.prompt || "",
+        profileId:
+          record.resources?.find(
+            (resource) =>
+              ["checkpoint", "diffusion_model"].includes(resource.role) &&
+              ["installed", "substitute"].includes(resource.status),
+          )?.profileId ||
+          record.suggestion?.profileId ||
+          "",
+        loras: (record.resources || [])
+          .filter((resource) => resource.role === "lora" && resource.status === "installed")
+          .map((resource) => ({
+            name: resource.localName || resource.want?.file || "",
+            strength: resource.strength ?? 1,
+          })),
+      }));
+    return [...saved, ...imported].filter((item) => item.prompt.trim());
+  },
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),

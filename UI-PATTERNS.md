@@ -291,7 +291,7 @@ primary component reference and verify APIs against the installed version.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
   up, then unrated, then thumbs down, each alphabetically (the picker's Sort can
-  order its choices by name instead); Dream loads only thumbs up. Library and
+  order its choices by name instead); Dream loads thumbs up, sometimes tries an unrated one and never loads thumbs down. Library and
   Settings lists sort by their `DataTable` headers, and the reference picker
   keeps the gallery's order.
 - References pick from the gallery. Uploads are the uploader's gallery images
@@ -344,6 +344,8 @@ primary component reference and verify APIs against the installed version.
   under More). A choice there moves the viewer on to the next card, and closing
   returns to the deck where it is. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
+- A Dream card's why line leads with what the idea explores (a new model, a new
+  LoRA, an import), and the card lists its LoRAs, each with thumbs up and down.
 - A comparison is one swipe card of two images, side by side (stacked on
   phones), named A and B by what differs, under its question (Which Model?,
   Which LoRA Strength?, Which Wording?…). Swipe or press left for A, right for

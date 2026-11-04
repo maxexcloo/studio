@@ -238,6 +238,36 @@ function useRating() {
     onError: () => cache.invalidateQueries({ queryKey: loraLibraryQuery.queryKey }),
   });
 }
+/** A LoRA's thumbs up and down for the account; tapping the pressed one clears it. */
+export function LoraThumbs({ file, title }: { file: string; title: string }) {
+  const library = useQuery(loraLibraryQuery);
+  const rate = useRating();
+  const current = library.data?.library.ratings?.[file];
+  return (
+    <Group gap={4} wrap="nowrap">
+      {(
+        [
+          ["up", "Thumbs Up", ThumbsUp, "green"],
+          ["down", "Thumbs Down", ThumbsDown, "red"],
+        ] as const
+      ).map(([rating, label, Icon, color]) => (
+        <ActionIcon
+          key={rating}
+          variant="subtle"
+          color="gray"
+          aria-label={`${label} ${title}`}
+          aria-pressed={current === rating}
+          onClick={() => rate.mutate({ name: file, rating: current === rating ? null : rating })}
+        >
+          <Icon
+            size={16}
+            color={current === rating ? `var(--mantine-color-${color}-filled)` : "currentColor"}
+          />
+        </ActionIcon>
+      ))}
+    </Group>
+  );
+}
 
 function LoraControls({
   value,
@@ -259,7 +289,6 @@ function LoraControls({
   const info = useQuery(loraInfoQuery);
   const library = useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
-  const rate = useRating();
   const metadata = info.data?.loras || {};
   const family = profile?.family || "";
   const stacks = useLoraStacks(family);
@@ -347,36 +376,7 @@ function LoraControls({
           selected={selected.has(file)}
           row
           onToggle={() => toggle(file)}
-          action={
-            <Group gap={4} wrap="nowrap">
-              {(
-                [
-                  ["up", "Thumbs Up", ThumbsUp, "green"],
-                  ["down", "Thumbs Down", ThumbsDown, "red"],
-                ] as const
-              ).map(([rating, label, Icon, color]) => (
-                <ActionIcon
-                  key={rating}
-                  variant="subtle"
-                  color="gray"
-                  aria-label={`${label} ${title(file)}`}
-                  aria-pressed={ratings[file] === rating}
-                  onClick={() =>
-                    rate.mutate({ name: file, rating: ratings[file] === rating ? null : rating })
-                  }
-                >
-                  <Icon
-                    size={16}
-                    color={
-                      ratings[file] === rating
-                        ? `var(--mantine-color-${color}-filled)`
-                        : "currentColor"
-                    }
-                  />
-                </ActionIcon>
-              ))}
-            </Group>
-          }
+          action={<LoraThumbs file={file} title={title(file)} />}
         />
       ))}
     </PickerGrid>
