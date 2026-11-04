@@ -11,13 +11,10 @@ import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
 import { ChatWorkspace, chatShellClass } from "./features/sessions/ChatWorkspace";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
-// Library and Settings load with the app so their first open shows the sections, not a loader.
-import { LibraryPage } from "./features/library/LibraryPage";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
-import { SettingsPage } from "./features/settings/SettingsPage";
 import { usePhone } from "./ui/usePhone";
 const ComparePage = lazy(() =>
   import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
@@ -26,6 +23,12 @@ const loadDream = () => import("./features/dream/DreamPage");
 const loadChat = () => import("./features/sessions/SessionsPage");
 const DreamPage = lazy(() => loadDream().then((module) => ({ default: module.DreamPage })));
 const ChatPage = lazy(() => loadChat().then((module) => ({ default: module.ChatPage })));
+const loadLibrary = () => import("./features/library/LibraryPage");
+const loadSettings = () => import("./features/settings/SettingsPage");
+const LibraryPage = lazy(() => loadLibrary().then((module) => ({ default: module.LibraryPage })));
+const SettingsPage = lazy(() =>
+  loadSettings().then((module) => ({ default: module.SettingsPage })),
+);
 const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {
   const { appearance } = useAppearance();
@@ -51,10 +54,13 @@ function Workspace() {
     if (overlay && location.hash) setSections((saved) => ({ ...saved, [overlay]: location.hash }));
   }, [overlay, location.hash, setSections]);
   const resumeSection = overlay && !location.hash && sections[overlay];
-  // The other modes load once the first one is up, so switching never shows their loader.
+  // The other modes, Library and Settings load once the first mode is up, so opening them never
+  // shows their loader.
   useEffect(() => {
     void loadDream();
     void loadChat();
+    void loadLibrary();
+    void loadSettings();
   }, []);
   const background = location.state?.backgroundLocation || {
     pathname: "/images",
@@ -170,12 +176,16 @@ function Workspace() {
                 />
               ) : panel === "library" ? (
                 library.allowed ? (
-                  <LibraryPage />
+                  <Suspense fallback={<LoadingState label="Loading Library" fill />}>
+                    <LibraryPage />
+                  </Suspense>
                 ) : (
                   <LoadingState label="Loading Library" fill />
                 )
               ) : (
-                <SettingsPage />
+                <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
+                  <SettingsPage />
+                </Suspense>
               )}
             </Modal>
           </AppShell>
