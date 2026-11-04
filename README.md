@@ -6,7 +6,7 @@ Images and Videos share a bottom composer; Chat combines streamed conversation w
 
 ## Development
 
-Use Node 26.12 or newer and the shared Mise tools:
+Use the Node version in `package.json` `engines` and the shared Mise tools:
 
 ```sh
 mise run setup
