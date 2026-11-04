@@ -5,6 +5,7 @@ import test from "node:test";
 import express from "express";
 import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
+import { ChatStore } from "./chat-store.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
 import { everyone, Store } from "./store.ts";
@@ -194,6 +195,75 @@ test("Deleting a chat is owner scoped, waits for active work and deletes only ch
     assert.deepEqual(store.jobs("alice"), []);
     assert.equal(store.jobs("bob").length, 1);
     assert.ok(store.session("bob", other.id));
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
+test("Chats are searched, archived and deleted in bulk within the owner's own chats", async () => {
+  const db = openDatabase(":memory:");
+  const store = new Store(db);
+  const chats = new ChatStore(db);
+  const birds = store.createSession("alice", "Blue Birds"),
+    talk = store.createSession("alice", "Lighting"),
+    busy = store.createSession("alice", "Busy"),
+    foreign = store.createSession("bob", "Blue Birds");
+  chats.add("alice", talk.id, { role: "user", content: "Soft 100% daylight", status: "completed" });
+  store.save({ ...store.enqueue("alice", busy.id, {}, "image"), status: "running" });
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]) } });
+    next();
+  });
+  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions`;
+  const call = async (path: string, body?: unknown) => {
+    const response = await fetch(`${base}${path}`, {
+      method: body ? "POST" : "GET",
+      headers: { "Content-Type": "application/json", "X-User": "alice" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return (await response.json()) as Record<string, any>;
+  };
+  const titles = async (query = "") =>
+    ((await call(query ? `?q=${encodeURIComponent(query)}` : "")).sessions as { title: string }[])
+      .map((chat) => chat.title)
+      .sort();
+  try {
+    assert.deepEqual(await titles("blue"), ["Blue Birds"]);
+    assert.deepEqual(await titles("100%"), ["Lighting"]);
+    assert.deepEqual(await titles("_"), []);
+
+    const before = store.session("alice", birds.id)!.updatedAt;
+    assert.deepEqual(
+      await call("/archive", { ids: [birds.id, foreign.id, "missing"], archived: true }),
+      { ids: [birds.id] },
+    );
+    assert.equal(store.session("alice", birds.id)?.archived, true);
+    assert.equal(store.session("alice", birds.id)?.updatedAt, before);
+    assert.equal(store.session("bob", foreign.id)?.archived, undefined);
+    await call("/archive", { ids: [birds.id], archived: false });
+    assert.equal(store.session("alice", birds.id)?.archived, undefined);
+
+    const deleted = await call("/delete", { ids: [birds.id, busy.id, foreign.id] });
+    assert.deepEqual(deleted.removed, [birds.id]);
+    assert.deepEqual(
+      deleted.failed.map((entry: { id: string; reason?: string }) => [entry.id, entry.reason]),
+      [
+        [busy.id, "active-jobs"],
+        [foreign.id, undefined],
+      ],
+    );
+    assert.deepEqual(await titles(), ["Busy", "Lighting"]);
+    assert.ok(store.session("bob", foreign.id));
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

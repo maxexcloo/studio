@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { QueueJob, Session } from "../../types";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -13,6 +13,15 @@ export const sessionsQuery = queryOptions({
   queryFn: () => api<{ sessions: Session[] }>("/api/sessions"),
   refetchInterval: (query) => (query.state.data?.sessions.some(awaitingTitle) ? 2000 : false),
 });
+
+/** The account's Chats whose title or a message contains `query`, newest first. */
+export const sessionSearchQuery = (query: string) =>
+  queryOptions({
+    queryKey: ["sessions", { query }],
+    queryFn: () =>
+      api<{ sessions: Session[] }>(`/api/sessions?${new URLSearchParams({ q: query })}`),
+    placeholderData: keepPreviousData,
+  });
 
 /** One Chat with its generations; polls while one is in progress, and an MCP Chat for its client's next turn. */
 export const sessionQuery = (id: string) =>

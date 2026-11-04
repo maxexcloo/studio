@@ -123,12 +123,30 @@ export class Store {
     return session;
   }
 
-  sessions(ownerId: string): StudioSession[] {
+  /** The owner's Chats, newest first; a `query` keeps those whose title or a message contains it. */
+  sessions(ownerId: string, query = ""): StudioSession[] {
+    const pattern = query ? `%${query.replace(/[\\%_]/g, "\\$&")}%` : null;
     return this.db
-      .prepare("SELECT record FROM studio_sessions WHERE owner_id = ? ORDER BY updated_at DESC")
-      .all(ownerId)
+      .prepare(
+        `SELECT record FROM studio_sessions AS chat WHERE owner_id = ?1 AND (?2 IS NULL
+          OR json_extract(record, '$.title') LIKE ?2 ESCAPE '\\'
+          OR EXISTS (SELECT 1 FROM studio_chat_messages AS message
+            WHERE message.owner_id = ?1 AND message.session_id = chat.id
+              AND json_extract(message.record, '$.content') LIKE ?2 ESCAPE '\\'))
+        ORDER BY updated_at DESC`,
+      )
+      .all(ownerId, pattern)
       .map((row) => JSON.parse(row.record as string) as StudioSession)
       .filter((session) => !session.hidden);
+  }
+
+  /** Archives or unarchives the owner's Chats without reordering them; returns the IDs it found. */
+  archiveSessions(ownerId: string, ids: string[], archived: boolean): string[] {
+    const update = this.db.prepare(
+      `UPDATE studio_sessions SET record = ${archived ? "json_set(record, '$.archived', json('true'))" : "json_remove(record, '$.archived')"}
+        WHERE id = ? AND owner_id = ? AND json_extract(record, '$.hidden') IS NULL`,
+    );
+    return [...new Set(ids)].filter((id) => update.run(id, ownerId).changes > 0);
   }
 
   session(ownerId: string, id: string): StudioSession | undefined {
