@@ -11,7 +11,12 @@ import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
-import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
+import {
+  DefinitionEditor,
+  definitionPath,
+  type DefinitionKind,
+  type LoadedDefinition,
+} from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -250,6 +255,13 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     <>
       <Menu.Item onClick={() => setEditing({ kind, id })}>Edit {noun}</Menu.Item>
       <Menu.Item onClick={() => void copyText(id, `${noun} ID`)}>Copy {noun} ID</Menu.Item>
+      <Menu.Item
+        component="a"
+        href={`${definitionPath(kind, id)}/download`}
+        download={`${id}.json`}
+      >
+        Download {noun}
+      </Menu.Item>
     </>
   );
   return (
