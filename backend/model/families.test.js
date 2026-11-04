@@ -117,6 +117,23 @@ test("model files are placed by their names", () => {
   assert.deepEqual([unknownCheckpoint.family, unknownCheckpoint.variant.id], ["sdxl", "pony"]);
 });
 
+test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3 video", async () => {
+  const { refinedFamily } = await import("../family-catalog.js");
+  const { classifyEncoder, classifyVae } = await import("./components.js");
+  for (const file of ["p-h3-image_w4a8.safetensors", "p-h3-image_int8_convrot.safetensors"]) {
+    const found = classifyModel("unet", file);
+    assert.deepEqual([found.family, found.variant.defaults.steps], ["p_h3_image", 8], file);
+  }
+  assert.equal(
+    classifyModel("unet", "minimax_h3_fl2va_pruned_int8_convrot.safetensors").family,
+    "minimax_h3",
+  );
+  assert.equal(refinedFamily("minimax_h3", "p-h3-image_bf16.safetensors"), "p_h3_image");
+  assert.equal(classifyVae("p-h3-image_vae_int8_convrot.safetensors").kind, "p_h3_image");
+  assert.equal(classifyVae("minimax_h3_video_vae_int8_convrot.safetensors").kind, "h3_video");
+  assert.equal(classifyEncoder("p-h3-image_text_encoder_w4a8.safetensors").kind, "p_h3_image");
+});
+
 /* ------------------------------------------------------------ profiles */
 
 test("an imported workflow's missing file gets a download only for that exact catalog file", async () => {

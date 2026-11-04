@@ -11,6 +11,8 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, triggersFromMetadata } =
   await import("./info.js");
 
+const { loraCompatibility } = await import("./policy.js");
+
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
 
 test("metadata names the base model where the keys cannot", () => {
@@ -31,6 +33,13 @@ test("MiniMax H3 compatibility comes from explicit trainer metadata", () => {
     [],
     "a title alone does not establish compatibility",
   );
+});
+
+test("P-H3-Image's LoRA is a MiniMax H3 adapter that no P-H3 Image profile takes", () => {
+  const families = familiesFromMetadata({ base_model: "PrunaAI/p-h3-image" });
+  assert.deepEqual(families, ["minimax_h3"]);
+  assert.equal(loraCompatibility({ families }, { family: "minimax-h3" }), "fits");
+  assert.equal(loraCompatibility({ families }, { family: "p-h3-image" }), "other");
 });
 
 test("trigger words come from the trainer's note, else the tags on every image", () => {
