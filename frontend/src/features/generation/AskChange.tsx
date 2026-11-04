@@ -1,4 +1,4 @@
-import { useState, type PointerEvent, type ReactNode, type Ref } from "react";
+import { useState, type CSSProperties, type PointerEvent, type ReactNode, type Ref } from "react";
 import { ActionIcon, Badge, Group, Loader, Menu, Textarea, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
@@ -11,6 +11,7 @@ import {
 import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
+import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
 
@@ -84,10 +85,10 @@ export function useAskChange<T>({
 }
 
 /**
- * A field's change actions, two to a row beside its text as the composer's prompt tools stand:
- * Ask for a Change, Suggestions, Undo and the field's send, showing only those that apply. A
- * `send` cell keeps to the second column, so it ends the last row. A `row` lines them up in one
- * row instead, for a one-line field such as the phone viewer's.
+ * A field's change actions in one column beside its text, as the composer's prompt tools stand:
+ * Ask for a Change, Suggestions, Undo and the field's send last, showing only those that apply. A
+ * `row` lines them up in one row instead, for a short phone field such as the viewer's, where the
+ * column would stand taller than the text.
  */
 export function ChangeActions({ row = false, children }: { row?: boolean; children: ReactNode }) {
   return (
@@ -96,6 +97,12 @@ export function ChangeActions({ row = false, children }: { row?: boolean; childr
     </div>
   );
 }
+
+/** Text box props that keep a field's text at least as tall as its column of `count` actions. */
+export const fitActions = (count: number) => ({
+  classNames: { input: classes.fit },
+  style: { "--change-actions": count } as CSSProperties,
+});
 
 function FieldAction({
   label,
@@ -133,7 +140,7 @@ export function UndoButton({ onClick }: { onClick: () => void }) {
   return <FieldAction label="Undo" icon={<icons.undo size={16} />} onClick={onClick} />;
 }
 
-/** The field's send (Generate, or Run for a proposal), at the end of the last row. */
+/** The field's send (Generate, or Run for a proposal), last in its actions. */
 export function SendButton({
   label,
   disabled,
@@ -148,7 +155,6 @@ export function SendButton({
   return (
     <Tooltip label={label}>
       <ActionIcon
-        className={classes.send}
         variant="filled"
         aria-label={label}
         disabled={disabled}
@@ -285,6 +291,7 @@ export function ChangeRequest({
   onSend: (request: string) => void;
   ref?: Ref<HTMLTextAreaElement>;
 }) {
+  const phone = usePhone();
   if (ask.request === null) return null;
   const send = () => {
     if (ask.request?.trim()) onSend(ask.request);
@@ -299,6 +306,7 @@ export function ChangeRequest({
         description={label}
         placeholder="Ask for a change, like “make it night”"
         size="sm"
+        {...(phone ? {} : fitActions(suggestions ? 3 : 2))}
         autosize
         minRows={2}
         maxRows={4}
@@ -319,7 +327,7 @@ export function ChangeRequest({
           }
         }}
       />
-      <ChangeActions>
+      <ChangeActions row={phone}>
         <AskButton disabled={!ask.request.trim()} loading={ask.pending} onClick={send} />
         {suggestions}
         {ask.proposal ? (

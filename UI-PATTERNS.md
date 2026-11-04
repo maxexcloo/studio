@@ -455,10 +455,11 @@ primary component reference and verify APIs against the installed version.
   replaces the text in place, tinted, with the action's name in a small label
   over the field and Undo (restoring what was there), the one review pause
   before a written prompt runs; there is no panel above the field. Its actions
-  are icons with tooltips, two to a row beside the field like the composer's
-  prompt tools (one row in the phone viewer's short field and editor header),
+  are icons with tooltips in one column beside the field like the composer's
+  prompt tools, the field growing to the column's height (one row on phones,
+  where the column would stand taller than the short field, and in the editor header),
   showing only those that apply: Ask for a Change, Suggestions,
-  Undo and the send (Generate or Run) ending the last row; text buttons never
+  Undo and the send (Generate or Run) last; text buttons never
   sit in the field, where they would be cut off. Suggestions (Lightbulb) opens a
   menu of short changes that fit the image (its next steps) or the draft
   (surface `draft` without a request), loaded when it opens and cached per item
