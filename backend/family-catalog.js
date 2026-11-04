@@ -1717,6 +1717,57 @@ export const families = {
     frames: 124,
     fps: 24,
   },
+  // PrunaAI's P-H3-Image (Nov 2026): MiniMax H3's transformer tuned for stills, distilled to 8
+  // steps without CFG or a negative, with its own text encoder (Qwen3-VL 4B parts, CLIPLoader type
+  // minimax) and VAE. Settings from PrunaAI/P-H3-Image-Comfy's workflows (ComfyUI 0.44):
+  // ModelSamplingMiniMaxH3 at 1/1, PH3ImageConditioning for the conditioning and the latent (and
+  // up to 8 images to edit, the first being edited), ManualSigmas' 8-step grid, euler and
+  // BasicGuider. 8 MP for text-to-image, 4 MP for edits. Its 2 GB LoRA turns H3's FL2VA into it,
+  // so that LoRA is an H3 adapter.
+  p_h3_image: {
+    label: "P-H3 Image",
+    kind: "image",
+    native: draws4k,
+    sources: ["unet"],
+    refines: { family: "minimax_h3", name: /p[-_ ]?h3[-_ ]?image/i },
+    slots: [{ slot: "encoder", label: "P-H3 Image text encoder", kinds: ["p_h3_image"] }],
+    clipType: "minimax",
+    vae: ["p_h3_image"],
+    latent: "PH3ImageConditioning",
+    sizeStep: 32,
+    negative: "none",
+    sampling: "custom",
+    aspects: [
+      ["1:1", 1, 1],
+      ["4:3", 4, 3],
+      ["3:4", 3, 4],
+      ["3:2", 3, 2],
+      ["2:3", 2, 3],
+      ["16:9", 16, 9],
+      ["9:16", 9, 16],
+    ],
+    modelSampling: { node: "MiniMaxH3SigmaShift", shift_video: 1, shift_audio: 1 },
+    references: 3,
+    requiredNodes: [
+      "PH3ImageConditioning",
+      "MiniMaxH3SigmaShift",
+      "ManualSigmas",
+      "BasicGuider",
+      "RandomNoise",
+      "KSamplerSelect",
+      "SamplerCustomAdvanced",
+    ],
+    variants: [
+      {
+        id: "standard",
+        label: "P-H3 Image",
+        sigmas: [1.0, 0.984753, 0.967905, 0.951688, 0.925372, 0.881923, 0.810083, 0.528718, 0.0],
+        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
+      },
+    ],
+    // 4 MP, which edits want and the shared 32 GB card holds beside H3; text-to-image is best at 8 MP (2912²).
+    size: [2048, 2048],
+  },
   // Lumina Image 2.0 and its fine-tunes (Neta Lumina, NetaYume). Gemma reads a
   // system prompt before yours, as it did in training; the anime fine-tunes
   // were trained on their own, with a matching one for the negative.
@@ -2053,6 +2104,7 @@ export function familyFromName(name = "", source = "unet") {
     ["mage_flow", /mage[-_ ]?flow/i],
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
     ["lumina2", /lumina|neta[-_ ]?yume|netayume|neta[-_ ]?lumina/i],
+    ["p_h3_image", /p[-_ ]?h3[-_ ]?image/i],
     ["minimax_h3", /minimax[-_ ]?h3|\bh3[-_]/i],
     ["wan22_14b", /wan[-_ ]?2[._]?2.*(high|low)[-_ ]?noise|(high|low)[-_ ]?noise.*wan/i],
     ["wan22_5b", /wan[-_ ]?2[._]?2.*5b|ti2v/i],

@@ -207,14 +207,22 @@ export async function resolveCivitaiModel(
   };
 }
 
-/** Where a Hugging Face file most likely belongs, and whether that is only a guess. */
-export function hfFolder(filePath, { tags = [], card = {} } = {}) {
+// Tensor names only an adapter carries: kohya (lora_up/lora_down), PEFT (lora_A/lora_B), LyCORIS.
+const adapterTensor =
+  /(^|[._])(lora_(up|down|a|b)|lora\.(up|down)|lokr_w[12]|hada_w[12]|oft_blocks)([._]|$)/i;
+
+/**
+ * Where a Hugging Face file most likely belongs, and whether that is only a guess. The file decides
+ * before its repository: its safetensors `header` (adapter tensors or none), then its name and
+ * folder. A repository's LoRA tags place only files that neither tells apart, since a repository
+ * such as PrunaAI/P-H3-Image-Comfy tags itself `lora` for the one adapter beside its full model.
+ */
+export function hfFolder(filePath, { tags = [], card = {}, header = null } = {}) {
   const name = filePath.toLowerCase();
-  const lora =
-    tags.some((tag) => /^lora$|^base_model:adapter:/i.test(String(tag))) ||
-    typeof card.instance_prompt === "string";
-  if (/(^|[/_.-])loras?([/_.-]|$)/.test(name) || (lora && !/vae|text[_-]?encoder/.test(name)))
-    return { folder: "loras", guessed: !/(^|[/_.-])loras?([/_.-]|$)/.test(name) && !lora };
+  const tensors = header ? Object.keys(header).filter((key) => key !== "__metadata__") : [];
+  const adapter = tensors.length ? tensors.some((key) => adapterTensor.test(key)) : null;
+  if (adapter || (adapter === null && /(^|[/_.-])loras?([/_.-]|$)/.test(name)))
+    return { folder: "loras", guessed: false };
   if (/clip[_-]?vision|siglip/.test(name)) return { folder: "clip_vision", guessed: false };
   if (/(^|[/_.-])vae([/_.-]|$)|^ae\.safetensors$|[/]ae\.safetensors$/.test(name))
     return { folder: "vae", guessed: false };
@@ -224,8 +232,45 @@ export function hfFolder(filePath, { tags = [], card = {} } = {}) {
     return { folder: "text_encoders", guessed: false };
   if (/(^|[/_.-])(unet|transformer|diffusion[_-]?models?)([/_.-]|$)/.test(name))
     return { folder: "diffusion_models", guessed: false };
+  const loraRepo =
+    tags.some((tag) => /^lora$|^base_model:adapter:/i.test(String(tag))) ||
+    typeof card.instance_prompt === "string";
+  if (adapter === null && loraRepo) return { folder: "loras", guessed: false };
   return { folder: "diffusion_models", guessed: true };
 }
+
+const maxHeaderBytes = 32 * 1024 * 1024;
+
+/** A Hugging Face file's safetensors header, read with two range requests, or null. */
+async function hfHeader(url, request) {
+  const read = async (start, end) => {
+    const response = await request(url, {
+      headers: { range: `bytes=${start}-${end}` },
+      signal: AbortSignal.timeout(30000),
+    });
+    // Anything but a partial answer would be the whole file.
+    if (response.status !== 206) {
+      await response.body?.cancel();
+      return null;
+    }
+    return limitedBody(response, end - start + 1);
+  };
+  try {
+    const prefix = await read(0, 7);
+    if (prefix?.length !== 8) return null;
+    const size = Number(prefix.readBigUInt64LE(0));
+    if (!size || size > maxHeaderBytes) return null;
+    const body = await read(8, 7 + size);
+    const header = body ? JSON.parse(body.toString()) : null;
+    return header && typeof header === "object" && !Array.isArray(header) ? header : null;
+  } catch {
+    return null;
+  }
+}
+
+// At most this many headers per repository, a few at a time; the rest keep their name's folder.
+const maxHeaders = 24;
+const headerConcurrency = 4;
 
 /** A Hugging Face link split into owner, repo, revision and (for a file) its path. */
 export function parseHfLink(value) {
@@ -312,14 +357,31 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
   if (!files.length) throw new Error("This repository has no SafeTensors or GGUF files.");
   const uncensored = tags.includes("not-for-all-audiences") ? true : null;
   const repoUrl = `https://huggingface.co/${owner}/${repo}`;
+  const fileUrl = (item) =>
+    `${repoUrl}/resolve/${metadata.sha}/${item.rfilename.split("/").map(encodeURIComponent).join("/")}`;
+  // Files whose name doesn't place them are placed by their header.
+  const unplaced = files
+    .filter((item) => /\.safetensors$/i.test(item.rfilename) && hfFolder(item.rfilename).guessed)
+    .slice(0, maxHeaders);
+  const headers = new Map();
+  for (let at = 0; at < unplaced.length; at += headerConcurrency)
+    await Promise.all(
+      unplaced
+        .slice(at, at + headerConcurrency)
+        .map(async (item) => headers.set(item, await hfHeader(fileUrl(item), request))),
+    );
   const resources = files.map((item) => {
     const file = path.posix.basename(item.rfilename);
     const sha256 = /^[a-f0-9]{64}$/i.test(item.lfs?.sha256 || "")
       ? item.lfs.sha256.toLowerCase()
       : "";
     const bytes = Number(item.lfs?.size || item.size || 0);
-    const { folder, guessed } = hfFolder(item.rfilename, { tags, card });
-    const url = `${repoUrl}/resolve/${metadata.sha}/${item.rfilename.split("/").map(encodeURIComponent).join("/")}`;
+    const { folder, guessed } = hfFolder(item.rfilename, {
+      tags,
+      card,
+      header: headers.get(item),
+    });
+    const url = fileUrl(item);
     const spec =
       sha256 && modelFolders.has(folder)
         ? {
