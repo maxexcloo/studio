@@ -70,7 +70,7 @@ export interface DreamProfile {
   model?: string;
   workflow?: string;
   defaults?: GenerationInput;
-  capabilities?: { startImage?: boolean };
+  capabilities?: { startImage?: boolean; steps?: boolean };
   mediaInputs?: { id: string; required?: boolean }[];
   /** The LoRA files this profile can load. */
   options?: { loras?: string[] };
@@ -742,8 +742,9 @@ export function createDream(options: {
           ],
         });
     }
+    // A fixed-step profile has no steps control, so both sides would render alike.
     const steps = Number(input.steps);
-    if (steps > 0) {
+    if (steps > 0 && profile.capabilities?.steps) {
       const next = steps <= 12 ? steps * 2 : Math.round(steps / 2);
       choices.push({
         question: "Which Steps?",

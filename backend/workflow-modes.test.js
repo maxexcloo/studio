@@ -121,6 +121,20 @@ test("mode selection reaches final graphs, preserves fixed generation denoise an
   assert.equal(referenced[2].inputs.denoise, 0.3);
 });
 
+test("a fixed-step profile sends no steps, so its graph keeps its own", () => {
+  const body = sanitizeGenerateBody(
+    {
+      kind: "image",
+      workflow: "custom:mode-test",
+      model: "custom:mode-test",
+      prompt: "A scene",
+      steps: 30,
+    },
+    info,
+  );
+  assert.equal(body.steps, undefined);
+});
+
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
   const { optionalLoraIssue } = await import("./lora/catalogue.js");
   const prepared = structuredClone(raw);

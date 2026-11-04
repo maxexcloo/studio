@@ -83,8 +83,8 @@ async function applyMappedInputs(graph, workflow, body) {
     weightDtype: body.weightDtype || defaults.weightDtype || "default",
     width: Number(body.width || 0),
     height: Number(body.height || 0),
-    steps: Number(body.steps || 0),
-    // A distilled profile sends no CFG (validation.js), so its graph keeps its own.
+    // A fixed-step or distilled profile sends no steps or CFG (validation.js), so its graph keeps its own.
+    steps: body.steps == null || body.steps === "" ? undefined : Number(body.steps),
     cfg: body.cfg == null || body.cfg === "" ? undefined : Number(body.cfg),
     denoise: Number(body.denoise ?? 1),
     sampler: body.sampler || "",
