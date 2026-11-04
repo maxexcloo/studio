@@ -104,6 +104,11 @@ export function OwnAccount() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Sign-In">
+        {own.accessProfile && (
+          <SettingRow label="Access Group">
+            <Text size="sm">{own.accessProfile.name}</Text>
+          </SettingRow>
+        )}
         <SettingRow
           label="Email & Password"
           description={
@@ -116,16 +121,6 @@ export function OwnAccount() {
             </Button>
           )}
         </SettingRow>
-        <SettingRow label="Sign-In Method">
-          <Text size="sm">
-            {[
-              own.canChangePassword && "Password",
-              (own.provider === "pocket-id" || own.signInLinked) && "Single Sign-On",
-            ]
-              .filter(Boolean)
-              .join(" & ") || "None"}
-          </Text>
-        </SettingRow>
         <SettingRow
           label="Role"
           description={
@@ -136,11 +131,16 @@ export function OwnAccount() {
         >
           <Badge miw="max-content">{admin ? "Administrator" : "User"}</Badge>
         </SettingRow>
-        {own.accessProfile && (
-          <SettingRow label="Access Group">
-            <Text size="sm">{own.accessProfile.name}</Text>
-          </SettingRow>
-        )}
+        <SettingRow label="Sign-In Method">
+          <Text size="sm">
+            {[
+              own.canChangePassword && "Password",
+              (own.provider === "pocket-id" || own.signInLinked) && "Single Sign-On",
+            ]
+              .filter(Boolean)
+              .join(" & ") || "None"}
+          </Text>
+        </SettingRow>
       </SettingGroup>
       <PersonalMcpToken initial={account.data.mcp} />
       <Modal opened={editing} onClose={() => setEditing(false)} title="Email & Password">

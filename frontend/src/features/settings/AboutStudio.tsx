@@ -10,6 +10,7 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 
 const repository = "https://github.com/maxexcloo/studio";
+// Studio's lineage first, then what it runs on.
 const credits = [
   {
     name: "HEISS UI",
@@ -38,6 +39,7 @@ const credits = [
   },
 ];
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+// Grouped by where each key works: the gallery, composer, Chat, then the viewer.
 const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["/"], [mod, "F"]], action: "Search the Gallery" },
   { keys: [[mod, "Enter"]], action: "Generate" },
@@ -139,6 +141,7 @@ export function AboutStudio() {
           {outputs ? ` ${outputs.toLocaleString()} results made here · no telemetry.` : ""}
         </Text>
       </Stack>
+      {/* What is running leads; the other groups follow A–Z. */}
       <SettingGroup title="Release">
         <SettingRow label="Commit" description="The commit running here.">
           {commit ? (
@@ -162,7 +165,6 @@ export function AboutStudio() {
           {link(repository, "GitHub")}
         </SettingRow>
       </SettingGroup>
-      <Help />
       <SettingGroup title="Credits">
         {credits.map((credit) => (
           <SettingRow key={credit.name} label={credit.name} description={credit.what}>
@@ -170,6 +172,7 @@ export function AboutStudio() {
           </SettingRow>
         ))}
       </SettingGroup>
+      <Help />
     </Stack>
   );
 }
