@@ -25,7 +25,6 @@ import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import {
-  FilterChips,
   GalleryFilterPanel,
   appendGalleryFilters,
   emptyGalleryFilters,
@@ -280,14 +279,6 @@ export function ReferencePicker({
         filterCount={activeFilters.length}
         onClearFilters={() => browse({ filters: emptyGalleryFilters })}
         actions={uploadButton}
-        chips={
-          activeFilters.length > 0 && (
-            <FilterChips
-              chips={activeFilters}
-              onClear={() => browse({ filters: emptyGalleryFilters })}
-            />
-          )
-        }
         filters={
           <GalleryFilterPanel
             kind="image"
