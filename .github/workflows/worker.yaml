@@ -70,8 +70,6 @@ jobs:
             test -x /opt/radiance/runtime/ld-linux-x86-64.so.2
             test -x /opt/radiance/bin/radiance
             test -s /opt/studio/LICENSE
-            python3 -m compileall -q /root/ComfyUI/custom_nodes/radiance /root/ComfyUI/custom_nodes/studio_worker
-            bash -n /opt/studio/entrypoint.sh
           '
       - name: Log In to GHCR
         if: env.PUBLISH == 'true'

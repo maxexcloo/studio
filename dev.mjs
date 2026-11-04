@@ -31,16 +31,7 @@ const children = [
   }),
   spawn(
     process.execPath,
-    [
-      "node_modules/vite/bin/vite.js",
-      "--config",
-      "frontend/vite.config.ts",
-      "--host",
-      environment.HOST,
-      "--port",
-      "5173",
-      "--strictPort",
-    ],
+    ["node_modules/vite/bin/vite.js", "--config", "frontend/vite.config.ts"],
     { cwd: root, env: environment, stdio: "inherit" },
   ),
 ];
