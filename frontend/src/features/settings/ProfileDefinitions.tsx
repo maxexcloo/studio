@@ -2,13 +2,18 @@ import { useState, type ReactNode } from "react";
 import { ActionIcon, Alert, Badge, Group, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Combine, FileDown, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
+import { Combine, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import {
+  SectionHeader,
+  SectionToolbar,
+  ToolbarAction,
+  ToolbarDivider,
+} from "../../ui/SectionToolbar";
 import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import {
@@ -53,8 +58,9 @@ interface MoreAction {
 }
 
 /**
- * A group's toolbar actions: the rest as icons with tooltips (phones, which show no tooltips, list
- * them by name under More), then the labelled create action at the far right.
+ * A toolbar's actions after its search and filter, each group behind a divider: the rest as icons
+ * with tooltips (phones, which show no tooltips, list them by name under More), then the labelled
+ * create action at the far right.
  */
 function GroupActions({
   noun,
@@ -69,6 +75,7 @@ function GroupActions({
   const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
   return (
     <>
+      <ToolbarDivider />
       {more.length > 0 &&
         (phone ? (
           <Menu position="bottom-end">
@@ -105,6 +112,7 @@ function GroupActions({
             </Tooltip>
           ))
         ))}
+      {more.length > 0 && <ToolbarDivider />}
       {children}
     </>
   );
@@ -166,8 +174,8 @@ interface Editing {
 }
 
 /**
- * Settings › Profiles: generation profiles, then the prompting guides they use, each a group with
- * its own toolbar and saved versions.
+ * Settings › Profiles: generation profiles under the section's own toolbar, then the prompting
+ * guides they use as a group with its own toolbar; each keeps its saved versions.
  */
 export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [profileQuery, setProfileQuery] = useState("");
@@ -265,132 +273,127 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
     </>
   );
   return (
-    <Stack gap="lg">
-      {heading}
-      <SettingGroup
-        title="Profiles"
-        toolbar={
-          <SectionToolbar
-            label="Profiles"
-            query={profileQuery}
-            onQueryChange={setProfileQuery}
-            filters={
-              <Select
-                label="Family"
-                placeholder="All Families"
-                data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
-                value={family}
-                onChange={setFamily}
-                clearable
-                searchable
-                openOnFocus={false}
-                comboboxProps={{ withinPortal: false }}
-                data-mantine-stop-propagation
-              />
-            }
-            filterCount={Number(!!family)}
-            onResetFilters={() => setFamily(null)}
-            actions={
-              <GroupActions
-                noun="Profile"
-                more={[
-                  {
-                    label: "Merge Duplicate Profiles",
-                    icon: Merge,
-                    onClick: () => setMerging(true),
-                  },
-                  { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
-                  // The bundle holds the guides too.
-                  { label: "Export Definitions", icon: FileDown, href: "/api/profiles/export" },
-                ]}
-              >
-                <ToolbarAction
-                  label="Import Workflow"
-                  icon={<Upload size={18} />}
-                  loading={importing.isPending}
-                  onClick={workflowFile.open}
-                />
-              </GroupActions>
-            }
-          />
-        }
-      >
-        <Stack gap="xs">
-          {importing.error && <Alert color="red">{importing.error.message}</Alert>}
-          {profileList.error ? (
-            <Alert color="red">{profileList.error.message}</Alert>
-          ) : (
-            <DataTable
-              label="Editable Profiles"
-              rows={profileRows}
-              rowKey={(entry) => entry.id}
-              rowName={(entry) => entry.name || entry.id}
-              loading={profileList.isPending && "Loading Profiles"}
-              query={profileQuery}
-              searchText={(entry) => [
-                entry.name,
-                entry.id,
-                entry.family && modelFamilyLabel(entry.family),
-                guideOf(entry),
-              ]}
-              initialSort={{ key: "name", descending: false }}
-              empty={profiles.length ? "No Matches" : "No Profiles"}
-              columns={[
-                {
-                  key: "name",
-                  header: "Name",
-                  main: true,
-                  sortValue: (entry) => entry.name || entry.id,
-                  // The name and its family wrap rather than cut off; Copy ID has the exact ID.
-                  cell: (entry) => (
-                    <>
-                      <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                        {entry.name || entry.id}
-                      </Text>
-                      <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                        {[
-                          entry.family && modelFamilyLabel(entry.family),
-                          entry.kind && kindLabels[entry.kind],
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || entry.id}
-                      </Text>
-                      <Text size="xs" c="dimmed" hiddenFrom="sm">
-                        {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
-                      </Text>
-                    </>
-                  ),
-                },
-                {
-                  key: "guide",
-                  header: "Guide",
-                  visibleFrom: "sm",
-                  sortValue: guideOf,
-                  cell: (entry) => (
-                    <Text size="sm" c={guideOf(entry) ? undefined : "dimmed"}>
-                      {guideOf(entry) || "None"}
-                    </Text>
-                  ),
-                },
-                {
-                  key: "version",
-                  header: "Version",
-                  sortValue: (entry) => entry.version,
-                  cell: (entry) => <Version {...entry} />,
-                },
-                {
-                  key: "use",
-                  header: "Last 30 Days",
-                  visibleFrom: "md",
-                  sortValue: (entry) => statsOf(entry.id)?.runs,
-                  cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
-                },
-              ]}
-              rowActions={(entry) => rowMenu("profile", "Profile", entry.id)}
+    <Stack gap="md">
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Profiles"
+          query={profileQuery}
+          onQueryChange={setProfileQuery}
+          filters={
+            <Select
+              label="Family"
+              placeholder="All Families"
+              data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
+              value={family}
+              onChange={setFamily}
+              clearable
+              searchable
+              openOnFocus={false}
+              comboboxProps={{ withinPortal: false }}
+              data-mantine-stop-propagation
             />
-          )}
-        </Stack>
-      </SettingGroup>
+          }
+          filterCount={Number(!!family)}
+          onResetFilters={() => setFamily(null)}
+          actions={
+            <GroupActions
+              noun="Profile"
+              more={[
+                { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
+                // Every profile and guide, in one archive.
+                { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
+                {
+                  label: "Merge Duplicate Profiles",
+                  icon: Merge,
+                  onClick: () => setMerging(true),
+                },
+              ]}
+            >
+              <ToolbarAction
+                label="Import Workflow"
+                icon={<Upload size={18} />}
+                loading={importing.isPending}
+                onClick={workflowFile.open}
+              />
+            </GroupActions>
+          }
+        />
+      </SectionHeader>
+      <Stack gap="xs">
+        {importing.error && <Alert color="red">{importing.error.message}</Alert>}
+        {profileList.error ? (
+          <Alert color="red">{profileList.error.message}</Alert>
+        ) : (
+          <DataTable
+            label="Editable Profiles"
+            rows={profileRows}
+            rowKey={(entry) => entry.id}
+            rowName={(entry) => entry.name || entry.id}
+            loading={profileList.isPending && "Loading Profiles"}
+            query={profileQuery}
+            searchText={(entry) => [
+              entry.name,
+              entry.id,
+              entry.family && modelFamilyLabel(entry.family),
+              guideOf(entry),
+            ]}
+            initialSort={{ key: "name", descending: false }}
+            empty={profiles.length ? "No Matches" : "No Profiles"}
+            columns={[
+              {
+                key: "name",
+                header: "Name",
+                main: true,
+                sortValue: (entry) => entry.name || entry.id,
+                // The name and its family wrap rather than cut off; Copy ID has the exact ID.
+                cell: (entry) => (
+                  <>
+                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
+                      {entry.name || entry.id}
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                      {[
+                        entry.family && modelFamilyLabel(entry.family),
+                        entry.kind && kindLabels[entry.kind],
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || entry.id}
+                    </Text>
+                    <Text size="xs" c="dimmed" hiddenFrom="sm">
+                      {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
+                    </Text>
+                  </>
+                ),
+              },
+              {
+                key: "guide",
+                header: "Guide",
+                visibleFrom: "sm",
+                sortValue: guideOf,
+                cell: (entry) => (
+                  <Text size="sm" c={guideOf(entry) ? undefined : "dimmed"}>
+                    {guideOf(entry) || "None"}
+                  </Text>
+                ),
+              },
+              {
+                key: "version",
+                header: "Version",
+                sortValue: (entry) => entry.version,
+                cell: (entry) => <Version {...entry} />,
+              },
+              {
+                key: "use",
+                header: "Last 30 Days",
+                visibleFrom: "md",
+                sortValue: (entry) => statsOf(entry.id)?.runs,
+                cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
+              },
+            ]}
+            rowActions={(entry) => rowMenu("profile", "Profile", entry.id)}
+          />
+        )}
+      </Stack>
       <SettingGroup
         title="Guides"
         toolbar={
