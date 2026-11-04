@@ -126,20 +126,24 @@ export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) 
     return { colour: "red", label: "Services Unavailable" };
   return { colour: "yellow", label: "Services Partly Available" };
 }
+/**
+ * The status panel's service rows: each service's name on the left, its state and any Start on
+ * the right, every row one compact bar's height whether or not it offers Start.
+ */
 export function ServiceHealthSummary() {
   const status = useQuery(servicesStatusQuery);
   const admin = useIsAdmin();
   if (status.error)
     return (
-      <Text size="xs" c="red">
+      <Text size="sm" c="red">
         {status.error.message}
       </Text>
     );
   const available = services.filter(({ kind }) => status.data?.services[kind]);
   return (
-    <Stack gap={6} component="section" aria-label="Service Status">
+    <Stack gap={0} component="section" aria-label="Service Status">
       {status.isPending && (
-        <Text size="xs" c="dimmed">
+        <Text size="sm" c="dimmed" lh="32px">
           Checking Services
         </Text>
       )}
@@ -152,18 +156,19 @@ export function ServiceHealthSummary() {
             justify="space-between"
             gap="xs"
             wrap="nowrap"
+            mih={32}
             aria-label={`${label}: ${healthLabel(service.state)}`}
           >
-            <Group gap={6} wrap="nowrap">
+            <Group gap="xs" wrap="nowrap">
               <CircleDot
                 size={12}
                 color={`var(--mantine-color-${healthColour(service.state)}-6)`}
               />
-              <Text size="xs">{label}</Text>
+              <Text size="sm">{label}</Text>
             </Group>
             <Group gap="xs" wrap="nowrap">
               <Text
-                size="xs"
+                size="sm"
                 c="dimmed"
                 title={service.state === "parked" ? service.reason : undefined}
               >
@@ -175,7 +180,7 @@ export function ServiceHealthSummary() {
         );
       })}
       {status.data && !available.length && (
-        <Text size="xs" c="dimmed">
+        <Text size="sm" c="dimmed" lh="32px">
           No Services
         </Text>
       )}

@@ -9,6 +9,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: var(--mantine-spacing-xs);
   min-height: 0;
   padding-bottom: calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
 }
@@ -18,14 +19,14 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: var(--mantine-spacing-md);
   touch-action: pan-y;
 }
-/* The status block sits above a link covering it; its own buttons (Start) stay on top. */
+/* The status block sits above a link covering it; its own buttons (Start) stay on top. Its
+   padding reaches out past the rows, so their text lines up with the heading and queue above. */
 .status {
   position: relative;
-  margin-top: var(--mantine-spacing-xs);
-  padding: var(--mantine-spacing-xs);
+  margin-inline: calc(-1 * var(--mantine-spacing-xs));
+  padding: 4px var(--mantine-spacing-xs);
   border-radius: var(--mantine-radius-md);
 }
 .status:has(.statusLink:hover) {
@@ -43,7 +44,8 @@
 .statusLink:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
 }
-/* The desktop dropdown bounds the list, leaving room for Empty Queue, above the service summary. */
+/* The desktop dropdown sizes the list to its rows (Empty Queue is one line), bounded above the
+   service summary, with even gaps around the divider. */
 .dropdown {
   display: flex;
   flex-direction: column;
@@ -51,6 +53,5 @@
 }
 .dropdown .list {
   flex: none;
-  min-height: 8rem;
   max-height: min(60dvh, 32rem);
 }
