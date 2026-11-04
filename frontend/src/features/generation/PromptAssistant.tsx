@@ -1,10 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionIcon, Button, Group, Loader, Menu, Stack, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, failure, request } from "../../api";
+import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import classes from "./PromptAssistant.module.css";
 
@@ -83,6 +95,10 @@ export function usePromptAssistant({
   onAsk?: () => void;
 }) {
   const status = useQuery(assistantQuery);
+  const phone = usePhone();
+  // Custom asks for its instruction first; the last one stays for the next time.
+  const [asking, setAsking] = useState(false);
+  const [instruction, setInstruction] = useState("");
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -164,7 +180,15 @@ export function usePromptAssistant({
   }
   const assistance = useMutation({
     mutationKey: ["prompt-assistance"],
-    mutationFn: async ({ action, preset }: { action: Action; preset?: string }) => {
+    mutationFn: async ({
+      action,
+      preset,
+      instruction,
+    }: {
+      action: Action;
+      preset?: string;
+      instruction?: string;
+    }) => {
       if (!profile || !input.prompt.trim())
         throw new Error("Write a prompt and choose a profile first.");
       const source = {
@@ -180,6 +204,7 @@ export function usePromptAssistant({
         body.loras = input.loras.filter((item) => item.enabled !== false).map((item) => item.name);
       if (action === "rewrite") {
         body.preset = preset;
+        if (instruction) body.instruction = instruction;
         body.stream = false;
         body.references = info?.vision
           ? await Promise.all(
@@ -256,13 +281,18 @@ export function usePromptAssistant({
   if (!info?.available || !profile || !info.presets.length)
     return { action: null, suggestions: null };
   const disabled = !input.prompt.trim();
-  const run = (action: Action, style?: string) => {
+  const run = (action: Action, style?: string, instruction?: string) => {
     if (style) setPresetId(style);
-    assistance.mutate({ action, preset: style });
+    assistance.mutate({ action, preset: style, instruction });
   };
+  // Styles A–Z, with Custom last.
+  const styles = [...info.presets].sort(
+    (a, b) =>
+      Number(a.id === "custom") - Number(b.id === "custom") || a.label.localeCompare(b.label),
+  );
   const working = assistance.variables && workingLabels[assistance.variables.action];
   // While it works the action spins; hovering or focusing it offers Stop.
-  const action = assistance.isPending ? (
+  const menu = assistance.isPending ? (
     <Tooltip label={`${working} Click to Stop.`}>
       <ActionIcon
         className={classes.working}
@@ -298,19 +328,20 @@ export function usePromptAssistant({
           <>
             <Menu.Label>Improve Prompt</Menu.Label>
             {/* Each style is a choice that runs at once; the last one used carries a check. */}
-            {[...info.presets]
-              .sort((a, b) => a.label.localeCompare(b.label))
-              .map((item) => (
+            {styles.map((item) => {
+              const label = item.id === "custom" ? `${item.label}…` : item.label;
+              return (
                 <Menu.Item
                   key={item.id}
                   disabled={disabled}
-                  aria-label={`Improve Prompt: ${item.label}`}
+                  aria-label={`Improve Prompt: ${label}`}
                   rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
-                  onClick={() => run("rewrite", item.id)}
+                  onClick={() => (item.id === "custom" ? setAsking(true) : run("rewrite", item.id))}
                 >
-                  {item.label}
+                  {label}
                 </Menu.Item>
-              ))}
+              );
+            })}
             {(negativeOffered || lorasOffered) && <Menu.Divider />}
           </>
         ) : (
@@ -335,6 +366,45 @@ export function usePromptAssistant({
         )}
       </Menu.Dropdown>
     </Menu>
+  );
+  const action = (
+    <>
+      {menu}
+      <Modal
+        opened={asking}
+        onClose={() => setAsking(false)}
+        title="Custom Improvement"
+        centered
+        size="sm"
+        fullScreen={phone}
+      >
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!instruction.trim()) return;
+            setAsking(false);
+            run("rewrite", "custom", instruction.trim());
+          }}
+        >
+          <Stack>
+            <TextBox
+              label="Instruction"
+              placeholder="How should the prompt change?"
+              autosize
+              minRows={3}
+              data-autofocus
+              value={instruction}
+              onChange={setInstruction}
+            />
+            <Group justify="flex-end">
+              <Button type="submit" disabled={!instruction.trim()}>
+                Improve Prompt
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+    </>
   );
   const list = suggestions.length ? (
     <Stack gap="xs">

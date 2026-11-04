@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// The prompt assistant's rewrite presets, sorted by label as its menu lists them. Each is an
-// instruction block added after the profile's guide; a guide may replace one with its own
-// `presets.<id>` text. Spicy runs on the separate, uncensored model an administrator chooses, and
-// only for accounts with Uncensored Models.
+// The prompt assistant's rewrite presets, sorted by label as its menu lists them, with Custom last.
+// Each is an instruction block added after the profile's guide; a guide may replace one with its own
+// `presets.<id>` text. Spicy, and explicit wording in a Custom instruction, are only for accounts
+// with Uncensored Models.
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 export const assistantPresets = Object.freeze([
@@ -18,7 +18,7 @@ export const assistantPresets = Object.freeze([
     label: "Cinematic",
     description: "A film still: framing, grade and mood.",
     instruction:
-      "Cinematic: write it as a still from a film. Name the framing and camera angle, dramatic motivated light, the colour grade and the atmosphere, as a cinematographer would.",
+      "Cinematic: write it as a still from a film, a moment caught mid-story. Name the framing and camera angle, dramatic motivated light, the colour grade and the atmosphere, as a cinematographer would.",
   },
   {
     id: "concise",
@@ -32,7 +32,7 @@ export const assistantPresets = Object.freeze([
     label: "Enhance",
     description: "Richer detail in the guide’s own style.",
     instruction:
-      "Enhance: make the prompt clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
+      "Enhance: keep the prompt’s own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
   {
     id: "illustration",
@@ -42,18 +42,18 @@ export const assistantPresets = Object.freeze([
       "Illustration: make it artwork, not a photograph. Use the medium the prompt names, or choose one that suits the subject (such as watercolour, ink, gouache, flat vector, cel-shaded animation or oil paint), and describe its linework, palette, texture and composition. No camera, lens or photographic words.",
   },
   {
+    id: "photographic",
+    label: "Photographic",
+    description: "A polished photograph: lens, light and composition.",
+    instruction:
+      "Photographic: make it a polished, professional photograph of whatever the subject is. Name the kind of shot and a plausible camera and lens (such as a wide-angle landscape, a macro close-up or a 50mm street scene), deliberate light and its direction, a considered composition and crisp, true-to-life materials and textures. No painterly, illustrated or film-still words.",
+  },
+  {
     id: "portrait",
     label: "Portrait",
     description: "A person in focus: face, expression and light.",
     instruction:
       "Portrait: make the person the clear focus of a portrait photograph. Describe the face, expression, hair and clothing specifically, the pose and where they look, flattering light and its direction, a portrait lens with shallow depth of field and a simple background that suits them. Keep real skin texture.",
-  },
-  {
-    id: "product",
-    label: "Product",
-    description: "A clean studio shot of an object or dish.",
-    instruction:
-      "Product: write it as a clean commercial studio shot of the main object. Name its materials, finish and fine details, a simple surface or backdrop that suits it, controlled studio light (soft key, rim light, gentle reflections) and a clear camera angle, with the whole object sharp and nothing distracting around it.",
   },
   {
     id: "spicy",
@@ -63,9 +63,20 @@ export const assistantPresets = Object.freeze([
     instruction:
       "Spicy: make the scene sensual and explicit where the request allows it, with frank, specific wording about bodies, clothing and poses. Every person is an adult. Keep the request’s subjects and setting.",
   },
+  {
+    id: "custom",
+    label: "Custom",
+    description: "Your own instruction.",
+    custom: true,
+    instruction:
+      "Custom: apply the person’s instruction below in full. Where it changes a subject, detail or style, it overrides keeping them; keep everything else as asked.",
+  },
 ]);
 
 export const defaultPreset = "enhance";
+
+// A Custom instruction's length limit.
+export const maxInstructionCharacters = 500;
 
 export function assistantPreset(id) {
   return assistantPresets.find((preset) => preset.id === id) || null;

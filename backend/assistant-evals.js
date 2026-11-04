@@ -4,7 +4,8 @@
  * CI replays the recorded replies through the engine (assistant-evals.test.js); `mise run
  * eval:assistant` replays the same cases against the live gateway on demand (backend/commands/assistant-eval.mjs).
  *
- *   rewrite.json   prompts per preset: subjects and quoted text kept, no setting words, preset tone
+ *   rewrite.json   prompts per preset (Custom with its instruction): subjects and quoted text kept,
+ *                  no setting words, preset tone
  *   loras.json     prompts against a frozen catalogue snapshot: expected and forbidden LoRAs
  *   negative.json  negatives: unused where the guide says so, wanted terms, no prompt subjects
  *   animate.json   motion prompts per profile shape: the guide's sections or none, camera, sound
@@ -64,8 +65,8 @@ const tones = {
     "painted",
     "linework",
   ],
+  photographic: ["photograph", "lens", "mm", "macro", "wide-angle", "aperture", "f/"],
   portrait: ["portrait", "close-up", "face", "expression", "eyes", "lens", "depth of field"],
-  product: ["product", "studio", "backdrop", "softbox", "key light", "rim light", "surface"],
   spicy: ["sensual", "sultry", "bare", "intimate", "lingerie", "seductive", "skin"],
 };
 
@@ -281,6 +282,8 @@ export async function runEvals({
       guide: item.guide || null,
       prompt: item.prompt,
       preset: item.preset || "enhance",
+      instruction: item.instruction,
+      explicit: item.explicit === true,
       stack: item.stack || [],
     });
     results.rewrite.push({

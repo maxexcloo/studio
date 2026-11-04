@@ -151,7 +151,16 @@ test("the assistant is for every account, and only for profiles the account may 
       true,
       false,
       false,
-      ["candid", "cinematic", "concise", "enhance", "illustration", "portrait", "product"],
+      [
+        "candid",
+        "cinematic",
+        "concise",
+        "enhance",
+        "illustration",
+        "photographic",
+        "portrait",
+        "custom",
+      ],
     ],
   );
   assert.equal(
@@ -235,6 +244,20 @@ test("Spicy needs Uncensored Models, whatever the profile, and runs on the assis
   );
   assert.equal(spicy.status, 200, "an unmarked profile is fine with Uncensored Models");
   assert.equal(calls.at(-1).model, "cloud/auto");
+});
+
+test("Custom needs an instruction and keeps it non-explicit without Uncensored Models", async () => {
+  const custom = (account, instruction) =>
+    post(
+      "/api/assistant/rewrite",
+      { profileId: plain.id, prompt: "a couple", preset: "custom", instruction },
+      account,
+    );
+  assert.equal((await custom("user", "")).status, 400);
+  assert.equal((await custom("user", "make it explicit")).status, 200);
+  assert.match(calls.at(-1).messages[0].content, /Don't make it any more sexual/);
+  assert.equal((await custom("spicy", "make it explicit")).status, 200);
+  assert.match(calls.at(-1).messages[0].content, /Every person is an adult\.$/);
 });
 
 test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; drafts are for administrators", async () => {
