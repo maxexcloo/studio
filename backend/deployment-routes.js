@@ -98,9 +98,7 @@ export function registerDeploymentRoutes(
       }
       res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
     } catch (error) {
-      res
-        .status(error.message.includes("deployment configuration") ? 409 : 400)
-        .json({ ok: false, error: error.message });
+      res.status(error.status || 400).json({ ok: false, error: error.message });
     }
   });
 }
