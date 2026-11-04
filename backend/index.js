@@ -676,13 +676,15 @@ const textBusy = () =>
       )
       .get(),
   );
+/** Whether what the owner is offered may be worded explicitly. */
+const explicitFor = (ownerId) =>
+  explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
 // Suggestions (domain/suggestions.ts): composer ideas, viewer next steps and Chat context from taste.
 const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
   online: textOnline,
-  explicit: (ownerId) =>
-    explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId)),
+  explicit: explicitFor,
   item: (ownerId, jobId) =>
     filterVisibleGallery(
       gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
@@ -866,6 +868,7 @@ const suggester = createPromptSuggester({
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
+  explicit: explicitFor,
 });
 // Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
 const nextSteps = createNextStepWork({

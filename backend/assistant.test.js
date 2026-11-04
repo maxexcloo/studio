@@ -11,8 +11,8 @@ import {
   readServerSentEvents,
   stripThinking,
   validDraftGuide,
-  writerGuide,
 } from "./assistant.js";
+import { writerGuide } from "./domain/writing-standard.ts";
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 const gateway = (extra = {}) => ({
@@ -107,17 +107,25 @@ test("gateway settings are all or nothing and name an OpenAI-compatible endpoint
     assert.equal(gatewaySettings(at(url)).endpoint, endpoint);
 });
 
-test("the writer guide drops sources, review dates and sampling at every level", () => {
+test("the writer guide drops sources, review dates, sampling and operator notes at every level", () => {
   const guide = JSON.parse(
     writerGuide({
       summary: "S",
       sources: ["x"],
       reviewed_on: "d",
       sampling: { steps: 8 },
-      mode: { id: "m", rules: ["R"], sources: ["y"] },
+      operator: ["Run it at 8 steps."],
+      mode: {
+        id: "m",
+        rules: ["R", "Turbo uses 8 steps and CFG 1 with Euler.", "At CFG 1 describe the result."],
+        sources: ["y"],
+      },
     }),
   );
-  assert.deepEqual(guide, { summary: "S", mode: { id: "m", rules: ["R"] } });
+  assert.deepEqual(guide, {
+    summary: "S",
+    mode: { id: "m", rules: ["R", "At CFG 1 describe the result."] },
+  });
 });
 
 test("think blocks are stripped from whole replies and from streams split anywhere", () => {
@@ -207,7 +215,7 @@ test("a gateway that does not stream hands over the whole reply; a guide may ove
     onDelta: (text) => deltas.push(text),
   });
   assert.deepEqual([deltas, result.prompt], [["Short cabin."], "Short cabin."]);
-  assert.match(calls[0].body.messages[0].content, /Style: House concise rule\.$/);
+  assert.match(calls[0].body.messages[0].content, /\nStyle: House concise rule\.\n/);
 });
 
 test("chat streams reasoning_content and <think> blocks as thinking, apart from the reply", async () => {
@@ -393,7 +401,7 @@ test("Custom follows its instruction, and only Uncensored Models lift the explic
   });
   assert.match(
     seen.calls.at(-1).body.messages[0].content,
-    /"make it summer"\nEvery person is an adult\.$/,
+    /"make it summer"\nEvery person in it is an adult\. Explicit/,
   );
 });
 

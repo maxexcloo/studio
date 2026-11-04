@@ -16,6 +16,7 @@ export interface PromptDescriber {
     images: ModelImage[];
     hint: string;
     title?: string;
+    explicit?: boolean;
     signal?: AbortSignal;
   }): Promise<{ available: boolean; reason?: string; prompt?: string }>;
 }
@@ -38,6 +39,8 @@ export function createPromptSuggester(options: {
   /** A small (≤512 px) copy of the picture, or null when there is none. */
   image(item: SuggestedPromptItem): Promise<ModelImage | null>;
   save(item: SuggestedPromptItem, prompt: string): void;
+  /** Whether the owner's prompts may be worded explicitly (account-policy.js `explicitWording`). */
+  explicit?(ownerId: string): boolean;
   now?: () => number;
   log?: { info(message: string): void };
 }) {
@@ -65,6 +68,7 @@ export function createPromptSuggester(options: {
         images: image ? [image] : [],
         hint: item.caption?.text || "",
         title: item.source?.title || "",
+        explicit: options.explicit?.(item.ownerId || "") ?? false,
         signal,
       });
       if (signal.aborted) return;

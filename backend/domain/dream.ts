@@ -12,6 +12,7 @@ import type { DomainResponse, GenerationAccount, GenerationScope } from "./admis
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
 import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
 import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
+import { contentRule, writerGuide } from "./writing-standard.ts";
 
 /** One account's Dream settings. Dream is off until the person turns it on. */
 export interface DreamSettings {
@@ -307,29 +308,13 @@ function overlap(a: Set<string>, b: Set<string>) {
 /** A short subject for an idea: its title, else its opening words. */
 const subjectOf = (title: unknown, prompt: unknown) =>
   clean(title, 80) || clean(prompt, 400).split(" ").slice(0, 6).join(" ");
-const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
-/** The prompting guide without provenance or sampling notes, as compact JSON (as assistant.js `writerGuide`). */
-function writerGuide(guide: unknown): string {
-  const prune = (value: unknown): unknown =>
-    Array.isArray(value)
-      ? value.map(prune)
-      : value && typeof value === "object"
-        ? Object.fromEntries(
-            Object.entries(value)
-              .filter(([key]) => !omittedGuideKeys.has(key))
-              .map(([key, item]) => [key, prune(item)]),
-          )
-        : value;
-  return guide && typeof guide === "object" ? JSON.stringify(prune(guide)) : "";
-}
 const loraLabel = (name: string) =>
   name
     .split(/[\\/]/)
     .pop()!
     .replace(/\.safetensors$/i, "");
 const roundTo = (value: number, step: number) => Math.round(value / step) * step;
-const spicyTheme =
-  "Spicy: sensual, explicit content where it suits the scene, with frank, specific wording about bodies. Every person is an adult.";
+const spicyTheme = "Spicy: sensual, explicit content where it suits the scene.";
 
 const dreamJob = (job: OwnedJob) => job.priority === queuePriority.dream;
 const waiting = (job: OwnedJob) => ["writing", "queued", "waiting"].includes(job.status);
@@ -654,6 +639,7 @@ export function createDream(options: {
                 ? []
                 : [direction()]),
             spicy ? `Theme: ${spicyTheme}` : "Keep it safe for work.",
+            contentRule(Boolean(spicy)),
             'Reply with JSON only: {"prompt": "<the prompt>", "why": "<at most 15 words on which of their tastes it draws on>", "title": "<a Title Case title of two to five words naming its subject>"}.',
             guide,
           ].join("\n"),

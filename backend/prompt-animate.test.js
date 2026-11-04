@@ -42,7 +42,9 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
   assert.doesNotMatch(silent, /dialogue with who says it/);
   assert.match(silent, /three beats that fill the 5-second, 16 fps clip/);
   assert.match(silent, /At 16 fps fast motion judders/);
-  assert.match(silent, /never add people, animals or objects that aren't in it/);
+  assert.match(silent, /never add subjects or objects/);
+  assert.match(silent, /Don't make it any more sexual/);
+  assert.match(silent, /Let the light or mood shift/);
   assert.match(silent, /Animate what that prompt was going for/);
   const extend = animateInstructions({ ...shapes.grok, writing: { ...writing, extend: true } });
   assert.match(extend, /Don't replay its action: escalate it or turn it/);
@@ -57,8 +59,13 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("cinematic"), /the camera move carries the shot.*composition invites/);
   assert.match(theme("living"), /camera stays still/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
-  assert.match(theme("spicy"), /already in the frame.*Every person is an adult/);
+  assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it is an adult/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
+  // A Living Photo loops, so its light stays as it is.
+  assert.doesNotMatch(
+    animateInstructions({ ...shapes.grok, writing: { theme: "living" } }),
+    /Let the light or mood shift/,
+  );
 });
 
 test("the clip's length and frame rate come from the control the profile runs on", () => {
