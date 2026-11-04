@@ -196,59 +196,6 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("Details asks for a change under the item's prompt, as the viewer's field does", async ({
-  page,
-}, testInfo) => {
-  const asked: any[] = [];
-  const { state, viewer } = await seed(page, {}, (page) =>
-    page.route("**/api/suggestions", (route) => {
-      const body = route.request().postDataJSON();
-      if (body.surface !== "change") return route.fallback();
-      asked.push(body);
-      return route.fulfill({
-        json: {
-          suggestions: [
-            { action: "edit", label: "Night", request: body.request, prompt: "A night bird" },
-          ],
-        },
-      });
-    }),
-  );
-  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
-  if (testInfo.project.use.isMobile) {
-    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
-  }
-  const ask = details.getByRole("button", { name: "Ask for a Change", exact: true });
-  await ask.click();
-  const request = details.getByRole("textbox", { name: "Change", exact: true });
-  await request.fill("make it night");
-  await ask.click();
-  // The proposal takes the prompt's place; Undo brings the prompt and the request back.
-  await expect(details.getByText("A night bird", { exact: true })).toBeVisible();
-  await expect(details.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
-  expect(asked).toEqual([
-    {
-      surface: "change",
-      jobId: "job-hub",
-      request: "make it night",
-      actions: ["edit", "recreate", "animate", "upscale"],
-    },
-  ]);
-  await details.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(details.getByText("A night bird", { exact: true })).toHaveCount(0);
-  await expect(request).toHaveValue("make it night");
-  await request.press("Enter");
-  await details.getByRole("button", { name: "Run", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(2);
-  expect(state.jobs[1]).toMatchObject({
-    operation: "refine",
-    parentItemId: "hub",
-    input: { prompt: "A night bird" },
-  });
-  await expect(details.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
-});
-
 test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
   page,
 }) => {

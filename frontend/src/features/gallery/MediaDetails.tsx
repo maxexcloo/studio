@@ -23,14 +23,6 @@ import { WritingThinking } from "../generation/PromptWriting";
 import { referenceLabel } from "../generation/references";
 import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
-import {
-  AskButton,
-  ChangeRequest,
-  ProposalControls,
-  proposalText,
-  proposedClass,
-} from "../generation/AskChange";
-import { useItemChange, type ChangeContext } from "./useItemChange";
 
 const fileStem = (name: unknown) =>
   String(name || "")
@@ -190,20 +182,16 @@ export function useSettingsText(item: MediaItem) {
 function PromptText({
   dimmed,
   clamped,
-  proposed,
   children,
 }: {
   dimmed?: boolean;
   clamped?: boolean;
-  /** Holds a proposed change, tinted until it runs or is undone. */
-  proposed?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className={classes.promptText}>
       <ScrollArea.Autosize mah="12rem">
         <Text
-          className={proposed ? proposedClass : undefined}
           size="sm"
           c={dimmed ? "dimmed" : undefined}
           lineClamp={clamped ? 2 : undefined}
@@ -299,36 +287,11 @@ function Caption({ item }: { item: MediaItem }) {
   );
 }
 
-/**
- * Details › Prompt. Its Ask opens a request line under the prompt and asks as the viewer's field
- * does; the proposal takes the prompt's place, tinted, until Run runs it or Undo brings the
- * request back.
- */
-function DetailsPrompt({ item, actions }: { item: MediaItem; actions: ChangeContext }) {
-  const ask = useItemChange<null>(item, actions);
-  const proposal = ask.proposal;
+/** Details › Prompt, with the prompt's thinking and any negative prompt. */
+function DetailsPrompt({ item }: { item: MediaItem }) {
   return (
-    <DetailSection
-      title="Prompt"
-      action={
-        ask.available &&
-        ask.request === null &&
-        !proposal && <AskButton onClick={() => ask.setRequest("")} />
-      }
-    >
-      <PromptText proposed={Boolean(proposal)}>
-        {proposal ? proposalText(proposal) : item.prompt || "No prompt recorded."}
-      </PromptText>
-      <ChangeRequest ask={ask} onSend={() => ask.send(ask.request!, null)} />
-      {proposal && (
-        <Group gap="xs">
-          <ProposalControls
-            proposal={proposal}
-            onUndo={ask.undo}
-            run={{ label: "Run", disabled: false, onSubmit: () => ask.run(proposal.prompt) }}
-          />
-        </Group>
-      )}
+    <DetailSection title="Prompt">
+      <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
       <WritingThinking writing={item.writing} />
       {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
     </DetailSection>
@@ -404,17 +367,14 @@ function Related({
 
 /**
  * Details › Prompt, Caption, Source, From, Derived, Model, LoRAs, References, Settings, Output and Timing
- * for one result; `open` shows a related result in the viewer, and `actions` carry out a change
- * asked for under its prompt.
+ * for one result; `open` shows a related result in the viewer.
  */
 export function MediaDetails({
   item,
   open,
-  actions,
 }: {
   item: MediaItem;
   open?: (item: MediaItem) => void;
-  actions: ChangeContext;
 }) {
   const related = useDerivations(item);
   const url = item.status === "done" ? mediaSource(item).url : "";
@@ -424,7 +384,7 @@ export function MediaDetails({
   const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
-      <DetailsPrompt key={item.id} item={item} actions={actions} />
+      <DetailsPrompt item={item} />
       <Caption item={item} />
       {item.source && (
         <DetailSection title="Source">

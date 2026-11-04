@@ -6,13 +6,13 @@ import { findAction, type ActionGroups } from "./ActionBar";
 import type { Iteration } from "./useMediaAction";
 
 /** What carries out an item's change: its current actions, whose Upscale it may run, and runs. */
-export interface ChangeContext {
+interface ChangeContext {
   groups: () => ActionGroups;
   iterate: (iteration: Iteration) => void;
 }
 
 /**
- * Ask for a Change on a finished item, as the viewer's field and Details offer it: an image edits,
+ * Ask for a Change on a finished item, as the viewer's field offers it: an image edits,
  * recreates or animates, a video animates again, and either upscales where its actions can.
  * `run` carries out the proposal with its (perhaps edited) prompt.
  */
