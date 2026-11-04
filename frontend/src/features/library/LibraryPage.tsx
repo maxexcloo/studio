@@ -1,11 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Alert, SimpleGrid } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router";
 import { api, post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { WorkspaceSections } from "../../ui/WorkspaceSections";
+import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
 import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
@@ -23,9 +22,7 @@ export function LibraryPage() {
   const { profiles } = useGenerationActions();
   const [editing, setEditing] = useState<LibraryItem | null>(null);
   const client = useQueryClient();
-  const { hash } = useLocation();
-  const activeSection =
-    options.find((section) => `#${section.value}` === hash)?.value || options[0].value;
+  const { active: activeSection } = useWorkspaceSection(options);
   const catalogueActive = ["models", "loras"].includes(activeSection);
   const catalogue = useQuery({
     queryKey: ["library"],

@@ -306,6 +306,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Actions for Imported Checkpoint", exact: true }).click();
   await page.getByRole("menuitem", { name: "Review Import", exact: true }).click();
   const button = page.getByRole("button", { name: "Draft Profile", exact: true });
@@ -347,6 +348,7 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Clear Failed", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Clear Failed Imports?" })
@@ -370,6 +372,7 @@ test("A Reddit link in Library › Import adds the post's images to Uploads", as
   });
   await page.goto("/images");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit URL" });
   await link.fill("https://www.reddit.com/r/birds/comments/abc/birds/");
   await page.getByRole("button", { name: "Import", exact: true }).click();
@@ -508,6 +511,7 @@ test("Library shows import grades and reuses compatible inspiration settings", a
   if (await close.isVisible()) await close.click();
   else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
   await openNav(page, "Library");
+  await section(page, "Library", "Imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
   await section(page, "Library", "Inspiration");
