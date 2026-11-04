@@ -348,11 +348,15 @@ function LoraControls({
         : tab === "favourites"
           ? "No Favourites"
           : "No LoRAs";
-  const choices = info.isPending ? (
-    <LoadingState label="Loading LoRAs" />
+  // Loading and empty states take the scroll pane's place, centred in its space.
+  const state = info.isPending ? (
+    <LoadingState fill label="Loading LoRAs" />
   ) : info.error ? (
     <Alert color="red">{info.error.message}</Alert>
-  ) : shown.length ? (
+  ) : (
+    !shown.length && <EmptyState fill>{empty}</EmptyState>
+  );
+  const choices = shown.length > 0 && (
     // A list on every breakpoint, so names, families and types scan down one column; clicking a
     // row adds or removes its LoRA, and the thumbs beside it rate without toggling it.
     <PickerGrid label="LoRA Choices" rows>
@@ -380,8 +384,6 @@ function LoraControls({
         />
       ))}
     </PickerGrid>
-  ) : (
-    <EmptyState fill>{empty}</EmptyState>
   );
   const header = (
     <PickerHeader
@@ -510,9 +512,13 @@ function LoraControls({
     return (
       <>
         {header}
-        <ScrollArea h="45dvh" offsetScrollbars="present">
-          {choices}
-        </ScrollArea>
+        {state ? (
+          <Stack h="45dvh">{state}</Stack>
+        ) : (
+          <ScrollArea h="45dvh" offsetScrollbars="present">
+            {choices}
+          </ScrollArea>
+        )}
         <Stack gap="xs">{stack}</Stack>
         {footer}
       </>
@@ -522,9 +528,11 @@ function LoraControls({
       <div className={classes.panel}>
         <div className={classes.column}>
           {header}
-          <ScrollArea flex={1} offsetScrollbars="present">
-            {choices}
-          </ScrollArea>
+          {state || (
+            <ScrollArea flex={1} offsetScrollbars="present">
+              {choices}
+            </ScrollArea>
+          )}
         </div>
         <ScrollArea
           className={`${classes.column} ${classes.stackColumn}`}

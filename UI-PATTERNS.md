@@ -174,6 +174,9 @@ primary component reference and verify APIs against the installed version.
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
   the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.
+  Both centre horizontally and vertically in the space they take: where the
+  container has a height (a picker's pane, a page) they take its place with
+  `fill` rather than sitting at the top of a scroll area.
   Loading and failure remain distinct states.
 
 ## Generation & Conversation
