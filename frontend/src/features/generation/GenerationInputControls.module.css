@@ -24,6 +24,11 @@
   padding-inline: 0;
 }
 
+/* With no padding, Mantine's shrinkable label would squeeze the icon to nothing. */
+.iconChip svg {
+  flex: none;
+}
+
 /* Sized so Profile shares its row on phones and the desktop rail fits one row. */
 .label {
   display: block;
