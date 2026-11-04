@@ -572,7 +572,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await expect(aspect).toHaveText("16:9 · 2K");
   await page.getByRole("combobox", { name: "Count", exact: true }).click();
   await page.getByRole("option", { name: "2 Images", exact: true }).click();
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await page.getByRole("button", { name: "Generate Images", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({
     operation: "image",
