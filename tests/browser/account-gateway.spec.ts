@@ -182,10 +182,12 @@ test("Signed out with single sign-on goes straight to it, and a failed return sh
   let starts = 0;
   await page.route("**/api/accounts/oidc/start", (route) => {
     starts++;
-    // The first attempt fails at the provider; the second returns without a session.
+    // The first attempt fails at the provider; the second returns without a session. WebKit can't
+    // fulfil a redirect, so a page sends the browser back as the provider's redirect would.
+    const back = starts === 1 ? "/?sign-in=failed" : "/";
     return route.fulfill({
-      status: 302,
-      headers: { location: starts === 1 ? "/?sign-in=failed" : "/" },
+      contentType: "text/html",
+      body: `<script>location.replace(${JSON.stringify(back)})</script>`,
     });
   });
   await page.goto("/");
