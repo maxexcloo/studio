@@ -120,6 +120,21 @@ if PromptServer is not None and getattr(PromptServer, "instance", None) is not N
                         models.remove, *args, str(body.get("sha256", ""))
                     )
                 }
+            elif action == "cancel":
+                models.cancel_fetch(*args)
+                result = {}
+            elif action == "fetch":
+                result = await asyncio.to_thread(
+                    models.start_fetch,
+                    *args,
+                    str(body.get("repo", "")),
+                    str(body.get("revision", "")),
+                    str(body.get("path", "")),
+                    int(body.get("size", 0)),
+                    str(body.get("sha256", "")),
+                    body.get("note") if isinstance(body.get("note"), dict) else {},
+                    str(body.get("token", "")),
+                )
             elif action in {"stat", "hash"}:
                 result = await asyncio.to_thread(models.state, *args, action == "hash")
             else:

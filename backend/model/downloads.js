@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { comfyUrl } from "../comfy/comfy.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
-import { hfFetch as fetch } from "../hf-access.js";
+import { hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
 import { civitaiFetch } from "../civitai/access.js";
 
 /**
@@ -333,6 +333,8 @@ async function fetchIntoWorker(entry, signal) {
     entry.already = true;
     return;
   }
+  const hub = hubFile(entry.url);
+  if (hub && !hfMirrored()) return fetchOnWorker(entry, hub, source, signal);
   const bound = saved.note?.source === source && saved.note?.sha256 === entry.sha256.toLowerCase();
   let offset = bound ? saved.partialBytes || 0 : 0;
   const note = saved.note || {};
@@ -399,4 +401,50 @@ async function fetchIntoWorker(entry, signal) {
   });
   entry.receivedBytes = result.size;
   entry.totalBytes = result.size;
+}
+
+/** The repo, revision and path of a pinned huggingface.co/<owner>/<repo>/resolve/<revision>/<path> address. */
+function hubFile(value) {
+  const url = new URL(value);
+  if (url.hostname !== "huggingface.co") return null;
+  const [owner, repo, operation, revision, ...path] = url.pathname
+    .split("/")
+    .filter(Boolean)
+    .map(decodeURIComponent);
+  if (operation !== "resolve" || !revision || !path.length) return null;
+  return { repo: `${owner}/${repo}`, revision, path: path.join("/") };
+}
+
+/**
+ * Hugging Face files download on the worker itself (huggingface_hub with hf_xet), far faster than
+ * streaming them through Studio. Studio starts it, then follows the worker's progress; asking again
+ * for a transfer the worker is already running just rejoins it, as after a Studio restart.
+ */
+async function fetchOnWorker(entry, hub, source, signal) {
+  await workerModelFile(entry, "fetch", {
+    ...hub,
+    size: Number(entry.totalBytes || 0),
+    token: hfTokenValue(),
+    note: { source, id: entry.id, label: entry.label },
+  });
+  const stop = () => workerModelFile(entry, "cancel").catch(() => {});
+  signal.addEventListener("abort", stop, { once: true });
+  let last = { at: Date.now(), bytes: entry.receivedBytes };
+  try {
+    for (;;) {
+      await wait(1000, signal);
+      const state = await workerModelFile(entry);
+      entry.receivedBytes = Math.max(state.partialBytes || 0, state.size || 0);
+      const now = Date.now();
+      entry.bytesPerSecond = ((entry.receivedBytes - last.bytes) * 1000) / (now - last.at);
+      last = { at: now, bytes: entry.receivedBytes };
+      if (state.size > 0) break;
+      if (state.error) throw finalError(state.error);
+      if (!state.fetching) throw new Error("The worker stopped downloading. Try again to resume.");
+    }
+  } finally {
+    signal.removeEventListener("abort", stop);
+  }
+  entry.totalBytes = entry.receivedBytes;
+  await refreshWorkerModels({ force: true, workerUrl: entry.workerUrl });
 }

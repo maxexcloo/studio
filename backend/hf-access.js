@@ -27,6 +27,16 @@ function hfToken(env = process.env) {
   return { token: "", source: "", key: "" };
 }
 
+/** The credential for the worker's own Hugging Face download, or "". */
+export function hfTokenValue(env = process.env) {
+  return hfToken(env).token;
+}
+
+/** Whether downloads go to a mirror instead of huggingface.co. */
+export function hfMirrored(env = process.env) {
+  return Boolean(hfEndpoint(env));
+}
+
 /** Whether a token is set, where from and under which name, never the token itself. */
 export function hfTokenStatus(env = process.env) {
   const { token, source, key } = hfToken(env);

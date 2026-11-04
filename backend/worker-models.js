@@ -54,7 +54,7 @@ export async function refreshWorkerModels({ force = false, workerUrl = libraryUr
   return cached;
 }
 
-export async function workerModelFile(spec, action = "stat") {
+export async function workerModelFile(spec, action = "stat", extra = {}) {
   return request(
     "/file",
     {
@@ -64,6 +64,7 @@ export async function workerModelFile(spec, action = "stat") {
         folder: spec.folder,
         file: spec.file,
         sha256: spec.sha256 || "",
+        ...extra,
         action,
       }),
     },
