@@ -185,10 +185,10 @@ export function TextBox({
       {column ? (
         <div className={classes.columned}>
           {textarea}
-          <Stack gap={4} className={classes.tools}>
+          <div className={classes.tools}>
             {rightSection}
             {actions}
-          </Stack>
+          </div>
         </div>
       ) : (
         textarea

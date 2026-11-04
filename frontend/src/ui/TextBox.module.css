@@ -48,7 +48,7 @@
   padding-top: var(--mantine-spacing-xs);
 }
 
-/* A multi-row box's tools stand in one column beside it, and the text fills its full height. */
+/* A multi-row box's tools stand in a two-column grid beside it, and the text fills its full height. */
 .columned {
   display: flex;
   gap: var(--mantine-spacing-xs);
@@ -68,4 +68,8 @@
 
 .tools {
   flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  align-content: start;
+  gap: 4px;
 }
