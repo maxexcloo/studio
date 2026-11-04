@@ -104,51 +104,63 @@ test("An idea chip fills the empty Chat message with a request to create it", as
   expect(state.chatRequests).toHaveLength(0);
 });
 
-test("Viewer next steps load in place, a step generates its change and More asks for others", async ({
+test("Viewer Suggestions load in the menu, Refresh replaces them and Custom… hands over the field", async ({
   page,
 }) => {
-  const state = await openViewer(page);
+  await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
-  let release = () => {};
-  const held = new Promise<void>((resolve) => (release = resolve));
+  // The first answer and the refreshed one each wait to be released, so loading shows.
+  const release: (() => void)[] = [];
+  const held = [0, 1].map(() => new Promise<void>((resolve) => release.push(resolve)));
   await page.route("**/api/suggestions", async (route) => {
     const body = route.request().postDataJSON();
     asked.push(body);
-    if (!body.fresh) await held;
+    await held[body.fresh ? 1 : 0];
     return route.fulfill({ json: { suggestions: body.fresh ? others : steps } });
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const row = viewer.getByRole("group", { name: "Next Steps" });
-  await expect(row).toHaveAttribute("aria-busy", "true");
-  release();
-  await expect(row).not.toHaveAttribute("aria-busy");
-  const more = row.getByRole("button", { name: "More Next Steps", exact: true });
-  await expect(row.getByRole("button")).toHaveText([...steps.map((step) => step.label), ""]);
-  expect(asked).toContainEqual({ surface: "viewer", jobId: "job-hub", fresh: false });
-  await row.getByRole("button", { name: "Warmer Light" }).click();
-  await expect.poll(() => state.jobs.length).toBe(2);
-  expect(state.jobs[1]).toMatchObject({
-    parentJobId: "job-hub",
-    input: { prompt: "An amber bird, warm light" },
-  });
-  await more.click();
-  await expect(row.getByRole("button", { name: "Snowfall" })).toBeVisible();
+  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
+  const menu = page.getByRole("menu");
+  const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
+  await expect(thinking).toBeVisible();
+  release[0]();
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    ...steps.map((step) => step.label),
+    "Refresh",
+    "Custom…",
+  ]);
+  expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
+  await menu.getByRole("menuitem", { name: "Refresh", exact: true }).click();
+  await expect(thinking).toBeVisible();
+  release[1]();
+  await expect(menu.getByRole("menuitem")).toHaveText(["Snowfall", "Refresh", "Custom…"]);
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
+  // Custom… selects the prompt for a change typed over it; phones open the editor for it.
+  await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  await expect(menu).toBeHidden();
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  if (page.viewportSize()!.width >= 768) {
+    await expect(field).toBeFocused();
+    await page.keyboard.type("make it night");
+    await expect(field).toHaveValue("make it night");
+  } else await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
 });
 
-test("No ideas or next steps show when Studio has none", async ({ page }) => {
+test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await openViewer(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(
-    viewer.getByRole("group", { name: "Generation Actions", exact: true }),
-  ).toBeVisible();
-  await expect(viewer.getByRole("group", { name: "Next Steps" })).toHaveCount(0);
+  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
   await create(page);
   await Promise.all([
     page.waitForResponse("**/api/suggestions"),

@@ -638,15 +638,11 @@ export function MediaViewer({
             </div>
             <MediaViewerDock
               item={displayed}
-              neighbour={canNavigate ? viewable[currentIndex + 1] : undefined}
               family={family}
               choose={(next) => {
                 setCompare(false);
                 navigate?.(next);
               }}
-              iterate={iterate}
-              pending={pending}
-              steps={!actions}
               actions={
                 actions ? (
                   <ActionBarSurface

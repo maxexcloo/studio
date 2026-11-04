@@ -1,22 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Image,
-  Loader,
-  ScrollArea,
-  Skeleton,
-  Tooltip,
-  UnstyledButton,
-} from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
+import { Play } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
-import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery } from "../generation/Queue";
-import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import type { Iteration } from "./useMediaAction";
 import { derivation, versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -69,111 +56,18 @@ export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
   }, [jobs, item, extra]);
 }
 
-/** Whether the viewer offers next steps for this item: a finished image, with the prompt assistant. */
-const steppable = (item: MediaItem | undefined, assistant: boolean): item is MediaItem =>
-  Boolean(assistant && item?.type === "image" && item.status === "done" && item.url && item.jobId);
-
-/**
- * Taste-led next steps for a finished image. Placeholder chips hold the row while they load; a
- * chip generates its rewritten prompt with the item's settings at once, and More Next
- * Steps asks for different ones. The neighbour's steps are fetched once these have arrived.
- */
-function NextSteps({
-  item,
-  neighbour,
-  iterate,
-  pending,
-}: {
-  item: MediaItem;
-  neighbour?: MediaItem;
-  iterate: (iteration: Iteration) => void;
-  pending?: Iteration;
-}) {
-  const client = useQueryClient();
-  const running = pending?.kind === "prompt";
-  const query = nextStepsQuery(item.jobId!);
-  const steps = useQuery(query);
-  const more = useMutation({
-    mutationFn: () => askNextSteps(item.jobId!, true),
-    onSuccess: (fresh) => client.setQueryData(query.queryKey, fresh),
-  });
-  const ready = steps.isSuccess;
-  const next = steppable(neighbour, true) ? neighbour.jobId! : "";
-  useEffect(() => {
-    if (ready && next) void client.prefetchQuery(nextStepsQuery(next));
-  }, [ready, next]);
-  const loading = steps.isPending || more.isPending;
-  const list = steps.data?.suggestions ?? [];
-  if (steps.isError || (!loading && !list.length)) return null;
-  return (
-    <ScrollArea type="never" className={classes.steps} onClick={(event) => event.stopPropagation()}>
-      <Group
-        role="group"
-        aria-label="Next Steps"
-        aria-busy={loading || undefined}
-        gap={6}
-        wrap="nowrap"
-        className={classes.stepRow}
-      >
-        {loading
-          ? [0, 1, 2].map((index) => (
-              <Skeleton key={index} radius="xl" className={classes.stepSkeleton} />
-            ))
-          : list.map((step) => (
-              <Button
-                key={step.label}
-                size="compact-sm"
-                radius="xl"
-                variant="default"
-                title={step.request}
-                className={classes.step}
-                loading={running && pending.prompt === step.prompt}
-                disabled={running}
-                onClick={() => iterate({ kind: "prompt", prompt: step.prompt, operation: "image" })}
-              >
-                {step.label}
-              </Button>
-            ))}
-        <Tooltip label="More Next Steps">
-          <ActionIcon
-            variant="subtle"
-            size="sm"
-            aria-label="More Next Steps"
-            disabled={loading}
-            onClick={() => more.mutate()}
-          >
-            <RefreshCw size={14} />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
-    </ScrollArea>
-  );
-}
-
-/** The version strip, the actions and the next steps under the viewer image. */
+/** The version strip and the actions under the viewer image. */
 export function MediaViewerDock({
   item,
-  neighbour,
   family,
   choose,
-  iterate,
-  pending,
   actions,
-  steps = true,
 }: {
   item: MediaItem;
-  /** The next item, whose next steps load once this item's have. */
-  neighbour?: MediaItem;
   family: Entry[];
   choose?: (item: MediaItem) => void;
-  /** Queues a next step's prompt with the item's settings; its run joins the strip. */
-  iterate: (iteration: Iteration) => void;
-  pending?: Iteration;
   actions: React.ReactNode;
-  /** Whether to offer next steps, which iterate on the item. */
-  steps?: boolean;
 }) {
-  const assistant = useQuery(assistantQuery);
   // Only variations that arrive while this family is shown animate in, not those present on open.
   const root = family[0]?.key;
   const [shown, setShown] = useState(() => ({ root, keys: new Set(family.map(({ key }) => key)) }));
@@ -230,15 +124,6 @@ export function MediaViewerDock({
         </ScrollArea>
       )}
       {actions}
-      {steps && steppable(item, Boolean(assistant.data?.available)) && (
-        <NextSteps
-          key={item.jobId}
-          item={item}
-          neighbour={neighbour}
-          iterate={iterate}
-          pending={pending}
-        />
-      )}
     </div>
   );
 }

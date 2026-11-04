@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { ActionIcon, Tooltip } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -14,7 +14,7 @@ import {
   SendButton,
   UndoButton,
 } from "../generation/AskChange";
-import { nextStepsQuery } from "../taste/suggestions";
+import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { ActionGroups } from "./ActionBar";
 import { itemAction, useChatAction } from "./MediaActions";
 import { typedPrompt, type Iteration } from "./useMediaAction";
@@ -48,6 +48,7 @@ export function ViewerPrompt({
   const chatOn = useGroupFeature("chat");
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
+  const field = useRef<HTMLTextAreaElement>(null);
   const ask = useItemChange<string>(item, {
     groups: () => groups,
     iterate,
@@ -114,11 +115,18 @@ export function ViewerPrompt({
       <ChangeSuggestions
         key="suggestions"
         query={nextStepsQuery(item.jobId!)}
+        fresh={() => askNextSteps(item.jobId!, true)}
         disabled={ask.pending}
         // The field is the request: a suggestion fills it and asks at once.
         onPick={(request) => {
           setPrompt(request);
           ask.send(request, request);
+        }}
+        // Custom… selects the prompt for a change typed over it; phones open the editor.
+        onCustom={() => {
+          if (phone) return field.current?.click();
+          field.current?.focus();
+          field.current?.select();
         }}
       />
     ),
@@ -136,6 +144,7 @@ export function ViewerPrompt({
   ].filter(Boolean);
   return (
     <TextBox
+      ref={field}
       aria-label="Prompt"
       placeholder={`Describe the ${video ? "video" : "image"}, or ask for a change`}
       variant="unstyled"

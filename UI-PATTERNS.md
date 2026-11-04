@@ -349,11 +349,9 @@ primary component reference and verify APIs against the installed version.
   viewer next-step suggestions and Chat. Dream's Taste icon (beside Settings)
   edits it; Dream itself always opens on Deck (Discarded is the other view).
 - Suggestions never move the layout or act on their own: prompt ideas float
-  over an empty, focused prompt and fill it (in Chat as "Create an image: …");
-  viewer next steps hold their row with placeholder chips while loading, written
-  ahead of time while Studio is idle; a step generates its prompt with the
-  item's settings, showing progress on the chip, and a small refresh action
-  asks for different ones. With none to offer, nothing shows.
+  over an empty, focused prompt and fill it (in Chat as "Create an image: …"),
+  and with none to offer nothing shows; an image's next steps, written ahead of
+  time while Studio is idle, are offered only in its field's Suggestions menu.
 
 ## Data & Feedback
 
@@ -454,7 +452,10 @@ primary component reference and verify APIs against the installed version.
   menu of short changes that fit the image (its next steps) or the draft
   (surface `draft` without a request), loaded when it opens and cached per item
   or prompt; picking one fills the request and asks at once, and an empty or
-  failed answer says No Suggestions. The viewer's field is itself the request:
+  failed answer says No Suggestions. After a divider, Refresh asks for different
+  ones in their place (loading in the menu) and Custom… leaves the person to type
+  their own: the composer's empty request line, or the viewer's prompt selected
+  (the editor on phones). The viewer's field is itself the request:
   Ask sends its text, the assistant picks Edit, Recreate, Animate or Upscale
   (`/api/suggestions`, surface `change`) and Run runs it (phones keep the
   editor's send arrow for Generate). The composer's prompt (first in its Prompt
