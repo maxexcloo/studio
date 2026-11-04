@@ -723,11 +723,11 @@ test("Copy ▾ copies the prompt first and Details copies every input", async ({
         "An amber bird",
         "Negative Prompt: blurry",
         "Profile: Image Quality",
-        "VAE: ae",
-        "Steps: 28",
         "CFG: 4",
         "Sampler: euler",
         "Seed: 1234567",
+        "Steps: 28",
+        "VAE: ae",
         "Dimensions: 1024 × 1024",
       ].join("\n"),
     );
@@ -885,8 +885,10 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
     }),
   ).toBeVisible();
   const tags = details.getByLabel("Caption Tags", { exact: true });
+  // The caption starts folded; Show More brings its tags and Show Less folds it again.
+  await expect(tags).toBeHidden();
+  await details.getByRole("button", { name: "Show More", exact: true }).click();
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
-  // The caption starts expanded; Show Less folds it and Show More brings it back.
   await details.getByRole("button", { name: "Show Less", exact: true }).click();
   await expect(tags).toBeHidden();
   await details.getByRole("button", { name: "Show More", exact: true }).click();
