@@ -243,7 +243,7 @@ test("An administrator turns Cloud and Uncensored Models off for itself in Setti
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  state.preferences.grants = { cloudModels: true, uncensoredModels: true };
+  state.preferences.grants = { cloudModels: true, spicyPrompts: true, uncensoredModels: true };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Models", exact: true });
   await expect(models.getByRole("switch")).toHaveCount(2);
@@ -252,6 +252,27 @@ test("An administrator turns Cloud and Uncensored Models off for itself in Setti
   await uncensored.click({ force: true });
   await expect(uncensored).not.toBeChecked();
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
+});
+
+test("Spicy Prompts shows in Settings › Preferences only with Uncensored Models", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "member", role: "user" });
+  await page.goto("/settings#preferences");
+  const prompts = page.getByRole("region", { name: "Prompts", exact: true });
+  await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
+  await expect(prompts.getByRole("switch", { name: "Spicy Prompts" })).toHaveCount(0);
+  state.preferences.grants = { cloudModels: false, spicyPrompts: true, uncensoredModels: true };
+  await page.reload();
+  const spicy = prompts.getByRole("switch", { name: "Spicy Prompts", exact: true });
+  await expect(spicy).not.toBeChecked();
+  await expect(
+    prompts.getByText("Let prompt ideas, suggestions and proposed changes use explicit wording."),
+  ).toBeVisible();
+  await spicy.click({ force: true });
+  await expect(spicy).toBeChecked();
+  await expect.poll(() => state.preferences.preferences.spicyPrompts).toBe(true);
 });
 
 test("Finish Starred Images in Settings › Preferences saves its switch, quality and face detail", async ({

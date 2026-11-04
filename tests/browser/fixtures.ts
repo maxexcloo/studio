@@ -173,9 +173,14 @@ export async function fixtures(page: Page) {
   };
 
   const preferences = {
-    preferences: { cloudModels: true, tileCaptions: false, uncensoredModels: true },
+    preferences: {
+      cloudModels: true,
+      spicyPrompts: false,
+      tileCaptions: false,
+      uncensoredModels: true,
+    },
     saved: [] as string[],
-    grants: { cloudModels: false, uncensoredModels: false },
+    grants: { cloudModels: false, spicyPrompts: false, uncensoredModels: false },
   };
 
   await page.route("**/api/**", async (route) => {

@@ -359,7 +359,7 @@ test("A member turns the Cloud and Uncensored Models its group grants off for it
     role: "user",
     features: { cloudModels: true, uncensoredModels: true },
   });
-  state.preferences.grants = { cloudModels: true, uncensoredModels: false };
+  state.preferences.grants = { cloudModels: true, spicyPrompts: false, uncensoredModels: false };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Models", exact: true });
   // Only what the group grants can be turned off.

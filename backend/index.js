@@ -153,7 +153,13 @@ import {
 } from "./multi-user-auth.js";
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
-import { isCloudProfile, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
+import {
+  explicitWording,
+  isCloudProfile,
+  mayUseFeature,
+  mayUseGenerationProfile,
+} from "./account-policy.js";
+import { accountPreferences } from "./account-preferences.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -656,12 +662,8 @@ const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
   online: textOnline,
-  uncensored: (ownerId) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    return (
-      !ownerId || Boolean(account?.authenticated && mayUseFeature(account, "uncensoredModels"))
-    );
-  },
+  explicit: (ownerId) =>
+    explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId)),
   item: (ownerId, jobId) =>
     filterVisibleGallery(
       gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
