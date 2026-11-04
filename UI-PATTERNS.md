@@ -515,10 +515,10 @@ primary component reference and verify APIs against the installed version.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
 - Item actions have one definition (`gallery/MediaActions.tsx`) and one order in
-  every bar and menu (viewer, tile ⋯, right-click and phone More): Animate, Edit,
+  every bar and menu (viewer, tile ⋯ and right-click): Animate, Edit,
   Recreate, Upscale | Compare, Continue in Chat | Copy, Download | Star, Delete.
   Retry or Stop lead for unfinished work, Compare shows only in menus (the tile
-  and right-click menu and the selection's More, never the viewer's bar) and
+  and right-click menu, never the viewer's bar) and
   Delete is last. Bars are icons with tooltips (their accessible
   names unchanged) at one size and spacing; only the desktop viewer names Animate ▾,
   Edit, Recreate ▾ and Upscale ▾ beside their icons, and only those labelled buttons show
@@ -533,7 +533,7 @@ primary component reference and verify APIs against the installed version.
   settings) › Edit Prompt (opens the composer), Use as Reference (images), Run
   Again (new seed), Run Again (Same Seed), and for an upload only Edit Prompt
   from its suggested prompt (the run is its version; several selected uploads
-  queue one run each) and Use as Reference; Edit opens
+  queue one run each from the selection bar) and Use as Reference; Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
   original kept); Animate › Fast or Quality as a small segmented control at the
@@ -558,17 +558,17 @@ primary component reference and verify APIs against the installed version.
   zoom modes, native transforms, keyboard shortcuts and transient controls in
   the bottom-right corner of the media, above the action bar.
 - Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
-  toolbar's place, sticky under the header on its surface. Desktop shows the
-  count, a divider and compact text buttons Select All, Select Failed and Select
-  In Progress (when they apply), then every action as an icon with a tooltip,
-  without a More menu, and, after a divider, Clear Selection (✕) last. Phones
-  keep the count bar on top, with the selects named All, Failed and In Progress
-  and Clear Selection at its end, and a full-width
-  bottom toolbar above the safe area with Retry or Stop when they apply,
-  Download, Star, Delete and, when any apply, More with the other shared actions;
-  actions for one item at a time show
-  only while one item is selected. Right-click or Shift+F10 opens the same
-  actions as a menu; Escape ends selection and Delete asks to delete.
+  toolbar's place, sticky under the header on its surface. It holds only what
+  acts on the selection, whatever its count: Retry or Stop when they apply,
+  Recreate for uploads, Download (Share on phones that share natively), Star and
+  Delete; an item's own actions stay on its tile and in the viewer. Desktop shows
+  the count, a divider and compact text buttons Select All, Select Failed and
+  Select In Progress (when they apply), then the actions as icons with tooltips
+  and, after a divider, Clear Selection (✕) last. Phones keep the count bar on
+  top, with the selects named All, Failed and In Progress and Clear Selection at
+  its end, and a full-width bottom toolbar above the safe area with the actions
+  and, for Recreate, More. Right-click or Shift+F10 opens the same actions as a
+  menu; Escape ends selection and Delete asks to delete.
 - Display, thumbnails, sharing and downloads use the saved original/upscale
   choice through `mediaSource`. Video upscales stay videos; comparison is an
   image action. Upscale quality, size and optional face detail use the worker’s

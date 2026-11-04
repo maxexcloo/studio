@@ -6,25 +6,14 @@ import { failure } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, menuWidth, type Action } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, menuWidth } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import {
-  AnimateDialog,
-  itemAction,
-  itemActionGroups,
-  useMediaActions,
-  type ItemActionId,
-} from "./MediaActions";
-import { useMediaTransfer } from "./mediaShare";
-import { UpscaleDialog } from "./UpscaleControls";
-import { TrimVideoDialog } from "./videoEdits";
+import { itemAction, itemActionGroups } from "./MediaActions";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
-import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
-import type { AnimateTheme } from "./useMediaAction";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
@@ -123,24 +112,15 @@ export function GallerySelectionBar({
     }
   }
   const pending = busy !== null;
-  // A sole selected item's own actions, kept by `OneItemActions` so the bar never remounts.
-  const oneItem = useRef<Action[]>([]);
-  const [, setOneItemState] = useState("");
-  // Actions for one item at a time show only while one item is selected.
-  const single = (id: ItemActionId) =>
-    selected.length === 1 ? oneItem.current.find((action) => action.id === id) : undefined;
+  // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
   const actions = itemActionGroups([
-    single("animate"),
-    single("edit"),
-    // Several uploads share Recreate, one run queued for each.
-    selected.length > 1 && uploads.length > 0
-      ? itemAction("recreate", {
-          disabled: recreate.isPending,
-          loading: recreate.isPending,
-          onClick: () => recreate.mutate(uploads),
-        })
-      : single("recreate"),
-    single("chat"),
+    // Selected uploads share Recreate, one run queued for each.
+    uploads.length > 0 &&
+      itemAction("recreate", {
+        disabled: recreate.isPending,
+        loading: recreate.isPending,
+        onClick: () => recreate.mutate(uploads),
+      }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
         disabled: pending || !failed.length,
@@ -153,9 +133,6 @@ export function GallerySelectionBar({
         loading: busy === "stop",
         onClick: () => void stopSelected(),
       }),
-    single("compare"),
-    single("upscale"),
-    single("copy"),
     // Phones that share natively share instead of downloading.
     phone && typeof navigator.share === "function"
       ? itemAction("share", {
@@ -318,81 +295,12 @@ export function GallerySelectionBar({
           <ActionMenuItems groups={actions} />
         </Menu.Dropdown>
       </Menu>
-      {selected.length === 1 && (
-        <OneItemActions
-          item={selected[0]}
-          onApplied={selection.end}
-          sink={oneItem}
-          onChange={setOneItemState}
-        />
-      )}
       <DeleteMediaDialog
         opened={confirm}
         ids={deletable.map((item) => item.id)}
         close={() => setConfirm(false)}
         onDeleted={(_deleted, failed) => selection.retain(failed)}
       />
-    </>
-  );
-}
-
-/** What a bar shows of the actions, so their owner re-renders only when it changes. */
-const shownState = (actions: Action[]): string =>
-  actions
-    .map((action) =>
-      [action.id, action.label, action.disabled, action.loading, action.pressed, action.checked]
-        .concat(action.menu ? shownState(action.menu.flat()) : [])
-        .join(","),
-    )
-    .join("|");
-
-/**
- * A sole selected item's own actions, written to `sink` for the selection's bar and menu (with
- * `onChange` when what they show changes), and the dialogs they open.
- */
-function OneItemActions({
-  item,
-  onApplied,
-  sink,
-  onChange,
-}: {
-  item: MediaItem;
-  onApplied: () => void;
-  sink: { current: Action[] };
-  onChange: (state: string) => void;
-}) {
-  const transfer = useMediaTransfer(item, false);
-  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
-  const [upscaling, setUpscaling] = useState(false);
-  const [trimming, setTrimming] = useState(false);
-  const actions = useMediaActions(item, {
-    transfer,
-    onApplied,
-    onAnimate: setAnimating,
-    // The selection's own Delete covers it.
-    onDelete: () => {},
-    onTrim: () => setTrimming(true),
-    onUpscale: () => setUpscaling(true),
-  }).flat();
-  sink.current = actions;
-  const state = `${item.id}:${shownState(actions)}`;
-  useEffect(() => onChange(state), [state]);
-  // Another item selected later never shows this one's actions first.
-  useEffect(
-    () => () => {
-      sink.current = [];
-    },
-    [],
-  );
-  return (
-    <>
-      {animating && (
-        <AnimateDialog item={item} theme={animating} onClose={() => setAnimating(null)} />
-      )}
-      {item.status === "done" && (
-        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
-      )}
-      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>
   );
 }
