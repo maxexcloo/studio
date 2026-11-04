@@ -523,10 +523,11 @@ primary component reference and verify APIs against the installed version.
   toolbar's place, sticky under the header on its surface: Clear Selection (✕)
   and the count, then on desktop every action as an icon with a tooltip, without
   a More menu: Select All, Select Failed and Select In Progress (when they
-  apply), then the shared item actions. Phones keep the count bar on top and a
-  full-width bottom toolbar above the safe area with Retry or Stop when they
-  apply, Download, Star, Delete and More, which lists the selects and every
-  other shared action; actions for one item at a time show
+  apply), then the shared item actions. Phones keep the count bar on top, with
+  the selects named All, Failed and In Progress at its end, and a full-width
+  bottom toolbar above the safe area with Retry or Stop when they apply,
+  Download, Star, Delete and, when any apply, More with the other shared actions;
+  actions for one item at a time show
   only while one item is selected. Right-click or Shift+F10 opens the same
   actions as a menu; Escape ends selection and Delete asks to delete.
 - Display, thumbnails, sharing and downloads use the saved original/upscale
