@@ -264,7 +264,11 @@ test("suggestions are worded explicitly only with Spicy Prompts on and Uncensore
   await draft("open");
   assert.match(systems[1], /Explicit content is allowed/);
   await draft("plain");
-  assert.doesNotMatch(systems[2], /Explicit content is allowed/, "ignored without Uncensored Models");
+  assert.doesNotMatch(
+    systems[2],
+    /Explicit content is allowed/,
+    "ignored without Uncensored Models",
+  );
   // Turning Uncensored Models off for itself turns explicit wording off too.
   const optedOut = member("open", { uncensoredModels: false });
   assert.equal(explicitWording(optedOut, { spicyPrompts: true }), false);
