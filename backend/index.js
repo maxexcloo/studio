@@ -140,7 +140,7 @@ import { cancelPrompt } from "./comfy/queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
-import { loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
+import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -645,6 +645,10 @@ const admitGeneration = createGenerationAdmission({
   pendingItems: makePendingItems,
   revision: galleryRevisionValue,
   validate: validateGenerationInput,
+  separateRuns: (input) => {
+    const workflow = getCustomWorkflow(input.profileId, input.profileBackend);
+    return input.kind === "image" && Boolean(workflow) && !workflow.controls?.count;
+  },
   admitted: jobAdmitted,
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");

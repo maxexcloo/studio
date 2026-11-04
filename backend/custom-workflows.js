@@ -308,7 +308,8 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       seed: Boolean(controls.seed),
       steps: Boolean(controls.steps),
       negativePrompt: Boolean(controls.negative),
-      variations: Boolean(controls.count),
+      // Count always works for images: a profile with no batch control makes separate runs (domain/admission.ts).
+      variations: meta.kind !== "video",
       frames: Boolean(controls.frames),
       fps: Boolean(controls.fps),
       duration: Boolean(controls.duration),
