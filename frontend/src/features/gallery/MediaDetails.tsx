@@ -181,24 +181,11 @@ export function useSettingsText(item: MediaItem) {
  * A prompt or caption on a subtle surface; long text scrolls within a bounded height, or `clamped`
  * shows its first two lines ending in "…".
  */
-function PromptText({
-  dimmed,
-  clamped,
-  children,
-}: {
-  dimmed?: boolean;
-  clamped?: boolean;
-  children: React.ReactNode;
-}) {
+function PromptText({ clamped, children }: { clamped?: boolean; children: React.ReactNode }) {
   return (
     <div className={classes.promptText}>
       <ScrollArea.Autosize mah="12rem">
-        <Text
-          size="sm"
-          c={dimmed ? "dimmed" : undefined}
-          lineClamp={clamped ? 2 : undefined}
-          style={{ whiteSpace: "pre-wrap" }}
-        >
+        <Text size="sm" lineClamp={clamped ? 2 : undefined} style={{ whiteSpace: "pre-wrap" }}>
           {children}
         </Text>
       </ScrollArea.Autosize>
@@ -290,14 +277,20 @@ function Caption({ item }: { item: MediaItem }) {
   );
 }
 
-/** Details › Prompt, with the prompt's thinking and any negative prompt. */
+/** Details › Prompt with the prompt's thinking, then any Negative Prompt as its own section. */
 function DetailsPrompt({ item }: { item: MediaItem }) {
   return (
-    <DetailSection title="Prompt">
-      <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
-      <WritingThinking writing={item.writing} />
-      {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
-    </DetailSection>
+    <>
+      <DetailSection title="Prompt">
+        <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
+        <WritingThinking writing={item.writing} />
+      </DetailSection>
+      {item.negative && (
+        <DetailSection title="Negative Prompt">
+          <PromptText>{item.negative}</PromptText>
+        </DetailSection>
+      )}
+    </>
   );
 }
 
@@ -369,8 +362,9 @@ function Related({
 }
 
 /**
- * Details › Caption, Prompt, Source, From, Derived, Model, LoRAs, References, Settings, Output and Timing
- * for one result; `open` shows a related result in the viewer.
+ * Details › Caption (with its tags), From, Prompt, Negative Prompt, Source, Derived, Model, LoRAs,
+ * References, Settings, Output and Timing for one result; `open` shows a related result in the
+ * viewer.
  */
 export function MediaDetails({
   item,
@@ -388,6 +382,7 @@ export function MediaDetails({
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
+      <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
       {item.source && (
         <DetailSection title="Source">
@@ -396,7 +391,6 @@ export function MediaDetails({
           </Anchor>
         </DetailSection>
       )}
-      <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <Related title="Derived" items={related.derived} open={open} />
       {details.profile && (
         <DetailSection title="Model">
