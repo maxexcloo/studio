@@ -262,36 +262,33 @@
   border-radius: var(--mantine-radius-sm);
 }
 
-/* A chip's name and thumbnails share one cell, so the chip is as wide as the wider of them. */
+/* The chip's picture keeps one size whether it shows the icon or a stack of thumbnails. */
 .chipContent {
-  display: inline-grid;
-  align-items: center;
-}
-
-.chipContent > * {
-  grid-area: 1 / 1;
-}
-
-.chipName {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.chipName[data-hidden] {
-  visibility: hidden;
+.stack {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 28px;
+  height: 24px;
 }
 
-/* Chip thumbnails overlap like a stack, with a count beyond the first few; the widest is reserved. */
-.thumbs {
-  display: inline-flex;
-  align-items: center;
-  min-width: 4rem;
+.stack > * {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+
+.stack > svg {
+  justify-self: center;
 }
 
 .thumb {
   display: grid;
-  flex-shrink: 0;
   place-items: center;
   width: 24px;
   height: 24px;
@@ -301,10 +298,6 @@
   background: var(--mantine-color-default-hover);
   color: var(--mantine-color-dimmed);
   animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-.thumb + .thumb {
-  margin-left: -6px;
 }
 
 .thumb[data-off] {
@@ -317,8 +310,21 @@
   object-fit: cover;
 }
 
-.more {
-  margin-left: 6px;
+.count {
+  z-index: 4;
+  align-self: end;
+  justify-self: end;
+  min-width: 14px;
+  height: 14px;
+  margin: 0 -4px -4px 0;
+  padding-inline: 3px;
+  border-radius: 7px;
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
