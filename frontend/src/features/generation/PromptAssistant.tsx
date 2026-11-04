@@ -72,12 +72,15 @@ export function usePromptAssistant({
   onChange,
   references = [],
   scopeKey = "",
+  onAsk,
 }: {
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   references?: ReferenceAsset[];
   scopeKey?: string;
+  /** Opens Ask for a Change, listed first where the composer offers it. */
+  onAsk?: () => void;
 }) {
   const status = useQuery(assistantQuery);
   // The style last used comes first and is marked, so repeating it is one click.
@@ -285,6 +288,12 @@ export function usePromptAssistant({
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown data-composer-layer>
+        {onAsk && (
+          <>
+            <Menu.Item onClick={onAsk}>Ask for a Change</Menu.Item>
+            <Menu.Divider />
+          </>
+        )}
         {info.presets.length > 1 ? (
           <>
             <Menu.Label>Improve Prompt</Menu.Label>
