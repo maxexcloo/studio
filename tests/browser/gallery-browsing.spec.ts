@@ -6,7 +6,6 @@ import {
   gallerySearch,
   image,
   selectionAction,
-  selectionMenuItem,
   showOnly,
   stamp,
 } from "./fixtures";
@@ -567,20 +566,18 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  // A sole item's own actions show (desktop on the bar, phones under More); with several they
-  // are left out.
+  // The bar holds only the selection's actions, even for one item: its own stay on its tile.
   const phone = test.info().project.use.isMobile;
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
-  await expect(await selectionMenuItem(page, "Edit")).toBeEnabled();
-  // Phones close More again: the selects sit in the top bar, named by what they select.
-  if (phone) {
-    await selectionAction(page, "More").click();
-    await expect(page.getByRole("menu")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText("All");
-  }
+  await expect(page.getByRole("status")).toHaveText("1 Selected");
+  await expect(selectionAction(page, "Edit")).toHaveCount(0);
+  await expect(selectionAction(page, "More")).toHaveCount(0);
+  // The selects sit beside the count; phones name them by what they select.
+  await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
+    phone ? "All" : "Select All",
+  );
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  // Nothing else applies to all three, so neither shows Edit or More.
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
   await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
