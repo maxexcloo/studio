@@ -8,7 +8,7 @@
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
  *   POST /api/profiles/editable/:id/remove          {baseHash}: removes the profile, with a backup (profile/remove.js)
  *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, and its own fields over it
- *   GET  /api/profiles/guides                       every guide pack with its version and AI-Drafted state
+ *   GET  /api/profiles/guides                       every guide pack with its name, version and AI-Drafted state
  *   GET  /api/profiles/guides/:packId               one pack with its hash (an edit's base) and meta
  *   PUT  /api/profiles/guides/:packId               {pack, baseHash, draft?}: saves a guide pack as a new version
  *   GET  /api/profiles/guides/:packId/versions      the pack's versions, newest first
@@ -31,7 +31,9 @@
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
+import { families as familyCatalog } from "../family-catalog.js";
 import { fromChat, requireAdmin } from "../route-access.js";
+import { loraFamilyId } from "../../shared/profiles.ts";
 import { approveEditableProfile, readEditableProfile, revertEditableProfile } from "./editor.js";
 import { writeExport } from "./export.js";
 import { backendCandidates, combineBackends } from "./backends.js";
@@ -188,12 +190,20 @@ export function registerProfileRoutes(
     "/api/profiles/guides",
     route((_req, res) => {
       const store = guides().read() || {};
+      // A guide is named by its pack's `name`, else the label of a family it guides, else its id.
+      const familyLabel = (packId) =>
+        Object.entries(store.families || {})
+          .filter(([, kinds]) => Object.values(kinds || {}).includes(packId))
+          .map(([family]) => familyCatalog[loraFamilyId(family)]?.label)
+          .find(Boolean);
       const packs = Object.keys(store.packs || {})
         .sort()
         .map((packId) => {
           const meta = store.meta?.[packId] || {};
+          const name = String(store.packs[packId]?.name || "").trim();
           return {
             packId,
+            name: name || familyLabel(packId) || packId,
             version: meta.version || 0,
             origin: meta.origin || "seed",
             aiDrafted: meta.aiDrafted === true,

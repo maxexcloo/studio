@@ -162,6 +162,10 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await editor.getByRole("button", { name: "Save Guide", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(saved[1]).toEqual({ ...original, summary: "Updated guidance." });
+  // The Guides group lists a guide by its name.
+  await expect(page.getByRole("table", { name: "Editable Guides", exact: true })).toContainText(
+    "Owned Guide",
+  );
   await editDefinition(page, "Guide");
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Updated guidance.",
