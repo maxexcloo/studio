@@ -486,6 +486,39 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     return pack(packId);
   }
 
+  /**
+   * Removes a pack when `baseHash` is its current hash and no profile binding or family uses it
+   * (409 otherwise). Its versions stay, the last holding it, so reverting to that version restores it.
+   */
+  function remove(packId, { by = "", origin = "studio", baseHash = "" } = {}) {
+    const { pack: value, hash } = pack(packId);
+    if (baseHash !== hash)
+      throw conflict("This guide changed since you opened it. Reload it, then remove it again.");
+    const store = read();
+    const users = [
+      ...Object.entries(store.profiles || {})
+        .filter(([, binding]) => binding?.pack === packId)
+        .map(([id]) => id),
+      ...Object.entries(store.families || {}).flatMap(([family, kinds]) =>
+        Object.entries(kinds || {})
+          .filter(([, id]) => id === packId)
+          .map(([kind]) => `the ${family} family (${kind})`),
+      ),
+    ];
+    if (users.length)
+      throw conflict(
+        `This guide is still used by ${users.join(", ")}. Bind them to another guide first, then remove it.`,
+      );
+    store.meta = { ...(store.meta || {}) };
+    const last = versionsIn(historyDir(packId)).at(-1);
+    if (!last || readJsonFile(path.join(historyDir(packId), `${last}.json`)).hash !== hash)
+      addVersion(store, packId, value, { by, origin, note: "Before removing" });
+    delete store.packs[packId];
+    delete store.meta[packId];
+    writeStore(store);
+    return { removed: packId };
+  }
+
   function versions(packId) {
     if (!versionedId(packId)) throw notFound("That guide was not found.");
     return versionsIn(historyDir(packId))
@@ -682,6 +715,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     versions,
     version,
     revert,
+    remove,
     approve,
     resolve,
     bind,

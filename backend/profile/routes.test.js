@@ -373,6 +373,11 @@ test("chat edits through the same routes record chat as the origin, and a chat d
     baseHash: ui.body.hash,
   });
   assert.equal(reverted.body.meta.origin, "chat");
+  const inUse = await call("POST", "/api/profiles/guides/krea2/remove", {
+    baseHash: reverted.body.hash,
+  });
+  assert.equal(inUse.status, 409);
+  assert.match(inUse.body.error, /still used by/);
 
   // Bindings: a chat draft removes one, an administrator approves, a stale edit is refused.
   const bindings = await call("GET", "/api/profiles/guide-bindings");
