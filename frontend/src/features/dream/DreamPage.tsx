@@ -11,6 +11,8 @@ import {
 } from "@mantine/core";
 import { icons } from "../../ui/icons";
 import { useQuery } from "@tanstack/react-query";
+import { Fingerprint } from "lucide-react";
+import { useState } from "react";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
@@ -97,7 +99,8 @@ export function DreamPage() {
   const phone = usePhone();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
-  const [view, setView] = useRemembered<"deck" | "discarded" | "taste">("dream-view", "deck");
+  // Dream always opens on the deck; Taste is its own icon beside Settings.
+  const [view, setView] = useState<"deck" | "discarded" | "taste">("deck");
   const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
   const status = data && statusLine(data);
@@ -108,12 +111,11 @@ export function DreamPage() {
         <SegmentedControl
           radius="xl"
           aria-label="Dream View"
-          value={view}
+          value={view === "taste" ? "" : view}
           onChange={(value) => setView(value as typeof view)}
           data={[
             { value: "deck", label: "Deck" },
             { value: "discarded", label: "Discarded" },
-            { value: "taste", label: "Taste" },
           ]}
         />
         <div className={classes.status} role="status" aria-label="Dream Status">
@@ -142,6 +144,16 @@ export function DreamPage() {
               </ActionIcon>
             </Tooltip>
           )}
+          <Tooltip label="Taste">
+            <ActionIcon
+              variant={view === "taste" ? "filled" : "default"}
+              aria-label="Taste"
+              aria-pressed={view === "taste"}
+              onClick={() => setView(view === "taste" ? "deck" : "taste")}
+            >
+              <Fingerprint size={18} />
+            </ActionIcon>
+          </Tooltip>
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
