@@ -32,6 +32,7 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
       scale: async () => {
         throw new Error("Service health never scales deployments");
       },
+      logs: async () => [],
     },
     workloads: [
       workload("image", "image", "http://image.invalid"),
@@ -147,6 +148,7 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
     engine: {
       state: async () => ({ replicas: 0, ready: 0, pods: 0 }),
       scale: async () => {},
+      logs: async () => [],
     },
     workloads,
     pools: { gpu: 2 },

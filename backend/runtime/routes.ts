@@ -68,6 +68,17 @@ export function createRuntimeRouter(
     ),
   );
   router.get(
+    "/workloads/:id/logs",
+    // The last `lines` (1–1000, else 200) of each pod's log.
+    handle((request) => {
+      const lines = Math.trunc(Number(request.query.lines));
+      return controller.logs(
+        String(request.params.id),
+        Number.isFinite(lines) ? Math.min(Math.max(lines, 1), 1000) : 200,
+      );
+    }),
+  );
+  router.get(
     "/operations/:id",
     handle((request) => controller.operation(String(request.params.id))),
   );

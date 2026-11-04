@@ -526,6 +526,35 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.keyboard.press("Escape");
   await expect(log).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
+  // A workload's own log opens on its pod's tail, with the changes that touched it a tab away.
+  await page.route("**/api/runtime/workloads/text/logs*", (route) =>
+    route.fulfill({
+      json: {
+        pods: [
+          {
+            name: "text-1",
+            container: "main",
+            phase: "Running",
+            restarts: 0,
+            lines: [`${stamp} Listening.`],
+          },
+        ],
+      },
+    }),
+  );
+  await table
+    .getByRole("row", { name: "Text", exact: true })
+    .getByRole("button", { name: "Actions for Text", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "View Log", exact: true }).click();
+  const workloadLog = page.getByRole("dialog", { name: "Text Log", exact: true });
+  await expect(workloadLog.getByLabel("Pod Log", { exact: true })).toContainText("Listening.");
+  await workloadLog.getByRole("tab", { name: "Changes", exact: true }).click();
+  await expect(workloadLog.getByLabel("Change Steps", { exact: true })).toContainText(
+    "Stopping Text.",
+  );
+  await page.keyboard.press("Escape");
+  await expect(workloadLog).toBeHidden();
   await table.getByRole("checkbox", { name: "Run Image", exact: true }).click();
   await table.getByRole("checkbox", { name: "Run Video", exact: true }).click();
   await page.getByRole("button", { name: "Preview Changes", exact: true }).click();
