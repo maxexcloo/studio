@@ -15,12 +15,12 @@ import { isVersion, versionPromptOverlap } from "../shared/versions.ts";
 
 const source = { input: { profileId: "sdxl", prompt: "a red fox in the snow at dawn" } };
 
-test("a run from a result's settings is a version only with the same profile and most of the prompt", () => {
+test("a run from a result's settings is a version on any model while it keeps most of the prompt", () => {
   const run = (input) => ({ operation: "image", input: { ...source.input, ...input } });
   assert.equal(versionPromptOverlap, 0.5);
   assert.equal(isVersion(run({ prompt: "a red fox in the snow at dusk" }), source), true);
   assert.equal(isVersion(run({ prompt: "a castle on a hill under stars" }), source), false);
-  assert.equal(isVersion(run({ profileId: "flux" }), source), false);
+  assert.equal(isVersion(run({ profileId: "flux" }), source), true);
   // Edits and animations work on the result itself, whatever their prompt.
   assert.equal(
     isVersion({ operation: "refine", input: { prompt: "make it night" } }, source),
@@ -92,6 +92,8 @@ test("gallery results take their run's source after a dry run, with a backup, on
   const castle = run("alice", { profileId: "sdxl", prompt: "a castle" }, "image", fromFox);
   const edit = run("alice", { prompt: "night", referenceAssets: [{ assetId: fox }] }, "refine");
   const foreign = run("bob", { prompt: "mine", referenceAssets: [{ assetId: fox }] }, "refine");
+  // A run on another model that an earlier rule marked derived.
+  const flux = run("alice", { ...source.input, profileId: "flux" }, "image", fromFox);
   const item = (url, job) => ({
     id: url,
     url,
@@ -107,6 +109,7 @@ test("gallery results take their run's source after a dry run, with a backup, on
     item("/media/castle.png", castle),
     item("/media/edit.png", edit),
     item("/media/foreign.png", foreign),
+    { ...item("/media/flux.png", flux), ...fromFox, derived: true },
   ]);
   store.db.close();
 
@@ -121,17 +124,21 @@ test("gallery results take their run's source after a dry run, with a backup, on
     ],
   );
   assert.equal(plan.referenced, 1);
+  assert.deepEqual(plan.versions, ["/media/flux.png"]);
 
   const result = gallerySources(dataDir, { apply: true });
   const backup = JSON.parse(
     fs.readFileSync(path.join(result.backup, "studio_gallery.json"), "utf8"),
   );
-  assert.equal(backup.length, 3);
+  assert.equal(backup.length, 4);
   const db = openDatabase(path.join(dataDir, "studio.sqlite"));
   const rows = new Map(readGalleryRows(db).map((row) => [row.id, row]));
   db.close();
   assert.equal(rows.get("/media/edit.png").parentItemId, "/media/fox.png");
   assert.equal(rows.get("/media/castle.png").derived, true);
   assert.equal(rows.get("/media/foreign.png").parentItemId, undefined);
-  assert.deepEqual(gallerySources(dataDir).filled, []);
+  assert.equal(rows.get("/media/flux.png").derived, undefined);
+  assert.equal(rows.get("/media/flux.png").parentItemId, "/media/fox.png");
+  const again = gallerySources(dataDir);
+  assert.deepEqual([again.filled, again.versions], [[], []]);
 });

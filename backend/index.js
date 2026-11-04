@@ -127,7 +127,7 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
   onGalleryFilesDeleted,
-  reloadGalleryFields,
+  reloadGallerySources,
 } from "./gallery/store.js";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
@@ -627,7 +627,7 @@ registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
 registerMigrationRoutes(app, {
   dataDir,
   requireAdmin,
-  reload: { gallerySources: () => reloadGalleryFields(["parentItemId", "parentJobId", "derived"]) },
+  reload: { gallerySources: reloadGallerySources },
 });
 const admitGeneration = createGenerationAdmission({
   store,

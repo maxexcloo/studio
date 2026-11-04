@@ -73,7 +73,7 @@ const steps = [
   {
     name: "gallerySources",
     run: gallerySources,
-    changes: (plan) => size(plan.filled),
+    changes: (plan) => size(plan.filled) + size(plan.versions),
     online: true,
   },
   { name: "profilePrompting", run: profilePrompting, changes: (plan) => size(plan.profiles) },
