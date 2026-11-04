@@ -9,6 +9,7 @@ import { z } from "zod";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { assistantPresets, defaultPreset } from "../assistant-presets.js";
 import { mcpJson } from "./media.js";
+import { maxPromptCharacters } from "../../shared/queue.ts";
 
 const maxRemembered = 512;
 const rememberMs = 6 * 60 * 60 * 1000;
@@ -105,7 +106,7 @@ export function createChatAssistantMemory({ now = Date.now, file = "", log = con
 export function registerAssistantTools({ tool, server, media, owner, profileOf, memory }) {
   // Custom is the UI's free-text instruction; the chat restyles with its own words instead.
   const presetIds = assistantPresets.filter((preset) => !preset.custom).map((preset) => preset.id);
-  const prompt = z.string().trim().min(1).max(4000);
+  const prompt = z.string().trim().min(1).max(maxPromptCharacters);
   const profileId = z
     .string()
     .min(1)

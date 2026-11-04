@@ -23,11 +23,10 @@ import { civitaiFileSpec, civitaiModelFiles } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
 import { splitCatalogueKey } from "./catalogue.js";
 import { limitedBody } from "../civitai/access.js";
+import { shareFamily } from "./offers.js";
 
 export const dailyMs = 24 * 60 * 60 * 1000;
 const checkLimit = 300;
-const shareFamily = (a = [], b = []) =>
-  !a.length || !b.length || a.some((family) => b.includes(family));
 const iso = (at) => new Date(at).toISOString();
 
 /** The newest same-family Civitai version above the installed one, from the model's versions. */

@@ -59,7 +59,7 @@ export function runVariant(body = {}) {
   return { refs: Math.max(images, body.startImageId ? 1 : 0), tiled: Boolean(body.tiledDecode) };
 }
 
-const median = (values) => {
+export const median = (values) => {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!sorted.length) return null;
   const middle = Math.floor(sorted.length / 2);

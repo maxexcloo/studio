@@ -1,4 +1,5 @@
 import { ownerIdForRequest } from "../account-ownership.js";
+import { imageMimes } from "../reference-names.js";
 import { maxUploadBytes, saveUpload } from "../references.js";
 import { requireLocal } from "../route-access.js";
 
@@ -21,7 +22,6 @@ const postHosts = new Set([
   "www.reddit.com",
 ]);
 const maxPageBytes = 5 * 1024 * 1024;
-const imageMimes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const redirects = 3;
 
 /** The Redlib path for a pasted Reddit post or gallery link. */
@@ -131,7 +131,7 @@ export async function importRedditPost(link, ownerId = "", { fetch: fetcher = fe
         .split(";")[0]
         .trim()
         .toLowerCase();
-      if (!imageMimes.has(mime)) throw new Error("It isn’t a PNG, JPEG or WebP image.");
+      if (!imageMimes.includes(mime)) throw new Error("It isn’t a PNG, JPEG or WebP image.");
       const buffer = await cappedBody(
         response,
         maxUploadBytes,
