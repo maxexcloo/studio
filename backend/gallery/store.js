@@ -1247,20 +1247,27 @@ export function updateGalleryJobPreviews(id, previews = []) {
 }
 
 /**
- * Takes `fields` from the saved rows into the loaded items, after a migration step wrote them while
- * Studio runs (version-sources.js `gallerySources`), so the next save keeps them.
+ * Takes each result's source fields from its saved row into the loaded items, after a migration
+ * step wrote them while Studio runs (version-sources.js `gallerySources`), so the next save keeps
+ * them. A run's settlement records them together, so a row without a source may not have saved the
+ * item's yet and leaves it as it is.
  */
-export function reloadGalleryFields(fields) {
+export function reloadGallerySources() {
+  const fields = ["parentItemId", "parentJobId", "derived"];
   const saved = new Map(
     readGalleryRows(runtimeDatabase(dataDir)).map((row) => [galleryKey(row), row]),
   );
   let changed = false;
   gallery = gallery.map((item) => {
     const row = saved.get(galleryKey(item));
-    const missing = row && fields.filter((key) => key in row && !(key in item));
-    if (!missing?.length) return item;
+    if (!row?.parentItemId || fields.every((key) => row[key] === item[key])) return item;
     changed = true;
-    return { ...item, ...Object.fromEntries(missing.map((key) => [key, row[key]])) };
+    const next = { ...item };
+    for (const key of fields) {
+      if (key in row) next[key] = row[key];
+      else delete next[key];
+    }
+    return next;
   });
   if (!changed) return;
   bumpRevision();

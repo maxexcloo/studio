@@ -2,7 +2,7 @@ import type { GenerationInput, GenerationOperation, QueueMedia } from "./queue.t
 
 /**
  * The least share of prompt words (distinct words both prompts use, of the words either uses) a
- * run made from a result's settings must keep to stay one of its versions.
+ * fresh run from a result must keep to stay one of its versions.
  */
 export const versionPromptOverlap = 0.5;
 
@@ -25,21 +25,21 @@ export function promptOverlap(a: unknown, b: unknown) {
 const model = (input: GenerationInput) => String(input.profileId || input.model || "");
 
 /**
- * Whether a run made from a result (its recorded `parentItemId`) is one of that result's versions
- * rather than a new image derived from it. Edits and animations work on the result itself, so they
- * always are; a run from its settings (Prompt, Run Again, Exact Repeat) is while it keeps the
- * profile and at least `versionPromptOverlap` of the prompt. A source no model made (an upload,
- * gallery/recreate.js) has nothing to keep, so every run from it (Recreate) is.
+ * Whether a run made from a result (its recorded `parentItemId`) is one of that result's versions,
+ * an iteration of it, rather than a new image derived from it. Every iteration is, whatever model
+ * or operation it uses: an edit or animation (Edit, Animate, the viewer's prompt, a Chat edit)
+ * works on the result itself, and a fresh run from its settings (Prompt, Run Again, Exact Repeat,
+ * on any model) keeps at least `versionPromptOverlap` of its prompt. Only a fresh run that replaces
+ * most of the prompt, using the result as a reference or starting point for something new, is
+ * derived. A source no model made (an upload, gallery/recreate.js) has no prompt to keep, so every
+ * run from it (Recreate) is a version.
  */
 export function isVersion(
   run: { operation: GenerationOperation; input: GenerationInput },
   source: { input: GenerationInput },
 ) {
   if (run.operation !== "image" || !model(source.input)) return true;
-  return (
-    model(run.input) === model(source.input) &&
-    promptOverlap(run.input.prompt, source.input.prompt) >= versionPromptOverlap
-  );
+  return promptOverlap(run.input.prompt, source.input.prompt) >= versionPromptOverlap;
 }
 
 /**
