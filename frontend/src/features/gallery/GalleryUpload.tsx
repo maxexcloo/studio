@@ -2,8 +2,9 @@ import { useRef, useState } from "react";
 import { Button, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FolderUp, Upload } from "lucide-react";
+import { ChevronDown, FolderUp } from "lucide-react";
 import { api } from "../../api";
+import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
@@ -138,10 +139,10 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
               {...(phone ? iconChipProps : chipProps)}
               aria-label="Upload"
               loading={upload.uploading}
-              leftSection={phone ? undefined : <Upload size={15} />}
+              leftSection={phone ? undefined : <icons.upload size={15} />}
               rightSection={phone ? undefined : <ChevronDown size={14} />}
             >
-              {phone ? <Upload size={16} /> : "Upload"}
+              {phone ? <icons.upload size={16} /> : "Upload"}
             </Button>
           </Menu.Target>
         </Tooltip>
@@ -152,7 +153,7 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
                 {
                   id: "upload-files",
                   label: "Upload Files…",
-                  icon: Upload,
+                  icon: icons.upload,
                   onClick: () => filesInput.current?.click(),
                 },
                 {

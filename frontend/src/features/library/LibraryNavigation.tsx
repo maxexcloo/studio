@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, FileCog, HardDriveDownload, Lightbulb } from "lucide-react";
+import { BookOpen, Boxes, Compass, FileCog, HardDriveDownload, Import } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -35,7 +35,7 @@ export const librarySections = {
   },
   downloads: {
     label: "Downloads",
-    description: "Current and recent model downloads. Cancelling keeps partial files to resume.",
+    description: "Current and recent model downloads. Stopping keeps partial files to resume.",
     icon: HardDriveDownload,
     admin: true,
     group: "Getting More",
@@ -44,14 +44,14 @@ export const librarySections = {
     label: "Imports",
     description:
       "Import a Civitai or Hugging Face link, or an image, and review its compatibility.",
-    icon: icons.download,
+    icon: Import,
     admin: true,
     group: "Getting More",
   },
   presets: {
     label: "Inspiration",
     description: "Saved prompts and settings to start from.",
-    icon: Lightbulb,
+    icon: Compass,
     admin: true,
     group: "Getting More",
   },

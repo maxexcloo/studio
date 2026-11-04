@@ -544,12 +544,12 @@ function DefinitionForm({
                 disabled={busy}
                 onClick={() => setRemoving(true)}
               >
-                Remove {noun}
+                Delete {noun}
               </Button>
             )}
           </Group>
           <Group gap="xs">
-            <Button variant="subtle" color="gray" onClick={close}>
+            <Button variant="default" onClick={close}>
               Cancel
             </Button>
             <Button
@@ -564,16 +564,16 @@ function DefinitionForm({
       </Stack>
       <ConfirmDialog
         opened={removing}
-        title={`Remove ${noun}`}
-        action="Remove"
+        title={`Delete ${noun}`}
+        action="Delete"
         pending={remove.isPending}
         error={remove.error?.message}
         onConfirm={() => remove.mutate()}
         onClose={() => setRemoving(false)}
       >
         {kind === "profile"
-          ? `Remove ${id}? Studio keeps a backup and its version history; gallery items made with it stay.`
-          : `Remove ${id}? Studio keeps its version history. A guide that profiles still use stays until they use another.`}
+          ? `Delete ${id}? Its backup and version history keep it restorable; gallery items made with it stay.`
+          : `Delete ${id}? Its version history keeps it restorable. A guide that profiles still use stays until they use another.`}
       </ConfirmDialog>
     </form>
   );

@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { ChevronDown, ImagePlus, Upload } from "lucide-react";
+import { ChevronDown, ImagePlus } from "lucide-react";
 import { icons } from "../../ui/icons";
 import {
   keepPreviousData,
@@ -223,9 +223,9 @@ export function ReferencePicker({
             aria-label="Upload Reference"
             loading={placement.uploading}
             disabled={!target}
-            leftSection={phone ? undefined : <Upload size={15} />}
+            leftSection={phone ? undefined : <icons.upload size={15} />}
           >
-            {phone ? <Upload size={16} /> : "Upload"}
+            {phone ? <icons.upload size={16} /> : "Upload"}
           </Button>
         </Tooltip>
       )}

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
-import { Bookmark, Brush, ChevronDown, X } from "lucide-react";
+import { Bookmark, Brush, ChevronDown } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { usePhone } from "../../ui/usePhone";
@@ -133,7 +133,7 @@ function ReferenceRole({
       )}
       {mask?.painted && (
         <Button {...iconChipProps} aria-label="Remove Mask" onClick={mask.onRemove}>
-          <X size={14} />
+          <icons.clear size={14} />
         </Button>
       )}
     </Button.Group>
@@ -217,7 +217,7 @@ export function GenerationInputControls({
         <Button
           {...chipProps}
           aria-label={`Clear Seed ${seed}`}
-          rightSection={<X size={14} />}
+          rightSection={<icons.clear size={14} />}
           onClick={() => onChange({ seed: "" })}
         >
           Seed {seed}

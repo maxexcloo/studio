@@ -155,8 +155,7 @@ export function ReferenceSlots({
                       </>
                     )}
                     <Menu.Item
-                      color="red"
-                      leftSection={<icons.delete size={16} />}
+                      leftSection={<icons.clear size={16} />}
                       onClick={() =>
                         onChange(references.filter((reference) => referenceKey(reference) !== key))
                       }

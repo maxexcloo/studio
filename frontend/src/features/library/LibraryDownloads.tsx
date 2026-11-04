@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
 import type { Models } from "../../types";
 import { DataTable } from "../../ui/DataTable";
+import { icons } from "../../ui/icons";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 interface ModelDownload {
@@ -167,14 +168,16 @@ export function LibraryDownloads({ active }: { active: boolean }) {
                 {running && (
                   <Menu.Item
                     color="red"
+                    leftSection={<icons.stop size={16} />}
                     disabled={action.isPending}
                     onClick={() => action.mutate({ id: item.id, cancel: true })}
                   >
-                    Cancel Download
+                    Stop Download
                   </Menu.Item>
                 )}
                 {retry && (
                   <Menu.Item
+                    leftSection={<icons.retry size={16} />}
                     disabled={action.isPending}
                     onClick={() => action.mutate({ id: item.id, cancel: false })}
                   >

@@ -394,12 +394,12 @@ test("Account menu names the account by its email and opens the account workspac
       "Sign Out",
     ]);
   } else {
-    // Appearance, Library, Settings, User: each named on hover.
+    // Appearance, Library, Settings, Account: each named on hover.
     await page.getByRole("button", { name: "Appearance", exact: true }).hover();
     await expect(page.getByRole("tooltip", { name: "Appearance", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "User", exact: true }).hover();
-    await expect(page.getByRole("tooltip", { name: "User", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "User", exact: true }).click();
+    await page.getByRole("button", { name: "Account", exact: true }).hover();
+    await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Account", exact: true }).click();
   }
   await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();

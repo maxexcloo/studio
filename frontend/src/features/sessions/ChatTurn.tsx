@@ -1,7 +1,8 @@
 import { Alert, Button, Collapse, Group, Loader, Paper, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Check, ChevronDown, ChevronRight, Pencil, Wand, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Wand, X } from "lucide-react";
 import type { ChatMessage, ChatStep } from "../../../../shared/chat";
+import { icons } from "../../ui/icons";
 import { WritingStream, WritingThinking } from "../generation/PromptWriting";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GenerationCard } from "./GenerationCard";
@@ -95,7 +96,7 @@ export function ChatTurn({
   if (message.role === "user")
     return quiet ? (
       <Group gap={6} justify="flex-end" c="dimmed" className={classes.quiet}>
-        <Pencil size={13} aria-hidden />
+        <icons.edit size={13} aria-hidden />
         <Text size="xs">{quiet}</Text>
       </Group>
     ) : (

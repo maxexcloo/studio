@@ -29,7 +29,9 @@ primary component reference and verify APIs against the installed version.
   settings, ListFilter for filters, the gear for settings, Layers only for
   versions, Sparkles only for the prompt assistant, Star only for starring, Trophy
   for a comparison's winner, Blend for Compare and Columns for side by side,
-  Square for Stop, X for Clear, Info for Details and Ellipsis for More.
+  Square for Stop, X for Clear (and for removing an item from a draft), Trash
+  only for Delete, Info for Details, Ellipsis for More, RefreshCw for Refresh
+  and Check Updates, and one icon each for Rename and Upload.
 - Style with Mantine props and theme `extend` defaults first; component-specific
   CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
   global class rules and per-call sizes that the theme should own.
@@ -44,8 +46,8 @@ primary component reference and verify APIs against the installed version.
   app-specific CSS. Translucent blurred ("glass") surfaces apply throughout
   (header, sidebars, cards, overlays, viewer chrome, composer) through theme
   defaults, with readable contrast over media. Follow the system colour scheme by
-  default. The header Theme popover owns persisted Animations, Background, Colour,
-  Colour Scheme, Corners and Layout controls in that order; Settings does not duplicate appearance controls.
+  default. The header Appearance popover owns persisted Animations, Background, Colour,
+  Colour Scheme, Corners and Layout controls in that order, each control named as its heading; Settings does not duplicate appearance controls.
 - Controls follow one size and emphasis scale from the `theme.ts` defaults,
   in two densities that `theme.ts` sets once: forms 36 px and bars 32 px, both
   40 px on phones. Standard: Button and inputs `md` (forms), ActionIcon (bars),
@@ -76,10 +78,10 @@ primary component reference and verify APIs against the installed version.
   (the sidebar lists the Chats); on phones a slideout, listing the Chats in Chat.
   Full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
-  placement shown honestly. The phone overflow orders Library, Settings,
-  Theme, a divider, the account name, Account and supported Sign Out. Desktop
-  Library and Settings are followed by Theme and the account icon, each with a
-  tooltip; the header follows the workspace width. The account menu shows the actual name,
+  placement shown honestly. The phone overflow orders Appearance, Library,
+  Settings (16 px icons), a divider, the account name, Account and supported
+  Sign Out. Desktop shows Appearance, Library, Settings and Account as icons,
+  each with a tooltip; the header follows the workspace width. The account menu shows the actual name,
   Account and supported Sign Out.
 - Full/Fixed controls the workspace. Chat has a structural desktop sessions
   sidebar, flush below the header through the viewport bottom, with a distinct
@@ -490,7 +492,7 @@ primary component reference and verify APIs against the installed version.
   prompt as the message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
   viewer queue as usual into a strip of the item's versions, grouped as the grid
   groups them (`gallery/versions.ts`); choosing one makes it current. Under the
-  field come the labelled Animate ▾, Edit, Recreate ▾, Upscale ▾, Copy ▾ and
+  field come the labelled Animate ▾ (Extend ▾ for a video, in Chat cards too), Edit, Recreate ▾, Upscale ▾, Copy ▾ and
   Download, then Star and Delete as icons with tooltips; Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom, Animate in Composer). Details lists
@@ -558,7 +560,7 @@ primary component reference and verify APIs against the installed version.
   queue one run each from the selection bar) and Use as Reference; Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
-  original kept); Animate › Fast or Quality as a small segmented control at the
+  original kept); Animate (a video's is named Extend) › Fast or Quality as a small segmented control at the
   top (Fast by default, shown when they run different video profiles, for the
   themes and the composer), Review Prompt First (checked), themes, Custom
   Animation, Animate in Composer (a video's themes continue it from its last
@@ -566,10 +568,11 @@ primary component reference and verify APIs against the installed version.
   Animate in Composer, and Use Frame as Reference and Save Frame as Image take the
   frame showing in the viewer, else the last); Upscale › once upscaled Show
   Upscale (switching between it and the original) and Compare Upscale first, then,
-  set out as Animate's are, Upscale Quality as a small segmented control (Fast, Balanced by default, High)
-  and Face Detail (checked; disabled when the worker can't run it), then Upscale
-  Image (or Video; Regenerate Upscale once upscaled) at those settings and the
-  automatic size, and Upscale Options… (quality, size, Face Detail); Copy › Prompt, Details; a video's Download › Video, GIF,
+  set out as Animate's are, the settings: Upscale Quality as a small segmented control (Fast, Balanced by default, High),
+  Face Detail (checked; disabled when the worker can't run it) and Upscale
+  Options… (a dialog of quality, size and Face Detail whose action is Upscale
+  Image or Video), then last Upscale Image (or Video; Regenerate Upscale once
+  upscaled) at those settings and the automatic size; Copy › Prompt, Details; a video's Download › Video, GIF,
   Back and Forth (an MP4 played forward then back, looping without a jump). Phones
   that share natively show Share Image in Download's place; desktop has no Share.
   The viewer and gallery selection share one `ActionBarGroups` bar of divided

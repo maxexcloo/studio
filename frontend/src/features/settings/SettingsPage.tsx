@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ActionIcon, Stack, Tooltip } from "@mantine/core";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { RuntimePanel, servicesStatusQuery, workersQuery } from "../runtime/RuntimePanel";
 import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { SectionHeader } from "../../ui/SectionToolbar";
@@ -29,7 +29,7 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
-        <Tooltip label="Check Every Service Again">
+        <Tooltip label="Refresh">
           <ActionIcon
             variant="subtle"
             color="gray"
@@ -39,7 +39,7 @@ function WorkerSettings({ heading }: { heading: ReactNode }) {
               workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
             }
           >
-            <RefreshCw size={18} />
+            <icons.refresh size={18} />
           </ActionIcon>
         </Tooltip>
       </SectionHeader>

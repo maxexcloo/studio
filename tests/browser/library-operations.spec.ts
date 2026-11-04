@@ -150,12 +150,12 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     await page.getByRole("menuitem", { name: action, exact: true }).click();
     await expect(page.getByRole("menu")).toBeHidden();
   };
-  await actions(active.file, "Cancel Download");
+  await actions(active.file, "Stop Download");
   await expect(page.getByText("Worker is reconnecting. Try again.", { exact: true })).toBeVisible();
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText(
     "Downloading",
   );
-  await actions(active.file, "Cancel Download");
+  await actions(active.file, "Stop Download");
   await expect(table.getByRole("row").filter({ hasText: active.file })).toContainText("Paused");
   await expect(table.getByRole("row").filter({ hasText: queued.file })).toContainText("Queued");
   await actions(paused.file, "Resume Download");

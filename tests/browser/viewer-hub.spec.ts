@@ -641,7 +641,7 @@ test("With local video stopped, an Animate theme queues on Grok", async ({ page 
   });
 });
 
-test("A video's Animate theme continues it from its last frame, and its frame can be a reference or an image", async ({
+test("A video's Extend theme continues it from its last frame, and its frame can be a reference or an image", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -661,7 +661,7 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
   await page.goto("/video");
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
   await expect(
     page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
   ).toBeVisible();
@@ -676,7 +676,7 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
     },
   });
   // The frame showing is saved as an image, or becomes a reference in the composer.
-  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await viewer.getByRole("button", { name: "Extend", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Saved to Uploads", exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
