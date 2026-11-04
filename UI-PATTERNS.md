@@ -467,9 +467,8 @@ primary component reference and verify APIs against the installed version.
   prompt as the message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
   viewer queue as usual into a strip of the item's versions, grouped as the grid
   groups them (`gallery/versions.ts`); choosing one makes it current. Under the
-  field come the labelled primaries Animate ▾, Edit, Recreate ▾ and Upscale ▾,
-  then the other shared actions as icons with tooltips (Copy, Download, Star,
-  Delete); Animate opens its LLM prompt menu
+  field come the labelled Animate ▾, Edit, Recreate ▾, Upscale ▾, Copy ▾ and
+  Download, then Star and Delete as icons with tooltips; Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
@@ -521,8 +520,8 @@ primary component reference and verify APIs against the installed version.
   and right-click menu, never the viewer's bar) and
   Delete is last. Bars are icons with tooltips (their accessible
   names unchanged) at one size and spacing; only the desktop viewer names Animate ▾,
-  Edit, Recreate ▾ and Upscale ▾ beside their icons, and only those labelled buttons show
-  ▾. There are no split buttons: a control with options opens its menu on click,
+  Edit, Recreate ▾, Upscale ▾, Copy ▾ and Download (▾ for a video) beside their
+  icons, and only those labelled buttons show ▾. There are no split buttons: a control with options opens its menu on click,
   and its first option that isn't a setting (a segmented choice or a checked
   option that keeps the menu open) is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
