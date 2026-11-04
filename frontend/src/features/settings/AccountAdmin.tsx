@@ -95,23 +95,29 @@ function GroupEditor({
       }}
     >
       <Stack>
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+        {/* The ID is fixed once a group exists, so only a new group shows it. */}
+        <SimpleGrid cols={{ base: 1, sm: initial ? 1 : 2 }}>
           <TextInput label="Group Name" required {...form.getInputProps("name")} />
-          <TextInput
-            label="Group ID"
-            description="Lowercase letters, numbers, colons or hyphens."
-            required
-            disabled={!!initial}
-            {...form.getInputProps("id")}
-          />
+          {!initial && (
+            <TextInput
+              label="Group ID"
+              description="Lowercase letters, numbers, colons or hyphens."
+              inputWrapperOrder={["label", "input", "description", "error"]}
+              required
+              {...form.getInputProps("id")}
+            />
+          )}
         </SimpleGrid>
+        <Text size="sm" fw={500}>
+          Model Access
+        </Text>
         <Checkbox
           label="All Local Models"
           {...form.getInputProps("allModels", { type: "checkbox" })}
         />
         {!form.values.allModels && (
           <MultiSelect
-            label="Local Model Access"
+            label="Local Models"
             searchable
             data={ids.map((id) => ({
               value: id,
@@ -134,7 +140,7 @@ function GroupEditor({
         </SimpleGrid>
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <Button type="submit" style={{ alignSelf: "start" }} loading={save.isPending}>
-          Save Access Group
+          Save
         </Button>
       </Stack>
     </form>
@@ -313,7 +319,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
-        title={editing === "new" ? "New Group" : `Edit ${editing?.name || "Group"}`}
+        title={editing === "new" ? "New Group" : "Edit Group"}
         size="lg"
       >
         <FocusTrap.InitialFocus />
