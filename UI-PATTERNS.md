@@ -545,8 +545,8 @@ primary component reference and verify APIs against the installed version.
   and its first option that isn't a setting (a segmented choice or a checked
   option that keeps the menu open) is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
-  dividers only between real groups and no explanatory notes, only the reason when
-  nothing can run. Options are submenus on desktop and expand in place on phones,
+  dividers only between real groups and no explanatory notes (when nothing can
+  run, the options are simply disabled). Options are submenus on desktop and expand in place on phones,
   never as a second floating layer, and an action left with one option runs it
   without a submenu. The options: Recreate (reusing the item's prompt and
   settings) › Edit Prompt (opens the composer), Use as Reference (images), Run
