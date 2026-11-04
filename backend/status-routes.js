@@ -6,7 +6,7 @@ import { profileOnBackendKey, routeJob } from "./comfy/backends.js";
 import { comfyUrl, isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import { dataDir, filterVisibleGallery, gallery } from "./gallery/store.js";
+import { dataDir, gallery, visibleGallery } from "./gallery/store.js";
 import { queueClearsAt } from "./jobs.js";
 import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
@@ -149,7 +149,7 @@ export function registerStatusRoutes(app, { observeServices, store }) {
   // Library › Profiles: each profile's runs, failures, stars and speed across every account.
   app.get("/api/stats/profiles", (req, res) => {
     if (!requireAdmin(req, res)) return;
-    res.json({ ok: true, profiles: profileStats(filterVisibleGallery(gallery)) });
+    res.json({ ok: true, profiles: profileStats(visibleGallery()) });
   });
 
   // Versions, system and GPU for a bug report (Settings › About, and a failed card's Copy report).
