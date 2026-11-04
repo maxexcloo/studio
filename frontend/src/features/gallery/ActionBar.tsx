@@ -14,6 +14,7 @@ import {
 } from "@mantine/core";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
+import { menuWidth } from "../../theme";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -51,10 +52,6 @@ export interface Action {
 }
 /** Groups are separated by dividers, in menus and bars alike. */
 export type ActionGroups = Action[][];
-
-/** Every action menu's width and row height; their icons are 16px. */
-export const menuWidth = 220;
-const rowHeight = 36;
 
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
 const hasOptions = (action: Action) => Boolean(action.menu && shown(action.menu).length);
@@ -117,7 +114,6 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           return (
             <Fragment key={id}>
               <Menu.Item
-                h={rowHeight}
                 color={color}
                 leftSection={<Icon size={16} />}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
@@ -142,12 +138,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           return (
             <Menu.Sub key={id} position="right-start">
               <Menu.Sub.Target>
-                <Menu.Sub.Item
-                  h={rowHeight}
-                  color={color}
-                  leftSection={<Icon size={16} />}
-                  disabled={disabled}
-                >
+                <Menu.Sub.Item color={color} leftSection={<Icon size={16} />} disabled={disabled}>
                   {label}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
@@ -160,7 +151,6 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
         return (
           <Menu.Item
             key={id}
-            h={rowHeight}
             color={color}
             leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
             rightSection={checked ? <Check size={14} /> : undefined}

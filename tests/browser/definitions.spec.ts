@@ -12,7 +12,7 @@ import {
 /** Desktop shows the Profiles actions as icons; phones list them under More. */
 async function profileAction(page: Page, name: string) {
   if ((page.viewportSize()?.width || 1440) < 768) {
-    await page.getByRole("button", { name: "More Profile Actions", exact: true }).click();
+    await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
     await page.getByRole("menuitem", { name, exact: true }).click();
   } else await page.getByRole("button", { name, exact: true }).click();
 }
@@ -438,7 +438,7 @@ test("The Profiles toolbar groups search and filter, the other actions A–Z, th
   );
   const middle =
     (page.viewportSize()?.width || 1440) < 768
-      ? ["More Profile Actions"]
+      ? ["More Profiles Actions"]
       : ["Combine Backends", "Download All", "Merge Duplicate Profiles"];
   expect(items).toEqual(["Search Profiles", "Filter Profiles", "|", ...middle, "|", "New Profile"]);
 });

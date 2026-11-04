@@ -42,6 +42,8 @@ export const backgrounds = {
   cool: { label: "Cool", light: "#f1f5f9", dark: "#0f1720" },
 } as const;
 export type Background = keyof typeof backgrounds;
+/** Every action and row menu's width; their icons are 16px. */
+export const menuWidth = 220;
 export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
 export type MotionSpeed = keyof typeof motionSpeeds;
 // Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
@@ -228,7 +230,8 @@ export function studioTheme({
       }),
       Menu: Menu.extend({
         defaultProps: { transitionProps: popupTransition },
-        styles: { dropdown },
+        // One row height for every menu's items.
+        styles: { dropdown, item: { minHeight: 36 } },
       }),
       // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
       // deep shadow. Full-screen dialogs (the viewer, phone panels) fill the viewport instead.

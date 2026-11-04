@@ -41,7 +41,7 @@ export function GenerationSettings() {
           disabled={setting.locked}
           searchable
           clearable
-          nothingFoundMessage="No Matching Profiles"
+          nothingFoundMessage="No Matches"
           w={{ base: "100%", sm: 240 }}
         />
       </SettingRow>

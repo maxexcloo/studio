@@ -342,7 +342,7 @@ function LoraControls({
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   const empty =
     terms || filter !== "all"
-      ? "No Matching LoRAs"
+      ? "No Matches"
       : tab === "recommended"
         ? "No Recommended LoRAs"
         : tab === "favourites"

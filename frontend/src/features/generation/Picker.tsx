@@ -29,6 +29,7 @@ import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
+import { menuWidth } from "../../theme";
 import { usePhone } from "../../ui/usePhone";
 import { escapePanel } from "./chip";
 import classes from "./Picker.module.css";
@@ -526,7 +527,7 @@ export function SavedList<T extends SavedItem>({
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // Update From Current changes nothing in view, so its row says Updated for a moment.
+  // Update from Current changes nothing in view, so its row says Updated for a moment.
   const [updated, flashUpdated] = useFlash<string>();
   if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
   return (
@@ -574,7 +575,7 @@ export function SavedList<T extends SavedItem>({
               </UnstyledButton>
             )}
             {/* Rename focuses its field, so the closing menu must not take focus back. */}
-            <Menu position="bottom-end" withinPortal={false} returnFocus={false}>
+            <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
               <Menu.Target>
                 <ActionIcon
                   variant="subtle"
@@ -585,18 +586,29 @@ export function SavedList<T extends SavedItem>({
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item onClick={() => setRenaming(item.id)}>Rename {noun}</Menu.Item>
+                <Menu.Item
+                  leftSection={<icons.rename size={16} />}
+                  onClick={() => setRenaming(item.id)}
+                >
+                  Rename {noun}
+                </Menu.Item>
                 {onUpdate && (
                   <Menu.Item
+                    leftSection={<icons.refresh size={16} />}
                     onClick={() => {
                       onUpdate(item);
                       flashUpdated(item.id);
                     }}
                   >
-                    Update From Current
+                    Update from Current
                   </Menu.Item>
                 )}
-                <Menu.Item color="red" onClick={() => onDelete(item)}>
+                <Menu.Divider />
+                <Menu.Item
+                  color="red"
+                  leftSection={<icons.delete size={16} />}
+                  onClick={() => onDelete(item)}
+                >
                   Delete {noun}
                 </Menu.Item>
               </Menu.Dropdown>
