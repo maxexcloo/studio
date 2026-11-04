@@ -45,7 +45,8 @@ export function fileFits(file = "", folder = "", { gguf = false } = {}) {
   return gguf ? { fits: true, note: "" } : { fits: false, note: "The worker has no GGUF loader" };
 }
 
-const shareFamily = (a = [], b = []) =>
+/** Whether two family lists overlap; an unknown family (an empty list) fits any. */
+export const shareFamily = (a = [], b = []) =>
   !a.length || !b.length || a.some((family) => b.includes(family));
 
 /**

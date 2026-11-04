@@ -33,7 +33,7 @@ import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { loadMcpPrompting } from "../mcp/prompting.js";
 
 const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
-const validId = (id) =>
+export const validId = (id) =>
   /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
 const validPackId = (id) =>
   /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(String(id || "")) && !String(id).includes("..");

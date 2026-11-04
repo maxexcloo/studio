@@ -13,19 +13,14 @@
  * within about 35%.
  */
 
+import { median } from "./generation-timing.js";
+
 const PER_KEY = 30;
 const TOTAL = 200;
 const MIN_UPSCALES = 2;
 const TRUSTED_ERROR = 0.35;
 // How a whole upscale scales with size before there is spread to fit both parts.
 const SIZE_EXPONENT = 0.8;
-
-const median = (values) => {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
 
 /** What an upscale writes, in output megapixels across the batch. */
 export function upscaleWork({ width = 0, height = 0, count = 1 } = {}) {
