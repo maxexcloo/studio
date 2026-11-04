@@ -35,6 +35,8 @@ export const encoderKinds = {
   gemma3_12b: { label: "Gemma 3 12B", name: /gemma[-_ ]?3.*12b/i },
   gemma2_2b: { label: "Gemma 2 2B", name: /gemma[-_ ]?2.*2b/i },
   llama31_8b: { label: "Llama 3.1 8B", name: /llama/i },
+  // P-H3-Image's own build, which no other family's slot takes.
+  p_h3_image: { label: "P-H3 Image", name: /p[-_ ]?h3[-_ ]?image.*text[-_ ]?encoder/i },
 };
 
 // VAE layouts group kinds whose shapes match exactly
@@ -58,6 +60,7 @@ export const vaeKinds = {
   h3_video: { label: "MiniMax H3 video VAE", layout: "h3v" },
   h3_audio: { label: "MiniMax H3 audio VAE", layout: "h3a" },
   mage_flow: { label: "MageFlow VAE", layout: "mage" },
+  p_h3_image: { label: "P-H3 Image VAE", layout: "unknown" },
 };
 
 function isAbliterated(name = "") {
@@ -91,6 +94,7 @@ const vaeNameHints = [
   ["sdxl", /xl/i],
   ["hunyuan15", /hunyuan[-_ ]?video[-_ ]?1[._]?5|hunyuanvideo15/i],
   ["hunyuan_video", /hunyuan/i],
+  ["p_h3_image", /p[-_ ]?h3[-_ ]?image/i],
   ["h3_audio", /h3.*audio/i],
   ["h3_video", /h3/i],
   ["ltx_video", /ltx/i],

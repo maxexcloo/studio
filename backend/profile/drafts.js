@@ -193,8 +193,8 @@ const listed = (info, classType, file) =>
  * parts to download, `record.results` the profile and guide ids, `record.warnings` what to know.
  *
  * deps: templates() → [{id, family, kind, raw, aiDrafted}]; info() → object_info or null;
- * families(baseModel) → family ids; familyFromName(file) → family id; taken(id) → bool;
- * downloadsFor(file, folder) → catalogue download specs; engine (assistant.js) or null;
+ * families(baseModel, file) → family ids, as the file's name narrows them; familyFromName(file)
+ * → family id; taken(id) → bool; downloadsFor(file, folder) → catalogue download specs; engine (assistant.js) or null;
  * draftedProfile (assistant.js, used without an engine); validate(id, text, {info});
  * create(id, text, {by}) → saves the new AI-drafted profile; guides (profile/store.js guide
  * store); onSaved().
@@ -212,7 +212,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   const families = [
     ...new Set(
       [
-        ...(deps.families(record.baseModel || "") || []),
+        ...(deps.families(record.baseModel || "", modelFile) || []),
         ...(deps.familyFromName?.(modelFile) ? [deps.familyFromName(modelFile)] : []),
       ].filter((family) => family && family !== "custom"),
     ),
