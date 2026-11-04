@@ -599,6 +599,14 @@ test("new chats get a model title, stay New Chat while it is offline and never r
   };
   await service.title("alice", renamed.id, "anything");
   assert.equal(db.session("alice", renamed.id)?.title, "My Name");
+
+  // With Chat Titles off, the model is never asked and the chat stays New Chat.
+  const before = requests.length;
+  const untitled = db.createSession("alice");
+  Object.assign(service.options, { titles: () => false });
+  await service.title("alice", untitled.id, "a quiet harbour");
+  assert.equal(requests.length, before);
+  assert.equal(db.session("alice", untitled.id)?.title, "New Chat");
   db.close();
 });
 test("the system context carries the owner's taste summary as data, and nothing without one", async () => {

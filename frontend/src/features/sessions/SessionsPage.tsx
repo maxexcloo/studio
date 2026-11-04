@@ -13,7 +13,7 @@ import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatWorkspace, SessionList } from "./ChatWorkspace";
+import { ChatHeading, SessionList } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { sessionQuery } from "./queries";
 import { iterationTiles, SessionIteration } from "./SessionIteration";
@@ -28,7 +28,7 @@ export function SessionsPage() {
   const phone = usePhone();
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
-    <ChatWorkspace>
+    <>
       {/* Phones have no Chats sidebar, so the chats are listed here; the box below starts one. */}
       {phone ? (
         <Stack
@@ -45,7 +45,7 @@ export function SessionsPage() {
         <EmptyState fill>No Chat Selected</EmptyState>
       )}
       <ChatDock />
-    </ChatWorkspace>
+    </>
   );
 }
 
@@ -141,17 +141,17 @@ function SessionPage() {
   }, [id, session.data, draft.sessionId, setDraft]);
   if (loading)
     return (
-      <ChatWorkspace>
+      <>
         <LoadingState fill label="Loading Chat" />
         <ChatDock />
-      </ChatWorkspace>
+      </>
     );
   if (session.error)
     return (
-      <ChatWorkspace>
+      <>
         <Alert color="red">{session.error.message}</Alert>
         <ChatDock />
-      </ChatWorkspace>
+      </>
     );
   const jobs = session.data.jobs;
   const messages = chat.data?.messages || [];
@@ -189,7 +189,8 @@ function SessionPage() {
       stagedSource === undefined ? 0 : stagedSource + 1,
     );
   return (
-    <ChatWorkspace session={session.data.session}>
+    <>
+      <ChatHeading session={session.data.session} />
       <Stack gap="xl" className={classes.page}>
         <div
           className={classes.thread}
@@ -273,6 +274,6 @@ function SessionPage() {
           />
         )}
       </Stack>
-    </ChatWorkspace>
+    </>
   );
 }

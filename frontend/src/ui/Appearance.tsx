@@ -142,28 +142,36 @@ export function AppearanceControls() {
             Background
           </Text>
           <SimpleGrid cols={2} spacing="xs">
-            {(Object.keys(backgrounds) as Background[]).map((background) => (
-              <Button
-                key={background}
-                variant={appearance.background === background ? "light" : "default"}
-                aria-label={`Use ${backgrounds[background].label} Background`}
-                aria-pressed={appearance.background === background}
-                onClick={() => setAppearance((previous) => ({ ...previous, background }))}
-                h={54}
-                px={6}
-                justify="space-between"
-              >
-                <Group gap={6} wrap="nowrap">
-                  <ColorSwatch
-                    color={backgrounds[background][scheme]}
-                    size={24}
-                    style={{ border: "1px solid var(--mantine-color-dimmed)" }}
-                  />
-                  <Text size="xs">{backgrounds[background].label}</Text>
-                  {appearance.background === background && <Check size={12} />}
-                </Group>
-              </Button>
-            ))}
+            {(Object.keys(backgrounds) as Background[]).map((background) => {
+              const chosen = appearance.background === background;
+              return (
+                <Button
+                  key={background}
+                  variant="default"
+                  aria-label={`Use ${backgrounds[background].label} Background`}
+                  aria-pressed={chosen}
+                  onClick={() => setAppearance((previous) => ({ ...previous, background }))}
+                  size="sm"
+                  px="xs"
+                  justify="flex-start"
+                  // Every tile keeps one bordered style; the chosen one's border takes the colour.
+                  style={
+                    chosen ? { borderColor: "var(--mantine-primary-color-filled)" } : undefined
+                  }
+                >
+                  <Group gap="xs" wrap="nowrap">
+                    <ColorSwatch
+                      color={backgrounds[background][scheme]}
+                      size={20}
+                      withShadow={false}
+                      style={{ border: "1px solid var(--mantine-color-default-border)" }}
+                    />
+                    <Text size="sm">{backgrounds[background].label}</Text>
+                    {chosen && <Check size={14} />}
+                  </Group>
+                </Button>
+              );
+            })}
           </SimpleGrid>
         </Stack>
 
@@ -171,7 +179,15 @@ export function AppearanceControls() {
           <Text size="sm" fw={500}>
             Colour
           </Text>
-          <Group gap="xs">
+          {/* Two even rows of five, spread across the popover's width. */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 30px)",
+              justifyContent: "space-between",
+              rowGap: "var(--mantine-spacing-xs)",
+            }}
+          >
             {colours.map((colour) => (
               <Tooltip
                 key={colour}
@@ -191,7 +207,7 @@ export function AppearanceControls() {
                 </ActionIcon>
               </Tooltip>
             ))}
-          </Group>
+          </div>
         </Stack>
         <Stack gap={6}>
           <Text size="sm" fw={500}>

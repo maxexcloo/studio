@@ -14,8 +14,9 @@ const item = (id: string, extra: Partial<SuggestedPromptItem> = {}): SuggestedPr
 
 /** A suggester over fakes: no model is called. */
 function fixture(items: SuggestedPromptItem[], vision: boolean) {
-  const state = { items, sent: [] as { images: number; hint: string }[] };
+  const state = { items, enabled: true, sent: [] as { images: number; hint: string }[] };
   const suggester = createPromptSuggester({
+    enabled: () => state.enabled,
     writer: {
       supportsVision: async () => vision,
       describe: async ({ images, hint }) => {
@@ -75,4 +76,12 @@ test("without vision the caption is the hint, and an uncaptioned item waits", as
     state.items.map((entry) => entry.suggestedPrompt),
     ["A prompt from a dog on a beach", undefined],
   );
+});
+
+test("switched off, no prompt is suggested and the model is never asked", async () => {
+  const { state, suggester } = fixture([item("upload")], true);
+  state.enabled = false;
+  assert.equal(await suggester.tick(), "off");
+  assert.deepEqual(state.sent, []);
+  assert.equal(state.items[0].suggestedPrompt, undefined);
 });

@@ -117,15 +117,18 @@ primary component reference and verify APIs against the installed version.
   badges and row menus, in Library as in Settings (Models, LoRAs and Imports
   as Users and Workers). A section with several lists shows its main list under
   the section's own toolbar and gives each further list a `SettingGroup`
-  heading with its own toolbar beside it, the create action at its far right
-  (Settings › Profiles: the profiles, then Guides, each row showing how they
-  link and its menu downloading that one as JSON; Download All takes every
-  profile and guide in one archive);
+  heading with its own toolbar beside it, the create action at its far right;
   every other part of a section, such as an import review's Files, is a
   `SettingGroup` too, never a second section heading. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
-  each run alphabetical, in the desktop navigation and the phone Section Select. No accordions:
+  and the Library its What You Have sections (Guides, LoRAs, Models, Profiles)
+  and then its Getting More ones (Downloads, Imports, Inspiration), each run
+  alphabetical, in the desktop navigation and the phone Section Select. The
+  Library opens on Models. Profiles and Guides live in the Library, each row
+  showing how they link and its menu downloading that one as JSON; Download All
+  in Profiles takes every profile and guide in one archive. Every section shows
+  `LoadingState` while its data first loads, and cached data at once after. No accordions:
   headings group a section's parts, and creating or configuring a record opens
   a popup. Dense records use the shared `DataTable` on Mantine Table
   (sortable headers, the toolbar query, one empty line, loading and the row menu;
@@ -455,10 +458,11 @@ primary component reference and verify APIs against the installed version.
   replaces the text in place, tinted, with the action's name in a small label
   over the field and Undo (restoring what was there), the one review pause
   before a written prompt runs; there is no panel above the field. Its actions
-  are icons with tooltips, two to a row beside the field like the composer's
-  prompt tools (one row in the phone viewer's short field and editor header),
+  are icons with tooltips in one column beside the field like the composer's
+  prompt tools, the field growing to the column's height (one row on phones,
+  where the column would stand taller than the short field, and in the editor header),
   showing only those that apply: Ask for a Change, Suggestions,
-  Undo and the send (Generate or Run) ending the last row; text buttons never
+  Undo and the send (Generate or Run) last; text buttons never
   sit in the field, where they would be cut off. Suggestions (Lightbulb) opens a
   menu of short changes that fit the image (its next steps) or the draft
   (surface `draft` without a request), loaded when it opens and cached per item
@@ -488,7 +492,7 @@ primary component reference and verify APIs against the installed version.
   inside the column (never bleeding past its edges), wrapping long words and
   scrolling within a bounded height, the caption starting expanded
   until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
-  sections run Caption, Prompt, Source, From, Derived, Model, LoRAs, References,
+  sections run Caption (with its tags), From, Prompt, Negative Prompt, Source, Derived, Model, LoRAs, References,
   Settings, Output and Timing, each a heading over its content, and an
   upscale's Output adds the Original Size the model drew beside its
   Dimensions. The

@@ -253,6 +253,7 @@ const catalogue = createModelCatalogue({ store, runtime, directCloud });
 const {
   catalogueModels,
   comfyDownMessage,
+  latestComfyContext,
   loadComfyContext,
   mediaModels,
   presetModels,
@@ -372,6 +373,21 @@ const presetRoutes = registerPresetRoutes(app, { models: presetModels });
 const unique = (...lists) => [
   ...new Set(lists.flat().filter((name) => typeof name === "string" && name)),
 ];
+/** The model files a ComfyUI node list offers, by folder. */
+const installedFiles = (info) => ({
+  loras: optionsFor(info, "LoraLoader", "lora_name"),
+  checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
+  diffusion_models: unique(
+    optionsFor(info, "UNETLoader", "unet_name"),
+    optionsFor(info, "UnetLoaderGGUF", "unet_name"),
+  ),
+  text_encoders: unique(
+    optionsFor(info, "CLIPLoader", "clip_name"),
+    optionsFor(info, "CLIPLoaderGGUF", "clip_name"),
+  ),
+  vae: optionsFor(info, "VAELoader", "vae_name"),
+  clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
+});
 const library = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
@@ -381,23 +397,12 @@ const library = registerLibraryRoutes(app, {
       info: () => profileObjectInfo("image"),
     }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  loraInfo: (names) => loraInfos(names),
-  installed: async () => {
-    const { info } = await loadComfyContext();
-    return {
-      loras: optionsFor(info, "LoraLoader", "lora_name"),
-      checkpoints: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
-      diffusion_models: unique(
-        optionsFor(info, "UNETLoader", "unet_name"),
-        optionsFor(info, "UnetLoaderGGUF", "unet_name"),
-      ),
-      text_encoders: unique(
-        optionsFor(info, "CLIPLoader", "clip_name"),
-        optionsFor(info, "CLIPLoaderGGUF", "clip_name"),
-      ),
-      vae: optionsFor(info, "VAELoader", "vae_name"),
-      clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
-    };
+  loraInfo: (names, options) => loraInfos(names, options),
+  installed: async () => installedFiles((await loadComfyContext()).info),
+  // The Library's list: the worker's last known files at once, refreshed in the background.
+  latestInstalled: async () => {
+    const { info, current } = await latestComfyContext();
+    return { files: installedFiles(info), current };
   },
   // Lookup says which ready profiles a link's base model fits.
   readyProfiles: async () =>
@@ -436,7 +441,7 @@ registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (req) => req.studioAccount?.userId || "",
 });
-// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
+// Library › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),
@@ -485,7 +490,12 @@ const tasteWriter = (ownerId) =>
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
-const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
+const tasteStore = createTaste({
+  dataDir,
+  writer: tasteWriter,
+  online: textOnline,
+  updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
+});
 // Signals name a merged profile by the id it goes by now (profile/merge.js).
 const taste = {
   ...tasteStore,
@@ -680,6 +690,8 @@ const suggestions = createSuggestions({
   image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
   // The viewer asks by job, so every result of the run keeps the same steps.
   save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
+  ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
+  nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
 });
 registerSuggestionRoutes(app, { suggestions });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
@@ -836,6 +848,7 @@ registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requ
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
+  enabled: () => flagEnabled("STUDIO_GALLERY_TITLES"),
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
@@ -845,6 +858,7 @@ const titler = createTitler({
 });
 // Suggested prompts (domain/suggested-prompts.ts) for items without one, such as uploads; Recreate uses them.
 const suggester = createPromptSuggester({
+  enabled: () => flagEnabled("STUDIO_SUGGESTED_PROMPTS"),
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
@@ -855,6 +869,7 @@ const suggester = createPromptSuggester({
 });
 // Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
 const nextSteps = createNextStepWork({
+  enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
   writer: assistantEngine,
   idle: galleryIdle,

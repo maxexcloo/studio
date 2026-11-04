@@ -113,15 +113,13 @@ function Workspace() {
                   <Route
                     path="/chat/:id?"
                     element={
-                      <Suspense
-                        fallback={
-                          <ChatWorkspace>
-                            <LoadingState fill label="Loading Chat" />
-                          </ChatWorkspace>
-                        }
-                      >
-                        <ChatPage />
-                      </Suspense>
+                      // The Chats list stays outside Suspense so a selection or search started while
+                      // the page loads survives it.
+                      <ChatWorkspace>
+                        <Suspense fallback={<LoadingState fill label="Loading Chat" />}>
+                          <ChatPage />
+                        </Suspense>
+                      </ChatWorkspace>
                     }
                   />
                   <Route path="*" element={<Navigate to="/images" replace />} />

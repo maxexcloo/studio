@@ -1,4 +1,4 @@
-import { Boxes, FileCog, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
+import { Boxes, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import {
@@ -40,13 +40,6 @@ const settingSections = {
     label: "Integrations",
     description: "Civitai, Hugging Face and the prompt assistant.",
     icon: Plug,
-    admin: true,
-    group: "Administration",
-  },
-  profiles: {
-    label: "Profiles",
-    description: "Generation profiles and prompting guides. Every saved version is kept.",
-    icon: FileCog,
     admin: true,
     group: "Administration",
   },

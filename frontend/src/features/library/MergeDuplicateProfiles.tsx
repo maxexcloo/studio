@@ -21,7 +21,7 @@ const duplicateProfilesQuery = queryOptions({
 });
 
 /**
- * Settings › Profiles › Merge Duplicate Profiles: previews same-named profiles that run the same
+ * Library › Profiles › Merge Duplicate Profiles: previews same-named profiles that run the same
  * definition, then keeps the newer id and records the older one as its alias (profile/merge.js).
  */
 export function MergeDuplicateProfiles({

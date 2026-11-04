@@ -26,7 +26,6 @@ test("Settings follow the settled section order and run maintenance and worker r
     "Generation",
     "Groups",
     "Integrations",
-    "Profiles",
     "Users",
     "Workers",
     "About",
@@ -42,7 +41,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(2, 8));
+    ).toHaveText(order.slice(2, 7));
   await section(page, "Settings", "Preferences");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
@@ -208,6 +207,8 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   await page.goto("/settings#preferences");
   // The unlabelled track sits over the input; the row's accessible name is on the input.
   const toggle = page.getByRole("switch", { name: "Tile Captions", exact: true });
+  // Force skips the wait for the switch to enable once the account's preferences load.
+  await expect(toggle).toBeEnabled();
   await toggle.click({ force: true });
   await expect(toggle).toBeChecked();
   await page.getByRole("button", { name: "Close Settings", exact: true }).click();
@@ -708,7 +709,9 @@ test("Settings › Generation switches follow at once and settle back after a fa
     });
   });
   await page.goto("/settings#generation");
-  const toggle = page.getByRole("switch", { name: "Gallery Captions", exact: true });
+  const toggle = page
+    .getByRole("region", { name: "Background AI", exact: true })
+    .getByRole("switch", { name: "Gallery Captions", exact: true });
   await expect(toggle).toBeChecked();
   await toggle.click({ force: true });
   // The switch moves before the server answers, and nothing else in the section locks.

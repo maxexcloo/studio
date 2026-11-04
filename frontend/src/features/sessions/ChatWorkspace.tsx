@@ -403,7 +403,7 @@ export function SessionList({
  * The open chat's title with Rename and Delete, and a close cross back to No Chat Selected;
  * follows the list so generated titles arrive.
  */
-function ChatHeading({ session }: { session: Session }) {
+export function ChatHeading({ session }: { session: Session }) {
   const listed = useQuery({
     ...sessionsQuery,
     select: (data) => data.sessions.find((entry) => entry.id === session.id),
@@ -448,16 +448,13 @@ function ChatHeading({ session }: { session: Session }) {
   );
 }
 
-export function ChatWorkspace({ children, session }: { children: ReactNode; session?: Session }) {
+export function ChatWorkspace({ children }: { children: ReactNode }) {
   return (
     <div className={classes.workspace} data-chat-workspace>
       <aside className={classes.sidebar} aria-label="Chats">
         <SessionList heading />
       </aside>
-      <div className={classes.main}>
-        {session && <ChatHeading session={session} />}
-        {children}
-      </div>
+      <div className={classes.main}>{children}</div>
     </div>
   );
 }

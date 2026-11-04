@@ -198,6 +198,25 @@ test("every eighth signal rewrites the summary in the background, at most every 
   assert.equal(taste.read("bob").summary, reply);
 });
 
+test("with Taste Updates off, signals never rewrite the summary, but Refresh still does", async (t) => {
+  let calls = 0;
+  const writer = {
+    settings: () => ({}),
+    model: async () => "fixture-text",
+    chat: async () => {
+      calls += 1;
+      return { text: "Likes misty harbours." };
+    },
+  };
+  const taste = tasteFixture(t, { writer: () => writer, updates: () => false });
+  for (let index = 0; index < 8; index++)
+    taste.record("alice", [tasteSignal("star", `job-${index}`)]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(calls, 0);
+  assert.equal((await taste.refresh("alice")).summary, "Likes misty harbours.");
+  assert.equal(calls, 1);
+});
+
 test("a compare winner is preferred over each other variant, which the summary treats as relative", async (t) => {
   const calls: { messages: { role: string; content: string }[] }[] = [];
   const taste = tasteFixture(t, {

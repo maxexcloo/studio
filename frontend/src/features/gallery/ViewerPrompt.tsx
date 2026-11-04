@@ -9,6 +9,7 @@ import {
   AskButton,
   ChangeActions,
   ChangeSuggestions,
+  fitActions,
   ProposalLabel,
   proposalText,
   proposedClass,
@@ -27,7 +28,7 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its actions stand two to a row beside the text. Continue in Chat (desktop; phones list it under
+ * Its actions stand in one column beside the text, the send last. Continue in Chat (desktop; phones list it under
  * More) takes the item, and any change typed, to a new Chat.
  */
 export function ViewerPrompt({
@@ -156,8 +157,8 @@ export function ViewerPrompt({
       variant="unstyled"
       autosize
       minRows={1}
-      // Two rows of actions keep the text as tall beside them.
-      wrapperProps={{ "data-action-rows": !phone && actions.length > 2 ? 2 : 1 }}
+      // The text grows to the height of its column of actions.
+      {...(phone ? {} : fitActions(actions.length))}
       maxRows={phone ? 2 : 4}
       className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
       description={change && <ProposalLabel proposal={change} />}
@@ -167,8 +168,8 @@ export function ViewerPrompt({
       onKeyDown={keys}
       // Phones list Continue in Chat under More.
       rightSection={<ChangeActions row={phone}>{actions}</ChangeActions>}
-      // Phones line the actions up in one row (at most three), desktop two to a row.
-      rightSectionWidth={phone ? actions.length * 44 : actions.length > 1 ? 72 : 36}
+      // Phones line the actions up in one row (at most three); desktop stands them in one column.
+      rightSectionWidth={phone ? actions.length * 44 : 40}
       rightSectionPointerEvents="all"
       rightSectionProps={{ style: { alignItems: "flex-start" } }}
       submit={change ? undefined : submit}
