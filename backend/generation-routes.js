@@ -404,6 +404,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
     // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
     const inpaintSkipped = Boolean(!isMockJob && req.body?.inpaint?.mask && !body.inpaint);
+    // Kept with the result, so Details says the mask went unused.
+    body.maskSkipped = inpaintSkipped;
     if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
