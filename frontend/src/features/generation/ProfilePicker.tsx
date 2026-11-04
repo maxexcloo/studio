@@ -108,7 +108,7 @@ export function ProfilePicker({
                 <>
                   {profile?.aiDrafted && (
                     <Badge size="xs" color="orange">
-                      AI-Drafted
+                      AI
                     </Badge>
                   )}
                   {profile?.failing && (
