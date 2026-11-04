@@ -1,5 +1,18 @@
 import { useState, type ReactNode } from "react";
-import { ActionIcon, Alert, Badge, Group, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  FocusTrap,
+  Group,
+  Menu,
+  Modal,
+  Select,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Combine, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
@@ -166,6 +179,64 @@ function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean 
   );
 }
 
+/**
+ * New Profile › Duplicate Profile…: a copy of a profile's file under `<id>-copy` (or the next free
+ * `<id>-copy-<n>`), named "… Copy", opened in the editor to create.
+ */
+function DuplicateProfile({
+  profiles,
+  duplicated,
+}: {
+  profiles: ProfileRow[];
+  duplicated: (id: string, creating: LoadedDefinition) => void;
+}) {
+  const [source, setSource] = useState<string | null>(null);
+  const copy = useMutation({
+    meta: { inlineError: true },
+    mutationFn: async (id: string) => {
+      const { text } = await api<{ text: string }>(definitionPath("profile", id));
+      const raw = JSON.parse(text);
+      const taken = new Set(profiles.map((entry) => entry.id));
+      let copied = `${id}-copy`;
+      for (let n = 2; taken.has(copied); n++) copied = `${id}-copy-${n}`;
+      const studio = { ...raw.studio, id: copied, name: `${raw.studio?.name || id} Copy` };
+      return { id: copied, text: `${JSON.stringify({ ...raw, studio }, null, 2)}\n` };
+    },
+    onSuccess: ({ id, text }) => duplicated(id, { text, hash: "" }),
+  });
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (source) copy.mutate(source);
+      }}
+    >
+      <Stack>
+        <Select
+          label="Profile"
+          placeholder="Choose a Profile"
+          data={profiles
+            .map((entry) => ({ value: entry.id, label: entry.name || entry.id }))
+            .sort((a, b) => a.label.localeCompare(b.label))}
+          value={source}
+          onChange={setSource}
+          searchable
+          required
+        />
+        {copy.error && <Alert color="red">{copy.error.message}</Alert>}
+        <Button
+          type="submit"
+          loading={copy.isPending}
+          disabled={!source}
+          style={{ alignSelf: "start" }}
+        >
+          Duplicate Profile
+        </Button>
+      </Stack>
+    </form>
+  );
+}
+
 /** The definition editor that is open: an existing ID, or "" with `creating` for a new one. */
 interface Editing {
   kind: DefinitionKind;
@@ -184,6 +255,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [merging, setMerging] = useState(false);
   const [combining, setCombining] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   // Family names come with the models list; following it re-labels once they arrive.
   useQuery(modelsQuery);
   // Under "definition-list", which every editor save refreshes.
@@ -309,12 +381,26 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 },
               ]}
             >
-              <ToolbarAction
-                label="Import Workflow"
-                icon={<Upload size={18} />}
-                loading={importing.isPending}
-                onClick={workflowFile.open}
-              />
+              <Menu position="bottom-end">
+                <Menu.Target>
+                  <ToolbarAction
+                    label="New Profile"
+                    icon={<Plus size={18} />}
+                    loading={importing.isPending}
+                  />
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item
+                    leftSection={<icons.copy size={16} />}
+                    onClick={() => setDuplicating(true)}
+                  >
+                    Duplicate Profile…
+                  </Menu.Item>
+                  <Menu.Item leftSection={<Upload size={16} />} onClick={workflowFile.open}>
+                    Import Workflow…
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
             </GroupActions>
           }
         />
@@ -468,6 +554,18 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           />
         )}
       </SettingGroup>
+      <Modal opened={duplicating} onClose={() => setDuplicating(false)} title="Duplicate Profile">
+        <FocusTrap.InitialFocus />
+        {duplicating && (
+          <DuplicateProfile
+            profiles={profiles}
+            duplicated={(id, creating) => {
+              setDuplicating(false);
+              setEditing({ kind: "profile", id, creating });
+            }}
+          />
+        )}
+      </Modal>
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       <CombineBackends opened={combining} onClose={() => setCombining(false)} />
       {editing && (
