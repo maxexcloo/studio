@@ -318,7 +318,7 @@ primary component reference and verify APIs against the installed version.
 - A comparison is one swipe card of two images, side by side (stacked on
   phones), named A and B by what differs, under its question (Which Model?,
   Which LoRA Strength?, Which Wording?…). Swipe or press left for A, right for
-  B, up for Both and down for Neither, or use the bar's A, Both, Neither and B;
+  B, up for Both and down for Neither, or use the bar's Neither, A, B and Both;
   dragging toward a side fades the other. Opened full screen, a segmented choice
   of the two sides (plus Side by Side on desktop) replaces the position badge,
   arrows and swipes switch sides as they move between items, and the bar answers.

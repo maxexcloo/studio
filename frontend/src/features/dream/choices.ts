@@ -25,7 +25,7 @@ export interface Choice {
 }
 
 /**
- * The top card's choices, in groups: a comparison's A, Both, Neither and B; a single card's Skip,
+ * The top card's choices, in groups: a comparison's Neither, A, B and Both (the picks in the middle); a single card's Skip,
  * Edit and Animate, Star, Variations and More Like This, then Keep. Edit, Animate, Variations and
  * More Like This need a Dream image; a gallery image passes or is liked.
  */
@@ -35,10 +35,10 @@ export function dreamChoices(card: DeckCard): Choice[][] {
       card.labels?.[index] ? `${side}: ${card.labels[index]}` : undefined;
     return [
       [
-        { choice: "a", id: "a", label: "A", icon: icons.winner, hint: "←", tip: tip(0, "A") },
-        { choice: "both", id: "both", label: "Both", icon: icons.keep, hint: "↑" },
         { choice: "neither", id: "neither", label: "Neither", icon: X, hint: "↓" },
+        { choice: "a", id: "a", label: "A", icon: icons.winner, hint: "←", tip: tip(0, "A") },
         { choice: "b", id: "b", label: "B", icon: icons.winner, hint: "→", tip: tip(1, "B") },
+        { choice: "both", id: "both", label: "Both", icon: icons.keep, hint: "↑" },
       ],
     ];
   }
