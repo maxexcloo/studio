@@ -366,7 +366,7 @@ function Related({
 }
 
 /**
- * Details › Prompt, Caption, Source, From, Derived, Model, LoRAs, References, Settings, Output and Timing
+ * Details › Caption, Prompt, Source, From, Derived, Model, LoRAs, References, Settings, Output and Timing
  * for one result; `open` shows a related result in the viewer.
  */
 export function MediaDetails({
@@ -384,8 +384,8 @@ export function MediaDetails({
   const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
-      <DetailsPrompt item={item} />
       <Caption item={item} />
+      <DetailsPrompt item={item} />
       {item.source && (
         <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
