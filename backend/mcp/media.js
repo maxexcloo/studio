@@ -22,11 +22,12 @@ import {
   chooseProfile,
   isCloudProfile,
   localVideoUnavailable,
-  parkedWorker,
+  stoppedServices,
 } from "./tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { withResolution } from "../../shared/resolution.ts";
 import { imageMimes } from "../reference-names.js";
+import { accessFeatures } from "../account-policy.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -63,7 +64,13 @@ const maxReferenceScopes = 5000;
 const attachedImageHint =
   "LibreChat can't pass attached files to tools: call UploadLink, ask the user to upload the image there, then call Search with uploads: true to use it.";
 // An upload link (UploadLink) takes one image within this time.
-const uploadLinkMs = 15 * 60 * 1000;
+export const uploadLinkMinutes = 15;
+const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
+// The largest reference image Upload and the upload link take, and the base64 text it makes.
+export const maxUploadMegabytes = 20;
+const maxUploadBytes = maxUploadMegabytes * 1_000_000;
+export const maxUploadBase64 = maxUploadBytes * 1.4;
+const tooLarge = `Reference images must be at most ${maxUploadMegabytes} MB.`;
 // Short result links: ten random base62 characters (about 59 bits), mapped server-side to an owner and output.
 const shortAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
@@ -412,12 +419,10 @@ export class McpMedia {
       if (kind === "video" && models.backends?.video?.available === false) {
         if (!cloudOffered) throw new Error(localVideoUnavailable(parked));
         profiles = ready.filter(isCloudProfile);
-        note = `The local video worker is ${parked ? "parked" : "offline"}, so this went to the cloud. Tell the user. `;
+        note = `Videos are ${parked ? "Stopped" : "Offline"}, so this went to the cloud. Tell the user. `;
       } else if (parked)
         // Queued work would wait until an administrator starts it, so say why now.
-        throw new Error(
-          `Local ${kind} is unavailable right now: ${parkedWorker(kind)} Tell the user.`,
-        );
+        throw new Error(`${stoppedServices(kind)} Tell the user.`);
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
@@ -486,6 +491,26 @@ export class McpMedia {
       return loras;
     } catch {
       return {};
+    }
+  }
+  /**
+   * The account's role and effective features right now (its group's, narrowed by its own switches),
+   * as /api/accounts/status reports them; every feature in single-user mode, null when unknown.
+   */
+  async access(owner = "", signal) {
+    try {
+      const status = await this.request("GET", "/api/accounts/status", undefined, owner, {
+        signal,
+      });
+      if (status?.mode === "single-user")
+        return {
+          role: "administrator",
+          features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
+        };
+      const { role, features } = status?.account || {};
+      return role ? { role, features: features || {} } : null;
+    } catch {
+      return null;
     }
   }
   /** The account's thumbs up and down per LoRA file, which order every LoRA list. */
@@ -1563,7 +1588,7 @@ export class McpMedia {
     return (width > 0 && height > 0 && frameSize(profile, width, height)) || {};
   }
   async upload(owner, base64, filename = "reference.png") {
-    if (base64.length > 28000000) throw new Error("Reference images must be at most 20 MB.");
+    if (base64.length > maxUploadBase64) throw new Error(tooLarge);
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))
       throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachedImageHint}`);
     return this.store(owner, Buffer.from(base64, "base64"), filename, {
@@ -1575,7 +1600,7 @@ export class McpMedia {
    * owner's tools take its reference. A HEIC photo becomes a JPEG when sharp can read it.
    */
   async store(owner, content, filename, { credential, advice = "" } = {}) {
-    if (content.length > 20000000) throw new Error("Reference images must be at most 20 MB.");
+    if (content.length > maxUploadBytes) throw new Error(tooLarge);
     let metadata = {};
     try {
       if (content.length)

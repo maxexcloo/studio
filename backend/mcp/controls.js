@@ -349,6 +349,38 @@ export function resolveLoraName(profile, value) {
   return null;
 }
 
+// Words that ask for LoRAs in general ("lora", "all loras"), so a lookup made only of them lists every one.
+const generalLoraWords = new Set([
+  "a",
+  "all",
+  "any",
+  "every",
+  "list",
+  "lora",
+  "loras",
+  "my",
+  "show",
+  "the",
+]);
+/** A LoRA lookup's words that name something, without the ones that only ask for LoRAs. */
+export const loraQueryWords = (query) =>
+  String(query || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => {
+      const bare = word.replace(/[^a-z0-9]/g, "");
+      return bare && !generalLoraWords.has(bare);
+    });
+
+/** Every compatible LoRA as its file name and Models' index line. */
+export const loraIndex = (profile, infos = {}, ratings = {}) => {
+  const short = shortNames(profile);
+  return loraCandidates(profile, infos, ratings).map((entry) => ({
+    name: entry.name,
+    line: indexLine(entry, short(entry.name)),
+  }));
+};
+
 /**
  * Compatible LoRAs for Models. Without a lookup, a compact index of every compatible LoRA;
  * with lora_query or lora_names, full details for the first few matches.
@@ -356,10 +388,8 @@ export function resolveLoraName(profile, value) {
 export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings = {} } = {}) {
   const candidates = loraCandidates(profile, infos, ratings);
   const short = shortNames(profile);
-  const needle = String(query || "")
-    .trim()
-    .toLowerCase();
-  if (!needle && !names.length)
+  const wanted = loraQueryWords(query);
+  if (!wanted.length && !names.length)
     return {
       loras: candidates.map((entry) => indexLine(entry, short(entry.name))),
       total: candidates.length,
@@ -375,14 +405,19 @@ export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings 
       else if (!entry) missing.push(value);
     }
   } else {
-    // Name matches lead, then titles, then trigger words and descriptions.
-    const rank = ({ name, info }) =>
-      [stem(name), info?.title, [...(info?.triggers || []), info?.description].join(" ")].findIndex(
-        (value) =>
-          String(value || "")
-            .toLowerCase()
-            .includes(needle),
-      );
+    // Name matches lead, then titles, then trigger words and descriptions; every word must appear somewhere.
+    const rank = ({ name, info }) => {
+      const fields = [
+        stem(name),
+        info?.title,
+        [...(info?.triggers || []), info?.description].join(" "),
+      ].map((value) => String(value || "").toLowerCase());
+      const found = fields.findIndex((field) => wanted.every((word) => field.includes(word)));
+      if (found >= 0) return found;
+      return wanted.every((word) => fields.some((field) => field.includes(word)))
+        ? fields.length
+        : -1;
+    };
     matches = candidates
       .map((entry) => ({ entry, rank: rank(entry) }))
       .filter((item) => item.rank >= 0)

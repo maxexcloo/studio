@@ -935,11 +935,17 @@ test("media and administrator credentials discover only their own friendly tools
     /Grok/,
     "every caller gets the same text, so none names Grok: an account may have no cloud profile",
   );
+  // Clients cache the tool list and instructions for a whole session, so neither names a live profile.
+  assert.doesNotMatch(
+    JSON.stringify(tools) + media.getInstructions(),
+    new RegExp(`${imageProfile.id}|${imageProfile.label}|${videoProfile.id}`),
+  );
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
-    // then from 10,200 for Search and from 10,900 for Gallery, Queue, Dream and Taste.
-    JSON.stringify(tools).length + media.getInstructions().length < 14500,
+    // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
+    // for the rule to read live state from Models and its LoRA paging.
+    JSON.stringify(tools).length + media.getInstructions().length < 15000,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1009,8 +1015,14 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   const f = await fixture(t);
   const client = await f.client("previously-unknown-user");
   const compact = data(await call(client, "Models", { kind: "image" }));
-  assert.deepEqual(compact, { image: [`${imageProfile.id} — ${imageProfile.label}`] });
+  // A profile that isn't ready lists apart, with why, so the chat never offers it as ready.
+  assert.deepEqual(compact, {
+    image: [`${imageProfile.id} — ${imageProfile.label}`],
+    needs_setup: { "not-ready": "Its files or nodes aren't ready." },
+  });
   const detail = data(await call(client, "Models", { profile_id: imageProfile.id }));
+  // The reference count comes from the profile's graph, not its hand-written text.
+  assert.equal(detail.references.max, (imageProfile.mediaInputs || []).length);
   // Only adjustable controls are advertised; raw capability and constraint tables are not.
   assert.equal(detail.capabilities, undefined);
   assert.equal(detail.constraints, undefined);
@@ -1660,6 +1672,7 @@ test("guide packs retain compact discovery, profile modes and reviewed variants"
   // Guides stay in the detail; the compact list carries only each profile's id and label.
   assert.deepEqual(data(await call(client, "Models", { kind: "image" })), {
     image: [`${imageProfile.id} — ${imageProfile.label}`],
+    needs_setup: { "not-ready": "Its files or nodes aren't ready." },
   });
   const detail = data(
     await call(client, "Models", { profile_id: imageProfile.id, full_guide: true }),
@@ -2510,6 +2523,17 @@ test("Models indexes every compatible LoRA compactly and details only the LoRAs 
     ).missing,
     [{ name: "fixture-glow", closest: ["fixture-effect", "fixture-unknown"] }],
   );
+  // "lora" asks for LoRAs in general, so it lists them; a lookup that matches none says how many there are.
+  const general = data(await call(client, "Models", { lora_query: "lora" }));
+  assert.deepEqual(general.loras, ["fixture-effect [glowfx]", "fixture-unknown (unverified)"]);
+  assert.equal(general.pages, 1);
+  const none = data(await call(client, "Models", { lora_query: "watercolour" }));
+  assert.deepEqual(none.loras, []);
+  assert.match(none.loras_note, /No LoRA matches "watercolour", but \d+ are installed/);
+  // A tier the deployment doesn't have is refused with the current list, not by the client's schema.
+  const tier = await call(client, "Models", { tier: "ultra" });
+  assert.equal(tier.isError, true);
+  assert.match(tier.content[0].text, /tier: Use one of quality, standard, fast, turbo/);
 
   await f.profiles([
     {
@@ -3651,7 +3675,7 @@ test("while the local video worker is off, video runs on a granted cloud profile
   });
   const client = await f.client();
   const fallback = await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.match(texts(fallback), /local video worker is offline, so this went to the cloud/i);
+  assert.match(texts(fallback), /Videos are Offline, so this went to the cloud/);
   assert.equal(data(fallback).profile.remote, true);
 });
 
@@ -3666,7 +3690,7 @@ test("with no cloud profile granted, video is refused while the local video work
   const none = await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.equal(
     texts(none),
-    "Local video is unavailable right now: the video worker is offline. Tell the user to try again later.",
+    "Videos are Offline: the video worker isn't answering. Tell the user to try again later.",
   );
   const listing = data(await call(client, "Models", { kind: "video" }));
   assert.equal("cloud" in listing || "cloud_note" in listing, false);
@@ -3869,7 +3893,7 @@ test("video stays local while the worker is up, and a plain request never reache
   const restricted = await f.client("", Object.keys(tokens)[0]);
   const refused = await call(restricted, "Generate", { kind: "video", prompts: ["A wave"] });
   assert.equal(refused.isError, true);
-  assert.match(refused.content[0].text, /^Local video is unavailable right now/);
+  assert.match(refused.content[0].text, /^Videos are Offline/);
   data(await call(restricted, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
   const nowhere = await call(restricted, "Reuse", { job_id: "result 1", mode: "animate" });
@@ -4828,7 +4852,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
   const instructions = (await f.client("", adminToken)).getInstructions();
   assert.match(
     instructions,
-    /only CombineBackends apply removes files \(the profiles it combines, after a backup\), and no tool touches GPUs/,
+    /removals \(CatalogueEdit remove, ProfileEdit remove, CombineBackends apply\) run only when asked and back up or keep versions first, and no tool touches GPUs/,
   );
   // Only Maintenance, which can end another account's job, is destructive; the read-only ones say so.
   const tools = (await (await f.client("", adminToken)).listTools()).tools.filter((tool) =>
