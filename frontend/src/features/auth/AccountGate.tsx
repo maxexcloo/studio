@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
+  Center,
   Container,
   Divider,
   Loader,
@@ -83,9 +84,9 @@ export function AccountGate({ children }: { children: ReactNode }) {
   });
   if (status.isPending)
     return (
-      <Container py="xl">
+      <Center h="100dvh">
         <Loader aria-label="Loading Studio" />
-      </Container>
+      </Center>
     );
   if (status.error)
     return (
