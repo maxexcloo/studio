@@ -33,6 +33,8 @@ const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/;
 
 export const assistantSettingKeys = Object.freeze([assistantModelKey]);
 
+export const promptAssistantOff = "The prompt assistant is off for this account.";
+
 /** Whether an account (or single-user Studio, with no account) has a feature. */
 const allowed = (req, feature) => !req.studioAccount || mayUseFeature(req.studioAccount, feature);
 
@@ -200,6 +202,10 @@ export function registerAssistantRoutes(
   /** The engine and the account's profile, or an answer explaining why not. */
   const ready = async (req, res, { profileRequired = true } = {}) => {
     res.setHeader("Cache-Control", "no-store");
+    if (!allowed(req, "promptAssistant")) {
+      res.status(403).json({ ok: false, error: promptAssistantOff });
+      return null;
+    }
     if (!engine) {
       res.status(503).json({ ok: false, error: "The prompt assistant is not configured." });
       return null;
@@ -227,7 +233,9 @@ export function registerAssistantRoutes(
 
   app.get("/api/assistant", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!engine) return res.json({ ok: true, available: false, presets: [] });
+    // Without the feature the app hides every assistant control, as without a gateway.
+    if (!engine || !allowed(req, "promptAssistant"))
+      return res.json({ ok: true, available: false, presets: [] });
     try {
       const spicy = allowed(req, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
