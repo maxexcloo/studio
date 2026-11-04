@@ -75,11 +75,9 @@ export function PromptFields({
   negative,
   textareaRef,
   autoFocus = false,
-  edit = false,
   fill = false,
   ideas: offerIdeas = false,
   ask,
-  submit,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -91,16 +89,12 @@ export function PromptFields({
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocus?: boolean;
-  /** Opens the phone's full-screen prompt editor. */
-  edit?: boolean;
-  /** Sizes the prompt for the phone Drawer, whose editor fills the screen while typing. */
+  /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
   ideas?: boolean;
   /** Offers Ask for a Change on the draft (`useDraftChange`) in the assistant's menu. */
   ask?: DraftChange;
-  /** The form's send action, offered in the phone prompt editor. */
-  submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
   const phone = usePhone();
   const assistant = usePromptAssistant({
@@ -112,7 +106,7 @@ export function PromptFields({
     onAsk: ask?.available ? () => ask.setRequest("") : undefined,
   });
   const proposal = ask?.proposal;
-  // The proposal's action rides with Undo, under the prompt and in the phone editor; Generate runs it.
+  // The proposal's action rides with Undo under the prompt; Generate runs it.
   const below = (assistant.suggestions || proposal) && (
     <>
       {assistant.suggestions}
@@ -149,10 +143,11 @@ export function PromptFields({
           placeholder={
             input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
           }
-          // The phone prompt leaves room for the settings below; its editor takes the screen to type.
-          autosize
-          minRows={fill ? 5 : 3}
+          // In the phone sheet the prompt fills the room above the settings instead of growing.
+          autosize={!fill}
+          minRows={3}
           maxRows={10}
+          inline={fill}
           rightSection={
             <>
               <PromptHistory
@@ -177,8 +172,6 @@ export function PromptFields({
           }}
           overlay={offerIdeas && ideas.ideas}
           below={below}
-          edit={edit}
-          submit={submit}
         />
       </div>
       {ask && <ChangeRequest ask={ask} onSend={ask.sendRequest} />}
@@ -199,6 +192,7 @@ export function PromptFields({
             />
           }
           rightSectionPointerEvents="all"
+          inline={fill}
           value={input.negative}
           onChange={(negative) => onChange({ negative })}
         />

@@ -78,14 +78,12 @@ export function GenerationForm({
   compact = false,
   autoFocusPrompt = false,
   focusPrompt = false,
-  editPrompt = false,
   fill = false,
 }: {
   onSubmitted?: (jobId: string) => void;
   compact?: boolean;
   autoFocusPrompt?: boolean;
   focusPrompt?: boolean;
-  editPrompt?: boolean;
   fill?: boolean;
 }) {
   const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
@@ -127,7 +125,7 @@ export function GenerationForm({
             maxRows={1}
             variant="unstyled"
             className={classes.compactPrompt}
-            // A phone tap opens the prompt editor, so the bar never raises the keyboard.
+            // A phone tap opens the Generate sheet, so the bar never raises the keyboard.
             inputMode={phone ? "none" : undefined}
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
@@ -233,7 +231,6 @@ export function GenerationForm({
       }
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
-      editPrompt={editPrompt}
       fill={fill}
       ideas
     />
