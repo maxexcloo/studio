@@ -60,6 +60,14 @@ export function repointWorkflowPreferences(canonical) {
   });
 }
 
+/**
+ * After migrate-runtime rewrote the file (runtime-migrations.js): moves the loaded preferences,
+ * which may hold a change not yet saved, onto the ids `canonical` gives and saves them.
+ */
+export function reloadWorkflowPreferences(canonical) {
+  if (preferencesCache) repointWorkflowPreferences(canonical);
+}
+
 function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {

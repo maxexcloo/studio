@@ -48,7 +48,7 @@ const profile = (id, name, { model = "h3.safetensors", description = "" } = {}) 
   )}\n`;
 const write = (id, text) => fs.writeFileSync(path.join(userWorkflowsDir, `${id}.json`), text);
 const oldId = "h3-fl-pdd8";
-const keptId = "image-h3-first-frame-fast-comfyui";
+const keptId = "image-h3-first-frame-fast";
 
 fs.mkdirSync(userWorkflowsDir, { recursive: true });
 write(oldId, profile(oldId, "H3 · ComfyUI · Fast", { description: "Older wording." }));
