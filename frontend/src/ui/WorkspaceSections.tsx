@@ -144,7 +144,8 @@ export function WorkspaceSections({
   );
   const apart = sections.filter((section) => section.apart);
   return (
-    <Grid gap="xl" mih={{ base: 0, sm: "24rem" }}>
+    // Fills the modal body, so a section's loading and empty states centre in what it leaves.
+    <Grid gap="xl" classNames={{ root: classes.grid, inner: classes.inner }}>
       <Grid.Col span={3} visibleFrom="sm">
         <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
           {groupSections(sections.filter((section) => !section.apart)).map(([group, items]) => (
@@ -170,7 +171,7 @@ export function WorkspaceSections({
           )}
         </Stack>
       </Grid.Col>
-      <Grid.Col span={{ base: 12, sm: 9 }} style={{ minWidth: 0 }}>
+      <Grid.Col span={{ base: 12, sm: 9 }} className={classes.body}>
         {sections.map((section) => {
           const body = content[section.value];
           const heading = (
@@ -190,12 +191,13 @@ export function WorkspaceSections({
               component="section"
               aria-label={`${label}: ${section.label}`}
               hidden={section.value !== active}
+              className={classes.section}
             >
-              <Stack>
+              <Stack flex={1}>
                 {typeof body !== "function" && heading}
                 {visited.has(section.value) && (
                   <SectionErrorBoundary label={section.label}>
-                    <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
+                    <Suspense fallback={<LoadingState label={`Loading ${section.label}`} fill />}>
                       {typeof body === "function" ? body(heading) : body}
                     </Suspense>
                   </SectionErrorBoundary>
