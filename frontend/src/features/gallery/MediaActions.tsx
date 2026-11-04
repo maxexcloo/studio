@@ -416,8 +416,8 @@ export function useMediaActions(
               : []),
             ...reviewItems,
           ],
+          [...themeItems(!animation.data)],
           [
-            ...themeItems(!animation.data),
             {
               id: "animate-composer",
               label: "Animate in Composer",
@@ -579,6 +579,14 @@ export function useMediaActions(
                   },
                 ]
               : []),
+            // The rest of the settings, under the quick ones.
+            {
+              id: "upscale-options",
+              label: "Upscale Options…",
+              icon: icons.settings,
+              disabled: upscaleBusy,
+              onClick: onUpscale,
+            },
           ],
           [
             upscaled
@@ -596,13 +604,6 @@ export function useMediaActions(
                   disabled: upscaleBusy,
                   onClick: quick.run,
                 },
-            {
-              id: "upscale-options",
-              label: "Upscale Options…",
-              icon: icons.settings,
-              disabled: upscaleBusy,
-              onClick: onUpscale,
-            },
           ],
         ],
       }),
