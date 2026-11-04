@@ -125,7 +125,7 @@ export function PresetPicker({
           noun="Preset"
           items={savedItems(items, query, sort)}
           current={selection.presetId}
-          empty={items.length ? "No Matching Presets" : "No Saved Presets"}
+          empty={items.length ? "No Matches" : "No Saved Presets"}
           replaces={!!input.prompt.trim()}
           replaceMessage="Replace the current prompt and settings with this preset?"
           onLoad={onLoad}

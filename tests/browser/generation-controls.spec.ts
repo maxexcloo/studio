@@ -284,7 +284,7 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ).toHaveValue("0.35");
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
-  await savedAction(page, "Stack", "Copper Detail", "Update From Current");
+  await savedAction(page, "Stack", "Copper Detail", "Update from Current");
   await savedAction(page, "Stack", "Copper Detail", "Rename Stack");
   const name = page.getByRole("textbox", { name: "Stack Name", exact: true });
   await name.fill("Copper Detail Refined");
@@ -663,7 +663,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   await closePresets(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
   await openPresets(page);
-  await savedAction(page, "Preset", "Bird Study", "Update From Current");
+  await savedAction(page, "Preset", "Bird Study", "Update from Current");
   await savedAction(page, "Preset", "Bird Study", "Rename Preset");
   const name = page.getByRole("textbox", { name: "Preset Name", exact: true });
   await name.fill("Updated Bird Study");

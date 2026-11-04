@@ -14,9 +14,10 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Video } from "lucide-react";
+import { Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useMatch, useNavigate } from "react-router";
+import { menuWidth } from "../../theme";
 import { api, post } from "../../api";
 import type { Session } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
@@ -211,7 +212,7 @@ export function ChatMenu({
   const title = chatTitle(session);
   return (
     <>
-      <Menu position="bottom-end" width={180}>
+      <Menu position="bottom-end" width={menuWidth}>
         <Menu.Target>
           <ActionIcon
             className={className}
@@ -223,11 +224,10 @@ export function ChatMenu({
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>
-          <Menu.Item h={36} leftSection={<Pencil size={16} />} onClick={onRename}>
+          <Menu.Item leftSection={<icons.rename size={16} />} onClick={onRename}>
             Rename
           </Menu.Item>
           <Menu.Item
-            h={36}
             leftSection={
               session.archived ? <icons.unarchive size={16} /> : <icons.archive size={16} />
             }
@@ -235,8 +235,8 @@ export function ChatMenu({
           >
             {session.archived ? "Unarchive" : "Archive"}
           </Menu.Item>
+          <Menu.Divider />
           <Menu.Item
-            h={36}
             color="red"
             leftSection={<icons.delete size={16} />}
             onClick={() => setDeleting(true)}

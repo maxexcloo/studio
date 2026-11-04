@@ -9,6 +9,7 @@ import {
   type MantineBreakpoint,
 } from "@mantine/core";
 import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
+import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
@@ -160,7 +161,7 @@ export function DataTable<T>({
               {rowActions && (
                 <Table.Td>
                   {actions && (
-                    <Menu position="bottom-end">
+                    <Menu position="bottom-end" width={menuWidth}>
                       <Menu.Target>
                         <ActionIcon
                           variant="subtle"

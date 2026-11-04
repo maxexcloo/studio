@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -11,23 +10,17 @@ import {
   Select,
   Stack,
   Text,
-  Tooltip,
 } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Combine, Merge, Plus, Upload, type LucideIcon } from "lucide-react";
+import { ChevronDown, Combine, Merge, Plus } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import {
-  SectionHeader,
-  SectionToolbar,
-  ToolbarAction,
-  ToolbarDivider,
-} from "../../ui/SectionToolbar";
-import { usePhone } from "../../ui/usePhone";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import {
   DefinitionEditor,
   definitionPath,
@@ -60,75 +53,6 @@ interface GuideBindings {
 }
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-
-interface MoreAction {
-  label: string;
-  icon: LucideIcon;
-  onClick?: () => void;
-  /** A download link instead of a click. */
-  href?: string;
-}
-
-/**
- * A toolbar's actions after its search and filter, each group behind a divider: the rest as icons
- * with tooltips (phones, which show no tooltips, list them by name under More), then the labelled
- * create action at the far right.
- */
-function GroupActions({
-  noun,
-  more = [],
-  children,
-}: {
-  noun: string;
-  more?: MoreAction[];
-  children: ReactNode;
-}) {
-  const phone = usePhone();
-  const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
-  return (
-    <>
-      <ToolbarDivider />
-      {more.length > 0 &&
-        (phone ? (
-          <Menu position="bottom-end">
-            <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" aria-label={`More ${noun} Actions`}>
-                <icons.more size={18} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              {more.map(({ label, icon: Icon, onClick, href }) => (
-                <Menu.Item
-                  key={label}
-                  leftSection={<Icon size={16} />}
-                  onClick={onClick}
-                  {...link(href)}
-                >
-                  {label}
-                </Menu.Item>
-              ))}
-            </Menu.Dropdown>
-          </Menu>
-        ) : (
-          more.map(({ label, icon: Icon, onClick, href }) => (
-            <Tooltip key={label} label={label}>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                aria-label={label}
-                onClick={onClick}
-                {...link(href)}
-              >
-                <Icon size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ))
-        ))}
-      {more.length > 0 && <ToolbarDivider />}
-      {children}
-    </>
-  );
-}
 
 interface ProfileStats {
   runs: number;
@@ -185,9 +109,11 @@ function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean 
 function DuplicateProfile({
   profiles,
   duplicated,
+  onCancel,
 }: {
   profiles: ProfileRow[];
   duplicated: (id: string, creating: LoadedDefinition) => void;
+  onCancel: () => void;
 }) {
   const [source, setSource] = useState<string | null>(null);
   const copy = useMutation({
@@ -223,14 +149,11 @@ function DuplicateProfile({
           required
         />
         {copy.error && <Alert color="red">{copy.error.message}</Alert>}
-        <Button
-          type="submit"
-          loading={copy.isPending}
-          disabled={!source}
-          style={{ alignSelf: "start" }}
-        >
-          Duplicate Profile
-        </Button>
+        <DialogFooter pending={copy.isPending} onCancel={onCancel}>
+          <Button type="submit" loading={copy.isPending} disabled={!source}>
+            Duplicate Profile
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
@@ -285,9 +208,17 @@ function useDefinitions() {
 function rowMenu(edit: (editing: Editing) => void, kind: DefinitionKind, noun: string, id: string) {
   return (
     <>
-      <Menu.Item onClick={() => edit({ kind, id })}>Edit {noun}</Menu.Item>
-      <Menu.Item onClick={() => void copyText(id, `${noun} ID`)}>Copy {noun} ID</Menu.Item>
+      <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
+        Edit {noun}
+      </Menu.Item>
       <Menu.Item
+        leftSection={<icons.copy size={16} />}
+        onClick={() => void copyText(id, `${noun} ID`)}
+      >
+        Copy {noun} ID
+      </Menu.Item>
+      <Menu.Item
+        leftSection={<icons.download size={16} />}
         component="a"
         href={`${definitionPath(kind, id)}/download`}
         download={`${id}.json`}
@@ -374,42 +305,35 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             />
           }
           filterCount={Number(!!family)}
-          onResetFilters={() => setFamily(null)}
+          onClearFilters={() => setFamily(null)}
+          more={[
+            { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
+            // Every profile and guide, in one archive.
+            { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
+            { label: "Merge Duplicate Profiles", icon: Merge, onClick: () => setMerging(true) },
+          ]}
           actions={
-            <GroupActions
-              noun="Profile"
-              more={[
-                { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
-                // Every profile and guide, in one archive.
-                { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
-                {
-                  label: "Merge Duplicate Profiles",
-                  icon: Merge,
-                  onClick: () => setMerging(true),
-                },
-              ]}
-            >
-              <Menu position="bottom-end">
-                <Menu.Target>
-                  <ToolbarAction
-                    label="New Profile"
-                    icon={<Plus size={18} />}
-                    loading={importing.isPending}
-                  />
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item
-                    leftSection={<icons.copy size={16} />}
-                    onClick={() => setDuplicating(true)}
-                  >
-                    Duplicate Profile…
-                  </Menu.Item>
-                  <Menu.Item leftSection={<Upload size={16} />} onClick={workflowFile.open}>
-                    Import Workflow…
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </GroupActions>
+            <Menu position="bottom-end">
+              <Menu.Target>
+                <ToolbarAction
+                  label="New Profile"
+                  icon={<Plus size={18} />}
+                  rightSection={<ChevronDown size={14} />}
+                  loading={importing.isPending}
+                />
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  leftSection={<icons.copy size={16} />}
+                  onClick={() => setDuplicating(true)}
+                >
+                  Duplicate Profile…
+                </Menu.Item>
+                <Menu.Item leftSection={<icons.upload size={16} />} onClick={workflowFile.open}>
+                  Import Workflow…
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           }
         />
       </SectionHeader>
@@ -493,6 +417,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
         {duplicating && (
           <DuplicateProfile
             profiles={profiles}
+            onCancel={() => setDuplicating(false)}
             duplicated={(id, creating) => {
               setDuplicating(false);
               setEditing({ kind: "profile", id, creating });
@@ -528,19 +453,17 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
           query={guideQuery}
           onQueryChange={setGuideQuery}
           actions={
-            <GroupActions noun="Guide">
-              <ToolbarAction
-                label="New Guide"
-                icon={<Plus size={18} />}
-                onClick={() =>
-                  setEditing({
-                    kind: "guide",
-                    id: "",
-                    creating: { pack: { name: "", summary: "", rules: [] }, hash: "" },
-                  })
-                }
-              />
-            </GroupActions>
+            <ToolbarAction
+              label="New Guide"
+              icon={<Plus size={18} />}
+              onClick={() =>
+                setEditing({
+                  kind: "guide",
+                  id: "",
+                  creating: { pack: { name: "", summary: "", rules: [] }, hash: "" },
+                })
+              }
+            />
           }
         />
       </SectionHeader>

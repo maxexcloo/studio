@@ -1,6 +1,26 @@
 import type { ReactNode } from "react";
 import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
 
+/** Every dialog's footer: Cancel, then its one primary action (`children`), at the right. */
+export function DialogFooter({
+  pending,
+  onCancel,
+  children,
+}: {
+  pending?: boolean;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Group justify="flex-end">
+      <Button variant="default" disabled={pending} onClick={onCancel}>
+        Cancel
+      </Button>
+      {children}
+    </Group>
+  );
+}
+
 /** Destructive confirmation that stays open and locked while the action runs. */
 export function ConfirmDialog({
   opened,
@@ -45,14 +65,11 @@ export function ConfirmDialog({
           {children}
         </Text>
         {error && <Alert color="red">{error}</Alert>}
-        <Group justify="flex-end">
-          <Button variant="default" disabled={pending} onClick={close}>
-            Cancel
-          </Button>
+        <DialogFooter pending={pending} onCancel={close}>
           <Button color="red" loading={pending} disabled={disabled} onClick={onConfirm}>
             {action}
           </Button>
-        </Group>
+        </DialogFooter>
       </Stack>
     </Modal>
   );

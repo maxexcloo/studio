@@ -423,7 +423,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
               placeholder={profileIds.length < most ? "Add a Profile" : undefined}
               searchable
               maxValues={most}
-              nothingFoundMessage="No Matching Profiles"
+              nothingFoundMessage="No Matches"
               data={options.map((group) => ({
                 ...group,
                 items: group.items.map((item) => ({
@@ -452,7 +452,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
                   description="Each variant runs one of these at its usual strength."
                   searchable
                   maxValues={most}
-                  nothingFoundMessage="No Matching LoRAs"
+                  nothingFoundMessage="No Matches"
                   data={loraOptions}
                   value={loraNames}
                   onChange={setLoraNames}
@@ -463,7 +463,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
                     label="LoRA"
                     searchable
                     allowDeselect={false}
-                    nothingFoundMessage="No Matching LoRAs"
+                    nothingFoundMessage="No Matches"
                     data={loraOptions}
                     value={lora || null}
                     onChange={(value) => {

@@ -8,7 +8,8 @@ import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
-import { ActionMenuItems, menuWidth } from "./ActionBar";
+import { ActionMenuItems } from "./ActionBar";
+import { menuWidth } from "../../theme";
 
 const listedFailures = 5;
 

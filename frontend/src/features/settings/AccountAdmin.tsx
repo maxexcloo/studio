@@ -18,9 +18,9 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { KeyRound, Plus, ShieldCheck, Unlink, UserCheck, UserRound, UserX } from "lucide-react";
 import { api, post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -57,10 +57,12 @@ function GroupEditor({
   initial,
   admin,
   saved,
+  onCancel,
 }: {
   initial?: AccessGroup;
   admin: Administration;
   saved: (group: AccessGroup) => void;
+  onCancel: () => void;
 }) {
   const { profiles } = useGenerationActions();
   const form = useForm<AccessGroup>({
@@ -139,14 +141,24 @@ function GroupEditor({
           ))}
         </SimpleGrid>
         {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <Button type="submit" style={{ alignSelf: "start" }} loading={save.isPending}>
-          Save
-        </Button>
+        <DialogFooter pending={save.isPending} onCancel={onCancel}>
+          <Button type="submit" loading={save.isPending}>
+            Save
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
 }
-function NewAccount({ admin, saved }: { admin: Administration; saved: () => void }) {
+function NewAccount({
+  admin,
+  saved,
+  onCancel,
+}: {
+  admin: Administration;
+  saved: () => void;
+  onCancel: () => void;
+}) {
   const form = useForm({
     initialValues: {
       username: "",
@@ -193,9 +205,11 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
           />
         </Stack>
         {create.error && <Alert color="red">{create.error.message}</Alert>}
-        <Button type="submit" loading={create.isPending} style={{ alignSelf: "start" }}>
-          Create User
-        </Button>
+        <DialogFooter pending={create.isPending} onCancel={onCancel}>
+          <Button type="submit" loading={create.isPending}>
+            Create User
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
@@ -293,7 +307,10 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
         ]}
         rowActions={(group) => (
           <>
-            <Menu.Item onClick={() => setEditing(group)}>Edit Group</Menu.Item>
+            <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => setEditing(group)}>
+              Edit Group
+            </Menu.Item>
+            <Menu.Divider />
             {/* The server refuses too: a group in use or the default stays. */}
             <Menu.Item
               color="red"
@@ -328,6 +345,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
             key={editing === "new" ? "new" : editing.id}
             initial={editing === "new" ? undefined : editing}
             admin={data}
+            onCancel={() => setEditing(null)}
             saved={(group) => {
               client.setQueryData<Administration>(accountAdminQuery.queryKey, (previous) =>
                 previous
@@ -353,7 +371,15 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
 type UserAction = "delete" | "disable" | "password" | "role";
 
 /** Reset Password: an administrator sets a new one, which ends the account's sessions. */
-function ResetPassword({ account, saved }: { account: Account; saved: () => void }) {
+function ResetPassword({
+  account,
+  saved,
+  onCancel,
+}: {
+  account: Account;
+  saved: () => void;
+  onCancel: () => void;
+}) {
   const [password, setPassword] = useState("");
   const reset = useMutation({
     meta: { inlineError: true },
@@ -385,14 +411,11 @@ function ResetPassword({ account, saved }: { account: Account; saved: () => void
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
         {reset.error && <Alert color="red">{reset.error.message}</Alert>}
-        <Button
-          type="submit"
-          loading={reset.isPending}
-          disabled={password.length < 8}
-          style={{ alignSelf: "start" }}
-        >
-          Reset Password
-        </Button>
+        <DialogFooter pending={reset.isPending} onCancel={onCancel}>
+          <Button type="submit" loading={reset.isPending} disabled={password.length < 8}>
+            Reset Password
+          </Button>
+        </DialogFooter>
       </Stack>
     </form>
   );
@@ -546,6 +569,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               {identitiesOf(account).map(({ identity }) => (
                 <Menu.Item
                   key={identity}
+                  leftSection={<Unlink size={16} />}
                   disabled={gatewayChange.isPending}
                   onClick={() => gatewayChange.mutate({ kind: "link", identity })}
                 >
@@ -553,34 +577,48 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                 </Menu.Item>
               ))}
               {!own && (
-                <Menu.Item onClick={act("role")}>
+                <Menu.Item
+                  leftSection={
+                    account.role === "user" ? <ShieldCheck size={16} /> : <UserRound size={16} />
+                  }
+                  onClick={act("role")}
+                >
                   {account.role === "user" ? "Make Administrator" : "Make User"}
                 </Menu.Item>
               )}
               {account.passwordSignIn && (
-                <Menu.Item onClick={act("password")}>Reset Password</Menu.Item>
+                <Menu.Item leftSection={<KeyRound size={16} />} onClick={act("password")}>
+                  Reset Password
+                </Menu.Item>
               )}
-              {account.disabled ? (
+              {account.disabled && (
                 <Menu.Item
+                  leftSection={<UserCheck size={16} />}
                   onClick={() => change.mutate({ id: account.id, patch: { disabled: false } })}
                 >
-                  Enable Account
+                  Enable User
                 </Menu.Item>
-              ) : (
-                !own && (
-                  <Menu.Item color="red" onClick={act("disable")}>
-                    Disable Account
-                  </Menu.Item>
-                )
               )}
               {!own && (
-                <Menu.Item
-                  color="red"
-                  leftSection={<icons.delete size={16} />}
-                  onClick={act("delete")}
-                >
-                  Delete Account
-                </Menu.Item>
+                <>
+                  <Menu.Divider />
+                  {!account.disabled && (
+                    <Menu.Item
+                      color="red"
+                      leftSection={<UserX size={16} />}
+                      onClick={act("disable")}
+                    >
+                      Disable User
+                    </Menu.Item>
+                  )}
+                  <Menu.Item
+                    color="red"
+                    leftSection={<icons.delete size={16} />}
+                    onClick={act("delete")}
+                  >
+                    Delete User
+                  </Menu.Item>
+                </>
               )}
             </>
           );
@@ -608,6 +646,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         {creating && (
           <NewAccount
             admin={data}
+            onCancel={() => setCreating(false)}
             saved={() => {
               setCreating(false);
               refresh();
@@ -622,7 +661,12 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       >
         <FocusTrap.InitialFocus />
         {target && acting?.action === "password" && (
-          <ResetPassword key={target.id} account={target} saved={() => setActing(null)} />
+          <ResetPassword
+            key={target.id}
+            account={target}
+            saved={() => setActing(null)}
+            onCancel={() => setActing(null)}
+          />
         )}
       </Modal>
       <ConfirmDialog
@@ -645,18 +689,18 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       </ConfirmDialog>
       <ConfirmDialog
         opened={acting?.action === "disable"}
-        title="Disable Account"
+        title="Disable User"
         action="Disable"
         pending={change.isPending}
         onConfirm={() => target && change.mutate({ id: target.id, patch: { disabled: true } })}
         onClose={() => setActing(null)}
       >
         Disable {target?.username}? They are signed out everywhere and can’t sign in until you
-        enable the account again.
+        enable them again.
       </ConfirmDialog>
       <ConfirmDialog
         opened={acting?.action === "delete"}
-        title="Delete Account"
+        title="Delete User"
         action="Delete"
         pending={remove.isPending}
         onConfirm={() => target && remove.mutate(target.id)}

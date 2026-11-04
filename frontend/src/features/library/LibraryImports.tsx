@@ -13,7 +13,6 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImageUp } from "lucide-react";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -70,6 +69,7 @@ export function LibraryImports({
   const [view, setView] = useState("all");
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState<ImportRecord | null>(null);
   const [cleared, flashCleared] = useFlash<number>();
   const imports = useQuery({
     queryKey: ["imports"],
@@ -136,7 +136,10 @@ export function LibraryImports({
   const remove = useMutation({
     mutationFn: (id: string) =>
       api(`/api/library/imports/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      setDeleting(null);
+      refresh();
+    },
   });
   if (reviewId)
     return (
@@ -196,7 +199,7 @@ export function LibraryImports({
                       aria-label="Upload Image"
                       loading={uploading.isPending}
                     >
-                      <ImageUp size={18} />
+                      <icons.upload size={18} />
                     </ActionIcon>
                   </Tooltip>
                 )}
@@ -298,18 +301,28 @@ export function LibraryImports({
           ]}
           rowActions={(record) => (
             <>
-              <Menu.Item onClick={() => setReviewId(record.id)}>Review Import</Menu.Item>
+              <Menu.Item
+                leftSection={<icons.details size={16} />}
+                onClick={() => setReviewId(record.id)}
+              >
+                Review Import
+              </Menu.Item>
               {record.state === "needs-files" && (
-                <Menu.Item disabled={download.isPending} onClick={() => download.mutate(record.id)}>
+                <Menu.Item
+                  leftSection={<icons.download size={16} />}
+                  disabled={download.isPending}
+                  onClick={() => download.mutate(record.id)}
+                >
                   Download Missing
                 </Menu.Item>
               )}
+              <Menu.Divider />
               <Menu.Item
                 color="red"
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(record.id)}
+                leftSection={<icons.delete size={16} />}
+                onClick={() => setDeleting(record)}
               >
-                Remove
+                Delete Import
               </Menu.Item>
             </>
           )}
@@ -317,13 +330,24 @@ export function LibraryImports({
       )}
       <ConfirmDialog
         opened={confirming}
-        title="Clear Failed Imports?"
+        title="Clear Failed Imports"
         action="Clear Failed"
         pending={clearFailed.isPending}
         onConfirm={() => clearFailed.mutate()}
         onClose={() => setConfirming(false)}
       >
         Failed imports leave Library › Imports. Downloaded files stay.
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={Boolean(deleting)}
+        title="Delete Import"
+        action="Delete"
+        pending={remove.isPending}
+        onConfirm={() => deleting && remove.mutate(deleting.id)}
+        onClose={() => setDeleting(null)}
+      >
+        Delete {deleting ? `"${nameOf(deleting)}"` : "this import"} from Library › Imports?
+        Downloaded files stay.
       </ConfirmDialog>
     </Stack>
   );

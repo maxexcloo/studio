@@ -5,13 +5,15 @@ import {
   Button,
   Divider,
   Group,
+  Menu,
   Popover,
   ScrollArea,
   SegmentedControl,
   Stack,
+  Text,
   Tooltip,
 } from "@mantine/core";
-import { Search } from "lucide-react";
+import { Search, type LucideIcon } from "lucide-react";
 import { icons } from "./icons";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
@@ -51,10 +53,23 @@ export function ToolbarDivider() {
   return <Divider orientation="vertical" className={classes.divider} />;
 }
 
+/** A toolbar action shown as an icon with a tooltip, or by name under More on phones. */
+export interface ToolbarMoreAction {
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+  /** A download link instead of a click. */
+  href?: string;
+}
+
+const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
+
 /**
  * Library and Settings lists share one toolbar: segmented views on the left, then an expanding
- * search, one filter popover and the section's own actions. Escape closes search, keeping the query,
- * or the filters; `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
+ * search, one filter popover and the section's own actions, each group behind a divider: `more` as
+ * icons with tooltips (phones, which show no tooltips, list them by name under More), then
+ * `actions`, ending with the labelled create action. Escape closes search, keeping the query, or the
+ * filters; `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
  */
 export function SectionToolbar({
   label,
@@ -65,7 +80,8 @@ export function SectionToolbar({
   onQueryChange,
   filters,
   filterCount = 0,
-  onResetFilters,
+  onClearFilters,
+  more = [],
   actions,
 }: {
   label: string;
@@ -76,7 +92,8 @@ export function SectionToolbar({
   onQueryChange?: (value: string) => void;
   filters?: ReactNode;
   filterCount?: number;
-  onResetFilters?: () => void;
+  onClearFilters?: () => void;
+  more?: ToolbarMoreAction[];
   actions?: ReactNode;
 }) {
   const phone = usePhone();
@@ -168,22 +185,64 @@ export function SectionToolbar({
             </Tooltip>
             <Popover.Dropdown aria-label={`${label} Filters`} role="dialog" p="sm">
               <ScrollArea.Autosize mah="min(60dvh, 420px)">
+                {/* Titled with Clear, as the gallery's and the pickers' Filters popups are. */}
                 <Stack gap="sm">
+                  <Group justify="space-between" wrap="nowrap" mih={28}>
+                    <Text fw={500}>Filters</Text>
+                    <Button
+                      data-mantine-stop-propagation
+                      variant="subtle"
+                      size="compact-sm"
+                      disabled={!filterCount}
+                      onClick={onClearFilters}
+                    >
+                      Clear
+                    </Button>
+                  </Group>
                   {filters}
-                  <Button
-                    data-mantine-stop-propagation
-                    variant="subtle"
-                    size="compact-sm"
-                    onClick={onResetFilters}
-                    style={{ alignSelf: "end" }}
-                  >
-                    Reset Filters
-                  </Button>
                 </Stack>
               </ScrollArea.Autosize>
             </Popover.Dropdown>
           </Popover>
         )}
+        {(onQueryChange || filters) && (more.length > 0 || actions) && <ToolbarDivider />}
+        {more.length > 0 &&
+          (phone ? (
+            <Menu position="bottom-end">
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="gray" aria-label={`More ${label} Actions`}>
+                  <icons.more size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                {more.map((action) => (
+                  <Menu.Item
+                    key={action.label}
+                    leftSection={<action.icon size={16} />}
+                    onClick={action.onClick}
+                    {...link(action.href)}
+                  >
+                    {action.label}
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
+          ) : (
+            more.map((action) => (
+              <Tooltip key={action.label} label={action.label}>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label={action.label}
+                  onClick={action.onClick}
+                  {...link(action.href)}
+                >
+                  <action.icon size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ))
+          ))}
+        {more.length > 0 && actions && <ToolbarDivider />}
         {actions}
       </Group>
     </Group>

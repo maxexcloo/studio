@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
-import { RefreshCw } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
@@ -199,7 +200,7 @@ export function LibraryCatalogueTable({
             </>
           }
           filterCount={filterCount}
-          onResetFilters={() => {
+          onClearFilters={() => {
             setFamily(null);
             setType(null);
             setModelType(null);
@@ -215,7 +216,7 @@ export function LibraryCatalogueTable({
                   disabled={updatePending}
                   onClick={onCheckUpdates}
                 >
-                  <RefreshCw size={18} />
+                  <icons.refresh size={18} />
                 </ActionIcon>
               </Tooltip>
             )
@@ -350,30 +351,51 @@ export function LibraryCatalogueTable({
           const free = item.update?.freeAlternative;
           return (
             <>
+              {onEdit && (
+                <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
+                  Edit Catalogue Entry
+                </Menu.Item>
+              )}
               {onUpdate &&
                 canUpdate(item) &&
                 (latest?.downloadable && !latest.unavailable ? (
-                  <Menu.Item disabled={updatePending} onClick={() => onUpdate(item)}>
+                  <Menu.Item
+                    leftSection={<icons.download size={16} />}
+                    disabled={updatePending}
+                    onClick={() => onUpdate(item)}
+                  >
                     Update to {latest.name}
                   </Menu.Item>
                 ) : free?.downloadable && !free.unavailable ? (
-                  <Menu.Item disabled={updatePending} onClick={() => onUpdate(item, true)}>
+                  <Menu.Item
+                    leftSection={<icons.download size={16} />}
+                    disabled={updatePending}
+                    onClick={() => onUpdate(item, true)}
+                  >
                     Update to {free.name}
                   </Menu.Item>
                 ) : (
-                  <Menu.Item disabled>
+                  <Menu.Item leftSection={<icons.download size={16} />} disabled>
                     {latest?.unavailable?.note || "This update cannot be downloaded."}
                   </Menu.Item>
                 ))}
-              <Menu.Item onClick={() => void copyText(item.file || item.key, "File name")}>
+              <Menu.Item
+                leftSection={<icons.copy size={16} />}
+                onClick={() => void copyText(item.file || item.key, "File name")}
+              >
                 Copy File Name
               </Menu.Item>
               {source && (
-                <Menu.Item component="a" href={source} target="_blank" rel="noopener noreferrer">
+                <Menu.Item
+                  leftSection={<ExternalLink size={16} />}
+                  component="a"
+                  href={source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Open Source Page
                 </Menu.Item>
               )}
-              {onEdit && <Menu.Item onClick={() => onEdit(item)}>Edit Catalogue Entry</Menu.Item>}
             </>
           );
         }}

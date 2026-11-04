@@ -375,14 +375,18 @@ test("Clear Failed removes failed imports and says how many; Remove takes one", 
   await section(page, "Library", "Imports");
   await page.getByRole("button", { name: "Clear Failed", exact: true }).click();
   await page
-    .getByRole("dialog", { name: "Clear Failed Imports?" })
+    .getByRole("dialog", { name: "Clear Failed Imports" })
     .getByRole("button", { name: "Clear Failed", exact: true })
     .click();
   await expect(page.getByText("1 cleared", { exact: true })).toBeVisible();
   await expect(page.getByText("Blocked Model", { exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "Clear Failed", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Actions for Kept Model", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete Import", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Import", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
   await expect(page.getByText("No Imports", { exact: true })).toBeVisible();
 });
 
@@ -480,7 +484,10 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await page.getByRole("option", { name: "SDXL", exact: true }).click();
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("XL Base");
-  await page.getByRole("button", { name: "Reset Filters", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Models Filters", exact: true })
+    .getByRole("button", { name: "Clear", exact: true })
+    .click();
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Models", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Models Filters", exact: true })).toBeHidden();

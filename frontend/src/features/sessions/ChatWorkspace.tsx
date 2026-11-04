@@ -304,7 +304,7 @@ export function SessionList({
         query={query}
         onQueryChange={setQuery}
         filterCount={archived ? 1 : 0}
-        onResetFilters={() => setShow("all")}
+        onClearFilters={() => setShow("all")}
         filters={
           // One of these at a time, as the gallery's Show.
           <Input.Wrapper label="Show">

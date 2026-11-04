@@ -1,15 +1,5 @@
 import { useState } from "react";
-import {
-  Alert,
-  Button,
-  FocusTrap,
-  Loader,
-  Modal,
-  Select,
-  Stack,
-  Switch,
-  Text,
-} from "@mantine/core";
+import { Alert, Button, FocusTrap, Modal, Select, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   UpscaleQuality,
@@ -19,6 +9,8 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
+import { DialogFooter } from "../../ui/ConfirmDialog";
+import { LoadingState } from "../../ui/LoadingState";
 import { useRemembered } from "../auth/useRemembered";
 
 const statusQuery = (quality: UpscaleQuality) => ({
@@ -26,7 +18,7 @@ const statusQuery = (quality: UpscaleQuality) => ({
   queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
 });
 
-function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void }) {
+function UpscaleForm({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   const [quality, setQuality] = useState<UpscaleQuality>("balanced");
   const [target, setTarget] = useState("0");
   const [faceDetail, setFaceDetail] = useState(false);
@@ -42,7 +34,7 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
         faceDetail: faceDetail && Boolean(faceAvailable),
       } satisfies UpscaleRequest),
     onSuccess: () => {
-      onQueued();
+      onClose();
       void Promise.all(
         ["gallery", "queue", "session", "sessions"].map((key) =>
           cache.invalidateQueries({ queryKey: [key] }),
@@ -56,7 +48,7 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
     Boolean(status.data.faceDetail.detectors.length);
   return (
     <Stack gap="sm">
-      {status.isPending ? <Loader size="sm" aria-label="Checking Upscale Worker" /> : null}
+      {status.isPending && <LoadingState fill label="Checking Upscale Worker" />}
       {status.error && (
         <Alert color="red" title="Upscale Unavailable">
           {status.error.message}
@@ -127,13 +119,15 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
         </>
       )}
       {upscale.error && <Alert color="red">{upscale.error.message}</Alert>}
-      <Button
-        loading={upscale.isPending}
-        disabled={!status.data?.ready || status.isFetching}
-        onClick={() => upscale.mutate()}
-      >
-        Queue Upscale
-      </Button>
+      <DialogFooter pending={upscale.isPending} onCancel={onClose}>
+        <Button
+          loading={upscale.isPending}
+          disabled={!status.data?.ready || status.isFetching}
+          onClick={() => upscale.mutate()}
+        >
+          {item.type === "image" ? "Upscale Image" : "Upscale Video"}
+        </Button>
+      </DialogFooter>
     </Stack>
   );
 }
@@ -193,7 +187,7 @@ export function UpscaleDialog({
   return (
     <Modal opened={opened} onClose={onClose} title="Upscale" centered size="sm">
       <FocusTrap.InitialFocus />
-      <UpscaleForm item={item} onQueued={onClose} />
+      <UpscaleForm item={item} onClose={onClose} />
     </Modal>
   );
 }

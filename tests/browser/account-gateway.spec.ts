@@ -249,9 +249,9 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "Disable Account", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Disable User", exact: true }).click();
   await page
-    .getByRole("dialog", { name: "Disable Account", exact: true })
+    .getByRole("dialog", { name: "Disable User", exact: true })
     .getByRole("button", { name: "Disable", exact: true })
     .click();
   await expect(member.getByText("Disabled", { exact: true })).toBeVisible();
@@ -323,8 +323,8 @@ test("Administrators change roles, reset passwords and delete accounts and empty
   await reset.getByRole("button", { name: "Reset Password", exact: true }).click();
   await expect(reset).toBeHidden();
 
-  await menu("Delete Account");
-  const confirm = page.getByRole("dialog", { name: "Delete Account", exact: true });
+  await menu("Delete User");
+  const confirm = page.getByRole("dialog", { name: "Delete User", exact: true });
   await expect(confirm).toContainText("stay on disk");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(member).toHaveCount(0);

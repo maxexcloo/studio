@@ -274,9 +274,7 @@ export function PromptHistory({
                     </Group>
                   ))}
                   {!filtered.length && (
-                    <EmptyState fill>
-                      {query.trim() ? "No Matching Prompts" : "No Saved Prompts"}
-                    </EmptyState>
+                    <EmptyState fill>{query.trim() ? "No Matches" : "No Saved Prompts"}</EmptyState>
                   )}
                 </Combobox.Options>
               </ScrollArea.Autosize>

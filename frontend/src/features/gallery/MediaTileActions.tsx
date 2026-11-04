@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
-import { menuWidth } from "./ActionBar";
+import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { AnimateDialog, MediaActionMenu } from "./MediaActions";
 import type { AnimateTheme } from "./useMediaAction";
