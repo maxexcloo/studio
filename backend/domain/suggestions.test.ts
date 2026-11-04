@@ -79,6 +79,14 @@ function fixture(
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     ideas: () => options.switches?.ideas ?? true,
     nextSteps: () => options.switches?.nextSteps ?? true,
+    target: async (_owner, item) =>
+      item.type === "image"
+        ? {
+            label: "Flux 2",
+            guide: { summary: "Subject first.", sampling: {} },
+            edits: "instruction",
+          }
+        : null,
     now: () => clock,
   });
   return {
@@ -179,10 +187,10 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
     reason: "Next steps are offered for finished images.",
   });
   assert.equal(calls.length, 1);
-  assert.doesNotMatch(calls[0][0].content, /uncensored/);
+  assert.doesNotMatch(calls[0][0].content, /Explicit content is allowed/);
   // An account with explicit wording gets steps that keep an explicit image explicit.
   await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
-  assert.match(calls[1][0].content, /may make uncensored images[^\n]*never refuse/);
+  assert.match(calls[1][0].content, /Explicit content is allowed[^\n]*never refuse/);
 });
 
 test("viewer next steps read the image itself where the text model can", async () => {
@@ -219,13 +227,13 @@ test("turning explicit wording on or off writes an image's kept next steps and c
   await steps();
   await draft();
   assert.equal(calls.length, 2);
-  assert.ok(calls.every(([system]) => !/uncensored/.test(system.content)));
+  assert.ok(calls.every(([system]) => !/Explicit content is allowed/.test(system.content)));
   explicit = true;
   await steps();
   await draft();
   await steps();
   assert.equal(calls.length, 4);
-  assert.ok(calls.slice(2).every(([system]) => /uncensored/.test(system.content)));
+  assert.ok(calls.slice(2).every(([system]) => /Explicit content is allowed/.test(system.content)));
   // Off again, the earlier answer serves while cached; after that, the steps are written again.
   explicit = false;
   assert.deepEqual(await steps(), first);
@@ -233,7 +241,7 @@ test("turning explicit wording on or off writes an image's kept next steps and c
   advance(11 * 60_000);
   await steps();
   assert.equal(calls.length, 5);
-  assert.doesNotMatch(calls[4][0].content, /uncensored/);
+  assert.doesNotMatch(calls[4][0].content, /Explicit content is allowed/);
 });
 
 test("idle work writes next steps ahead of time, from the image where the model reads it", async () => {
@@ -330,6 +338,10 @@ test("a requested change picks one of the offered actions and rewrites the promp
   const [system, user] = calls[0];
   assert.match(system.content, /- edit: [\s\S]*- recreate: [\s\S]*- upscale: /);
   assert.doesNotMatch(system.content, /animate:|teleport/);
+  // The prompt follows the result's model: its guide, and its edits worded as instructions.
+  assert.match(system.content, /- edit: [^\n]*"change X, keep Y"/);
+  assert.match(system.content, /Prompting guide: \{"summary":"Subject first\."\}/);
+  assert.match(system.content, /Don't make it any more sexual/);
   assert.match(user.content, /Prompt: A harbour at dawn[\s\S]*Request: make it night/);
   // An action that wasn't offered is unusable; a video's animate runs it again.
   assert.equal((await ask(["recreate"])).reason, "The text model’s reply was unusable.");
@@ -360,11 +372,11 @@ test("a change to the composer's draft rewrites its prompt and can't upscale", a
   });
   const [system, user] = calls[0];
   assert.match(system.content, /draft prompt[\s\S]*- edit: [^\n]*reference[\s\S]*- recreate: /);
-  assert.doesNotMatch(system.content, /upscale|uncensored/);
+  assert.doesNotMatch(system.content, /upscale|Explicit content is allowed/);
   assert.match(user.content, /The draft:\nPrompt: A castle at noon[\s\S]*Request: make it night/);
   // Explicit wording follows the account's, as for a result.
   await ask("bob", ["edit"]);
-  assert.match(calls[1][0].content, /uncensored/);
+  assert.match(calls[1][0].content, /Explicit content is allowed/);
   await assert.rejects(ask("alice", ["upscale"]), { status: 400 });
 });
 
@@ -377,10 +389,10 @@ test("a draft without a request gets change ideas for its prompt, explicit where
   assert.equal((result.suggestions[0] as { request: string }).request, "make the light warmer");
   const [system, user] = calls[0];
   assert.match(system.content, /draft prompt of an image[\s\S]*"steps"/);
-  assert.doesNotMatch(system.content, /uncensored/);
+  assert.doesNotMatch(system.content, /Explicit content is allowed/);
   assert.match(user.content, /The draft prompt: A harbour at dawn/);
   await ask("bob", "A sultry portrait");
-  assert.match(calls[1][0].content, /uncensored/);
+  assert.match(calls[1][0].content, /Explicit content is allowed/);
   assert.deepEqual(await ask("alice", " "), {
     suggestions: [],
     reason: "Write a prompt to change first.",
