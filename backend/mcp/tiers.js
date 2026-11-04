@@ -6,8 +6,6 @@ import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 
 export const mcpTiers = ["quality", "standard", "fast", "turbo"];
 
-/** A provider-backed cloud profile (Grok). MCP never chooses one by itself. */
-export { isCloudProfile };
 // "grok" anywhere; "cloud" only as a request for it ("in the cloud", "a cloud model"), so "a cloud over the hills" stays local.
 const cloudWords =
   /\bgrok\b|\b(?:in|on|via|use|using|with|through|to)\s+(?:the\s+)?cloud\b|\bcloud\s+(?:models?|profiles?|videos?|images?|generation|version)\b/i;

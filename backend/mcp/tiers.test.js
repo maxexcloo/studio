@@ -4,7 +4,6 @@ import {
   asksForCloud,
   chooseProfile,
   familyMatches,
-  isCloudProfile,
   localUnlessAsked,
   findProfile,
   nameWords,
@@ -16,6 +15,7 @@ import {
   takesFirstFrame,
   tierOf,
 } from "./tiers.js";
+import { isCloudProfile } from "../cloud-profiles.js";
 
 test("tiers come from the label segment, and untiered labels are standard", () => {
   assert.equal(tierOf({ label: "Krea 2 Turbo · Super Fast · 2 Steps" }), "turbo");
