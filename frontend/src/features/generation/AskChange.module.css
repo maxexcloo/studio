@@ -7,28 +7,20 @@
   box-shadow: 0 0 0 4px var(--proposed-tint);
 }
 
-/* Two actions to a row, as the composer's prompt tools stand beside its text. */
+/* One column of actions beside the text, as the composer's prompt tools stand. */
 .actions {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  justify-content: end;
-  align-content: start;
-}
-
-/* The send ends the last row. */
-.send {
-  grid-column: 2;
 }
 
 /* A one-line field, and the phone editor's header, line them up in one row. */
 .actions[data-row],
 :global(.mantine-Modal-header) .actions {
-  grid-template-columns: none;
-  grid-auto-flow: column;
+  flex-direction: row;
 }
 
-.actions[data-row] .send,
-:global(.mantine-Modal-header) .send {
-  grid-column: auto;
+/* The text stands as tall as its column of `--change-actions` 32 px bar icons and their gaps. */
+.fit {
+  min-height: calc(var(--change-actions) * 36px - 4px);
 }
