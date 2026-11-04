@@ -264,7 +264,11 @@ export function registerRewriteRoutes(
   app.get("/api/queue", (req, res) => {
     const pauses = store.pauses();
     return res.json({
-      jobs: shown(owner(req), listed(store, owner(req))),
+      // Polled while work runs: a job with gallery records drops the adapter's copies of them,
+      // which every reader passes over for the records.
+      jobs: shown(owner(req), listed(store, owner(req))).map((job) =>
+        job.items.length ? { ...job, outputs: [] } : job,
+      ),
       paused: { mine: pauses.has(owner(req)), all: pauses.has(everyone) },
     } satisfies QueueResponse);
   });
