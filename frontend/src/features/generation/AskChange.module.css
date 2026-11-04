@@ -20,7 +20,13 @@
   flex-direction: row;
 }
 
-/* The text stands as tall as its column of `--change-actions` 32 px bar icons and their gaps. */
+/* Four or more desktop actions stand in two columns, so the field stays two rows tall. */
+.actions[data-grid] {
+  display: grid;
+  grid-template-columns: repeat(2, 32px);
+}
+
+/* The text stands as tall as `--change-actions` rows of 32 px bar icons and their gaps. */
 .fit {
   min-height: calc(var(--change-actions) * 36px - 4px);
 }
