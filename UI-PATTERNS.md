@@ -371,7 +371,8 @@ primary component reference and verify APIs against the installed version.
   work keeps its place and reads Paused wherever its waiting reason shows (the
   queue, MCP Result); started work finishes. Waiting rows drag by their handle
   (pointer, touch or keyboard) to a new place among the account's own waiting
-  work only, so other accounts and the queue tiers keep their order.
+  work only, so other accounts and the queue tiers keep their order. The handle
+  sits on the row's trailing side, before its spinner, so every row's text lines up.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Image lists share one toolbar row (`GalleryFilters.tsx`): search, Filter ▾
