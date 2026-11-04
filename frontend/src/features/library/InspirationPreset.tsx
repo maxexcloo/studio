@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Button, Card, Group, Image, Stack, Text } from "@mantine/core";
-import { useNavigate } from "react-router";
+import { useOpenComposer } from "../generation/openComposer";
 import type { GenerationInput, Profile } from "../../types";
 import { isProfile } from "../generation/payload";
 import { initialInput, inputForProfile, useGeneration } from "../generation/GenerationProvider";
@@ -125,7 +125,7 @@ function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
 }
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
-  const navigate = useNavigate();
+  const openComposer = useOpenComposer();
   const { profiles, setDraft, changeKind } = useGeneration();
   const [selection, setSelection] = useState<GenerationInput | null>(null);
   const kind = preset.type || "image";
@@ -177,7 +177,7 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
                 }),
                 "gallery",
               );
-              navigate(kind === "video" ? "/video?compose=1" : "/images?compose=1");
+              openComposer(kind);
             }}
           >
             Use Prompt
@@ -208,7 +208,7 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
                 }),
                 "gallery",
               );
-              navigate(kind === "video" ? "/video?compose=1" : "/images?compose=1");
+              openComposer(kind);
             }}
           >
             Use Settings

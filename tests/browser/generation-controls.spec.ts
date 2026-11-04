@@ -553,8 +553,9 @@ test("The chip composer offers supported sizes and settings, follows the output 
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  // Edit opens the composer on the staged draft.
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
-  await expandComposer(page);
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await prompt.fill("A wide copper horizon");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });

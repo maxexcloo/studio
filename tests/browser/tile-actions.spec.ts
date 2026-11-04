@@ -140,8 +140,8 @@ for (const operation of ["Edit", "Animate"] as const) {
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
     await expect(page).toHaveURL(operation === "Animate" ? /\/video\?compose=1/ : /\/images/);
-    // Videos opens with its composer expanded; Images keeps the compact bar until it is clicked.
-    if (operation === "Edit") await page.locator("[data-composer-prompt]").click();
+    // Either way the composer opens on the staged draft.
+    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "A copper bird",
     );
@@ -174,7 +174,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
-  await expandComposer(page);
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
   await page.getByRole("button", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
