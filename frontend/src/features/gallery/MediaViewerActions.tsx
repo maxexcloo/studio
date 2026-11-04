@@ -20,6 +20,26 @@ import classes from "./MediaViewer.module.css";
 const labelled = ["animate", "edit", "recreate", "upscale"];
 const primary = ["retry", "stop", "animate", "edit", "recreate"];
 
+/** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
+export interface ViewerActions {
+  /** The bar's accessible name. */
+  label: string;
+  groups: ActionGroups;
+  /** The actions desktop names beside their icons. */
+  labelled: string[];
+  /** The actions phones keep on the bar, labelled under their icons; the rest go under More. */
+  primary: string[];
+}
+
+/** The bar's controls: desktop's divided groups, or the phone's labelled primaries and More. */
+export function ViewerActionGroups({ groups, labelled, primary }: Omit<ViewerActions, "label">) {
+  const phone = usePhone();
+  if (!phone) return <ActionBarGroups groups={groups} labelled={labelled} />;
+  const primaries = primary.flatMap((id) => groups.flat().filter((action) => action.id === id));
+  const more = groups.map((group) => group.filter((action) => !primary.includes(action.id)));
+  return <StackedActionBar primary={primaries} more={more} />;
+}
+
 /** The viewer's action bar: the prompt field above the shared item actions. */
 export function MediaViewerActions({
   item,
@@ -74,10 +94,6 @@ export function MediaViewerActions({
     onVersionChange,
   });
   if (shortcuts) shortcuts.current = groups;
-  const primaries = primary.flatMap((id) => groups.flat().filter((action) => action.id === id));
-  const more = groups.map((group) => group.filter((action) => !primary.includes(action.id)));
-  // Desktop's prompt field carries Continue in Chat.
-  const bar = groups.map((group) => group.filter((action) => action.id !== "chat"));
   return (
     <ActionBarSurface
       ref={ref}
@@ -96,11 +112,14 @@ export function MediaViewerActions({
           onApplied={onApplied}
         />
       )}
-      {phone ? (
-        <StackedActionBar primary={primaries} more={more} />
-      ) : (
-        <ActionBarGroups groups={bar} labelled={labelled} />
-      )}
+      <ViewerActionGroups
+        // Desktop's prompt field carries Continue in Chat.
+        groups={
+          phone ? groups : groups.map((group) => group.filter((action) => action.id !== "chat"))
+        }
+        labelled={labelled}
+        primary={primary}
+      />
       {animating && (
         <AnimateDialog
           item={item}

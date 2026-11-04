@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { Maximize2, X } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { Maximize2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { post } from "../../api";
@@ -12,6 +11,7 @@ import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { queueQuery } from "../generation/Queue";
+import { dreamChoices, viewerChoices, type Choice, type Verdict } from "./choices";
 import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
 import { PairContent, sideNames } from "./PairCard";
 import {
@@ -26,7 +26,6 @@ import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
 import { layerAbove } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
-type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine" | "more";
 type SingleCard = Exclude<DeckCard, PairDeckCard>;
 const directions: Record<Verdict, Direction> = {
   discard: "left",
@@ -238,7 +237,8 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Edit, Animate, Star and
  * More Like This in the compact bar keep the result too. A comparison asks about two results
  * alike but for one thing: ← or a left swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a
- * card (or its View action) opens it in the viewer over the deck, which stays where it was.
+ * card (or its View action) opens it in the viewer over the deck, with the card's choices in its
+ * bar; a choice there moves on to the next card in the viewer.
  * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
  * judging them changes nothing in the gallery beyond an optional Star. `empty` shows once the
  * deck is through, told whether calibration images are available.
@@ -255,7 +255,8 @@ export function DreamDeck({
   const phone = usePhone();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [counts, setCounts] = useState({ judged: 0, calibrated: 0, dreamed: 0 });
-  const [viewing, setViewing] = useState<{ item: MediaItem; items: MediaItem[] } | null>(null);
+  // The id of the top card's item open in the viewer; after a verdict it follows the next card.
+  const [viewing, setViewing] = useState<string | null>(null);
   const judge = useJudge((card) =>
     setDecided((previous) => {
       const next = new Set(previous);
@@ -332,22 +333,26 @@ export function DreamDeck({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const viewer = viewing && (
+  // The viewer shows the top card, so a verdict there moves on to the next card in place.
+  const shown = !top ? [] : top.kind === "pair" ? top.items : [top.item];
+  if (viewing && !shown.length) setViewing(null);
+  const pairLabel = (item: MediaItem) => {
+    if (top?.kind !== "pair") return "";
+    const index = top.items.findIndex((side) => side.id === item.id);
+    return `${sideNames[index]}${top.labels ? ` · ${top.labels[index]}` : ""}`;
+  };
+  const viewer = viewing && top && (
     <MediaViewer
-      item={viewing.items.find((item) => item.id === viewing.item.id) || viewing.item}
-      items={viewing.items}
-      navigate={(item) => setViewing({ ...viewing, item })}
+      item={shown.find((item) => item.id === viewing) || shown[0]}
+      items={shown}
+      navigate={(item) => setViewing(item.id)}
       close={() => setViewing(null)}
+      actions={viewerChoices(top, (choice) => void act(choice))}
+      itemLabel={top.kind === "pair" ? pairLabel : undefined}
+      sideBySide={top.kind === "pair"}
     />
   );
-  if (!top)
-    return (
-      <>
-        {empty(gallery.length > 0)}
-        {viewer}
-      </>
-    );
-  const calibrating = top.kind === "calibration";
+  if (!top) return empty(gallery.length > 0);
   // Phones show the bar's icons with a short name under each.
   const labelled = (control: ReactNode, name: string) => (
     <div className={classes.labelled}>
@@ -355,54 +360,42 @@ export function DreamDeck({
       <span aria-hidden>{name}</span>
     </div>
   );
-  const button = (
-    choice: Verdict | PairAnswer,
-    label: string,
-    icon: ReactNode,
-    options: {
-      hint?: string;
-      tip?: string;
-      primary?: boolean;
-      disabled?: boolean;
-      short?: string;
-    } = {},
-  ) => (
-    <Tooltip
-      key={choice}
-      label={`${options.tip || label}${options.hint ? ` (${options.hint})` : ""}`}
-    >
-      {phone && icon ? (
-        labelled(
-          <ActionIcon
+  const button = ({ choice, label, icon: Icon, ...options }: Choice) => {
+    const icon = (
+      <ActionIcon
+        variant={options.primary ? "filled" : "default"}
+        radius="xl"
+        aria-label={label}
+        disabled={options.disabled}
+        onClick={() => void act(choice)}
+      >
+        <Icon size={18} />
+      </ActionIcon>
+    );
+    return (
+      <Tooltip
+        key={choice}
+        label={`${options.tip || label}${options.hint ? ` (${options.hint})` : ""}`}
+      >
+        {phone ? (
+          labelled(icon, options.short || label)
+        ) : options.iconOnly ? (
+          icon
+        ) : (
+          <Button
             variant={options.primary ? "filled" : "default"}
             radius="xl"
-            aria-label={label}
+            size="sm"
+            leftSection={<Icon size={18} />}
             disabled={options.disabled}
             onClick={() => void act(choice)}
           >
-            {icon}
-          </ActionIcon>,
-          options.short || label,
-        )
-      ) : (
-        <Button
-          variant={options.primary ? "filled" : "default"}
-          radius="xl"
-          size="sm"
-          leftSection={icon}
-          disabled={options.disabled}
-          onClick={() => void act(choice)}
-        >
-          {label}
-        </Button>
-      )}
-    </Tooltip>
-  );
-  const star = (
-    <ActionIcon variant="default" radius="xl" aria-label="Star" onClick={() => void act("star")}>
-      <icons.star size={18} />
-    </ActionIcon>
-  );
+            {label}
+          </Button>
+        )}
+      </Tooltip>
+    );
+  };
   const view = (item: MediaItem, label = "View") => (
     <Tooltip label={label}>
       <ActionIcon
@@ -410,7 +403,7 @@ export function DreamDeck({
         variant="default"
         radius="xl"
         aria-label={label}
-        onClick={() => setViewing({ item, items: [item] })}
+        onClick={() => setViewing(item.id)}
       >
         <Maximize2 size={16} />
       </ActionIcon>
@@ -442,11 +435,9 @@ export function DreamDeck({
                       : { left: "Pass", right: "Like" }
                 }
                 onTap={(target) => {
-                  if (card.kind !== "pair")
-                    return setViewing({ item: card.item, items: [card.item] });
+                  if (card.kind !== "pair") return setViewing(card.item.id);
                   const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
-                  if (side !== undefined)
-                    setViewing({ item: card.items[Number(side)], items: card.items });
+                  if (side !== undefined) setViewing(card.items[Number(side)].id);
                 }}
                 onSwipe={(direction) => {
                   const choice = card.kind === "pair" ? answers[direction] : intent(direction);
@@ -487,41 +478,19 @@ export function DreamDeck({
         )}
       </div>
       <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
-        {top.kind === "pair" ? (
-          <>
-            {button("a", "A", null, { hint: "←", tip: top.labels?.[0] && `A: ${top.labels[0]}` })}
-            {button("both", "Both", null, { hint: "↑" })}
-            {button("neither", "Neither", null, { hint: "↓" })}
-            {button("b", "B", null, { hint: "→", tip: top.labels?.[1] && `B: ${top.labels[1]}` })}
-          </>
-        ) : (
-          <>
-            {button("discard", calibrating ? "Pass" : "Skip", <X size={18} />, { hint: "←" })}
-            {button("refine", "Edit", <icons.edit size={18} />, {
-              disabled: !(image && dream),
-            })}
-            {button("animate", "Animate", <icons.animate size={18} />, {
-              disabled: !(image && dream),
-            })}
-            <Tooltip label="Star">{phone ? labelled(star, "Star") : star}</Tooltip>
-            {button("more", "More Like This", <icons.moreLikeThis size={18} />, {
-              disabled: !(image && dream),
-              short: "Similar",
-            })}
-            {button("keep", calibrating ? "Like" : "Keep", <icons.keep size={18} />, {
-              hint: "→",
-              primary: true,
-            })}
-          </>
-        )}
+        {/* The deck offers Variations by ↑ or an upward swipe; the viewer's bar has room for it. */}
+        {dreamChoices(top)
+          .flat()
+          .filter((choice) => choice.choice !== "variations")
+          .map(button)}
       </Group>
       {!phone && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? "← A · → B · ↑ Both · ↓ Neither"
-            : `← ${calibrating ? "Pass" : "Skip"} · → ${calibrating ? "Like" : "Keep"}${
-                image && dream ? " · ↑ Keep & Variations" : ""
-              }`}
+            : `← ${top.kind === "calibration" ? "Pass" : "Skip"} · → ${
+                top.kind === "calibration" ? "Like" : "Keep"
+              }${image && dream ? " · ↑ Keep & Variations" : ""}`}
         </Text>
       )}
       {viewer}
