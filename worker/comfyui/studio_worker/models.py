@@ -439,7 +439,7 @@ def start_fetch(root, folder, filename, repo, revision, path, size, sha256, note
             Path(str(file) + ".part.json").unlink(missing_ok=True)
         except InterruptedError:
             fetch["error"] = "stopped"
-        except Exception as error:  # reported to Studio through `state`
+        except Exception as error:  # noqa: BLE001 -- Reported to Studio through `state`.
             fetch["error"] = str(error) or "The Hugging Face download failed."
         finally:
             fetch["done"] = True
