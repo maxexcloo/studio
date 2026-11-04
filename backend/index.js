@@ -69,7 +69,7 @@ import { presetsEnabled } from "./features.js";
 import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { seedSamples } from "./profile/seed.js";
-import { registerAssistantRoutes } from "./assistant-routes.js";
+import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import {
   canonicalProfileId,
@@ -704,7 +704,13 @@ const suggestions = createSuggestions({
       item.settings?.profileId || "",
     ),
 });
-registerSuggestionRoutes(app, { suggestions });
+registerSuggestionRoutes(app, {
+  suggestions,
+  refusal: (req) =>
+    req.studioAccount && !mayUseFeature(req.studioAccount, "promptAssistant")
+      ? promptAssistantOff
+      : "",
+});
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
 // It only queues work; it never places GPU workloads, and cloud profiles never take part.
 const dream = createDream({
@@ -847,6 +853,11 @@ function promptAssistantOwner(ownerId) {
   if (!multiUserEnabled) return true;
   return Boolean(ownerId && accountAccessForId(ownerId)?.authenticated);
 }
+// Prompts and next steps written for the owner also need its group's Prompt Assistant feature.
+function promptWriterOwner(ownerId) {
+  if (!multiUserEnabled) return true;
+  return Boolean(ownerId && mayUseFeature(accountAccessForId(ownerId), "promptAssistant"));
+}
 /** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
 async function smallImage(item) {
   const sharp = await loadSharp();
@@ -910,7 +921,7 @@ const suggester = createPromptSuggester({
   enabled: () => flagEnabled("STUDIO_SUGGESTED_PROMPTS"),
   writer: assistantEngine,
   idle: galleryIdle,
-  allowed: promptAssistantOwner,
+  allowed: promptWriterOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
@@ -923,7 +934,7 @@ const nextSteps = createNextStepWork({
   suggestions,
   writer: assistantEngine,
   idle: galleryIdle,
-  allowed: promptAssistantOwner,
+  allowed: promptWriterOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,

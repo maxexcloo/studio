@@ -91,7 +91,11 @@ const engine = {
     return { text: '"The camera slowly pushes in."', thinking: "A push-in suits a bird." };
   },
 };
-const user = (features) => ({ authenticated: true, role: "user", features });
+const user = (features) => ({
+  authenticated: true,
+  role: "user",
+  features: { promptAssistant: true, ...features },
+});
 const issue = (features, writing) =>
   writingIssue(writingRequest({ kind: "animate", ...writing }), { engine, account: user(features) })
     ?.status;
@@ -102,6 +106,7 @@ test("Animate is admitted only for known themes, with Spicy behind Uncensored Mo
   assert.equal(issue({}, { theme: "custom" }), 400);
   assert.equal(issue({}, { theme: "spicy" }), 403);
   assert.equal(issue({ uncensoredModels: true }, { theme: "spicy" }), undefined);
+  assert.equal(issue({ promptAssistant: false }, { theme: "cinematic" }), 403);
   // Dream's Spicy needs it too.
   const dream = (features) =>
     writingIssue(writingRequest({ kind: "dream", spicy: true }), {

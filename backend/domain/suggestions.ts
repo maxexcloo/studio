@@ -605,12 +605,20 @@ export function createNextStepWork(options: {
   });
 }
 
-/** `POST /api/suggestions`: the caller's own suggestions for one surface. */
+/**
+ * `POST /api/suggestions`: the caller's own suggestions for one surface, refused with the reason
+ * `refusal` gives (the group's Prompt Assistant feature off).
+ */
 export function registerSuggestionRoutes(
   app: Router,
-  { suggestions }: { suggestions: SuggestionService },
+  {
+    suggestions,
+    refusal = () => "",
+  }: { suggestions: SuggestionService; refusal?: (req: Request) => string },
 ) {
   app.post("/api/suggestions", async (req, res) => {
+    const refused = refusal(req);
+    if (refused) return res.status(403).json({ ok: false, error: refused });
     try {
       return res.json(await suggestions.suggest(req.studioAccount?.userId || "", req.body || {}));
     } catch (error) {

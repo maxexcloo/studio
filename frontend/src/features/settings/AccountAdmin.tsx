@@ -37,6 +37,7 @@ const featureLabels = {
   cloudModels: "Cloud Models",
   dream: "Dream",
   loras: "LoRAs",
+  promptAssistant: "Prompt Assistant",
   uncensoredModels: "Uncensored Models",
 };
 interface AccessGroup {
@@ -72,7 +73,7 @@ function GroupEditor({
       allModels: false,
       generationProfiles: [],
       // As the server reads a group without them (backend/account-policy.js).
-      features: { chat: true, dream: true },
+      features: { chat: true, dream: true, promptAssistant: true },
     },
   });
   const save = useMutation({
@@ -301,6 +302,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
                 {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
                 {!group.features.chat && groupFeature(false, "Chat")}
                 {!group.features.dream && groupFeature(false, "Dream")}
+                {!group.features.promptAssistant && groupFeature(false, "Prompt Assistant")}
               </Group>
             ),
           },

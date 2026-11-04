@@ -12,6 +12,7 @@
  * prompt into the item; a failure throws with the reason, which fails the item.
  */
 import { mayUseFeature } from "./account-policy.js";
+import { promptAssistantOff } from "./assistant-routes.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 
@@ -43,6 +44,9 @@ export function writingRequest(value) {
 export function writingIssue(writing, { engine, account }) {
   const allowed = (feature) => !account || mayUseFeature(account, feature);
   if (!writing) return { status: 400, error: "Choose a known way to write the prompt." };
+  // Animate's themes are written for the person; Dream's writing follows the Dream feature.
+  if (writing.kind === "animate" && !allowed("promptAssistant"))
+    return { status: 403, error: promptAssistantOff };
   if (!engine) return { status: 503, error: "The prompt assistant is not configured." };
   if (writing.kind === "dream" && writing.spicy && !allowed("uncensoredModels"))
     return { status: 403, error: "Spicy needs Uncensored Models for this account." };

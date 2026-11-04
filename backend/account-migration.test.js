@@ -48,11 +48,10 @@ test("waiting accounts join the default group and groups keep only the features 
       [{ id: "waiting", username: "waiting@example.com" }],
       {
         artists: {
-          removed: ["gallery", "promptAssistant"],
+          removed: ["gallery"],
           granted: [
             "imageGeneration",
             "imageReferences",
-            "promptAssistant",
             "promptHistory",
             "upscale",
             "videoGeneration",
@@ -74,13 +73,16 @@ test("waiting accounts join the default group and groups keep only the features 
     cloudModels: false,
     dream: true,
     loras: false,
+    promptAssistant: true,
     uncensoredModels: false,
   });
+  // Prompt Assistant is read again, so a group that turned it off keeps it off.
   assert.deepEqual(next.profiles.artists.features, {
     chat: true,
     cloudModels: false,
     dream: true,
     loras: true,
+    promptAssistant: false,
     uncensoredModels: false,
   });
   assert.deepEqual(

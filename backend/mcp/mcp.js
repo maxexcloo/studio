@@ -55,6 +55,7 @@ import {
 } from "./tiers.js";
 import { animateThemes } from "../prompt-animate.js";
 import { gatewaySettings } from "../assistant.js";
+import { mayUseFeature } from "../account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import { registerManageTools } from "./manage.js";
@@ -270,6 +271,9 @@ export function registerMcpRoutes(
   const instructions = mediaInstructions;
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
+  // ... and the account's Prompt Assistant feature (the routes they call refuse without it too).
+  const assistantFor = (account) =>
+    assistantGateway && (!account || mayUseFeature(account, "promptAssistant"));
   const chatAssistant = createChatAssistantMemory({
     file: dataDir ? path.join(dataDir, "mcp-assistant.json") : "",
   });
@@ -371,7 +375,7 @@ export function registerMcpRoutes(
       return res.status(400).json({ error: "Invalid conversation identity." });
     const owner = account?.userId || (scope === "media" ? media.owner(user, token) : null);
     // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
-    const assistant = scope === "media" && assistantGateway;
+    const assistant = scope === "media" && assistantFor(account);
     // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
     // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
     const admin =
@@ -2062,7 +2066,7 @@ export function registerMcpRoutes(
       conversation,
       refs,
       session,
-      assistant: assistantGateway,
+      assistant: assistantFor(account),
       // As for a chat gateway's linked account: administrators while Chat Gateway Admin Tools is on.
       admin: adminScope({ account, gateway: true, gatewayAdminTools }),
     });
