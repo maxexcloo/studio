@@ -1084,6 +1084,7 @@ export function generationSettings(body) {
       // The reference's id lets the live preview draw over the original.
       if (body.inpaint.referenceId) settings.inpaint.referenceId = body.inpaint.referenceId;
     }
+    if (body.maskSkipped) settings.maskSkipped = true;
   }
   if (body.kind === "video" && !body.duration) {
     settings.frames = Number(body.frames || 0);

@@ -508,7 +508,10 @@ primary component reference and verify APIs against the installed version.
   prompts and the caption sit in boxes framed like the composer's text box,
   inside the column (never bleeding past its edges), wrapping long words and
   scrolling within a bounded height, the caption starting expanded
-  until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
+  until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength;
+  References list each picture the run took (its thumbnail opens it) with the role it ran as (Edit Source,
+  Reference 2, a video's frame slot) and its denoise or inpaint strength, then anything supplied but
+  not used; Settings names the image's Mode (Generate, Edit, Reference or Inpaint). Its
   sections run Caption (with its tags), From, Prompt, Negative Prompt, Source, Derived, Model, LoRAs, References,
   Settings, Output and Timing, each a heading over its content, and an
   upscale's Output adds the Original Size the model drew beside its

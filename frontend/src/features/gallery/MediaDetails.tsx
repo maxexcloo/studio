@@ -8,19 +8,18 @@ import {
   Table,
   Text,
   Title,
-  Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import type { MediaItem, Profile, ReferenceAsset } from "../../types";
+import type { MediaItem, Profile } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { mediaTitle } from "./mediaLabels";
 import { useDerivations } from "./versions";
 import { WritingThinking } from "../generation/PromptWriting";
-import { referenceLabel } from "../generation/references";
 import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
 
@@ -51,12 +50,20 @@ const time = (value?: string) => {
 };
 
 type Row = [label: string, value: string];
+/** A reference the run took: the role it ran as and, where recorded, how strongly it applied. */
+interface RanReference {
+  id: string;
+  role: string;
+  strength: string;
+}
 // Holds the File Size row's place while the size loads, so the table does not grow afterwards.
 const pendingValue = "…";
 interface Details {
   profile: string;
   loras: { name: string; strength: string }[];
-  references: ReferenceAsset[];
+  references: RanReference[];
+  /** What was supplied but did not reach the run. */
+  unused: string[];
   settings: Row[];
   output: Row[];
   timing: Row[];
@@ -79,12 +86,34 @@ function generationDetails(
   const sorted = (entries: [string, unknown][]): Row[] =>
     rows(entries).sort(([a], [b]) => a.localeCompare(b));
   const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
-  const references = Array.isArray(settings.referenceDetails)
-    ? (settings.referenceDetails as ReferenceAsset[])
-    : [];
   const shown = mediaSource(item);
   const inpaint = settings.inpaint as { strength?: number } | undefined;
   const video = item.type === "video";
+  const staged = (Array.isArray(settings.referenceAssets) ? settings.referenceAssets : []).filter(
+    (reference): reference is { slot?: string; assetId: string } => Boolean(reference?.assetId),
+  );
+  const guides = !inpaint && settings.referenceRole === "reference";
+  const slots = recorded?.mediaInputs || [];
+  // The reference a run frames and edits: the start slot's, else the first.
+  const primarySlot = (slots.find((slot) => slot.role === "start") || slots[0])?.id;
+  const primary = staged.find((reference) => reference.slot === primarySlot) || staged[0];
+  const denoise = Number(settings.denoise);
+  const references = staged.map(({ slot, assetId: id }, index): RanReference => {
+    // A video's frames read by their slot, such as First Frame; an unlabelled one by its ID.
+    const named =
+      slots.find((input) => input.id === slot)?.label ||
+      String(slot || "").replace(/^\w/, (letter) => letter.toUpperCase());
+    if (video) return { id, role: named || `Reference ${index + 1}`, strength: "" };
+    if (staged[index] !== primary || guides)
+      return { id, role: `Reference ${index + 1}`, strength: "Guides the picture" };
+    if (inpaint)
+      return {
+        id,
+        role: "Edit Source · Masked",
+        strength: inpaint.strength === undefined ? "" : `Inpaint ${inpaint.strength}`,
+      };
+    return { id, role: "Edit Source", strength: denoise > 0 ? `Denoise ${denoise}` : "" };
+  });
   return {
     profile: shownProfileName(
       String(
@@ -101,6 +130,9 @@ function generationDetails(
         strength: Number(lora.strength ?? 1).toFixed(2),
       })),
     references,
+    unused: settings.maskSkipped
+      ? ["Mask: nothing in it was painted, so this ran as an edit of the whole picture."]
+      : [],
     // Every recorded input, A–Z; Copy Settings copies the same rows.
     settings: sorted([
       // The backend a combined profile ran on.
@@ -114,7 +146,20 @@ function generationDetails(
       ["CFG", settings.cfg],
       ["Sampler", settings.sampler],
       ["Scheduler", settings.scheduler],
-      ["Denoise", !video && references.length ? settings.denoise : ""],
+      // A picture's mode, named as the composer's Reference Role chips name it.
+      [
+        "Mode",
+        video
+          ? ""
+          : !staged.length
+            ? "Generate"
+            : inpaint
+              ? "Inpaint"
+              : guides
+                ? "Reference"
+                : "Edit",
+      ],
+      ["Denoise", !video && staged.length ? settings.denoise : ""],
       ["Inpaint", inpaint?.strength ?? ""],
       ["Seed", settings.seed],
       ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
@@ -155,8 +200,6 @@ function useGenerationDetails(item: MediaItem, size?: number | null) {
 /** Copy Settings: the prompts and every input that was set, one per line. */
 export function useSettingsText(item: MediaItem) {
   const details = useGenerationDetails(item);
-  const { profiles } = useGenerationActions();
-  const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return () =>
     [
       item.prompt?.trim(),
@@ -165,7 +208,8 @@ export function useSettingsText(item: MediaItem) {
       details.loras.length &&
         `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,
       details.references.length &&
-        `References: ${details.references.map((asset, index) => referenceLabel(asset, index, profile)).join(", ")}`,
+        `References: ${details.references.map(({ role, strength }) => (strength ? `${role} (${strength})` : role)).join(", ")}`,
+      ...details.unused.map((note) => `Not Used: ${note}`),
       ...[
         ...details.settings,
         ...details.output.filter(([label]) =>
@@ -326,6 +370,17 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   );
 }
 
+/**
+ * The result a reference was taken from, when it is among `items`: a gallery reference's ID holds
+ * its result's address (backend/references.js), before any frame suffix.
+ */
+function galleryReference(id: string, items: MediaItem[]) {
+  const encoded = /^gallery:([\w-]+)/.exec(id)?.[1];
+  if (!encoded) return;
+  const key = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+  return items.find((candidate) => candidate.url === key || candidate.id === key);
+}
+
 /** Links to the results an item was made from or made, opening each in the viewer when it can. */
 function Related({
   title,
@@ -380,8 +435,6 @@ export function MediaDetails({
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
-  const { profiles } = useGenerationActions();
-  const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
@@ -414,25 +467,54 @@ export function MediaDetails({
           ))}
         </DetailSection>
       )}
-      {!!details.references.length && (
+      {!!(details.references.length || details.unused.length) && (
         <DetailSection title="References">
-          <Group gap="xs">
-            {details.references.map((asset, index) => (
-              <Tooltip
-                key={`${asset.slot}:${asset.id}`}
-                label={referenceLabel(asset, index, profile)}
-              >
-                <Image
-                  src={asset.thumbnailUrl || asset.url}
-                  alt={referenceLabel(asset, index, profile)}
-                  w={48}
-                  h={48}
-                  radius="sm"
-                  fallbackSrc=""
-                />
-              </Tooltip>
-            ))}
-          </Group>
+          {details.references.map((reference) => {
+            const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
+            const source = galleryReference(reference.id, [
+              ...(loaded || []),
+              ...(related.source ? [related.source] : []),
+            ]);
+            const thumbnail = (
+              <Image src={`${address}/thumbnail`} alt="" w={48} h={48} radius="sm" fallbackSrc="" />
+            );
+            // A result in the gallery opens in the viewer; any other picture in a new tab.
+            return (
+              <Group key={`${reference.role}:${reference.id}`} gap="sm" wrap="nowrap">
+                {source && open ? (
+                  <UnstyledButton
+                    aria-label={`Open ${reference.role}`}
+                    onClick={() => open(source)}
+                  >
+                    {thumbnail}
+                  </UnstyledButton>
+                ) : (
+                  <UnstyledButton
+                    component="a"
+                    href={`${address}/media`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${reference.role}`}
+                  >
+                    {thumbnail}
+                  </UnstyledButton>
+                )}
+                <Stack gap={0}>
+                  <Text size="sm">{reference.role}</Text>
+                  {reference.strength && (
+                    <Text size="xs" c="dimmed">
+                      {reference.strength}
+                    </Text>
+                  )}
+                </Stack>
+              </Group>
+            );
+          })}
+          {details.unused.map((note) => (
+            <Text key={note} size="sm" c="yellow">
+              Not used: {note}
+            </Text>
+          ))}
         </DetailSection>
       )}
       <Section title="Settings" rows={details.settings} />
