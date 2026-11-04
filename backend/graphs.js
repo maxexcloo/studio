@@ -84,7 +84,8 @@ async function applyMappedInputs(graph, workflow, body) {
     width: Number(body.width || 0),
     height: Number(body.height || 0),
     steps: Number(body.steps || 0),
-    cfg: Number(body.cfg || 0),
+    // A distilled profile sends no CFG (validation.js), so its graph keeps its own.
+    cfg: body.cfg == null || body.cfg === "" ? undefined : Number(body.cfg),
     denoise: Number(body.denoise ?? 1),
     sampler: body.sampler || "",
     scheduler: body.scheduler || "",
