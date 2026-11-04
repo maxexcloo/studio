@@ -21,6 +21,8 @@ export interface SuggestionItem extends IdleItem {
   width?: number;
   height?: number;
   settings?: Record<string, unknown>;
+  /** What the image shows, in the assistant model's words (domain/captions.ts). */
+  caption?: { text?: string };
   /** The last next steps written for it, shown at once when the viewer opens. */
   nextSteps?: SavedSteps;
 }
@@ -96,7 +98,7 @@ const empty = <T = string | NextStep>(reason: string): Suggestions<T> => ({
 });
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 
-/** What the item was made with, for the viewer's next steps. */
+/** What the item was made with and what it shows, for the model's next steps and changes. */
 function describeItem(item: SuggestionItem) {
   const settings = item.settings || {};
   const loras = (Array.isArray(settings.loras) ? settings.loras : [])
@@ -108,6 +110,7 @@ function describeItem(item: SuggestionItem) {
     item.width && item.height ? `Size: ${item.width} × ${item.height}` : "",
     loras.length ? `LoRAs: ${loras.join(", ")}` : "",
     `Prompt: ${clean(item.prompt, maxPromptCharacters)}`,
+    item.caption?.text ? `What it shows: ${clean(item.caption.text, 600)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -115,7 +118,8 @@ function describeItem(item: SuggestionItem) {
 
 /**
  * Short, taste-led suggestions from the text model: prompt ideas for an empty composer, next-step
- * chips for a finished image in the viewer, a paragraph of taste context for Chat, and the action
+ * chips for a finished image in the viewer (from its prompt, settings, caption and, where the
+ * running text model reads images, the image itself), a paragraph of taste context for Chat, and the action
  * and prompt for a change asked for in plain words to a finished result (`change`) or to the
  * composer's draft (`draft`), never cached or saved. Answers are
  * cached per owner and input for ten minutes, and an image's next steps are saved with it (most
@@ -129,6 +133,7 @@ export function createSuggestions({
   online,
   uncensored,
   item,
+  image,
   save,
   now = Date.now,
 }: {
@@ -140,6 +145,8 @@ export function createSuggestions({
   uncensored: (ownerId: string) => boolean;
   /** The owner's finished gallery item for a job, if it is theirs and visible. */
   item: (ownerId: string, jobId: string) => SuggestionItem | undefined;
+  /** A small (≤512 px) copy of the image where the running text model reads images, else null. */
+  image: (item: SuggestionItem) => Promise<ModelImage | null>;
   /** Keeps an image's latest next steps with it. */
   save: (item: SuggestionItem, nextSteps: SavedSteps) => void;
   now?: () => number;
@@ -456,7 +463,11 @@ export function createSuggestions({
           return empty("The prompt assistant is not configured.");
         }
         if (!(await online())) return empty("The text model is offline.");
-        if (source) return stepsFor(model, ownerId, source);
+        if (source)
+          return stepsFor(model, ownerId, source, {
+            // Without the picture the steps still come from its prompt and caption.
+            image: await image(source).catch(() => null),
+          });
         const context = [
           ...lines,
           ...(prompt ? ["", `They have started this prompt: ${prompt}`] : []),
