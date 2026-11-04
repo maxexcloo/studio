@@ -15,6 +15,7 @@ import {
   listedControls,
   loraIndex,
   loraQueryWords,
+  maxJobsPerCall,
   mcpControls,
   mcpGenerationCount,
   mcpLoras,
@@ -23,7 +24,6 @@ import {
 import {
   McpMedia,
   assertJobCount,
-  maxJobsPerCall,
   mcpJson,
   maxUploadBase64,
   maxUploadMegabytes,
@@ -39,7 +39,6 @@ import {
   familyMatches,
   fastestFirst,
   findProfile,
-  isCloudProfile,
   localUnlessAsked,
   mcpTiers,
   nameWords,
@@ -61,8 +60,10 @@ import { adminInstructions, registerAdminTools } from "./admin.js";
 import { registerManageTools } from "./manage.js";
 import fs from "node:fs";
 import { imageMimes } from "../reference-names.js";
+import { resolutions } from "../../shared/resolution.ts";
 import { appVersion } from "../data-dir.js";
 import { accessFeatures } from "../account-policy.js";
+import { isCloudProfile } from "../cloud-profiles.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -1060,7 +1061,7 @@ export function registerMcpRoutes(
             .string()
             .optional()
             .describe("landscape, portrait, square or a ratio like 16:9; prefer to width/height."),
-          resolution: z.enum(["1K", "2K", "4K"]).optional(),
+          resolution: z.enum(resolutions).optional(),
           width: z.number().int().positive().max(16384).optional(),
           height: z.number().int().positive().max(16384).optional(),
           steps: z.number().int().positive().max(10000).optional(),
