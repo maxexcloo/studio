@@ -126,62 +126,71 @@ export function PromptFields({
   });
   return (
     <>
-      <div
-        className={classes.area}
-        data-fill={fill || undefined}
-        {...(offerIdeas ? ideas.focusProps : {})}
-      >
-        <TextBox
-          ref={textareaRef}
-          tools
-          data-expanded-prompt
-          classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
-          className={proposal ? proposedClass : undefined}
-          variant="unstyled"
-          aria-label="Prompt"
-          data-autofocus={autoFocus || undefined}
-          placeholder={
-            input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
-          }
-          // In the phone sheet the prompt fills the room above the settings instead of growing.
-          autosize={!fill}
-          minRows={3}
-          maxRows={10}
-          inline={fill}
-          rightSection={
-            <>
-              <PromptHistory
-                kind="positive"
-                value={input.prompt}
-                onPick={(prompt) => onChange({ prompt })}
-              />
-              {assistant.action}
-            </>
-          }
-          rightSectionWidth={40}
-          rightSectionPointerEvents="all"
-          rightSectionProps={{ style: { alignItems: "flex-start" } }}
-          value={input.prompt}
-          onChange={(prompt) => onChange({ prompt })}
-          onKeyDown={(event) => {
-            // Undoing the proposal comes first; a second Escape closes the composer.
-            if (event.key === "Escape" && proposal && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              ask.undo();
+      {/* The prompt and its change request are one field, shown together while either is edited. */}
+      <div className={classes.prompt} data-fill={fill || undefined}>
+        <div
+          className={classes.area}
+          data-fill={fill || undefined}
+          {...(offerIdeas ? ideas.focusProps : {})}
+        >
+          <TextBox
+            ref={textareaRef}
+            tools
+            data-expanded-prompt
+            classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
+            className={proposal ? proposedClass : undefined}
+            variant="unstyled"
+            aria-label="Prompt"
+            data-autofocus={autoFocus || undefined}
+            placeholder={
+              input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
             }
-          }}
-          overlay={offerIdeas && ideas.ideas}
-          below={below}
-        />
+            // In the phone sheet the prompt fills the room above the settings instead of growing.
+            autosize={!fill}
+            minRows={3}
+            maxRows={10}
+            inline={fill}
+            rightSection={
+              <>
+                <PromptHistory
+                  kind="positive"
+                  value={input.prompt}
+                  onPick={(prompt) => onChange({ prompt })}
+                />
+                {assistant.action}
+              </>
+            }
+            rightSectionWidth={40}
+            rightSectionPointerEvents="all"
+            rightSectionProps={{ style: { alignItems: "flex-start" } }}
+            value={input.prompt}
+            onChange={(prompt) => onChange({ prompt })}
+            onKeyDown={(event) => {
+              // Undoing the proposal comes first; a second Escape closes the composer.
+              if (event.key === "Escape" && proposal && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                ask.undo();
+              }
+            }}
+            overlay={offerIdeas && ideas.ideas}
+            below={below}
+          />
+        </div>
+        {ask && <ChangeRequest ask={ask} onSend={ask.sendRequest} />}
       </div>
-      {ask && <ChangeRequest ask={ask} onSend={ask.sendRequest} />}
       {negative && (
         <TextBox
           tools
           aria-label="Negative Prompt"
           placeholder="Negative prompt: what to leave out"
           size="sm"
-          autosize
+          // In the phone sheet it keeps two rows until edited, when it takes the room left.
+          autosize={!fill}
+          rows={fill ? 2 : undefined}
+          rightSectionProps={fill ? { style: { alignItems: "flex-start" } } : undefined}
+          classNames={
+            fill ? { root: classes.negative, wrapper: classes.negativeWrapper } : undefined
+          }
           minRows={1}
           maxRows={phone ? 2 : 4}
           rightSection={

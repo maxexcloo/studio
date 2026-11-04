@@ -14,7 +14,14 @@
   bottom: 4px;
 }
 
+.prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+
 /* The phone sheet's prompt (its text box, tools column and suggestions) takes the room left. */
+.prompt[data-fill],
 .area[data-fill] {
   flex: 1;
   min-height: 0;
@@ -30,5 +37,25 @@
 .area[data-fill] .input {
   min-height: 0;
   font-size: 1.0625rem;
+  resize: none;
+}
+
+/* Typed in on the phone sheet, the negative prompt takes the room left too. */
+:global([data-typing]) .negative:focus-within {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:global([data-typing]) .negative:focus-within .negativeWrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:global([data-typing]) .negative:focus-within textarea {
+  flex: 1;
   resize: none;
 }

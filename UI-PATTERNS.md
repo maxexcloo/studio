@@ -199,11 +199,13 @@ primary component reference and verify APIs against the installed version.
   Generate upward with a short transition and the standard accessible close
   action. It is exactly the screen and never scrolls: the prompt fills the top
   with its tools column beside it and the negative prompt under it, and a bottom
-  bar at the safe bottom holds the chips in one row that scrolls sideways, then
-  Image/Video, Clear and Generate. Opening it leaves the keyboard down; tapping
-  the prompt types in place, with no separate editor or Done. While the keyboard
-  is up the bar sits just above it with only its actions, and the prompt shrinks
-  to the room left.
+  bar at the safe bottom holds the chips, wrapping onto as many rows as they
+  need, then Image/Video, Clear and Generate. Opening it leaves the keyboard
+  down; tapping the prompt types in place, with no separate editor or Done.
+  While the keyboard is up for a text box (or its tools), only it shows, filling
+  the room above the bar, which sits just above the keyboard with only its
+  actions; the header, chips and the other box return when the text loses focus
+  or the keyboard drops.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. The prompt's tools (Recent Prompts, Prompt

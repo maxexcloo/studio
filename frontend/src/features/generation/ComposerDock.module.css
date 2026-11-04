@@ -56,6 +56,11 @@
   overflow: hidden;
 }
 
+/* Typing in a text box shows only it and the action bar, without the sheet's header. */
+.sheet:has([data-typing] [data-generation-fields]:focus-within) .sheetHeader {
+  display: none;
+}
+
 .sheetBody {
   flex: 1;
   min-height: 0;

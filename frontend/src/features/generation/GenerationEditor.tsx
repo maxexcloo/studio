@@ -162,7 +162,7 @@ export function GenerationEditor({
   focusPrompt?: boolean;
   /**
    * Fills the phone Generate sheet without scrolling: the prompt takes the room above a bottom bar
-   * of the chips and actions.
+   * of the wrapping chips and actions, and a text box being edited takes it alone.
    */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
@@ -256,7 +256,6 @@ export function GenerationEditor({
       }
       expert={expert}
       onCompare={onCompare}
-      row={fill}
     />
   );
   return (
@@ -271,7 +270,7 @@ export function GenerationEditor({
           if (!blockedReason && !pending) onSubmit();
         }}
       >
-        <div className={classes.fields} aria-label="Generation Fields">
+        <div className={classes.fields} data-generation-fields aria-label="Generation Fields">
           {!profile && (
             <Alert color="yellow">
               {input.profileId && profiles.length

@@ -285,7 +285,11 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           onPaste={pasteReferences}
           onDragOver={dragReferences}
           onDrop={dropReferences}
-          classNames={{ content: classes.sheet, body: classes.sheetBody }}
+          classNames={{
+            content: classes.sheet,
+            header: classes.sheetHeader,
+            body: classes.sheetBody,
+          }}
           styles={{
             // Opaque, like the phone text editor, so the page never shows through the prompt; it
             // follows the visible viewport, so the keyboard lifts its bottom bar.
