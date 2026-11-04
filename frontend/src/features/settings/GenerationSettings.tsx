@@ -4,7 +4,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import {
   deploymentQuery,
-  sourceNote,
+  lockedNote,
   useDeploymentSetting,
   type Flag,
   type Setting,
@@ -27,7 +27,7 @@ export function GenerationSettings() {
       <SettingRow
         wide
         label={label}
-        description={`${sourceNote(setting)} · New drafts start on ${effective?.label || "the first ready profile"}.`}
+        description={`New drafts start on ${effective?.label || "the first ready profile"}.${lockedNote(setting)}`}
       >
         <Select
           aria-label={label}
@@ -51,7 +51,7 @@ export function GenerationSettings() {
     <SettingRow
       key={flag.key}
       label={flag.label}
-      description={`${flag.description} ${sourceNote(flag)}.`}
+      description={`${flag.description}.${lockedNote(flag)}`}
     >
       <Switch
         aria-label={flag.label}
