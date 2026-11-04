@@ -10,9 +10,13 @@ import { downloadSources } from "./library/download-sources.js";
 import { loraLayers } from "./library/lora-layers.js";
 import { loraRatings } from "./lora/ratings.js";
 import { profilePrompting } from "./profile/prompting-migration.js";
+import { profileIds } from "./profile/rename.js";
+import { createProfileStore } from "./profile/store.js";
+import { reloadTimings } from "./timings.js";
 import { uncensoredMarker } from "./uncensored-marker.js";
 import { migrateUploads } from "./uploads.js";
 import { versionSources } from "./version-sources.js";
+import { reloadWorkflowPreferences } from "./workflow-catalog.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -88,6 +92,25 @@ const steps = [
       size(plan.modelChoices) +
       plan.galleryReferences.records +
       plan.chatRequests,
+  },
+  {
+    name: "profileIds",
+    run: profileIds,
+    changes: (plan) =>
+      size(plan.profiles) +
+      size(plan.guides) +
+      size(plan.conflicts) +
+      plan.bindings +
+      size(plan.grants) +
+      plan.preferences +
+      size(plan.loraStacks) +
+      plan.timings,
+    online: true,
+    reload: (dataDir) => {
+      reloadAccountStore();
+      reloadWorkflowPreferences(createProfileStore({ dataDir }).canonical);
+      reloadTimings();
+    },
   },
   {
     name: "envSettings",

@@ -34,6 +34,11 @@ function save(label) {
   }
 }
 
+/** Forgets the loaded timings, so the next read takes what migrate-runtime wrote (runtime-migrations.js). */
+export function reloadTimings() {
+  timings = null;
+}
+
 /** What a generation of `body` should take here; see estimateRun. `warm` overrides the guess. */
 export function generationEstimate(body, options = {}) {
   return estimateRun(load().runs, body, options);

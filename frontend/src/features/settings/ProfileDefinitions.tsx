@@ -26,6 +26,8 @@ interface ProfileRow {
 }
 interface GuideRow {
   packId: string;
+  /** The pack's name, else the label of a family it guides, else its id (GET /api/profiles/guides). */
+  name: string;
   version: number;
   aiDrafted?: boolean;
 }
@@ -196,12 +198,17 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const profileRows = family ? profiles.filter((entry) => entry.family === family) : profiles;
   // Runs and guide bindings record the runtime id, `custom:` plus the definition's id.
   const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];
-  const guideOf = (entry: ProfileRow) =>
+  const guideIdOf = (entry: ProfileRow) =>
     bindings?.profiles[`custom:${entry.id}`]?.pack ??
     (entry.family ? bindings?.families[entry.family]?.[entry.kind || "image"] : undefined);
+  const guideNames = new Map(guides.map((entry) => [entry.packId, entry.name]));
+  const guideOf = (entry: ProfileRow) => {
+    const id = guideIdOf(entry);
+    return id && (guideNames.get(id) || id);
+  };
   const users = new Map<string, number>();
   for (const entry of profiles) {
-    const guide = guideOf(entry);
+    const guide = guideIdOf(entry);
     if (guide) users.set(guide, (users.get(guide) || 0) + 1);
   }
   const importing = useMutation({
@@ -404,10 +411,10 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             label="Editable Guides"
             rows={guides}
             rowKey={(entry) => entry.packId}
-            rowName={(entry) => entry.packId}
+            rowName={(entry) => entry.name}
             loading={guideList.isPending && "Loading Guides"}
             query={guideQuery}
-            searchText={(entry) => [entry.packId]}
+            searchText={(entry) => [entry.name, entry.packId]}
             initialSort={{ key: "name", descending: false }}
             empty={guides.length ? "No Matches" : "No Guides"}
             columns={[
@@ -415,10 +422,11 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 key: "name",
                 header: "Name",
                 main: true,
-                sortValue: (entry) => entry.packId,
+                sortValue: (entry) => entry.name,
+                // Copy ID has the exact ID.
                 cell: (entry) => (
                   <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                    {entry.packId}
+                    {entry.name}
                   </Text>
                 ),
               },

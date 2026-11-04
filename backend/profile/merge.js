@@ -6,7 +6,8 @@
  * Two profile files are duplicates when they share a name and kind and run the same definition:
  * the same graph (node titles aside), the same profile block apart from id, name and description,
  * the same guide binding and negatives, and the same AI-Drafted state. The kept profile is the one
- * whose id follows `<kind>-…-<backend>` (`video-h3-first-frame-fast-comfyui`); a group where no
+ * whose id follows `<kind>-<model>[-<variant>]-<speed>` (`video-minimax-h3-first-frame-fast`, profile/rename.js)
+ * rather than an older shape or a backend ending (`-comfyui`, `-radiance`, `-cloud`); a group where no
  * single id does is listed, not merged. Same-named profiles that differ are listed with what
  * differs.
  *
@@ -28,7 +29,8 @@ import { guideStore, hashOf, profileStore } from "./store.js";
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
 
-const newerId = /^(image|video)-[a-z0-9._-]+-(comfyui|radiance|cloud)$/;
+const currentId = (id) =>
+  /^(image|video)-[a-z0-9.-]+$/.test(id) && !/-(comfyui|radiance|cloud)$/.test(id);
 const ignoredFields = new Set(["id", "name", "description"]);
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -103,15 +105,15 @@ export function duplicateProfiles() {
     const sets = [...clusters.values()].map((set) => set.sort((a, b) => a.id.localeCompare(b.id)));
     for (const set of sets) {
       if (set.length < 2) continue;
-      const kept = set.filter((member) => newerId.test(member.id));
+      const kept = set.filter((member) => currentId(member.id));
       if (kept.length !== 1) {
         unresolved.push({
           ids: set.map((member) => member.id),
           name: set[0].name,
           kind: set[0].kind,
           reason: kept.length
-            ? "More than one id follows the <kind>-…-<backend> naming."
-            : "No id follows the <kind>-…-<backend> naming.",
+            ? "More than one id follows the <kind>-<model>-<speed> naming."
+            : "No id follows the <kind>-<model>-<speed> naming.",
         });
         continue;
       }
