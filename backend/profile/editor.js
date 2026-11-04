@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -13,16 +12,13 @@ import {
 import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { fromChat, requireAdmin } from "../route-access.js";
-import { profileStore } from "./store.js";
+import { hashOf, profileStore, validId } from "./store.js";
 
 /**
  * Studio owns editable runtime profiles and their version history; ai is a read-only seed.
  */
 export const editsFile = () => path.join(userWorkflowsDir, ".studio-edits.json");
 const backupsDir = () => path.join(dataDir, "backups", "profile-edits");
-const validId = (id) =>
-  /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
-const hashOf = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const fileFor = (id) => path.join(userWorkflowsDir, `${id}.json`);
 const metaOf = (raw) => raw?.studio;
 
