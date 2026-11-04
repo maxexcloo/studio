@@ -410,13 +410,20 @@ primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub. One glass action bar (`ViewerPrompt` over
   the shared item actions) holds the item's prompt in a field: editing it and
   pressing Enter or Generate runs it with the item's settings (a video's
-  animates again). Its Ask action (Sparkles, Ask for a Change) sends the field's
-  text as a change in plain words ("make it night"); the prompt assistant picks
-  Edit, Recreate, Animate or Upscale (`/api/suggestions`, surface `change`) and
-  its prompt replaces the text in place, tinted, with the action's name, Undo
-  (restoring what was typed) and Run at its end (on phones Run is the editor's
-  send arrow), the one review pause before a written prompt runs; there is no
-  panel above the field. Continue in Chat (in the
+  animates again). Ask for a Change (Sparkles, `generation/AskChange.tsx`) is
+  offered wherever a prompt is: it sends a change in plain words ("make it
+  night") and the prompt assistant picks the action and writes its prompt, which
+  replaces the text in place, tinted, with the action's name and Undo (restoring
+  what was there), the one review pause before a written prompt runs; there is no
+  panel above the field. The viewer's field is itself the request: Ask sends its
+  text, the assistant picks Edit, Recreate, Animate or Upscale
+  (`/api/suggestions`, surface `change`) and Run sits at the field's end (on
+  phones Run is the editor's send arrow). Details › Prompt (its heading's Ask)
+  and the composer's prompt (first in its Prompt Assistance menu) open a request
+  line under the prompt instead, and Undo reopens it. Details asks and runs as
+  the viewer does, with Run beside Undo; the composer's draft (surface `draft`)
+  rewrites its prompt and, with a reference attached, picks Edit or a fresh run
+  (setting Edit Image or Generate), which the composer's Generate then runs. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached
   as its reference, its settings as the input, any change typed over the
   prompt as the message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the

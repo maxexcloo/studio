@@ -289,6 +289,8 @@ export function MediaViewer({
     iteration.mutate(next, { onSuccess: joinStrip });
   }
   const pending = iteration.isPending ? iteration.variables : undefined;
+  // Details asks for a change as the bar's field does, with the bar's actions.
+  const changeActions = { groups: () => shortcutActions.current, iterate };
   function move(direction: -1 | 1) {
     // Navigation stops at either end rather than wrapping round.
     const next = canNavigate && viewable[currentIndex + direction];
@@ -584,6 +586,7 @@ export function MediaViewer({
                     </Stack>
                     <MediaDetails
                       item={displayed}
+                      actions={changeActions}
                       open={
                         navigate &&
                         ((next) => {
@@ -622,6 +625,7 @@ export function MediaViewer({
               </Text>
               <MediaDetails
                 item={displayed}
+                actions={changeActions}
                 open={
                   navigate &&
                   ((next) => {

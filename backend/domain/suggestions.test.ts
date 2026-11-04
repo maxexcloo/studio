@@ -255,6 +255,33 @@ test("a requested change picks one of the offered actions and rewrites the promp
   assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
 });
 
+test("a change to the composer's draft rewrites its prompt and can't upscale", async () => {
+  const { calls, suggestions } = fixture({
+    reply: () => JSON.stringify({ action: "edit", label: "night", prompt: "A castle at night" }),
+  });
+  const ask = (owner: string, actions: string[]) =>
+    suggestions.suggest(owner, {
+      surface: "draft",
+      kind: "image",
+      prompt: "A castle at noon",
+      request: "make it night",
+      actions,
+    });
+  assert.deepEqual(await ask("alice", ["edit", "recreate", "upscale"]), {
+    suggestions: [
+      { action: "edit", label: "Night", request: "make it night", prompt: "A castle at night" },
+    ],
+  });
+  const [system, user] = calls[0];
+  assert.match(system.content, /draft prompt[\s\S]*- edit: [^\n]*reference[\s\S]*- recreate: /);
+  assert.doesNotMatch(system.content, /upscale|uncensored/);
+  assert.match(user.content, /The draft:\nPrompt: A castle at noon[\s\S]*Request: make it night/);
+  // Explicit wording follows the account's Uncensored Models, as for a result.
+  await ask("bob", ["edit"]);
+  assert.match(calls[1][0].content, /uncensored/);
+  await assert.rejects(ask("alice", ["upscale"]), { status: 400 });
+});
+
 test("chat context is one paragraph from the taste profile", async () => {
   const { suggestions } = fixture();
   assert.deepEqual(await suggestions.suggest("bob", { surface: "chat" }), {

@@ -14,11 +14,11 @@ import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
-import { defaultProfile, useGeneration } from "./GenerationProvider";
+import { defaultProfile, useGeneration, type Draft } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails, usesNegative } from "./payload";
-import { PromptFields } from "./PromptFields";
+import { PromptFields, useDraftChange } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
@@ -123,8 +123,9 @@ export function GenerationEditor({
   onReferencesChange,
   onKindChange,
   onClear,
-  onSubmit,
+  onSubmit: submitDraft,
   operation,
+  onOperationChange,
   pending,
   blockedReason: callerReason,
   error,
@@ -146,7 +147,9 @@ export function GenerationEditor({
   onKindChange: (kind: MediaKind, profile?: Profile) => void;
   onClear: () => void;
   onSubmit: () => void;
-  operation?: string;
+  operation?: Draft["operation"];
+  /** Offers Ask for a Change on the draft, whose Edit or fresh run sets the operation. */
+  onOperationChange?: (operation: Draft["operation"]) => void;
   pending: boolean;
   blockedReason?: string;
   error?: unknown;
@@ -181,6 +184,18 @@ export function GenerationEditor({
     operation,
     blockedReason: callerReason,
   });
+  const ask = useDraftChange({
+    input,
+    references,
+    operation: operation ?? "image",
+    onChange,
+    onOperationChange: (next) => onOperationChange?.(next),
+  });
+  // Generate runs a proposed change, which ends its review.
+  const onSubmit = () => {
+    ask.done();
+    submitDraft();
+  };
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
@@ -256,6 +271,7 @@ export function GenerationEditor({
             edit={editPrompt}
             fill={fill}
             ideas={offerIdeas}
+            ask={onOperationChange && ask}
             submit={{ label, disabled: !!blockedReason || pending, onSubmit }}
           />
           <GenerationInputControls

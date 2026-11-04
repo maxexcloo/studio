@@ -26,6 +26,21 @@ export const nextStepsQuery = (jobId: string) =>
     ...cached,
   });
 
-/** The action and prompt for a change asked for in plain words, chosen from `actions`. */
+/** The action and prompt for a change to a result asked for in plain words, chosen from `actions`. */
 export const askChange = (jobId: string, request: string, actions: ChangeAction[]) =>
   post<Suggestions<Change>>("/api/suggestions", { surface: "change", jobId, request, actions });
+
+/** The same for the composer's draft prompt, which has no result yet. */
+export const askDraftChange = (
+  kind: MediaKind,
+  prompt: string,
+  request: string,
+  actions: ChangeAction[],
+) =>
+  post<Suggestions<Change>>("/api/suggestions", {
+    surface: "draft",
+    kind,
+    prompt,
+    request,
+    actions,
+  });
