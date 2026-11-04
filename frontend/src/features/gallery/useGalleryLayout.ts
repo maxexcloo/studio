@@ -57,17 +57,15 @@ export function useGalleryColumns() {
   );
   const [min, max] = phone ? [1, 4] : [2, 8];
   const columns = Math.min(Math.max(saved ?? (phone ? 2 : compact ? 3 : 5), min), max);
-  /** Changes the columns, holding the tile under `point` (the viewport's centre) in place. */
+  /**
+   * Changes the columns. A pinch or wheel holds the tile under its `point` in place; the toolbar's
+   * slider and buttons pass none and keep the scroll position, so the toolbar stays where it is.
+   */
   const zoomTo = useCallback(
     (next: number, point?: { x: number; y: number }) => {
       const target = Math.min(Math.max(next, min), max);
       if (target === columns) return;
-      zoomAnchor = anchorAt(
-        point?.x ?? window.innerWidth / 2,
-        point?.y ?? window.innerHeight / 2,
-        target,
-        columns / target,
-      );
+      zoomAnchor = point ? anchorAt(point.x, point.y, target, columns / target) : null;
       setSaved(target);
     },
     [columns, min, max, setSaved],
