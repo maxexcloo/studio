@@ -71,6 +71,7 @@ function ConnectionTable({
       rowKey={(row) => row.key}
       rowName={(row) => row.label}
       empty={empty}
+      compact
       minWidth={580}
       columns={[
         {
