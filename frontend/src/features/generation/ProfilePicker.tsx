@@ -12,7 +12,7 @@ import { ChipOption, ChipSelect } from "./ChipSelect";
 
 /**
  * Readiness from the profile's files and its assigned workers; unknown placement shows nothing.
- * Workers stopped on purpose are Parked, with the workloads an administrator can start.
+ * Workers stopped on purpose read Stopped, with the workloads an administrator can start.
  */
 function profileReadiness(profile: Profile, workers: Models["workers"]) {
   if (profile.ready === false) return { label: "Needs Setup", color: "yellow" };
@@ -21,7 +21,7 @@ function profileReadiness(profile: Profile, workers: Models["workers"]) {
   if (assigned.some((worker) => worker.available)) return { label: "Ready", color: "green" };
   return assigned.every((worker) => worker.parked)
     ? {
-        label: "Parked",
+        label: "Stopped",
         color: "gray",
         workloads: assigned.flatMap((worker) => worker.workloads ?? []),
       }
@@ -147,8 +147,8 @@ export function ProfilePicker({
             selectedBackend && backendLabel(selectedBackend),
             runtime.starting && !failure
               ? `Starting: ${runtime.starting.progress}`
-              : readiness?.label === "Parked" && !admin
-                ? "Parked by an Administrator"
+              : readiness?.label === "Stopped" && !admin
+                ? "Stopped by an Administrator"
                 : readiness?.label,
             selected?.readyReason,
           ]

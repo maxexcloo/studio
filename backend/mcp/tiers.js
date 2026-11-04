@@ -31,7 +31,7 @@ export const localVideoUnavailable = (parked = false) =>
 export const parkedWorker = (kinds) => {
   const list = [kinds].flat();
   const [it, worker] = list.length > 1 ? ["them", "workers are"] : ["it", "worker is"];
-  return `the ${list.join(" and ")} ${worker} parked (stopped on purpose; an administrator can start ${it} in Settings › Workers).`;
+  return `the ${list.join(" and ")} ${worker} stopped (on purpose; an administrator can start ${it} in Settings › Workers).`;
 };
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 const preferredTiers = ["fast", "turbo", "standard", "quality"];

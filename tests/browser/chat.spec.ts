@@ -624,7 +624,7 @@ test("An administrator's parked Chat model starts after confirming what it stops
   const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
   await expect(model).toHaveText("Studio Assistant");
   await model.click();
-  await expect(page.getByRole("option", { name: /Large Model/ })).toContainText("Parked");
+  await expect(page.getByRole("option", { name: /Large Model/ })).toContainText("Stopped");
   await page.getByRole("option", { name: /Large Model/ }).click();
   const dialog = page.getByRole("dialog", { name: "Switch to Large Model" });
   await expect(dialog).toContainText("Stop: Image");
@@ -653,12 +653,12 @@ test("Others see a parked Chat model as parked and cannot send to it", async ({ 
   );
   await page.goto("/chat");
   const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
-  await expect(model).toHaveAttribute("title", /Parked/);
+  await expect(model).toHaveAttribute("title", /Stopped/);
   await page.getByRole("textbox", { name: "Message", exact: true }).fill("Hello");
   await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeDisabled();
   await model.click();
   const parked = page.getByRole("option", { name: /Large Model/ });
-  await expect(parked).toContainText("Parked");
+  await expect(parked).toContainText("Stopped");
   await expect(parked).toHaveAttribute("aria-disabled", "true");
   await page.getByRole("option", { name: /Studio Assistant/ }).click();
   await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeEnabled();
