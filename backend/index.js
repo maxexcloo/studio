@@ -164,7 +164,6 @@ import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
   accountRoles,
   explicitWording,
-  isCloudProfile,
   mayUseFeature,
   mayUseGenerationProfile,
 } from "./account-policy.js";
@@ -177,6 +176,7 @@ import {
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
+import { isCloudProfile } from "./cloud-profiles.js";
 
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer(), flush: flushPendingGallery });

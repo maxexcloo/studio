@@ -20,8 +20,6 @@
 import { isCloudProfile } from "./cloud-profiles.js";
 import { canonicalProfileId } from "./profile/store.js";
 
-export { isCloudProfile };
-
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
 
 /**

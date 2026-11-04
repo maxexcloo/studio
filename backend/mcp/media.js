@@ -17,17 +17,12 @@ import {
 } from "./controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
-import {
-  choicePool,
-  chooseProfile,
-  isCloudProfile,
-  localVideoUnavailable,
-  stoppedServices,
-} from "./tiers.js";
+import { choicePool, chooseProfile, localVideoUnavailable, stoppedServices } from "./tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { withResolution } from "../../shared/resolution.ts";
 import { imageMimes } from "../reference-names.js";
 import { accessFeatures } from "../account-policy.js";
+import { isCloudProfile } from "../cloud-profiles.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -84,7 +79,6 @@ const sheetGround = "#18181b";
 // The All Results page and an "all" Result cover a conversation's most recent results.
 const maxListedResults = 24;
 const maxShownResults = 8;
-export { maxJobsPerCall };
 /** Refuses prompts × count over maxJobsPerCall (the schemas cap each alone), saying how to split. */
 export function assertJobCount(prompts = 1, count = 1) {
   if (prompts * count > maxJobsPerCall) {
