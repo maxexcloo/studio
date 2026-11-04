@@ -449,6 +449,7 @@ const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
   frame: (req, id) => assistant.image(req.studioAccount, id),
+  caption: (req, id) => assistant.caption(req.studioAccount, id),
   profiles: assistant.profiles,
   guide: assistant.guide,
   loras: assistant.loras,
@@ -558,6 +559,7 @@ const promptStage = createPromptStage({
   guide: assistant.guide,
   dream: () => dream,
   frame: assistant.image,
+  caption: assistant.caption,
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({

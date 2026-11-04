@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { animateInstructions, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
+import { animateClip, animateInstructions, writeAnimatePrompt } from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 
 // The three shapes Animate writes for, each with its mode's format rule from the merged guide.
@@ -27,25 +27,49 @@ const shapes = {
 test("each profile shape gets its guide's format, with sound for H3 and Grok", () => {
   const writing = { theme: "action", source: "A skater" };
   for (const { profile, guide } of Object.values(shapes)) {
-    const system = animateInstructions({ profile, guide, writing, seconds: 8 });
+    const system = animateInstructions({ profile, guide, writing, clip: { seconds: 8 } });
     assert.ok(system.includes(guide.mode.rules[0]), profile.id);
     assert.match(system, /makes sound with the picture/, profile.id);
     assert.match(system, /three beats that fill the 8-second clip/, profile.id);
+    assert.match(system, /a moment that invites speech/, profile.id);
   }
-  const silent = animateInstructions({ profile: { id: "video:wan", family: "wan22" }, writing });
+  const silent = animateInstructions({
+    profile: { id: "video:wan", family: "wan22" },
+    writing,
+    clip: { seconds: 5, fps: 16 },
+  });
   assert.match(silent, /makes no sound/);
-  assert.match(silent, /two to four beats/);
+  assert.doesNotMatch(silent, /dialogue with who says it/);
+  assert.match(silent, /three beats that fill the 5-second, 16 fps clip/);
+  assert.match(silent, /At 16 fps fast motion judders/);
+  assert.match(silent, /never add people, animals or objects that aren't in it/);
+  assert.match(silent, /Animate what that prompt was going for/);
   const extend = animateInstructions({ ...shapes.grok, writing: { ...writing, extend: true } });
   assert.match(extend, /Don't replay its action: escalate it or turn it/);
+  assert.match(extend, /two to four beats/);
+  assert.doesNotMatch(extend, /judders/);
   assert.equal(writingRequest({ kind: "animate", theme: "action", extend: true }).extend, true);
 });
 
-test("the clip's length comes from the control the profile runs on", () => {
+test("each theme asks for its own motion and camera", () => {
+  const theme = (name) =>
+    animateInstructions({ ...shapes.grok, writing: { theme: name } }).split("Theme: ")[1];
+  assert.match(theme("cinematic"), /the camera move carries the shot.*composition invites/);
+  assert.match(theme("living"), /camera stays still/);
+  assert.match(theme("action"), /energetic action that this frame sets up/);
+  assert.match(theme("spicy"), /already in the frame.*Every person is an adult/);
+  assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
+});
+
+test("the clip's length and frame rate come from the control the profile runs on", () => {
   const frames = { defaults: { frames: 192, fps: 24, duration: 5 } };
-  assert.equal(clipSeconds({}, frames), 8);
-  assert.equal(clipSeconds({ frames: 288 }, frames), 12);
-  assert.equal(clipSeconds({ duration: 10 }, { capabilities: { duration: true } }), 10);
-  assert.equal(clipSeconds({}, {}), 0);
+  assert.deepEqual(animateClip({}, frames), { seconds: 8, fps: 24 });
+  assert.deepEqual(animateClip({ frames: 288 }, frames), { seconds: 12, fps: 24 });
+  assert.deepEqual(animateClip({ duration: 10 }, { capabilities: { duration: true } }), {
+    seconds: 10,
+    fps: 0,
+  });
+  assert.deepEqual(animateClip({}, {}), { seconds: 0, fps: 0 });
 });
 
 const video = { id: "video:test", label: "Motion", kind: "video" };
@@ -121,7 +145,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     ["prompt", '"The camera slowly pushes in."'],
   ]);
   assert.match(calls[0].messages[0].content, /Cinematic Camera/);
-  assert.match(calls[0].messages[0].content, /5-second clip/);
+  assert.match(calls[0].messages[0].content, /5-second, 24 fps clip/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
   const spicy = await writeAnimatePrompt({
     engine,
@@ -141,16 +165,17 @@ test("the writing stage streams the motion prompt and its thinking with room to 
   );
 });
 
-test("the writer sees the first frame when the running model reads images, and only then", async () => {
+test("the writer sees the first frame when the model reads images, and reads its caption otherwise", async () => {
   const frame = { mime: "image/jpeg", data: "AAAA" };
   const asked = [];
-  const stage = (vision) =>
+  const stage = (vision, described = "") =>
     createPromptStage({
       engine: { ...engine, supportsVision: async () => vision },
       account: () => undefined,
       profiles: async () => [video],
       guide: () => null,
-      frame: async (_account, assetId) => (asked.push(assetId), frame),
+      frame: async (_account, assetId) => (asked.push(["frame", assetId]), frame),
+      caption: (_account, assetId) => (asked.push(["caption", assetId]), described),
     })(
       {
         ownerId: "",
@@ -163,19 +188,30 @@ test("the writer sees the first frame when the running model reads images, and o
       { signal: new AbortController().signal },
     );
   calls.length = 0;
-  await stage(true);
+  await stage(true, "A small amber bird on a branch.");
   const [system, request] = calls[0].messages;
-  assert.deepEqual(asked, ["frame-1"]);
-  assert.match(system.content, /You can see that frame too: anchor .*identity, outfit, setting/);
+  assert.deepEqual(asked, [["frame", "frame-1"]]);
+  assert.match(system.content, /You can see that frame\. Read it before writing/);
   assert.doesNotMatch(system.content, /under \d+ words/);
   assert.deepEqual(request.content[1], {
     type: "image_url",
     image_url: { url: "data:image/jpeg;base64,AAAA" },
   });
   assert.match(request.content[0].text, /An amber bird/);
+  assert.doesNotMatch(request.content[0].text, /What the frame shows/);
+  // A text-only writer reads the frame's caption instead.
+  asked.length = calls.length = 0;
+  await stage(false, "A small amber bird on a branch.");
+  assert.deepEqual(asked, [["caption", "frame-1"]]);
+  assert.match(calls[0].messages[0].content, /its description below says what it shows/);
+  assert.match(
+    calls[0].messages[1].content,
+    /made from: An amber bird\nWhat the frame shows: A small amber bird on a branch\./,
+  );
+  // Without a caption it keeps to the prompt.
   calls.length = 0;
   await stage(false);
-  assert.deepEqual(asked, ["frame-1"]);
   assert.equal(typeof calls[0].messages[1].content, "string");
-  assert.doesNotMatch(calls[0].messages[0].content, /You can see that frame/);
+  assert.match(calls[0].messages[0].content, /keep to what the prompt below states/);
+  assert.doesNotMatch(calls[0].messages[1].content, /What the frame shows/);
 });
