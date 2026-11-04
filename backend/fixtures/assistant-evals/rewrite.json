@@ -335,7 +335,7 @@
       "recorded": "Full-color outdoor photograph, a city park on an overcast afternoon. In the foreground, a silver humanoid robot with scuffed joints sits on a green wooden bench, holding an open newspaper in both hands, its round camera eyes angled down at the page. Behind it, a gravel path curves past plane trees and a rubbish bin."
     },
     {
-      "id": "product-ramen",
+      "id": "photographic-ramen",
       "profile": {
         "id": "custom:krea2-fixture",
         "label": "Krea 2",
@@ -350,11 +350,11 @@
         ]
       },
       "prompt": "a bowl of ramen",
-      "preset": "product",
+      "preset": "photographic",
       "expect": {
         "keep": ["ramen"]
       },
-      "recorded": "Studio product shot of a steaming bowl of tonkotsu ramen in a matte black ceramic bowl on a slate surface against a plain charcoal backdrop, a halved soft egg, chashu slices and spring onions on top, chopsticks resting on the rim, a soft key light from above left with a gentle rim light catching the steam, shot at a three-quarter angle with the whole bowl sharp."
+      "recorded": "A professional food photograph of a steaming bowl of tonkotsu ramen in a matte black ceramic bowl on a slate counter, a halved soft egg, chashu slices and spring onions on top, shot from a 45-degree angle on a 100mm macro lens at f/4, soft window light from the left with a white bounce card, steam catching the light against a dark, uncluttered background."
     },
     {
       "id": "cinematic-space",
@@ -444,6 +444,54 @@
         "avoid": ["blurry", "grainy", "motion blur", "phone", "snapshot"]
       },
       "recorded": "A candid photograph of a street musician playing violin on a busy pavement, caught mid-bow with eyes closed, an open case with a few coins at his feet, people walking past with shopping bags, flat overcast daylight on the wet stone and his frayed coat cuffs."
+    },
+    {
+      "id": "photographic-bridge",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "an old stone bridge over a river",
+      "preset": "photographic",
+      "expect": {
+        "keep": ["bridge", "river"],
+        "avoid": ["painting", "illustration", "film still"]
+      },
+      "recorded": "A polished landscape photograph of an old stone bridge arching over a slow river at sunrise, shot on a 24mm wide-angle lens from the bank, low golden side light raking across the weathered arches, mist lifting off the water, the bridge placed on the lower third with its reflection sharp in the still surface."
+    },
+    {
+      "id": "custom-summer",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a cosy cabin in snow at night",
+      "preset": "custom",
+      "expect": {
+        "keep": ["cabin"],
+        "avoid": ["snow"],
+        "tone": ["summer"]
+      },
+      "recorded": "A cosy wooden cabin on a warm summer evening, its porch lanterns just lit, wildflowers and long grass around it, the sky fading from apricot to lavender over the pines behind.",
+      "instruction": "make it a summer evening instead"
     }
   ]
 }

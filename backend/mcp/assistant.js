@@ -103,7 +103,8 @@ export function createChatAssistantMemory({ now = Date.now, file = "", log = con
  * profile id or name the way Generate does, and `memory` is createChatAssistantMemory's.
  */
 export function registerAssistantTools({ tool, server, media, owner, profileOf, memory }) {
-  const presetIds = assistantPresets.map((preset) => preset.id);
+  // Custom is the UI's free-text instruction; the chat restyles with its own words instead.
+  const presetIds = assistantPresets.filter((preset) => !preset.custom).map((preset) => preset.id);
   const prompt = z.string().trim().min(1).max(4000);
   const profileId = z
     .string()

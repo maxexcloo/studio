@@ -9,7 +9,7 @@ import {
   scoreRewrite,
 } from "./assistant-evals.js";
 
-test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 6 animate cases with unique ids", () => {
+test("the eval set has 22 rewrite, 15 LoRA, 5 negative and 6 animate cases with unique ids", () => {
   const evals = loadEvals();
   assert.deepEqual(
     [
@@ -18,7 +18,7 @@ test("the eval set has 20 rewrite, 15 LoRA, 5 negative and 6 animate cases with 
       evals.negative.cases.length,
       evals.animate.cases.length,
     ],
-    [20, 15, 5, 6],
+    [22, 15, 5, 6],
   );
   const ids = Object.values(evals).flatMap((set) => set.cases.map((item) => item.id));
   assert.equal(new Set(ids).size, ids.length);

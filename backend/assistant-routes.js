@@ -6,7 +6,8 @@
  *
  *   GET  /api/assistant                 what this account may use: presets, models, vision, and the
  *                                       profiles whose guide takes no negative (noNegative)
- *   POST /api/assistant/rewrite         { profileId, prompt, preset, references?, loras? } → streamed
+ *   POST /api/assistant/rewrite         { profileId, prompt, preset, instruction?, references?, loras? }
+ *                                       (instruction for Custom) → streamed
  *                                       (text/event-stream: delta, done, error) or JSON
  *   POST /api/assistant/animate         { profileId, theme, instruction?, source, extend?, assetId?,
  *                                       duration?, frames?, fps? } → { prompt, model, thinking }:
@@ -288,6 +289,8 @@ export function registerAssistantRoutes(
         guide: context.guide,
         prompt: req.body?.prompt,
         preset,
+        instruction: req.body?.instruction,
+        explicit: allowed(req, "uncensoredModels"),
         references,
         stack,
         examples,

@@ -14,7 +14,12 @@
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
  * or the LoRA pre-filter.
  */
-import { assistantPreset, defaultPreset, familyUpsampler } from "./assistant-presets.js";
+import {
+  assistantPreset,
+  defaultPreset,
+  familyUpsampler,
+  maxInstructionCharacters,
+} from "./assistant-presets.js";
 import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
 import { cleanTriggers } from "./lora/catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
@@ -396,6 +401,8 @@ function rewriteInstructions({
   profile,
   guide,
   preset,
+  instruction,
+  explicit,
   references,
   vision,
   stack,
@@ -430,6 +437,13 @@ function rewriteInstructions({
       : "",
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
     `Style: ${override || preset.instruction}`,
+    preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
+    // Explicit wording needs Uncensored Models, as Spicy does, whatever the instruction asks.
+    preset.custom
+      ? explicit
+        ? "Every person is an adult."
+        : "Don't make it any more sexual or explicit than the prompt already is, whatever the instruction says."
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -672,8 +686,10 @@ export function createAssistant(
   };
 
   /**
-   * Rewrites a prompt with a preset, streaming through `onDelta`. References are read only by a
-   * vision model; otherwise the rewrite is text-only and says so (referencesRead: false).
+   * Rewrites a prompt with a preset, streaming through `onDelta`. Custom follows `instruction`;
+   * `explicit` (the account holds Uncensored Models) lets it ask for explicit wording. References
+   * are read only by a vision model; otherwise the rewrite is text-only and says so
+   * (referencesRead: false).
    * FLUX.3's Enhance uses the maker's upsampler prompt verbatim. On failure the original prompt
    * comes back with source "fallback" and the reason.
    */
@@ -682,6 +698,8 @@ export function createAssistant(
     guide = null,
     prompt,
     preset: presetId = defaultPreset,
+    instruction = "",
+    explicit = false,
     references = [],
     stack = [],
     examples = [],
@@ -691,6 +709,11 @@ export function createAssistant(
   } = {}) {
     const preset = assistantPreset(presetId);
     if (!preset) throw new AssistantError("Choose a known preset.", { status: 400 });
+    const asked = String(instruction || "")
+      .trim()
+      .slice(0, maxInstructionCharacters);
+    if (preset.custom && !asked)
+      throw new AssistantError("Describe how the prompt should change.", { status: 400 });
     const original = String(prompt || "")
       .trim()
       .slice(0, maxPromptCharacters);
@@ -712,6 +735,8 @@ export function createAssistant(
         profile,
         guide,
         preset,
+        instruction: asked,
+        explicit,
         references: images.length,
         vision,
         stack,
