@@ -4,13 +4,14 @@ import {
   saveAccountPreferences,
   savedPreferenceKeys,
 } from "./account-preferences.js";
-import { mayUseFeature } from "./account-policy.js";
+import { mayUseFeature, personalFeatures } from "./account-policy.js";
 import { accountAccessForId, groupGrants } from "./account-store.js";
 
 /**
- * Settings › Preferences: the caller's own preferences, which of Cloud Models and Uncensored
- * Models its role or group grants, which it may turn off for itself, and whether it may turn Spicy
- * Prompts on (Uncensored Models in its effective access; always in single-user mode).
+ * Settings › Preferences: the caller's own preferences, which personal features (Cloud Models,
+ * LoRAs, Uncensored Models) its role or group grants, which it may turn off for itself, and
+ * whether it may turn Spicy Prompts on (Uncensored Models in its effective access; always in
+ * single-user mode).
  */
 export function registerPreferenceRoutes(app) {
   const show = (req) => {
@@ -19,7 +20,8 @@ export function registerPreferenceRoutes(app) {
       preferences: accountPreferences(ownerId),
       saved: savedPreferenceKeys(ownerId),
       grants: {
-        ...((ownerId && groupGrants(ownerId)) || { cloudModels: false, uncensoredModels: false }),
+        ...((ownerId && groupGrants(ownerId)) ||
+          Object.fromEntries(personalFeatures.map((feature) => [feature, false]))),
         spicyPrompts: !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels"),
       },
     };
@@ -31,7 +33,7 @@ export function registerPreferenceRoutes(app) {
   app.patch("/api/preferences", (req, res) => {
     const { grants } = show(req);
     const patch = req.body || {};
-    for (const feature of ["cloudModels", "uncensoredModels"])
+    for (const feature of personalFeatures)
       if (patch[feature] !== undefined && !grants[feature])
         return res.status(400).json({
           ok: false,

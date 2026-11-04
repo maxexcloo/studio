@@ -197,7 +197,7 @@ test("uncensored profiles need Uncensored Models and All Models grants every loc
   assert.equal(mayUseGenerationProfile(admin, uncensored), true);
 });
 
-test("an administrator that turns Cloud or Uncensored Models off loses them for its own use", () => {
+test("an administrator that turns Cloud Models, LoRAs or Uncensored Models off loses them for its own use", () => {
   const grok = { id: "grok-image", family: "grok" };
   const spicy = { id: "image-spicy", uncensored: true };
   const drafted = { id: "image-draft", aiDrafted: true };
@@ -219,6 +219,9 @@ test("an administrator that turns Cloud or Uncensored Models off loses them for 
   assert.equal(mayUseGenerationProfile(narrowed, spicy), false);
   assert.equal(mayUseFeature(narrowed, "uncensoredModels"), false, "Dream's Spicy");
   assert.equal(mayUseFeature(narrowed, "loras"), true);
+  const noLoras = effectiveAccountAccess(account, {}, null, { loras: false });
+  assert.equal(mayUseFeature(noLoras, "loras"), false, "the picker, admission and Dream");
+  assert.equal(mayUseFeature(noLoras, "cloudModels"), true);
 });
 
 test("suggestions are worded explicitly only with Spicy Prompts on and Uncensored Models", async () => {

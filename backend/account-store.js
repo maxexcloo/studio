@@ -6,6 +6,7 @@ import {
   builtInAccessProfile,
   effectiveAccountAccess,
   normaliseAccessProfile,
+  personalFeatures,
   validAccountKey,
 } from "./account-policy.js";
 import { currentDataDir } from "./data-dir.js";
@@ -134,19 +135,19 @@ export function accountAccessForId(accountId) {
 }
 
 /**
- * The Cloud Models and Uncensored Models an account's role or group grants, before its own choices:
- * both for an administrator.
+ * The personal features (account-policy.js) an account's role or group grants, before its own
+ * choices: all of them for an administrator.
  */
 export function groupGrants(accountId) {
   const store = readStore();
   const account = store.accounts.find((item) => item.id === accountId);
   if (account?.role === accountRoles.administrator)
-    return { cloudModels: true, uncensoredModels: true };
+    return Object.fromEntries(personalFeatures.map((feature) => [feature, true]));
   if (account?.role !== accountRoles.user) return null;
   const group = store.profiles[account.accessProfileId];
   if (!group) return null;
   const { features } = normaliseAccessProfile(group);
-  return { cloudModels: features.cloudModels, uncensoredModels: features.uncensoredModels };
+  return Object.fromEntries(personalFeatures.map((feature) => [feature, features[feature]]));
 }
 
 /** Stored grants stay listed while discovery is degraded; the UI marks them unavailable. */
