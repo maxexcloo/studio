@@ -23,26 +23,36 @@
   flex-shrink: 0;
 }
 
-/* The phone Drawer owns scrolling; its action row stays at the safe bottom. */
+/*
+ * The phone Generate sheet never scrolls: the fields take the room above a bottom bar of chips and
+ * actions, which sits at the safe bottom or just above the keyboard (`--keyboard-inset`).
+ */
 .editor[data-fill] {
   flex: 1;
   max-height: none;
 }
 
 .editor[data-fill] .fields {
-  overflow: visible;
+  overflow: hidden;
 }
 
-.footer[data-sticky] {
-  position: sticky;
-  bottom: 0;
-  margin-top: auto;
-  /* Span the Drawer body's padding so scrolled fields never show beside the actions. */
+.editor[data-fill] .footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  /* Span the sheet's padding so the bar reaches both edges. */
   margin-inline: calc(-1 * var(--mantine-spacing-md));
   padding-inline: var(--mantine-spacing-md);
   padding-block: var(--mantine-spacing-sm)
-    max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
-  background: var(--studio-glass-raised);
-  -webkit-backdrop-filter: var(--studio-glass-filter);
-  backdrop-filter: var(--studio-glass-filter);
+    max(
+      var(--mantine-spacing-md),
+      env(safe-area-inset-bottom),
+      calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-xs))
+    );
+  border-top: 1px solid var(--studio-glass-border);
+}
+
+/* While the keyboard is up the bar keeps only its actions, leaving the prompt room to type. */
+:global([data-typing]) .editor[data-fill] .footer > [role="group"] {
+  display: none;
 }

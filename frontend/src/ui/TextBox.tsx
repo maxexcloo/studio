@@ -26,6 +26,7 @@ import { notifications } from "@mantine/notifications";
 import { ArrowUp, Check } from "lucide-react";
 import { icons } from "./icons";
 import { useCopy } from "./clipboard";
+import { useKeyboard } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
 
@@ -39,7 +40,7 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
  * phones the box is a summary of its text: tapping it (or `edit`) opens it full screen with the
  * same right section, Copy, Clear and Done, and `below` under the text; Done, Escape or
  * dismissing the keyboard returns to the page. `submit` adds its send arrow there too,
- * so typing and sending take one tap.
+ * so typing and sending take one tap. An `inline` box edits in place on phones too, as on desktop.
  */
 export function TextBox({
   value,
@@ -47,7 +48,7 @@ export function TextBox({
   tools = false,
   overlay,
   below,
-  edit = false,
+  inline = false,
   submit,
   rightSection,
   rightSectionWidth,
@@ -62,51 +63,28 @@ export function TextBox({
   overlay?: ReactNode;
   /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
   below?: ReactNode;
-  /** Opens the phone editor once it turns true. */
-  edit?: boolean;
+  /** Edits in place on phones, for a surface that is itself full screen (the Generate sheet). */
+  inline?: boolean;
   /** The form's send action, offered in the phone editor beside Done. */
   submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
-  const phone = usePhone();
+  const phone = usePhone() && !inline;
   const [editing, setEditing] = useState(false);
-  // How far the visible viewport sits from the editor's top (iOS scrolls it) and how much of the
-  // editor's bottom the keyboard covers.
-  const [keyboard, setKeyboard] = useState({ top: 0, inset: 0 });
   const content = useRef<HTMLDivElement>(null);
+  const keyboard = useKeyboard(editing, content);
+  const deepest = useRef(0);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const latest = useRef({ value, onChange });
   const { copied, copy } = useCopy();
   latest.current = { value, onChange };
-  useEffect(() => {
-    if (edit && phone) setEditing(true);
-  }, [edit, phone]);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
+  // How far the visible viewport is shorter than the editor, wherever iOS has scrolled it.
+  const shortened = keyboard.top + keyboard.inset;
   useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!editing || !viewport) return;
-    // iOS scrolls the page to the focused text; the page returns where it was once the editor closes.
-    const scrolled = window.scrollY;
-    let lowest = viewport.height;
-    const resize = () => {
-      lowest = Math.min(lowest, viewport.height);
-      const full = content.current?.clientHeight || viewport.height;
-      setKeyboard({
-        top: viewport.offsetTop,
-        inset: Math.max(0, full - viewport.height - viewport.offsetTop),
-      });
-      // Android hides the keyboard (Back) without blurring the field; the viewport grows back.
-      if (viewport.height - lowest > 120) setEditing(false);
-    };
-    resize();
-    viewport.addEventListener("resize", resize);
-    viewport.addEventListener("scroll", resize);
-    return () => {
-      viewport.removeEventListener("resize", resize);
-      viewport.removeEventListener("scroll", resize);
-      setKeyboard({ top: 0, inset: 0 });
-      if (window.scrollY !== scrolled) window.scrollTo({ top: scrolled });
-    };
-  }, [editing]);
+    deepest.current = editing ? Math.max(deepest.current, shortened) : 0;
+    // Android hides the keyboard (Back) without blurring the field; the viewport grows back.
+    if (deepest.current - shortened > 120) setEditing(false);
+  }, [editing, shortened]);
   function clear() {
     const previous = value;
     onChange("");

@@ -1218,7 +1218,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
 
 test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile settings", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "legacy-item",
@@ -1243,12 +1243,6 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  // Phones open the prompt in its own editor, which Done closes.
-  if (testInfo.project.use.isMobile)
-    await page
-      .getByRole("dialog", { name: "Prompt", exact: true })
-      .getByRole("button", { name: "Done", exact: true })
-      .click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
   await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();

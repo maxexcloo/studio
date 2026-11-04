@@ -49,6 +49,21 @@
   padding-block: 0;
 }
 
+/* The phone Generate sheet is exactly the screen and never scrolls as a whole. */
+.sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sheetBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
 .panel {
   width: 100%;
   min-width: 0;

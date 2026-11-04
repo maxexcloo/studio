@@ -14,7 +14,21 @@
   bottom: 4px;
 }
 
+/* The phone sheet's prompt (its text box, tools column and suggestions) takes the room left. */
+.area[data-fill] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.area[data-fill] > :first-child {
+  flex: 1;
+  min-height: 0;
+}
+
 .area[data-fill] .input {
+  min-height: 0;
   font-size: 1.0625rem;
   resize: none;
 }
