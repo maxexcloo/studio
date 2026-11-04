@@ -1,0 +1,8 @@
+/* A proposed change replaces the field's text in place, tinted until it runs or is undone; the
+   shadow extends the tint past the text without moving it. */
+.proposed {
+  --proposed-tint: color-mix(in srgb, var(--mantine-primary-color-filled) 22%, transparent);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--proposed-tint);
+  box-shadow: 0 0 0 4px var(--proposed-tint);
+}

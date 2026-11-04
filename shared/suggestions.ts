@@ -4,10 +4,10 @@ export interface NextStep {
   request: string;
   prompt: string;
 }
-/** How the viewer carries out a requested change. */
+/** How a requested change is carried out; a composer draft has nothing to upscale. */
 export const changeActions = ["edit", "recreate", "animate", "upscale"] as const;
 export type ChangeAction = (typeof changeActions)[number];
-/** The viewer's plain-language change: the action the text model chose, with its prompt. */
+/** A change asked for in plain words: the action the text model chose, with its prompt. */
 export interface Change extends NextStep {
   action: ChangeAction;
 }
