@@ -22,7 +22,7 @@ import {
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
-import { animateIssue, animateRequest, clipSeconds, writeAnimatePrompt } from "./prompt-animate.js";
+import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { loadSharp } from "./sharp-loader.js";
 
 const maxReferences = 4;
@@ -168,7 +168,8 @@ export function assistantSettingValue(key, value) {
  * `profiles(req)`: the generation profiles this account may use (account-scoped). `guide(profile)`:
  * its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
  * profile)`: { examples, loras } from starred results on the same family. `frame(req, assetId)`: a
- * reference image the account may use, as the text model reads it.
+ * reference image the account may use, as the text model reads it; `caption(req, assetId)` what it
+ * shows in words.
  */
 export function registerAssistantRoutes(
   app,
@@ -182,6 +183,7 @@ export function registerAssistantRoutes(
     loras = async () => [],
     starred = async () => ({ examples: [], loras: [] }),
     frame = async () => null,
+    caption = () => "",
   } = {},
 ) {
   const fail = (res, error) => {
@@ -324,8 +326,9 @@ export function registerAssistantRoutes(
           ...context,
           engine,
           writing,
-          seconds: clipSeconds(req.body, context.profile),
+          clip: animateClip(req.body, context.profile),
           frame: () => frame(req, assetId),
+          caption: () => caption(req, assetId),
           signal,
         })),
       });

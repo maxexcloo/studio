@@ -509,6 +509,16 @@ export async function bytesForReference(req, id) {
   return bytesForReferenceAccount(req?.studioAccount, id);
 }
 
+/**
+ * An image reference's gallery caption (domain/captions.ts), or "" for a video frame, whose caption
+ * describes the video's first frame rather than this one.
+ */
+export function captionForReferenceAccount(account, id) {
+  if (frameReference(id)) return "";
+  const caption = findGalleryItemForAccount(id, account)?.caption?.text;
+  return typeof caption === "string" ? caption.trim() : "";
+}
+
 export async function bytesForReferenceAccount(account, id) {
   const frame = frameReference(id);
   if (frame) return frameBytes(account, frame);

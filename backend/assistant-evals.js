@@ -181,7 +181,10 @@ const soundWords = [
 // A section label at the start of a line, such as H3's `overall_soundscape:`.
 const sectionLabel = /^([a-z]+(?:_[a-z]+)*):/gm;
 
-/** Scores one motion prompt: the guide's sections in order (or none), a camera, sound, no filler. */
+/**
+ * Scores one motion prompt: the guide's sections in order (or none), a camera, sound (or, for a
+ * silent model, no dialogue), no filler.
+ */
 export function scoreAnimate(item, output) {
   const text = String(output || "");
   const expect = item.expect || {};
@@ -209,11 +212,13 @@ export function scoreAnimate(item, output) {
     camera.some((word) => lower(text).includes(word)),
     `None of ${camera.join(", ")}`,
   );
-  check(
-    "sound",
-    soundWords.some((word) => lower(text).includes(word)),
-    "No sound cue",
-  );
+  if (expect.silent) check("no dialogue", !quotedText(text).length, "A quoted line");
+  else
+    check(
+      "sound",
+      soundWords.some((word) => lower(text).includes(word)),
+      "No sound cue",
+    );
   if (expect.dialogue)
     check(
       "dialogue",
@@ -316,7 +321,8 @@ export async function runEvals({
       profile: item.profile,
       guide: item.guide || null,
       writing: { kind: "animate", instruction: "", ...item.writing },
-      seconds: item.seconds || 0,
+      clip: { seconds: item.seconds || 0, fps: item.fps || 0 },
+      caption: () => item.caption || "",
     }).catch(() => ({ prompt: "" }));
     results.animate.push({ ...scoreAnimate(item, result.prompt), output: result.prompt });
   }

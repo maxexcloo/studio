@@ -5,7 +5,7 @@ import { gallery } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
 import { canonicalProfileId, livePrompting } from "./profile/store.js";
-import { bytesForReferenceAccount } from "./references.js";
+import { bytesForReferenceAccount, captionForReferenceAccount } from "./references.js";
 
 /**
  * What the prompt assistant reads for an account: its profiles, their prompting guides, its LoRAs,
@@ -82,5 +82,7 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
     ]);
     return downscaled || null;
   }
-  return { guide, image, loras, profiles, starred };
+  /** What a reference image shows in words (its gallery caption), for a writer that can't see it; or "". */
+  const caption = (account, id) => (id ? captionForReferenceAccount(account, id) : "");
+  return { caption, guide, image, loras, profiles, starred };
 }
