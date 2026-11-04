@@ -189,15 +189,16 @@ export function loraInfo(name) {
 
 /**
  * Every listed LoRA's info. ComfyUI hands out the metadata block (no tensor
- * names) through /view_metadata, so each is read a few at a time and remembered.
+ * names) through /view_metadata, so each is read a few at a time and remembered;
+ * `remote: false` (a worker that isn't answering) keeps to what is remembered.
  */
-export async function loraInfos(names = [], { concurrency = 6 } = {}) {
+export async function loraInfos(names = [], { concurrency = 6, remote: ask = true } = {}) {
   const result = {};
   const remote = [];
   for (const name of names) {
     const info = loraInfo(name);
     if (info) result[name] = info;
-    else if (/\.safetensors$/i.test(name)) remote.push(name);
+    else if (ask && /\.safetensors$/i.test(name)) remote.push(name);
   }
   async function worker() {
     while (remote.length) {
@@ -215,7 +216,10 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
-  for (const [name, info] of Object.entries(result)) result[name] = catalogueLoraInfo(name, info);
+  // One catalogue view for the whole list, rather than a manifest check per LoRA.
+  const view = loraCatalogue().loraView();
+  for (const [name, info] of Object.entries(result))
+    result[name] = catalogueLoraInfo(name, info, view);
   return result;
 }
 
@@ -223,10 +227,13 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
 export const loraCatalogue = () => catalogueStore({ familiesFromMetadata });
 
 /** Provider and local policy metadata can be checked before submitting an optional stack. */
-export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [], triggers: [] }) {
+export function catalogueLoraInfo(
+  name,
+  info = loraInfo(name) || { families: [], triggers: [] },
   // One catalogue (library/catalogue.json) holds provider downloads, LoRA definitions and Studio's
   // edits; this view keeps the shapes the older catalogue files had.
-  const { sources, catalogue } = loraCatalogue().loraView();
+  { sources, catalogue } = loraCatalogue().loraView(),
+) {
   return enrichLocalLoraInfo(
     enrichLoraInfo(info, name, sources, familiesFromMetadata, families),
     name,

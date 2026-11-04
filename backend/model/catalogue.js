@@ -69,6 +69,23 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return shareContextRequest(backend, () => fetchComfyContext(backend));
   }
 
+  /**
+   * The default worker's latest known context without waiting on it: its cached answer, refreshed
+   * in the background once 30 seconds old, else its last stored observation. Only a worker never
+   * seen is waited for. `current` says whether it answered within those 30 seconds.
+   */
+  function latestComfyContext() {
+    const backend = currentComfyBackend();
+    const cached = contextFor(backend);
+    if (cached.info && Date.now() - cached.fetchedAt < 30000)
+      return Promise.resolve({ ...cached, current: true });
+    const worker = workerById(backend);
+    const known = cached.info ? cached : worker && store.workerModels(backend, worker.url);
+    if (!known?.info) return loadComfyContext().then((context) => ({ ...context, current: true }));
+    loadComfyContext().catch(() => null);
+    return Promise.resolve({ ...known, current: false });
+  }
+
   async function fetchComfyContext(backend) {
     const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
     const [info, stats] = await Promise.all([
@@ -296,6 +313,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   return {
     catalogueModels,
     comfyDownMessage,
+    latestComfyContext,
     loadComfyContext,
     mediaModels,
     presetModels,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Settings › Profiles › Merge Duplicate Profiles: an administrator's explicit, repeatable action,
+ * Library › Profiles › Merge Duplicate Profiles: an administrator's explicit, repeatable action,
  * never run at startup.
  *
  * Two profile files are duplicates when they share a name and kind and run the same definition:

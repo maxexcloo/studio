@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Settings › Profiles › Remove Profile: an administrator's explicit removal of one profile.
+ * Library › Profiles › Remove Profile: an administrator's explicit removal of one profile.
  *
  * The file is copied to `<data>/backups/profile-removals/<time>/<id>.json` and recorded as the
  * profile's last version, so its history stays and a seed never brings the id back; then the file

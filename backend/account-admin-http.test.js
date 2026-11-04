@@ -40,7 +40,7 @@ async function member(name) {
 const accountRoute = (id) => `/api/accounts/users/${encodeURIComponent(id)}`;
 
 before(async () => {
-  // An uncensored profile in the data folder, as Settings › Profiles lists it.
+  // An uncensored profile in the data folder, as Library › Profiles lists it.
   const sample = JSON.parse(
     fs.readFileSync(new URL("./samples/sdxl-base-refiner.json", import.meta.url), "utf8"),
   );
@@ -164,7 +164,7 @@ test(
     assert.equal(off.status, 200, off.body.error);
     assert.equal((await own()).uncensoredModels, false);
     assert.equal((await own()).cloudModels, true);
-    // Administration is not narrowed: Settings › Profiles still lists the uncensored profile.
+    // Administration is not narrowed: Library › Profiles still lists the uncensored profile.
     const editable = await call("/api/profiles/editable", { cookie: admin });
     assert.equal(editable.status, 200, editable.body.error);
     assert.equal(

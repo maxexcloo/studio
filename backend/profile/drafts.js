@@ -15,7 +15,7 @@
  *   5. The draft is checked with validateProfileText against ComfyUI's object_info before it is
  *      written: without ComfyUI, or with node types it doesn't know, nothing is activated.
  *   6. It is saved as a new profile (origin "ai", AI-Drafted: administrators only until an
- *      administrator approves it in Settings › Profiles), and its guide is drafted from the page
+ *      administrator approves it in Library › Profiles), and its guide is drafted from the page
  *      and the template's guide, saved AI-Drafted and bound to the profile.
  *
  * Everything that talks to the outside is injected, so tests need no worker or gateway.

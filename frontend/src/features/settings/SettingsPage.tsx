@@ -13,7 +13,6 @@ import { GenerationSettings } from "./GenerationSettings";
 import { IntegrationSettings } from "./IntegrationSettings";
 import { OwnAccount } from "./OwnAccount";
 import { Preferences } from "./Preferences";
-import { ProfileDefinitions } from "./ProfileDefinitions";
 import { useSettingsNavigation } from "./SettingsNavigation";
 
 const workerQueries = [
@@ -73,7 +72,6 @@ export function SettingsPage() {
         generation: <GenerationSettings />,
         groups: (heading) => <GroupsAdmin heading={heading} />,
         integrations: <IntegrationSettings />,
-        profiles: (heading) => <ProfileDefinitions heading={heading} />,
         users: (heading) => <UsersAdmin heading={heading} />,
         workers: (heading) => <WorkerSettings heading={heading} />,
         about: <AboutStudio />,

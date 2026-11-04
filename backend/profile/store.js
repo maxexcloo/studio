@@ -17,7 +17,7 @@
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
  * `<data>/history/guides/<packId>/<n>.json`; the bindings (`families`, `profiles`, `variants`,
  * `negatives`) are versioned together as `_bindings`, an id no pack can have. The store is the only
- * source of guides. Studio is the only writer of live profiles and guides; Settings › Profiles ›
+ * source of guides. Studio is the only writer of live profiles and guides; Library › Profiles ›
  * Export backs them up.
  *
  * Origins: "seed" (a sample profile or an older seed), "studio" (an administrator in Studio), "ai"
