@@ -111,12 +111,13 @@ function SpicyPrompts() {
   );
 }
 
-/** Cloud Models and Uncensored Models, which an account turns off for itself where its role or group grants them. */
+const modelChoices = ["cloudModels", "loras", "uncensoredModels"] as const;
+/** Cloud Models, LoRAs and Uncensored Models, which an account turns off for itself where its role or group grants them. */
 function ModelChoices() {
   const status = useQuery(preferencesQuery).data;
   const save = useSavePreferences();
-  if (!status || (!status.grants.cloudModels && !status.grants.uncensoredModels)) return null;
-  const choice = (key: "cloudModels" | "uncensoredModels", label: string, description: string) =>
+  if (!status || !modelChoices.some((key) => status.grants[key])) return null;
+  const choice = (key: (typeof modelChoices)[number], label: string, description: string) =>
     status.grants[key] && (
       <SettingRow label={label} description={description}>
         <Switch
@@ -132,6 +133,11 @@ function ModelChoices() {
         "cloudModels",
         "Cloud Models",
         "Offer the cloud models you have access to. Off hides them here, in Chat and over MCP.",
+      )}
+      {choice(
+        "loras",
+        "LoRAs",
+        "Offer the LoRAs you have access to. Off hides them everywhere, Dream included.",
       )}
       {choice(
         "uncensoredModels",

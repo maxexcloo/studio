@@ -7,7 +7,7 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// An administrator and members of a group that grants Cloud Models and Uncensored Models.
+// An administrator and members of a group that grants Cloud Models, LoRAs and Uncensored Models.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-account-admin-"));
 let child;
 let base = "";
@@ -80,7 +80,7 @@ before(async () => {
       id: "open",
       name: "Open",
       allModels: true,
-      features: { cloudModels: true, uncensoredModels: true },
+      features: { cloudModels: true, loras: true, uncensoredModels: true },
     },
   });
   assert.equal(saved.status, 200, saved.body.error);
@@ -94,7 +94,7 @@ after(async () => {
 });
 
 test(
-  "a member turns granted Cloud and Uncensored Models off for itself",
+  "a member turns granted Cloud Models, LoRAs and Uncensored Models off for itself",
   { timeout: 30_000 },
   async () => {
     const { cookie } = await member("chooser");
@@ -103,6 +103,7 @@ test(
     const shown = await call("/api/preferences", { cookie });
     assert.deepEqual(shown.body.grants, {
       cloudModels: true,
+      loras: true,
       spicyPrompts: true,
       uncensoredModels: true,
     });
@@ -112,11 +113,12 @@ test(
     const off = await call("/api/preferences", {
       method: "PATCH",
       cookie,
-      body: { cloudModels: false, tileCaptions: true },
+      body: { cloudModels: false, loras: false, tileCaptions: true },
     });
     assert.equal(off.status, 200, off.body.error);
-    assert.deepEqual(off.body.saved, ["cloudModels", "tileCaptions"]);
+    assert.deepEqual(off.body.saved, ["cloudModels", "loras", "tileCaptions"]);
     assert.equal((await features()).cloudModels, false);
+    assert.equal((await features()).loras, false);
     assert.equal((await features()).uncensoredModels, true);
     const spicy = await call("/api/preferences", {
       method: "PATCH",
@@ -149,6 +151,7 @@ test(
       (await call("/api/accounts/status", { cookie: admin })).body.account.features;
     assert.deepEqual((await call("/api/preferences", { cookie: admin })).body.grants, {
       cloudModels: true,
+      loras: true,
       spicyPrompts: true,
       uncensoredModels: true,
     });

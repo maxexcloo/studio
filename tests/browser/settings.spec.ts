@@ -238,15 +238,25 @@ test("A device's earlier Tile Captions choice moves to the account once", async 
   expect(state.preferences.preferences.tileCaptions).toBe(false);
 });
 
-test("An administrator turns Cloud and Uncensored Models off for itself in Settings › Preferences", async ({
+test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for itself in Settings › Preferences", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  state.preferences.grants = { cloudModels: true, spicyPrompts: true, uncensoredModels: true };
+  state.preferences.grants = {
+    cloudModels: true,
+    loras: true,
+    spicyPrompts: true,
+    uncensoredModels: true,
+  };
   await page.goto("/settings#preferences");
   const models = page.getByRole("region", { name: "Models", exact: true });
-  await expect(models.getByRole("switch")).toHaveCount(2);
+  await expect(models.getByRole("switch")).toHaveCount(3);
+  const loras = models.getByRole("switch", { name: "LoRAs", exact: true });
+  await expect(loras).toBeChecked();
+  await loras.click({ force: true });
+  await expect(loras).not.toBeChecked();
+  await expect.poll(() => state.preferences.preferences.loras).toBe(false);
   const uncensored = models.getByRole("switch", { name: "Uncensored Models", exact: true });
   await expect(uncensored).toBeChecked();
   await uncensored.click({ force: true });
@@ -263,7 +273,12 @@ test("Spicy Prompts shows in Settings › Preferences only with Uncensored Model
   const prompts = page.getByRole("region", { name: "Prompts", exact: true });
   await expect(prompts.getByRole("switch", { name: "Keep Recent Prompts" })).toBeVisible();
   await expect(prompts.getByRole("switch", { name: "Spicy Prompts" })).toHaveCount(0);
-  state.preferences.grants = { cloudModels: false, spicyPrompts: true, uncensoredModels: true };
+  state.preferences.grants = {
+    cloudModels: false,
+    loras: false,
+    spicyPrompts: true,
+    uncensoredModels: true,
+  };
   await page.reload();
   const spicy = prompts.getByRole("switch", { name: "Spicy Prompts", exact: true });
   await expect(spicy).not.toBeChecked();
