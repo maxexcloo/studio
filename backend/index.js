@@ -119,6 +119,8 @@ import {
   flushPendingGallery,
   makePendingItems,
   gallery,
+  galleryItem,
+  galleryJobItems,
   dataDir,
   importedImageFile,
   recordsFromComfyHistory,
@@ -608,18 +610,14 @@ registerRewriteRoutes(app, {
   resourceFor: queueResourceFor,
   validate: validateGenerationInput,
   deleteMedia: deleteOwnedGalleryItems,
-  media: (ownerId) => {
-    const byJob = new Map();
-    for (const item of gallery)
-      if (item.jobId && (item.ownerId || "") === ownerId && !isGalleryHidden(item))
-        byJob.set(item.jobId, [...(byJob.get(item.jobId) || []), item]);
-    for (const items of byJob.values()) items.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-    return byJob;
-  },
-  ownsItem: (ownerId, id) =>
-    gallery.some(
-      (item) => item.id === id && (item.ownerId || "") === ownerId && !isGalleryHidden(item),
+  media: (ownerId, jobId) =>
+    galleryJobItems(jobId).filter(
+      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
     ),
+  ownsItem: (ownerId, id) => {
+    const item = galleryItem(id);
+    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
+  },
   title: chatTitle,
   admitted: jobAdmitted,
 });

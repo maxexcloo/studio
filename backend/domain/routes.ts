@@ -75,11 +75,11 @@ export function registerRewriteRoutes(
       ids: string[],
     ) => { removed: string[]; files: { deleted: number; skipped: number } };
     /**
-     * The owner's gallery records by job. A job's own results are what its adapter reported (a
+     * The owner's gallery records of a job. A job's own results are what its adapter reported (a
      * cloud provider's bare files, or a snapshot taken on completion), so the queue and Chat show the
      * gallery's records instead: each with its prompt, settings, title and star.
      */
-    media?: (ownerId: string) => Map<string, QueueMedia[]>;
+    media?: (ownerId: string, jobId: string) => QueueMedia[];
     /** Whether the owner has this gallery item, which a run may then be made from. */
     ownsItem?: (ownerId: string, id: string) => boolean;
     /** Titles a chat started by its first generation; must not reject. */
@@ -88,13 +88,11 @@ export function registerRewriteRoutes(
     admitted?: (job: OwnedJob) => void;
   },
 ) {
-  const shown = (ownerId: string, jobs: OwnedJob[]) => {
-    const saved = media?.(ownerId);
-    return jobs.map((job) => {
-      const items = saved?.get(job.id);
+  const shown = (ownerId: string, jobs: OwnedJob[]) =>
+    jobs.map((job) => {
+      const items = media?.(ownerId, job.id);
       return publicJob(items?.length ? { ...job, items } : job);
     });
-  };
   app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
   app.post("/api/user-presets", (req, res) => {
     if (typeof req.body?.title !== "string" || !req.body.title.trim() || !object(req.body.input))
