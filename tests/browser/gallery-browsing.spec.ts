@@ -531,7 +531,7 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   for (const action of ["Stop All", "Clear Failed"]) {
     await queue.getByRole("button", { name: action, exact: true }).click();
     await page
-      .getByRole("dialog", { name: `${action} Generations?` })
+      .getByRole("dialog", { name: `${action} Generations`, exact: true })
       .getByRole("button", { name: action, exact: true })
       .click();
   }
