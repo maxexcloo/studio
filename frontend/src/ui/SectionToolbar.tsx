@@ -31,11 +31,13 @@ export function ToolbarAction({
   label,
   icon,
   loading,
+  disabled,
   onClick,
 }: {
   label: string;
   icon: ReactNode;
   loading?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -44,6 +46,7 @@ export function ToolbarAction({
       size="compact-sm"
       leftSection={icon}
       loading={loading}
+      disabled={disabled}
       onClick={onClick}
     >
       {label}

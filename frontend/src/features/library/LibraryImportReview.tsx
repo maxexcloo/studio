@@ -17,6 +17,9 @@ import { api, post } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { SectionHeading } from "../../ui/SectionHeading";
+import { icons } from "../../ui/icons";
+import { SettingGroup } from "../../ui/SettingRows";
+import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
 
 interface Availability {
@@ -182,10 +185,15 @@ export function LibraryImportReview({
   return (
     <Stack>
       <Group justify="space-between">
-        <Button variant="subtle" onClick={onBack}>
+        <Button variant="subtle" size="compact-sm" onClick={onBack}>
           Back to Imports
         </Button>
-        <Button variant="default" loading={query.isFetching} onClick={() => void query.refetch()}>
+        <Button
+          variant="default"
+          size="compact-sm"
+          loading={query.isFetching}
+          onClick={() => void query.refetch()}
+        >
           Check Again
         </Button>
       </Group>
@@ -310,13 +318,22 @@ export function LibraryImportReview({
             </Stack>
           )}
           {!!resources.length && (
-            <>
-              <Group justify="space-between">
-                <SectionHeading>Files</SectionHeading>
-                <Button disabled={!missing || action.isPending} onClick={() => run("download")}>
-                  Download Missing
-                </Button>
-              </Group>
+            <SettingGroup
+              title="Files"
+              toolbar={
+                <SectionToolbar
+                  label="Files"
+                  actions={
+                    <ToolbarAction
+                      label="Download Missing"
+                      icon={<icons.download size={18} />}
+                      disabled={!missing || action.isPending}
+                      onClick={() => run("download")}
+                    />
+                  }
+                />
+              }
+            >
               {resources.map((resource, index) => (
                 <Stack
                   key={`${index}:${resource.name}`}
@@ -325,7 +342,7 @@ export function LibraryImportReview({
                   style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
                 >
                   <Group justify="space-between">
-                    <Text fw={500} style={{ overflowWrap: "anywhere" }}>
+                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
                       {resource.want?.file || resource.name}
                     </Text>
                     <Badge color={resource.status === "installed" ? "green" : "gray"}>
@@ -405,18 +422,22 @@ export function LibraryImportReview({
                   </Group>
                 </Stack>
               ))}
-            </>
+            </SettingGroup>
           )}
           {!!record.offers?.length && (
-            <>
-              <SectionHeading>Other Versions</SectionHeading>
-              <Text size="sm" c="dimmed">
+            <SettingGroup title="Other Versions">
+              <Text size="xs" c="dimmed">
                 Only versions that suit this model’s family and worker are listed. Nothing downloads
                 until you choose one.
               </Text>
               {record.offers.map((offer, index) => (
-                <Stack key={offer.key} gap="xs">
-                  <Text fw={500} style={{ overflowWrap: "anywhere" }}>
+                <Stack
+                  key={offer.key}
+                  gap="xs"
+                  py="sm"
+                  style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }}
+                >
+                  <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
                     {offer.file}
                   </Text>
                   <Text size="sm" c="dimmed">
@@ -457,7 +478,7 @@ export function LibraryImportReview({
                   </Group>
                 </Stack>
               ))}
-            </>
+            </SettingGroup>
           )}
         </>
       ) : null}
