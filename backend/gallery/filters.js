@@ -13,18 +13,12 @@ export const gallerySizeBands = [
   { id: "over-2k", label: "Over 2K", detail: "More than 2048 px", min: 2049, max: Infinity },
 ];
 
-/** Common aspect ratios; model-native sizes (multiples of 64) snap within 4%, and anything further is Other. */
+/** Orientations, A–Z; within 3% of 1:1 counts as square. */
 export const galleryAspects = [
-  { id: "1:1", ratio: 1 },
-  { id: "4:3", ratio: 4 / 3 },
-  { id: "3:4", ratio: 3 / 4 },
-  { id: "3:2", ratio: 3 / 2 },
-  { id: "2:3", ratio: 2 / 3 },
-  { id: "16:9", ratio: 16 / 9 },
-  { id: "9:16", ratio: 9 / 16 },
-  { id: "21:9", ratio: 21 / 9 },
+  { id: "landscape", label: "Landscape" },
+  { id: "portrait", label: "Portrait" },
+  { id: "square", label: "Square" },
 ];
-export const otherAspect = "other";
 
 function dimensions(item) {
   const width = Number(item?.width);
@@ -43,12 +37,11 @@ export function aspectOf(item) {
   const size = dimensions(item);
   if (!size) return "";
   const ratio = size.width / size.height;
-  const nearest = galleryAspects.reduce((best, aspect) =>
-    Math.abs(Math.log(ratio / aspect.ratio)) < Math.abs(Math.log(ratio / best.ratio))
-      ? aspect
-      : best,
-  );
-  return Math.abs(ratio / nearest.ratio - 1) <= 0.04 ? nearest.id : otherAspect;
+  return Math.abs(Math.log(ratio)) <= Math.log(1.03)
+    ? "square"
+    : ratio > 1
+      ? "landscape"
+      : "portrait";
 }
 
 /** A filter's values as a list: a string, an array of them, or nothing; blanks dropped. */

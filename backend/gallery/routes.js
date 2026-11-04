@@ -19,7 +19,7 @@ import {
   recordBelongsToAccount,
   recordsForRequest,
 } from "../account-ownership.js";
-import { galleryAspects, gallerySizeBands, otherAspect } from "./filters.js";
+import { galleryAspects, gallerySizeBands } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { requireAdmin } from "../route-access.js";
 
@@ -109,10 +109,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
         label: band.label,
         description: band.detail,
       })),
-      aspects: [
-        ...galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.id })),
-        { value: otherAspect, label: "Other" },
-      ],
+      aspects: galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.label })),
       chats: [
         ...new Map(
           items

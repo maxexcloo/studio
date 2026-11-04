@@ -206,7 +206,9 @@ test("repeated gallery filters match any of their values and combine across filt
       .sort();
   assert.deepEqual(await ids({ model: ["flux", "sdxl"] }), ["job-flux", "job-sdxl"]);
   assert.deepEqual(await ids({ model: "wan" }), ["job-wan"]);
-  assert.deepEqual(await ids({ model: ["flux", "sdxl"], aspect: ["1:1", "9:16"] }), ["job-flux"]);
+  assert.deepEqual(await ids({ model: ["flux", "sdxl"], aspect: ["square", "portrait"] }), [
+    "job-flux",
+  ]);
   assert.deepEqual(
     await ids({ model: ["", ""] }),
     ["job-flux", "job-sdxl", "job-wan"],
@@ -245,7 +247,10 @@ test("gallery filter options cover the owned gallery without exposing other acco
   assert.deepEqual(facets.models, ["base-model", "late-model", "shared-model"]);
   assert.deepEqual(facets.loras, ["detail.safetensors"]);
   assert.equal(facets.sizes[0].value, "up-to-1k");
-  assert.equal(facets.aspects.at(-1).value, "other");
+  assert.deepEqual(
+    facets.aspects.map((aspect) => aspect.label),
+    ["Landscape", "Portrait", "Square"],
+  );
 });
 
 test("gallery items carry their Chat, which filters pages and lists as a facet", async () => {
