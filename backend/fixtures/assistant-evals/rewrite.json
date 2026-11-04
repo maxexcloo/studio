@@ -68,7 +68,7 @@
       "recorded": "A red fox standing alert in a wildflower meadow at golden hour, its thick russet coat lit from behind, tall grasses and yellow buttercups around it, soft hills fading into haze in the distance."
     },
     {
-      "id": "photographic-portrait",
+      "id": "portrait-fisherman",
       "profile": {
         "id": "custom:krea2-fixture",
         "label": "Krea 2",
@@ -83,14 +83,14 @@
         ]
       },
       "prompt": "portrait of an old fisherman",
-      "preset": "photographic",
+      "preset": "portrait",
       "expect": {
         "keep": ["fisherman"]
       },
-      "recorded": "Close-up photograph of an old fisherman on a harbour wall, deep weathered lines across his face, grey stubble and a navy wool cap, shot on an 85mm lens at f/2 with overcast daylight from the left, the boats behind him softly out of focus."
+      "recorded": "Close-up portrait of an old fisherman on a harbour wall, deep weathered lines across his face, grey stubble and a navy wool cap, his pale eyes looking just past the camera with a wry half-smile, soft overcast light from the left, an 85mm lens with shallow depth of field, the boats behind him a soft grey-blue wash."
     },
     {
-      "id": "photographic-street",
+      "id": "illustration-tokyo",
       "profile": {
         "id": "custom:krea2-fixture",
         "label": "Krea 2",
@@ -105,11 +105,11 @@
         ]
       },
       "prompt": "a rainy street in Tokyo at night",
-      "preset": "photographic",
+      "preset": "illustration",
       "expect": {
         "keep": ["Tokyo", "night"]
       },
-      "recorded": "Street photograph of a narrow rainy lane in Tokyo at night, wet asphalt reflecting red and white lanterns, a commuter with a clear umbrella mid-stride, shot handheld on a 35mm lens with a slow shutter catching the drizzle."
+      "recorded": "Watercolour illustration of a narrow rainy lane in Tokyo at night, loose wet-on-wet washes of indigo and violet, red and white lanterns bleeding warm glows into the puddles, a commuter with a clear umbrella drawn in fine ink linework, the paper's texture showing through the rain."
     },
     {
       "id": "cinematic-desert",
@@ -217,9 +217,10 @@
       "prompt": "a family having breakfast",
       "preset": "candid",
       "expect": {
-        "keep": ["breakfast"]
+        "keep": ["breakfast"],
+        "avoid": ["blurry", "grainy", "motion blur", "phone", "snapshot"]
       },
-      "recorded": "A candid phone snapshot of a family having breakfast in a small kitchen, a child mid-laugh with milk on his lip, a parent pouring coffee, cereal boxes and a cluttered counter, soft natural light from the window."
+      "recorded": "A candid photograph of a family having breakfast in a small kitchen, a child mid-laugh with milk on his lip, a parent pouring coffee while reading a note on the fridge, cereal boxes and a cluttered counter, soft morning window light, eye-level framing."
     },
     {
       "id": "candid-dog",
@@ -239,9 +240,10 @@
       "prompt": "a dog on a sofa",
       "preset": "candid",
       "expect": {
-        "keep": ["dog", "sofa"]
+        "keep": ["dog", "sofa"],
+        "avoid": ["blurry", "grainy", "motion blur", "phone", "snapshot"]
       },
-      "recorded": "An unposed everyday snapshot of a scruffy terrier dog dozing on a worn grey sofa, one ear flopped over, a crumpled blanket and a phone charger cable beside it, afternoon light through half-closed blinds."
+      "recorded": "An unposed everyday photograph of a scruffy terrier dog dozing on a worn grey sofa, one ear flopped over, a crumpled blanket and a half-read paperback beside it, afternoon daylight through half-closed blinds laying soft stripes across the cushions."
     },
     {
       "id": "spicy-couple",
@@ -333,7 +335,7 @@
       "recorded": "Full-color outdoor photograph, a city park on an overcast afternoon. In the foreground, a silver humanoid robot with scuffed joints sits on a green wooden bench, holding an open newspaper in both hands, its round camera eyes angled down at the page. Behind it, a gravel path curves past plane trees and a rubbish bin."
     },
     {
-      "id": "photographic-food",
+      "id": "product-ramen",
       "profile": {
         "id": "custom:krea2-fixture",
         "label": "Krea 2",
@@ -348,11 +350,11 @@
         ]
       },
       "prompt": "a bowl of ramen",
-      "preset": "photographic",
+      "preset": "product",
       "expect": {
         "keep": ["ramen"]
       },
-      "recorded": "Overhead food photograph of a steaming bowl of tonkotsu ramen on a dark wooden counter, a halved soft egg, chashu slices and spring onions on top, chopsticks resting on the rim, shot on a 50mm lens under a single warm pendant light."
+      "recorded": "Studio product shot of a steaming bowl of tonkotsu ramen in a matte black ceramic bowl on a slate surface against a plain charcoal backdrop, a halved soft egg, chashu slices and spring onions on top, chopsticks resting on the rim, a soft key light from above left with a gentle rim light catching the steam, shot at a three-quarter angle with the whole bowl sharp."
     },
     {
       "id": "cinematic-space",
@@ -438,9 +440,10 @@
       "prompt": "a street musician playing violin",
       "preset": "candid",
       "expect": {
-        "keep": ["violin"]
+        "keep": ["violin"],
+        "avoid": ["blurry", "grainy", "motion blur", "phone", "snapshot"]
       },
-      "recorded": "A candid snapshot of a street musician playing violin on a busy pavement, caught mid-bow with eyes closed, an open case with a few coins at his feet, passers-by blurred as they walk past in flat overcast light."
+      "recorded": "A candid photograph of a street musician playing violin on a busy pavement, caught mid-bow with eyes closed, an open case with a few coins at his feet, people walking past with shopping bags, flat overcast daylight on the wet stone and his frayed coat cuffs."
     }
   ]
 }
