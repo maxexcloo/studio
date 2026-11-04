@@ -1,6 +1,7 @@
 import {
   filterVisibleGallery,
   gallery,
+  galleryJobItems,
   galleryKey,
   hideGalleryItems,
   removeGalleryItems,
@@ -26,7 +27,7 @@ import { requireAdmin } from "../route-access.js";
 export function galleryJobResponse(account, id, settings = false) {
   cleanupGalleryState(jobs);
   const items = filterVisibleGallery(
-    gallery.filter((item) => item.jobId === id && recordBelongsToAccount(item, account)),
+    galleryJobItems(id).filter((item) => recordBelongsToAccount(item, account)),
   );
   const fields = [
     "id",

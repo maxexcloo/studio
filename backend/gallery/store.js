@@ -247,6 +247,30 @@ function visibleItems({ type = "", includeFailed = true, uploads = false, filter
   return filter ? { items: entry.items.filter(filter), positions: null } : entry;
 }
 
+// Items by job (in output order) and by id, rebuilt when the gallery is replaced: it changes only
+// by replacement, never in place.
+let lookup = { gallery: null, byJob: new Map(), byId: new Map() };
+function galleryLookup() {
+  if (lookup.gallery === gallery) return lookup;
+  const byJob = new Map();
+  const byId = new Map();
+  for (const item of gallery) {
+    if (item.id && !byId.has(item.id)) byId.set(item.id, item);
+    if (!item.jobId) continue;
+    if (byJob.has(item.jobId)) byJob.get(item.jobId).push(item);
+    else byJob.set(item.jobId, [item]);
+  }
+  for (const items of byJob.values()) items.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  lookup = { gallery, byJob, byId };
+  return lookup;
+}
+
+/** A job's items in output order, hidden ones included. */
+export const galleryJobItems = (jobId) => galleryLookup().byJob.get(jobId) || [];
+
+/** The item with an id, hidden or not. */
+export const galleryItem = (id) => galleryLookup().byId.get(id);
+
 /** Every visible item (filterVisibleGallery), kept with the page lists until the gallery changes. */
 export function visibleGallery() {
   const lists = visibleLists();
