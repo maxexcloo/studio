@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -18,7 +18,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
@@ -55,7 +55,15 @@ const views = [
 ];
 
 /** Library › Imports: a link or an image becomes a graded import that can be reviewed. */
-export function LibraryImports({ active, admin }: { active: boolean; admin: boolean }) {
+export function LibraryImports({
+  heading,
+  active,
+  admin,
+}: {
+  heading: ReactNode;
+  active: boolean;
+  admin: boolean;
+}) {
   const client = useQueryClient();
   const [url, setUrl] = useState("");
   const [reviewId, setReviewId] = useState<string | null>(null);
@@ -132,14 +140,17 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
   });
   if (reviewId)
     return (
-      <LibraryImportReview
-        id={reviewId}
-        active={active}
-        vision={imports.data?.vision}
-        admin={admin}
-        onBack={() => setReviewId(null)}
-        onOpen={setReviewId}
-      />
+      <Stack gap="md">
+        {heading}
+        <LibraryImportReview
+          id={reviewId}
+          active={active}
+          vision={imports.data?.vision}
+          admin={admin}
+          onBack={() => setReviewId(null)}
+          onOpen={setReviewId}
+        />
+      </Stack>
     );
   const records = imports.data?.imports || [];
   const nameOf = (record: ImportRecord) =>
@@ -150,6 +161,50 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
   const added = reddit.data;
   return (
     <Stack gap="md">
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Imports"
+          views={records.length ? views : undefined}
+          view={view}
+          onViewChange={setView}
+          query={query}
+          onQueryChange={records.length ? setQuery : undefined}
+          actions={
+            <>
+              {records.some((record) => record.state === "failed") && (
+                <Tooltip label="Clear Failed">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Clear Failed"
+                    onClick={() => setConfirming(true)}
+                  >
+                    <icons.clear size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <FileButton
+                onChange={(file) => file && uploading.mutate(file)}
+                accept="image/png,image/jpeg,image/webp"
+              >
+                {(props) => (
+                  <Tooltip label="Upload Image">
+                    <ActionIcon
+                      {...props}
+                      variant="subtle"
+                      color="gray"
+                      aria-label="Upload Image"
+                      loading={uploading.isPending}
+                    >
+                      <ImageUp size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </FileButton>
+            </>
+          }
+        />
+      </SectionHeader>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -172,24 +227,6 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
           <Button type="submit" loading={importing.isPending || reddit.isPending}>
             Import
           </Button>
-          <FileButton
-            onChange={(file) => file && uploading.mutate(file)}
-            accept="image/png,image/jpeg,image/webp"
-          >
-            {(props) => (
-              <Tooltip label="Upload Image">
-                <ActionIcon
-                  {...props}
-                  size={42}
-                  variant="default"
-                  aria-label="Upload Image"
-                  loading={uploading.isPending}
-                >
-                  <ImageUp size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </FileButton>
         </Group>
       </form>
       {failed && <Alert color="red">{failed.message}</Alert>}
@@ -200,30 +237,6 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
             `; ${added.failed.length} couldn’t be saved: ${added.failed.map((entry) => entry.error).join(" ")}`}
           .
         </Text>
-      )}
-      {records.length > 0 && (
-        <SectionToolbar
-          label="Imports"
-          views={views}
-          view={view}
-          onViewChange={setView}
-          query={query}
-          onQueryChange={setQuery}
-          actions={
-            records.some((record) => record.state === "failed") && (
-              <Tooltip label="Clear Failed">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Clear Failed"
-                  onClick={() => setConfirming(true)}
-                >
-                  <icons.clear size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )
-          }
-        />
       )}
       {cleared !== undefined && (
         <Text c="dimmed" size="xs">
@@ -310,7 +323,7 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
         onConfirm={() => clearFailed.mutate()}
         onClose={() => setConfirming(false)}
       >
-        Failed imports leave Library › Import. Downloaded files stay.
+        Failed imports leave Library › Imports. Downloaded files stay.
       </ConfirmDialog>
     </Stack>
   );
