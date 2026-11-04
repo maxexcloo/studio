@@ -602,8 +602,9 @@ export async function fixtures(page: Page) {
         loras: ["detail.safetensors", "soft-style.safetensors"],
         sizes: [{ value: "up-to-1k", label: "Up to 1K", description: "1024 px or less" }],
         aspects: [
-          { value: "1:1", label: "1:1" },
-          { value: "other", label: "Other" },
+          { value: "landscape", label: "Landscape" },
+          { value: "portrait", label: "Portrait" },
+          { value: "square", label: "Square" },
         ],
         chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
