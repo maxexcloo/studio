@@ -248,7 +248,11 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     weightDtype: String(input.weightDtype || "default"),
     width: snapInteger(input.width, widthRange.default, widthRange),
     height: snapInteger(input.height, heightRange.default, heightRange),
-    steps: snapInteger(input.steps, stepsRange.default, stepsRange),
+    // A fixed-step profile (capabilities.steps false) keeps its graph's own steps, as with CFG.
+    steps:
+      profile.capabilities?.steps === false
+        ? undefined
+        : snapInteger(input.steps, stepsRange.default, stepsRange),
     // A profile without CFG (distilled; capabilities.cfg false) keeps its graph's own guidance, so none is taken or recorded.
     cfg:
       profile.capabilities?.cfg === false

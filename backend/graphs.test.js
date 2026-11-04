@@ -171,3 +171,16 @@ test("a request without CFG (a distilled profile) keeps the graph's own CFG", as
   assert.ok(own > 0, "the graph keeps a usable CFG");
   assert.equal(cfgOf(await customWorkflowGraph({ ...request, cfg: own + 1 })), own + 1);
 });
+
+test("a request without steps (a fixed-step profile) keeps the graph's own steps", async () => {
+  const request = {
+    workflow: "custom:flux2-real-dream-image-edit",
+    prompt: "Remove the hat",
+    width: 1024,
+    height: 1024,
+    cfg: 1,
+    seed: 42,
+  };
+  assert.equal((await customWorkflowGraph(request))["373"].inputs.steps, 2);
+  assert.equal((await customWorkflowGraph({ ...request, steps: 6 }))["373"].inputs.steps, 6);
+});
