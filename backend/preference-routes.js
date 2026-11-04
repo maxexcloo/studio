@@ -4,11 +4,13 @@ import {
   saveAccountPreferences,
   savedPreferenceKeys,
 } from "./account-preferences.js";
-import { groupGrants } from "./account-store.js";
+import { mayUseFeature } from "./account-policy.js";
+import { accountAccessForId, groupGrants } from "./account-store.js";
 
 /**
- * Settings › Preferences: the caller's own preferences, and which of Cloud Models and Uncensored
- * Models its role or group grants, which it may turn off for itself.
+ * Settings › Preferences: the caller's own preferences, which of Cloud Models and Uncensored
+ * Models its role or group grants, which it may turn off for itself, and whether it may turn Spicy
+ * Prompts on (Uncensored Models in its effective access; always in single-user mode).
  */
 export function registerPreferenceRoutes(app) {
   const show = (req) => {
@@ -16,7 +18,10 @@ export function registerPreferenceRoutes(app) {
     return {
       preferences: accountPreferences(ownerId),
       saved: savedPreferenceKeys(ownerId),
-      grants: (ownerId && groupGrants(ownerId)) || { cloudModels: false, uncensoredModels: false },
+      grants: {
+        ...((ownerId && groupGrants(ownerId)) || { cloudModels: false, uncensoredModels: false }),
+        spicyPrompts: !ownerId || mayUseFeature(accountAccessForId(ownerId), "uncensoredModels"),
+      },
     };
   };
   app.get("/api/preferences", (req, res) => {
@@ -32,6 +37,8 @@ export function registerPreferenceRoutes(app) {
           ok: false,
           error: "Your group doesn’t grant that, so there is nothing to turn off.",
         });
+    if (patch.spicyPrompts === true && !grants.spicyPrompts)
+      return res.status(400).json({ ok: false, error: "Spicy Prompts needs Uncensored Models." });
     try {
       saveAccountPreferences(ownerIdForRequest(req), patch);
       res.json(show(req));

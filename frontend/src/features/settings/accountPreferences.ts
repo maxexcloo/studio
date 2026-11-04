@@ -6,6 +6,7 @@ import { modelsQuery } from "../generation/GenerationProvider";
 /** The account's own preferences (backend/account-preferences.js). */
 export interface Preferences {
   cloudModels: boolean;
+  spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
 }
@@ -13,8 +14,11 @@ interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];
-  /** What the account's role or group grants, which it may turn off for itself. */
-  grants: Pick<Preferences, "cloudModels" | "uncensoredModels">;
+  /**
+   * What the account's role or group grants, which it may turn off for itself, and whether it may
+   * turn Spicy Prompts on (Uncensored Models in its effective access).
+   */
+  grants: Pick<Preferences, "cloudModels" | "spicyPrompts" | "uncensoredModels">;
 }
 export const preferencesQuery = queryOptions({
   queryKey: ["preferences"],
@@ -38,6 +42,9 @@ export function useSavePreferences() {
       if ("cloudModels" in patch || "uncensoredModels" in patch)
         for (const queryKey of [["account"], modelsQuery.queryKey])
           void client.invalidateQueries({ queryKey });
+      // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
+      if ("spicyPrompts" in patch || "uncensoredModels" in patch)
+        void client.invalidateQueries({ queryKey: ["suggestions"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });
