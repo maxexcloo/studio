@@ -13,11 +13,15 @@ export const closingPopup = () => closing;
 // Select keeps its dropdown mounted but hidden, and a closing layer fades towards opacity 0. A
 // popover's trigger (Mantine gives it the dropdown's id less `-dropdown`) reports it collapsed a
 // frame before the fade starts, and expanded while it still waits at opacity 0 to fade in, so the
-// trigger decides where there is one.
+// trigger decides where there is one. A dialog has no trigger: at opacity 0 it is closing once it
+// has been seen open, and otherwise still waiting to fade in.
+const seenOpen = new WeakSet<HTMLElement>();
 const shown = (layer: HTMLElement) => {
   if (!layer.getClientRects().length) return false;
   const expanded = document.getElementById(layer.id.replace(/-dropdown$/, ""))?.ariaExpanded;
-  return expanded ? expanded === "true" : layer.style.opacity !== "0";
+  if (expanded) return expanded === "true";
+  if (layer.style.opacity !== "0") seenOpen.add(layer);
+  return layer.style.opacity !== "0" || !seenOpen.has(layer);
 };
 const popupOpen = () => [...document.querySelectorAll<HTMLElement>(popupLayer)].some(shown);
 const openLayers = () =>
@@ -70,6 +74,8 @@ window.addEventListener(
   "pointerdown",
   (event) => {
     const target = event.target as Element;
+    // Sees open dialogs before a press closes one, so its fade-out is not taken for a fade-in.
+    openLayers();
     // A dialog opened from a popup, such as a delete confirmation, sits above it and owns its clicks.
     closing =
       !target.closest(`${popupLayer}, [aria-expanded="true"], .mantine-Modal-root`) && popupOpen();
