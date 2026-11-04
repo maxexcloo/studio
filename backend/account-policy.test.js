@@ -67,24 +67,26 @@ test("access profiles contain only currently available generation profiles and k
       name: "Artists",
       generationProfiles: ["image-fast"],
       allModels: false,
-      // Chat and Dream stay on unless a group turns them off.
+      // Chat, Dream and Prompt Assistant stay on unless a group turns them off.
       features: {
         chat: true,
         cloudModels: false,
         dream: true,
         loras: true,
+        promptAssistant: true,
         uncensoredModels: false,
       },
     },
   );
 });
 
-test("the built-in User group has Chat and Dream but no cloud models, LoRAs or uncensored models, and administrators have every feature", () => {
+test("the built-in User group has Chat, Dream and Prompt Assistant but no cloud models, LoRAs or uncensored models, and administrators have every feature", () => {
   assert.deepEqual(builtInAccessProfile.features, {
     chat: true,
     cloudModels: false,
     dream: true,
     loras: false,
+    promptAssistant: true,
     uncensoredModels: false,
   });
   const admin = effectiveAccountAccess({ id: "a1", role: "administrator" }, {});

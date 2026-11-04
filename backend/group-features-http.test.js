@@ -7,8 +7,8 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// A member of a group saved without Chat or Dream settings, as groups were before they existed, and a
-// member of a group that turns both off.
+// A member of a group saved without Chat, Dream or Prompt Assistant settings, as groups were before
+// they existed, and a member of a group that turns all three off.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-group-features-"));
 let child;
 let base = "";
@@ -51,7 +51,12 @@ before(async () => {
   });
   for (const group of [
     { id: "plain", name: "Plain", allModels: true },
-    { id: "limited", name: "Limited", allModels: true, features: { chat: false, dream: false } },
+    {
+      id: "limited",
+      name: "Limited",
+      allModels: true,
+      features: { chat: false, dream: false, promptAssistant: false },
+    },
   ]) {
     const saved = await call("/api/accounts/profiles", {
       method: "POST",
@@ -100,6 +105,47 @@ test("Chat is on unless the account's group turns it off", { timeout: 30_000 }, 
   assert.equal(refused.status, 403);
   assert.equal(refused.body.error, off);
 });
+
+test(
+  "Prompt Assistant is on unless the account's group turns it off, at every assistant route",
+  { timeout: 30_000 },
+  async () => {
+    const off = "The prompt assistant is off for this account.";
+    // This fixture has no assistant gateway, so a member with the feature gets "not configured".
+    const rewrite = { profileId: "any", prompt: "A lighthouse" };
+    const member = await call("/api/assistant/rewrite", {
+      method: "POST",
+      cookie: cookies.member,
+      body: rewrite,
+    });
+    assert.deepEqual(
+      [member.status, member.body.error],
+      [503, "The prompt assistant is not configured."],
+    );
+    for (const route of ["rewrite", "animate", "negative", "loras"]) {
+      const refused = await call(`/api/assistant/${route}`, {
+        method: "POST",
+        cookie: cookies.limited,
+        body: rewrite,
+      });
+      assert.deepEqual([route, refused.status, refused.body.error], [route, 403, off]);
+    }
+    assert.equal((await call("/api/assistant", { cookie: cookies.limited })).body.available, false);
+    const ideas = { surface: "composer", kind: "image" };
+    const allowed = await call("/api/suggestions", {
+      method: "POST",
+      cookie: cookies.member,
+      body: ideas,
+    });
+    assert.equal(allowed.status, 200);
+    const refused = await call("/api/suggestions", {
+      method: "POST",
+      cookie: cookies.limited,
+      body: ideas,
+    });
+    assert.deepEqual([refused.status, refused.body.error], [403, off]);
+  },
+);
 
 test(
   "an ordinary account's workflow list leaves out every account's last use",

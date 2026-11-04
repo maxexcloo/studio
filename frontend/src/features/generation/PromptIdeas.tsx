@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { icons } from "../../ui/icons";
 import type { MediaKind } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import { useGroupFeature } from "../auth/AccountGate";
 import { promptIdeasQuery } from "../taste/suggestions";
 import classes from "./PromptIdeas.module.css";
 
@@ -29,7 +30,9 @@ export function usePromptIdeas({
   const [focused, setFocused] = useState(false);
   const [asked, setAsked] = useState(false);
   const motionDuration = useMotionDuration();
-  const query = useQuery({ ...promptIdeasQuery(kind), enabled: asked });
+  // A group without Prompt Assistant gets no ideas, so they are never asked for.
+  const offered = useGroupFeature("promptAssistant");
+  const query = useQuery({ ...promptIdeasQuery(kind), enabled: asked && offered });
   const list = query.data?.suggestions ?? [];
   return {
     focusProps: {

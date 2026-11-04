@@ -49,6 +49,9 @@ const ordinaryRoutes = [
   ["POST", /^\/api\/loras\/library\/ops$/],
   ["GET", /^\/api\/reference-assets\/[^/]+(\/(media|thumbnail))?$/],
   ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
+  // The prompt assistant works only with the requester's profiles, LoRAs and references.
+  ["GET", /^\/api\/assistant$/],
+  ["POST", /^\/api\/assistant\/(animate|loras|negative|rewrite)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/discarded)?)$/],
   [

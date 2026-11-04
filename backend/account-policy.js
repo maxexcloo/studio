@@ -26,17 +26,20 @@ export const accountRoles = Object.freeze({ administrator: "administrator", user
 
 /**
  * What varies between groups beyond their models. Everything else (generation, references, the
- * gallery, prompt history, upscaling and the prompt assistant) comes with an account.
+ * gallery, prompt history and upscaling) comes with an account. Prompt Assistant gates every text
+ * the assistant writes for a person (Improve, Ask for a Change, Suggestions, prompt ideas, Animate's
+ * themes, negative and LoRA suggestions, suggested prompts); Chat gates only Studio Chat.
  */
 export const accessFeatures = Object.freeze([
   "chat",
   "cloudModels",
   "dream",
   "loras",
+  "promptAssistant",
   "uncensoredModels",
 ]);
 // On unless a group turns them off, so groups saved before these existed keep them.
-const defaultOnFeatures = new Set(["chat", "dream"]);
+const defaultOnFeatures = new Set(["chat", "dream", "promptAssistant"]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 
@@ -177,8 +180,8 @@ export function visibleGenerationProfiles(profiles, access) {
 
 /**
  * The User access profile Studio adds when absent, the default for new accounts until an
- * administrator picks another: every local model except uncensored ones, Chat and Dream, no cloud
- * models and no LoRAs. Once added it is an ordinary access profile. Administrators have full access
+ * administrator picks another: every local model except uncensored ones, Chat, Dream and the prompt
+ * assistant, no cloud models and no LoRAs. Once added it is an ordinary access profile. Administrators have full access
  * by role.
  */
 export const builtInAccessProfile = Object.freeze({

@@ -19,7 +19,6 @@ const retired = [
   "gallery",
   "imageGeneration",
   "imageReferences",
-  "promptAssistant",
   "promptHistory",
   "upscale",
   "videoGeneration",
