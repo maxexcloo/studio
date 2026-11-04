@@ -13,7 +13,8 @@ export function EmptyState({
   fill?: boolean;
 }) {
   return (
-    <Center flex={fill ? 1 : undefined} mih={fill ? 0 : { base: "12rem", sm: "24rem" }} px="md">
+    // Grows to centre in any flex or sized container, as LoadingState does.
+    <Center flex={1} h="100%" mih={fill ? 0 : { base: "12rem", sm: "24rem" }} px="md">
       <Stack align="center" gap="sm" c="dimmed" ta="center" maw={520}>
         <Text size="sm">{children}</Text>
         {action}
