@@ -390,8 +390,7 @@ export function useMediaActions(
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        // Only why nothing can run shows above the options.
-        note: animation.error?.message,
+        // When nothing can animate, the options stay disabled without an explanation.
         menu: [
           [
             // Fast or Quality picks the video model for the themes and the composer below.

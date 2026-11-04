@@ -697,7 +697,7 @@ test("With local video stopped, Animate in Composer pre-selects Grok", async ({ 
   expect(state.jobs).toHaveLength(1);
 });
 
-test("With neither local video nor Grok, Animate says why and queues nothing", async ({ page }) => {
+test("With neither local video nor Grok, Animate's options are disabled", async ({ page }) => {
   const reason =
     "Local video isn't running and this account has no Grok access (Cloud Models), so nothing can animate this image right now.";
   const { state, viewer } = await seed(page, {}, (page) =>
@@ -706,7 +706,6 @@ test("With neither local video nor Grok, Animate says why and queues nothing", a
     ),
   );
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  await expect(page.getByText(reason, { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeDisabled();
   await expect(
     page.getByRole("menuitem", { name: "Animate in Composer", exact: true }),
