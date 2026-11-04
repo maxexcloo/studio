@@ -1,9 +1,9 @@
 import {
-  deleteGalleryFiles,
   filterVisibleGallery,
   gallery,
   galleryKey,
   hideGalleryItems,
+  removeGalleryItems,
   saveGallery,
   setGallery,
   cleanupGalleryState,
@@ -233,26 +233,33 @@ export function registerGalleryErrorRoutes(app) {
   });
 }
 
+/** Deletes the request's own items named by ID (or URL); answers with the IDs it deleted. */
+function deleteRequested(req, ids) {
+  const wanted = new Set(ids.map(String));
+  const removed = recordsForRequest(gallery, req).filter(
+    (item) => wanted.has(item.id) || wanted.has(item.url),
+  );
+  const files = removeGalleryItems(removed);
+  const matched = new Set(removed.flatMap((item) => [item.id, item.url]));
+  return { files, removed: [...wanted].filter((id) => matched.has(id)) };
+}
+
 export function registerGalleryDeleteRoute(app) {
+  // Many items in one request: one store change and one save, however many there are.
+  app.post("/api/gallery/delete", (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    res.json({ ok: true, ...deleteRequested(req, ids) });
+  });
   app.delete("/api/gallery/:id", (req, res) => {
     // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.
     const id = req.params.id;
-    const owned = recordsForRequest(gallery, req);
-    const removed = owned.filter((item) => item.id === id || item.url === id);
+    const { files, removed } = deleteRequested(req, [id]);
     // Accounts never learn whether another owner's item exists.
     if (req.studioAccount && !removed.length) {
       console.warn(`[Studio] Could not delete gallery item ${id}: not among the account's items`);
       res.status(404).json({ ok: false, error: "That item was not found." });
       return;
     }
-    const files = deleteGalleryFiles(removed);
-    hideGalleryItems(removed);
-    setGallery(
-      gallery.filter(
-        (item) => !recordBelongsToRequest(item, req) || (item.id !== id && item.url !== id),
-      ),
-    );
-    if (removed.length) saveGallery();
     res.json({
       ok: true,
       files,

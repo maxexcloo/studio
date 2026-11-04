@@ -586,6 +586,11 @@ export async function fixtures(page: Page) {
         .forEach((item) => (item.favorite = body.favorite));
       return respond({ ok: true });
     }
+    if (path === "/api/gallery/delete" && method === "POST") {
+      const removed = body.ids.filter((id: string) => gallery.some((item) => item.id === id));
+      gallery.splice(0, gallery.length, ...gallery.filter((item) => !removed.includes(item.id)));
+      return respond({ ok: true, removed });
+    }
     if (path.startsWith("/api/gallery/") && method === "DELETE") {
       const index = gallery.findIndex((item) => item.id === decodeURIComponent(path.split("/")[3]));
       if (index >= 0) gallery.splice(index, 1);

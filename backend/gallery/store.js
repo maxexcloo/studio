@@ -676,18 +676,24 @@ export function flushPendingGallery() {
   }
 }
 
-/** Viewer deletion for several of one owner's items: files, delete markers and records. */
+/** Deletes these gallery items at once: their files, delete markers and records, in one save. */
+export function removeGalleryItems(items) {
+  const files = deleteGalleryFiles(items);
+  if (!items.length) return files;
+  hideGalleryItems(items);
+  const gone = new Set(items);
+  setGallery(gallery.filter((item) => !gone.has(item)));
+  return files;
+}
+
+/** Viewer deletion for several of one owner's items. */
 export function deleteOwnedGalleryItems(ownerId, ids) {
   const wanted = new Set(ids);
   const account = ownerId ? { userId: ownerId } : undefined;
   const removed = gallery.filter(
     (item) => wanted.has(item.id) && recordBelongsToAccount(item, account),
   );
-  const files = deleteGalleryFiles(removed);
-  hideGalleryItems(removed);
-  const gone = new Set(removed);
-  setGallery(gallery.filter((item) => !gone.has(item)));
-  if (removed.length) saveGallery();
+  const files = removeGalleryItems(removed);
   return { removed: removed.map((item) => item.id), files };
 }
 

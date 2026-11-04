@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api";
+import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useQueueAction } from "../generation/Queue";
 
@@ -23,11 +23,10 @@ export function useTryAgain(items: MediaItem[]) {
           // Reported by the queue command's default notification.
         }
       }
-      await Promise.allSettled(
-        items
-          .filter((item) => item.status === "error" && accepted.has(item.jobId || ""))
-          .map((item) => api(`/api/gallery/${encodeURIComponent(item.id)}`, { method: "DELETE" })),
-      );
+      const replaced = items
+        .filter((item) => item.status === "error" && accepted.has(item.jobId || ""))
+        .map((item) => item.id);
+      if (replaced.length) await post("/api/gallery/delete", { ids: replaced }).catch(() => {});
       if (accepted.size) await client.invalidateQueries({ queryKey: ["gallery"] });
       return accepted;
     },
