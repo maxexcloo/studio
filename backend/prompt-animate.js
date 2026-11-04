@@ -6,15 +6,22 @@
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
- * sound. Spicy needs Uncensored Models.
+ * sound. Spicy, and explicit wording in a Custom instruction, need Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
  *
  * `extend` marks a continuation from a video's last frame, whose `source` is that video's prompt.
  */
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { AssistantError, cleanPrompt, writerGuide } from "./assistant.js";
+import { AssistantError, cleanPrompt } from "./assistant.js";
 import { userContent } from "./domain/model-content.ts";
+import {
+  contentRule,
+  fidelity,
+  filler,
+  precedence,
+  writerGuide,
+} from "./domain/writing-standard.ts";
 import { isCloudProfile } from "./cloud-profiles.js";
 import { families } from "./family-catalog.js";
 
@@ -26,21 +33,14 @@ export const animateThemes = Object.freeze({
   action:
     "Action: the subject does one clear, physical, energetic action that this frame sets up, from their pose, the props and the place (spinning, leaping, running, throwing, striking, dancing), with a wind-up, a peak and a follow-through. Momentum shows in the body and its secondary motion (hair whipping, fabric snapping, splashes, sparks, dust or debris), and the camera moves with it: tracking alongside, whip-panning, a handheld follow or a fast push-in on the impact, at a pace that keeps the motion readable.",
   spicy:
-    "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with frank, specific wording about bodies, touch and movement and intensity that builds across the beats. Every person is an adult.",
+    "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats.",
   custom:
     "Custom: the person's instruction decides what happens. Make it happen with what is in the frame, and build the beats, camera and any sound around it without changing it. Bring in only what the instruction names, entering naturally (from out of frame, through a door) rather than appearing from nowhere.",
 });
 
-// Phrases that tell a video model nothing; the writer is told to leave them out.
-export const animateFiller = [
-  "cinematic",
-  "smooth",
-  "dynamic",
-  "epic",
-  "high quality",
-  "masterpiece",
-  "4K",
-];
+// Phrases that tell a video model nothing; the writer is told to leave them out. Not "cinematic",
+// which MiniMax H3's own guide uses.
+export const animateFiller = [...filler, "smooth", "dynamic"];
 
 /**
  * The clip's length in seconds and frame rate from the run's input over the profile's defaults,
@@ -74,23 +74,32 @@ const frameKnowledge = {
 /**
  * The writer's instructions. The guide comes first, including its format: a wrapped profile takes
  * only the description body, one without a wrapper every section its mode lists. `known`: how the
- * writer knows the frame (frameKnowledge).
+ * writer knows the frame (frameKnowledge); `explicit`: the account holds Uncensored Models.
  */
-export function animateInstructions({ profile, guide, writing, clip = {}, known = "unknown" }) {
+export function animateInstructions({
+  profile,
+  guide,
+  writing,
+  clip = {},
+  known = "unknown",
+  explicit = false,
+}) {
   const { seconds = 0, fps = 0 } = clip;
   const audio = makesSound(profile);
   const beats = !seconds ? "two to four" : seconds <= 4 ? "two" : seconds <= 8 ? "three" : "four";
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   const length = [seconds && `${seconds}-second`, fps && `${fps} fps`].filter(Boolean).join(", ");
   return [
-    `You write motion prompts for the image-to-video model ${profile.label || profile.id}. Its prompting guide below comes first: where it sets length, structure, format or wording, follow it over anything here.`,
+    `You write motion prompts for the image-to-video model ${profile.label || profile.id}. Follow its prompting guide below.`,
+    precedence,
     "Format: write exactly what the guide's mode asks this profile to receive, matching its example. When the profile adds section labels itself, write only the description body, with no labels, and put any dialogue and sound inside it. When the guide asks for complete sections, write every section it lists for a run with an attached image, labelled and in order, separated by blank lines. Otherwise write one flowing paragraph.",
     writing.extend
       ? "This continues an existing clip: its last frame is the attached image the new clip starts from, and the clip so far was made from the prompt below. Don't replay its action: escalate it or turn it, with a new development, a reaction, a reveal or a consequence of what just happened, and carry on the camera's motion from where it ended."
-      : "The attached image is the first frame, made from the prompt below; the model already sees it. Don't re-describe it: spend the words on what changes.",
+      : "The attached image is the first frame, made from the prompt below; the model already sees it. Don't re-describe it: open with one short sentence anchoring the frame only where the guide asks for it (such as MiniMax H3's keyframe shot or Grok's opening composition), and otherwise spend the words on what changes.",
     frameKnowledge[known],
     `The prompt is guidance on the intent, subjects and mood; where it and the frame disagree, the frame wins.${writing.extend ? "" : " Animate what that prompt was going for, not just what happens to be in view."}`,
-    "Never contradict the frame and never add people, animals or objects that aren't in it unless the instruction asks for them. Keep each subject's identity, face, body, outfit, setting and style as they are unless the theme or instruction changes them.",
+    fidelity,
+    "Never contradict the frame. Keep each subject's identity, face, body, outfit, setting and style as they are unless the theme or instruction changes them.",
     `In the present tense, play the shot out as ${beats} beats that fill the ${length ? `${length} clip` : "clip"}: the onset, how it develops, and the result or reaction the last frame lands on. Pace the beats to the time; don't cram in more action than the clip can show, and don't leave it static.`,
     fps && fps < 20
       ? `At ${fps} fps fast motion judders: favour fluid, moderate-speed movement and steady camera moves.`
@@ -98,7 +107,10 @@ export function animateInstructions({ profile, guide, writing, clip = {}, known 
     "Keep it clean and consistent: one through-line of action that the frame sets up, each beat following from the last, not a list of unrelated motions. Keep it alive: pick what is particular to this frame (its subject, props, weather, light) and make that move, rather than a stock gesture any image would get.",
     "Make every beat concrete and physical: what the hands, eyes, head and body do; how hair, fabric, water, smoke, dust and light respond; how the subject touches or disturbs the things and people around them.",
     "Choose the camera for this composition and the theme, and give it one deliberate, continuous path, or keep it still where the theme says so: name the move (push-in, zoom, pull-out, pan, tilt, orbit, tracking, crane, handheld or static), its speed and how the framing changes by the end. A deep wide frame suits a push-in or a slow pan across it, a close portrait a gentle push-in or a held shot, a tall subject a tilt, a subject with space around them an orbit, fast action a tracking or handheld follow. Don't default to the same slow push-in for every frame.",
-    "Let the light or mood shift with the action (a cloud passes, a neon sign flickers on, a door spills light), not stay fixed.",
+    // A Living Photo loops, so it ends as it began.
+    writing.theme === "living"
+      ? ""
+      : "Let the light or mood shift with the action (a cloud passes, a neon sign flickers on, a door spills light), not stay fixed.",
     audio
       ? "This model makes sound with the picture. Give each beat the sound it makes (footsteps, rustling fabric, a glass set down) over the scene's ambience. Where a person in the frame is in a moment that invites speech (facing someone or the camera, mid-conversation, reacting), add one short line of dialogue with who says it and how, their lips moving with it, in the guide's dialogue format (in double quotes when it sets none); give no line to someone asleep, kissing, eating, far off or turned away, and none where there is no one. Add music only when the scene has a source for it or the theme calls for it."
       : "This model makes no sound: describe only what is seen, with no dialogue, sound or music.",
@@ -106,6 +118,8 @@ export function animateInstructions({ profile, guide, writing, clip = {}, known 
     `Unless the guide sets a length, write about ${words} words.`,
     "Reply with the prompt only, as plain text: no preamble, Markdown or notes, and no quotation marks around the whole prompt.",
     `Theme: ${animateThemes[writing.theme]}`,
+    // Spicy is admitted only with Uncensored Models (animateIssue).
+    contentRule(explicit || writing.theme === "spicy"),
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
   ]
     .filter(Boolean)
@@ -142,7 +156,7 @@ export function animateIssue(writing, { allowed }) {
  * Writes the motion prompt for `profile` and a `clip` ({ seconds, fps }), streaming through
  * `onThinking` and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data },
  * downscaled) and is asked only when the text model reads images; otherwise `caption()` says what
- * it shows in words.
+ * it shows in words. `explicit`: the account holds Uncensored Models.
  */
 export async function writeAnimatePrompt({
   engine,
@@ -150,6 +164,7 @@ export async function writeAnimatePrompt({
   guide,
   writing,
   clip = {},
+  explicit = false,
   frame = async () => null,
   caption = () => "",
   signal,
@@ -166,7 +181,7 @@ export async function writeAnimatePrompt({
     messages: [
       {
         role: "system",
-        content: animateInstructions({ profile, guide, writing, clip, known }),
+        content: animateInstructions({ profile, guide, writing, clip, known, explicit }),
       },
       {
         role: "user",

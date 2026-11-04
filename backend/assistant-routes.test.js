@@ -257,7 +257,7 @@ test("Custom needs an instruction and keeps it non-explicit without Uncensored M
   assert.equal((await custom("user", "make it explicit")).status, 200);
   assert.match(calls.at(-1).messages[0].content, /Don't make it any more sexual/);
   assert.equal((await custom("spicy", "make it explicit")).status, 200);
-  assert.match(calls.at(-1).messages[0].content, /Every person is an adult\.$/);
+  assert.match(calls.at(-1).messages[0].content, /\nEvery person in it is an adult\. Explicit/);
 });
 
 test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; drafts are for administrators", async () => {
