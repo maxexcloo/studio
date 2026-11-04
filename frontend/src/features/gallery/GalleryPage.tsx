@@ -13,7 +13,12 @@ import {
 } from "@mantine/core";
 import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useDebouncedValue } from "@mantine/hooks";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
@@ -93,20 +98,41 @@ export function GalleryPage() {
       active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
     }),
   }).data;
-  const gallery = useInfiniteQuery({
-    queryKey: ["gallery", search, kind, filters],
-    initialPageParam: "",
-    queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams({ limit: "60", cursor: pageParam, q: search, type: kind });
+  const galleryKey = useMemo(() => ["gallery", search, kind, filters], [search, kind, filters]);
+  const galleryPage = useCallback(
+    (cursor: string) => {
+      const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
       return api<Page>(`/api/gallery?${params}`);
     },
+    [search, kind, filters],
+  );
+  const gallery = useInfiniteQuery({
+    queryKey: galleryKey,
+    initialPageParam: "",
+    queryFn: ({ pageParam }) => galleryPage(pageParam),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
-    refetchInterval: jobs?.active ? 3000 : false,
   });
+  // Active work's tiles are the newest, on the first page: only it polls, for live previews.
+  // Work starting or finishing refreshes every page through the queue key below.
+  useEffect(() => {
+    if (!jobs?.active) return;
+    const timer = setInterval(() => {
+      if (document.hidden) return;
+      void galleryPage("")
+        .then((first) =>
+          client.setQueryData<InfiniteData<Page>>(
+            galleryKey,
+            (data) => data && { ...data, pages: [first, ...data.pages.slice(1)] },
+          ),
+        )
+        .catch(() => undefined);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [jobs?.active, galleryPage, galleryKey, client]);
   const seenJobs = useRef(jobs?.key);
   useEffect(() => {
     if (seenJobs.current === jobs?.key) return;
