@@ -1,9 +1,9 @@
-import type { Ref } from "react";
+import { useRef, type Ref } from "react";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { askDraftChange, draftStepsQuery } from "../taste/suggestions";
+import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggestions";
 import {
   ChangeRequest,
   ChangeSuggestions,
@@ -102,6 +102,7 @@ export function PromptFields({
   ask?: DraftChange;
 }) {
   const phone = usePhone();
+  const requestRef = useRef<HTMLTextAreaElement>(null);
   const assistant = usePromptAssistant({
     scopeKey: assistantScope,
     input,
@@ -174,6 +175,7 @@ export function PromptFields({
         </div>
         {ask && (
           <ChangeRequest
+            ref={requestRef}
             ask={ask}
             onSend={ask.sendRequest}
             // The proposal's action names it over the request; Generate runs it.
@@ -181,10 +183,16 @@ export function PromptFields({
             suggestions={
               <ChangeSuggestions
                 query={draftStepsQuery(input.kind, base.trim())}
+                fresh={() => askDraftSteps(input.kind, base.trim(), true)}
                 disabled={!base.trim() || ask.pending}
                 onPick={(request) => {
                   ask.setRequest(request);
                   ask.sendRequest(request);
+                }}
+                // As Ask for a Change opens it: an empty request line to type in.
+                onCustom={() => {
+                  ask.setRequest("");
+                  requestRef.current?.focus();
                 }}
               />
             }

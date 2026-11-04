@@ -234,32 +234,6 @@
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
 }
 
-/* Next steps hold their row's height while they load, so the dock never jumps. */
-.steps {
-  width: auto;
-  max-width: min(100%, var(--studio-composer-width));
-}
-
-/* Centred while the steps fit; a phone scrolls an overflowing row from its first step. */
-.stepRow {
-  justify-content: safe center;
-  min-height: 26px;
-  padding-inline: 2px;
-}
-
-.step {
-  flex-shrink: 0;
-  font-weight: 500;
-  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
-}
-
-/* Placeholder chips where the steps will appear, at a step's height. */
-.stepSkeleton {
-  flex-shrink: 0;
-  width: 96px;
-  height: 26px;
-}
-
 /* Framed like the composer's text box and kept inside the Details column, so no edge is clipped. */
 .promptText {
   border: 1px solid var(--mantine-color-default-border);

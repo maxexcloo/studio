@@ -320,7 +320,7 @@ test("Ask for a Change rewrites the draft's prompt in place, for Generate to run
   await expect(request).toHaveValue("add rain");
   await expect.poll(() => asked.length).toBe(4);
   expect(asked.slice(2)).toEqual([
-    { surface: "draft", kind: "image", prompt: "A castle at noon" },
+    { surface: "draft", kind: "image", prompt: "A castle at noon", fresh: false },
     {
       surface: "draft",
       kind: "image",
