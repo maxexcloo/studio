@@ -219,12 +219,18 @@ let visibleListBuilds = 0;
 /** How often a page list was built from the whole gallery; the paging test counts it. */
 export const visibleListBuildCount = () => visibleListBuilds;
 
-function visibleItems({ type = "", includeFailed = true, uploads = false, filter = null } = {}) {
+/** The cached lists, emptied first when the gallery, hide markers or a folder listing changed. */
+function visibleLists() {
   refreshFolderListings();
   const key = `${galleryRevision}|${hiddenVersion}|${listingGeneration}`;
   if (visibleCache.key !== key) visibleCache = { key, lists: new Map() };
+  return visibleCache.lists;
+}
+
+function visibleItems({ type = "", includeFailed = true, uploads = false, filter = null } = {}) {
+  const lists = visibleLists();
   const listKey = `${type}|${includeFailed}|${uploads}`;
-  let entry = visibleCache.lists.get(listKey);
+  let entry = lists.get(listKey);
   if (!entry) {
     // The gallery is kept sorted, so this sort only confirms the order (linear on sorted input).
     const items = sortGallery(filterVisibleGallery(gallery)).filter((item) => {
@@ -235,10 +241,18 @@ function visibleItems({ type = "", includeFailed = true, uploads = false, filter
     });
     entry = { items, positions: null };
     visibleListBuilds += 1;
-    visibleCache.lists.set(listKey, entry);
+    lists.set(listKey, entry);
   }
   // A search filters the cached list; its positions are its own, so it is not kept.
   return filter ? { items: entry.items.filter(filter), positions: null } : entry;
+}
+
+/** Every visible item (filterVisibleGallery), kept with the page lists until the gallery changes. */
+export function visibleGallery() {
+  const lists = visibleLists();
+  if (!lists.has("visible"))
+    lists.set("visible", { items: filterVisibleGallery(gallery), positions: null });
+  return lists.get("visible").items;
 }
 
 /** Where the page after `cursor` starts: right after the cursor's own item while it is listed, else the first one past its time. */
