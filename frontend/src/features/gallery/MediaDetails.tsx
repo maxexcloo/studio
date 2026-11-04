@@ -76,6 +76,8 @@ function generationDetails(
     entries
       .filter(([, value]) => value !== "" && value !== undefined && value !== null && value !== 0)
       .map(([label, value]) => [label, String(value)]);
+  const sorted = (entries: [string, unknown][]): Row[] =>
+    rows(entries).sort(([a], [b]) => a.localeCompare(b));
   const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
   const references = Array.isArray(settings.referenceDetails)
     ? (settings.referenceDetails as ReferenceAsset[])
@@ -99,8 +101,8 @@ function generationDetails(
         strength: Number(lora.strength ?? 1).toFixed(2),
       })),
     references,
-    // Every recorded input, in the order they shape the run; Copy Settings copies the same rows.
-    settings: rows([
+    // Every recorded input, A–Z; Copy Settings copies the same rows.
+    settings: sorted([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
       ["Text Encoder", fileStem(settings.textEncoder)],
@@ -117,7 +119,7 @@ function generationDetails(
       ["Seed", settings.seed],
       ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
     ]),
-    output: rows([
+    output: sorted([
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
       // An upscale's size as the model drew it.
       ["Original Size", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
@@ -243,7 +245,8 @@ function DetailSection({
 
 /** The gallery caption in the prompt's style, expanded until Show Less folds it to two lines. */
 function Caption({ item }: { item: MediaItem }) {
-  const [open, setOpen] = useState(true);
+  // Two lines until asked for the rest, so the prompt below stays in view.
+  const [open, setOpen] = useState(false);
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
   return (
