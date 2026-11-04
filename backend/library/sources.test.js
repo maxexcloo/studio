@@ -289,3 +289,96 @@ test("a Hugging Face file link imports that file; a repository lists its model f
     /isn’t in this repository/,
   );
 });
+
+/** A safetensors file's opening bytes: the 8-byte header length, then the header. */
+const safetensors = (tensors) => {
+  const header = Buffer.from(
+    JSON.stringify({
+      __metadata__: { format: "pt" },
+      ...Object.fromEntries(
+        tensors.map((name) => [name, { dtype: "BF16", shape: [1], data_offsets: [0, 2] }]),
+      ),
+    }),
+  );
+  const length = Buffer.alloc(8);
+  length.writeBigUInt64LE(BigInt(header.length));
+  return Buffer.concat([length, header]);
+};
+const adapterHeader = safetensors([
+  "diffusion_model.blocks.0.attn.qkv_proj.alpha",
+  "diffusion_model.blocks.0.attn.qkv_proj.lora_A.weight",
+  "diffusion_model.blocks.0.attn.qkv_proj.lora_B.weight",
+]);
+const modelHeader = safetensors(["blocks.0.attn.out_proj.weight", "blocks.0.attn.k_norm.weight"]);
+
+test("a Hugging Face file goes where the file itself says, not where the repository's LoRA tag does", async () => {
+  assert.deepEqual(
+    hfFolder("diffusion_models/p-h3-image_w4a8.safetensors", { tags: ["lora"] }),
+    { folder: "diffusion_models", guessed: false },
+    "a diffusion_models/ path beats the repository's tag",
+  );
+  assert.deepEqual(hfFolder("loras/p-h3-image_lora_bf16.safetensors", { tags: ["lora"] }), {
+    folder: "loras",
+    guessed: false,
+  });
+  const header = (bytes) => JSON.parse(bytes.subarray(8).toString());
+  assert.deepEqual(hfFolder("model.safetensors", { tags: ["lora"], header: header(modelHeader) }), {
+    folder: "diffusion_models",
+    guessed: true,
+  });
+  assert.deepEqual(hfFolder("model.safetensors", { header: header(adapterHeader) }), {
+    folder: "loras",
+    guessed: false,
+  });
+
+  // PrunaAI/P-H3-Image-Comfy: tagged `lora` for its one adapter, beside root files only headers place.
+  const sha = (char) => ({ sha256: char.repeat(64), size: 4096 });
+  const siblings = [
+    ["diffusion_models/p-h3-image_w4a8.safetensors", "a"],
+    ["text_encoders/p-h3-image_text_encoder_w4a8.safetensors", "b"],
+    ["vae/p-h3-image_vae_int8_convrot.safetensors", "c"],
+    ["loras/p-h3-image_lora_bf16.safetensors", "d"],
+    ["style.safetensors", "e"],
+    ["merged.safetensors", "f"],
+  ].map(([rfilename, char]) => ({ rfilename, lfs: sha(char) }));
+  const bodies = { "style.safetensors": adapterHeader, "merged.safetensors": modelHeader };
+  const ranges = [];
+  const request = async (url, init = {}) => {
+    const range = new Headers(init.headers || {}).get("range");
+    if (!range) return hfResponse({ sha: "e".repeat(40), tags: ["lora"], cardData: {}, siblings });
+    const file = decodeURIComponent(String(url).split("/").pop());
+    ranges.push(file);
+    const [, start, end] = /bytes=(\d+)-(\d+)/.exec(range).map(Number);
+    return new Response(bodies[file].subarray(start, end + 1), { status: 206 });
+  };
+  const listing = await resolveHuggingFace("https://huggingface.co/PrunaAI/P-H3-Image-Comfy", {
+    request,
+  });
+  assert.deepEqual(
+    listing.resources.map((item) => [item.want.file, item.want.folder, item.role]),
+    [
+      ["p-h3-image_w4a8.safetensors", "diffusion_models", "diffusion_model"],
+      ["p-h3-image_text_encoder_w4a8.safetensors", "text_encoders", "text_encoder"],
+      ["p-h3-image_vae_int8_convrot.safetensors", "vae", "vae"],
+      ["p-h3-image_lora_bf16.safetensors", "loras", "lora"],
+      ["style.safetensors", "loras", "lora"],
+      ["merged.safetensors", "diffusion_models", "diffusion_model"],
+    ],
+  );
+  assert.deepEqual(
+    [...new Set(ranges)].sort(),
+    ["merged.safetensors", "style.safetensors"],
+    "only files their names don't place are read",
+  );
+  // A server that ignores the range (and would send the whole file) leaves the tag to decide.
+  const whole = await resolveHuggingFace(
+    "https://huggingface.co/PrunaAI/P-H3-Image-Comfy/blob/main/merged.safetensors",
+    {
+      request: async (url, init = {}) =>
+        new Headers(init.headers || {}).get("range")
+          ? new Response(modelHeader, { status: 200 })
+          : request(url, init),
+    },
+  );
+  assert.equal(whole.resources[0].want.folder, "loras");
+});
