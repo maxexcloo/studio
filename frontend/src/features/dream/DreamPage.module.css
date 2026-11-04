@@ -6,6 +6,14 @@
   height: calc(100dvh - var(--app-shell-header-offset, 68px) - 2 * var(--app-shell-padding, 1rem));
   min-height: 0;
 }
+/* Taste sits in the middle of the page until it outgrows it and scrolls; Mantine's content wrapper
+   is an inline table, so the override needs !important. */
+.taste > div {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+}
 /* The batch: one segment per result, judged ones filled and the current one marked. */
 .strip {
   flex-shrink: 0;
