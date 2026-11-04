@@ -101,16 +101,15 @@ test("local and provider policy enrichment retains explicit constraints without 
 test("packaged server catalogue imports and applies policy without a source tree", async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-packaged-lora-policy-"));
   try {
-    fs.mkdirSync(path.join(scratch, "server"));
+    const server = path.join(scratch, "backend", "lora");
+    fs.mkdirSync(server, { recursive: true });
+    fs.mkdirSync(path.join(scratch, "shared"));
     fs.writeFileSync(path.join(scratch, "package.json"), JSON.stringify({ type: "module" }));
-    for (const name of ["policy.js", "catalogue.js"]) {
-      fs.copyFileSync(
-        fileURLToPath(new URL(name, import.meta.url)),
-        path.join(scratch, "server", name),
-      );
+    for (const name of ["policy.js", "catalogue.js", "../../shared/profiles.ts"]) {
+      fs.copyFileSync(fileURLToPath(new URL(name, import.meta.url)), path.join(server, name));
     }
-    assert.equal(fs.existsSync(path.join(scratch, "src")), false);
-    const packaged = await import(pathToFileURL(path.join(scratch, "server", "catalogue.js")).href);
+    assert.equal(fs.existsSync(path.join(scratch, "frontend")), false);
+    const packaged = await import(pathToFileURL(path.join(server, "catalogue.js")).href);
     assert.match(
       packaged.optionalLoraPolicyIssue({ name: "effect", strength: 1 }, effect, {
         ...profile,
@@ -127,7 +126,8 @@ test("packaged server catalogue imports and applies policy without a source tree
   }
 });
 
-test("FLUX.3 adapters fit built-in and imported Klein family identifiers", () => {
+test("adapters fit imported profiles' family spellings (FLUX.3 Klein, hyphenated ids)", () => {
+  assert.equal(loraCompatibility({ families: ["minimax_h3"] }, { family: "minimax-h3" }), "fits");
   assert.equal(loraCompatibility({ families: ["flux3"] }, { family: "flux3" }), "fits");
   assert.equal(loraCompatibility({ families: ["flux3"] }, { family: "flux3_klein" }), "fits");
   assert.equal(loraCompatibility({ families: ["flux3_klein"] }, { family: "flux3" }), "fits");

@@ -26,6 +26,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Profile } from "../../types";
 import { isProfile } from "./payload";
+import { loraFamilyId } from "../../../../shared/profiles";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 import {
@@ -85,11 +86,14 @@ export const defaultStrength = (range: LoraInfo["strengthRange"]) =>
   range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1);
 export const loraTitle = (info: LoraInfo | undefined, file: string) =>
   info?.title || file.replace(/\.[^.]+$/, "");
+/** Whether a LoRA lists the profile's family, however the profile spells it. */
+const fitsFamily = (families: string[], family: string) =>
+  families.some((value) => loraFamilyId(value) === loraFamilyId(family));
 /** The profile's LoRAs that suit its family; one without a family listed may suit any. */
 export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
   (profile?.options?.loras || []).filter((file) => {
     const families = metadata[file]?.families || [];
-    return !families.length || families.includes(profile!.family);
+    return !families.length || fitsFamily(families, profile!.family);
   });
 
 const ratingOrder = (rating?: LoraRating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
@@ -269,7 +273,7 @@ function LoraControls({
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "recommended";
   const listed =
     tab === "recommended"
-      ? available.filter((file) => familiesOf(file).includes(family))
+      ? available.filter((file) => fitsFamily(familiesOf(file), family))
       : tab === "favourites"
         ? compatible.filter((file) => ratings[file] === "up")
         : compatible;

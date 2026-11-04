@@ -1,8 +1,6 @@
+import { loraFamilyId as familyId } from "../../shared/profiles.ts";
+
 const constraintKeys = ["baseModels", "conditionings", "profileIds"];
-const familyId = (value) => {
-  const id = String(value || "").replace(/-/g, "_");
-  return id === "flux3_klein" ? "flux3" : id;
-};
 const basename = (value) =>
   String(value || "")
     .split(/[\\/]/)

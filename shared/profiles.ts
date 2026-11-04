@@ -20,3 +20,12 @@ export const profileNameParts = (name: string) =>
     .split("·")
     .map((part) => part.trim())
     .filter((part) => part && !Object.hasOwn(profileBackendLabels, part.toLowerCase()));
+
+/**
+ * A profile family as LoRAs list it: an imported profile may say "minimax-h3" for "minimax_h3",
+ * and FLUX.3 Klein's "flux3_klein" is the "flux3" its adapters name.
+ */
+export const loraFamilyId = (family: unknown) => {
+  const id = String(family || "").replaceAll("-", "_");
+  return id === "flux3_klein" ? "flux3" : id;
+};
