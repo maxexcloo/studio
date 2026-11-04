@@ -102,6 +102,48 @@
   pointer-events: auto;
 }
 
+/* The items side by side, each fitted to its half; the current one is outlined. */
+.together {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: var(--mantine-spacing-md);
+  width: 100%;
+  height: 100%;
+  padding: var(--mantine-spacing-xl) var(--mantine-spacing-xl) 0;
+}
+
+/* Each side is its picture with its name under it. */
+.side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--mantine-spacing-sm);
+  min-width: 0;
+  min-height: 0;
+  cursor: zoom-in;
+}
+
+.side img {
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--mantine-radius-md);
+  object-fit: contain;
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+  transition: outline-color var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.side[aria-current] img {
+  outline-color: var(--mantine-primary-color-filled);
+}
+
+.sideLabel {
+  flex-shrink: 0;
+}
+
 .comparison {
   width: 100%;
   height: 100%;
