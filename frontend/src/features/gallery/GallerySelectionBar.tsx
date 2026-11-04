@@ -254,17 +254,6 @@ export function GallerySelectionBar({
   return (
     <>
       <div className={classes.header} role="group" aria-label="Gallery Selection">
-        <Tooltip label="Clear Selection">
-          <ActionIcon
-            variant="subtle"
-            color="gray"
-            aria-label="Clear Selection"
-            disabled={pending}
-            onClick={selection.end}
-          >
-            <icons.clear size={18} />
-          </ActionIcon>
-        </Tooltip>
         <Text size="sm" fw={500} role="status" className={classes.count}>
           {selected.length} Selected
         </Text>
@@ -293,6 +282,18 @@ export function GallerySelectionBar({
             {bar}
           </div>
         )}
+        {/* The count leads; closing the selection is always the last icon. */}
+        <Tooltip label="Clear Selection">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label="Clear Selection"
+            disabled={pending}
+            onClick={selection.end}
+          >
+            <icons.clear size={18} />
+          </ActionIcon>
+        </Tooltip>
       </div>
       {phone && (
         <ActionBar
