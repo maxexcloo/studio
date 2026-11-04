@@ -280,8 +280,8 @@ test(
         base,
         (job) => job.id === first.id && job.status === "completed",
       );
-      assert.equal(completed.outputs.length, 1);
-      assert.equal(new URL(completed.outputs[0].url, base).searchParams.get("type"), "media");
+      assert.equal(completed.items.length, 1);
+      assert.equal(new URL(completed.items[0].url, base).searchParams.get("type"), "media");
       assert.equal(
         fake.prompts.filter((prompt) => prompt.client_id === first.id).length,
         1,
@@ -290,7 +290,7 @@ test(
       const reopened = await (await fetch(base + "/api/gallery")).json();
       const square = reopened.items.find((item) => item.id === "square");
       assert.equal(square.upscaleActive, true);
-      assert.equal(square.upscale.url, completed.outputs[0].url);
+      assert.equal(square.upscale.url, completed.items[0].url);
       const saved = await fetch(base + square.upscale.url);
       assert.equal(saved.status, 200);
       assert.equal((await sharp(Buffer.from(await saved.arrayBuffer())).metadata()).width, 640);

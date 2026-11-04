@@ -224,9 +224,9 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     (job) => job.status === "completed",
   );
   assert.equal(recordedJob(completed.id).cancelRequested, true);
-  assert.equal(completed.outputs.length, 1);
-  assert.equal(new URL(completed.outputs[0].url, base).searchParams.get("type"), "media");
-  const saved = await fetch(new URL(completed.outputs[0].url, base));
+  assert.equal(completed.items.length, 1);
+  assert.equal(new URL(completed.items[0].url, base).searchParams.get("type"), "media");
+  const saved = await fetch(new URL(completed.items[0].url, base));
   assert.equal(saved.status, 200);
   assert.ok((await saved.arrayBuffer()).byteLength > 0);
   // The switch waited for the saved output; now it stops media, waits for its pod and starts text.
