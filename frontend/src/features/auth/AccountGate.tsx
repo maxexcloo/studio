@@ -46,18 +46,24 @@ export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
 });
+// Set while Studio sends the browser to single sign-on, so a return still signed out shows the form.
+const oidcAttempt = "studio-oidc-attempt";
+
 export function AccountGate({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const status = useAccount();
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState("");
+  const [query] = useState(() => new URLSearchParams(window.location.search));
   const [outcome] = useState(
     () =>
       ({
         refused: "This account is disabled or was deleted. Ask an administrator.",
         failed: "Single sign-on did not complete. Try again.",
         unavailable: "Single sign-on is unavailable right now.",
-      })[new URLSearchParams(window.location.search).get("sign-in") || ("" as "refused")],
+        "signed-out": "Signed out.",
+      })[query.get("sign-in") || ("" as "refused")] ||
+      (sessionStorage.getItem(oidcAttempt) ? "Single sign-on did not sign you in." : undefined),
   );
   useEffect(() => {
     const signOut = () => {
@@ -69,6 +75,21 @@ export function AccountGate({ children }: { children: ReactNode }) {
   }, [client]);
   const multi = status.data?.mode === "multi-user",
     bootstrap = !!status.data?.needsRecoveryAdmin;
+  // Signed out with single sign-on set up goes straight to it, unless it just failed, the account
+  // signed out or ?password=1 asks for the form (the recovery administrator and local accounts).
+  const toOidc =
+    multi &&
+    status.data?.signedIn === false &&
+    !!status.data.oidc &&
+    !bootstrap &&
+    !outcome &&
+    !query.has("password");
+  useEffect(() => {
+    if (status.data?.signedIn) sessionStorage.removeItem(oidcAttempt);
+    if (!toOidc) return;
+    sessionStorage.setItem(oidcAttempt, "1");
+    window.location.replace("/api/accounts/oidc/start");
+  }, [toOidc, status.data?.signedIn]);
   const signIn = useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
@@ -82,7 +103,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
       await status.refetch();
     },
   });
-  if (status.isPending)
+  if (status.isPending || toOidc)
     return (
       <Center h="100dvh">
         <Loader aria-label="Loading Studio" />

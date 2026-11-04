@@ -163,13 +163,39 @@ test("Sign-in gate keeps account data behind authentication", async ({ page }) =
   await page.route("**/api/accounts/status", (route) =>
     route.fulfill({ json: { mode: "multi-user", signedIn: false, oidc: { label: "Pocket ID" } } }),
   );
-  await page.goto("/");
+  await page.goto("/?password=1");
   await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign In With Pocket ID" })).toHaveAttribute(
     "href",
     "/api/accounts/oidc/start",
   );
   await expect(page.getByRole("link", { name: "Images", exact: true })).toHaveCount(0);
+});
+
+test("Signed out with single sign-on goes straight to it, and a failed return shows the form", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.route("**/api/accounts/status", (route) =>
+    route.fulfill({ json: { mode: "multi-user", signedIn: false, oidc: { label: "Pocket ID" } } }),
+  );
+  let starts = 0;
+  await page.route("**/api/accounts/oidc/start", (route) => {
+    starts++;
+    // The first attempt fails at the provider; the second returns without a session.
+    return route.fulfill({
+      status: 302,
+      headers: { location: starts === 1 ? "/?sign-in=failed" : "/" },
+    });
+  });
+  await page.goto("/");
+  await expect(page.getByText("Single sign-on did not complete. Try again.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Sign In With Pocket ID" }).click();
+  await expect(page.getByText("Single sign-on did not sign you in.")).toBeVisible();
+  await page.goto("/?sign-in=signed-out");
+  await expect(page.getByText("Signed out.", { exact: true })).toBeVisible();
+  expect(starts).toBe(2);
 });
 
 test("A group without Chat or Dream hides them and leaves their routes for Images", async ({

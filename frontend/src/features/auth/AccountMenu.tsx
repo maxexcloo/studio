@@ -17,7 +17,7 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
     mutationFn: () => post("/api/accounts/sign-out"),
     onSuccess: () => {
       client.clear();
-      window.location.assign("/");
+      window.location.assign("/?sign-in=signed-out");
     },
   });
   const name = multi ? own.data?.account.username || "Your Account" : "Single-User Development";
