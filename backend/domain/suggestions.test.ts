@@ -16,6 +16,7 @@ function fixture(
     writer?: (owner: string) => boolean;
     online?: boolean;
     image?: boolean;
+    explicit?: (owner: string) => boolean;
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -71,7 +72,7 @@ function fixture(
     },
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
-    uncensored: (owner) => owner === "bob",
+    explicit: options.explicit || ((owner) => owner === "bob"),
     item: (owner, jobId) => items[`${owner}:${jobId}`],
     image: async () => (options.image ? { mime: "image/jpeg", data: "AAAA" } : null),
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
@@ -176,7 +177,7 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
   });
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls[0][0].content, /uncensored/);
-  // An account with Uncensored Models gets steps that keep an explicit image explicit.
+  // An account with explicit wording gets steps that keep an explicit image explicit.
   await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
   assert.match(calls[1][0].content, /may make uncensored images[^\n]*never refuse/);
 });
@@ -202,6 +203,34 @@ test("an image's next steps are kept with it, and More asks for different ones",
     calls[1][1].content,
     /Already suggested \(offer different ones\): Warmer Light Please Now, Closer Crop/,
   );
+});
+
+test("turning explicit wording on or off writes an image's kept next steps and cached drafts again", async () => {
+  let explicit = false;
+  const { calls, suggestions, advance } = fixture({ explicit: () => explicit });
+  const steps = () => suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
+  const draft = () =>
+    suggestions.suggest("bob", { surface: "draft", kind: "image", prompt: "A sultry portrait" });
+  const first = await steps();
+  await draft();
+  await steps();
+  await draft();
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(([system]) => !/uncensored/.test(system.content)));
+  explicit = true;
+  await steps();
+  await draft();
+  await steps();
+  assert.equal(calls.length, 4);
+  assert.ok(calls.slice(2).every(([system]) => /uncensored/.test(system.content)));
+  // Off again, the earlier answer serves while cached; after that, the steps are written again.
+  explicit = false;
+  assert.deepEqual(await steps(), first);
+  assert.equal(calls.length, 4);
+  advance(11 * 60_000);
+  await steps();
+  assert.equal(calls.length, 5);
+  assert.doesNotMatch(calls[4][0].content, /uncensored/);
 });
 
 test("idle work writes next steps ahead of time, from the image where the model reads it", async () => {
@@ -288,7 +317,7 @@ test("a change to the composer's draft rewrites its prompt and can't upscale", a
   assert.match(system.content, /draft prompt[\s\S]*- edit: [^\n]*reference[\s\S]*- recreate: /);
   assert.doesNotMatch(system.content, /upscale|uncensored/);
   assert.match(user.content, /The draft:\nPrompt: A castle at noon[\s\S]*Request: make it night/);
-  // Explicit wording follows the account's Uncensored Models, as for a result.
+  // Explicit wording follows the account's, as for a result.
   await ask("bob", ["edit"]);
   assert.match(calls[1][0].content, /uncensored/);
   await assert.rejects(ask("alice", ["upscale"]), { status: 400 });

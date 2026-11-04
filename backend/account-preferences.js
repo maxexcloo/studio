@@ -8,10 +8,12 @@ import {
 /**
  * Each account's own preferences, the `preferences:<account id>` document in studio.sqlite
  * (`preferences:` in single-user mode). Cloud Models and Uncensored Models only narrow what the
- * account's group grants (account-policy.js); they start on wherever the group grants them.
+ * account's group grants (account-policy.js); they start on wherever the group grants them. Spicy
+ * Prompts starts off and counts only with Uncensored Models (`explicitWording`).
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
+  spicyPrompts: false,
   tileCaptions: false,
   uncensoredModels: true,
 });

@@ -101,8 +101,13 @@ test(
     const features = async () =>
       (await call("/api/accounts/status", { cookie })).body.account.features;
     const shown = await call("/api/preferences", { cookie });
-    assert.deepEqual(shown.body.grants, { cloudModels: true, uncensoredModels: true });
+    assert.deepEqual(shown.body.grants, {
+      cloudModels: true,
+      spicyPrompts: true,
+      uncensoredModels: true,
+    });
     assert.deepEqual(shown.body.saved, []);
+    assert.equal(shown.body.preferences.spicyPrompts, false);
     assert.equal((await features()).cloudModels, true);
     const off = await call("/api/preferences", {
       method: "PATCH",
@@ -113,6 +118,26 @@ test(
     assert.deepEqual(off.body.saved, ["cloudModels", "tileCaptions"]);
     assert.equal((await features()).cloudModels, false);
     assert.equal((await features()).uncensoredModels, true);
+    const spicy = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { spicyPrompts: true },
+    });
+    assert.equal(spicy.status, 200, spicy.body.error);
+    assert.equal(spicy.body.preferences.spicyPrompts, true);
+    // Without Uncensored Models, Spicy Prompts can't be turned on.
+    const optedOut = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { uncensoredModels: false },
+    });
+    assert.equal(optedOut.body.grants.spicyPrompts, false);
+    const refused = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { spicyPrompts: true },
+    });
+    assert.equal(refused.status, 400);
   },
 );
 
@@ -124,6 +149,7 @@ test(
       (await call("/api/accounts/status", { cookie: admin })).body.account.features;
     assert.deepEqual((await call("/api/preferences", { cookie: admin })).body.grants, {
       cloudModels: true,
+      spicyPrompts: true,
       uncensoredModels: true,
     });
     assert.equal((await own()).uncensoredModels, true);

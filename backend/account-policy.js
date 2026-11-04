@@ -8,6 +8,8 @@
  *
  * A generation profile marked `uncensored` needs the Uncensored Models feature on top of its
  * grant. The prompt assistant's Spicy preset needs Uncensored Models too, whatever profile is selected.
+ * Its own prompt ideas, suggestions and proposed changes are worded explicitly only with
+ * `explicitWording`.
  * `allModels` grants every local profile, including ones added later.
  *
  * Any account may turn the Cloud Models and Uncensored Models it has off for itself
@@ -158,6 +160,15 @@ export function hasFullAccess(access) {
 export function mayUseFeature(access, feature) {
   return Boolean(access?.authenticated && access.features?.[feature] === true);
 }
+
+/**
+ * Whether the assistant may word what it offers unasked (prompt ideas, next steps, proposed
+ * changes) explicitly: the account's Spicy Prompts preference on and Uncensored Models in its
+ * effective access. `access` is undefined only in single-user mode, which has every feature.
+ */
+export const explicitWording = (access, preferences) =>
+  preferences.spicyPrompts === true &&
+  (access === undefined || mayUseFeature(access, "uncensoredModels"));
 
 export function visibleGenerationProfiles(profiles, access) {
   if (!access?.authenticated) return [];

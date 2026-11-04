@@ -92,6 +92,25 @@ function DeleteFailedItems() {
   );
 }
 
+/** Spicy Prompts, offered only where the account's access has Uncensored Models. */
+function SpicyPrompts() {
+  const status = useQuery(preferencesQuery).data;
+  const save = useSavePreferences();
+  if (!status?.grants.spicyPrompts) return null;
+  return (
+    <SettingRow
+      label="Spicy Prompts"
+      description="Let prompt ideas, suggestions and proposed changes use explicit wording."
+    >
+      <Switch
+        aria-label="Spicy Prompts"
+        checked={status.preferences.spicyPrompts}
+        onChange={(event) => save.mutate({ spicyPrompts: event.currentTarget.checked })}
+      />
+    </SettingRow>
+  );
+}
+
 /** Cloud Models and Uncensored Models, which an account turns off for itself where its role or group grants them. */
 function ModelChoices() {
   const status = useQuery(preferencesQuery).data;
@@ -175,6 +194,7 @@ export function Preferences() {
             onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
           />
         </SettingRow>
+        <SpicyPrompts />
       </SettingGroup>
       <SettingGroup title="Danger Zone" danger>
         <DeleteFailedItems />
