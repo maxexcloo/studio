@@ -561,8 +561,8 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
 });
 test("new chats get a model title, stay New Chat while it is offline and never replace a rename", async () => {
   const db = new Store(openDatabase(":memory:"));
-  let reply: (() => Response) | undefined;
-  const requests: Record<string, unknown>[] = [];
+  let reply: (() => string) | undefined;
+  const requests: { ownerId: string; text: string }[] = [];
   const service = new ChatService({
     store: new ChatStore(db.db),
     session: (owner, id) => db.session(owner, id),
@@ -570,20 +570,17 @@ test("new chats get a model title, stay New Chat while it is offline and never r
     admit: async () => {
       throw new Error("No media.");
     },
-    fetchImpl: async (_url, options) => {
-      requests.push(JSON.parse(String(options?.body)));
+    writeTitle: async (ownerId, text) => {
+      requests.push({ ownerId, text });
       if (!reply) throw new Error("Gateway offline.");
       return reply();
     },
   });
   const generated = db.createSession("alice", "a cosy cabin, snow");
-  reply = () =>
-    Response.json({
-      choices: [{ message: { content: '"Cosy Cabin In Snowy Woods At Dusk Tonight."' } }],
-    });
+  reply = () => "Cosy Cabin In Snowy Woods";
   await service.title("alice", generated.id, "a cosy cabin, snow");
-  assert.equal(db.session("alice", generated.id)?.title, "Cosy Cabin In Snowy Woods At");
-  assert.equal(requests[0].model, "text");
+  assert.equal(db.session("alice", generated.id)?.title, "Cosy Cabin In Snowy Woods");
+  assert.deepEqual(requests[0], { ownerId: "alice", text: "a cosy cabin, snow" });
   await service.title("alice", generated.id, "something else");
   assert.equal(requests.length, 1);
 
@@ -595,7 +592,7 @@ test("new chats get a model title, stay New Chat while it is offline and never r
   const renamed = db.createSession("alice");
   reply = () => {
     db.updateSession("alice", renamed.id, { title: "My Name" });
-    return Response.json({ choices: [{ message: { content: "Model Name" } }] });
+    return "Model Name";
   };
   await service.title("alice", renamed.id, "anything");
   assert.equal(db.session("alice", renamed.id)?.title, "My Name");
