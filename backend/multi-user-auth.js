@@ -69,6 +69,8 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
+  // Search: the account's own gallery search.
+  ["GET", /^\/api\/gallery$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
   // Reuse's Extend: a video result's last frame as the next video's first.
   ["POST", /^\/api\/reference-assets\/from-gallery$/],

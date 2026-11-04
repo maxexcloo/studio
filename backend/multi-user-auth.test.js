@@ -189,6 +189,11 @@ test("only an authenticated administrator can create profiles and ordinary accou
     accountForRequest(bearer("GET", "/api/models")).userId,
     accountForRequest(admin).userId,
   );
+  // Search reads the account's own gallery.
+  assert.equal(
+    accountForRequest(bearer("GET", "/api/gallery")).userId,
+    accountForRequest(admin).userId,
+  );
   // A personal MCP token is not a general API or administrator credential.
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/gateway-admin")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
