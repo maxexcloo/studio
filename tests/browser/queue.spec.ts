@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, signIn, stamp } from "./fixtures";
+import { fixtures, image, signIn, stamp } from "./fixtures";
 
 test("the queue pauses, resumes and reorders the account's waiting work", async ({ page }) => {
   const state = await fixtures(page);
@@ -17,8 +17,23 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
       operation: "image",
       status,
       reason: "",
-      // Each row names the profile it runs on.
-      input: { prompt: id, profileId: id === "running-job" ? "image:test" : undefined },
+      // Each row names the profile it runs on; "first" carries the inputs its details show.
+      input: {
+        prompt: id,
+        profileId: id === "running-job" ? "image:test" : undefined,
+        ...(id === "first" && {
+          negative: "blurry",
+          width: 1024,
+          height: 768,
+          steps: 20,
+          seed: 7,
+          count: 2,
+          loras: [{ name: "detail.safetensors", strength: 0.8, enabled: true }],
+          referenceDetails: [
+            { id: "ref", slot: "reference", name: "ref.png", thumbnailUrl: image },
+          ],
+        }),
+      },
       items: [],
       outputs: [],
       createdAt: stamp,
@@ -67,4 +82,20 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Space");
   await expect.poll(order).toEqual(["running-job", "first", "third", "second"]);
+
+  // Tapping a row shows what it runs with; tapping again hides it.
+  const row = queue.getByRole("button", { name: /^first\b/ });
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "true");
+  await expect(queue.getByText("Negative: blurry", { exact: true })).toBeVisible();
+  await expect(
+    queue.getByText("1024 × 768 · 20 Steps · Seed 7 · Detail Slider 0.80 · 2 Outputs", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(queue.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  await row.click();
+  await expect(row).toHaveAttribute("aria-expanded", "false");
+  await expect(queue.getByText("Negative: blurry", { exact: true })).toBeHidden();
 });
