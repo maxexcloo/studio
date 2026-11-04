@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Alert, SimpleGrid } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
@@ -69,13 +69,19 @@ export function LibraryPage() {
       ...items.flatMap((item) => item.families || []),
     ]),
   ].sort();
-  const catalogueSection = (section: "models" | "loras") =>
-    catalogue.isPending ? (
-      <LoadingState label={`Loading ${librarySections[section].label}`} />
-    ) : catalogue.error ? (
-      <Alert color="red">{catalogue.error.message}</Alert>
+  const catalogueSection = (section: "models" | "loras") => (heading: ReactNode) =>
+    catalogue.isPending || catalogue.error ? (
+      <>
+        {heading}
+        {catalogue.error ? (
+          <Alert color="red">{catalogue.error.message}</Alert>
+        ) : (
+          <LoadingState label={`Loading ${librarySections[section].label}`} />
+        )}
+      </>
     ) : (
       <LibraryCatalogueTable
+        heading={heading}
         label={librarySections[section].label as "Models" | "LoRAs"}
         items={items.filter((item) =>
           section === "loras"
@@ -98,8 +104,12 @@ export function LibraryPage() {
         label="Library"
         sections={options}
         content={{
-          imports: (
-            <LibraryImports active={importsEnabled && activeSection === "imports"} admin={admin} />
+          imports: (heading) => (
+            <LibraryImports
+              heading={heading}
+              active={importsEnabled && activeSection === "imports"}
+              admin={admin}
+            />
           ),
           presets: presets.isPending ? (
             <LoadingState label="Loading Inspiration" />

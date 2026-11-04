@@ -106,9 +106,12 @@ primary component reference and verify APIs against the installed version.
   button (`ToolbarAction`: New User, New Group, New Guide, Import Workflow), the
   rest icons with tooltips; phones may fold a crowded toolbar's actions into
   More) at the end of the same row, above compact rows with status
-  badges and row menus. A section with several lists gives each a `SettingGroup`
+  badges and row menus, in Library as in Settings (Models, LoRAs and Imports
+  as Users and Workers). A section with several lists gives each a `SettingGroup`
   heading with its own toolbar beside it, the create action at its far right
-  (Settings › Profiles: Profiles, then Guides, each row showing how they link). Sections are alphabetical, About apart at the end, and
+  (Settings › Profiles: Profiles, then Guides, each row showing how they link);
+  every other part of a section, such as an import review's Files, is a
+  `SettingGroup` too, never a second section heading. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
   each run alphabetical, in the desktop navigation and the phone Section Select. No accordions:
@@ -394,7 +397,7 @@ primary component reference and verify APIs against the installed version.
   sideways, so the row never changes height), then on desktop the result count
   and the zoom slider, and at the end Upload ▾ (Upload Files… and Upload Folder…; files and folders dropped on the
   gallery upload too) with Select right of it. A Reddit post's images import from Library ›
-  Import's link field, which then says how many it added to Uploads. Phones expand the search from an icon into a full-width focused
+  Imports' link field, which then says how many it added to Uploads. Phones expand the search from an icon into a full-width focused
   input, and closing it (Back or Escape) clears the query while active filters
   stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): View, Grid or Runs as
   a segmented control on its own row; Show, a segmented control of All, Starred
