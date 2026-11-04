@@ -99,6 +99,8 @@ export function usePromptAssistant({
   // Custom asks for its instruction first; the last one stays for the next time.
   const [asking, setAsking] = useState(false);
   const [instruction, setInstruction] = useState("");
+  // A custom rewrite lands in the prompt box with the caret at its end, ready to edit.
+  const editAfter = useRef(false);
   // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -244,6 +246,16 @@ export function usePromptAssistant({
           prompt: result.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
+        if (editAfter.current) {
+          editAfter.current = false;
+          requestAnimationFrame(() => {
+            const field = document.querySelector<HTMLTextAreaElement>(
+              "textarea[data-expanded-prompt]",
+            );
+            field?.focus();
+            field?.setSelectionRange(field.value.length, field.value.length);
+          });
+        }
       } else if (action === "negative") {
         if (result.unused || !result.negative?.trim()) {
           notifications.show({ message: "This model does not use a negative prompt." });
@@ -378,6 +390,7 @@ export function usePromptAssistant({
             event.preventDefault();
             if (!instruction.trim()) return;
             setAsking(false);
+            editAfter.current = true;
             run("rewrite", "custom", instruction.trim());
           }}
         >
@@ -390,6 +403,13 @@ export function usePromptAssistant({
               data-autofocus
               value={instruction}
               onChange={setInstruction}
+              // Enter improves the prompt; Shift+Enter adds a line.
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing)
+                  return;
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }}
             />
             <Group justify="flex-end">
               <Button type="submit" disabled={!instruction.trim()}>
