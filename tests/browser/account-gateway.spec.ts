@@ -223,7 +223,10 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await section(page, "Settings", "Groups");
   await page.getByRole("button", { name: "New Group", exact: true }).click();
   await page.getByRole("textbox", { name: "Group Name", exact: true }).fill("Member Cloud");
-  await page.getByRole("textbox", { name: "Group ID", exact: true }).fill("member-cloud");
+  // The ID follows the name.
+  await expect(page.getByRole("textbox", { name: "Group ID", exact: true })).toHaveValue(
+    "member-cloud",
+  );
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "LoRAs", exact: true }).check();
