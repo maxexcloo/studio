@@ -1,6 +1,8 @@
 import { recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
+import { isCloudProfile } from "./cloud-profiles.js";
 import { optionsFor } from "./comfy/comfy.js";
+import { families } from "./family-catalog.js";
 import { gallery } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
@@ -84,5 +86,27 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
   }
   /** What a reference image shows in words (its gallery caption), for a writer that can't see it; or "". */
   const caption = (account, id) => (id ? captionForReferenceAccount(account, id) : "");
-  return { caption, guide, image, loras, profiles, starred };
+  /**
+   * The profile a result was made with as a suggestion writer needs it (domain/suggestions.ts
+   * WritingTarget), or null where the account can't use it: an edit model (references, or a
+   * cloud model) takes edits as instructions, plain image-to-image as a full description.
+   */
+  async function target(account, profileId) {
+    const id = canonicalProfileId(profileId);
+    const profile = (await profiles({ studioAccount: account })).find((item) => item.id === id);
+    if (!profile) return null;
+    const family = families[String(profile.family || "").replaceAll("-", "_")];
+    const edits =
+      isCloudProfile(profile) || family?.references
+        ? "instruction"
+        : family?.img2img
+          ? "description"
+          : undefined;
+    return {
+      label: profile.label || profile.id,
+      guide: guide(profile),
+      ...(edits ? { edits } : {}),
+    };
+  }
+  return { caption, guide, image, loras, profiles, starred, target };
 }

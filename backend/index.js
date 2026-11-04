@@ -694,6 +694,11 @@ const suggestions = createSuggestions({
   save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
   ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
   nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
+  target: (ownerId, item) =>
+    assistant.target(
+      ownerId ? accountAccessForId(ownerId) : undefined,
+      item.settings?.profileId || "",
+    ),
 });
 registerSuggestionRoutes(app, { suggestions });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
