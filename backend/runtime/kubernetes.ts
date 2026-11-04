@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import https from "node:https";
+import type { RuntimePodLog } from "../../shared/runtime.ts";
 import { RuntimeUnavailable } from "./controller.ts";
 
 export interface Deployment {
@@ -15,6 +16,7 @@ export interface DeploymentState {
   /** Why a pod is not ready yet, such as an unschedulable GPU claim or an image pull failure. */
   reason?: string;
 }
+/** Answers JSON parsed, and anything else (such as a pod log) as its text. */
 export type KubernetesRequest = (
   method: "GET" | "PATCH",
   path: string,
@@ -46,7 +48,7 @@ export function inClusterRequest(
           ca,
           timeout: 15_000,
           headers: {
-            Accept: "application/json",
+            Accept: "application/json, */*",
             Authorization: `Bearer ${readFileSync(`${directory}/token`, "utf8").trim()}`,
             ...(payload ? { "Content-Type": "application/merge-patch+json" } : {}),
           },
@@ -56,7 +58,10 @@ export function inClusterRequest(
           response.setEncoding("utf8");
           response.on("data", (chunk) => (text += chunk));
           response.on("end", () =>
-            resolve({ status: response.statusCode ?? 0, body: parse(text) }),
+            resolve({
+              status: response.statusCode ?? 0,
+              body: parse(text, response.headers["content-type"]),
+            }),
           );
           response.on("error", reject);
         },
@@ -74,18 +79,22 @@ export function urlRequest(base: string, fetchImpl: typeof fetch = fetch): Kuber
     const response = await fetchImpl(`${root}${path}`, {
       method,
       headers: {
-        Accept: "application/json",
+        Accept: "application/json, */*",
         ...(body === undefined ? {} : { "Content-Type": "application/merge-patch+json" }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       redirect: "error",
       signal: AbortSignal.timeout(15_000),
     });
-    return { status: response.status, body: parse(await response.text()) };
+    return {
+      status: response.status,
+      body: parse(await response.text(), response.headers.get("content-type")),
+    };
   };
 }
 
-function parse(text: string) {
+function parse(text: string, type?: string | null) {
+  if (!type?.includes("json")) return text;
   try {
     return text ? JSON.parse(text) : {};
   } catch {
@@ -94,7 +103,8 @@ function parse(text: string) {
 }
 
 interface Pod {
-  metadata?: { deletionTimestamp?: string };
+  metadata?: { name?: string; deletionTimestamp?: string };
+  spec?: { containers?: { name: string }[] };
   status?: {
     phase?: string;
     conditions?: {
@@ -104,6 +114,8 @@ interface Pod {
       message?: string;
     }[];
     containerStatuses?: {
+      name?: string;
+      restartCount?: number;
       state?: { waiting?: { reason?: string; message?: string } };
     }[];
   };
@@ -156,7 +168,8 @@ export class KubernetesEngine {
     return response.body as Record<string, any>;
   }
 
-  async state(target: Deployment): Promise<DeploymentState> {
+  /** The deployment and the pods its selector matches, terminating ones included. */
+  private async pods(target: Deployment) {
     const namespace = encodeURIComponent(target.namespace);
     const deployment = await this.call(
       target,
@@ -178,6 +191,11 @@ export class KubernetesEngine {
         `/api/v1/namespaces/${namespace}/pods?labelSelector=${selector}`,
       )
     ).items ?? []) as Pod[];
+    return { deployment, pods };
+  }
+
+  async state(target: Deployment): Promise<DeploymentState> {
+    const { deployment, pods } = await this.pods(target);
     const replicas = Number(deployment.spec?.replicas ?? 0);
     const ready = Number(deployment.status?.readyReplicas ?? 0);
     const waiting = replicas > ready || pods.some((pod) => pod.metadata?.deletionTimestamp);
@@ -189,6 +207,66 @@ export class KubernetesEngine {
       pods: pods.length,
       ...(reason ? { reason } : {}),
     };
+  }
+
+  /**
+   * The last `lines` of each pod's first container, timestamped; the previous container's when it
+   * restarted and the current one has logged nothing yet. A pod that hasn't started has no lines.
+   */
+  async logs(target: Deployment, lines: number): Promise<RuntimePodLog[]> {
+    const { pods } = await this.pods(target);
+    return Promise.all(
+      pods.map(async (pod) => {
+        const name = pod.metadata?.name ?? "";
+        const container = pod.spec?.containers?.[0]?.name ?? "";
+        const restarts =
+          pod.status?.containerStatuses?.find((item) => item.name === container)?.restartCount ?? 0;
+        const read = (previous: boolean) => this.log(target, name, container, lines, previous);
+        let text = await read(false);
+        const previous = !text && restarts > 0;
+        if (previous) text = await read(true);
+        return {
+          name,
+          container,
+          phase: pod.metadata?.deletionTimestamp ? "Terminating" : (pod.status?.phase ?? "Unknown"),
+          restarts,
+          ...(previous ? { previous } : {}),
+          lines: text.split("\n").filter(Boolean),
+        };
+      }),
+    );
+  }
+
+  private async log(
+    target: Deployment,
+    pod: string,
+    container: string,
+    lines: number,
+    previous: boolean,
+  ) {
+    const query = new URLSearchParams({
+      container,
+      tailLines: String(lines),
+      timestamps: "true",
+      ...(previous ? { previous: "true" } : {}),
+    });
+    let response: Awaited<ReturnType<KubernetesRequest>>;
+    try {
+      response = await this.request(
+        "GET",
+        `/api/v1/namespaces/${encodeURIComponent(target.namespace)}/pods/${encodeURIComponent(pod)}/log?${query}`,
+      );
+    } catch {
+      throw new RuntimeUnavailable("The Kubernetes API is unavailable.");
+    }
+    if (response.status === 401)
+      throw new RuntimeUnavailable("Kubernetes refused Studio's service account token.");
+    if (response.status === 403)
+      throw new RuntimeUnavailable(
+        `Pod logs aren't permitted yet: Studio's runtime role in ${target.namespace} needs pods/log get.`,
+      );
+    // A container waiting to start, or without a previous run, answers 400 and has no log.
+    return response.status === 200 && typeof response.body === "string" ? response.body : "";
   }
 
   async scale(target: Deployment, replicas: number) {

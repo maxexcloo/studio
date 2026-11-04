@@ -60,7 +60,7 @@ export const icons = {
   edit: Pencil,
   filter: ListFilter,
   keep: Heart,
-  /** A record's timestamped steps: a runtime change's log. */
+  /** A record's timestamped lines: a runtime change's steps or a workload's log. */
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,

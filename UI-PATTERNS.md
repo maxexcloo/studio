@@ -82,7 +82,11 @@ primary component reference and verify APIs against the installed version.
   small loader, and one line beside the table's actions reads Switching to
   Video… (or why the last change didn't finish, in red, with the rows it left
   short marked). That line and each History row's menu offer View Log, the
-  change's timestamped steps in a monospace dialog with Copy. Readiness comes from actual text/media endpoints, with unknown
+  change's timestamped steps in a monospace dialog with Copy. Each workload
+  row's menu offers View Log too: the same dialog with a Changes tab (the steps
+  of every change that touched it) and a Pod tab (its pods' log tail, newest at
+  the bottom, refreshed every 3 seconds while open, 200, 500 or 1000 lines).
+  Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Appearance, Library,
   Settings (16 px icons), a divider, the account name, Account and supported
   Sign Out. Desktop shows Appearance, Library, Settings and Account as icons,

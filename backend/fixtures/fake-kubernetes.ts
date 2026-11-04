@@ -12,6 +12,8 @@ interface Pod {
   name: string;
   ready: boolean;
   deleting: boolean;
+  /** Container restarts; a restarted pod's log is its previous container's until it logs again. */
+  restarts: number;
 }
 /** A workload Studio discovers: its kind label, pool, GPU count, Service address and annotations. */
 interface Discovered {
@@ -36,6 +38,9 @@ interface Deployment {
  * patches. Deployments given a `workload` are listed for discovery with a Service on its `url`'s
  * port (serviceUrl) and a `gpu-<count>` claim template. Time moves in ticks: a tick removes terminating pods, readies pending ones and creates
  * pods for missing replicas. `log` records every scale and every pod that went away, in order.
+ * A ready pod's container logs `started` and `ready`; one given restarts has logged nothing since
+ * and its previous container `crashed`. `denied` namespaces refuse everything and `logsDenied`
+ * ones only pod logs, as a role without `pods/log` does.
  */
 export function fakeKubernetes(
   initial: { namespace: string; name: string; replicas?: number; workload?: Discovered }[],
@@ -44,11 +49,13 @@ export function fakeKubernetes(
   const deployments = new Map<string, Deployment>();
   const log: string[] = [];
   const denied = new Set<string>();
+  const logsDenied = new Set<string>();
   let counter = 0;
   const pod = (deployment: Deployment, ready: boolean): Pod => ({
     name: `${deployment.name}-${++counter}`,
     ready,
     deleting: false,
+    restarts: 0,
   });
   for (const { namespace, name, replicas = 0, workload } of initial) {
     const deployment: Deployment = { namespace, name, replicas, pods: [], workload };
@@ -73,6 +80,30 @@ export function fakeKubernetes(
     const url = new URL(path, "http://kubernetes.invalid");
     const listed = discovery(url.pathname);
     if (listed) return listed;
+    const podLog = /^\/api\/v1\/namespaces\/([^/]+)\/pods\/([^/]+)\/log$/.exec(url.pathname);
+    if (podLog) {
+      const [, namespace, name] = podLog;
+      if (denied.has(namespace) || logsDenied.has(namespace))
+        return { status: 403, body: { message: "forbidden" } };
+      const item = [...deployments.values()]
+        .filter((deployment) => deployment.namespace === namespace)
+        .flatMap((deployment) => deployment.pods)
+        .find((entry) => entry.name === name);
+      if (!item) return { status: 404, body: {} };
+      const previous = url.searchParams.get("previous") === "true";
+      if (previous ? !item.restarts : !item.ready)
+        return { status: 400, body: { message: "container is waiting to start" } };
+      const lines = previous
+        ? [`2026-10-27T00:00:00.000000000Z ${name} crashed`]
+        : item.restarts
+          ? []
+          : [
+              `2026-10-27T00:00:00.000000000Z ${name} started`,
+              `2026-10-27T00:00:01.000000000Z ${name} ready`,
+            ];
+      const tail = lines.slice(-Number(url.searchParams.get("tailLines")));
+      return { status: 200, body: tail.map((line) => `${line}\n`).join("") };
+    }
     const pods = /^\/api\/v1\/namespaces\/([^/]+)\/pods$/.exec(url.pathname);
     const match = /^\/apis\/apps\/v1\/namespaces\/([^/]+)\/deployments\/([^/]+)(\/scale)?$/.exec(
       url.pathname,
@@ -91,8 +122,12 @@ export function fakeKubernetes(
               name: item.name,
               ...(item.deleting ? { deletionTimestamp: "2026-10-27T00:00:00Z" } : {}),
             },
+            spec: { containers: [{ name: "main" }, { name: "sidecar" }] },
             status: item.ready
-              ? { phase: "Running" }
+              ? {
+                  phase: "Running",
+                  containerStatuses: [{ name: "main", restartCount: item.restarts }],
+                }
               : deployment?.unschedulable
                 ? {
                     phase: "Pending",
@@ -180,8 +215,11 @@ export function fakeKubernetes(
       incoming.url ?? "/",
       text ? JSON.parse(text) : undefined,
     );
-    response.writeHead(answer.status, { "content-type": "application/json" });
-    response.end(JSON.stringify(answer.body));
+    const plain = typeof answer.body === "string";
+    response.writeHead(answer.status, {
+      "content-type": plain ? "text/plain" : "application/json",
+    });
+    response.end(plain ? answer.body : JSON.stringify(answer.body));
   }
-  return { request, handle, tick, log, deployments, denied };
+  return { request, handle, tick, log, deployments, denied, logsDenied };
 }

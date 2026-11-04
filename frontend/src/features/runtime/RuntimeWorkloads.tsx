@@ -12,13 +12,21 @@ import {
   Select,
   Stack,
   Switch,
+  Tabs,
   Text,
 } from "@mantine/core";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Check } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   RuntimeOperation,
+  RuntimePodLog,
   RuntimePreview,
   RuntimeSettings,
   RuntimeStatus,
@@ -127,6 +135,52 @@ function logText(entry: RuntimeOperation) {
   ].join("\n");
 }
 
+/** A change's one-line summary: what it did, how it ended, who asked and when. */
+const changeSummary = (entry: RuntimeOperation, change: (entry: RuntimeOperation) => string) =>
+  `${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${new Date(
+    entry.startedAt,
+  ).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`;
+
+/** Monospace log text, oldest first, kept scrolled to the newest line as it grows, with Copy. */
+function LogText({
+  text,
+  empty,
+  label,
+  controls,
+}: {
+  text: string;
+  empty: string;
+  label: string;
+  controls?: ReactNode;
+}) {
+  const viewport = useRef<HTMLDivElement>(null);
+  const { copied, copy } = useCopy();
+  useEffect(() => {
+    viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
+  }, [text]);
+  return (
+    <>
+      <ScrollArea.Autosize mah="50vh" viewportRef={viewport}>
+        <Code block aria-label={label}>
+          {text || empty}
+        </Code>
+      </ScrollArea.Autosize>
+      <Group justify="space-between">
+        {controls ?? <span />}
+        <Button
+          size="compact-sm"
+          variant="default"
+          leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
+          disabled={!text}
+          onClick={() => copy(text, "log")}
+        >
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </Group>
+    </>
+  );
+}
+
 /** A runtime change's log: its steps oldest first, following new ones while it runs. */
 function OperationLog({
   entry,
@@ -137,39 +191,116 @@ function OperationLog({
   change: (entry: RuntimeOperation) => string;
   onClose: () => void;
 }) {
-  const viewport = useRef<HTMLDivElement>(null);
-  const { copied, copy } = useCopy();
-  const text = entry ? logText(entry) : "";
-  useEffect(() => {
-    viewport.current?.scrollTo({ top: viewport.current.scrollHeight });
-  }, [text]);
   return (
     <Modal opened={Boolean(entry)} onClose={onClose} title="Runtime Log">
       {entry && (
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
-            {`${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${new Date(
-              entry.startedAt,
-            ).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`}
+            {changeSummary(entry, change)}
           </Text>
-          <ScrollArea.Autosize mah="50vh" viewportRef={viewport}>
-            <Code block aria-label="Steps">
-              {text || "No steps recorded."}
-            </Code>
-          </ScrollArea.Autosize>
-          <Group justify="flex-end">
-            <Button
-              size="compact-sm"
-              variant="default"
-              leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
-              disabled={!text}
-              onClick={() => copy(text, "log")}
-            >
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </Group>
+          <LogText text={logText(entry)} empty="No steps recorded." label="Steps" />
         </Stack>
       )}
+    </Modal>
+  );
+}
+
+/** Each pod's tail under a heading line, for the workload log's Pod tab. */
+const podText = (pods: RuntimePodLog[]) =>
+  pods
+    .map((pod) =>
+      [
+        `# ${pod.name} · ${pod.container} · ${pod.phase} · ${pod.restarts} ${pod.restarts === 1 ? "restart" : "restarts"}${pod.previous ? " · last run" : ""}`,
+        ...(pod.lines.length ? pod.lines : ["No log yet."]),
+      ].join("\n"),
+    )
+    .join("\n\n");
+
+/**
+ * A workload's log: Changes, the steps of every change that touched it, oldest first; and Pod,
+ * the tail of its pods' logs, refreshed every 3 seconds while shown.
+ */
+function WorkloadLog({
+  workload,
+  history,
+  change,
+  onClose,
+}: {
+  workload?: { id: string; label: string };
+  history: RuntimeOperation[];
+  change: (entry: RuntimeOperation) => string;
+  onClose: () => void;
+}) {
+  const [tab, setTab] = useState<string | null>("pod");
+  const [lines, setLines] = useState("200");
+  const logs = useQuery({
+    queryKey: ["runtime-logs", workload?.id, lines],
+    queryFn: () =>
+      api<{ pods: RuntimePodLog[] }>(
+        `/api/runtime/workloads/${encodeURIComponent(workload!.id)}/logs?lines=${lines}`,
+      ),
+    enabled: Boolean(workload) && tab === "pod",
+    refetchInterval: 3000,
+    retry: false,
+    // Keep showing the last tail while another line count loads, but never another workload's.
+    placeholderData: (previous, query) =>
+      query?.queryKey[1] === workload?.id ? keepPreviousData(previous) : undefined,
+  });
+  const id = workload?.id ?? "";
+  const changes = history
+    .filter((entry) => entry.stop.includes(id) || entry.start.includes(id))
+    .reverse()
+    .map((entry) => `# ${changeSummary(entry, change)}\n${logText(entry)}`)
+    .join("\n\n");
+  return (
+    <Modal
+      opened={Boolean(workload)}
+      onClose={() => {
+        setTab("pod");
+        onClose();
+      }}
+      title={`${workload?.label ?? ""} Log`}
+      size="xl"
+    >
+      <Tabs value={tab} onChange={setTab} keepMounted={false}>
+        <Tabs.List>
+          <Tabs.Tab value="changes">Changes</Tabs.Tab>
+          <Tabs.Tab value="pod">Pod</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="changes" pt="sm">
+          <Stack gap="sm">
+            <LogText text={changes} empty="No changes recorded." label="Change Steps" />
+          </Stack>
+        </Tabs.Panel>
+        <Tabs.Panel value="pod" pt="sm">
+          <Stack gap="sm">
+            {logs.error && <Alert color="yellow">{logs.error.message}</Alert>}
+            {!logs.data ? (
+              !logs.error && <LoadingState label="Loading Pod Log" />
+            ) : (
+              <LogText
+                text={podText(logs.data.pods)}
+                empty="No pods are running."
+                label="Pod Log"
+                controls={
+                  <Select
+                    aria-label="Lines"
+                    w={120}
+                    size="xs"
+                    data={["200", "500", "1000"].map((value) => ({
+                      value,
+                      label: `${value} Lines`,
+                    }))}
+                    value={lines}
+                    allowDeselect={false}
+                    onChange={(value) => value && setLines(value)}
+                  />
+                }
+              />
+            )}
+          </Stack>
+        </Tabs.Panel>
+      </Tabs>
     </Modal>
   );
 }
@@ -236,6 +367,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [restarting, setRestarting] = useState<string | null>(null);
   const [allChanges, setAllChanges] = useState(false);
   const [logId, setLogId] = useState("");
+  const [workloadLogId, setWorkloadLogId] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
   const previewing = useMutation({
     mutationFn: (workloads: string[]) =>
@@ -373,20 +505,28 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               },
             },
           ]}
-          rowActions={(item) =>
-            item.phase === "parked" || item.phase === "down" ? (
-              <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
-                Start
-              </Menu.Item>
-            ) : (
+          rowActions={(item) => (
+            <>
+              {item.phase === "parked" || item.phase === "down" ? (
+                <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
+                  Start
+                </Menu.Item>
+              ) : (
+                <Menu.Item
+                  disabled={Boolean(operation) || item.phase !== "running"}
+                  onClick={() => setRestarting(item.id)}
+                >
+                  Restart
+                </Menu.Item>
+              )}
               <Menu.Item
-                disabled={Boolean(operation) || item.phase !== "running"}
-                onClick={() => setRestarting(item.id)}
+                leftSection={<icons.log size={16} />}
+                onClick={() => setWorkloadLogId(item.id)}
               >
-                Restart
+                View Log
               </Menu.Item>
-            )
-          }
+            </>
+          )}
         />
         <Group justify="space-between" gap="xs">
           {shown && line ? (
@@ -429,6 +569,12 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
           entry={history.find((entry) => entry.id === logId)}
           change={change}
           onClose={() => setLogId("")}
+        />
+        <WorkloadLog
+          workload={workloads.find((item) => item.id === workloadLogId)}
+          history={history}
+          change={change}
+          onClose={() => setWorkloadLogId("")}
         />
         <ConfirmDialog
           opened={Boolean(preview)}

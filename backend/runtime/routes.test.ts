@@ -87,3 +87,57 @@ test("administrator runtime routes preview, apply and report operations, with pl
     body: { error: "text is not running; only a running workload can be restarted." },
   });
 });
+
+test("the logs route tails each pod's first container, falling back to its last run, and says plainly when logs aren't permitted", async (context) => {
+  const { kube, controller } = runtime(
+    [
+      { id: "text", kind: "text", url: "http://text.invalid" },
+      { id: "media", kind: "image", url: "http://media.invalid" },
+    ],
+    ["text"],
+  );
+  const app = express();
+  app.use(createRuntimeRouter(controller, () => "account:admin"));
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  context.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const get = async (path: string) => {
+    const response = await fetch(base + path);
+    return { status: response.status, body: await response.json() };
+  };
+  const [pod] = kube.deployments.get("gpu/text")!.pods;
+  assert.deepEqual(await get("/workloads/text/logs?lines=1"), {
+    status: 200,
+    body: {
+      pods: [
+        {
+          name: pod.name,
+          container: "main",
+          phase: "Running",
+          restarts: 0,
+          lines: [`2026-10-27T00:00:01.000000000Z ${pod.name} ready`],
+        },
+      ],
+    },
+  });
+  assert.equal((await get("/workloads/text/logs?lines=5000")).body.pods[0].lines.length, 2);
+  assert.deepEqual(await get("/workloads/media/logs"), { status: 200, body: { pods: [] } });
+  pod.restarts = 1;
+  assert.deepEqual((await get("/workloads/text/logs")).body.pods[0], {
+    name: pod.name,
+    container: "main",
+    phase: "Running",
+    restarts: 1,
+    previous: true,
+    lines: [`2026-10-27T00:00:00.000000000Z ${pod.name} crashed`],
+  });
+  kube.logsDenied.add("gpu");
+  assert.deepEqual(await get("/workloads/text/logs"), {
+    status: 503,
+    body: {
+      error: "Pod logs aren't permitted yet: Studio's runtime role in gpu needs pods/log get.",
+    },
+  });
+  assert.equal((await get("/workloads/missing/logs")).status, 400);
+});

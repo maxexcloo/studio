@@ -53,6 +53,19 @@ export interface RuntimeSettings {
   parkIdleMinutes: number;
 }
 
+/** The tail of one pod's container log (`GET /api/runtime/workloads/:id/logs`), oldest line first. */
+export interface RuntimePodLog {
+  name: string;
+  container: string;
+  /** The pod's Kubernetes phase, or Terminating. */
+  phase: string;
+  restarts: number;
+  /** The lines are the previous container's: it restarted and the current one has logged nothing. */
+  previous?: boolean;
+  /** Each starts with its RFC 3339 timestamp. */
+  lines: string[];
+}
+
 export interface RuntimeStatus {
   settings: RuntimeSettings;
   pools: { id: string; capacity: number; used: number }[];
