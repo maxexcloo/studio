@@ -9,7 +9,6 @@ import type {
   ChatStep,
 } from "../../shared/chat.ts";
 import type { GenerationInput, QueueJob } from "../../shared/queue.ts";
-import { replyTitle } from "../../shared/titles.ts";
 import { ChatStore } from "./chat-store.ts";
 
 interface ChatSettings {
@@ -70,6 +69,8 @@ interface ChatOptions {
   taste?: (ownerId: string) => string;
   /** Whether new chats are titled by the text model (STUDIO_CHAT_TITLES); on without it. */
   titles?: () => boolean;
+  /** Titles a chat from its first message (assistant.js `title`); none where the owner can't use the assistant. */
+  writeTitle?: (ownerId: string, text: string) => Promise<string>;
   fetchImpl?: typeof fetch;
 }
 /** Model calls one reply may make: tool rounds, then a last answer without tools. */
@@ -271,48 +272,11 @@ export class ChatService {
    * Titles a new chat from its first request. A user rename always wins; while the text model is
    * unavailable or `titles` is off the chat stays New Chat, and nothing here rejects.
    */
-  async title(ownerId: string, sessionId: string, text: string, modelId?: string) {
+  async title(ownerId: string, sessionId: string, text: string) {
     try {
       const session = this.options.session(ownerId, sessionId) as { titleSource?: string };
       if (!session || session.titleSource || this.options.titles?.() === false) return;
-      let title = "";
-      const settings = this.options.settings();
-      if (settings) {
-        const models = await this.models(ownerId, settings).catch(() => []);
-        const model =
-          models.find((item) => item.id === (modelId || settings.model)) ||
-          (modelId ? undefined : models[0]);
-        if (model) {
-          const response = await (this.options.fetchImpl || fetch)(settings.endpoint, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${settings.key}`,
-              "Content-Type": "application/json",
-            },
-            signal: AbortSignal.timeout(20_000),
-            redirect: "error",
-            body: JSON.stringify({
-              model: model.id,
-              stream: false,
-              max_tokens: 24,
-              // A reasoning model would spend these few tokens thinking and return no title.
-              reasoning_effort: "none",
-              messages: [
-                {
-                  role: "system",
-                  content:
-                    "Name this chat. Reply with a short Title Case title of at most six words, without quotes or punctuation.",
-                },
-                { role: "user", content: text.slice(0, 4000) },
-              ],
-            }),
-          }).catch(() => undefined);
-          if (response?.ok)
-            title = replyTitle(
-              (await response.json().catch(() => undefined))?.choices?.[0]?.message?.content,
-            );
-        }
-      }
+      const title = (await this.options.writeTitle?.(ownerId, text)) || "";
       if (title) this.options.store.generatedTitle(ownerId, sessionId, title);
     } catch {
       // Titling is cosmetic; the chat keeps its current title.
@@ -690,7 +654,7 @@ export class ChatService {
       if (
         !history.some((message) => message.role === "assistant" && message.status === "completed")
       )
-        void this.title(ownerId, sessionId, user.content, modelId);
+        void this.title(ownerId, sessionId, user.content);
     } catch (error) {
       if (assistant) {
         assistant.status = signal.aborted ? "cancelled" : "failed";
