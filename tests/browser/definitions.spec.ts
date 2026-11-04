@@ -135,6 +135,11 @@ test("Guide editing and restoring an earlier version create distinct saved revis
       return route.fulfill({
         json: { version: { pack: saved[Number(path.split("/").at(-1)) - 1] } },
       });
+    if (path.endsWith("/remove"))
+      return route.fulfill({
+        status: 409,
+        json: { ok: false, error: "This guide is still used by custom:fixture." },
+      });
     if (path.endsWith("/revert")) {
       const body = route.request().postDataJSON();
       expect(body.baseHash).toBe(`hash-${version}`);
@@ -177,6 +182,11 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Original guidance.",
   );
+  // A guide that profiles still use stays, and the confirmation says why.
+  await editor.getByRole("button", { name: "Remove Guide", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Remove Guide", exact: true });
+  await confirm.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(confirm).toContainText("This guide is still used by custom:fixture.");
 });
 
 test("Model classification saves and reads back while definition administration stays restricted", async ({

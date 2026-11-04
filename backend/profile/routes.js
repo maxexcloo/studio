@@ -15,6 +15,7 @@
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
+ *   POST /api/profiles/guides/:packId/remove        {baseHash}: removes a pack no profile or family uses; its versions stay
  *   GET  /api/profiles/guide-bindings               the family map, profile bindings, variants and negatives, with their hash and meta
  *   PUT  /api/profiles/guide-bindings               {bindings, baseHash, draft?}: saves them as a new version
  *   GET  /api/profiles/guide-bindings/versions      their versions, newest first
@@ -259,6 +260,19 @@ export function registerProfileRoutes(
         origin: fromChat(req) ? "chat" : "studio",
       });
       res.json({ ok: true, ...saved });
+    }),
+  );
+  app.post(
+    "/api/profiles/guides/:packId/remove",
+    route((req, res) => {
+      res.json({
+        ok: true,
+        ...guides().remove(req.params.packId, {
+          by: accountName(req),
+          origin: fromChat(req) ? "chat" : "studio",
+          baseHash: String(req.body?.baseHash || ""),
+        }),
+      });
     }),
   );
   app.post(
