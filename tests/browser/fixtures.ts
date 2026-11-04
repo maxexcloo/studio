@@ -1039,7 +1039,10 @@ export async function savedAction(
   action: string,
 ) {
   await page.getByRole("button", { name: `${noun} Actions for ${name}`, exact: true }).click();
-  await page.getByRole("menuitem", { name: action, exact: true }).click();
+  const item = page.getByRole("menuitem", { name: action, exact: true });
+  await item.click();
+  // The next click must not land while the menu is still closing over the row.
+  await expect(item).toBeHidden();
 }
 
 /** Chooses a picker tab, such as LoRAs › Stacks. */
