@@ -41,12 +41,11 @@ export function useSubmitState({
 }) {
   const uploading = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
   const assisting = useIsMutating({ mutationKey: ["prompt-assistance"] }) > 0;
+  const many = (input.count || 1) > 1;
   const label =
     operation === "refine"
       ? "Edit Image"
-      : input.kind === "video"
-        ? "Generate Video"
-        : "Generate Image";
+      : `Generate ${input.kind === "video" ? "Video" : "Image"}${many ? "s" : ""}`;
   return {
     label,
     blockedReason:
