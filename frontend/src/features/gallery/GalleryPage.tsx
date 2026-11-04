@@ -365,6 +365,7 @@ export function GalleryPage() {
                 )
               : items
           }
+          related={loaded}
           navigate={setSelected}
           onReturnFocus={(item) => setFocusItem(item.id)}
           close={() => setSelected(null)}

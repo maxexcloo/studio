@@ -67,7 +67,10 @@ export interface QueueJob {
   jobId: string;
   sessionId: string;
   parentJobId?: string;
-  /** The parent job's result this run is a version of (Edit, Recreate, Animate and the like). */
+  /**
+   * The result this run was made from (Edit, Recreate, Animate and the like), one of `parentJobId`'s
+   * results when the run joined that job's Chat. Its gallery results keep it (`resultSource`).
+   */
   parentItemId?: string;
   operation: GenerationOperation;
   status: QueueStatus;

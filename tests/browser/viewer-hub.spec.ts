@@ -324,6 +324,35 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
+test("A version keeps its strip once the runs have left the queue, and runs from it record it", async ({
+  page,
+}) => {
+  const { state, viewer } = await seed(page, {}, async (_page, state) => {
+    // Neither run is listed any more (a deleted Chat, say): the version kept its source.
+    state.jobs.length = 0;
+    state.gallery.unshift({
+      ...state.gallery[0],
+      id: "hub-night",
+      jobId: "job-night",
+      prompt: "An amber bird at night",
+      createdAt: "2026-10-23T00:01:00.000Z",
+      parentItemId: "hub",
+    });
+  });
+  const strip = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(strip.getByRole("listitem")).toHaveCount(2);
+  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird at night",
+  );
+  await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
+  // Its source's Chat is gone, so a run from it starts a Chat and still records where it came from.
+  await newSeed(page);
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
+});
+
 test("Run Again and Edit Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
   page,
 }) => {

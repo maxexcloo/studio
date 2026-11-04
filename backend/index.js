@@ -124,6 +124,7 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
   onGalleryFilesDeleted,
+  reloadGalleryFields,
 } from "./gallery/store.js";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
@@ -601,11 +602,19 @@ registerRewriteRoutes(app, {
     for (const items of byJob.values()) items.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
     return byJob;
   },
+  ownsItem: (ownerId, id) =>
+    gallery.some(
+      (item) => item.id === id && (item.ownerId || "") === ownerId && !isGalleryHidden(item),
+    ),
   title: chatTitle,
   admitted: jobAdmitted,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
-registerMigrationRoutes(app, { dataDir, requireAdmin });
+registerMigrationRoutes(app, {
+  dataDir,
+  requireAdmin,
+  reload: { gallerySources: () => reloadGalleryFields(["parentItemId", "parentJobId", "derived"]) },
+});
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,

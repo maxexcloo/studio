@@ -132,6 +132,11 @@ export interface MediaItem {
   outputName?: string;
   /** The Chat whose generation made this item. */
   sessionId?: string;
+  /** The result this one was made from, kept from its run (backend/version-sources.js `resultSource`). */
+  parentItemId?: string;
+  parentJobId?: string;
+  /** Made from `parentItemId` but changed too much to be one of its versions (`isVersion`). */
+  derived?: true;
   durationMs?: number;
   timing?: {
     runMs?: number;

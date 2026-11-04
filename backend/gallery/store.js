@@ -1239,3 +1239,24 @@ export function updateGalleryJobPreviews(id, previews = []) {
   if (upserts.length) bumpRevision();
   return upserts.length > 0;
 }
+
+/**
+ * Takes `fields` from the saved rows into the loaded items, after a migration step wrote them while
+ * Studio runs (version-sources.js `gallerySources`), so the next save keeps them.
+ */
+export function reloadGalleryFields(fields) {
+  const saved = new Map(
+    readGalleryRows(runtimeDatabase(dataDir)).map((row) => [galleryKey(row), row]),
+  );
+  let changed = false;
+  gallery = gallery.map((item) => {
+    const row = saved.get(galleryKey(item));
+    const missing = row && fields.filter((key) => key in row && !(key in item));
+    if (!missing?.length) return item;
+    changed = true;
+    return { ...item, ...Object.fromEntries(missing.map((key) => [key, row[key]])) };
+  });
+  if (!changed) return;
+  bumpRevision();
+  saveGallery();
+}

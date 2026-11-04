@@ -43,6 +43,16 @@ export function isVersion(
 }
 
 /**
+ * A saved result as the source `isVersion` compares a run with, for a source whose own run is gone:
+ * its recorded settings, prompt and model.
+ */
+export const resultInput = (item: {
+  settings?: Record<string, unknown>;
+  prompt?: string;
+  model?: string;
+}): GenerationInput => ({ ...item.settings, prompt: item.prompt, model: item.model });
+
+/**
  * The result of `parent` that a run's first reference is (the image, or a video's last frame), so
  * the run was made from it. Chat records its runs' sources this way.
  */

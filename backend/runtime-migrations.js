@@ -15,7 +15,7 @@ import { createProfileStore } from "./profile/store.js";
 import { reloadTimings } from "./timings.js";
 import { uncensoredMarker } from "./uncensored-marker.js";
 import { migrateUploads } from "./uploads.js";
-import { versionSources } from "./version-sources.js";
+import { gallerySources, versionSources } from "./version-sources.js";
 import { reloadWorkflowPreferences } from "./workflow-catalog.js";
 
 /**
@@ -69,6 +69,13 @@ const steps = [
   },
   { name: "loraRatings", run: loraRatings, changes: (plan) => size(plan.files), online: true },
   { name: "versionSources", run: versionSources, changes: (plan) => size(plan.recorded) },
+  // The server holds the gallery, so it passes a reload for this step (registerMigrationRoutes).
+  {
+    name: "gallerySources",
+    run: gallerySources,
+    changes: (plan) => size(plan.filled),
+    online: true,
+  },
   { name: "profilePrompting", run: profilePrompting, changes: (plan) => size(plan.profiles) },
   {
     name: "loraLayers",
@@ -126,10 +133,11 @@ const stopped =
  * Each step's plan, or with `apply` its result (a `backup` path where it writes one). `online`
  * (the running server) skips applying a step that isn't online-safe and has work, returning its
  * plan with `refused`. `dreamOwner` adds the Dream ownership step (the command's --dream-owner).
+ * `reload` maps a step's name to what makes the running server read what that step applied.
  */
 export function runtimeMigrations(
   dataDir,
-  { apply = false, online = false, dreamOwner = "" } = {},
+  { apply = false, online = false, dreamOwner = "", reload = {} } = {},
 ) {
   const list = dreamOwner
     ? [
@@ -149,7 +157,10 @@ export function runtimeMigrations(
         continue;
       }
       results[step.name] = step.run(dataDir, { apply });
-      if (apply && results[step.name].applied) step.reload?.(dataDir);
+      if (apply && results[step.name].applied) {
+        step.reload?.(dataDir);
+        reload[step.name]?.();
+      }
     } catch (error) {
       throw new Error(`${step.name}: ${error.message}`, { cause: error });
     }
@@ -179,12 +190,12 @@ function summary(results, apply) {
  * it returns every step's plan; with it, it applies the online-safe steps against Studio's data
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
-export function registerMigrationRoutes(app, { dataDir, requireAdmin, log = console }) {
+export function registerMigrationRoutes(app, { dataDir, requireAdmin, reload, log = console }) {
   app.post("/api/maintenance/migrations", (req, res) => {
     if (!requireAdmin(req, res)) return;
     const apply = req.body?.apply === true;
     try {
-      const results = runtimeMigrations(dataDir, { apply, online: true });
+      const results = runtimeMigrations(dataDir, { apply, online: true, reload });
       log.info?.(`[migrations] ${apply ? "Apply" : "Dry run"}: ${summary(results, apply)}`);
       return res.json({ ok: true, apply, steps: results });
     } catch (error) {
