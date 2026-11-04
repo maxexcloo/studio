@@ -89,7 +89,7 @@ export function profileStats(items = [], now = Date.now()) {
     const profile = canonicalProfileId(item?.settings?.profileId);
     const at = Date.parse(item?.createdAt || "");
     if (!profile || !(now - at < 30 * dayMs)) continue;
-    if (item.status !== "done" && item.status !== "failed") continue;
+    if (item.status !== "done" && item.status !== "error") continue;
     const entry = stats.get(profile) || {
       runs: 0,
       failed: 0,
@@ -100,7 +100,7 @@ export function profileStats(items = [], now = Date.now()) {
       lastAt: "",
     };
     entry.runs += 1;
-    if (item.status === "failed") entry.failed += 1;
+    if (item.status === "error") entry.failed += 1;
     else {
       if (item.favorite) entry.starred += 1;
       const ms = Number(item.timing?.runMs);
@@ -108,7 +108,7 @@ export function profileStats(items = [], now = Date.now()) {
     }
     if (now - at < 7 * dayMs) {
       entry.week += 1;
-      if (item.status === "failed") entry.weekFailed += 1;
+      if (item.status === "error") entry.weekFailed += 1;
     }
     if (item.createdAt > entry.lastAt) entry.lastAt = item.createdAt;
     stats.set(profile, entry);

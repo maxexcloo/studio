@@ -67,10 +67,10 @@ test("profile stats count the last 30 days and flag a profile failing most of it
     [
       run("steady", "done", 1, { favorite: true, timing: { runMs: 9000 } }),
       run("steady", "done", 2, { timing: { runMs: 11000 } }),
-      run("steady", "failed", 3),
-      run("steady", "cancelled", 1),
+      run("steady", "error", 3),
+      run("steady", "canceled", 1),
       run("steady", "done", 40),
-      ...Array.from({ length: 5 }, (_, index) => run("broken", index ? "failed" : "done", index)),
+      ...Array.from({ length: 5 }, (_, index) => run("broken", index ? "error" : "done", index)),
     ],
     now,
   );
