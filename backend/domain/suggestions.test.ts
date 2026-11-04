@@ -17,6 +17,7 @@ function fixture(
     online?: boolean;
     image?: boolean;
     explicit?: (owner: string) => boolean;
+    switches?: { ideas?: boolean; nextSteps?: boolean };
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -76,6 +77,8 @@ function fixture(
     item: (owner, jobId) => items[`${owner}:${jobId}`],
     image: async () => (options.image ? { mime: "image/jpeg", data: "AAAA" } : null),
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
+    ideas: () => options.switches?.ideas ?? true,
+    nextSteps: () => options.switches?.nextSteps ?? true,
     now: () => clock,
   });
   return {
@@ -243,6 +246,7 @@ test("idle work writes next steps ahead of time, from the image where the model 
   ];
   let clock = 0;
   const work = createNextStepWork({
+    enabled: () => true,
     suggestions,
     writer: { supportsVision: async () => vision },
     idle: () => true,
@@ -265,6 +269,47 @@ test("idle work writes next steps ahead of time, from the image where the model 
   clock += 10_000;
   assert.equal(await work.tick(), "none");
   assert.equal(calls.length, 2);
+});
+
+test("switched off, prompt ideas and next steps are never written, while asked-for changes still are", async () => {
+  const { calls, suggestions } = fixture({ switches: { ideas: false, nextSteps: false } });
+  const items = [
+    { id: "a", jobId: "job-a", ownerId: "alice", type: "image", status: "done", prompt: "A" },
+  ];
+  const work = createNextStepWork({
+    enabled: () => false,
+    suggestions,
+    writer: { supportsVision: async () => true },
+    idle: () => true,
+    allowed: () => true,
+    items: () => items,
+    visible: () => true,
+    image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
+    log: { info: () => {} },
+  });
+  assert.equal(await work.tick(), "off");
+  await work.completed(items);
+  assert.deepEqual(await suggestions.suggest("alice", { surface: "composer", kind: "image" }), {
+    suggestions: [],
+    reason: "Prompt Ideas is off in Settings › Generation.",
+  });
+  for (const body of [
+    { surface: "viewer", jobId: "job-a" },
+    { surface: "viewer", jobId: "job-a", fresh: true },
+    { surface: "draft", kind: "image", prompt: "A harbour" },
+  ])
+    assert.equal(
+      (await suggestions.suggest("alice", body)).reason,
+      "Suggestions are off in Settings › Generation.",
+    );
+  assert.equal(calls.length, 0);
+  await suggestions.suggest("alice", {
+    surface: "change",
+    jobId: "job-a",
+    request: "make it night",
+    actions: ["edit"],
+  });
+  assert.equal(calls.length, 1, "Ask for a Change has no switch");
 });
 
 test("a requested change picks one of the offered actions and rewrites the prompt", async () => {

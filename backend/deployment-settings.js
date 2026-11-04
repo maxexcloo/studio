@@ -49,20 +49,50 @@ const flag = (key, label, description, defaultOn = true) => ({
 });
 
 /**
- * Catalogue switches: what the generation catalogue offers. LoRAs, Cloud Models
- * and Presets & Civitai Imports are access-profile features; STUDIO_ENABLE_PRESETS
- * stays a deployment variable that switches presets off for everyone (features.js).
+ * Settings › Generation switches. Background AI (A–Z) covers every model call Studio makes on its
+ * own; what a person asks for (Improve, Ask for a Change, Animate, Chat replies) is never switched
+ * off here. Run While Busy sits with the gallery passes.
  */
 export const catalogueFlags = [
+  flag(
+    "STUDIO_CHAT_TITLES",
+    "Chat Titles",
+    "The assistant model names each new chat from its first request; without it a chat stays New Chat until renamed.",
+  ),
   flag(
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
     "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",
   ),
   flag(
+    "STUDIO_GALLERY_TITLES",
+    "Gallery Titles",
+    "The assistant model titles finished images and videos from their prompts, as they finish and while Studio is idle.",
+  ),
+  flag(
     "STUDIO_IMAGE_SEARCH",
     "Image Search",
     "Gallery search also finds images that look like the words, read by SigLIP 2 on Studio's CPU while it is idle. Downloads the model (about 690 MB) into the data folder.",
+  ),
+  flag(
+    "STUDIO_NEXT_STEPS",
+    "Next Steps",
+    "The assistant model writes the Suggestions menu's changes for finished images (ahead of time while Studio is idle, and as one opens) and for the composer's draft.",
+  ),
+  flag(
+    "STUDIO_PROMPT_IDEAS",
+    "Prompt Ideas",
+    "The assistant model offers prompt ideas from each account's taste when an empty prompt is focused.",
+  ),
+  flag(
+    "STUDIO_SUGGESTED_PROMPTS",
+    "Suggested Prompts",
+    "While Studio is idle, the assistant model writes a prompt for uploads and other items without one, which Recreate uses.",
+  ),
+  flag(
+    "STUDIO_TASTE_UPDATES",
+    "Taste Updates",
+    "The assistant model rewrites an account's taste profile after a few stars, compare votes and iterations; its Refresh on the Dream page still works.",
   ),
   flag(
     "STUDIO_GALLERY_WHILE_BUSY",

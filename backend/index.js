@@ -484,7 +484,12 @@ const tasteWriter = (ownerId) =>
 // Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
-const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
+const tasteStore = createTaste({
+  dataDir,
+  writer: tasteWriter,
+  online: textOnline,
+  updates: () => flagEnabled("STUDIO_TASTE_UPDATES"),
+});
 // Signals name a merged profile by the id it goes by now (profile/merge.js).
 const taste = {
   ...tasteStore,
@@ -671,6 +676,8 @@ const suggestions = createSuggestions({
   image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
   // The viewer asks by job, so every result of the run keeps the same steps.
   save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
+  ideas: () => flagEnabled("STUDIO_PROMPT_IDEAS"),
+  nextSteps: () => flagEnabled("STUDIO_NEXT_STEPS"),
 });
 registerSuggestionRoutes(app, { suggestions });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
@@ -827,6 +834,7 @@ registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requ
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
+  enabled: () => flagEnabled("STUDIO_GALLERY_TITLES"),
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
@@ -836,6 +844,7 @@ const titler = createTitler({
 });
 // Suggested prompts (domain/suggested-prompts.ts) for items without one, such as uploads; Recreate uses them.
 const suggester = createPromptSuggester({
+  enabled: () => flagEnabled("STUDIO_SUGGESTED_PROMPTS"),
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
@@ -846,6 +855,7 @@ const suggester = createPromptSuggester({
 });
 // Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
 const nextSteps = createNextStepWork({
+  enabled: () => flagEnabled("STUDIO_NEXT_STEPS"),
   suggestions,
   writer: assistantEngine,
   idle: galleryIdle,

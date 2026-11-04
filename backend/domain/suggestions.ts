@@ -137,6 +137,8 @@ export function createSuggestions({
   item,
   image,
   save,
+  ideas,
+  nextSteps,
   now = Date.now,
 }: {
   taste: Pick<Taste, "read">;
@@ -151,6 +153,10 @@ export function createSuggestions({
   image: (item: SuggestionItem) => Promise<ModelImage | null>;
   /** Keeps an image's latest next steps with it. */
   save: (item: SuggestionItem, nextSteps: SavedSteps) => void;
+  /** The Settings › Generation switch for the composer's prompt ideas (STUDIO_PROMPT_IDEAS). */
+  ideas: () => boolean;
+  /** The switch for next steps, an image's and the composer draft's (STUDIO_NEXT_STEPS). */
+  nextSteps: () => boolean;
   now?: () => number;
 }) {
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
@@ -453,6 +459,11 @@ export function createSuggestions({
         body.kind !== "video"
       )
         throw failure("Choose image or video ideas.", 400);
+      // Switched off, the menu or ideas simply have none; the model is never asked.
+      if (surface === "composer" && !ideas())
+        return empty("Prompt Ideas is off in Settings › Generation.");
+      if ((surface === "viewer" || surface === "draft") && !nextSteps())
+        return empty("Suggestions are off in Settings › Generation.");
       let source: SuggestionItem | undefined;
       if (surface === "viewer") {
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
@@ -516,6 +527,8 @@ type SuggestionService = ReturnType<typeof createSuggestions>;
  * and never with cloud.
  */
 export function createNextStepWork(options: {
+  /** The Settings › Generation switch (STUDIO_NEXT_STEPS). */
+  enabled(): boolean;
   suggestions: Pick<SuggestionService, "prepare">;
   writer: { supportsVision(): Promise<boolean> } | null;
   idle(): boolean;
@@ -531,7 +544,7 @@ export function createNextStepWork(options: {
   return createIdleWork<SuggestionItem>({
     ...options,
     name: "Viewer next steps",
-    enabled: () => Boolean(writer),
+    enabled: () => Boolean(writer) && options.enabled(),
     unavailable: async () => "",
     wanted: (item) =>
       item.type === "image" && Boolean(item.jobId && item.prompt) && !item.nextSteps,
