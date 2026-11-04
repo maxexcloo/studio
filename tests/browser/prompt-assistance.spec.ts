@@ -216,6 +216,52 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
+test("Improve Prompt lists its styles A–Z with Custom… last, which asks for an instruction", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const rewrites: any[] = [];
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        defaultPreset: "enhance",
+        presets: [
+          { id: "custom", label: "Custom" },
+          { id: "portrait", label: "Portrait" },
+          { id: "enhance", label: "Enhance" },
+          { id: "candid", label: "Candid" },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/assistant/rewrite", (route) => {
+    rewrites.push(route.request().postDataJSON());
+    return route.fulfill({ json: { prompt: "A bird in summer light", source: "assistant" } });
+  });
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("A bird in snow");
+  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /^Improve Prompt: / })).toHaveText([
+    "Candid",
+    "Enhance",
+    "Portrait",
+    "Custom…",
+  ]);
+  await page.getByRole("menuitem", { name: "Improve Prompt: Custom…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
+  const submit = dialog.getByRole("button", { name: "Improve Prompt", exact: true });
+  await expect(submit).toBeDisabled();
+  await dialog.getByRole("textbox", { name: "Instruction", exact: true }).fill("make it summer");
+  await submit.click();
+  await expect(dialog).toBeHidden();
+  await expect(prompt).toHaveValue("A bird in summer light");
+  expect(rewrites).toMatchObject([
+    { prompt: "A bird in snow", preset: "custom", instruction: "make it summer" },
+  ]);
+});
+
 test("Ask for a Change rewrites the draft's prompt in place, for Generate to run or Undo to restore", async ({
   page,
 }) => {

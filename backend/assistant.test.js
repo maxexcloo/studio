@@ -365,6 +365,38 @@ test("Spicy runs on the assistant model", async () => {
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
 });
 
+test("Custom follows its instruction, and only Uncensored Models lift the explicit limit", async () => {
+  const seen = fakeGateway(() => json("A cabin in summer."));
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  await assert.rejects(
+    engine.rewrite({ profile, prompt: "a cabin", preset: "custom", instruction: "  " }),
+    /how the prompt should change/,
+  );
+  await engine.rewrite({
+    profile,
+    prompt: "a cabin",
+    preset: "custom",
+    instruction: `make it summer${"!".repeat(600)}`,
+  });
+  const system = seen.calls.at(-1).body.messages[0].content;
+  assert.match(
+    system,
+    /Style: Custom[^\n]*\nInstruction: "make it summer!+"\nDon't make it any more sexual/,
+  );
+  assert.equal(/Instruction: "(.*)"/.exec(system)[1].length, 500, "the instruction is cut to 500");
+  await engine.rewrite({
+    profile,
+    prompt: "a cabin",
+    preset: "custom",
+    instruction: "make it summer",
+    explicit: true,
+  });
+  assert.match(
+    seen.calls.at(-1).body.messages[0].content,
+    /"make it summer"\nEvery person is an adult\.$/,
+  );
+});
+
 test("negatives: none when the guide says so, written otherwise, the guide default as fallback", async () => {
   const seen = fakeGateway(() => json("Negative: blurry, extra fingers"));
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
