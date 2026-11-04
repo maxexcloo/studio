@@ -34,7 +34,7 @@ export function animateProfile(
 ) {
   // A parked worker was stopped on purpose; say so rather than call it not running.
   const notRunning = localParked
-    ? "Local video is stopped (an administrator stopped it on purpose)"
+    ? "Videos are Stopped (an administrator can start them in Settings › Workers)"
     : "Local video isn't running";
   const usable = profiles.filter(
     (profile) => profile.kind === "video" && profile.ready !== false && profile.mediaInputs?.length,

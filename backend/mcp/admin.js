@@ -10,8 +10,9 @@
  *
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
- * Backends backs up the profiles it replaces, only an empty group can be deleted, and no tool
- * deletes a model file or touches a GPU. Maintenance runs Settings' upkeep: migrations and Merge
+ * Backends backs up the profiles it replaces, only an empty group can be deleted, a model file goes
+ * only with its catalogue entry (CatalogueEdit remove, when no profile uses it) and no tool touches
+ * a GPU. Maintenance runs Settings' upkeep: migrations and Merge
  * Duplicate Profiles back up what they change, and ending another account's unfinished job is the
  * one step that cannot be undone, so that tool alone is marked destructive.
  */
@@ -38,7 +39,7 @@ export const adminToolNames = Object.freeze([
   "Maintenance",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with Library, Profiles, Accounts or Maintenance before stating or changing it. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, removals (CatalogueEdit remove, ProfileEdit remove, CombineBackends apply) run only when asked and back up or keep versions first, and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
@@ -417,7 +418,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Imports",
     "Library Imports",
-    "Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most 20) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record and remove one import record (id), when the user asks; downloaded files stay.",
+    `Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most ${maxWaitSeconds}) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record and remove one import record (id), when the user asks; downloaded files stay.`,
     {
       action: z.enum(["read", "clear_failed", "remove"]).default("read"),
       id: id.optional(),
@@ -785,7 +786,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "ProfileEdit",
     "Edit Profile or Guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"krea2": {"image": "krea2"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"<family>": {"image": "<pack>"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
     {
       action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),

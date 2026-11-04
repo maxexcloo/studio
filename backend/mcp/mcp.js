@@ -13,6 +13,8 @@ import { hostAllowed } from "../request-guard.js";
 import {
   closest,
   listedControls,
+  loraIndex,
+  loraQueryWords,
   mcpControls,
   mcpGenerationCount,
   mcpLoras,
@@ -23,8 +25,11 @@ import {
   assertJobCount,
   maxJobsPerCall,
   mcpJson,
+  maxUploadBase64,
+  maxUploadMegabytes,
   mcpOutputPath,
   replyRule,
+  uploadLinkMinutes,
   uploadPage,
 } from "./media.js";
 import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
@@ -38,8 +43,9 @@ import {
   localUnlessAsked,
   mcpTiers,
   nameWords,
-  parkedWorker,
   profileFromRequest,
+  serviceState,
+  stoppedServices,
   speedWordList,
   profilesForTier,
   profilesNearTier,
@@ -54,6 +60,8 @@ import { adminInstructions, registerAdminTools } from "./admin.js";
 import { registerManageTools } from "./manage.js";
 import fs from "node:fs";
 import { imageMimes } from "../reference-names.js";
+import { appVersion } from "../data-dir.js";
+import { accessFeatures } from "../account-policy.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -86,7 +94,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To find earlier work, call Search. For an attached image, call UploadLink. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call Models, for work in progress Queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To find earlier work, call Search. For an attached image, call UploadLink. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -119,7 +127,24 @@ const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
 };
 const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
-const tier = z.enum(mcpTiers).describe("turbo is Super Fast.");
+// A free string checked here, so a call with a tier this deployment doesn't have gets the current list.
+const tier = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((value) => mcpTiers.includes(value), {
+    message: `Use one of ${mcpTiers.join(", ")}`,
+  })
+  .describe(`One of ${mcpTiers.join(", ")}; turbo is Super Fast.`);
+// The animation themes Reuse takes, checked at call time like tier.
+const theme = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((value) => Object.hasOwn(animateThemes, value), {
+    message: `Use one of ${Object.keys(animateThemes).join(", ")}`,
+  })
+  .describe(`One of ${Object.keys(animateThemes).join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);
 /** A JSON array sent as one string, or a single prompt. */
@@ -578,16 +603,79 @@ export function registerMcpRoutes(
         ? { profile: found, note: "" }
         : withinFamily(profiles, found, wanted);
     };
-    /** Profiles as Models lists them: "id — label" grouped by kind. */
+    /**
+     * How many references a profile takes, from its graph's media inputs, and per backend where a
+     * combined profile's backends differ; its label or description may say otherwise.
+     */
+    const referenceCount = (profile) => {
+      const inputs = profile.mediaInputs || [];
+      const backends = (profile.backendOptions || []).filter((option) =>
+        Number.isInteger(option.references),
+      );
+      const differ = new Set(backends.map((option) => option.references)).size > 1;
+      return {
+        max: inputs.length,
+        required: inputs.filter((slot) => slot.required).length,
+        ...(differ
+          ? {
+              by_backend: Object.fromEntries(
+                backends.map((option) => [option.label, option.references]),
+              ),
+            }
+          : {}),
+        note: "From the profile's graph, so it outranks any count its label or description gives.",
+      };
+    };
+    // A profile whose worker isn't answering, as Settings › Workers names that state.
+    const workerState = { parked: "Stopped", offline: "Offline" };
+    /** Profiles as Models lists them: "id — label" grouped by kind, marked when their worker isn't running. */
     const listed = (profiles) => {
       const list = {};
-      for (const profile of profiles)
+      for (const profile of profiles) {
+        const state = workerState[profile.availability]
+          ? ` (${workerState[profile.availability]})`
+          : "";
         (list[profile.kind] ||= []).push(
-          profile.label && profile.label !== profile.id
-            ? `${profile.id} — ${profile.label}`
-            : profile.id,
+          `${profile.label && profile.label !== profile.id ? `${profile.id} — ${profile.label}` : profile.id}${state}`,
         );
+      }
       return list;
+    };
+    /** Why the account sees no LoRAs, so an empty list is never read as Studio having none. */
+    const noLoras = async ({ profile, taking = false } = {}) => {
+      const access = await media.access(owner);
+      const label = profile && (profile.label || profile.id);
+      const reason =
+        access && !access.features.loras
+          ? "LoRAs are off for this account (its group doesn't grant them, or its own LoRAs switch in Preferences is off), so none can be listed or used. This doesn't mean Studio has none."
+          : profile
+            ? listedControls(profile).loras
+              ? `No installed LoRA fits ${label}.`
+              : `${label} takes no LoRAs.`
+            : taking
+              ? "No installed LoRA fits this account's ready profiles."
+              : "No ready profile takes LoRAs right now, so none can be listed; this doesn't mean Studio has none. Models without lora_query shows each service's state.";
+      return { loras: [], loras_note: `${reason}${hiddenLoras(access)}` };
+    };
+    /** Uncensored LoRAs stay out of an account's lists without Uncensored Models. */
+    const hiddenLoras = (access) =>
+      access?.features.loras && !access.features.uncensoredModels
+        ? " LoRAs marked uncensored stay hidden without Uncensored Models."
+        : "";
+    /** A lookup that matched none: says so, with how many there are and how to list them. */
+    const noMatch = async (query, installed) =>
+      `No LoRA matches ${query ? `"${query}"` : "those names"}, but ${installed} ${installed === 1 ? "is" : "are"} installed for this account. Call Models with lora_query "all" to list them, or try other words.${hiddenLoras(await media.access(owner))}`;
+    /** One page of LoRA index lines. */
+    const lorasPage = async (lines, number, installed) => {
+      const pages = Math.max(1, Math.ceil(lines.length / maxListedLoras));
+      const at = Math.min(number, pages);
+      return {
+        loras: lines.slice((at - 1) * maxListedLoras, at * maxListedLoras),
+        loras_installed: installed,
+        page: at,
+        pages,
+        loras_note: `Each reads name — hint [trigger word].${at < pages ? ` Call Models again with lora_page ${at + 1} for more.` : ""} Pass names to Generate; Studio adds missing trigger words.${hiddenLoras(await media.access(owner))}`,
+      };
     };
     /** A ready profile by id or name, the fastest of one family's matches; otherwise the closest few, fastest first, so one call corrects a guess. */
     const profileNamed = (profiles, value) => {
@@ -643,7 +731,8 @@ export function registerMcpRoutes(
       }
     };
     const server = new McpServer(
-      { name: "Studio", version: "1.0.0" },
+      // The commit the image was built from, so a client sees when Studio (and its tools) changed.
+      { name: "Studio", version: appVersion || "development" },
       {
         instructions:
           scope === "control"
@@ -660,7 +749,7 @@ export function registerMcpRoutes(
         server,
         "Models",
         "Find Models",
-        'List ready profiles as "id — label" by kind. With profile_id (id, label or words: "flux 3"): the gist of its guide, defaults, controls, reference slots and LoRAs; lora_query or lora_names detail LoRAs, in all profiles without profile_id. Rarely needed: Generate picks models and resolves names.',
+        "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features. With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
         {
           kind: z.enum(["all", "image", "video"]).default("all"),
           tier: tier.optional(),
@@ -669,12 +758,13 @@ export function registerMcpRoutes(
             .string()
             .max(200)
             .optional()
-            .describe("Looks up LoRAs by name, title or trigger."),
+            .describe('Words from a LoRA\'s name, title or trigger; "all" lists every one.'),
           // Clients validate against the published schema, so extra names are dropped here, not rejected.
           lora_names: z
             .array(z.string().min(1))
             .transform((names) => names.slice(0, 5))
             .optional(),
+          lora_page: z.number().int().min(1).max(1000).default(1),
           full_guide: z
             .boolean()
             .optional()
@@ -686,6 +776,7 @@ export function registerMcpRoutes(
           profile_id: named_id,
           lora_query,
           lora_names = [],
+          lora_page,
           full_guide,
         }) => {
           const profile_id = canonicalProfileId(named_id);
@@ -696,13 +787,23 @@ export function registerMcpRoutes(
             profiles = profiles.filter((profile) => !isCloudProfile(profile));
             if (wanted) profiles = profilesNearTier(profiles, wanted);
             // A LoRA lookup without a model searches every ready profile, so one call answers it.
-            if (lora_query || lora_names.length) {
+            if (lora_query !== undefined || lora_names.length) {
               const infos = await media.loraInfos(owner);
               const ratings = await media.loraRatings(owner);
+              const taking = profiles.filter((profile) => listedControls(profile).loras);
+              const installed = new Set(taking.flatMap((profile) => profile.options?.loras || []));
+              if (!installed.size) return mcpJson(await noLoras({ taking: taking.length > 0 }));
+              // A general lookup ("lora", "all") lists every LoRA, a page at a time.
+              if (!loraQueryWords(lora_query).length && !lora_names.length) {
+                const lines = new Map();
+                for (const profile of taking)
+                  for (const { name, line } of loraIndex(profile, infos, ratings))
+                    if (!lines.has(name)) lines.set(name, line);
+                return mcpJson(await lorasPage([...lines.values()], lora_page, installed.size));
+              }
               const found = new Map();
               const missing = new Set(lora_names);
-              for (const profile of profiles) {
-                if (!listedControls(profile).loras) continue;
+              for (const profile of taking) {
                 const result = mcpLoras(profile, infos, {
                   query: lora_query,
                   names: lora_names,
@@ -718,25 +819,63 @@ export function registerMcpRoutes(
               return mcpJson({
                 loras: [...found.values()].slice(0, maxListedLoras),
                 ...(missing.size ? { missing: [...missing] } : {}),
-                loras_note:
-                  "Pass names to Generate without profile_id and Studio picks a profile that takes them all.",
+                loras_installed: installed.size,
+                loras_note: found.size
+                  ? "Pass names to Generate without profile_id and Studio picks a profile that takes them all."
+                  : await noMatch(lora_query, installed.size),
               });
             }
-            const { backends } = await media.catalogue(owner);
-            const parked = ["image", "video"].filter(
-              (value) => (kind === "all" || kind === value) && backends?.[value]?.parked,
+            const catalogue = await media.catalogue(owner);
+            const access = await media.access(owner);
+            const shown = (value) => kind === "all" || kind === value;
+            const services = catalogue.backends
+              ? Object.fromEntries(
+                  ["image", "video"]
+                    .filter(shown)
+                    .map((value) => [value, serviceState(catalogue.backends[value])]),
+                )
+              : null;
+            const inState = (state) =>
+              Object.keys(services || {}).filter((value) => services[value] === state);
+            const servicesNote = [
+              inState("Stopped").length ? stoppedServices(inState("Stopped")) : "",
+              inState("Offline").length
+                ? `${inState("Offline")
+                    .map((value) => (value === "image" ? "Images" : "Videos"))
+                    .join(" and ")} are Offline: the worker isn't answering; try again later.`
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            const unready = (catalogue.profiles || []).filter(
+              (profile) => profile.ready === false && shown(profile.kind),
             );
             return mcpJson({
               ...listed(profiles),
-              ...(parked.length
-                ? {
-                    parked_note: `Local ${parked.join(" and ")} can't run now: ${parkedWorker(parked)}`,
-                  }
-                : {}),
               ...(cloud.length
                 ? {
                     cloud: listed(cloud),
                     cloud_note: "Only when the user asks for Grok or the cloud.",
+                  }
+                : {}),
+              ...(unready.length
+                ? {
+                    needs_setup: Object.fromEntries(
+                      unready.map((profile) => [
+                        profile.id,
+                        profile.readyReason || "Its files or nodes aren't ready.",
+                      ]),
+                    ),
+                  }
+                : {}),
+              ...(services ? { services } : {}),
+              ...(servicesNote ? { services_note: servicesNote } : {}),
+              ...(access
+                ? {
+                    account: {
+                      role: access.role,
+                      features: accessFeatures.filter((feature) => access.features[feature]),
+                    },
                   }
                 : {}),
             });
@@ -761,7 +900,18 @@ export function registerMcpRoutes(
           const ratings = Object.keys(infos).length ? await media.loraRatings(owner) : {};
           const controls = listedControls(profile);
           // A LoRA lookup answers only that question; the profile's guide and controls come without one.
-          if (controls.loras && (lora_query || lora_names.length)) {
+          if (lora_query !== undefined || lora_names.length) {
+            if (!controls.loras || !profile.options?.loras?.length)
+              return mcpJson({ id: profile.id, ...(await noLoras({ profile })) });
+            if (!loraQueryWords(lora_query).length && !lora_names.length)
+              return mcpJson({
+                id: profile.id,
+                ...(await lorasPage(
+                  loraIndex(profile, infos, ratings).map(({ line }) => line),
+                  lora_page,
+                  profile.options.loras.length,
+                )),
+              });
             const { loras, total, more, missing } = mcpLoras(profile, infos, {
               query: lora_query,
               names: lora_names,
@@ -773,6 +923,7 @@ export function registerMcpRoutes(
               loras_total: total,
               ...(more ? { more_matches: more } : {}),
               ...(missing ? { missing } : {}),
+              ...(loras.length ? {} : { loras_note: await noMatch(lora_query, total) }),
             });
           }
           review(refs, profile.id);
@@ -824,6 +975,10 @@ export function registerMcpRoutes(
                 .map((key) => [key, profile[key]]),
             ),
             tier: tierOf(profile),
+            references: referenceCount(profile),
+            ...(workerState[profile.availability]
+              ? { state: workerState[profile.availability] }
+              : {}),
             // A combined profile: the backend it runs on (an old per-backend id names its own) and the others it has.
             ...(profile.backend
               ? {
@@ -845,7 +1000,7 @@ export function registerMcpRoutes(
               ? {
                   loras: loras.slice(0, maxListedLoras),
                   loras_total: total,
-                  loras_note: `Each reads name — hint [trigger word]${total > maxListedLoras ? `; the first ${maxListedLoras} shown, lora_query finds others` : ""}. Pass names to Generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.`,
+                  loras_note: `Each reads name — hint [trigger word]${total > maxListedLoras ? `; the first ${maxListedLoras} shown, lora_query "all" with lora_page or other words finds others` : ""}. Pass names to Generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.`,
                 }
               : {}),
             ...(guide ? { prompting: guide } : {}),
@@ -858,7 +1013,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
         {
           request: z
             .string()
@@ -880,7 +1035,7 @@ export function registerMcpRoutes(
             .string()
             .min(1)
             .optional()
-            .describe('A model, family or id, e.g. "fast moss".'),
+            .describe("A model id, label or words from them; Models lists what is ready."),
           profile_ids: z.array(z.string().min(1)).min(1).max(maxJobsPerCall).optional(),
           each_profile: z.boolean().optional(),
           // Unknown keys (a misspelt "strength") are dropped rather than rejected.
@@ -888,12 +1043,14 @@ export function registerMcpRoutes(
             .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
             .max(8)
             .optional()
-            .describe("Up to 8; a profile may take fewer (Models)."),
+            .describe("Each profile's limit is its controls.loras.max in Models."),
           reference_asset_ids: z
             .array(z.string().min(1))
             .max(16)
             .optional()
-            .describe("From Search uploads, Upload or Reuse mode reference."),
+            .describe(
+              "From Search uploads, Upload or Reuse mode reference; Models gives each profile's references.max.",
+            ),
           reference_role: z.enum(["edit", "reference"]).optional(),
           aspect: z
             .string()
@@ -1340,10 +1497,10 @@ export function registerMcpRoutes(
           server,
           "Upload",
           "Upload Reference",
-          "Upload a PNG, JPEG or WebP reference image (base64, at most 20 MB) for Generate.",
+          `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for Generate.`,
           {
             // Left unbounded below so an empty file gets Upload's own advice, not a schema refusal.
-            content_base64: z.string().max(28000000),
+            content_base64: z.string().max(maxUploadBase64),
             filename: z.string().default("reference.png"),
           },
           async ({ content_base64, filename }) =>
@@ -1361,7 +1518,7 @@ export function registerMcpRoutes(
               content: [
                 {
                   type: "text",
-                  text: `Ask the user to open this link and upload the photo they attached, then call Search with uploads to use it as a reference. It works once, for 15 minutes.\n\n[Upload Photo](${url})`,
+                  text: `Ask the user to open this link and upload the photo they attached, then call Search with uploads to use it as a reference. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
                 },
               ],
               structuredContent: { link: url, expires_at: new Date(expires).toISOString() },
@@ -1388,7 +1545,7 @@ export function registerMcpRoutes(
           profile_id: z.string().min(1).optional(),
           preserve_seed: z.boolean().default(false),
           count: jobCount.default(1),
-          theme: z.enum(Object.keys(animateThemes)).optional(),
+          theme: theme.optional(),
           length: z.number().optional(),
           upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
         },
@@ -1817,10 +1974,10 @@ export function registerMcpRoutes(
       });
     }
     if (req.method === "GET") return send(200, {});
-    // At most the 20 MB image and its form; a body without a length is refused before it is read.
+    // At most the largest image and its form; a body without a length is refused before it is read.
     const length = Number(req.headers["content-length"]);
-    if (!(length > 0) || length > 20_100_000)
-      return send(413, { message: "The photo must be at most 20 MB." });
+    if (!(length > 0) || length > maxUploadMegabytes * 1_000_000 + 100_000)
+      return send(413, { message: `The photo must be at most ${maxUploadMegabytes} MB.` });
     try {
       const form = await new Request("http://upload.invalid/", {
         method: "POST",
