@@ -137,7 +137,7 @@ primary component reference and verify APIs against the installed version.
   the section's own toolbar and gives each further list a `SettingGroup`
   heading with its own toolbar beside it, the create action at its far right;
   every other part of a section, such as an import review's Files, is a
-  `SettingGroup` too, never a second section heading. Sections are alphabetical, About apart at the end, and
+  `SettingGroup` too, never a second section heading. A section's parts sit one `md` gap apart, and in a section with several lists each table's empty line is plain dimmed text (`DataTable compact`), not the centred block. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
   and the Library its What You Have sections (Guides, LoRAs, Models, Profiles)

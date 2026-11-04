@@ -428,6 +428,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
           rowKey={(item) => item.id}
           rowName={(item) => item.label}
           empty="No GPU Workloads"
+          compact
           columns={[
             {
               key: "run",
