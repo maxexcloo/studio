@@ -10,7 +10,8 @@ import {
 } from "../comfy/backends.js";
 import { comfy, comfyUrl, demoMode, isComfyTimeout, optionsFor } from "../comfy/comfy.js";
 import { families } from "../family-catalog.js";
-import { filterVisibleGallery, gallery } from "../gallery/store.js";
+import { customWorkflowsRevision } from "../custom-workflows.js";
+import { visibleGallery } from "../gallery/store.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
@@ -25,6 +26,29 @@ import {
 import { primeModelMetadata } from "./families.js";
 import { inferModels, mockModelResult, offlineModelResult } from "./models.js";
 import { uncensoredLoraNames } from "../lora/info.js";
+
+// A worker context's catalogue, kept per node list (each fetch or stored observation is its own
+// object) until the profile folder or a setting inferModels reads changes (Settings saves the
+// default profiles); `none` stands for no worker.
+const none = {};
+const inferredModels = new WeakMap();
+function inferred(info = none, stats = none, { configuredOnly = false } = {}) {
+  const { STUDIO_DEFAULT_IMAGE_PROFILE, STUDIO_DEFAULT_VIDEO_PROFILE, STUDIO_ENABLE_PRESETS } =
+    process.env;
+  const revision = [
+    customWorkflowsRevision(),
+    STUDIO_DEFAULT_IMAGE_PROFILE,
+    STUDIO_DEFAULT_VIDEO_PROFILE,
+    STUDIO_ENABLE_PRESETS,
+  ].join("|");
+  const entries = inferredModels.get(info) || new Map();
+  inferredModels.set(info, entries);
+  const kept = entries.get(configuredOnly);
+  if (kept?.revision === revision && kept.stats === stats) return kept.models;
+  const models = inferModels(info, stats, { configuredOnly });
+  entries.set(configuredOnly, { revision, stats, models });
+  return models;
+}
 
 /**
  * The media catalogue across every worker: each worker's ComfyUI context (node list, stats and
@@ -129,7 +153,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return withComfyBackend(backend, async () => {
       try {
         const context = await loadComfyContext({ force });
-        const models = inferModels(context.info, context.stats);
+        const models = inferred(context.info, context.stats);
         // What this worker has, so a job for one of its profiles goes to it (routeJob).
         noteWorkerProfiles(backend, models.profiles || []);
         return { ...context, models };
@@ -177,14 +201,14 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     if (demoMode && !answered.length && !direct.length)
       throw settled[0]?.reason || new Error("No worker is available.");
     const parked = await parkedWorkers(runtime?.controller, workers);
-    const configured = inferModels({}, {}, { configuredOnly: true });
+    const configured = inferred(none, none, { configuredOnly: true });
     const catalogues = workers
       .map((worker) => {
         const online = answered.find((entry) => entry.worker.id === worker.id);
         if (online) return online;
         const observed = store.workerModels(worker.id, worker.url);
         // Persist worker observations; project current runtime catalogue metadata on each read.
-        const cached = observed?.info && inferModels(observed.info, observed.stats);
+        const cached = observed?.info && inferred(observed.info, observed.stats);
         // Current runtime definitions replace cached custom profiles, including their permissions and defaults.
         const profiles = [
           ...(cached?.profiles || []).filter((profile) => !profile.id.startsWith("custom:")),
@@ -220,7 +244,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       : {
           ...mergeWorkerModels(
             catalogues.map(({ worker, result }) => ({ worker, models: result.models })),
-            inferModels({}, {}),
+            inferred(),
           ),
           backends,
         };
@@ -288,7 +312,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     if (demoMode) return mockModelResult();
     if (!listWorkers().length)
       return {
-        ...inferModels({}, {}),
+        ...inferred(),
         reason: noWorkerMessage("image"),
         backends: workerAvailability(),
       };
@@ -386,9 +410,15 @@ export function withProfileAliases(models) {
 }
 
 /** Profiles whose recent runs mostly fail carry `failing`: the composer badges them and MCP's own pick passes them over. */
+// The visible gallery's profile health, counted again when the gallery changes or a minute on.
+let profileHealth = { items: null, at: 0, stats: {} };
+
 export function withFailing(models) {
   if (!models?.profiles) return models;
-  const stats = profileStats(filterVisibleGallery(gallery));
+  const items = visibleGallery();
+  if (profileHealth.items !== items || Date.now() - profileHealth.at > 60_000)
+    profileHealth = { items, at: Date.now(), stats: profileStats(items) };
+  const { stats } = profileHealth;
   return {
     ...models,
     profiles: models.profiles.map((profile) =>

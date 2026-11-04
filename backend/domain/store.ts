@@ -43,6 +43,11 @@ export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued"
 
 export class Store {
   readonly db: DatabaseSync;
+  // Each worker's stored observation as last read or written: its node list is large to parse.
+  private readonly workerModelRecords = new Map<
+    string,
+    { url: string; record: Record<string, any> }
+  >();
 
   /** `db` comes from runtimeDatabase (or openDatabase in tests), which sets its pragmas. */
   constructor(db: DatabaseSync) {
@@ -425,19 +430,27 @@ export class Store {
     this.db.close();
   }
 
+  /** A worker's stored observation, shared between callers: treat it as read-only. */
   workerModels(id: string, url: string): Record<string, any> | undefined {
-    const row = this.db
-      .prepare("SELECT record FROM studio_worker_models WHERE id = ? AND url = ?")
-      .get(id, url);
-    return row ? JSON.parse(row.record as string) : undefined;
+    let kept = this.workerModelRecords.get(id);
+    if (!kept) {
+      const row = this.db
+        .prepare("SELECT url, record FROM studio_worker_models WHERE id = ?")
+        .get(id);
+      if (!row) return undefined;
+      kept = { url: row.url as string, record: JSON.parse(row.record as string) };
+      this.workerModelRecords.set(id, kept);
+    }
+    return kept.url === url ? kept.record : undefined;
   }
 
-  saveWorkerModels(id: string, url: string, models: unknown) {
+  saveWorkerModels(id: string, url: string, models: Record<string, any>) {
     this.db
       .prepare(
         "INSERT INTO studio_worker_models VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET url = excluded.url, record = excluded.record",
       )
       .run(id, url, JSON.stringify(models));
+    this.workerModelRecords.set(id, { url, record: models });
   }
 
   providerRecord<T>(ownerId: string, id: string): T | undefined {

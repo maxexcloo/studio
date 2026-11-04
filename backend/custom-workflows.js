@@ -473,8 +473,37 @@ function withinWorkflowRoot(file) {
 export const usesGrokMedia = (workflow) =>
   Object.values(workflow.graph || {}).some((node) => node.class_type === "GrokMedia");
 
+/**
+ * The profile folder's revision: every entry's name, inode, modified time and size. Profile writes
+ * replace files (json-store.js) or remove them, so any write by any path moves it; a stat per file
+ * is far cheaper than reading and checking every profile again.
+ */
+export function customWorkflowsRevision() {
+  let names;
+  try {
+    names = fs.readdirSync(userWorkflowsDir).sort();
+  } catch {
+    return "";
+  }
+  return names
+    .map((name) => {
+      try {
+        const stat = fs.statSync(path.join(userWorkflowsDir, name), { bigint: true });
+        return `${name}:${stat.ino}:${stat.mtimeNs}:${stat.size}`;
+      } catch {
+        return name;
+      }
+    })
+    .join("|");
+}
+
+// The checked profiles as of a folder revision. Shared between callers: treat them as read-only.
+let checkedWorkflows = { revision: null, workflows: [] };
+
 export function loadCustomWorkflows() {
-  return allCustomWorkflowRecords().filter((workflow) => {
+  const revision = customWorkflowsRevision();
+  if (checkedWorkflows.revision === revision) return checkedWorkflows.workflows;
+  const workflows = allCustomWorkflowRecords().filter((workflow) => {
     try {
       validateGraph(workflow.graph);
       return workflow.graph && Object.keys(workflow.graph).length;
@@ -482,6 +511,8 @@ export function loadCustomWorkflows() {
       return false;
     }
   });
+  checkedWorkflows = { revision, workflows };
+  return workflows;
 }
 
 /**
@@ -496,7 +527,8 @@ export function getCustomWorkflow(requested, backend = profileAliasBackend(reque
       workflow.id === profileId ||
       `custom:${workflow.id}` === profileId,
   );
-  return workflow ? workflowOnBackend(workflow, backend) : null;
+  // A run's own copy, so nothing it changes reaches the shared list.
+  return workflow ? workflowOnBackend(structuredClone(workflow), backend) : null;
 }
 
 export function saveImportedWorkflow(raw, meta = {}) {
