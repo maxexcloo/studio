@@ -99,7 +99,8 @@ export function scoreRewrite(item, output) {
   const preset = item.preset || "enhance";
   const max = expect.maxWords ?? (preset === "concise" ? 45 : 400);
   check(`at most ${max} words`, words <= max, `${words} words`);
-  const min = expect.minWords ?? (preset === "enhance" ? wordCount(item.prompt) + 3 : 1);
+  // A detailed prompt may only be tidied, so Enhance has no floor beyond the case's own.
+  const min = expect.minWords ?? 1;
   check(`at least ${min} words`, words >= min, `${words} words`);
   const tone = expect.tone || tones[preset];
   if (tone?.length)

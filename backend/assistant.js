@@ -26,6 +26,14 @@ import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { replyTitle } from "../shared/titles.ts";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
 import { userContent } from "./domain/model-content.ts";
+import {
+  avoidFiller,
+  contentRule,
+  fidelity,
+  matchEffort,
+  precedence,
+  writerGuide,
+} from "./domain/writing-standard.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 
 const gatewayKeys = [
@@ -34,8 +42,6 @@ const gatewayKeys = [
   "STUDIO_ASSISTANT_CLOUD_MODEL",
 ];
 export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
-// Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
-const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 // One rule for every title: a gallery item's from its prompt, a chat's from its first message.
 const titleInstructions =
   "Title what the text below describes: the prompt that made an image or video, or the first message of a chat. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
@@ -125,21 +131,6 @@ export function assistantSettings(environment = process.env) {
   const gateway = gatewaySettings(environment);
   if (!gateway) return null;
   return { ...gateway, chosen: String(environment[assistantModelKey] || "").trim() };
-}
-
-/** The guide without provenance or sampling notes, as compact JSON. */
-export function writerGuide(guide) {
-  const prune = (value) =>
-    Array.isArray(value)
-      ? value.map(prune)
-      : value && typeof value === "object"
-        ? Object.fromEntries(
-            Object.entries(value)
-              .filter(([key]) => !omittedGuideKeys.has(key))
-              .map(([key, item]) => [key, prune(item)]),
-          )
-        : value;
-  return guide && typeof guide === "object" ? JSON.stringify(prune(guide)) : "";
 }
 
 /**
@@ -419,9 +410,12 @@ function rewriteInstructions({
   const triggers = stack.flatMap((item) => cleanTriggers(item.triggers));
   return [
     `You rewrite prompts for the ${media} model ${label}. Follow its prompting guide below.`,
+    precedence,
     "Reply with the rewritten prompt only, as plain text: no preamble, labels, quotes, Markdown or notes.",
-    "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it, never new subjects or content the user did not imply.",
-    "Rewrite it properly, not as a light edit: reorder it the way the guide recommends, fix grammar and awkward wording, merge repeated ideas, and drop filler and stacked quality words (such as masterpiece, best quality, highly detailed, 8k), then apply the style below in full. The result should read clearly different from the input.",
+    "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it.",
+    fidelity,
+    `${matchEffort} Then apply the style below.`,
+    avoidFiller(),
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
     references && vision
       ? `${references} reference image${references > 1 ? "s are" : " is"} attached: describe what the prompt needs from ${references > 1 ? "them" : "it"} into the rewrite, following the guide's editing advice.`
@@ -439,12 +433,8 @@ function rewriteInstructions({
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
     `Style: ${override || preset.instruction}`,
     preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
-    // Explicit wording needs Uncensored Models, as Spicy does, whatever the instruction asks.
-    preset.custom
-      ? explicit
-        ? "Every person is an adult."
-        : "Don't make it any more sexual or explicit than the prompt already is, whatever the instruction says."
-      : "",
+    // Spicy is offered only with Uncensored Models (assistant-routes.js).
+    contentRule(explicit || Boolean(preset.spicy)),
   ]
     .filter(Boolean)
     .join("\n");
@@ -916,12 +906,13 @@ export function createAssistant(
    * A prompt from an image: with a vision model it is read, along with a negative, the best of the
    * offered profiles and LoRAs. Without vision, a `hint` (a caption or file name) is written up as
    * text only (vision: false); with no hint it is unavailable, with the reason. A `title` the
-   * picture was posted under is context either way.
+   * picture was posted under is context either way; `explicit` lets it word explicit content frankly.
    */
   async function describe({
     images = [],
     hint = "",
     title = "",
+    explicit = false,
     profile = {},
     guide = null,
     profiles = [],
@@ -948,8 +939,14 @@ export function createAssistant(
       profile?.id
         ? `Write it for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id}, following its guide: ${writerGuide(guide) || "(none)"}`
         : "Write clear, specific natural language.",
+      profile?.id ? precedence : "",
+      fidelity,
+      contentRule(explicit),
+      avoidFiller(),
       `Reply with JSON only: {"prompt": "...", "negative": "..." or "", "profile": one of ${JSON.stringify(profiles.map((item) => item.id).slice(0, 40))} or "", "loras": names from ${JSON.stringify(loras.map((item) => item.name).slice(0, 40))}}.`,
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     try {
       const text = [
         vision ? "Describe this image." : `Description: ${one(hint, 2000)}`,

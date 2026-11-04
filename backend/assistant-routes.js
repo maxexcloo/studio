@@ -330,6 +330,7 @@ export function registerAssistantRoutes(
           engine,
           writing,
           clip: animateClip(req.body, context.profile),
+          explicit: allowed(req, "uncensoredModels"),
           frame: () => frame(req, assetId),
           caption: () => caption(req, assetId),
           signal,

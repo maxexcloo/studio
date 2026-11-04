@@ -82,6 +82,7 @@ export function createPromptStage({
       guide: guide(profile),
       writing,
       clip: animateClip(job.input, profile),
+      explicit: !access || mayUseFeature(access, "uncensoredModels"),
       frame: () => frame(access, start),
       caption: () => caption(access, start),
       signal,

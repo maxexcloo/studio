@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The prompt assistant's rewrite presets, sorted by label as its menu lists them, with Custom last.
 // Each is an instruction block added after the profile's guide; a guide may replace one with its own
-// `presets.<id>` text. Spicy, and explicit wording in a Custom instruction, are only for accounts
-// with Uncensored Models.
+// `presets.<id>` text. Each sets only the tone; the content rule (domain/writing-standard.ts)
+// decides how explicit it may be, and Spicy is only for accounts with Uncensored Models.
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 export const assistantPresets = Object.freeze([
@@ -25,7 +25,7 @@ export const assistantPresets = Object.freeze([
     label: "Concise",
     description: "Short and direct, essentials only.",
     instruction:
-      "Concise: cut it to the essentials: the subject, the details that change the picture, the style and the framing, as one short sentence (under 30 words) or, where the guide prefers tags, a few comma-separated tags. Drop filler and every repeated or generic quality word. It should be clearly shorter than the input.",
+      "Concise: tighten it to the essentials: the subject, the details that change the picture, the style and the framing. Drop filler and every repeated or generic quality word. Where the guide sets a minimum length or wants a long caption, keep to that minimum rather than going under it; otherwise write one short sentence (under 30 words) or, where the guide prefers tags, a few comma-separated tags.",
   },
   {
     id: "enhance",
@@ -61,7 +61,7 @@ export const assistantPresets = Object.freeze([
     description: "Sensual and explicit, for uncensored models.",
     spicy: true,
     instruction:
-      "Spicy: make the scene sensual and explicit where the request allows it, with frank, specific wording about bodies, clothing and poses. Every person is an adult. Keep the request’s subjects and setting.",
+      "Spicy: make the scene sensual and explicit, building on the request’s own subjects and setting.",
   },
   {
     id: "custom",
