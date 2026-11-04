@@ -29,6 +29,7 @@ export function galleryJobResponse(account, id, settings = false) {
     gallery.filter((item) => item.jobId === id && recordBelongsToAccount(item, account)),
   );
   const fields = [
+    "id",
     "jobId",
     "index",
     "status",
