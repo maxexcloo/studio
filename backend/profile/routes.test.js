@@ -176,10 +176,24 @@ test("a profile’s guide view, guide edits, guide versions, revert and approve"
   const { call } = await serve(t);
   const guides = guideStore();
   guides.save("krea2", { name: "Krea 2", summary: "Seed guide." }, { by: "seed", origin: "seed" });
+  guides.save("krea2-video", { summary: "Unnamed." }, { by: "seed", origin: "seed" });
+  guides.save("loose", { summary: "Unnamed." }, { by: "seed", origin: "seed" });
   const store = guides.read();
   fs.writeFileSync(
     guides.file,
-    JSON.stringify({ ...store, families: { krea2: { image: "krea2" } } }),
+    JSON.stringify({ ...store, families: { krea2: { image: "krea2", video: "krea2-video" } } }),
+  );
+  // A guide is named by its pack, else the family it guides, else its id.
+  assert.deepEqual(
+    (await call("GET", "/api/profiles/guides")).body.packs.map(({ packId, name }) => [
+      packId,
+      name,
+    ]),
+    [
+      ["krea2", "Krea 2"],
+      ["krea2-video", "Krea 2"],
+      ["loose", "loose"],
+    ],
   );
   const view = await call("GET", "/api/profiles/editable/krea-test/guide");
   assert.deepEqual(

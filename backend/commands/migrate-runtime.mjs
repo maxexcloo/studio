@@ -31,6 +31,7 @@ if (
   result.conflicts?.length ||
   result.runtime?.conflicts.length ||
   result.galleryRows?.conflicts.length ||
-  result.uploads?.conflicts.length
+  result.uploads?.conflicts.length ||
+  result.profileIds?.conflicts.length
 )
   process.exitCode = 1;

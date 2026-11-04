@@ -19,6 +19,8 @@ const legacyRecordFiles = ["lora-stacks", "model-types", "studio_gallery", "stud
 const envSettingsFiles = [".env", "settings.json"];
 // What the download sources step (library/download-sources.js) backs up beside the catalogue.
 const downloadSourcesFiles = ["model-download-sources.json", "model-download-sources.json.bak"];
+// What the profile ids step (profile/rename.js) backs up beside profiles, versions and LoRA stacks.
+const profileIdFiles = ["guides/prompting.json", "workflow-preferences.json", "timings.json"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
@@ -252,7 +254,12 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   for (const mapping of manifest.mappings) {
     const store = mapping.source === "reference-assets/index.json";
-    const profile = /^workflows\/[a-z0-9][a-z0-9._-]*\.json$/.test(mapping.source);
+    // A profile and Studio's records beside it, a profile's or guide's version (profile/rename.js).
+    const profile =
+      /^workflows\/(\.studio-(aliases|edits|meta)|[a-z0-9][a-z0-9._-]*)\.json$/.test(
+        mapping.source,
+      ) ||
+      /^history\/(profiles|guides)\/[A-Za-z0-9][A-Za-z0-9._:-]*\/\d+\.json$/.test(mapping.source);
     const catalogue = mapping.source === "library/catalogue.json";
     const stacks = /^accounts\/[0-9a-f]{64}\/lora-stacks\.json$/.test(mapping.source);
     if (
@@ -262,10 +269,11 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
       !stacks &&
       !envSettingsFiles.includes(mapping.source) &&
       !downloadSourcesFiles.includes(mapping.source) &&
+      !profileIdFiles.includes(mapping.source) &&
       ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
     )
       throw new Error("Unsupported backup mapping");
-    if (profile || catalogue || stacks)
+    if (profile || catalogue || stacks || profileIdFiles.includes(mapping.source))
       fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {
         recursive: true,
         mode: 0o700,
