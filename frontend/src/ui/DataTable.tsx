@@ -4,6 +4,7 @@ import {
   Group,
   Menu,
   Table,
+  Text,
   UnstyledButton,
   VisuallyHidden,
   type MantineBreakpoint,
@@ -52,6 +53,7 @@ export function DataTable<T>({
   searchText,
   initialSort,
   empty,
+  compact = false,
   loading,
   minWidth,
 }: {
@@ -68,6 +70,8 @@ export function DataTable<T>({
   initialSort?: Sort;
   /** Shown when there are no rows; a query that hides every row shows No Matches. */
   empty: string;
+  /** Shows the empty line as plain text, for a section that holds several lists. */
+  compact?: boolean;
   /** The loading label while the rows are fetched. */
   loading?: string | false;
   /** For editable grids that cannot drop columns: scroll sideways below this width. */
@@ -83,7 +87,16 @@ export function DataTable<T>({
           return terms.every((term) => text.includes(term));
         })
       : rows;
-  if (!matching.length) return <EmptyState>{rows.length ? "No Matches" : empty}</EmptyState>;
+  if (!matching.length) {
+    const line = rows.length ? "No Matches" : empty;
+    return compact ? (
+      <Text size="sm" c="dimmed">
+        {line}
+      </Text>
+    ) : (
+      <EmptyState>{line}</EmptyState>
+    );
+  }
   const sortValue = columns.find((column) => column.key === sort?.key)?.sortValue;
   const sorted =
     sort && sortValue

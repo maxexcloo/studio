@@ -202,7 +202,7 @@ export function RuntimePanel() {
   );
   const shown = services.filter(({ kind }) => observed[kind]);
   return (
-    <Stack gap="lg" aria-label="Runtime">
+    <Stack gap="md" aria-label="Runtime">
       <Text size="sm" component="section" aria-label="Services">
         {/* A service's reason is its tooltip; the workloads table carries the detail. */}
         {shown.length
