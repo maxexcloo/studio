@@ -1132,6 +1132,20 @@ export function generationSettings(body) {
   return settings;
 }
 
+/** A saved output's own size, read from its file (sharp for an image, ffmpeg otherwise); null when unreadable. */
+export async function outputFileSize(file, type) {
+  if (type === "image") {
+    const sharp = await loadSharp();
+    return sharp
+      ? sharp(file)
+          .metadata()
+          .catch(() => null)
+      : null;
+  }
+  const { probeVideo } = await import("../video-previews.js");
+  return probeVideo(file);
+}
+
 export async function replaceGalleryJob(id, outputs, body, jobs, status = "done") {
   const title = promptTitle(body.prompt);
   const job = jobs.get(id) || {};
@@ -1153,15 +1167,9 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
           subfolder,
           params.get("type") || "output",
         );
-        if (file && item.type === "image") {
-          const sharp = await loadSharp();
-          size = sharp
-            ? await sharp(file)
-                .metadata()
-                .catch(() => null)
-            : null;
-        } else if (file) {
-          const { joinClips, probeVideo } = await import("../video-previews.js");
+        if (file && item.type === "image") size = await outputFileSize(file, item.type);
+        else if (file) {
+          const { joinClips } = await import("../video-previews.js");
           // An Extend (a run started from a video's frame) is kept joined onto that video. Only the
           // first reference is what the run was made from (shared/versions.ts). The extension's own
           // file stays, so a retried save or a provider's recorded output still finds it.
@@ -1180,7 +1188,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
               console.warn(`[Studio] Keeping an extension unjoined: ${error.message}`);
             }
           }
-          size = await probeVideo(file);
+          size = await outputFileSize(file, item.type);
         }
       }
       return {
@@ -1290,15 +1298,22 @@ export function updateGalleryJobPreviews(id, previews = []) {
  * them. A run's settlement records them together, so a row without a source may not have saved the
  * item's yet and leaves it as it is.
  */
-export function reloadGallerySources() {
-  const fields = ["parentItemId", "parentJobId", "derived"];
+export const reloadGallerySources = () =>
+  reloadGalleryFields(["parentItemId", "parentJobId", "derived"], (row) => row.parentItemId);
+
+/** Takes each result's size from its saved row, after gallery-sizes.js `gallerySizes` wrote it. */
+export const reloadGallerySizes = () =>
+  reloadGalleryFields(["width", "height"], (row) => Number(row.width) > 0);
+
+/** Takes `fields` from each saved row that is `settled` into the loaded item, then saves. */
+function reloadGalleryFields(fields, settled) {
   const saved = new Map(
     readGalleryRows(runtimeDatabase(dataDir)).map((row) => [galleryKey(row), row]),
   );
   let changed = false;
   gallery = gallery.map((item) => {
     const row = saved.get(galleryKey(item));
-    if (!row?.parentItemId || fields.every((key) => row[key] === item[key])) return item;
+    if (!row || !settled(row) || fields.every((key) => row[key] === item[key])) return item;
     changed = true;
     const next = { ...item };
     for (const key of fields) {

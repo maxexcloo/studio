@@ -123,12 +123,14 @@ import {
   galleryJobItems,
   dataDir,
   importedImageFile,
+  outputFileSize,
   recordsFromComfyHistory,
   setGallery,
   cleanupGalleryState,
   updateGalleryJob,
   galleryRevisionValue,
   onGalleryFilesDeleted,
+  reloadGallerySizes,
   reloadGallerySources,
 } from "./gallery/store.js";
 import { fillVideoSizes } from "./library/library.js";
@@ -147,7 +149,7 @@ import { registerRedditImportRoute } from "./gallery/reddit.js";
 import { loadLoraLibrary } from "./lora/stacks.js";
 import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
 import { compressJson, serveApp } from "./http-assets.js";
-import { isMediaUrl } from "./media-paths.js";
+import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
 import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
@@ -290,6 +292,15 @@ const recoverRunningJobs = createJobRecovery({
 async function ingestRecoveredRecords(records, promptIds = []) {
   if (!records.length) return records;
   const moved = await ingestRecords(records);
+  // A history record carries the size asked for; the saved file's own size is what the run drew.
+  moved.records = await Promise.all(
+    moved.records.map(async (record) => {
+      const params = mediaParams(record.url);
+      const file = params && mediaFile(params.filename, params.subfolder);
+      const size = file ? await outputFileSize(file, record.type) : null;
+      return size?.width ? { ...record, width: size.width, height: size.height } : record;
+    }),
+  );
   if (moved.comfyFiles.length) {
     const backend = currentComfyBackend();
     const ids = [
@@ -625,7 +636,7 @@ registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
 registerMigrationRoutes(app, {
   dataDir,
   requireAdmin,
-  reload: { gallerySources: reloadGallerySources },
+  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
 });
 const admitGeneration = createGenerationAdmission({
   store,

@@ -4,6 +4,7 @@ import { reloadAccountStore } from "./account-store.js";
 import { combinedProfiles } from "./combined-profiles.js";
 import { dreamOwnership } from "./dream-ownership.js";
 import { envSettings } from "./env-settings.js";
+import { gallerySizes } from "./gallery-sizes.js";
 import { legacyRecords } from "./legacy-records.js";
 import { reloadCatalogue } from "./library/catalogue.js";
 import { downloadSources } from "./library/download-sources.js";
@@ -74,6 +75,13 @@ const steps = [
     name: "gallerySources",
     run: gallerySources,
     changes: (plan) => size(plan.filled) + size(plan.versions),
+    online: true,
+  },
+  // The server passes a reload for this step too.
+  {
+    name: "gallerySizes",
+    run: gallerySizes,
+    changes: (plan) => plan.corrected,
     online: true,
   },
   { name: "profilePrompting", run: profilePrompting, changes: (plan) => size(plan.profiles) },
