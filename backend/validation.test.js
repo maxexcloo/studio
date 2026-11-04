@@ -112,11 +112,13 @@ test("omitted settings take the profile's defaults, not ComfyUI's node defaults"
     steps: ["INT", { default: 20, min: 1, max: 100 }],
     cfg: ["FLOAT", { default: 8, min: 0, max: 100, step: 0.1 }],
   });
-  const { steps, cfg, width, height, ...rest } = request;
+  const { steps, cfg, width, height, clipType, ...rest } = request;
   const body = sanitizeGenerateBody(
     { ...rest, referenceAssets: [{ slot: "reference", assetId: "upload-id" }] },
     generic,
     {},
   );
   assert.deepEqual([body.steps, body.cfg, body.width, body.height], [2, 1, 1216, 1536]);
+  // No clip type of its own, so the graph takes the profile's (flux2), not a generic stand-in.
+  assert.equal(body.clipType, "");
 });
