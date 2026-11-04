@@ -172,8 +172,9 @@ primary component reference and verify APIs against the installed version.
   video's Length, a set Seed (clearable), Backend (when the profile has several),
   Expert settings (its fields alphabetical, Allow Fallback under Worker), Compare
   and Presets, then Image/Video and Generate. Choosing items never resizes the
-  chips: References and LoRAs keep one width whether they show their name or
-  their thumbnails. Placing the first reference applies the
+  chips: References and LoRAs keep their name in place and one width at every
+  count, with one fixed picture before the name showing the icon, then the chosen
+  items' thumbnails stacked with a count. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its

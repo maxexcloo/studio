@@ -372,8 +372,9 @@ export function PickerTile({
 }
 
 /**
- * A picker chip's content: its icon and name, or once items are chosen their thumbnails, laid over
- * each other in one cell so the chip keeps one width as items come and go.
+ * A picker chip's content: its name, always in place, after one fixed-size picture that shows the
+ * icon until items are chosen, then their thumbnails stacked with a count, so the chip keeps one
+ * width as items come and go.
  */
 export function ChipContent({
   label,
@@ -384,48 +385,36 @@ export function ChipContent({
   icon: LucideIcon;
   items: { key: string; label: string; src?: string; off?: boolean }[];
 }) {
-  const chosen = items.length > 0;
+  const max = 3;
   return (
     <span className={classes.chipContent}>
-      <span className={classes.chipName} data-hidden={chosen || undefined} aria-hidden={chosen}>
-        <Icon size={16} />
-        {label}
+      <span className={classes.stack}>
+        {items.length ? (
+          items.slice(0, max).map((item, index) => (
+            <span
+              key={item.key}
+              className={classes.thumb}
+              data-off={item.off || undefined}
+              title={item.label}
+              style={{ zIndex: max - index, translate: `${index * 2}px 0` }}
+            >
+              {item.src ? (
+                <Image src={item.src} alt={item.label} fallbackSrc="" />
+              ) : (
+                <Icon size={14} aria-label={item.label} />
+              )}
+            </span>
+          ))
+        ) : (
+          <Icon size={16} />
+        )}
+        {items.length > 1 && (
+          <span className={classes.count} aria-hidden>
+            {items.length}
+          </span>
+        )}
       </span>
-      <ChipThumbnails items={items} placeholder={Icon} />
-    </span>
-  );
-}
-
-/** Thumbnails for a chip: overlapping like a stack, the first few and then a count. */
-function ChipThumbnails({
-  items,
-  placeholder: Placeholder,
-  max = 3,
-}: {
-  items: { key: string; label: string; src?: string; off?: boolean }[];
-  placeholder: LucideIcon;
-  max?: number;
-}) {
-  const shown = items.length > max ? items.slice(0, max - 1) : items;
-  return (
-    <span className={classes.thumbs}>
-      {shown.map((item) => (
-        <span
-          key={item.key}
-          className={classes.thumb}
-          data-off={item.off || undefined}
-          title={item.label}
-        >
-          {item.src ? (
-            <Image src={item.src} alt={item.label} fallbackSrc="" />
-          ) : (
-            <Placeholder size={14} aria-label={item.label} />
-          )}
-        </span>
-      ))}
-      {items.length > shown.length && (
-        <span className={classes.more}>+{items.length - shown.length}</span>
-      )}
+      {label}
     </span>
   );
 }
