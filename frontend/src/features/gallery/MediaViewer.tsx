@@ -225,6 +225,7 @@ export function MediaViewer({
   close,
   sessionId,
   items = [item],
+  related = items,
   navigate,
   onReturnFocus,
   actions,
@@ -235,6 +236,8 @@ export function MediaViewer({
   close: () => void;
   sessionId?: string;
   items?: MediaItem[];
+  /** The loaded items the version strip and Details › From and Derived look among; `items` by default. */
+  related?: MediaItem[];
   navigate?: (item: MediaItem) => void;
   onReturnFocus?: (item: MediaItem) => void;
   /** The opening surface's own actions, in place of the item's prompt field and actions. */
@@ -286,7 +289,7 @@ export function MediaViewer({
   const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
-  const family = useRunFamily(item, queued);
+  const family = useRunFamily(item, queued, related);
   const iteration = useMediaIteration(item, sessionId);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
@@ -696,6 +699,7 @@ export function MediaViewer({
                     </Stack>
                     <MediaDetails
                       item={displayed}
+                      related={related}
                       open={
                         navigate &&
                         ((next) => {
@@ -734,6 +738,7 @@ export function MediaViewer({
               </Text>
               <MediaDetails
                 item={displayed}
+                related={related}
                 open={
                   navigate &&
                   ((next) => {
