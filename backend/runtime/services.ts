@@ -239,7 +239,7 @@ export function createServicesObserver({
             const observed: Probe = target.workloads?.every((id) => parked.has(id))
               ? {
                   state: "parked",
-                  reason: "Parked: stopped on purpose. An administrator can start it.",
+                  reason: "Stopped on purpose. An administrator can start it.",
                   checkedAt: new Date(now()).toISOString(),
                 }
               : endpoint
@@ -283,7 +283,7 @@ export function createServicesObserver({
               : state === "waiting"
                 ? "Waiting for the selected runtime."
                 : state === "parked"
-                  ? "Parked: stopped on purpose. An administrator can start it."
+                  ? "Stopped on purpose. An administrator can start it."
                   : state === "offline"
                     ? "No runtime answered its health check."
                     : "Runtime readiness is unknown.",

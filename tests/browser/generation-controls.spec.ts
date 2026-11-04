@@ -120,7 +120,7 @@ test("A parked profile reads as parked, and an administrator choosing it starts 
   const picker = page.getByRole("combobox", { name: "Profile", exact: true });
   await picker.click();
   const option = page.getByRole("option", { name: /Parked Image/ });
-  await expect(option).toContainText("Parked");
+  await expect(option).toContainText("Stopped");
   await option.click();
   await expect(picker).toHaveAttribute("title", /Starting: Starting P\./);
   expect(previews).toEqual([{ start: ["image-p"] }]);

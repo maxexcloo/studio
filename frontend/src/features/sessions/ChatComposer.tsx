@@ -20,7 +20,7 @@ import classes from "./ChatComposer.module.css";
 /**
  * The composer's text model chip. Administrators also see models whose Studio workloads are
  * stopped: choosing one starts it (asking first when that stops others) and selects it once ready.
- * Others see parked models marked Parked and cannot choose them.
+ * Others see parked models marked Stopped and cannot choose them.
  */
 function ChatModelPicker({
   disabled,
@@ -183,7 +183,7 @@ function ChatComposer() {
               </ActionIcon>
             </Tooltip>
           ) : (
-            <Tooltip label={parked ? "Model Parked by an Administrator" : "Send Message"}>
+            <Tooltip label={parked ? "Model Stopped by an Administrator" : "Send Message"}>
               <ActionIcon
                 type="submit"
                 aria-label="Send Message"

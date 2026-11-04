@@ -81,7 +81,7 @@ const minutes = (ms: number) => plural(Math.round(ms / 60_000), "minute");
 const historyLimit = 100;
 /** Why work for a parked workload waits, in the words every surface uses. */
 export const parkedReason = (label: string) =>
-  `${label} is parked: it was stopped on purpose. An administrator can start it in Settings › Workers.`;
+  `${label} is stopped: an administrator can start it in Settings › Workers.`;
 const memoryStore = (): RuntimeStore => {
   let record: RuntimeRecord | undefined;
   return {

@@ -65,8 +65,10 @@ primary component reference and verify APIs against the installed version.
   accessible names and tooltips. The selected mode's pill slides between items (`FloatingIndicator`). On every breakpoint one status action sits
   right of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
-  cloud configuration alone is not proof of availability). A worker stopped on
-  purpose reads Parked in grey wherever it shows, never as failing, with Start
+  cloud configuration alone is not proof of availability). Services and
+  workloads read Running or Stopped to people (Starting, Stopping and failures
+  keep their own words; the API's `healthy` and `parked` stay). A worker stopped on
+  purpose reads Stopped in grey wherever it shows, never as failing, with Start
   for administrators there; one that should run but doesn't stays red. It opens active
   and failed generations with Stop, Retry and Clear, and the compact service
   summary at the bottom, which administrators tap to open Settings › Workers:
@@ -251,7 +253,7 @@ primary component reference and verify APIs against the installed version.
   models whose Studio text workloads are stopped; choosing one starts it,
   confirming first with the workloads it stops when no GPU is free, and selects
   it once ready, with progress under the rail. Others see models that run,
-  and parked ones marked Parked that they cannot choose. Media settings belong
+  and parked ones marked Stopped that they cannot choose. Media settings belong
   to timeline input cards, never a second mode in the bottom Chat composer.
   Header status owns connection information; keep it out of the conversation.
 - Render assistant Markdown semantically with the shared safe renderer, using

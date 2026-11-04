@@ -236,7 +236,7 @@ export function ExpertSettings({
               return {
                 value: id,
                 label: worker
-                  ? `${worker.name} · ${worker.available ? "Available" : worker.parked ? "Parked" : "Offline"}`
+                  ? `${worker.name} · ${worker.available ? "Available" : worker.parked ? "Stopped" : "Offline"}`
                   : id,
               };
             })}

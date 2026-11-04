@@ -74,7 +74,7 @@ export const phaseLabel = (phase: WorkloadPhase) =>
     running: "Running",
     starting: "Starting",
     stopping: "Stopping",
-    parked: "Parked",
+    parked: "Stopped",
     down: "Down",
     unknown: "Unknown",
   })[phase];

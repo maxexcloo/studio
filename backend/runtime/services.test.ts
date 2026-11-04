@@ -183,7 +183,10 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
     "video-tp2": "parked",
     text: "down",
   });
-  await assert.rejects(controller.acquire("image"), /image is parked: it was stopped on purpose/);
+  await assert.rejects(
+    controller.acquire("image"),
+    /image is stopped: an administrator can start it/,
+  );
   await assert.rejects(controller.acquire("text"), /text is down/);
 });
 

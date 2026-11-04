@@ -220,7 +220,7 @@ test("generation waits on a stopped workload: off says so, automatic starts medi
   const manual = fixture(["image"]);
   await assert.rejects(
     manual.controller.acquire("video"),
-    /Video is parked: it was stopped on purpose/,
+    /Video is stopped: an administrator can start it/,
   );
   assert.deepEqual(manual.kube.log, []);
   const { kube, controller } = fixture(["image", "text"], { automaticLifecycle: true });

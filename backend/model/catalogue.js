@@ -265,7 +265,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     };
     if (!answered.length && workers.length)
       models.reason = workers.every((worker) => parked.has(worker.id))
-        ? "Configured workers are parked: stopped on purpose. An administrator can start them in Settings › Workers."
+        ? "Configured workers are stopped: an administrator can start them in Settings › Workers."
         : "Configured workers are offline. Selected jobs wait until their worker is available.";
     models.workers = workers.map((worker) => {
       const available = answered.some((entry) => entry.worker.id === worker.id);
