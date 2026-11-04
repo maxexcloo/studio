@@ -24,8 +24,9 @@
 }
 
 /*
- * The phone Generate sheet never scrolls: the fields take the room above a bottom bar of chips and
- * actions, which sits at the safe bottom or just above the keyboard (`--keyboard-inset`).
+ * The phone Generate sheet never scrolls: the fields take the room above a bottom bar of chips
+ * (wrapping onto as many rows as they need) and actions, which sits at the safe bottom or just
+ * above the keyboard (`--keyboard-inset`).
  */
 .editor[data-fill] {
   flex: 1;
@@ -52,7 +53,15 @@
   border-top: 1px solid var(--studio-glass-border);
 }
 
-/* While the keyboard is up the bar keeps only its actions, leaving the prompt room to type. */
-:global([data-typing]) .editor[data-fill] .footer > [role="group"] {
+/*
+ * While the keyboard is up for a text box (or its tools have focus), it alone fills the room above
+ * the bar, which keeps only its actions; the chips and the other box return when the text loses
+ * focus or the keyboard drops.
+ */
+:global([data-typing]) .editor[data-fill] .fields:focus-within > :not(:focus-within) {
+  display: none;
+}
+
+:global([data-typing]) .editor[data-fill]:has(.fields:focus-within) .footer > [role="group"] {
   display: none;
 }
