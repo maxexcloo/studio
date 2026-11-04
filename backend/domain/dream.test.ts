@@ -38,7 +38,7 @@ const profiles: DreamProfile[] = [
 const everything: DreamAccess = { uncensored: false };
 
 /** Dream with fakes for every service; nothing generates and nothing starts on its own. */
-function fixture(t: TestContext) {
+function fixture(t: TestContext, catalogue = profiles) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-"));
   const store = new Store(openDatabase(":memory:"));
   t.after(() => {
@@ -81,7 +81,10 @@ function fixture(t: TestContext) {
     taste,
     owners: () => ["alice", "bob"],
     access: (ownerId) => state.access[ownerId] ?? null,
-    catalogue: async () => ({ profiles, defaults: { imageModel: "flux", videoModel: "wan" } }),
+    catalogue: async () => ({
+      profiles: catalogue,
+      defaults: { imageModel: "flux", videoModel: "wan" },
+    }),
     online: async (kind) => {
       const reach = (value: boolean | "parked") =>
         value === "parked" ? value : value ? "online" : "offline";
@@ -669,6 +672,40 @@ test("Dream loads up to two of the account's thumbs-up LoRAs the profile can use
   state.loras = {};
   const next = (await dreamOnce())!;
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
+});
+
+test("Dream compares steps only on a profile with a steps control", async (t) => {
+  const asked = async (capabilities: DreamProfile["capabilities"]) => {
+    const { dream, state, store, live, dreamOnce } = fixture(t, [
+      { id: "flux", kind: "image", label: "FLUX", capabilities },
+    ]);
+    const session = store.createSession("alice", "Gallery").id;
+    const base = store.enqueue(
+      "alice",
+      session,
+      { kind: "image", profileId: "flux", prompt: "a fox in snow", steps: 20 },
+      "image",
+    );
+    store.save({ ...base, status: "completed" });
+    state.items.push({
+      id: "base",
+      jobId: base.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      favorite: true,
+      prompt: "a fox in snow",
+      settings: { profileId: "flux" },
+    });
+    await dream.save("alice", { enabled: true, dailyImages: 10 });
+    for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+    await dream.tick();
+    return live("alice")[0].dream?.pair?.question;
+  };
+  // With one profile and no LoRAs, Steps comes first when offered and Wording otherwise.
+  assert.equal(await asked({ steps: true }), "Which Steps?");
+  assert.equal(await asked({ steps: false }), "Which Wording?");
+  assert.equal(await asked(undefined), "Which Wording?");
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
