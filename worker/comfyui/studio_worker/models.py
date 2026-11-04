@@ -22,6 +22,8 @@ FOLDERS = {
     "vae",
 }
 BUSY = set()
+# Hugging Face transfers running in this process, keyed by file path: bytes so far, a cancel flag, any error.
+FETCHES = {}
 
 
 def directories(root, folder):
@@ -90,10 +92,22 @@ def state(root, folder, filename, hash_file=False):
     try:
         partial = Path(str(file) + ".part")
         note = Path(str(file) + ".part.json")
+        fetch = FETCHES.get(str(file))
         result = {
             "size": file.stat().st_size if file.is_file() else 0,
-            "partialBytes": partial.stat().st_size if partial.is_file() else 0,
+            "partialBytes": max(
+                partial.stat().st_size if partial.is_file() else 0,
+                fetch["bytes"] if fetch else 0,
+                *[
+                    item.stat().st_size
+                    for item in Path(str(file) + ".hf").glob("**/*.incomplete")
+                ],
+            ),
         }
+        if fetch:
+            result["fetching"] = not fetch["done"]
+            if fetch["error"]:
+                result["error"] = fetch["error"]
         if file.is_file():
             result["mtimeMs"] = file.stat().st_mtime * 1000
             if hash_file:
@@ -347,3 +361,89 @@ async def receive(root, folder, filename, offset, expected_size, sha256, note, c
         return {"size": received}
     finally:
         release(file)
+
+
+def cancel_fetch(root, folder, filename):
+    """Stops a running Hugging Face transfer; its partial data stays for a later resume."""
+    fetch = FETCHES.get(str(target(root, folder, filename)))
+    if fetch:
+        fetch["cancel"] = True
+
+
+def start_fetch(root, folder, filename, repo, revision, path, size, sha256, note, token):
+    """Starts a Hugging Face download (hf_hub_download, hf_xet when available) in the background.
+
+    Studio polls `state` for progress. A transfer already running is left alone, and a partial one
+    resumes from huggingface_hub's own incomplete file. The finished file must match `sha256`.
+    """
+    file = target(root, folder, filename)
+    if (
+        size <= 0
+        or size > MAX_BYTES
+        or not re.fullmatch("[a-fA-F0-9]{64}", sha256)
+        or not re.fullmatch(r"[\w.-]+/[\w.-]+", repo)
+        or not re.fullmatch(r"[\w.-]+", revision)
+        or not path
+        or any(not part or part.startswith(".") for part in path.split("/"))
+    ):
+        raise ValueError("A Hugging Face file, size and published SHA-256 are required.")
+    if file.exists():
+        return {"already": True}
+    if (FETCHES.get(str(file)) or {}).get("done") is False:
+        return {"fetching": True}
+    if shutil.disk_usage(file.parent).free < size + 256 * 1024 * 1024:
+        raise ValueError("The worker has insufficient free disk space.")
+    acquire(file)
+    fetch = {"bytes": 0, "cancel": False, "done": False, "error": ""}
+    FETCHES[str(file)] = fetch
+    file.parent.mkdir(parents=True, exist_ok=True)
+    allowed_note = {
+        key: note[key][:1024]
+        for key in ["id", "label", "source"]
+        if isinstance(note.get(key), str)
+    }
+    allowed_note.update(totalBytes=size, exact=True, sha256=sha256.lower())
+    Path(str(file) + ".part.json").write_text(json.dumps(allowed_note))
+
+    def run():
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.utils import tqdm
+
+        class Progress(tqdm):
+            def update(self, n=1):
+                if fetch["cancel"]:
+                    raise InterruptedError("The download was stopped.")
+                result = super().update(n)
+                fetch["bytes"] = max(fetch["bytes"], int(self.n))
+                return result
+
+        staging = Path(str(file) + ".hf")
+        try:
+            downloaded = Path(
+                hf_hub_download(
+                    repo,
+                    path,
+                    revision=revision,
+                    token=token or None,
+                    local_dir=staging,
+                    tqdm_class=Progress,
+                )
+            )
+            if digest(downloaded) != sha256.lower():
+                Path(str(file) + ".part.json").unlink(missing_ok=True)
+                shutil.rmtree(staging, ignore_errors=True)
+                raise ValueError("The model did not match its published checksum.")
+            downloaded.chmod(0o644)
+            os.link(downloaded, file, follow_symlinks=False)
+            shutil.rmtree(staging, ignore_errors=True)
+            Path(str(file) + ".part.json").unlink(missing_ok=True)
+        except InterruptedError:
+            fetch["error"] = "stopped"
+        except Exception as error:  # reported to Studio through `state`
+            fetch["error"] = str(error) or "The Hugging Face download failed."
+        finally:
+            fetch["done"] = True
+            release(file)
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"fetching": True}
