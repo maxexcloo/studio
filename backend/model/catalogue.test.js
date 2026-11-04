@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,9 +9,33 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-catalogue-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+// A worker that takes requests and never answers, as a parked one behind its service can.
+const hung = http.createServer(() => {});
+await new Promise((resolve) => hung.listen(0, "127.0.0.1", resolve));
+const hungUrl = `http://127.0.0.1:${hung.address().port}`;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  { id: "primary", url: hungUrl, capabilities: ["image", "models"] },
+]);
+test.after(() => {
+  hung.closeAllConnections();
+  hung.close();
+});
 
 const { loraCatalogue } = await import("../lora/info.js");
-const { loraAllowed, modelsForAccount } = await import("./catalogue.js");
+const { createModelCatalogue, loraAllowed, modelsForAccount } = await import("./catalogue.js");
+
+test("the Library lists a worker's last known files without waiting on it", async () => {
+  const info = { LoraLoader: { input: { required: { lora_name: [["kept.safetensors"]] } } } };
+  const store = {
+    workerModels: (id, url) => (id === "primary" && url === hungUrl ? { info } : undefined),
+    saveWorkerModels: () => {},
+  };
+  const started = Date.now();
+  const latest = await createModelCatalogue({ store }).latestComfyContext();
+  assert.deepEqual(latest.info, info);
+  assert.equal(latest.current, false);
+  assert.ok(Date.now() - started < 1000);
+});
 
 test("uncensored LoRAs need Uncensored Models, in discovery and at admission", () => {
   loraCatalogue().edit("loras/explicit.safetensors", { uncensored: true });
