@@ -381,8 +381,13 @@ export function createImportEngine({
         continue;
       }
       delete resource.progress;
-      if (resource.downloadId && recent.get(resource.downloadId)?.status === "error")
-        resource.downloadError = recent.get(resource.downloadId).error || "The download stopped.";
+      const finished = resource.downloadId ? recent.get(resource.downloadId) : null;
+      if (finished?.status === "error")
+        resource.downloadError = finished.error || "The download stopped.";
+      // Downloads live in memory, so one the running Studio has never heard of was cut off by a restart.
+      else if (resource.downloadId && !finished)
+        resource.downloadError =
+          "Studio restarted during this download. Download again to continue from the saved part.";
       const found = resource.want.file
         ? await inspect(resource.want, { verify }).catch(() => ({ status: "missing" }))
         : { status: "missing" };
