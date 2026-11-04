@@ -4,7 +4,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-UPSTREAM_SHA256 = "108ceff11e5a5c9a34a57bbc380447cf9941beb673a1bd421abc818de54ccd5c"
+UPSTREAM_SHA256 = "75514fe9093c589da231938287ef0ceeb2dcf31179143a1de9a269fb2f7bb626"
 BEFORE = """def _resize(image, width, height, crop):
     # image [B, H, W, C] -> [B, height, width, 3]
     samples = image[..., :3].movedim(-1, 1)
