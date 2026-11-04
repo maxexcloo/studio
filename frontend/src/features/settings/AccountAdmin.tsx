@@ -40,6 +40,16 @@ const featureLabels = {
   promptAssistant: "Prompt Assistant",
   uncensoredModels: "Uncensored Models",
 };
+/** A group ID from its name, in the form the server takes (backend/account-policy.js validAccountKey). */
+const groupId = (name: string) =>
+  name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 128)
+    .replace(/-+$/, "");
 interface AccessGroup {
   id: string;
   name: string;
@@ -66,6 +76,7 @@ function GroupEditor({
   onCancel: () => void;
 }) {
   const { profiles } = useGenerationActions();
+  const [idTyped, setIdTyped] = useState(false);
   const form = useForm<AccessGroup>({
     initialValues: initial || {
       id: "",
@@ -98,18 +109,28 @@ function GroupEditor({
       }}
     >
       <Stack>
-        {/* The ID is fixed once a group exists, so only a new group shows it. */}
-        <SimpleGrid cols={{ base: 1, sm: initial ? 1 : 2 }}>
-          <TextInput label="Group Name" required {...form.getInputProps("name")} />
-          {!initial && (
-            <TextInput
-              label="Group ID"
-              description="Lowercase letters, numbers, colons or hyphens."
-              inputWrapperOrder={["label", "input", "description", "error"]}
-              required
-              {...form.getInputProps("id")}
-            />
-          )}
+        {/* A new group's ID follows its name until typed in; it is fixed once the group exists. */}
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <TextInput
+            label="Group ID"
+            required
+            readOnly={Boolean(initial)}
+            {...form.getInputProps("id")}
+            onChange={(event) => {
+              setIdTyped(event.currentTarget.value !== "");
+              form.setFieldValue("id", event.currentTarget.value);
+            }}
+          />
+          <TextInput
+            label="Group Name"
+            required
+            {...form.getInputProps("name")}
+            onChange={(event) => {
+              const name = event.currentTarget.value;
+              form.setFieldValue("name", name);
+              if (!initial && !idTyped) form.setFieldValue("id", groupId(name));
+            }}
+          />
         </SimpleGrid>
         <Text size="sm" fw={500}>
           Model Access
