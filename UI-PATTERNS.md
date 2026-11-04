@@ -105,8 +105,8 @@ primary component reference and verify APIs against the installed version.
   then the actions, a vertical `ToolbarDivider` before each group of them: the
   rest as icons with tooltips, A–Z, then the create or primary action at the far
   right as a labelled compact subtle button (`ToolbarAction`: New User, New
-  Group, New Guide, Import Workflow); phones may fold a crowded toolbar's icon
-  actions into More) at the end of the same row, above compact rows with status
+  Group, New Guide, and New Profile, a menu of Duplicate Profile… and Import
+  Workflow…); phones may fold a crowded toolbar's icon actions into More) at the end of the same row, above compact rows with status
   badges and row menus, in Library as in Settings (Models, LoRAs and Imports
   as Users and Workers). A section with several lists shows its main list under
   the section's own toolbar and gives each further list a `SettingGroup`
