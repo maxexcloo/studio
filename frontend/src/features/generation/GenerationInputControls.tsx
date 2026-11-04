@@ -3,7 +3,6 @@ import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
 import { Bookmark, Brush, ChevronDown } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
-import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
@@ -87,20 +86,16 @@ interface MaskControl {
 /**
  * How the placed references are used, as one group of chips: Edit or Reference, then the mask
  * painted on the first one (a mask edits that image, so Reference is off while there is one).
- * On desktop it stays in the rail, disabled until a reference is placed, so placing one never
- * reflows the rail under the open References popover; phones pick in a full-screen popup and keep
- * the row for when it applies, so the Generate Drawer still fits the screen.
+ * Shown only once a reference is placed.
  */
 function ReferenceRole({
   input,
   onChange,
   mask,
-  disabled,
 }: {
   input: GenerationInput;
   onChange: (patch: Partial<GenerationInput>) => void;
   mask?: MaskControl;
-  disabled: boolean;
 }) {
   const role = !input.inpaint && input.referenceRole === "reference" ? "reference" : "edit";
   return (
@@ -115,7 +110,7 @@ function ReferenceRole({
           key={value}
           {...chipProps}
           aria-pressed={role === value}
-          disabled={disabled || (value === "reference" && Boolean(input.inpaint))}
+          disabled={value === "reference" && Boolean(input.inpaint)}
           onClick={() => onChange({ referenceRole: value })}
         >
           {label}
@@ -125,7 +120,7 @@ function ReferenceRole({
         <Button
           {...chipProps}
           leftSection={<Brush size={15} />}
-          disabled={disabled || mask.disabled}
+          disabled={mask.disabled}
           onClick={mask.onPaint}
         >
           {mask.painted ? "Edit Mask" : "Paint Mask"}
@@ -182,13 +177,12 @@ export function GenerationInputControls({
   const backends = profile?.backendOptions || [];
   const seed = input.seed === "" || input.seed == null ? "" : String(input.seed);
   const length = lengthChoices(input, profile);
-  const phone = usePhone();
   return (
     <div className={classes.rail} role="group" aria-label="Generation Inputs">
       <ProfilePicker value={input} onChange={onChange} startParked />
       {references}
-      {references && (hasReferences || !phone) && (
-        <ReferenceRole input={input} onChange={onChange} mask={mask} disabled={!hasReferences} />
+      {references && hasReferences && (
+        <ReferenceRole input={input} onChange={onChange} mask={mask} />
       )}
       {profile?.capabilities.lora && (
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
