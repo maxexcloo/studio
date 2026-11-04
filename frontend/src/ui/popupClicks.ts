@@ -57,10 +57,13 @@ export const layerAbove = (
 
 /**
  * A Modal or Drawer `onClose` (give the dialog this `id`) that does nothing while another layer is
- * open over it: Mantine closes every open dialog on Escape, not only the topmost.
+ * open over it: Mantine closes every open dialog on Escape, not only the topmost. React may already
+ * have closed the layer above in an earlier listener for the same Escape, so the layers open as
+ * that key went down decide.
  */
 export const closeWhenTop = (id: string, close: () => void) => () => {
-  if (!layerAbove(document.getElementById(`${id}-body`))) close();
+  const key = window.event instanceof KeyboardEvent ? window.event : undefined;
+  if (!layerAbove(document.getElementById(`${id}-body`), key)) close();
 };
 
 window.addEventListener(
