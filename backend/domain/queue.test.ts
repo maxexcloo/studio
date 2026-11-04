@@ -12,7 +12,7 @@ import {
   unreachableCancelReason,
 } from "./queue.ts";
 import { pausedReason } from "../../shared/queue.ts";
-import { everyone, queuePriority, Store } from "./store.ts";
+import { everyone, type OwnedJob, queuePriority, Store } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -305,6 +305,40 @@ test("queued work reusing the loaded model and LoRAs runs first within its tier"
     const reuse = enqueue("a");
     await drain(queue);
     assert.deepEqual(queue.submitted, [first, reuse, other, withLora]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a tick reads unfinished work and only the finished jobs it still weighs", () => {
+  const store = new Store(openDatabase(":memory:"));
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (minute: number, status: string, origin = {}) => {
+      const job = store.enqueue(
+        "alice",
+        session.id,
+        {},
+        "image",
+        undefined,
+        undefined,
+        undefined,
+        origin,
+      );
+      store.save({ ...job, status: status as OwnedJob["status"] });
+      store.db
+        .prepare("UPDATE studio_queue SET created_at = ? WHERE id = ?")
+        .run(`2026-11-04T10:0${minute}:00.000Z`, job.id);
+      return job.id;
+    };
+    enqueue(1, "completed");
+    const setDone = enqueue(2, "completed", mcp("a"));
+    const open = enqueue(3, "queued", mcp("a"));
+    const later = enqueue(4, "failed");
+    assert.deepEqual(
+      store.schedulable().map((job) => job.id),
+      [setDone, open, later],
+    );
   } finally {
     store.close();
   }

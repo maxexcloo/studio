@@ -238,29 +238,34 @@ export class GenerationQueue {
 
   private async run() {
     const held = this.held();
-    for (const job of this.store.jobs()) {
+    // Read once until the observations below are awaited; this tick's saves update the list.
+    const jobs = new Map(this.store.schedulable().map((job) => [job.id, job]));
+    const save = (job: OwnedJob) => {
+      const saved = this.store.save(job);
+      jobs.set(saved.id, saved);
+      return saved;
+    };
+    for (const job of jobs.values()) {
       if (!pendingStatuses.has(job.status) || this.acceptedIds.has(job.id)) continue;
       // A prompt already being written finishes; its job then waits as Paused.
       if (held(job) && job.reason !== pausedReason && !this.writing.has(job.id))
-        this.store.save({
+        save({
           ...job,
           status: job.status === "waiting" ? "queued" : job.status,
           reason: pausedReason,
         });
-      else if (!held(job) && job.reason === pausedReason) this.store.save({ ...job, reason: "" });
+      else if (!held(job) && job.reason === pausedReason) save({ ...job, reason: "" });
     }
     // The shared text model writes at most maxWrites prompts at once, higher tiers first, then FIFO;
     // the rest wait in their writing stage.
-    const unwritten = this.store
-      .jobs()
+    const unwritten = [...jobs.values()]
       .filter((job) => job.status === "writing" && !this.writing.has(job.id) && !held(job))
       .sort((a, b) => (a.priority ?? queuePriority.manual) - (b.priority ?? queuePriority.manual));
     for (const job of unwritten)
       if (this.writing.size < maxWrites) this.write(job);
-      else if (job.reason !== writeWaitReason) this.store.save({ ...job, reason: writeWaitReason });
+      else if (job.reason !== writeWaitReason) save({ ...job, reason: writeWaitReason });
     await Promise.all(
-      this.store
-        .jobs()
+      [...jobs.values()]
         .filter(
           (item) =>
             !terminalStatuses.has(item.status) &&
@@ -307,13 +312,13 @@ export class GenerationQueue {
           }
         }),
     );
+    // Read again: jobs were added, observed or cancelled while the observations were awaited.
+    const all = this.store.schedulable();
     const occupied = new Set(
-      this.store
-        .jobs()
+      all
         .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
         .map((job) => job.resource),
     );
-    const all = this.store.jobs();
     const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
     // A started MCP set finishes before other work of its tier and below, so its jobs stay
     // contiguous; manual work still goes first.
