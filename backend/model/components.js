@@ -63,10 +63,6 @@ export const vaeKinds = {
   p_h3_image: { label: "P-H3 Image VAE", layout: "unknown" },
 };
 
-function isAbliterated(name = "") {
-  return /abliterat|uncensor|heretic/i.test(String(name));
-}
-
 function encoderKindFromName(name = "") {
   const base = String(name).split(/[\\/]/).pop() || "";
   for (const [kind, spec] of Object.entries(encoderKinds)) {
@@ -112,39 +108,4 @@ export function classifyVae(name) {
     kinds: kind ? [kind] : [],
     via: kind ? "name" : "",
   };
-}
-
-/* ------------------------------------------------------------ Matching */
-
-/**
- * Installed encoders that fit a slot, best first: abliterated files lead (the
- * user prefers them), then the order ComfyUI lists them in. Never "official
- * first". A slot with `only` takes just the files named for it (HiDream's own
- * CLIPs), since another model's build of the same kind looks identical.
- */
-export function rankEncoders(encoders, slot) {
-  const kinds = new Set(slot.kinds);
-  return encoders
-    .map((item, index) => ({ ...item, index }))
-    .filter((item) => {
-      const base = String(item.name).split(/[\\/]/).pop() || "";
-      // `only`: the model's own build; `not`: a tuned build of the same shapes it must not take.
-      return (
-        kinds.has(item.kind) &&
-        (!slot.only || slot.only.test(base)) &&
-        (!slot.not || !slot.not.test(base))
-      );
-    })
-    .sort((a, b) => isAbliterated(b.name) - isAbliterated(a.name) || a.index - b.index)
-    .map((item) => item.name);
-}
-
-/** VAEs that fit, best first: an exact kind before a same-shaped unnamed one. */
-export function rankVaes(vaes, want) {
-  const wanted = new Set(want);
-  return vaes
-    .map((item, index) => ({ ...item, index }))
-    .filter((item) => item.kinds.some((kind) => wanted.has(kind)))
-    .sort((a, b) => Number(wanted.has(b.kind)) - Number(wanted.has(a.kind)) || a.index - b.index)
-    .map((item) => item.name);
 }

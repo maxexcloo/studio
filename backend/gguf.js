@@ -1,18 +1,9 @@
-import { optionsFor } from "./comfy/comfy.js";
-
 /**
  * GGUF model files, the way ComfyUI-GGUF (city96) loads them: in a graph, a
  * core loader handed a .gguf file becomes its ComfyUI-GGUF twin.
  */
 
 export const isGguf = (name = "") => /\.gguf$/i.test(String(name));
-
-/* ------------------------------------------------------------ Model lists */
-
-/** GGUF text encoders CLIPLoaderGGUF lists (it lists the safetensors ones too; CLIPLoader has those). */
-export function ggufEncoderNames(info) {
-  return optionsFor(info, "CLIPLoaderGGUF", "clip_name").filter(isGguf);
-}
 
 /* ------------------------------------------------------------ Graph */
 
