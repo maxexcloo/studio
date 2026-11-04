@@ -41,8 +41,10 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
   const base = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(`${base}/api/gallery/jobs/chosen`);
   const result = await response.json();
+  // The item's id is what MCP's upscale names.
   assert.deepEqual(result.items, [
     {
+      id: "visible.png",
       jobId: "chosen",
       index: 0,
       status: "done",

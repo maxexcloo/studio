@@ -578,6 +578,29 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   );
   const artistToken = rotateAccountMcpToken(artist.id).token;
   assert.equal(accountForRequest(bearer(artistToken, "POST", "/api/library/imports")), null);
+  // The account's own gallery, queue, Dream and taste take any account's token, never as an administrator.
+  for (const [method, routePath] of [
+    ["POST", "/api/gallery/delete"],
+    ["POST", "/api/gallery/favorite"],
+    ["GET", "/api/queue"],
+    ["POST", "/api/queue/pause"],
+    ["POST", "/api/queue/job-1/retry"],
+    ["GET", "/api/dream"],
+    ["POST", "/api/dream/item-1/keep"],
+    ["PUT", "/api/taste"],
+    ["POST", "/api/loras/library/ops"],
+    ["POST", "/api/upscale"],
+  ]) {
+    assert.equal(
+      accountForRequest(bearer(artistToken, method, routePath))?.credential,
+      "mcp-token",
+      `${method} ${routePath}`,
+    );
+    assert.equal(
+      canAdmin({ studioAccount: accountForRequest(bearer(adminToken, method, routePath)) }),
+      false,
+    );
+  }
 
   // The switch is off by default: a gateway-linked administrator's loopback calls stay out.
   assert.equal(

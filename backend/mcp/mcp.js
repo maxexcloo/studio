@@ -51,6 +51,7 @@ import { animateThemes } from "../prompt-animate.js";
 import { gatewaySettings } from "../assistant.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
+import { registerManageTools } from "./manage.js";
 import fs from "node:fs";
 import { imageMimes } from "../reference-names.js";
 
@@ -1243,6 +1244,7 @@ export function registerMcpRoutes(
         },
         { readOnlyHint: true },
       );
+      registerManageTools({ tool, server, media, owner, refs, resolve });
       if (actor.admin)
         registerAdminTools({
           tool,
@@ -1371,7 +1373,7 @@ export function registerMcpRoutes(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
         {
           ...output,
           job_id: z
@@ -1379,7 +1381,7 @@ export function registerMcpRoutes(
             .min(1)
             .max(200)
             .describe('Its ref as the reply shows it ("result 1"), or a job_id; never "all".'),
-          mode: z.enum(["again", "animate", "extend", "reference"]).default("again"),
+          mode: z.enum(["again", "animate", "extend", "reference", "upscale"]).default("again"),
           request: z.string().trim().min(1).max(2000).optional(),
           prompt: z.string().trim().min(1).optional(),
           tier: tier.optional(),
@@ -1388,12 +1390,14 @@ export function registerMcpRoutes(
           count: jobCount.default(1),
           theme: z.enum(Object.keys(animateThemes)).optional(),
           length: z.number().optional(),
+          upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
         },
         async (
           {
             job_id,
             output_index,
             mode,
+            upscale_quality,
             tier: wanted,
             profile_id,
             preserve_seed,
@@ -1415,6 +1419,43 @@ export function registerMcpRoutes(
             throw new Error("length is for mode animate or extend. Call Reuse again.");
           if (theme === "custom" && !request)
             throw new Error("theme custom needs request: what should happen. Call Reuse again.");
+          if (upscale_quality && mode !== "upscale")
+            throw new Error("upscale_quality is for mode upscale. Call Reuse again.");
+          if (mode === "upscale") {
+            if (wanted || prompt || request || profile_id || preserve_seed || theme || count > 1)
+              throw new Error(
+                "mode upscale takes only job_id, output_index and upscale_quality. Call Reuse again.",
+              );
+            media.own(owner, id);
+            const { items = [] } = await media.request(
+              "GET",
+              `/api/gallery/jobs/${encodeURIComponent(id)}`,
+              undefined,
+              owner,
+              { signal },
+            );
+            const item = items.find(
+              (entry) => (entry.index ?? 0) === output_index && entry.status === "done",
+            );
+            if (!item?.id) throw new Error("This result has no finished output to upscale.");
+            const quality = upscale_quality || "balanced";
+            const { plan } = await media.request(
+              "POST",
+              "/api/upscale",
+              { galleryItemId: item.id, quality },
+              owner,
+              { signal },
+            );
+            return mcpJson({
+              upscaling: true,
+              quality,
+              ...(plan?.estimatedWidth
+                ? { size: `${plan.estimatedWidth}×${plan.estimatedHeight}` }
+                : {}),
+              link: media.pageUrl(owner, id),
+              note: "Queued. The upscale shows on this result in the gallery when it finishes; share the link and end your turn.",
+            });
+          }
           if (mode === "reference") {
             if (wanted || prompt || request || profile_id || preserve_seed || count > 1)
               throw new Error(

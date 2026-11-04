@@ -79,6 +79,20 @@ const mcpBearerRoutes = [
   // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],
+  // The account's own gallery, queue, Dream and taste (mcp/manage.js) and Reuse's upscale, as the
+  // UI calls them; each route scopes to the account and checks its group's features.
+  ["POST", /^\/api\/gallery\/(?:delete|favorite|errors\/clear)$/],
+  ["GET", /^\/api\/queue$/],
+  ["POST", /^\/api\/queue\/(?:pause|resume|cancel-all|clear-failed|[\w-]+\/(?:clear|move|retry))$/],
+  ["GET", /^\/api\/dream(?:\/discarded)?$/],
+  ["PUT", /^\/api\/dream\/settings$/],
+  ["POST", /^\/api\/dream\/(?:[^/]+\/(?:keep|discard|more|variations)|pairs\/[^/]+\/answer)$/],
+  ["GET", /^\/api\/taste$/],
+  ["PUT", /^\/api\/taste$/],
+  ["DELETE", /^\/api\/taste$/],
+  ["POST", /^\/api\/taste\/refresh$/],
+  ["POST", /^\/api\/loras\/library\/ops$/],
+  ["POST", /^\/api\/upscale$/],
 ];
 
 function mcpBearerRouteAllowed(method, routePath) {
