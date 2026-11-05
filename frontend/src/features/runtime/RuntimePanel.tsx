@@ -3,6 +3,7 @@ import { queryOptions, useQuery, useQueryClient, type UseQueryResult } from "@ta
 import { CircleDot } from "lucide-react";
 import type { ServiceHealth, ServiceStatus, ServicesStatus } from "../../../../shared/services";
 import { api } from "../../api";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useIsAdmin } from "../auth/AccountGate";
@@ -179,11 +180,7 @@ export function ServiceHealthSummary() {
           </Group>
         );
       })}
-      {status.data && !available.length && (
-        <Text size="sm" c="dimmed" lh="32px">
-          No Services
-        </Text>
-      )}
+      {status.data && !available.length && <EmptyState fill>No Services</EmptyState>}
     </Stack>
   );
 }

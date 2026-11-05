@@ -137,7 +137,7 @@ primary component reference and verify APIs against the installed version.
   the section's own toolbar and gives each further list a `SettingGroup`
   heading with its own toolbar beside it, the create action at its far right;
   every other part of a section, such as an import review's Files, is a
-  `SettingGroup` too, never a second section heading. A section's parts sit one `md` gap apart, and in a section with several lists each table's empty line is plain dimmed text (`DataTable compact`), not the centred block. Sections are alphabetical, About apart at the end, and
+  `SettingGroup` too, never a second section heading. A section's parts sit one `md` gap apart, and in a section with several lists each table's empty line keeps to its own height (`DataTable compact`), centred across it. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning; Settings labels
   its Personal sections (Account, Preferences) and then its Administration ones,
   and the Library its What You Have sections (Guides, LoRAs, Models, Profiles)
@@ -193,9 +193,12 @@ primary component reference and verify APIs against the installed version.
   the unselected conversation area, Empty Queue, and No Matches when a search
   or filter leaves nothing. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.
-  Both centre horizontally and vertically in the space they take: where the
-  container has a height (a picker's pane, a page) they take its place with
-  `fill` rather than sitting at the top of a scroll area.
+  Both centre horizontally and vertically in the space they take, and every empty
+  list, menu or panel shows its line through `EmptyState`, never as plain text:
+  where the container has a height (a picker's pane, a page, a panel's list) they
+  take its place with `fill` rather than sitting at the top of a scroll area, and
+  a Library or Settings section grows around a view's empty state so it centres
+  in the whole section.
   Loading and failure remain distinct states.
 
 ## Generation & Conversation
