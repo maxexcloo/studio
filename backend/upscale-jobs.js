@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy/comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { flushGalleryStrict, gallery, outputsFrom, updateGalleryJob } from "./gallery/store.js";
@@ -176,7 +177,7 @@ export async function runUpscaleJob(
       // A blip in the connection is waited out; a minute of silence or a dropped run ends it.
       const checked = await tracker.check();
       if (checked.state === "reconnecting") {
-        await new Promise((resolve) => setTimeout(resolve, checked.delayMs));
+        await delay(checked.delayMs);
         continue;
       }
       if (checked.state === "done") {
@@ -210,7 +211,7 @@ export async function runUpscaleJob(
         socket?.close();
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 1600));
+      await delay(1600);
     }
   } finally {
     socket?.close();

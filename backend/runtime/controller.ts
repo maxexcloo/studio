@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { createHash, randomUUID } from "node:crypto";
 import type { ServiceKind } from "../../shared/services.ts";
 import type {
@@ -125,7 +126,7 @@ export class RuntimeController {
     pools,
     store = memoryStore(),
     now = Date.now,
-    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    sleep = delay,
     pollMs = 2000,
     timeouts = { drain: 30 * 60_000, stop: 5 * 60_000, start: 20 * 60_000 },
   }: Options) {

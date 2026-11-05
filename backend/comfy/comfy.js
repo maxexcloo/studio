@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import {
   backendUrl,
   currentComfyBackend,
@@ -115,7 +116,7 @@ export async function comfy(pathname, options = {}) {
         error?.name !== "TypeError"
       )
         throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await delay(250);
       response = await fetch(`${activeComfyUrl()}${pathname}`, init);
     }
   } catch (error) {
