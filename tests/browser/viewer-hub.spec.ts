@@ -1269,7 +1269,6 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
   await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();

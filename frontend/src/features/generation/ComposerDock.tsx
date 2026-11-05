@@ -75,6 +75,18 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }
   const controlsId = useId();
   const keyboard = useKeyboard(!chat && phone && opened);
+  // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
+  // keyboard after its animation; it ends as the text loses focus or the keyboard drops (Android's
+  // Back keeps focus). The bar's lift still follows the viewport.
+  const keyboardUp = keyboard.inset > 0;
+  const [tappedField, setTappedField] = useState(false);
+  const tapping = useRef(false);
+  useEffect(() => {
+    if (!keyboardUp) setTappedField(false);
+  }, [keyboardUp]);
+  const typing = keyboardUp || tappedField;
+  const sheetField = (panel: HTMLElement, target: unknown) =>
+    target instanceof HTMLTextAreaElement && panel.contains(target);
   const [keyboardInset, setKeyboardInset] = useState(0);
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -126,6 +138,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
+    // The sheet unmounts without a blur.
+    setTappedField(false);
     close();
     setExpanded(false);
     if (main && params.has("compose")) {
@@ -336,7 +350,18 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           <div
             className={classes.panel}
             data-generate-drawer
-            data-typing={keyboard.inset > 0 || undefined}
+            data-typing={typing || undefined}
+            onPointerDown={(event) => {
+              tapping.current = sheetField(event.currentTarget, event.target);
+            }}
+            onFocus={(event) => {
+              if (tapping.current && sheetField(event.currentTarget, event.target))
+                setTappedField(true);
+              tapping.current = false;
+            }}
+            onBlur={(event) => {
+              if (!sheetField(event.currentTarget, event.relatedTarget)) setTappedField(false);
+            }}
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
           >

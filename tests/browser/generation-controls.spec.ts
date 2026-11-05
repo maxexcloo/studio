@@ -780,6 +780,9 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
   );
   await page.keyboard.type(" at dusk");
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
+  // Typing shows only the text; dismissing the keyboard brings back the header.
+  await expect(generate.getByRole("button", { name: "Close Generate", exact: true })).toBeHidden();
+  await prompt.blur();
   // Closing returns the page and its dock where they were.
   await generate.getByRole("button", { name: "Close Generate", exact: true }).click();
   await expect(generate).toBeHidden();
