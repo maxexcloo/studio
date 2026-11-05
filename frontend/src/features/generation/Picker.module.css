@@ -1,8 +1,11 @@
 /* A phone chip popup's content fills the screen under its header, so a picker's footer sits at the
    safe bottom edge. A drag on the header is the sheet's own, to pull it closed. */
+/* Mantine caps a full-screen modal's height rather than setting it; the sheet takes the whole
+   screen so its body, not the sheet, scrolls. */
 .sheet {
   display: flex;
   flex-direction: column;
+  height: 100dvh;
 }
 
 .sheetHeader {
