@@ -206,11 +206,22 @@ export function ReferencePicker({
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
   const restoreScroll = useRef(true);
   useLayoutEffect(() => {
-    if (!viewport) restoreScroll.current = true;
-    else if (restoreScroll.current && choices.length) {
+    if (!viewport) {
+      restoreScroll.current = true;
+      return;
+    }
+    if (!restoreScroll.current || !choices.length) return;
+    // A phone sheet sizes the grid as it opens; restoring before then would clamp to the top.
+    const restore = () => {
+      if (!viewport.clientHeight) return false;
       viewport.scrollTop = browser.scroll.current;
       restoreScroll.current = false;
-    }
+      return true;
+    };
+    if (restore()) return;
+    const sized = new ResizeObserver(() => restore() && sized.disconnect());
+    sized.observe(viewport);
+    return () => sized.disconnect();
   }, [viewport, choices.length, browser.scroll]);
   // Uploads go straight into the next slot, so this is an action rather than the gallery's menu.
   const uploadButton = (
