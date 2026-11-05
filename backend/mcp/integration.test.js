@@ -944,8 +944,9 @@ test("media and administrator credentials discover only their own friendly tools
   assert.ok(
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
-    // for the rule to read live state from Models and its LoRA paging.
-    JSON.stringify(tools).length + media.getInstructions().length < 15000,
+    // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
+    // gallery filters.
+    JSON.stringify(tools).length + media.getInstructions().length < 15200,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -3500,7 +3501,18 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.deepEqual((await search(alice, { query: "red", kind: "video" })).hits, [
     ["studio-waves", 0],
   ]);
-  assert.deepEqual((await search(alice, { query: "", starred: true })).hits, [["studio-waves", 0]]);
+  const starred = await search(alice, { starred: true, model: "wan", aspect: "landscape" });
+  // Stars and the gallery's filters pass through, and a starred hit says so.
+  assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
+    q: "",
+    includeFailed: "0",
+    limit: "200",
+    favorites: "1",
+    model: "wan",
+    aspect: "landscape",
+  });
+  assert.deepEqual(starred.hits, [["studio-waves", 0]]);
+  assert.match(texts(starred.result), /\) ★/);
   assert.deepEqual((await search(alice, { query: "paper lantern", limit: 1 })).hits, [
     ["studio-lantern", 0],
   ]);
