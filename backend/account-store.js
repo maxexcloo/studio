@@ -619,7 +619,7 @@ export async function resetAccountPassword(accountId, password) {
 /* -------------------------------------------- Trusted chat gateway identities */
 
 /**
- * A trusted gateway (LiteLLM for LibreChat) authenticates with its shared key and
+ * A trusted gateway (Bifrost for LibreChat) authenticates with its shared key and
  * forwards its own user ID, and optionally the user's email. A link maps that ID
  * to an account: an administrator's, or one made here when the forwarded email is
  * an enabled account's username. Unlinked IDs are remembered so they can be

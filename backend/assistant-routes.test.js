@@ -21,7 +21,7 @@ const { createAssistant } = await import("./assistant.js");
 const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
 
 const environment = {
-  STUDIO_ASSISTANT_URL: "http://litellm.invalid:4000",
+  STUDIO_ASSISTANT_URL: "http://bifrost.invalid:4000",
   STUDIO_ASSISTANT_KEY: "fixture-key",
   STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
 };

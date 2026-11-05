@@ -16,7 +16,7 @@ import { writerGuide } from "./domain/writing-standard.ts";
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 const gateway = (extra = {}) => ({
-  STUDIO_ASSISTANT_URL: "http://litellm.invalid:4000",
+  STUDIO_ASSISTANT_URL: "http://bifrost.invalid:4000",
   STUDIO_ASSISTANT_KEY: "fixture-key",
   STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
   ...extra,
@@ -60,8 +60,8 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   assert.deepEqual(
     [plain.endpoint, plain.root, plain.cloud, plain.chosen],
     [
-      "http://litellm.invalid:4000/v1/chat/completions",
-      "http://litellm.invalid:4000",
+      "http://bifrost.invalid:4000/v1/chat/completions",
+      "http://bifrost.invalid:4000",
       "cloud/auto",
       "",
     ],
@@ -105,8 +105,8 @@ test("gateway settings are all or nothing and name an OpenAI-compatible endpoint
     /without credentials/,
   );
   for (const [url, endpoint] of [
-    ["http://litellm.invalid:4000", "http://litellm.invalid:4000/v1/chat/completions"],
-    ["http://litellm.invalid:4000/v1/", "http://litellm.invalid:4000/v1/chat/completions"],
+    ["http://bifrost.invalid:4000", "http://bifrost.invalid:4000/v1/chat/completions"],
+    ["http://bifrost.invalid:4000/v1/", "http://bifrost.invalid:4000/v1/chat/completions"],
     [
       "https://gateway.invalid/api/v1/chat/completions",
       "https://gateway.invalid/api/v1/chat/completions",
@@ -198,7 +198,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
     ["A secret cabin at dusk, warm window light.", "assistant", "portrait", "cloud/auto", false],
   );
   const [{ body, authorization, url }] = calls;
-  assert.equal(url, "http://litellm.invalid:4000/v1/chat/completions");
+  assert.equal(url, "http://bifrost.invalid:4000/v1/chat/completions");
   assert.equal(authorization, "Bearer fixture-key");
   assert.equal(body.stream, true);
   assert.match(

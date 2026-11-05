@@ -269,7 +269,7 @@ export function registerMcpRoutes(
     cloudVideoFailures,
   });
   const instructions = mediaInstructions;
-  // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
+  // The prompt assistant's tools need its Bifrost gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
   // ... and the account's Prompt Assistant feature (the routes they call refuse without it too).
   const assistantFor = (account) =>
