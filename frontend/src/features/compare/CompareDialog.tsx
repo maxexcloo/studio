@@ -45,6 +45,7 @@ import {
   stepsRange,
   usesNegative,
 } from "../generation/payload";
+import { compareVariants } from "../../../../shared/compare";
 import { isCloudProfile } from "../../../../shared/profiles";
 import { loraLibraryQuery } from "../generation/LoraStacks";
 import { profileOptions } from "../generation/ProfilePicker";
@@ -74,8 +75,8 @@ const loraModes: { value: LoraMode; label: string }[] = [
 ];
 /** A strength sweep's starting values. */
 const sweep = ["0.4", "0.7", "1"];
-/** The run's limit, matching `/api/comparisons/run`. */
-const most = 4;
+const most = compareVariants.max;
+const range = `${compareVariants.min}–${most}`;
 const letter = (index: number) => String.fromCharCode(65 + index);
 type Lora = GenerationInput["loras"][number];
 /** One compared LoRA setting: a LoRA at a strength, or `null` for the run without it. */
@@ -297,12 +298,12 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   });
   const keys = variants.map((input) => JSON.stringify({ ...input, seed: "" }));
   const blockedReason =
-    variants.length < 2
+    variants.length < compareVariants.min
       ? dimension === "profile"
-        ? "Choose 2–4 profiles to compare."
+        ? `Choose ${range} profiles to compare.`
         : dimension === "loras" && loraMode === "loras"
-          ? "Choose 2–4 LoRAs to compare."
-          : "Choose 2–4 strengths to compare."
+          ? `Choose ${range} LoRAs to compare.`
+          : `Choose ${range} strengths to compare.`
       : dimension === "loras" && !compared.every(Boolean)
         ? "Choose a LoRA to compare."
         : variants
@@ -511,7 +512,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
           )}
           {(dimension === "prompt" || dimension === "settings") && (
             <SimpleGrid
-              cols={{ base: 1, sm: Math.min(patches.length, 2), md: patches.length }}
+              cols={{ base: 1, sm: Math.min(patches.length, 2), md: Math.min(patches.length, 4) }}
               spacing="sm"
             >
               {variants.map((input, index) => (
