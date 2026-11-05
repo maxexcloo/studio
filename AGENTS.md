@@ -27,3 +27,4 @@
 - Run `mise run check` after changes.
 - Retain browser interaction tests in CI.
 - Keep credentials and runtime data out of Git and test output.
+- Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
