@@ -1,9 +1,9 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { parseEnv } from "node:util";
 import { verifiedBackup } from "./persistence/migration.ts";
 import { runtimeDatabase, withOfflineDatabase } from "./persistence/runtime.ts";
+import { digest } from "./values.js";
 
 /**
  * The migrate-runtime step that moves what older builds' Settings wrote into the data folder's
@@ -32,7 +32,6 @@ const retiredKeys = [
   "STUDIO_VIDEO_CLOUD_FALLBACK",
 ];
 const assignment = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/;
-const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 function readSettings(dataDir) {
   return withOfflineDatabase(dataDir, (db) => {

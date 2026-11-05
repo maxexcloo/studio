@@ -27,11 +27,11 @@ import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
+import { isObject } from "../values.js";
 
 const currentId = (id) =>
   /^(image|video)-[a-z0-9.-]+$/.test(id) && !/-(comfyui|radiance|cloud)$/.test(id);
 const ignoredFields = new Set(["id", "name", "description"]);
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /** JSON with sorted keys, so key order never makes two definitions differ. */
 function sorted(value) {

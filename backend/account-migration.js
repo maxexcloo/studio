@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { accessFeatures, builtInAccessProfile, normaliseAccessProfile } from "./account-policy.js";
 import { verifiedBackup } from "./persistence/migration.ts";
 import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { isObject } from "./values.js";
 
 /**
  * The migrate-runtime step for the approval queue and the group features Studio retired. Each
@@ -13,7 +14,6 @@ import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime
  * store to `.backups/account-access-*` with a `mapping.json` (restorable with `--restore`), then
  * writes it, with Studio stopped. A second run finds nothing.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 // The retired features that gated something; Presets gated nothing.
 const retired = [
   "gallery",

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { createGuideStore, createProfileStore } from "./profile/store.js";
+import { isObject } from "./values.js";
 
 /**
  * Per-profile preferences that follow a merged or combined profile id to the id it became
@@ -11,7 +12,6 @@ import { createGuideStore, createProfileStore } from "./profile/store.js";
  * migrate-runtime step that moves what production's earlier combines left behind and prunes
  * guide bindings of profiles that no longer exist.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /** Preferences on the kept ids: the latest use wins. */
 export function repointedPreferences(preferences, canonical) {

@@ -1,8 +1,7 @@
 // Native port of the Studio MCP prompting service.
 import fs from "node:fs";
 import { isDeepStrictEqual } from "node:util";
-
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+import { isObject } from "../values.js";
 
 /**
  * A profile's prompting: its guide from prompting.json with the profile's own `prompting` fields

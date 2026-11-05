@@ -29,7 +29,8 @@ import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import type { Account } from "../../types";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
-import { isCloudProfile, profileName } from "../generation/payload";
+import { profileName } from "../generation/payload";
+import { isCloudProfile } from "../../../../shared/profiles";
 import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
 
 const featureLabels = {
@@ -98,7 +99,7 @@ function GroupEditor({
   const ids = [...new Set([...admin.availableProfiles, ...form.values.generationProfiles])].filter(
     (id) => {
       const profile = profiles.find((profile) => profile.id === id);
-      return !isCloudProfile({ id, family: profile?.family || "", provider: profile?.provider });
+      return !isCloudProfile({ id, family: profile?.family, provider: profile?.provider });
     },
   );
   return (
