@@ -50,7 +50,7 @@ primary component reference and verify APIs against the installed version.
   Colour Scheme, Corners and Layout controls in that order, each control named as its heading; Settings does not duplicate appearance controls.
 - Controls follow one size and emphasis scale from the `theme.ts` defaults,
   in two densities that `theme.ts` sets once: forms 36 px and bars 32 px, both
-  40 px on phones. Standard: Button and inputs `md` (forms), ActionIcon (bars),
+  40 px on phones, where their icons grow to 20 px (a button's ▾ keeps its size). Standard: Button and inputs `md` (forms), ActionIcon (bars),
   SegmentedControl `sm`. Compact surfaces (list rows, toolbars, chip rails,
   popover forms) step down one tier to bar height: Button `sm`/`compact-sm`,
   inputs and SegmentedControl `xs`/`sm`, Badge `xs`/`sm`. Emphasis: one filled primary action per view, `default` for
