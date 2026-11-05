@@ -146,7 +146,7 @@ export function GenerationEditor({
   onClear: () => void;
   onSubmit: () => void;
   operation?: Draft["operation"];
-  /** Offers Ask for a Change on the draft, whose Edit or fresh run sets the operation. */
+  /** Sends Improve Prompt › Custom… as a change to the draft, whose Edit or fresh run sets the operation. */
   onOperationChange?: (operation: Draft["operation"]) => void;
   pending: boolean;
   blockedReason?: string;
