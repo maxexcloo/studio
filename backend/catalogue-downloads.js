@@ -6,7 +6,7 @@ import {
   vaeDownloads,
   visionDownloads,
   visionKinds,
-} from "./family-catalog.js";
+} from "./family-catalogue.js";
 import { existingCopy } from "./model/downloads.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
 
@@ -31,7 +31,7 @@ function withDisk(entry) {
   return existingCopy(entry) ? { ...entry, onDisk: true } : entry;
 }
 
-/** Every catalog download Studio will fetch, by kind. The only files the download route accepts. */
+/** Every catalogue download Studio will fetch, by kind. The only files the download route accepts. */
 const downloadSources = {
   encoder: [encoderDownloads, "text_encoders"],
   vae: [vaeDownloads, "vae"],
@@ -41,10 +41,10 @@ const downloadSources = {
 };
 
 /**
- * One catalog download by id, with the builds listed after it for the same
+ * One catalogue download by id, with the builds listed after it for the same
  * part as `alternatives`: tried in order if this one is gone or gated.
  */
-export function catalogDownload(id = "") {
+export function catalogueDownload(id = "") {
   const [kind, key, index] = String(id).split(":");
   const [source, folder] = downloadSources[kind] || [];
   const list = source && Object.hasOwn(source, key) ? source[key] : [];
@@ -64,11 +64,11 @@ export function catalogDownload(id = "") {
 }
 
 /**
- * Catalog downloads for one exact file name in one models folder, so a file a
+ * Catalogue downloads for one exact file name in one models folder, so a file a
  * profile names gets a Download button. Only an exact match: a file under a
  * subfolder, or any other build, is not the file the profile asks for.
  */
-export function catalogDownloadsForFile(file = "", folder = "") {
+export function catalogueDownloadsForFile(file = "", folder = "") {
   const found = [];
   for (const [kind, [source, sourceFolder]] of Object.entries(downloadSources)) {
     if (sourceFolder !== folder) continue;

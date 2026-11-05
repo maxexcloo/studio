@@ -1,5 +1,5 @@
 import { comfy } from "../comfy/comfy.js";
-import { families as modelFamilies } from "../family-catalog.js";
+import { families as modelFamilies } from "../family-catalogue.js";
 import { enrichLocalLoraInfo, enrichLoraInfo } from "./catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
 

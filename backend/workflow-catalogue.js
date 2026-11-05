@@ -10,7 +10,7 @@ import {
   workflowMissingFiles,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { catalogDownloadsForFile } from "./catalog-downloads.js";
+import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { repointedPreferences } from "./combined-profiles.js";
 import { workflowRisks } from "./workflow-risk.js";
@@ -165,13 +165,13 @@ function validateWorkflow(workflow, info = {}, profile = null) {
 
 const loaderParts = { CLIPLoader: "encoder", VAELoader: "vae" };
 
-/** The files an imported workflow lacks, shaped like a family's missing parts, with a download where Studio's catalog has that exact file. */
+/** The files an imported workflow lacks, shaped like a family's missing parts, with a download where Studio's catalogue has that exact file. */
 function missingFileParts(workflow, info) {
   return workflowMissingFiles(workflow, info).map(({ file, folder, classType }) => ({
     part: loaderParts[classType] || "model",
     label: file,
     detail: `Put ${file} in ComfyUI’s models/${folder} folder.`,
-    downloads: catalogDownloadsForFile(file, folder),
+    downloads: catalogueDownloadsForFile(file, folder),
   }));
 }
 

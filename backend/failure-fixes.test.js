@@ -22,15 +22,15 @@ test("a node no known pack brings keeps the hint only", () => {
   assert.equal(packForNode("SomethingExotic"), null);
 });
 
-test("a damaged catalog file can be downloaded again; any other file cannot", () => {
-  const catalog = withFixes(
+test("a damaged catalogue file can be downloaded again; any other file cannot", () => {
+  const catalogue = withFixes(
     describeFailure({
       message: "Error while deserializing header: invalid header in ae.safetensors",
       nodeType: "VAELoader",
     }),
   );
-  assert.equal(catalog.redownload?.file, "ae.safetensors");
-  assert.equal(catalog.redownload?.folder, "vae");
+  assert.equal(catalogue.redownload?.file, "ae.safetensors");
+  assert.equal(catalogue.redownload?.folder, "vae");
   const unknown = withFixes(
     describeFailure({
       message: "Error while deserializing header: invalid header in myvae.safetensors",

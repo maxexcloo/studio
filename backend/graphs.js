@@ -4,7 +4,7 @@ import { comfy } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { startImageDataUrl } from "./start-images.js";
 import { prepareInputImage } from "./input-image-sizing.js";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { outputFolderName } from "./data-names.js";
 import { inpaintGraph } from "./inpaint.js";

@@ -7,7 +7,7 @@ import {
   workflowOptionIssues,
 } from "../custom-workflows.js";
 import { classifyModel } from "./families.js";
-import { families } from "../family-catalog.js";
+import { families } from "../family-catalogue.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { presetsEnabled } from "../features.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
@@ -156,7 +156,7 @@ export function buildProfile({
     ...(Object.keys(imageModes).length ? { imageModes } : {}),
     mediaInputs,
     aspectPolicy: aspectPolicy === "reference" ? "reference" : "manual",
-    // Whether the model draws 2K/4K itself, per size: "yes" or "maybe" (family catalog); {} for anything else.
+    // Whether the model draws 2K/4K itself, per size: "yes" or "maybe" (family catalogue); {} for anything else.
     native:
       kind === "image"
         ? Object.fromEntries(

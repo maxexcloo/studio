@@ -24,7 +24,7 @@ import { forgetComfyRun } from "./comfy/traces.js";
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { warmNewOutputs } from "./media-warmup.js";
-import { markWorkflowUsed } from "./workflow-catalog.js";
+import { markWorkflowUsed } from "./workflow-catalogue.js";
 import { completedTiming, remainingMs, RunTimer, slowSteps } from "./generation-timing.js";
 import {
   generationEstimate,

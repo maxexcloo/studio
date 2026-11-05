@@ -9,7 +9,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-settings-"))
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { variantFor } = await import("../family-catalog.js");
+const { variantFor } = await import("../family-catalogue.js");
 const { inferModels } = await import("./models.js");
 const { sanitizeGenerateBody } = await import("../validation.js");
 
