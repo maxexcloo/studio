@@ -612,9 +612,10 @@ export class McpMedia {
     const runs = count;
     assertJobCount(prompts.length, runs);
     // A profile that batches (as the composer's Count) draws a prompt's images as one job, its model
-    // loaded once; one that can't (no count control) runs a job per image.
+    // loaded once; one that can't (no count control) runs a job per image, each tracked here, since
+    // Studio would split a Count it can't batch into jobs it reports only the first of.
     const batch =
-      (profile.capabilities?.variations ?? profile.kind === "image")
+      (profile.capabilities?.batch ?? profile.capabilities?.variations ?? profile.kind === "image")
         ? Math.min(profile.constraints?.count?.max ?? 8, 8)
         : 1;
     const body = {

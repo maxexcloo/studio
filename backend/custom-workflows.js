@@ -310,6 +310,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       negativePrompt: Boolean(controls.negative),
       // Count always works for images: a profile with no batch control makes separate runs (domain/admission.ts).
       variations: meta.kind !== "video",
+      batch: Boolean(controls.count),
       frames: Boolean(controls.frames),
       fps: Boolean(controls.fps),
       duration: Boolean(controls.duration),
