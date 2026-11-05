@@ -48,14 +48,17 @@
   padding-top: var(--mantine-spacing-xs);
 }
 
-/* A multi-row box's tools stand in a two-column grid beside it, and the text fills its full height. */
+/*
+ * A multi-row box's tools stand in a two-column grid beside it, and the text fills its full height
+ * (under any description).
+ */
 .columned {
   display: flex;
   gap: var(--mantine-spacing-xs);
 }
 
 .columned > :first-child,
-.columned > :first-child > * {
+.columned > :first-child > :has(textarea) {
   flex: 1;
   min-width: 0;
   display: flex;
