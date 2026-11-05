@@ -2,7 +2,7 @@
  * System prompts for prompt upsamplers: small language models some image
  * models are meant to run behind, which turn a short request into the long,
  * literal caption the model was trained on (see `upsampler` in the family
- * catalog). Verbatim from the makers, never edited here: the models were
+ * catalogue). Verbatim from the makers, never edited here: the models were
  * tuned on exactly these words.
  */
 

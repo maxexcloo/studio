@@ -9,7 +9,7 @@ import {
   workerAvailability,
 } from "../comfy/backends.js";
 import { comfy, comfyUrl, demoMode, isComfyTimeout, optionsFor } from "../comfy/comfy.js";
-import { families } from "../family-catalog.js";
+import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { visibleGallery } from "../gallery/store.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";

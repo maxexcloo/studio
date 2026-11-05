@@ -2,7 +2,7 @@ import { recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
 import { isCloudProfile } from "../shared/profiles.ts";
 import { optionsFor } from "./comfy/comfy.js";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 import { gallery } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";

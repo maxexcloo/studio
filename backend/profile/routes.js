@@ -32,7 +32,7 @@
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
-import { families as familyCatalog } from "../family-catalog.js";
+import { families as familyCatalogue } from "../family-catalogue.js";
 import { fromChat, requireAdmin } from "../route-access.js";
 import { loraFamilyId } from "../../shared/profiles.ts";
 import { approveEditableProfile, readEditableProfile, revertEditableProfile } from "./editor.js";
@@ -202,7 +202,7 @@ export function registerProfileRoutes(
       const familyLabel = (packId) =>
         Object.entries(store.families || {})
           .filter(([, kinds]) => Object.values(kinds || {}).includes(packId))
-          .map(([family]) => familyCatalog[loraFamilyId(family)]?.label)
+          .map(([family]) => familyCatalogue[loraFamilyId(family)]?.label)
           .find(Boolean);
       const packs = Object.keys(store.packs || {})
         .sort()

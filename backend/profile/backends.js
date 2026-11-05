@@ -34,7 +34,7 @@ import { createEditableProfile, listEditableProfiles, readEditableProfile } from
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { renameTimingKeys } from "../timings.js";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
+import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
 
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });

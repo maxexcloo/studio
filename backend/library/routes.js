@@ -41,7 +41,7 @@ import { loadSharp } from "../sharp-loader.js";
 import { startLibraryDownload } from "./downloads.js";
 import { createImportEngine, importStore, publicImport } from "./imports.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
-import { familyFromName } from "../family-catalog.js";
+import { familyFromName } from "../family-catalogue.js";
 import { downloadState } from "../model/downloads.js";
 import { fromChat, requireLocal } from "../route-access.js";
 import { forgetLora } from "../lora/stacks.js";

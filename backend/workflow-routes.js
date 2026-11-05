@@ -9,7 +9,7 @@ import {
   previewWorkflowImport,
   saveWorkflowPreferences,
   workflowSummaries,
-} from "./workflow-catalog.js";
+} from "./workflow-catalogue.js";
 
 /** The workflow list, imports and their removal. `loadComfyContext` is model/catalogue.js's. */
 export function registerWorkflowRoutes(app, { loadComfyContext }) {

@@ -22,7 +22,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { isCloudProfile } from "../shared/profiles.ts";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 
 export const animateThemes = Object.freeze({
   cinematic:

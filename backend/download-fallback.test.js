@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { downloadState, setDownloadTransport, startDownload } = await import("./model/downloads.js");
-const { catalogDownload, downloadSource } = await import("./catalog-downloads.js");
+const { catalogueDownload, downloadSource } = await import("./catalogue-downloads.js");
 
 const spec = (file, extra = {}) => ({
   id: `encoder:test:${file}`,
@@ -25,12 +25,12 @@ async function settle(file) {
   throw new Error("download never finished");
 }
 
-test("a catalog entry carries the other builds of its part, and who publishes each", () => {
-  const first = catalogDownload("encoder:qwen3_4b:0");
+test("a catalogue entry carries the other builds of its part, and who publishes each", () => {
+  const first = catalogueDownload("encoder:qwen3_4b:0");
   assert.equal(first.alternatives.length, 1);
   assert.equal(first.alternatives[0].id, "encoder:qwen3_4b:1");
-  assert.equal(catalogDownload("encoder:qwen3_4b:1").alternatives.length, 0);
-  assert.equal(catalogDownload("encoder:qwen3_4b:x"), null);
+  assert.equal(catalogueDownload("encoder:qwen3_4b:1").alternatives.length, 0);
+  assert.equal(catalogueDownload("encoder:qwen3_4b:x"), null);
   assert.deepEqual(downloadSource(first.alternatives[0].url), {
     source: "Comfy-Org",
     repo: "Comfy-Org/z_image_turbo",

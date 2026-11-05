@@ -17,7 +17,7 @@ import { reloadTimings } from "./timings.js";
 import { uncensoredMarker } from "./uncensored-marker.js";
 import { migrateUploads } from "./uploads.js";
 import { gallerySources, versionSources } from "./version-sources.js";
-import { reloadWorkflowPreferences } from "./workflow-catalog.js";
+import { reloadWorkflowPreferences } from "./workflow-catalogue.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { comfy, localOutputFile, optionsFor } from "./comfy/comfy.js";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 import { classifyModel } from "./model/families.js";
 import { nodePacks } from "./node-packs.js";
 import { outputFolderName } from "./data-names.js";

@@ -11,7 +11,7 @@ import {
 } from "./workers.js";
 import crypto from "node:crypto";
 import { demoMode } from "./comfy/comfy.js";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   dedupeGallery,
@@ -26,7 +26,7 @@ import {
 import { recordPrompt } from "./prompt-history.js";
 import { jobs, runJob, runMockJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
-import { markWorkflowUsed } from "./workflow-catalog.js";
+import { markWorkflowUsed } from "./workflow-catalogue.js";
 
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";

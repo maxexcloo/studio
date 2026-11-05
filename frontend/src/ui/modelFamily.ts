@@ -5,7 +5,7 @@ const names: Record<string, string> = {
   svdq: "Nunchaku SVDQuant",
   z_image: "Z-Image",
 };
-// The catalogue's own family names (backend/family-catalog.js), from the models list.
+// The catalogue's own family names (backend/family-catalogue.js), from the models list.
 let catalogue: Record<string, string> = {};
 
 /** Takes the family names served with the models list (GenerationProvider's modelsQuery). */

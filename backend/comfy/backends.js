@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { families } from "../family-catalog.js";
+import { families } from "../family-catalogue.js";
 import {
   capabilityForProfile,
   defaultWorkerId,

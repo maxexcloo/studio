@@ -118,7 +118,7 @@ test("model files are placed by their names", () => {
 });
 
 test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3 video", async () => {
-  const { refinedFamily } = await import("../family-catalog.js");
+  const { refinedFamily } = await import("../family-catalogue.js");
   const { classifyEncoder, classifyVae } = await import("./components.js");
   for (const file of ["p-h3-image_w4a8.safetensors", "p-h3-image_int8_convrot.safetensors"]) {
     const found = classifyModel("unet", file);
@@ -136,21 +136,21 @@ test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3
 
 /* ------------------------------------------------------------ profiles */
 
-test("an imported workflow's missing file gets a download only for that exact catalog file", async () => {
-  const { catalogDownloadsForFile } = await import("../catalog-downloads.js");
-  const [vae] = catalogDownloadsForFile("flux2-vae.safetensors", "vae");
+test("an imported workflow's missing file gets a download only for that exact catalogue file", async () => {
+  const { catalogueDownloadsForFile } = await import("../catalogue-downloads.js");
+  const [vae] = catalogueDownloadsForFile("flux2-vae.safetensors", "vae");
   assert.deepEqual([vae.id, vae.label, vae.folder], ["vae:flux2:0", "Flux.2 VAE", "vae"]);
   assert.equal(
-    catalogDownloadsForFile("qwen_3_8b_fp8mixed.safetensors", "text_encoders")[0].id,
+    catalogueDownloadsForFile("qwen_3_8b_fp8mixed.safetensors", "text_encoders")[0].id,
     "encoder:qwen3_8b:1",
   );
   assert.deepEqual(
-    catalogDownloadsForFile("flux2-vae.safetensors", "text_encoders"),
+    catalogueDownloadsForFile("flux2-vae.safetensors", "text_encoders"),
     [],
     "right name, wrong folder",
   );
   assert.deepEqual(
-    catalogDownloadsForFile("flux/flux2-vae.safetensors", "vae"),
+    catalogueDownloadsForFile("flux/flux2-vae.safetensors", "vae"),
     [],
     "a subfolder path is not where a download lands",
   );

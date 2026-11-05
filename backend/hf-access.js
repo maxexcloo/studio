@@ -56,7 +56,7 @@ function hfEndpoint(env = process.env) {
   }
 }
 
-/** A catalog URL, pointed at the mirror when one is set. Only huggingface.co addresses move. */
+/** A catalogue URL, pointed at the mirror when one is set. Only huggingface.co addresses move. */
 export function mirroredUrl(value, env = process.env) {
   const url = new URL(String(value));
   const mirror = hfEndpoint(env);

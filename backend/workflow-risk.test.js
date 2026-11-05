@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { workflowRisks } from "./workflow-risk.js";
-import { previewWorkflowImport } from "./workflow-catalog.js";
+import { previewWorkflowImport } from "./workflow-catalogue.js";
 
 const plain = {
   1: { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "sdxl.safetensors" } },

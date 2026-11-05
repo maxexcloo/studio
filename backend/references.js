@@ -23,7 +23,7 @@ import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
-import { families } from "./family-catalog.js";
+import { families } from "./family-catalogue.js";
 import { imageMimes, mimeExtension, referenceInputName } from "./reference-names.js";
 import { uploadedGalleryItem } from "./uploads.js";
 import { recordBelongsToAccount } from "./account-ownership.js";

@@ -7,7 +7,7 @@ import {
   quantFromName,
   refinedFamily,
   variantFor,
-} from "../family-catalog.js";
+} from "../family-catalogue.js";
 import { readJsonFile } from "../json-store.js";
 
 /**

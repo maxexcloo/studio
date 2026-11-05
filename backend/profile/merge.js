@@ -26,7 +26,7 @@ import { writeJsonFile } from "../json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
+import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { isObject } from "../values.js";
 
 const currentId = (id) =>
