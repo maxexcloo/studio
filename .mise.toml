@@ -35,7 +35,7 @@ run = "playwright test"
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"
 
-# Prompt Assistant Evals (live LiteLLM replay on demand, never in CI; --record refreshes the fixtures)
+# Prompt Assistant Evals (live Bifrost replay on demand, never in CI; --record refreshes the fixtures)
 [tasks."eval:assistant"]
 run = "node backend/commands/assistant-eval.mjs"
 
