@@ -259,7 +259,7 @@ primary component reference and verify APIs against the installed version.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. The prompt's tools (Recent Prompts, Prompt
-  Assistance with Ask for a Change, Copy, Clear) stand in one icon column right
+  Assistance, Undo while a change is proposed, Copy, Clear) stand in one icon column right
   of the text, which keeps the full height; the one-row negative keeps them
   inside its box. The composer's boxes edit in place on every breakpoint (the
   phone Generate Drawer is already full screen). Elsewhere on phones a text box
@@ -490,8 +490,8 @@ primary component reference and verify APIs against the installed version.
   the shared item actions) holds the item's prompt in a field: editing it and
   pressing Enter or Generate runs it with the item's settings (a video's
   animates again). Ask for a Change (Sparkles, `generation/AskChange.tsx`) is
-  offered in the viewer's field and the composer's prompt (not in Details): it
-  sends a change in plain words ("make it
+  offered in the viewer's field and, as Prompt Assistance › Improve Prompt ›
+  Custom…, the composer's prompt (not in Details): it sends a change in plain words ("make it
   night") and the prompt assistant picks the action and writes its prompt, which
   replaces the text in place, tinted, with the action's name in a small label
   over the field and Undo (restoring what was there), the one review pause
@@ -506,14 +506,17 @@ primary component reference and verify APIs against the installed version.
   (surface `draft` without a request), loaded when it opens and cached per item
   or prompt; picking one fills the request and asks at once, and an empty or
   failed answer says No Suggestions. After a divider, Refresh asks for different
-  ones in their place (loading in the menu) and Custom… leaves the person to type
-  their own: the composer's empty request line, or the viewer's prompt selected
-  (the editor on phones). The viewer's field is itself the request:
+  ones in their place (loading in the menu) and, in the viewer, Custom… leaves the
+  person to type their own over the prompt, selected (the editor on phones). The
+  viewer's field is itself the request:
   Ask sends its text, the assistant picks Edit, Recreate, Animate or Upscale
   (`/api/suggestions`, surface `change`) and Run runs it (phones keep the
-  editor's send arrow for Generate). The composer's prompt (first in its Prompt
-  Assistance menu) opens a request line under the prompt instead, which stays
-  open with Undo while the proposal shows; the composer's draft (surface `draft`)
+  editor's send arrow for Generate). The composer's Custom… (last among Improve
+  Prompt's styles, the one Custom item) opens the Custom Improvement dialog
+  instead: the person types the change, or picks one from its Suggestions, and the
+  proposal lands in the prompt with its label over the text and Undo in the prompt's
+  tools (where there is no draft to change, as in Compare, the same dialog rewrites
+  with the Custom style); the composer's draft (surface `draft`)
   rewrites its prompt and, with a reference attached, picks Edit or a fresh run
   (setting Edit Image or Generate), which the composer's Generate then runs. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached

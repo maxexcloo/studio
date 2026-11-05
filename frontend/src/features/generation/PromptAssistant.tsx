@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
@@ -84,19 +84,27 @@ export function usePromptAssistant({
   onChange,
   references = [],
   scopeKey = "",
-  onAsk,
+  change,
 }: {
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   references?: ReferenceAsset[];
   scopeKey?: string;
-  /** Opens Ask for a Change, listed first where the composer offers it. */
-  onAsk?: () => void;
+  /**
+   * Sends Custom…'s text as a change to the draft (`useDraftChange`), proposed in the prompt for
+   * Undo, with `suggestions` (given what picking one does) beside the text. Without it, Custom…
+   * rewrites with the Custom style.
+   */
+  change?: {
+    send: (request: string) => void;
+    pending: boolean;
+    suggestions?: (pick: (request: string) => void) => ReactNode;
+  };
 }) {
   const status = useQuery(assistantQuery);
   const phone = usePhone();
-  // Custom asks for its instruction first; the last one stays for the next time.
+  // Custom… asks what to change first; the last request stays for the next time.
   const [asking, setAsking] = useState(false);
   const [instruction, setInstruction] = useState("");
   // A custom rewrite lands in the prompt box with the caret at its end, ready to edit.
@@ -293,18 +301,30 @@ export function usePromptAssistant({
   if (!info?.available || !profile || !info.presets.length)
     return { action: null, suggestions: null };
   const disabled = !input.prompt.trim();
-  const run = (action: Action, style?: string, instruction?: string) => {
+  const run = (action: Action, style?: string) => {
     if (style) setPresetId(style);
-    assistance.mutate({ action, preset: style, instruction });
+    assistance.mutate({ action, preset: style });
   };
-  // Styles A–Z, with Custom last.
-  const styles = [...info.presets].sort(
-    (a, b) =>
-      Number(a.id === "custom") - Number(b.id === "custom") || a.label.localeCompare(b.label),
+  // Styles A–Z, with Custom… last: a change to the draft where there is one, else the Custom style.
+  const custom = change || info.presets.some((item) => item.id === "custom");
+  const styles = info.presets
+    .filter((item) => item.id !== "custom")
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const customItem = custom && (
+    <Menu.Item
+      // A change can write a prompt from nothing; the Custom style rewrites one.
+      disabled={!change && disabled}
+      aria-label="Improve Prompt: Custom…"
+      onClick={() => setAsking(true)}
+    >
+      Custom…
+    </Menu.Item>
   );
   const working = assistance.variables && workingLabels[assistance.variables.action];
-  // While it works the action spins; hovering or focusing it offers Stop.
-  const menu = assistance.isPending ? (
+  // While it works the action spins; hovering or focusing it offers Stop. A change can't be stopped.
+  const menu = change?.pending ? (
+    <ActionIcon variant="subtle" color="gray" aria-label="Prompt Assistance" loading />
+  ) : assistance.isPending ? (
     <Tooltip label={`${working} Click to Stop.`}>
       <ActionIcon
         className={classes.working}
@@ -330,37 +350,32 @@ export function usePromptAssistant({
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown data-composer-layer>
-        {onAsk && (
-          <>
-            <Menu.Item onClick={onAsk}>Ask for a Change</Menu.Item>
-            <Menu.Divider />
-          </>
-        )}
-        {info.presets.length > 1 ? (
+        {styles.length > 1 ? (
           <>
             <Menu.Label>Improve Prompt</Menu.Label>
             {/* Each style is a choice that runs at once; the last one used carries a check. */}
-            {styles.map((item) => {
-              const label = item.id === "custom" ? `${item.label}…` : item.label;
-              return (
-                <Menu.Item
-                  key={item.id}
-                  disabled={disabled}
-                  aria-label={`Improve Prompt: ${label}`}
-                  rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
-                  onClick={() => (item.id === "custom" ? setAsking(true) : run("rewrite", item.id))}
-                >
-                  {label}
-                </Menu.Item>
-              );
-            })}
-            {(negativeOffered || lorasOffered) && <Menu.Divider />}
+            {styles.map((item) => (
+              <Menu.Item
+                key={item.id}
+                disabled={disabled}
+                aria-label={`Improve Prompt: ${item.label}`}
+                rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
+                onClick={() => run("rewrite", item.id)}
+              >
+                {item.label}
+              </Menu.Item>
+            ))}
+            {customItem}
           </>
         ) : (
-          <Menu.Item disabled={disabled} onClick={() => run("rewrite", preset?.id)}>
-            Improve Prompt
-          </Menu.Item>
+          <>
+            <Menu.Item disabled={disabled} onClick={() => run("rewrite", preset?.id)}>
+              Improve Prompt
+            </Menu.Item>
+            {customItem}
+          </>
         )}
+        {(negativeOffered || lorasOffered) && <Menu.Divider />}
         {lorasOffered && (
           <Menu.Item disabled={disabled} onClick={() => run("loras")}>
             Suggest LoRAs
@@ -374,6 +389,16 @@ export function usePromptAssistant({
       </Menu.Dropdown>
     </Menu>
   );
+  // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
+  function ask(text: string) {
+    setAsking(false);
+    if (change) change.send(text);
+    else {
+      editAfter.current = true;
+      // Not remembered as the last style, which runs from one tap.
+      assistance.mutate({ action: "rewrite", preset: "custom", instruction: text });
+    }
+  }
   const action = (
     <>
       {menu}
@@ -388,18 +413,17 @@ export function usePromptAssistant({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!instruction.trim()) return;
-            setAsking(false);
-            editAfter.current = true;
-            run("rewrite", "custom", instruction.trim());
+            if (instruction.trim()) ask(instruction.trim());
           }}
         >
           <Stack>
             <TextBox
-              label="Instruction"
-              placeholder="How should the prompt change?"
+              label="Change"
+              placeholder="What should change, like “make it night”"
               autosize
               minRows={3}
+              // The dialog is already full screen on phones.
+              inline
               data-autofocus
               value={instruction}
               onChange={setInstruction}
@@ -412,6 +436,11 @@ export function usePromptAssistant({
               }}
             />
             <Group justify="flex-end">
+              {/* A suggestion fills the request and asks at once. */}
+              {change?.suggestions?.((request) => {
+                setInstruction(request);
+                ask(request);
+              })}
               <Button type="submit" disabled={!instruction.trim()}>
                 Improve Prompt
               </Button>

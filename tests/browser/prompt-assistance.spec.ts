@@ -216,11 +216,10 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles A–Z with Custom… last, which asks for an instruction", async ({
+test("Improve Prompt lists its styles A–Z with Custom… last, which asks what to change", async ({
   page,
 }) => {
   await fixtures(page);
-  const rewrites: any[] = [];
   await page.route("**/api/assistant", (route) =>
     route.fulfill({
       json: {
@@ -235,13 +234,8 @@ test("Improve Prompt lists its styles A–Z with Custom… last, which asks for 
       },
     }),
   );
-  await page.route("**/api/assistant/rewrite", (route) => {
-    rewrites.push(route.request().postDataJSON());
-    return route.fulfill({ json: { prompt: "A bird in summer light", source: "assistant" } });
-  });
   await create(page);
-  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await prompt.fill("A bird in snow");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
   await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: /^Improve Prompt: / })).toHaveText([
     "Candid",
@@ -251,18 +245,11 @@ test("Improve Prompt lists its styles A–Z with Custom… last, which asks for 
   ]);
   await page.getByRole("menuitem", { name: "Improve Prompt: Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
-  const submit = dialog.getByRole("button", { name: "Improve Prompt", exact: true });
-  await expect(submit).toBeDisabled();
-  await dialog.getByRole("textbox", { name: "Instruction", exact: true }).fill("make it summer");
-  await submit.click();
-  await expect(dialog).toBeHidden();
-  await expect(prompt).toHaveValue("A bird in summer light");
-  expect(rewrites).toMatchObject([
-    { prompt: "A bird in snow", preset: "custom", instruction: "make it summer" },
-  ]);
+  await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Improve Prompt", exact: true })).toBeDisabled();
 });
 
-test("Ask for a Change rewrites the draft's prompt in place, for Generate to run or Undo to restore, and suggests changes", async ({
+test("Custom… rewrites the draft's prompt in place, for Generate to run or Undo to restore, and suggests changes", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -293,10 +280,12 @@ test("Ask for a Change rewrites the draft's prompt in place, for Generate to run
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A castle at noon");
-  await assist(page, "Ask for a Change");
-  const request = page.getByRole("textbox", { name: "Change", exact: true });
+  await assist(page, "Improve Prompt: Custom…");
+  const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
+  const request = dialog.getByRole("textbox", { name: "Change", exact: true });
   await request.fill("make it night");
-  await page.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await dialog.getByRole("button", { name: "Improve Prompt", exact: true }).click();
+  await expect(dialog).toBeHidden();
   await expect(prompt).toHaveValue("A castle at night");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toHaveText("Generate");
   expect(asked).toEqual([
@@ -308,16 +297,19 @@ test("Ask for a Change rewrites the draft's prompt in place, for Generate to run
       actions: ["recreate"],
     },
   ]);
-  // Undo restores the draft and keeps the request.
+  // Undo restores the draft; Custom… keeps the request for the next time.
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
+  await expect(page.getByLabel("Proposed Action", { exact: true })).toBeHidden();
+  await assist(page, "Improve Prompt: Custom…");
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
-  // A suggestion fits the draft as it was before the proposal, fills the request and asks at once.
-  await page.getByRole("button", { name: "Suggestions", exact: true }).click();
+  // A suggestion fits the draft as it was before the proposal and asks at once.
+  await assist(page, "Improve Prompt: Custom…");
+  await dialog.getByRole("button", { name: "Suggestions", exact: true }).click();
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
-  await expect(request).toHaveValue("add rain");
+  await expect(dialog).toBeHidden();
   await expect.poll(() => asked.length).toBe(4);
   expect(asked.slice(2)).toEqual([
     { surface: "draft", kind: "image", prompt: "A castle at noon", fresh: false },

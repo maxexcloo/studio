@@ -1,5 +1,5 @@
-import { useState, type CSSProperties, type PointerEvent, type ReactNode, type Ref } from "react";
-import { ActionIcon, Badge, Group, Loader, Menu, Textarea, Tooltip } from "@mantine/core";
+import { useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { ActionIcon, Badge, Loader, Menu, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   useMutation,
@@ -11,7 +11,6 @@ import {
 import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
-import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
 
@@ -35,9 +34,7 @@ export const proposalText = (proposal: Change) =>
 /**
  * Ask for a Change: the prompt assistant turns a change in plain words into the action it picks
  * and that action's prompt, which `show` puts in the field in place of `typed`; Undo hands `typed`
- * to `restore`. Asking again while a proposal shows replaces it and keeps the first `typed`. A field
- * that isn't itself the request (the composer) opens a request line for it, which stays open while
- * its proposal shows.
+ * to `restore`. Asking again while a proposal shows replaces it and keeps the first `typed`.
  */
 export function useAskChange<T>({
   ask,
@@ -50,7 +47,6 @@ export function useAskChange<T>({
   restore?: (typed: T) => void;
 }) {
   const assistant = useQuery(assistantQuery);
-  const [request, setRequest] = useState<string | null>(null);
   const [change, setChange] = useState<{ proposal: Change; typed: T } | null>(null);
   const mutation = useMutation({
     mutationFn: ({ text, typed }: { text: string; typed: T }) => ask(text, typed),
@@ -67,9 +63,6 @@ export function useAskChange<T>({
     /** What the proposal replaced, which Undo restores. */
     typed: change?.typed,
     pending: mutation.isPending,
-    /** The open request line's text, or null while it is closed. */
-    request,
-    setRequest,
     send: (text: string, typed: T) =>
       mutation.mutate({ text: text.trim(), typed: change ? change.typed : typed }),
     undo() {
@@ -79,7 +72,6 @@ export function useAskChange<T>({
     /** Ends the review once the proposal runs. */
     done() {
       setChange(null);
-      setRequest(null);
     },
   };
 }
@@ -179,8 +171,8 @@ export function SendButton({
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
  * picked. They load when the menu opens and stay cached per item or prompt; Refresh asks for
- * different ones (`fresh`) in their place, and Custom… leaves the person to type their own change
- * (`onCustom`). A failed or empty answer just says there are none.
+ * different ones (`fresh`) in their place, and Custom… (where `onCustom` is given) leaves the person
+ * to type their own change. A failed or empty answer just says there are none.
  */
 export function ChangeSuggestions<K extends QueryKey>({
   query,
@@ -193,7 +185,7 @@ export function ChangeSuggestions<K extends QueryKey>({
   fresh: () => Promise<Suggestions<NextStep>>;
   disabled?: boolean;
   onPick: (request: string) => void;
-  onCustom: () => void;
+  onCustom?: () => void;
 }) {
   const client = useQueryClient();
   const [opened, setOpened] = useState(false);
@@ -249,14 +241,16 @@ export function ChangeSuggestions<K extends QueryKey>({
         <Menu.Item closeMenuOnClick={false} disabled={loading} onClick={() => refresh.mutate()}>
           Refresh
         </Menu.Item>
-        <Menu.Item
-          onClick={() => {
-            setReturnFocus(false);
-            onCustom();
-          }}
-        >
-          Custom…
-        </Menu.Item>
+        {onCustom && (
+          <Menu.Item
+            onClick={() => {
+              setReturnFocus(false);
+              onCustom();
+            }}
+          >
+            Custom…
+          </Menu.Item>
+        )}
       </Menu.Dropdown>
     </Menu>
   );
@@ -275,75 +269,5 @@ export function ProposalLabel({
     <Badge component="span" variant="light" size="xs" aria-label="Proposed Action">
       {labels?.[proposal.action] ?? actionLabels[proposal.action]}
     </Badge>
-  );
-}
-
-/**
- * The request line of a field that isn't itself the request (the composer's prompt): Enter or Ask
- * sends it; Escape undoes a proposal first, then closes the line, as Close does.
- */
-export function ChangeRequest({
-  ask,
-  label,
-  suggestions,
-  onSend,
-  ref,
-}: {
-  ask: Pick<
-    ReturnType<typeof useAskChange>,
-    "request" | "setRequest" | "pending" | "proposal" | "undo"
-  >;
-  /** The proposal's name, over the line. */
-  label?: ReactNode;
-  suggestions?: ReactNode;
-  onSend: (request: string) => void;
-  ref?: Ref<HTMLTextAreaElement>;
-}) {
-  const phone = usePhone();
-  if (ask.request === null) return null;
-  const send = () => {
-    if (ask.request?.trim()) onSend(ask.request);
-  };
-  const close = () => ask.setRequest(null);
-  return (
-    <Group gap="xs" wrap="nowrap" align="flex-start">
-      <Textarea
-        ref={ref}
-        flex={1}
-        aria-label="Change"
-        description={label}
-        placeholder="Ask for a change, like “make it night”"
-        size="sm"
-        {...(phone ? {} : fitActions(suggestions ? 3 : 2))}
-        autosize
-        minRows={2}
-        maxRows={4}
-        autoFocus
-        data-autofocus
-        value={ask.request}
-        onChange={(event) => ask.setRequest(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            send();
-          } else if (event.key === "Escape") {
-            // The line's own Escape comes first; a second one closes what it sits in.
-            event.preventDefault();
-            if (ask.proposal) ask.undo();
-            else close();
-          }
-        }}
-      />
-      <ChangeActions row={phone}>
-        <AskButton disabled={!ask.request.trim()} loading={ask.pending} onClick={send} />
-        {suggestions}
-        {ask.proposal ? (
-          <UndoButton onClick={ask.undo} />
-        ) : (
-          <FieldAction label="Close Change" icon={<icons.clear size={16} />} onClick={close} />
-        )}
-      </ChangeActions>
-    </Group>
   );
 }

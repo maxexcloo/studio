@@ -18,14 +18,7 @@
   bottom: 4px;
 }
 
-.prompt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mantine-spacing-sm);
-}
-
 /* The phone sheet's prompt (its text box, tools column and suggestions) takes the room left. */
-.prompt[data-fill],
 .area[data-fill] {
   flex: 1;
   min-height: 0;
