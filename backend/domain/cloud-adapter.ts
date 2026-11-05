@@ -204,7 +204,15 @@ export function createCloudQueueAdapter({
     async saveOutputs(job) {
       const state = record(job);
       if (!state?.outputs.length) throw new Error("Provider outputs are not yet safely saved.");
-      await saveGallery(job, state.outputs, state.request);
+      try {
+        await saveGallery(job, state.outputs, state.request);
+      } catch (error) {
+        // An Extend that can't be joined onto its video fails rather than retrying the save.
+        if (!(error as { extendFailed?: boolean }).extendFailed) throw error;
+        const failed = { ...state, state: "failed" as const, reason: (error as Error).message };
+        store.saveProviderRecord(job.ownerId, job.id, failed);
+        return result(failed);
+      }
     },
   };
 }
