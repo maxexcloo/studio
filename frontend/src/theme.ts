@@ -115,7 +115,6 @@ export function studioTheme({
     timingFunction: easing.enter,
   };
   const popupTransition = { ...transitionProps, transition: raise };
-  const popupMiddlewares = { flip: true, shift: { padding: 12, crossAxis: true } };
   return createTheme({
     primaryColor,
     // Match both schemes so contrast resolves against the displayed amber shade.
