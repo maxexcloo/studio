@@ -578,8 +578,8 @@ primary component reference and verify APIs against the installed version.
   option that keeps the menu open) is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
   dividers only between real groups and no explanatory notes (when nothing can
-  run, the options are simply disabled). Options are submenus on desktop and expand in place on phones,
-  never as a second floating layer, and an action left with one option runs it
+  run, the options are simply disabled). Options are submenus on desktop and expand in place on phones
+  (sliding open, never as a second floating layer; a phone menu stays on screen and scrolls when it outgrows it), and an action left with one option runs it
   without a submenu. The options: Recreate (reusing the item's prompt and
   settings) › Edit Prompt (opens the composer), Use as Reference (images), Run
   Again (new seed), Run Again (Same Seed), and for an upload only Edit Prompt

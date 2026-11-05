@@ -5,6 +5,7 @@ import {
   AppShell,
   Badge,
   Button,
+  Collapse,
   createTheme,
   Drawer,
   FloatingIndicator,
@@ -114,6 +115,7 @@ export function studioTheme({
     timingFunction: easing.enter,
   };
   const popupTransition = { ...transitionProps, transition: raise };
+  const popupMiddlewares = { flip: true, shift: { padding: 12, crossAxis: true } };
   return createTheme({
     primaryColor,
     // Match both schemes so contrast resolves against the displayed amber shade.
@@ -220,6 +222,13 @@ export function studioTheme({
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
+      // Expanding sections share the motion setting.
+      Collapse: Collapse.extend({
+        defaultProps: {
+          transitionDuration: motionDuration,
+          transitionTimingFunction: easing.enter,
+        },
+      }),
       Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
@@ -234,10 +243,19 @@ export function studioTheme({
         defaultProps: { size: "md" },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
       }),
+      // One row height for every menu's items. Phones expand options in place, so a menu stays
+      // within the screen and scrolls when they outgrow it.
       Menu: Menu.extend({
-        defaultProps: { transitionProps: popupTransition },
-        // One row height for every menu's items.
-        styles: { dropdown, item: { minHeight: 36 } },
+        defaultProps: {
+          transitionProps: popupTransition,
+          ...(phone && { middlewares: { ...popupMiddlewares, size: { padding: 12 } } }),
+        },
+        styles: {
+          dropdown: phone
+            ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
+            : dropdown,
+          item: { minHeight: 36 },
+        },
       }),
       // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
       // deep shadow. Full-screen dialogs (the viewer, phone panels) fill the viewport instead.

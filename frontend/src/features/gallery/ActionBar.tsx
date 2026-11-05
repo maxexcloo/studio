@@ -2,6 +2,7 @@ import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
+  Collapse,
   Divider,
   Loader,
   Menu,
@@ -125,12 +126,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
               >
                 {label}
               </Menu.Item>
-              {open && (
+              {/* Unmounted when closed, so arrow keys skip the hidden options. */}
+              <Collapse expanded={open} keepMounted={false}>
                 <div role="group" aria-label={label} className={classes.inline}>
                   {note(action)}
                   <ActionMenuItems groups={action.menu} />
                 </div>
-              )}
+              </Collapse>
             </Fragment>
           );
         }
