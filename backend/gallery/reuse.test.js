@@ -321,7 +321,7 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
   const { loadSharp } = await import("../sharp-loader.js");
   const sharp = await loadSharp();
   if (!sharp) return;
-  const { bytesForReference } = await import("../references.js");
+  const { bytesForReferenceAccount } = await import("../references.js");
   const png = (width, height, r) =>
     sharp({ create: { width, height, channels: 3, background: { r, g: 0, b: 0 } } })
       .png()
@@ -341,13 +341,13 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
   setGallery([item]);
   await new Promise((resolve) => setTimeout(resolve, 1100));
   const id = `gallery:${Buffer.from(item.url).toString("base64url")}`;
-  const used = await bytesForReference({ headers: {} }, id);
+  const used = await bytesForReferenceAccount(undefined, id);
   const meta = await sharp(used.buffer).metadata();
   const { data } = await sharp(used.buffer).raw().toBuffer({ resolveWithObject: true });
   assert.deepEqual([meta.width, meta.height, data[0] > 200], [64, 48, true]);
 
   setGallery([{ ...item, upscaleActive: false }]);
-  const original = await bytesForReference({ headers: {} }, id);
+  const original = await bytesForReferenceAccount(undefined, id);
   const { data: originalData } = await sharp(original.buffer)
     .raw()
     .toBuffer({ resolveWithObject: true });

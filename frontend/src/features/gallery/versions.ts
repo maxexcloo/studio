@@ -33,7 +33,7 @@ export function derivation(
  * The source an item was made from and whether it is one of its versions: what the item kept of
  * its run, or, before it has, its run's while that is in the queue.
  */
-export function itemDerivation(
+function itemDerivation(
   item: MediaItem,
   byJob: Map<string, QueueJob>,
   known?: Map<string, MediaItem>,

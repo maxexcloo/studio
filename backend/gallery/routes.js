@@ -2,7 +2,6 @@ import {
   filterVisibleGallery,
   gallery,
   galleryJobItems,
-  galleryKey,
   hideGalleryItems,
   removeGalleryItems,
   saveGallery,
@@ -23,6 +22,7 @@ import {
 import { galleryAspects, gallerySizeBands } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { requireAdmin } from "../route-access.js";
+import { galleryKey } from "../persistence/gallery-rows.ts";
 
 export function galleryJobResponse(account, id, settings = false) {
   cleanupGalleryState(jobs);

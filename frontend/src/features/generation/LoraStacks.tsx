@@ -26,7 +26,7 @@ type Operation =
   | { op: "stack.rename"; key: string; id: string; name: string }
   | { op: "stack.delete"; key: string; id: string };
 /** A saved stack as the picker's saved list shows it. */
-export interface StackRecord {
+interface StackRecord {
   id: string;
   name: string;
   savedAt?: string;

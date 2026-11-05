@@ -24,7 +24,7 @@ import { profileName, shownProfileName } from "../generation/payload";
 import { profileNameParts } from "../../../../shared/profiles";
 import classes from "./GalleryFilters.module.css";
 
-export interface GalleryFilterOption {
+interface GalleryFilterOption {
   value: string;
   label: string;
   description?: string;
@@ -35,7 +35,7 @@ const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
 const facets = ["model", "lora", "size", "aspect", "chat"] as const;
 type Facet = (typeof facets)[number];
-export type GalleryDate = "" | "day" | "week" | "month" | "year";
+type GalleryDate = "" | "day" | "week" | "month" | "year";
 const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
   { value: "", label: "Any", chip: "", days: 0 },
   { value: "day", label: "Today", chip: "Today", days: 0 },

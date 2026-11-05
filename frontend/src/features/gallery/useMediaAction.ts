@@ -14,7 +14,7 @@ import { backendLabel, generationInput, isProfile, profileName } from "../genera
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
-export type AnimateTier = "fast" | "quality";
+type AnimateTier = "fast" | "quality";
 
 interface AnimateChoice {
   profileId: string;
@@ -238,7 +238,7 @@ export interface WrittenPrompt {
   thinking?: string;
 }
 /** How a given prompt runs: as Prompt › Edit would (a video animates again), an image edit or its animation. */
-export type PromptOperation = "image" | "refine" | "animate";
+type PromptOperation = "image" | "refine" | "animate";
 
 /**
  * Queues a new run from a saved result without leaving the viewer: a new seed (the composer's
@@ -322,7 +322,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
 }
 
 /** The prompt Review Prompt First shows, with the video model (and Fast or Quality) that will run it. */
-export interface AnimateReview extends WrittenPrompt {
+interface AnimateReview extends WrittenPrompt {
   profileLabel: string;
   tier?: AnimateTier;
 }

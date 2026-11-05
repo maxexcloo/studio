@@ -82,7 +82,7 @@ const definitions = {
   delete: { label: "Delete", icon: icons.delete, color: "red" as const },
   star: { label: "Star", icon: icons.star },
 };
-export type ItemActionId = keyof typeof definitions;
+type ItemActionId = keyof typeof definitions;
 /**
  * The sections and order everywhere: Animate, Edit, Recreate, Upscale | Compare, Continue in Chat |
  * Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only in
@@ -256,7 +256,7 @@ export function useChatAction(item: MediaItem, onApplied: () => void) {
   });
 }
 
-export interface MediaActionOptions {
+interface MediaActionOptions {
   transfer: MediaTransferActions;
   sessionId?: string;
   /** Action IDs a surface leaves out. */
