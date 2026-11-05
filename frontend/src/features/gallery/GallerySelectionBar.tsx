@@ -137,7 +137,7 @@ export function GallerySelectionBar({
     // Phones that share natively share instead of downloading.
     phone && typeof navigator.share === "function"
       ? itemAction("share", {
-          label: prepared ? "Share" : "Prepare Share",
+          label: "Share",
           disabled: !ready.length || ready.length > shareLimit,
           loading: prepare.isPending,
           onClick: () => void share(),

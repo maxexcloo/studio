@@ -106,7 +106,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Compare",
     "Continue in Chat",
     "Copy",
-    /^(Download|Share Image|Prepare Share)$/,
+    /^(Download|Share Image)$/,
     "Star",
     "Delete",
   ]);
