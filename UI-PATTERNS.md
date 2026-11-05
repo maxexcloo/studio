@@ -250,10 +250,12 @@ primary component reference and verify APIs against the installed version.
   bar at the safe bottom holds the chips, wrapping onto as many rows as they
   need, then Image/Video, Clear and Generate. Opening it leaves the keyboard
   down; tapping the prompt types in place, with no separate editor or Done.
-  While the keyboard is up for a text box (or its tools), only it shows, filling
-  the room above the bar, which sits just above the keyboard with only its
-  actions; the header, chips and the other box return when the text loses focus
-  or the keyboard drops.
+  While a text box (or its tools) is typed in, only it shows, filling the room
+  above the bar, which keeps only its actions and sits just above the keyboard.
+  The layout flips the moment the text is tapped or loses focus, without waiting
+  for the keyboard's animation or adding transitions; only the bar's lift follows
+  the keyboard. The header, chips and the other box return when the text loses
+  focus or the keyboard drops.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. The prompt's tools (Recent Prompts, Prompt
