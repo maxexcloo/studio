@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 // What a stacked LoRA adds to a prompt (its trigger words, leading), and the negative a profile's guide recommends.
 import { cleanTriggers } from "./catalogue.js";
 

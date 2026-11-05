@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Generation metadata embedded in an image file (design §2.3, Resolve: image files). Pure: no
  * files, no network.

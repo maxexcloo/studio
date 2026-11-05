@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Version offers (design §4, Version Offers): other versions and variants of an imported model
  * that match it. From Civitai, the model's newer and older versions and the chosen version's

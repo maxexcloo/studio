@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Native port of the Studio MCP media service; see mcp.LICENSE.
+// Native port of the Studio MCP media service.
 import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";

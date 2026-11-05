@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library imports as durable job records (design §2.3): one file per import,
  * `<data>/library/imports/<id>.json`, indexed when first read; the 500 newest are kept. A record

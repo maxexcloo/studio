@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 
 /**
  * A provider-backed cloud profile (Grok): it runs at the provider, not on a worker. Access

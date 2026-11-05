@@ -6,6 +6,7 @@ on:
       - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
+      - NOTICE
       - worker/**
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
+      - NOTICE
       - worker/**
   workflow_dispatch:
 
@@ -70,6 +72,7 @@ jobs:
             test -x /opt/radiance/runtime/ld-linux-x86-64.so.2
             test -x /opt/radiance/bin/radiance
             test -s /opt/studio/LICENSE
+            test -s /opt/studio/NOTICE
           '
       - name: Log In to GHCR
         if: env.PUBLISH == 'true'

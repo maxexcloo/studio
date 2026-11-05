@@ -31,7 +31,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
 COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
 COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
-COPY LICENSE /opt/studio/LICENSE
+COPY LICENSE NOTICE /opt/studio/
 WORKDIR /root/ComfyUI
 EXPOSE 8188
 ENTRYPOINT ["/bin/bash", "/opt/studio/entrypoint.sh"]

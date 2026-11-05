@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library link resolvers (design §2.3, Resolve): a Civitai model or version link, or a Hugging
  * Face file or repository link, becomes the files it names, each with its download spec (or why

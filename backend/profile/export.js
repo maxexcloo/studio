@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library › Profiles › Download All: Studio's live profiles, guides and model manifest as one archive
  * in the seed repository's layout (`ai/`), so a person can unpack it there, review the diff and
