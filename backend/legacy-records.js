@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { loraStackFiles } from "./combined-profiles.js";
@@ -6,6 +5,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { verifiedBackup } from "./persistence/migration.ts";
 import { runtimeDatabase, withOfflineDatabase } from "./persistence/runtime.ts";
 import { createProfileStore } from "./profile/store.js";
+import { digest, isObject } from "./values.js";
 
 /**
  * The migrate-runtime step that rewrites records older builds left in shapes Studio no longer
@@ -24,11 +24,9 @@ import { createProfileStore } from "./profile/store.js";
  * `.backups/legacy-records-*` folder with a `mapping.json` (restorable with `--restore`), then
  * writes them, with Studio stopped. A second run finds nothing.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const modelChoices = { "z-image": "zimage", wan: "wan22_5b", checkpoint: "" };
 const singleReferenceKeys = ["startImageId", "referenceImage", "referenceImageName"];
 const chatRequest = /^(Edit|Animate|Extend|Recreate) (iteration \d+|this result)$/;
-const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 function planLoraStacks(dataDir) {
   const { canonical } = createProfileStore({ dataDir, log: { info() {}, warn() {} } });

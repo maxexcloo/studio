@@ -1,8 +1,8 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { verifiedBackup } from "../persistence/migration.ts";
+import { digest, isObject } from "../values.js";
 
 /**
  * The migrate-runtime step that folds the retired `model-download-sources.json` (Civitai and
@@ -15,8 +15,6 @@ import { verifiedBackup } from "../persistence/migration.ts";
  * the catalogue and deletes the file and its `.bak`, with Studio stopped. A second run finds
  * nothing.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 
 export function downloadSources(dataDir, { apply = false } = {}) {
   const sourceName = "model-download-sources.json";

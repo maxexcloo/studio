@@ -24,24 +24,19 @@
  * administrator's edit or Approve clears it. Each store has one writer (this module) and writes
  * atomically (json-store.js).
  */
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { loadMcpPrompting } from "../mcp/prompting.js";
+import { digest, isObject } from "../values.js";
 
 const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
 export const validId = (id) =>
   /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
 const validPackId = (id) =>
   /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(String(id || "")) && !String(id).includes("..");
-export const hashOf = (value) =>
-  crypto
-    .createHash("sha256")
-    .update(typeof value === "string" ? value : JSON.stringify(value))
-    .digest("hex");
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+export const hashOf = (value) => digest(typeof value === "string" ? value : JSON.stringify(value));
 const stamp = () => new Date().toISOString();
 const notFound = (message) => Object.assign(new Error(message), { status: 404 });
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });

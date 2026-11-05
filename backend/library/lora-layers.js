@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { verifiedBackup } from "../persistence/migration.ts";
+import { isObject } from "../values.js";
 
 /**
  * The migrate-runtime step that folds the catalogue's `seed` and `admin` layers (LoRA entries
@@ -15,7 +16,6 @@ import { verifiedBackup } from "../persistence/migration.ts";
  * mapping (restorable with `--restore`), then writes it, with Studio stopped. A second run finds
  * nothing.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const text = (value, limit) => (typeof value === "string" ? value.trim().slice(0, limit) : "");
 const list = (value, limit = 30, size = 120) =>
   (Array.isArray(value) ? value : [])

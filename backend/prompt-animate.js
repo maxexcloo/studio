@@ -21,7 +21,7 @@ import {
   precedence,
   writerGuide,
 } from "./domain/writing-standard.ts";
-import { isCloudProfile } from "./cloud-profiles.js";
+import { isCloudProfile } from "../shared/profiles.ts";
 import { families } from "./family-catalog.js";
 
 export const animateThemes = Object.freeze({

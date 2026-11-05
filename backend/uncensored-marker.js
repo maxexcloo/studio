@@ -3,6 +3,7 @@ import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { createProfileStore } from "./profile/store.js";
 import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
+import { isObject } from "./values.js";
 
 /**
  * The migrate-runtime step that renames the old `nsfw` marker to `uncensored`: each profile's
@@ -10,7 +11,6 @@ import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime
  * the import records, and each access profile's `nsfwModels` feature. Plans by default; `apply`
  * writes, with Studio stopped. A second run finds nothing. Earlier profile versions keep their text.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const profileKey = /"nsfw"(\s*):/g;
 
 /** `value` with every `nsfw` key renamed; `count.n` counts them. A kept `uncensored` key wins. */

@@ -62,7 +62,7 @@ import { imageMimes } from "../reference-names.js";
 import { resolutions } from "../../shared/resolution.ts";
 import { appVersion } from "../data-dir.js";
 import { accessFeatures } from "../account-policy.js";
-import { isCloudProfile } from "../cloud-profiles.js";
+import { isCloudProfile } from "../../shared/profiles.ts";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
