@@ -208,7 +208,9 @@ export function PromptHistory({
         }}
       >
         <Stack
+          flex={1}
           gap="sm"
+          mih={0}
           onKeyDown={(event) => {
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
               event.preventDefault();
