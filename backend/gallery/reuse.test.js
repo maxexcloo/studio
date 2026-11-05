@@ -147,6 +147,40 @@ test("an Extend is saved joined onto the video it continued", async (context) =>
   assert.equal(retried.url, completed.url);
 });
 
+test("an Extend that can't be joined onto its video fails instead of saving apart", async () => {
+  // Neither clip reads as a video, so the join fails.
+  for (const name of ["broken-source.mp4", "broken-extension.mp4"])
+    fs.writeFileSync(path.join(outputDir, name), "not a video");
+  const sourceBody = { kind: "video", prompt: "A wave" };
+  setGallery(makePendingItems("broken-source-job", sourceBody));
+  const [source] = await replaceGalleryJob(
+    "broken-source-job",
+    [{ url: url("broken-source.mp4"), filename: "broken-source.mp4", type: "video" }],
+    sourceBody,
+    new Map(),
+  );
+  const extension = {
+    url: url("broken-extension.mp4"),
+    filename: "broken-extension.mp4",
+    type: "video",
+  };
+  const extend = (assetId) => {
+    const body = {
+      kind: "video",
+      prompt: "The wave rolls on",
+      referenceAssets: [{ assetId, slot: "start" }],
+    };
+    setGallery([source, ...makePendingItems("broken-extend-job", body)]);
+    return replaceGalleryJob("broken-extend-job", [extension], body, new Map());
+  };
+  await assert.rejects(extend(`${source.id}:last-frame`), (error) => error.extendFailed);
+  await assert.rejects(
+    extend("gone-video:last-frame"),
+    (error) => error.extendFailed && /no longer in the gallery/.test(error.message),
+  );
+  assert.ok(!fs.existsSync(path.join(outputDir, "broken-extension-joined.mp4")));
+});
+
 test("a video that cannot be probed still completes with its requested dimensions", async () => {
   const filename = "unreadable-video.mp4";
   fs.writeFileSync(path.join(outputDir, filename), "not a video");
