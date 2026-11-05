@@ -24,3 +24,9 @@
   flex: 1;
   flex-direction: column;
 }
+
+/* A section's Stacks around a view's empty state grow, so the line centres in the whole section
+   rather than under its toolbar. */
+.section :global(.mantine-Stack-root):has([data-empty-state="view"]) {
+  flex: 1;
+}

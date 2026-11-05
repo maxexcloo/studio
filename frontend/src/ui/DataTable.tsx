@@ -4,7 +4,6 @@ import {
   Group,
   Menu,
   Table,
-  Text,
   UnstyledButton,
   VisuallyHidden,
   type MantineBreakpoint,
@@ -70,7 +69,7 @@ export function DataTable<T>({
   initialSort?: Sort;
   /** Shown when there are no rows; a query that hides every row shows No Matches. */
   empty: string;
-  /** Shows the empty line as plain text, for a section that holds several lists. */
+  /** Keeps the empty line to its own height, for a section that holds several lists. */
   compact?: boolean;
   /** The loading label while the rows are fetched. */
   loading?: string | false;
@@ -89,13 +88,7 @@ export function DataTable<T>({
       : rows;
   if (!matching.length) {
     const line = rows.length ? "No Matches" : empty;
-    return compact ? (
-      <Text size="sm" c="dimmed">
-        {line}
-      </Text>
-    ) : (
-      <EmptyState>{line}</EmptyState>
-    );
+    return <EmptyState fill={compact}>{line}</EmptyState>;
   }
   const sortValue = columns.find((column) => column.key === sort?.key)?.sortValue;
   const sorted =
