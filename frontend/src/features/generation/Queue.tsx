@@ -29,7 +29,6 @@ import { LoadingState } from "../../ui/LoadingState";
 import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { Profile, QueueJob, ReferenceAsset } from "../../types";
-import { useMotionDuration } from "../../ui/Appearance";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery, loraTitle } from "./LoraPicker";
@@ -246,7 +245,6 @@ function QueueRow({
 }) {
   const [opened, setOpened] = useState(false);
   const detailsId = useId();
-  const duration = useMotionDuration();
   const failed = job.status === "failed";
   const { progress } = job;
   const percent = progressPercent(progress);
@@ -325,7 +323,7 @@ function QueueRow({
           <WritingStream progress={progress} />
         </div>
       )}
-      <Collapse id={detailsId} expanded={opened} keepMounted={false} transitionDuration={duration}>
+      <Collapse id={detailsId} expanded={opened} keepMounted={false}>
         <QueueJobDetails job={job} profile={profile} />
       </Collapse>
     </div>
