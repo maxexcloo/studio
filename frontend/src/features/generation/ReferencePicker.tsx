@@ -258,11 +258,10 @@ export function ReferencePicker({
         dropData(event.dataTransfer);
       }}
       gap="sm"
-      style={{
-        minHeight: 0,
-        // Phones fill the popup below its header; the grid owns scrolling and keeps its position.
-        height: phone ? "calc(100dvh - 5rem)" : "min(70dvh, 620px)",
-      }}
+      // Phones fill the popup below its header; the grid owns scrolling and keeps its position.
+      flex={phone ? 1 : undefined}
+      mih={0}
+      h={phone ? undefined : "min(70dvh, 620px)"}
     >
       <ReferenceSlots
         references={references}
