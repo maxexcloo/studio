@@ -462,7 +462,7 @@ export function useMediaActions(
           [
             { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
             editAction("reverse", "Reverse", Rewind, "reverse"),
-            editAction("back-and-forth", "Back and Forth", ArrowLeftRight, "loop"),
+            editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
           ],
           // Interpolated edits, the slowest to make.
           [
@@ -652,7 +652,7 @@ export function useMediaActions(
                       { id: "download-gif", label: "GIF", icon: Film, link: gif },
                       {
                         id: "download-loop",
-                        label: "Back and Forth",
+                        label: "Back & Forth",
                         icon: ArrowLeftRight,
                         link: loop,
                       },

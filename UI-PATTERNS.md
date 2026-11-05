@@ -607,7 +607,7 @@ primary component reference and verify APIs against the installed version.
   Options… (a dialog of quality, size and Face Detail whose action is Upscale
   Image or Video), then last Upscale Image (or Video; Regenerate Upscale once
   upscaled) at those settings and the automatic size; Copy › Prompt, Details; a video's Download › Video, GIF,
-  Back and Forth (an MP4 played forward then back, looping without a jump). Phones
+  Back & Forth (an MP4 played forward then back, looping without a jump). Phones
   that share natively show Share Image in Download's place; desktop has no Share.
   The viewer and gallery selection share one `ActionBarGroups` bar of divided
   groups that scrolls sideways when it overflows.
