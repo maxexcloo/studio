@@ -629,9 +629,7 @@ export function useMediaActions(
     ready &&
       (transfer.canShare
         ? itemAction("share", {
-            label: transfer.shareReady
-              ? `Share ${item.type === "video" ? "Video" : "Image"}`
-              : "Prepare Share",
+            label: `Share ${item.type === "video" ? "Video" : "Image"}`,
             disabled: transfer.sharing,
             loading: transfer.sharing,
             keepOpen: !transfer.shareReady,

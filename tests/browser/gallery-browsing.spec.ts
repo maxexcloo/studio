@@ -582,7 +582,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
-  if (sharing) await expect(selectionAction(page, "Prepare Share")).toBeEnabled();
+  if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
   else
     await expect(selectionAction(page, "Download", "link")).toHaveAttribute(
       "href",
