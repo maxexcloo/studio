@@ -1,11 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
+import { compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import type { Store, QueueOrigin } from "./store.ts";
 
 /**
- * A compare set: 2–4 image jobs shown side by side. `vote` is the starred winner and, with the
- * variants' recorded inputs, the taste signal the taste profile learns from.
+ * A compare set: `compareVariants` image jobs shown side by side. `vote` is the starred winner and,
+ * with the variants' recorded inputs, the taste signal the taste profile learns from.
  */
 export interface ComparisonRecord {
   id: string;
@@ -39,6 +40,9 @@ const letter = (index: number) => String.fromCharCode(65 + index);
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 const owner = (req: Request) => req.studioAccount?.userId || "";
+const range = `${compareVariants.min}–${compareVariants.max}`;
+const sized = (list: unknown[]) =>
+  list.length >= compareVariants.min && list.length <= compareVariants.max;
 
 /** Compare runs queue as one set and read back against the caller's current gallery. */
 export function registerCompareRoutes(
@@ -171,13 +175,12 @@ export function registerCompareRoutes(
     const { jobIds, labels } = req.body || {};
     if (
       !Array.isArray(jobIds) ||
-      jobIds.length < 2 ||
-      jobIds.length > 4 ||
+      !sized(jobIds) ||
       jobIds.some((id) => typeof id !== "string") ||
       new Set(jobIds).size !== jobIds.length ||
       !labelsValid(labels, jobIds.length)
     )
-      return res.status(400).json({ ok: false, error: "Choose 2–4 different image jobs." });
+      return res.status(400).json({ ok: false, error: `Choose ${range} different image jobs.` });
     const ownerId = owner(req);
     const image = (id: string) => {
       const job = store.job(ownerId, id);
@@ -197,17 +200,17 @@ export function registerCompareRoutes(
     const { variants, sessionId } = req.body || {};
     if (
       !Array.isArray(variants) ||
-      variants.length < 2 ||
-      variants.length > 4 ||
+      !sized(variants) ||
       variants.some((variant) => !object(variant?.input) || variant.input.kind === "video") ||
       !labelsValid(
         variants.map((variant) => variant.label),
         variants.length,
       )
     )
-      return res
-        .status(400)
-        .json({ ok: false, error: "Choose 2–4 image variants, each with a label and settings." });
+      return res.status(400).json({
+        ok: false,
+        error: `Choose ${range} image variants, each with a label and settings.`,
+      });
     const ownerId = owner(req);
     if (
       sessionId !== undefined &&
