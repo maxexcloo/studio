@@ -310,6 +310,8 @@ export function useMediaActions(
   const reference = useReferenceAction(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
+  // Phones compare an upscale above its original.
+  const phone = usePhone();
   const videoEdit = useVideoEdit(item);
   // A video edit's menu stays open while it saves, then its item says so for a moment.
   const [edited, flashEdited] = useFlash<VideoEdit["kind"]>();
@@ -540,7 +542,7 @@ export function useMediaActions(
                       {
                         id: "compare-upscale",
                         label: "Compare Upscale",
-                        icon: icons.compareSideBySide,
+                        icon: phone ? icons.compareStacked : icons.compareSideBySide,
                         checked: Boolean(compare),
                         onClick: onCompare,
                       },

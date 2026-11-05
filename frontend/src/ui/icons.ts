@@ -21,6 +21,7 @@ import {
   Puzzle,
   RefreshCw,
   RotateCw,
+  Rows2,
   ScrollText,
   Settings,
   Share,
@@ -52,6 +53,8 @@ export const icons = {
   compare: Blend,
   /** Two versions side by side (Compare Upscale). */
   compareSideBySide: Columns2,
+  /** Two versions one above the other (Compare Upscale on phones). */
+  compareStacked: Rows2,
   copy: Copy,
   delete: Trash2,
   details: Info,
