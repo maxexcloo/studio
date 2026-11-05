@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { yieldToEventLoop } from "./json-store.js";
 import { mediaType, videoPattern } from "./media-paths.js";
 import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery/store.js";
@@ -24,7 +25,6 @@ const displayBudget = Math.floor(cacheLimitBytes / 4 / (1024 * 1024));
 const posterBudget = Math.floor(maxCacheBytes / 4 / (32 * 1024));
 const previewBudget = Math.floor(maxCacheBytes / 4 / (512 * 1024));
 const settled = new Set();
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms).unref?.());
 let warming = null;
 let warmedRevision = 0;
 let shownRevision = -1;
@@ -70,7 +70,7 @@ async function quietly(key, media, build) {
     turnAt = performance.now();
   }
   if (settled.has(key)) return;
-  while (!idle()) await sleep(250);
+  while (!idle()) await delay(250, undefined, { ref: false });
   if (!stillShown(media)) return;
   const started = performance.now();
   try {
@@ -81,7 +81,7 @@ async function quietly(key, media, build) {
   settled.add(key);
   const took = performance.now() - started;
   // An existing file is found in a millisecond or two; only real work rests.
-  if (took > 5) await sleep(took);
+  if (took > 5) await delay(took, undefined, { ref: false });
 }
 
 /** One pass over the gallery as it is now. Resolves to how many files it looked at. */

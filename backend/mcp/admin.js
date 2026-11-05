@@ -15,6 +15,7 @@
  * Duplicate Profiles back up what they change, and ending another account's unfinished job is the
  * one step that cannot be undone, so that tool alone is marked destructive.
  */
+import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
 import { mcpJson } from "./media.js";
 import { lineDiff } from "../line-diff.js";
@@ -53,18 +54,6 @@ const key = z
   .min(3)
   .max(400)
   .describe("A catalogue key: folder/file, such as loras/glow.safetensors.");
-const pause = (milliseconds, signal) =>
-  new Promise((resolve) => {
-    const timer = setTimeout(resolve, milliseconds);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
 
 /** RFC 7386 JSON merge patch: objects merge, null removes, anything else replaces. */
 function mergePatch(target, patch) {
@@ -451,7 +440,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         signal,
       );
       while (busyImport.has(record?.state) && Date.now() < deadline && !signal?.aborted) {
-        await pause(Math.min(2000, deadline - Date.now()), signal);
+        await delay(Math.min(2000, deadline - Date.now()), undefined, { signal }).catch(() => {});
         ({ import: record } = await api(
           "GET",
           `/api/library/imports/${encodeURIComponent(wanted)}`,
