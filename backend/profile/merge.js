@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library › Profiles › Merge Duplicate Profiles: an administrator's explicit, repeatable action,
  * never run at startup.

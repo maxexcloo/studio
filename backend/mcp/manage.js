@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * MCP's tools for an account's own Studio, beside generation (mcp.js): its gallery, queue, Dream
  * and taste. Each action calls the route the UI calls with the account's own credential, so the

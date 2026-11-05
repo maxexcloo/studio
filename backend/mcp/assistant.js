@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 // The prompt assistant's MCP tools: RewritePrompt, SuggestNegative and SuggestLoras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
 // share one engine and one set of rules (Prompt Assistant, Uncensored Models for Spicy, LoRAs, the

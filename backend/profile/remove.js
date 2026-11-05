@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library › Profiles › Remove Profile: an administrator's explicit removal of one profile.
  *

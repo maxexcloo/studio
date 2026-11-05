@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The queue's writing stage (domain/queue.ts). Every prompt-assistant use that leads to a generation
  * writes its prompt as the queue item's first stage, from the request a surface sets as

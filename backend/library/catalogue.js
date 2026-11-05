@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * One catalogue for every model file Studio knows about (LoRAs, checkpoints, diffusion models,
  * text encoders, VAEs and CLIP vision), keyed by `folder/file`, with provenance and a hash index:

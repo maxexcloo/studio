@@ -115,7 +115,7 @@ jobs:
         with:
           flavor: latest=false
           images: ${{ env.IMAGE_NAME }}
-          labels: org.opencontainers.image.licenses=MIT
+          labels: org.opencontainers.image.licenses=AGPL-3.0-only
           tags: type=sha,format=long,enable={{is_default_branch}}
       - name: Build Image For Verification
         uses: docker/build-push-action@v7
@@ -207,7 +207,7 @@ jobs:
           # The worker gets a version only when it changed since the last release, so a deployment's
           # GPU workers restart only for that. Nothing is tagged until both images are known, so a
           # failed run never leaves a version behind for the next run to reuse.
-          worker_paths=(.dockerignore .github/workflows/worker.yaml LICENSE worker)
+          worker_paths=(.dockerignore .github/workflows/worker.yaml LICENSE NOTICE worker)
           worker_commit="$(git log -1 --first-parent --format=%H -- "${worker_paths[@]}")"
           latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
           worker=""

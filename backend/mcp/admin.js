@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * MCP's admin tools (design §6): an administrator's chat manages the Library, downloads, the
  * catalogue, profiles, guides and accounts' groups through the same routes the UI uses
