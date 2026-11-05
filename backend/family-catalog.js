@@ -673,7 +673,6 @@ const wide = [
 ];
 
 const speedName = /lightning|dmd2?|hyper|turbo|lcm|pcm|\d+[-_ ]?steps?|tcd|flash/i;
-const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
 
 /**
  * slots: text encoder inputs in loader order. kinds: accepted encoder kinds;
@@ -696,15 +695,6 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * with the same layout, which is `as` (a knownFamilies id) instead.
  * pack: a node-packs.js id when the family runs on custom nodes. ownLoaders:
  * the pack loads encoder and VAE itself (no pickers, no LoRAs).
- * runners: per model source, a custom node pack that runs the family another
- * way (MOSS-Image's Diffusers folders through its makers' own loader): pack,
- * note, ownLoaders, loras (the pack's model still takes ComfyUI's LoRAs),
- * loader { node, path (the input that takes the folder's full path), inputs }
- * in place of the three core loaders, modelSampling (its own shift node, in
- * place of the family's), patches (nodes put on the model before sampling,
- * after the shift), requiredNodes (core nodes those need) and
- * folders { classNames }: which models/diffusers folders are this family, by
- * their transformer/config.json.
  * upsampler: a small language model the family is meant to run behind (FLUX.3),
  * which rewrites your prompt into the long caption the model was trained on,
  * through ComfyUI's TextGenerate: slot (an encoder slot, `only` its own build),
@@ -716,10 +706,6 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * optional: the model runs without it; a missing one is offered as recommended
  * (the profile's `recommended`), not needed.
  * variants: first whose `match` passes wins; the last one is the fallback.
- * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
- * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
- * steps from a count in the file name ("…_4step"), for files distilled for
- * exactly that many.
  */
 /**
  * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
@@ -753,12 +739,10 @@ export const families = {
         id: "fast",
         label: "Fast (LCM/Lightning)",
         match: (name) => speedName.test(name),
-        defaults: { steps: 6, cfg: 1.5, sampler: "lcm", scheduler: "sgm_uniform" },
       },
       {
         id: "standard",
         label: "SD 1.5",
-        defaults: { steps: 25, cfg: 7, sampler: "dpmpp_2m", scheduler: "karras" },
       },
     ],
     size: [512, 512],
@@ -784,12 +768,10 @@ export const families = {
         label: "Base (512)",
         match: (name) => /512|(^|[^a-z])base([^a-z]|$)/i.test(name),
         size: [512, 512],
-        defaults: { steps: 25, cfg: 7, sampler: "dpmpp_2m", scheduler: "karras" },
       },
       {
         id: "standard",
         label: "SD 2.x",
-        defaults: { steps: 25, cfg: 7, sampler: "dpmpp_2m", scheduler: "karras" },
       },
     ],
     size: [768, 768],
@@ -819,33 +801,26 @@ export const families = {
         label: "SDXL Turbo",
         match: (name) => /sd_?xl_?turbo|sdxlturbo/i.test(name),
         size: [512, 512],
-        defaults: { steps: 1, cfg: 1, sampler: "euler_ancestral", scheduler: "normal" },
       },
       {
         id: "hyper",
         label: "Hyper",
         match: (name) => /hyper/i.test(name),
-        defaults: { steps: 8, cfg: 1, sampler: "ddim", scheduler: "sgm_uniform" },
       },
       {
         id: "dmd2",
         label: "DMD2",
         match: (name) => /dmd/i.test(name),
-        defaults: { steps: 4, cfg: 1, sampler: "lcm", scheduler: "sgm_uniform" },
       },
       {
         id: "lcm",
         label: "LCM",
         match: (name) => /lcm|pcm|tcd/i.test(name),
-        defaults: { steps: 6, cfg: 1.5, sampler: "lcm", scheduler: "sgm_uniform" },
       },
-      // SDXL-Lightning's steps must equal the count its file is distilled for (2, 4 or 8); DMD2's card uses 4.
       {
         id: "lightning",
         label: "Lightning",
         match: (name) => /lightning|turbo|\d+[-_ ]?steps?/i.test(name),
-        stepsFromName: true,
-        defaults: { steps: 6, cfg: 1, sampler: "euler", scheduler: "sgm_uniform" },
       },
       // NoobAI v-pred merges often lack the v_pred key ComfyUI looks for, so Studio sets the mode itself.
       {
@@ -853,24 +828,20 @@ export const families = {
         label: "V-prediction",
         match: (name) => /v[-_ ]?pred/i.test(name),
         vpred: true,
-        defaults: { steps: 30, cfg: 4.5, sampler: "euler", scheduler: "normal" },
       },
       {
         id: "pony",
         label: "Pony",
         match: (name) => /pony|pdxl|autismmix/i.test(name),
-        defaults: { steps: 25, cfg: 7, sampler: "euler_ancestral", scheduler: "normal" },
       },
       {
         id: "anime",
         label: "Illustrious / NoobAI",
         match: (name) => /illustrious|noob|ilxl|wai[-_]?nsfw|animagine/i.test(name),
-        defaults: { steps: 28, cfg: 5, sampler: "euler_ancestral", scheduler: "normal" },
       },
       {
         id: "standard",
         label: "SDXL",
-        defaults: { steps: 25, cfg: 7, sampler: "dpmpp_2m", scheduler: "karras" },
       },
     ],
     size: [1024, 1024],
@@ -893,7 +864,6 @@ export const families = {
         id: "auraflow",
         label: "AuraFlow",
         match: (name) => /auraflow/i.test(name),
-        defaults: { steps: 30, cfg: 3.5, sampler: "euler", scheduler: "simple" },
       },
       // Pony V7's own ComfyUI workflows (purplesmartai/pony-v7-base): the T5 padded
       // to 768 tokens, 1280×1536. The card asks for at least 30 steps.
@@ -902,7 +872,6 @@ export const families = {
         label: "Pony V7",
         t5Padding: { minPadding: 768, minLength: 768 },
         size: [1280, 1536],
-        defaults: { steps: 30, cfg: 3.5, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -929,12 +898,10 @@ export const families = {
         id: "turbo",
         label: "Turbo",
         match: (name) => /turbo/i.test(name),
-        defaults: { steps: 4, cfg: 1.2, sampler: "euler", scheduler: "sgm_uniform" },
       },
       {
         id: "standard",
         label: "SD 3.5",
-        defaults: { steps: 20, cfg: 4, sampler: "euler", scheduler: "sgm_uniform" },
       },
     ],
     size: [1024, 1024],
@@ -960,7 +927,6 @@ export const families = {
         id: "schnell",
         label: "Schnell",
         match: (name) => /schnell/i.test(name),
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       // De-distilled fine-tunes trade Flux guidance back for real CFG, so the negative prompt works again.
       {
@@ -968,20 +934,17 @@ export const families = {
         label: "De-distilled",
         match: (name) => /de[-_ ]?distill/i.test(name),
         negative: "text",
-        defaults: { steps: 28, cfg: 3, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "fast",
         label: "Dev, fast",
         match: (name) => speedName.test(name),
         guidance: 3.5,
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "dev",
         label: "Dev",
         guidance: 3.5,
-        defaults: { steps: 20, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1014,13 +977,11 @@ export const families = {
         label: "Fast",
         match: (name) => speedName.test(name),
         guidance: 4,
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "dev",
         label: "Dev",
         guidance: 4,
-        defaults: { steps: 28, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1051,13 +1012,11 @@ export const families = {
         label: "Base",
         match: (name) => /base/i.test(name) && !speedName.test(name),
         negative: "text",
-        defaults: { steps: 20, cfg: 5, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "distilled",
         label: "Distilled",
         negative: "zero",
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1088,13 +1047,11 @@ export const families = {
         label: "Base",
         match: (name) => /base/i.test(name) && !speedName.test(name),
         negative: "text",
-        defaults: { steps: 20, cfg: 5, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "distilled",
         label: "Distilled",
         negative: "zero",
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1113,18 +1070,15 @@ export const families = {
     negative: "text",
     img2img: true,
     aspects: square,
-    modelSampling: { node: "ModelSamplingAuraFlow", shift: 1 },
     variants: [
       {
         id: "fast",
         label: "Fast",
         match: (name) => speedName.test(name),
-        defaults: { steps: 10, cfg: 1, sampler: "euler", scheduler: "beta" },
       },
       {
         id: "standard",
         label: "Chroma",
-        defaults: { steps: 26, cfg: 3.5, sampler: "euler", scheduler: "beta" },
       },
     ],
     size: [1024, 1024],
@@ -1169,23 +1123,17 @@ export const families = {
         label: "Fast",
         match: (name) => /fast/i.test(name),
         negative: "zero",
-        modelSampling: { node: "ModelSamplingSD3", shift: 3 },
-        defaults: { steps: 16, cfg: 1, sampler: "lcm", scheduler: "normal" },
       },
       {
         id: "dev",
         label: "Dev",
         match: (name) => /dev/i.test(name),
         negative: "zero",
-        modelSampling: { node: "ModelSamplingSD3", shift: 6 },
-        defaults: { steps: 28, cfg: 1, sampler: "lcm", scheduler: "normal" },
       },
       {
         id: "full",
         label: "Full",
         negative: "text",
-        modelSampling: { node: "ModelSamplingSD3", shift: 3 },
-        defaults: { steps: 50, cfg: 5, sampler: "uni_pc", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1202,29 +1150,23 @@ export const families = {
     sizeStep: 16,
     img2img: true,
     aspects: square,
-    modelSampling: { node: "ModelSamplingAuraFlow", shift: 3.1 },
     variants: [
-      // Qwen-Image-Lightning comes as 4-step and 8-step builds; each wants its own count.
       {
         id: "fast",
         label: "Lightning",
         match: (name) => speedName.test(name),
         negative: "text",
-        stepsFromName: true,
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "2512",
         label: "Qwen-Image 2512",
         match: (name) => /2512/.test(name),
         negative: "text",
-        defaults: { steps: 50, cfg: 4, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Qwen-Image",
         negative: "text",
-        defaults: { steps: 20, cfg: 2.5, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1328, 1328],
@@ -1259,12 +1201,10 @@ export const families = {
           "KSamplerSelect",
           "SamplerCustomAdvanced",
         ],
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Qwen-Image 2.1",
-        defaults: { steps: 25, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1287,12 +1227,10 @@ export const families = {
         id: "base",
         label: "Base",
         match: (name) => isZImageBase(name),
-        defaults: { steps: 30, cfg: 4, sampler: "res_multistep", scheduler: "simple" },
       },
       {
         id: "turbo",
         label: "Turbo",
-        defaults: { steps: 8, cfg: 1, sampler: "res_multistep", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1320,12 +1258,10 @@ export const families = {
         match: (name) => isKrea2Raw(name),
         rawShift: true,
         native: draws2kMaybe,
-        defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "turbo",
         label: "Turbo",
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1351,12 +1287,10 @@ export const families = {
         label: "Turbo",
         match: (name) => speedName.test(name),
         negative: "zero",
-        defaults: { steps: 10, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Anima",
-        defaults: { steps: 30, cfg: 4, sampler: "er_sde", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1373,21 +1307,15 @@ export const families = {
     frameStep: 4,
     negative: "text",
     aspects: wide,
-    modelSampling: { node: "ModelSamplingSD3", shift: 8 },
     variants: [
       {
         id: "fast",
         label: "Fast",
         match: (name) => speedName.test(name) || /causvid|lightx2v|self[-_]?forcing/i.test(name),
-        defaults: { steps: 6, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
-      // uni_pc corrupts video on Apple Silicon (float32 rounding in its
-      // coefficients; ComfyUI issues 7027, 15921, 16573), euler does not.
       {
         id: "standard",
         label: "Wan 2.1",
-        apple: { sampler: "euler" },
-        defaults: { steps: 30, cfg: 6, sampler: "uni_pc", scheduler: "simple" },
       },
     ],
     size: [832, 480],
@@ -1407,19 +1335,15 @@ export const families = {
     negative: "text",
     startImage: true,
     aspects: wide,
-    modelSampling: { node: "ModelSamplingSD3", shift: 8 },
     variants: [
       {
         id: "fast",
         label: "Fast",
         match: (name) => speedName.test(name),
-        defaults: { steps: 6, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Wan 2.2 5B",
-        apple: { sampler: "euler" },
-        defaults: { steps: 20, cfg: 5, sampler: "uni_pc", scheduler: "simple" },
       },
     ],
     size: [1280, 704],
@@ -1453,19 +1377,15 @@ export const families = {
     negative: "text",
     sampling: "pair",
     aspects: wide,
-    modelSampling: { node: "ModelSamplingSD3", shift: 8 },
     variants: [
       {
         id: "fast",
         label: "Fast (4-step)",
         match: (name) => speedName.test(name) || /lightx2v|rapid/i.test(name),
-        modelSampling: { node: "ModelSamplingSD3", shift: 5 },
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Wan 2.2 14B",
-        defaults: { steps: 20, cfg: 3.5, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [832, 480],
@@ -1505,19 +1425,16 @@ export const families = {
     negative: "text",
     sampling: "pair",
     aspects: wide,
-    modelSampling: { node: "ModelSamplingSD3", shift: 5 },
     requiredNodes: ["WanImageToVideo", "LoadImage"],
     variants: [
       {
         id: "fast",
         label: "Fast (4-step)",
         match: (name) => speedName.test(name) || /lightx2v|rapid/i.test(name),
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Wan 2.2 14B I2V",
-        defaults: { steps: 20, cfg: 3.5, sampler: "euler", scheduler: "simple" },
       },
     ],
     // The template's 640×640 is the area; the aspect follows the picture you pick.
@@ -1540,48 +1457,33 @@ export const families = {
     frameStep: 4,
     negative: "text",
     aspects: wide,
-    // Tencent's table (model card): shift 5 at 480p, 9 for 720p text-to-video.
-    // Comfy-Org's 720p template keeps 20 steps for time; the CFG-distilled
-    // models "must use 50 steps to generate correct results".
-    modelSampling: hy15Shift(5),
     requiredNodes: ["EmptyHunyuanVideo15Latent"],
     variants: [
-      // Tencent ships step-distilled weights for 480p image-to-video only; lightx2v's
-      // 4-step 480p text-to-video build runs without CFG at shift 9 (its README).
       {
         id: "fast",
         label: "Fast (4-step)",
         match: (name) => speedName.test(name) || /lightx2v/i.test(name),
-        stepsFromName: true,
-        modelSampling: hy15Shift(9),
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "cfg_distilled_720",
         label: "720p CFG-distilled",
         match: (name) => /cfg[-_ ]?distill/i.test(name) && /720p/i.test(name),
         size: [1280, 720],
-        modelSampling: hy15Shift(9),
-        defaults: { steps: 50, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "cfg_distilled",
         label: "CFG-distilled",
         match: (name) => /cfg[-_ ]?distill/i.test(name),
-        defaults: { steps: 50, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "p720",
         label: "720p",
         match: (name) => /720p/i.test(name),
         size: [1280, 720],
-        modelSampling: hy15Shift(9),
-        defaults: { steps: 20, cfg: 6, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "HunyuanVideo 1.5",
-        defaults: { steps: 20, cfg: 6, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [848, 480],
@@ -1612,7 +1514,6 @@ export const families = {
     frameStep: 4,
     negative: "text",
     aspects: wide,
-    modelSampling: hy15Shift(5),
     requiredNodes: [
       "HunyuanVideo15ImageToVideo",
       "CLIPVisionLoader",
@@ -1624,35 +1525,27 @@ export const families = {
         id: "step_distilled",
         label: "Step-distilled",
         match: (name) => /step[-_ ]?distill/i.test(name) || speedName.test(name),
-        modelSampling: hy15Shift(7),
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "cfg_distilled_720",
         label: "720p CFG-distilled",
         match: (name) => /cfg[-_ ]?distill/i.test(name) && /720p/i.test(name),
         size: [1280, 720],
-        modelSampling: hy15Shift(7),
-        defaults: { steps: 50, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "cfg_distilled",
         label: "CFG-distilled",
         match: (name) => /cfg[-_ ]?distill/i.test(name),
-        defaults: { steps: 50, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "p720",
         label: "720p",
         match: (name) => /720p/i.test(name),
         size: [1280, 720],
-        modelSampling: hy15Shift(7),
-        defaults: { steps: 20, cfg: 6, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "HunyuanVideo 1.5 I2V",
-        defaults: { steps: 20, cfg: 6, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [848, 480],
@@ -1692,22 +1585,17 @@ export const families = {
         references: 3,
         referenceRequired: true,
         requiredNodes: ["MiniMaxH3ReferenceToVideo"],
-        defaults: { steps: 20, cfg: 1, sampler: "res_multistep", scheduler: "simple" },
       },
-      // Turbo is distilled for 4 or 8 steps (lightx2v's LoRAs); Comfy-Org's template runs the 8-step one.
       {
         id: "fast",
         label: "Turbo",
         match: (name) => speedName.test(name),
         references: 1,
-        stepsFromName: true,
-        defaults: { steps: 8, cfg: 1, sampler: "res_multistep", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "MiniMax H3",
         references: 1,
-        defaults: { steps: 20, cfg: 1, sampler: "res_multistep", scheduler: "simple" },
       },
     ],
     // The Comfy-Org template's 16:9 canvas, and the aspect its presets scale
@@ -1746,7 +1634,6 @@ export const families = {
       ["16:9", 16, 9],
       ["9:16", 9, 16],
     ],
-    modelSampling: { node: "MiniMaxH3SigmaShift", shift_video: 1, shift_audio: 1 },
     references: 3,
     requiredNodes: [
       "PH3ImageConditioning",
@@ -1762,7 +1649,6 @@ export const families = {
         id: "standard",
         label: "P-H3 Image",
         sigmas: [1.0, 0.984753, 0.967905, 0.951688, 0.925372, 0.881923, 0.810083, 0.528718, 0.0],
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     // 4 MP, which edits want and the shared 32 GB card holds beside H3; text-to-image is best at 8 MP (2912²).
@@ -1789,20 +1675,16 @@ export const families = {
         id: "neta",
         label: "Neta Lumina / NetaYume",
         match: (name) => /neta|yume/i.test(name),
-        modelSampling: { node: "ModelSamplingAuraFlow", shift: 4 },
         promptPrefix:
           "You are an assistant designed to generate high quality anime images based on textual prompts. <Prompt Start> ",
         negativePrefix:
           "You are an assistant designed to generate low-quality images based on textual prompts <Prompt Start> ",
-        defaults: { steps: 30, cfg: 4, sampler: "res_multistep", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "Lumina Image 2.0",
-        modelSampling: { node: "ModelSamplingAuraFlow", shift: 6 },
         promptPrefix:
           "You are an assistant designed to generate superior images with the superior degree of image-text alignment based on textual prompts or user prompts. <Prompt Start> ",
-        defaults: { steps: 25, cfg: 4, sampler: "res_multistep", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1828,12 +1710,10 @@ export const families = {
         label: "Turbo",
         match: (name) => speedName.test(name),
         negative: "none",
-        defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "MageFlow",
-        defaults: { steps: 30, cfg: 5, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -1859,18 +1739,16 @@ export const families = {
         label: "Turbo",
         match: (name) => speedName.test(name),
         negative: "zero",
-        defaults: { steps: 8, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "standard",
         label: "ERNIE-Image",
-        defaults: { steps: 20, cfg: 4, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
   },
   // NVIDIA's Sana is not native to ComfyUI; one of two custom node packs runs
-  // it (see sanaRunners), each loading its own Gemma 2 2B encoder and DC-AE VAE.
+  // it, each loading its own Gemma 2 2B encoder and DC-AE VAE.
   // Settings follow NVlabs/Sana's ComfyUI workflows: CFG 2 for the 1.6B Sana 1.0
   // models (1K, 2K, 4K), 4.5 for SANA 1.5.
   sana: {
@@ -1896,7 +1774,6 @@ export const families = {
         native: draws2kMaybe,
         negative: "none",
         dtype: "FP32",
-        defaults: { steps: 2, cfg: 4.5, sampler: "scm", scheduler: "sgm_uniform" },
       },
       {
         id: "4k",
@@ -1904,7 +1781,6 @@ export const families = {
         match: (name) => /4k/i.test(name),
         size: [4096, 4096],
         native: draws4k,
-        defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },
       },
       {
         id: "2k",
@@ -1912,7 +1788,6 @@ export const families = {
         match: (name) => /2k/i.test(name),
         size: [2048, 2048],
         native: draws2k,
-        defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },
       },
       {
         id: "512",
@@ -1920,19 +1795,16 @@ export const families = {
         match: (name) => /512px/i.test(name),
         size: [512, 512],
         native: drawsNone,
-        defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" },
       },
       // Sana 1.0 1.6B at 1024: 20 blocks without SANA 1.5's q/k norms.
       {
         id: "1600m",
         label: "1.6B",
-        defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },
         match: (name) => /1600m|1[._]6b/i.test(name) && !/1[._]5/.test(name),
       },
       {
         id: "standard",
         label: "Sana",
-        defaults: { steps: 28, cfg: 4.5, sampler: "euler", scheduler: "normal" },
       },
     ],
     size: [1024, 1024],
@@ -1962,7 +1834,6 @@ export const families = {
       "BatchImagesNode",
       "ImageScaleToTotalPixels",
     ],
-    modelSampling: { node: "ModelSamplingFlux", shift: Math.log(16) },
     references: 3,
     // BFL's pup.py: greedy decoding (top_k 1 here, as Comfy-Org's templates do it, since TextGenerate
     // needs sampling on for a presence penalty), no repetition penalty, presence 1.5 for a picture
@@ -2003,13 +1874,11 @@ export const families = {
         label: "Base",
         match: (name) => /(^|[^a-z])base([^a-z]|$)/i.test(name),
         negative: "text",
-        defaults: { steps: 50, cfg: 4, sampler: "euler", scheduler: "simple" },
       },
       {
         id: "distilled",
         label: "Klein",
         negative: "zero",
-        defaults: { steps: 16, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
     ],
     size: [1024, 1024],
@@ -2017,15 +1886,14 @@ export const families = {
   // OpenMOSS's MOSS-Image (Oct 2026): a 5B single-stream DiT in Flux.2's latent space that
   // reads prompts with a stock Qwen3.5 9B. Settings from its model card and ComfyUI
   // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
-  // Two ways to run it: ComfyUI's own nodes (master after 0.41.3, CLIPLoader type
-  // moss_image) with Comfy-Org's single files, or its makers' pack with the official
-  // Diffusers folder. Both take SkipLayerGuidanceDiTSimple, which skips layer 22 on the
-  // negative pass as the makers sample.
+  // It runs on ComfyUI's own nodes (master after 0.41.3, CLIPLoader type moss_image) with
+  // Comfy-Org's single files, and takes SkipLayerGuidanceDiTSimple, which skips layer 22 on
+  // the negative pass as the makers sample.
   moss_image: {
     label: "MOSS-Image",
     kind: "image",
     native: { "2k": "yes" },
-    sources: ["unet", "moss_diffusers"],
+    sources: ["unet"],
     // Stock Qwen3.5 9B; FLUX.3's upsampler is a tuned Qwen3.5 9B with the same shapes.
     slots: [{ slot: "encoder", label: "Qwen3.5 9B", kinds: ["qwen35_9b"], not: /upsampl/i }],
     clipType: "moss_image",
@@ -2038,40 +1906,15 @@ export const families = {
     // No shift node on ComfyUI's own nodes: their MOSS-Image samples at shift 5 by itself, with
     // timesteps 0-1. ModelSamplingSD3 would scale those by 1000 and draw only noise.
     requiredNodes: ["EmptyFlux2LatentImage"],
-    runners: {
-      moss_diffusers: {
-        pack: "moss_image",
-        ownLoaders: true,
-        loras: true,
-        // The makers' model is set up at shift 1 with timesteps x1000; their workflow shifts it to 5.
-        modelSampling: { node: "ModelSamplingSD3", shift: 5 },
-        note: "MOSS-Image’s makers ship these nodes. They load the official model folder.",
-        loader: {
-          node: "MOSSImageHFLoader",
-          path: "model_path",
-          inputs: { weight_dtype: "default", text_device: "default" },
-        },
-        patches: [
-          {
-            node: "SkipLayerGuidanceDiTSimple",
-            inputs: { double_layers: "", single_layers: "22", start_percent: 0, end_percent: 1 },
-          },
-        ],
-        requiredNodes: ["SkipLayerGuidanceDiTSimple", "ModelSamplingSD3", "EmptyFlux2LatentImage"],
-        folders: { classNames: ["MOSImageTransformer", "MOSSImageTransformer"] },
-      },
-    },
     variants: [
       {
         id: "base",
         label: "Base",
         match: (name) => /(^|[^a-z])base([^a-z]|$)/i.test(name),
-        defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" },
       },
       {
         id: "sft",
         label: "SFT",
-        defaults: { steps: 50, cfg: 3, sampler: "euler", scheduler: "sgm_uniform" },
       },
     ],
     size: [1024, 1024],
