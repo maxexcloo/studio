@@ -9,7 +9,7 @@ process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { classifyModel } = await import("./model/families.js");
-const { catalogDownload } = await import("./catalog-downloads.js");
+const { catalogueDownload } = await import("./catalogue-downloads.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });

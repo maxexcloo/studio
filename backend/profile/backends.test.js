@@ -27,7 +27,8 @@ const { matchesGalleryFilters } = await import("../gallery/filters.js");
 const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
 const { findProfile } = await import("../mcp/tiers.js");
 const { buildExport } = await import("./export.js");
-const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("../workflow-catalog.js");
+const { loadWorkflowPreferences, saveWorkflowPreferences } =
+  await import("../workflow-catalogue.js");
 const { McpMedia } = await import("../mcp/media.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 

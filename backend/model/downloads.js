@@ -8,7 +8,7 @@ import {
 import crypto from "node:crypto";
 import path from "node:path";
 import { comfyUrl } from "../comfy/comfy.js";
-// Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
+// Every catalogue request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
 import { civitaiFetch } from "../civitai/access.js";
 
@@ -22,7 +22,7 @@ import { civitaiFetch } from "../civitai/access.js";
  * Resuming asks for the rest only if the file is still the one it started
  * (If-Range with the ETag or Last-Modified it saw), so a file changed on
  * Hugging Face in between starts over instead of being glued onto the old
- * half. The worker checks a finished file against its catalog SHA-256.
+ * half. The worker checks a finished file against its catalogue SHA-256.
  */
 
 const allowedFolders = new Set([
@@ -135,14 +135,14 @@ function wait(ms, signal) {
   });
 }
 
-/** The catalog's published SHA-256 for a file, lower case, or "" when it has none. */
-function catalogSha256(spec) {
+/** The catalogue's published SHA-256 for a file, lower case, or "" when it has none. */
+function catalogueSha256(spec) {
   return /^[0-9a-f]{64}$/i.test(String(spec?.sha256 || ""))
     ? String(spec.sha256).toLowerCase()
     : "";
 }
 
-/** Queue one catalog file. Returns the queued entry, or the running one if it is already going. */
+/** Queue one catalogue file. Returns the queued entry, or the running one if it is already going. */
 export function startDownload(spec) {
   checkSpec(spec);
   const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
@@ -156,7 +156,7 @@ export function startDownload(spec) {
     folder: spec.folder,
     label: spec.label || spec.file,
     url: spec.url,
-    sha256: catalogSha256(spec),
+    sha256: catalogueSha256(spec),
     status: "queued",
     receivedBytes: 0,
     totalBytes: Number(spec.bytes || 0),
@@ -250,7 +250,7 @@ function unavailable(error) {
 }
 
 /**
- * The next catalog build of a part whose download is gone or gated, queued in
+ * The next catalogue build of a part whose download is gone or gated, queued in
  * its place so "Get" still ends with a working file. Builds already on disk
  * count as done; nothing is tried twice.
  */
@@ -275,7 +275,7 @@ function fallbackFor(failed) {
       folder: spec.folder,
       label: spec.label || spec.file,
       url: spec.url,
-      sha256: catalogSha256(spec),
+      sha256: catalogueSha256(spec),
       status: "queued",
       receivedBytes: 0,
       totalBytes: Number(spec.bytes || 0),

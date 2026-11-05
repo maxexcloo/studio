@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { quantFromName } from "../family-catalog.js";
+import { quantFromName } from "../family-catalogue.js";
 
 test("quantized formats are told from the file name", () => {
   assert.equal(quantFromName("svdq-int4_r32-flux.1-dev.safetensors"), "svdq");

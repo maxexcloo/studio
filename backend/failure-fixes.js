@@ -1,10 +1,10 @@
-import { catalogDownloadsForFile } from "./catalog-downloads.js";
+import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
 import { packInstallPlan } from "./node-install.js";
 import { nodePack, nodePacks } from "./node-packs.js";
 
 /**
  * What the viewer can offer as a button for a failure describeFailure
- * classified: the node pack that has a missing node, the catalog download that
+ * classified: the node pack that has a missing node, the catalogue download that
  * replaces a damaged file, and whether a retry may decode in tiles. Only what
  * Studio can actually do is attached; everything else stays a hint.
  */
@@ -23,13 +23,13 @@ export function packForNode(classType = "") {
   return id ? nodePack(id) : null;
 }
 
-/** The catalog download for a damaged file a loader could not read, or null when Studio cannot fetch it. */
+/** The catalogue download for a damaged file a loader could not read, or null when Studio cannot fetch it. */
 function redownloadFor(file = "", nodeType = "") {
   if (!file) return null;
   const folder = loaderFolders.find(([test]) => test.test(nodeType))?.[1];
   const folders = folder ? [folder] : ["vae", "text_encoders", "diffusion_models", "checkpoints"];
   for (const each of folders) {
-    const [download] = catalogDownloadsForFile(file, each);
+    const [download] = catalogueDownloadsForFile(file, each);
     if (download) {
       const { id, file: name, folder: where, label, bytes } = download;
       return { id, file: name, folder: where, label, ...(bytes ? { bytes } : {}) };

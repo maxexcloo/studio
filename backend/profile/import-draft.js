@@ -1,6 +1,6 @@
 import { draftedProfile } from "../assistant.js";
-import { catalogDownloadsForFile } from "../catalog-downloads.js";
-import { familyFromName, refinedFamily } from "../family-catalog.js";
+import { catalogueDownloadsForFile } from "../catalogue-downloads.js";
+import { familyFromName, refinedFamily } from "../family-catalogue.js";
 import { familiesFromMetadata } from "../lora/info.js";
 import { draftProfileFromImport } from "./drafts.js";
 import {
@@ -39,7 +39,7 @@ export async function draftCheckpointProfile(record, options, { engine, info }) 
       ),
     familyFromName: (file) => familyFromName(file),
     taken: profileIdTaken,
-    downloadsFor: catalogDownloadsForFile,
+    downloadsFor: catalogueDownloadsForFile,
     engine,
     draftedProfile,
     validate: validateProfileText,
