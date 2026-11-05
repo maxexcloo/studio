@@ -413,6 +413,8 @@ export function usePromptAssistant({
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            // React carries a submit through the portal to the composer's own form, which would Generate.
+            event.stopPropagation();
             if (instruction.trim()) ask(instruction.trim());
           }}
         >

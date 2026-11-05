@@ -427,8 +427,9 @@ test("Run Again (Same Seed) and Edit Prompt keep the backend a combined profile 
   await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
-  // The Backend chip shows the backend this draft runs on, not the profile's current one.
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  // The Backend chip shows the backend this draft runs on, not the profile's current one. Focus,
+  // not a tap: tapping the prompt on a phone switches to the typing layout, which hides the chips.
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).focus();
   await expect(page.getByRole("combobox", { name: "Backend", exact: true })).toContainText(
     "Radiance",
   );
