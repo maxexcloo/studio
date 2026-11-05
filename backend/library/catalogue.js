@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { isObject } from "../values.js";
 
 export const catalogueKinds = Object.freeze({
   loras: "lora",
@@ -34,7 +35,6 @@ const layerNames = ["definitions", "provider", "manifest"];
 const historyLimit = 20;
 const sha = (value) =>
   /^[a-f0-9]{64}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const text = (value, limit = 300) =>
   typeof value === "string" ? value.trim().slice(0, limit) : "";
 const list = (value, limit = 30, size = 120) =>

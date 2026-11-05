@@ -1,9 +1,9 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { loadMcpPrompting, mergedPrompting, ownPrompting } from "../mcp/prompting.js";
 import { verifiedBackup } from "../persistence/migration.ts";
 import { createGuideStore, createProfileStore } from "./store.js";
+import { digest, isObject } from "../values.js";
 
 /**
  * The migrate-runtime step that makes prompting.json the single source of prompting guides: each
@@ -14,8 +14,6 @@ import { createGuideStore, createProfileStore } from "./store.js";
  * prompting-*` folder with their mapping (restorable with `--restore`), then writes each as a new
  * profile version, with Studio stopped. A second run finds nothing.
  */
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
  * Slims one `holder.prompting` against `base` (what it would read without it) in place and returns

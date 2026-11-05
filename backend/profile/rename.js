@@ -19,7 +19,6 @@
  * read afresh, and runtime-migrations.js reloads the accounts, workflow preferences and timings it
  * holds. An interrupted apply finishes on the next run; a second run finds nothing.
  */
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { repointedPreferences, repointLoraState, loraStackFiles } from "../combined-profiles.js";
@@ -27,6 +26,7 @@ import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { verifiedBackup } from "../persistence/migration.ts";
 import { withOfflineDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { createGuideStore, createProfileStore } from "./store.js";
+import { digest, isObject } from "../values.js";
 
 export const profileRenames = Object.freeze({
   "image-fineporn-v6-fast-comfyui": "image-fineporn-6-fast",
@@ -60,8 +60,6 @@ export const guideRenames = Object.freeze({
   moss_image: "moss-image",
 });
 
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const digest = (bytes) => crypto.createHash("sha256").update(bytes).digest("hex");
 const by = "migrate-runtime";
 
 /** Every file under `dir`, relative to `dataDir`. */

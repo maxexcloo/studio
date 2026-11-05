@@ -1,4 +1,4 @@
-import { isCloudProfile } from "./cloud-profiles.js";
+import { isCloudProfile } from "../shared/profiles.ts";
 import { profileImageSize, referenceImageSize } from "./generation-defaults.js";
 import { chooseProfile, takesFirstFrame, tierDistance, tierOf } from "./mcp/tiers.js";
 import { videoAspect } from "./providers/cliproxy.ts";

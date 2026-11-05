@@ -41,11 +41,11 @@ import {
 import {
   controlRange,
   generationInput,
-  isCloudProfile,
   isProfile,
   stepsRange,
   usesNegative,
 } from "../generation/payload";
+import { isCloudProfile } from "../../../../shared/profiles";
 import { loraLibraryQuery } from "../generation/LoraStacks";
 import { profileOptions } from "../generation/ProfilePicker";
 import { PromptFields } from "../generation/PromptFields";

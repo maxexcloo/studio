@@ -17,7 +17,7 @@
  * administrator this narrows only its own use: administration (profile and catalogue editing, the
  * Library) does not go through these checks.
  */
-import { isCloudProfile } from "./cloud-profiles.js";
+import { isCloudProfile } from "../shared/profiles.ts";
 import { canonicalProfileId } from "./profile/store.js";
 
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
