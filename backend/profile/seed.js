@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Studio is the only writer of live profiles. The sample profiles in `backend/samples/` seed a
  * data folder that has never held one (a new install or local development); once Studio holds

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Update checks (design §4, Updates; Decision 4): a daily check, and Check Updates on demand,
  * for installed catalogue entries with a Civitai model or a Hugging Face file. An update shows

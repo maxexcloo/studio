@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library › Profiles beyond the JSON editor (profile/editor.js), administrators only:
  *

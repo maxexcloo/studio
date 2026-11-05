@@ -7,7 +7,7 @@
 - Runtime state is authoritative. Studio reads and writes only Studio names on disk (`studio` media folder, `.studio-trash`, the `studio` profile block); no legacy names or fallbacks. Runtime files are moved or renamed only by the explicit migration in `migrate-runtime` (backup, dry run, mapping, `--restore`) or an administrator's run of its steps through `POST /api/maintenance/migrations`, never implicitly.
 - Keep externally used names stable: MCP tool names, `/api` routes, the profile file format and result links, including the `heiss-mcp-result-link-v2` sealing label.
 - Studio owns live generation profiles, prompting guides and model/LoRA catalogue definitions in its runtime data folder, including uncensored content. Administrators edit and approve them in Studio. Live data is the only source: the sample profiles in `backend/samples/` seed only a data folder that has never held a profile. Keep deployment/workload configuration in kubelab.
-- Keep the credit and licence notices for HEISS UI and J-AI Studio (MIT) in Settings › About, `LICENSE` and `README.md`, and the AGPL notice for the native MCP modules.
+- The whole repository is AGPL-3.0 (`LICENSE`). Keep the MIT notices for HEISS UI, J-AI Studio and MantineHub in `NOTICE`, shipped in both images, and their credits in Settings › About and `README.md`.
 - Read `UI-PATTERNS.md` before UI work. Keep this guide to cross-cutting interaction rules and apply each rule everywhere it occurs.
 - The phone UI and the standard UI are one responsive implementation (shared item actions, selection and sheets).
 - `frontend` holds the React app and Vite build; `backend` the API, persistence, providers, commands and sample profiles; `shared` the API contracts; `worker` the GPU image and its ComfyUI nodes.

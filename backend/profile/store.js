@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Versioned generation profiles and prompting guides, owned by Studio.
  *

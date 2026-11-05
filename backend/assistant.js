@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
  * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage

@@ -35,4 +35,4 @@ Run one application replica with `Recreate`; two schedulers must not control the
 
 ## Credits & Licence
 
-Studio is a hard fork of [HEISS UI](https://github.com/tristmeister/HEISS-UI), based on [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Their MIT copyright and licence notices remain in [LICENSE](LICENSE). The MantineHub theme is adapted under MIT from RubixCube Innovations. Native MCP modules retain their [AGPL-3.0 notice](backend/mcp.LICENSE).
+Studio is a hard fork of [HEISS UI](https://github.com/tristmeister/HEISS-UI), based on [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Studio is licensed under [AGPL-3.0](LICENSE). The HEISS UI and J-AI Studio code, and the MantineHub theme adapted from RubixCube Innovations, keep their MIT copyright and licence notices in [NOTICE](NOTICE).

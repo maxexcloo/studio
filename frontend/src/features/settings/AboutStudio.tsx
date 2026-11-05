@@ -157,7 +157,7 @@ export function AboutStudio() {
         </SettingRow>
         <SettingRow
           label="Licence"
-          description="MIT, keeping the HEISS UI, J-AI Studio and MantineHub notices. Native MCP modules are AGPL-3.0."
+          description="AGPL-3.0, keeping the HEISS UI, J-AI Studio and MantineHub MIT notices."
         >
           {link(`${repository}/blob/main/LICENSE`, "Licence")}
         </SettingRow>

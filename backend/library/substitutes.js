@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Substitutes (design §4, Substitutes): when an import's exact file is missing, the nearest
  * installed file that can stand in for it, always marked and always lowering the grade. Only

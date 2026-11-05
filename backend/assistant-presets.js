@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 // The prompt assistant's rewrite presets, sorted by label as its menu lists them, with Custom last.
 // Each is an instruction block added after the profile's guide; a guide may replace one with its own
 // `presets.<id>` text. Each sets only the tone; the content rule (domain/writing-standard.ts)

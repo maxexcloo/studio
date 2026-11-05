@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt for the
  * frame a clip starts from and a theme, as the queue item's writing stage (prompt-stage.js) or for

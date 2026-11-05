@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * How faithfully a Library import can be recreated (design §2.4): Exact, Close or Partial, with
  * the reasons and the prompt fields that were not recorded. Pure: no files, no network.

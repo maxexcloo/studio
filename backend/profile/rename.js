@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The migrate-runtime step that gives the live profiles and guides their clean ids.
  *

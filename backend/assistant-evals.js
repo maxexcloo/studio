@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The prompt assistant's eval set (backend/fixtures/assistant-evals/) and its deterministic scorer.
  * CI replays the recorded replies through the engine (assistant-evals.test.js); `mise run

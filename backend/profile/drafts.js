@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * A checkpoint or diffusion model import becomes an AI-drafted profile and guide (design §4,
  * "Checkpoint or diffusion model"; Phase 5):

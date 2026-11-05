@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Read-only Library answers for MCP's admin tools (mcp/admin.js), behind the Library's routes:
  *

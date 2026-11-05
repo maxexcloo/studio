@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
  * access-profile feature, works only with profiles the account may use, and Spicy needs Uncensored Models.

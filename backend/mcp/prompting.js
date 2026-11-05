@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Native port of the Studio MCP prompting service; see mcp.LICENSE.
+// Native port of the Studio MCP prompting service.
 import fs from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 

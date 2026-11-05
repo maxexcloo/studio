@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Library › Profiles › Combine Backends: an administrator's explicit, repeatable action, never run
  * at startup. It makes one profile of a model's Radiance and ComfyUI profiles.

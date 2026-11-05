@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Whether a Civitai version may be downloaded (design §4, Paid Files). Paid, early-access and
  * restricted files are never downloaded; anything that can't be read for certain counts as
