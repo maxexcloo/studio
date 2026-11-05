@@ -122,7 +122,7 @@ test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3
   const { classifyEncoder, classifyVae } = await import("./components.js");
   for (const file of ["p-h3-image_w4a8.safetensors", "p-h3-image_int8_convrot.safetensors"]) {
     const found = classifyModel("unet", file);
-    assert.deepEqual([found.family, found.variant.defaults.steps], ["p_h3_image", 8], file);
+    assert.deepEqual([found.family, found.variant.id], ["p_h3_image", "standard"], file);
   }
   assert.equal(
     classifyModel("unet", "minimax_h3_fl2va_pruned_int8_convrot.safetensors").family,
