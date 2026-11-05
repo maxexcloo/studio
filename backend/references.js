@@ -430,15 +430,15 @@ async function frameBytes(account, { videoId, at }) {
 }
 
 /**
- * The local file and time of a video frame reference the owner may use (an Extend's start), or
- * null for any other reference.
+ * The local file (null once the owner's video is gone) and time of a video frame reference (an
+ * Extend's start), or null for any other reference.
  */
 export function frameSourceFile(id, ownerId = "") {
   const frame = frameReference(id);
-  const item = frame && findGalleryItemForAccount(frame.videoId, { userId: ownerId });
+  if (!frame) return null;
+  const item = findGalleryItemForAccount(frame.videoId, { userId: ownerId });
   const media = item?.type === "video" && mediaParams(item.url);
-  const file = media && mediaFile(media.filename, media.subfolder);
-  return file ? { file, at: frame.at } : null;
+  return { file: (media && mediaFile(media.filename, media.subfolder)) || null, at: frame.at };
 }
 
 /** `frame` picks a video's frame: "last", or a time in milliseconds. */

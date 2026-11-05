@@ -22,6 +22,10 @@ export interface JobObservation {
 export const unreachableCancelReason =
   "Cancelled. Its worker wasn't reachable, so nothing was left running there.";
 
+/** A saved job completes unless saving failed it (an Extend that couldn't be joined onto its video). */
+const savedStatus = (saved: JobObservation | void) =>
+  saved?.status === "failed" ? ("failed" as const) : ("completed" as const);
+
 export interface QueueAdapter {
   submit(job: OwnedJob): Promise<JobObservation>;
   observe(job: OwnedJob): Promise<JobObservation | undefined>;
@@ -300,7 +304,7 @@ export class GenerationQueue {
               job = this.store.save({ ...job, status: "saving" });
               const saved = await this.adapter.saveOutputs(job);
               // A cancellation that raced saving cannot discard already saved results.
-              const completed = this.store.save({ ...job, ...saved, status: "completed" });
+              const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
               await this.adapter.settled?.(completed);
             } else {
               this.store.save(job);
@@ -413,7 +417,7 @@ export class GenerationQueue {
               });
               if (observation.status === "completed") {
                 const saved = await this.adapter.saveOutputs(submitted);
-                submitted = this.store.save({ ...submitted, ...saved, status: "completed" });
+                submitted = this.store.save({ ...submitted, ...saved, status: savedStatus(saved) });
               }
               if (latest.cancelRequested && !terminalStatuses.has(observation.status))
                 await this.adapter.cancel(submitted);

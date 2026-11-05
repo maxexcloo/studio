@@ -1139,6 +1139,12 @@ export async function outputFileSize(file, type) {
   return probeVideo(file);
 }
 
+/** An Extend that could not be joined onto its video: the run fails rather than saving it apart. */
+const extendFailure = (reason) =>
+  Object.assign(new Error(`Studio couldn’t add this extension to its video: ${reason}`), {
+    extendFailed: true,
+  });
+
 export async function replaceGalleryJob(id, outputs, body, jobs, status = "done") {
   const title = promptTitle(body.prompt);
   const job = jobs.get(id) || {};
@@ -1163,23 +1169,26 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         if (file && item.type === "image") size = await outputFileSize(file, item.type);
         else if (file) {
           const { joinClips } = await import("../video-previews.js");
-          // An Extend (a run started from a video's frame) is kept joined onto that video. Only the
-          // first reference is what the run was made from (shared/versions.ts). The extension's own
-          // file stays, so a retried save or a provider's recorded output still finds it.
+          // An Extend (a run started from a video's frame) is saved joined onto that video, so each
+          // one makes it longer; it never saves as a clip of its own. Only the first reference is
+          // what the run was made from (shared/versions.ts). The extension's own file stays, so a
+          // retried save or a provider's recorded output still finds it.
           const { frameSourceFile } = await import("../references.js");
           const from =
             status === "done" && frameSourceFile(body.referenceAssets?.[0]?.assetId, ownerId);
           if (from && from.at !== 0) {
+            if (!from.file)
+              throw extendFailure("the video it continues is no longer in the gallery");
             const name = `${path.parse(file).name}-joined.mp4`;
             const joined = mediaPath(name, subfolder);
             try {
               if (!fs.existsSync(joined)) await joinClips(from.file, file, joined, from.at);
-              item = { ...item, ...mediaUrls(name, subfolder), filename: name };
-              file = joined;
             } catch (error) {
               await fs.promises.rm(joined, { force: true });
-              console.warn(`[Studio] Keeping an extension unjoined: ${error.message}`);
+              throw extendFailure(error.message);
             }
+            item = { ...item, ...mediaUrls(name, subfolder), filename: name };
+            file = joined;
           }
           size = await outputFileSize(file, item.type);
         }
