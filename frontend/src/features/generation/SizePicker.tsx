@@ -9,7 +9,8 @@ import {
 } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
-import { chipProps } from "./chip";
+import { usePhone } from "../../ui/usePhone";
+import { chipProps, fittedPopup } from "./chip";
 import { primaryReference } from "./payload";
 import {
   defaultResolution,
@@ -31,6 +32,7 @@ export function SizePicker({
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
 }) {
+  const phone = usePhone();
   const presets = profile?.aspectPresets || [];
   const reference = primaryReference(input.referenceDetails || [], profile);
   const framed =
@@ -62,7 +64,7 @@ export function SizePicker({
       ? `${active.label}${tiered ? ` · ${tier}` : ""}`
       : `${shown.w} × ${shown.h}`;
   return (
-    <Popover position="top-start" width={300} trapFocus>
+    <Popover position="top-start" width={300} trapFocus {...(phone && fittedPopup)}>
       <Popover.Target>
         <Button
           {...chipProps}

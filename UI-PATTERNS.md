@@ -219,8 +219,13 @@ primary component reference and verify APIs against the installed version.
   few controls (Clear References sits there), then the content; choices apply at
   once and closing the popup is the only dismissal, with no Use or Done action
   (picking the reference for a profile that takes one closes References).
-  Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
-  popover never opens a second level on phones. References, LoRAs and Presets share one picker
+  Desktop anchors a Popover to the chip; phones open a full-screen sheet (a
+  Modal), so a popover never opens a second level on phones. The sheet's content
+  fills it, a picker's footer sitting at the safe bottom edge, and a downward
+  swipe on its header, or on content scrolled to its top, closes it. Expert
+  settings is the exception on phones: like Profile, Aspect, Count, Length and
+  Backend it is a small popover floating over its chip, fitted to the screen and
+  scrolling inside when taller (`fittedPopup`). References, LoRAs and Presets share one picker
   (`Picker.tsx`): tabs, then search, Filter ▾ (badged with how many filters
   apply, with no filter chips, so choosing filters never reflows the row) and the
   picker's actions (Sort; References' Upload) in one row at the gallery
