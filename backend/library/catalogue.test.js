@@ -23,6 +23,9 @@ function fixture(t) {
   write("library/catalogue.json", {
     version: 1,
     layers: {
+      // Folded by an earlier release, which saved them back empty.
+      admin: {},
+      seed: {},
       definitions: {
         "loras/style.safetensors": {
           title: "Seed Style",
@@ -101,6 +104,8 @@ test("the catalogue merges every layer by folder/file with provenance, the more 
   const before = snapshot(f.dir);
   const store = f.store();
   assert.equal(store.migrate(), true);
+  const saved = JSON.parse(fs.readFileSync(path.join(f.dir, "library/catalogue.json"), "utf8"));
+  assert.deepEqual(Object.keys(saved.layers).sort(), ["definitions", "manifest", "provider"]);
   const entries = store.entries();
   assert.deepEqual(
     Object.keys(entries),
