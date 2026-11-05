@@ -10,6 +10,7 @@ import {
   ActionIcon,
   Box,
   Button,
+  FocusTrap,
   Group,
   Image,
   Menu,
@@ -32,7 +33,7 @@ import { useFlash } from "../../ui/useFlash";
 import { menuWidth } from "../../theme";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
-import { escapePanel } from "./chip";
+import { escapePanel, fittedPopup } from "./chip";
 import classes from "./Picker.module.css";
 
 /**
@@ -43,7 +44,9 @@ import classes from "./Picker.module.css";
 /**
  * A chip's popup, laid out like Recent Prompts: a title row with its few controls (such as Clear),
  * then the content. Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
- * popover never opens a second level there. Escape closes nested layers first.
+ * popover never opens a second level there, unless the popup is `floating`: a small form, such as
+ * Expert Settings, stays a popover fitted to the screen, as the rail's other dropdowns. Escape
+ * closes nested layers first.
  */
 export function ChipPopup({
   title,
@@ -56,6 +59,7 @@ export function ChipPopup({
   position = "top-start",
   trap = true,
   withinPortal = true,
+  floating = false,
   children,
 }: {
   title: string;
@@ -71,6 +75,8 @@ export function ChipPopup({
   trap?: boolean;
   /** Off for a popup inside another, so pressing in it is not outside its parent. */
   withinPortal?: boolean;
+  /** A popover on phones too, instead of a full-screen sheet. */
+  floating?: boolean;
   children: ReactNode;
 }) {
   const phone = usePhone();
@@ -91,7 +97,7 @@ export function ChipPopup({
       {headerEnd}
     </Group>
   );
-  if (phone)
+  if (phone && !floating)
     return (
       <>
         {target}
@@ -135,6 +141,7 @@ export function ChipPopup({
       returnFocus
       shadow="md"
       withinPortal={withinPortal}
+      {...(phone && fittedPopup)}
     >
       <Tooltip label={title} disabled={!tooltip || opened}>
         <Popover.Target>{target}</Popover.Target>
@@ -145,6 +152,8 @@ export function ChipPopup({
         maw="calc(100vw - 24px)"
         onKeyDown={onKeyDown}
       >
+        {/* Phones focus the popup itself, so its first field doesn't raise the keyboard. */}
+        {phone && <FocusTrap.InitialFocus />}
         <Stack gap="sm">
           <Group justify="space-between" wrap="nowrap" mih={28}>
             <Text fw={500}>{title}</Text>

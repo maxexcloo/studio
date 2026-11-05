@@ -1,4 +1,5 @@
 import type { KeyboardEvent, PointerEvent } from "react";
+import { popupMiddlewares } from "../../theme";
 import classes from "./GenerationInputControls.module.css";
 
 /** Shared Button props for the compact chips in the generation rail. */
@@ -19,6 +20,12 @@ export const iconChipProps = {
   ...chipProps,
   className: `${classes.chip} ${classes.iconChip}`,
 } as const;
+
+/** A phone chip's floating popup fits the screen and scrolls inside when it is taller. */
+export const fittedPopup = {
+  middlewares: { ...popupMiddlewares, size: { padding: 12 } },
+  classNames: { dropdown: classes.fitted },
+};
 
 /** Nested pickers, menus, open comboboxes and keyboard drags inside a panel handle their own Escape. */
 const nestedLayers =

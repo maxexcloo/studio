@@ -44,6 +44,8 @@ export const backgrounds = {
 export type Background = keyof typeof backgrounds;
 /** Every action and row menu's width; their icons are 16px. */
 export const menuWidth = 220;
+/** Popups flip and shift to stay 12 px inside the screen. */
+export const popupMiddlewares = { flip: true, shift: { padding: 12, crossAxis: true } };
 export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
 export type MotionSpeed = keyof typeof motionSpeeds;
 // Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
@@ -268,7 +270,7 @@ export function studioTheme({
       Popover: Popover.extend({
         defaultProps: {
           floatingStrategy: "fixed",
-          middlewares: { flip: true, shift: { padding: 12, crossAxis: true } },
+          middlewares: popupMiddlewares,
           transitionProps: popupTransition,
         },
         styles: { dropdown },

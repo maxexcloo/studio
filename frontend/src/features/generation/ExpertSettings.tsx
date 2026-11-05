@@ -288,6 +288,7 @@ export function ExpertSettings({
     <ChipPopup
       title="Expert Settings"
       tooltip
+      floating
       position="top"
       width={380}
       opened={opened}
