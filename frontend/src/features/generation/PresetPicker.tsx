@@ -107,7 +107,7 @@ export function PresetPicker({
     .reverse()
     .map((preset) => ({ ...preset, name: preset.title }));
   return (
-    <Stack gap="sm">
+    <Stack gap="sm" flex={1} mih={0}>
       <PickerHeader
         label="Presets"
         query={query}

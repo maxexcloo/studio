@@ -1,3 +1,18 @@
+/* A phone chip popup's content fills the screen under its header, so a picker's footer sits at the
+   safe bottom edge. */
+.sheet {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheetBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+}
+
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
 .header {
   display: flex;
