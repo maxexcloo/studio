@@ -127,7 +127,7 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
 
 test("Upscale comparison uses one bounded slider and preserves the original result", async ({
   page,
-}) => {
+}, info) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "original",
@@ -147,6 +147,11 @@ test("Upscale comparison uses one bounded slider and preserves the original resu
   await compareUpscale(page);
   const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
   await expect(slider).toBeVisible();
+  // Phones stack the upscale over the original and move the divider vertically.
+  await expect(slider).toHaveAttribute(
+    "aria-orientation",
+    info.project.name === "desktop" ? "horizontal" : "vertical",
+  );
   await slider.focus();
   await page.keyboard.press("ArrowRight");
   await expect(slider).toHaveAttribute("aria-valuenow", "51");

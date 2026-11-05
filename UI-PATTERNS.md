@@ -28,7 +28,7 @@ primary component reference and verify APIs against the installed version.
   controls take theirs from it: SlidersHorizontal only for Prompt and composer
   settings, ListFilter for filters, the gear for settings, Layers only for
   versions, Sparkles only for the prompt assistant, Star only for starring, Trophy
-  for a comparison's winner, Blend for Compare and Columns for side by side,
+  for a comparison's winner, Blend for Compare, Columns for side by side and Rows where phones stack the pair,
   Square for Stop, X for Clear (and for removing an item from a draft), Trash
   only for Delete, Info for Details, Ellipsis for More, RefreshCw for Refresh
   and Check Updates, and one icon each for Rename and Upload.
@@ -609,6 +609,10 @@ primary component reference and verify APIs against the installed version.
   Image viewing and original/upscale comparison share `MediaZoom` for named
   zoom modes, native transforms, keyboard shortcuts and transient controls in
   the bottom-right corner of the media, above the action bar.
+  Compare Upscale divides the original from the upscale with one slider: the
+  original on the left and a horizontal slider below on desktop; on phones the
+  upscale above the original, divided by a line that a vertical slider beside the
+  media moves, and Compare Upscale takes the stacked icon.
 - Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
   toolbar's place, sticky under the header on its surface. It holds only what
   acts on the selection, whatever its count: Retry or Stop when they apply,
