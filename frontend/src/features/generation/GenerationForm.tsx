@@ -115,7 +115,8 @@ export function GenerationForm({
           if (!blockedReason && !submit.isPending) submit.mutate();
         }}
       >
-        <Group wrap="nowrap" gap="xs">
+        {/* Bottom aligned, so the actions stay at the bottom as the prompt grows. */}
+        <Group wrap="nowrap" gap="xs" align="flex-end">
           <Textarea
             data-composer-prompt
             aria-label="Prompt"

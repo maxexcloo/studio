@@ -234,7 +234,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           }
         }}
         style={{
-          bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+          // The safe area stands in for the gap rather than adding to it, so the bar sits as far
+          // from the bottom as from the sides.
+          bottom: `calc(max(var(--studio-composer-gap), env(safe-area-inset-bottom)) + ${keyboardInset}px)`,
           marginBottom: chat ? keyboardInset : undefined,
         }}
       >

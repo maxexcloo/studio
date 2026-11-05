@@ -204,7 +204,9 @@ primary component reference and verify APIs against the installed version.
 ## Generation & Conversation
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
-  generation-input action and icon-only Generate. Expanded controls are one prompt
+  generation-input action and icon-only Generate, bottom aligned, sitting as far
+  from the bottom as from the sides (the safe area replaces the gap rather than
+  adding to it). Prompt boxes pad their text evenly on every side. Expanded controls are one prompt
   box with its tools beside it, the negative prompt under it when the
   profile takes one, and a row of compact chips: Profile, References, Reference
   Role (Edit and Reference as pressed chips, then Paint Mask where the profile
