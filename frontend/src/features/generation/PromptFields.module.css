@@ -1,6 +1,10 @@
+/* Even padding all round, clear of a right section where the box keeps its tools inside. */
 .input {
   font-size: 1rem;
   line-height: 1.55;
+  padding-block: var(--mantine-spacing-xs);
+  padding-inline-start: var(--mantine-spacing-xs);
+  padding-inline-end: max(var(--mantine-spacing-xs), var(--input-padding-inline-end, 0px));
 }
 
 /* Prompt ideas float over the empty prompt's lower lines, clear of its history and assistant actions. */
