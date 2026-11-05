@@ -32,6 +32,14 @@ export const catalogueKinds = Object.freeze({
 });
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
 const layerNames = ["definitions", "provider", "manifest"];
+// A layer Studio no longer reads is kept only while it holds something for migrate-runtime to fold
+// in (lora-layers.js); an empty one (a folded `seed` or `admin`) drops out on the next save.
+const keptLayers = (layers) =>
+  Object.fromEntries(
+    Object.entries(isObject(layers) ? layers : {}).filter(
+      ([name, layer]) => layerNames.includes(name) || Object.keys(layer || {}).length,
+    ),
+  );
 const historyLimit = 20;
 const sha = (value) =>
   /^[a-f0-9]{64}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
@@ -306,7 +314,7 @@ export function createCatalogueStore({
       const saved = readJsonFile(file);
       state =
         isObject(saved) && saved.version === 1
-          ? { ...empty(), ...saved, layers: { ...empty().layers, ...(saved.layers || {}) } }
+          ? { ...empty(), ...saved, layers: { ...empty().layers, ...keptLayers(saved.layers) } }
           : empty();
     } catch {
       state = empty();
