@@ -102,7 +102,7 @@ export function ChipPopup({
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
-          <Modal.Content {...layer} onKeyDownCapture={onKeyDown}>
+          <Modal.Content {...layer} className={classes.sheet} onKeyDownCapture={onKeyDown}>
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
               <Group gap="xs" wrap="nowrap">
@@ -110,7 +110,7 @@ export function ChipPopup({
                 <Modal.CloseButton aria-label={`Close ${title}`} />
               </Group>
             </Modal.Header>
-            <Modal.Body>{children}</Modal.Body>
+            <Modal.Body className={classes.sheetBody}>{children}</Modal.Body>
           </Modal.Content>
         </Modal.Root>
       </>
@@ -704,11 +704,14 @@ export function SaveCurrent({
   );
 }
 
-/** Secondary actions at the start and end, like Recent Prompts. */
+/**
+ * Secondary actions at the start and end, like Recent Prompts. In a phone sheet whose content
+ * fills its height, the footer sits at the bottom.
+ */
 export function PickerFooter({ start, end }: { start?: ReactNode; end?: ReactNode }) {
   if (!start && !end) return null;
   return (
-    <Group justify="space-between" gap="xs" wrap="nowrap">
+    <Group justify="space-between" gap="xs" wrap="nowrap" mt="auto">
       <Group gap="xs">{start}</Group>
       <Group gap="xs">{end}</Group>
     </Group>

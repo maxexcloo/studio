@@ -207,6 +207,7 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
         ref={picker.controls}
         aria-label="LoRA Controls"
         gap="sm"
+        flex={1}
         mih={0}
       >
         <LoraControls value={value} onChange={onChange} picker={picker} />
