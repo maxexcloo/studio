@@ -318,8 +318,9 @@ export function ReferencePicker({
           {search ? "No Matches" : "No Images"}
         </EmptyState>
       ) : (
-        <ScrollArea.Autosize
-          style={{ flex: 1, minHeight: 0 }}
+        <ScrollArea
+          flex={1}
+          mih={0}
           offsetScrollbars="present"
           viewportRef={setViewport}
           onScrollPositionChange={({ y }) => {
@@ -362,7 +363,7 @@ export function ReferencePicker({
             ))}
           </PickerGrid>
           {more}
-        </ScrollArea.Autosize>
+        </ScrollArea>
       )}
     </Stack>
   );
