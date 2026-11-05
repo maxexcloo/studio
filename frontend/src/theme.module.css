@@ -21,8 +21,7 @@
 
 /* Phones raise bar and form controls to 40 px touch targets; their icons grow to match. A
    button's ▾ in its right section keeps its size. */
-.phoneIcons > svg.lucide,
-.phoneIcons :where([data-position="left"], .mantine-Button-label) > svg.lucide {
+.phoneIcons :global(svg.lucide):not(:global(.mantine-Button-section[data-position="right"] *)) {
   width: 20px;
   height: 20px;
 }
