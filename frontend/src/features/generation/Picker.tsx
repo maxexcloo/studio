@@ -31,6 +31,7 @@ import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
 import { menuWidth } from "../../theme";
 import { usePhone } from "../../ui/usePhone";
+import { useSwipeClose } from "../../ui/useSwipeClose";
 import { escapePanel } from "./chip";
 import classes from "./Picker.module.css";
 
@@ -74,6 +75,8 @@ export function ChipPopup({
 }) {
   const phone = usePhone();
   const close = () => onOpenedChange(false);
+  // Pulling the phone sheet down by its header, or its content from the top, closes it.
+  const swipe = useSwipeClose("down", close);
   // The popup handles its own Escape, so the composer's Drawer behind it stays open.
   const layer = {
     "data-composer-layer": true,
@@ -102,8 +105,13 @@ export function ChipPopup({
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
-          <Modal.Content {...layer} className={classes.sheet} onKeyDownCapture={onKeyDown}>
-            <Modal.Header>
+          <Modal.Content
+            {...layer}
+            {...swipe}
+            className={classes.sheet}
+            onKeyDownCapture={onKeyDown}
+          >
+            <Modal.Header className={classes.sheetHeader}>
               <Modal.Title>{title}</Modal.Title>
               <Group gap="xs" wrap="nowrap">
                 {end}

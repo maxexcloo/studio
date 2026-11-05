@@ -9,7 +9,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
 import { Link, useLocation } from "react-router";
@@ -19,6 +19,7 @@ import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../ru
 import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { useSwipeClose } from "../../ui/useSwipeClose";
 import classes from "./ServiceStatus.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
 
@@ -41,7 +42,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
   // In Chat on phones it is plainly the Chats list, still coloured by service health.
   const Icon = chats ? MessagesSquare : Activity;
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
-  const drag = useRef<{ id: number; x: number; y: number; dx: number } | null>(null);
+  const swipe = useSwipeClose("left", close);
   const target = useRef<HTMLButtonElement>(null);
   const dropdown = useRef<HTMLDivElement>(null);
   // The dropdown closes on Escape or a press outside it, but not in a menu or confirmation it opened.
@@ -129,14 +130,6 @@ export function StatusAction({ chat }: { chat: boolean }) {
         </Popover.Dropdown>
       </Popover>
     );
-  function release(event: PointerEvent<HTMLElement>) {
-    const start = drag.current;
-    drag.current = null;
-    if (!start?.dx) return;
-    event.currentTarget.style.transition = "";
-    if (start.dx < -80 && event.type === "pointerup") close();
-    else event.currentTarget.style.transform = "";
-  }
   return (
     <>
       <Tooltip label={tooltip}>{trigger}</Tooltip>
@@ -149,28 +142,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
         classNames={{ content: classes.content }}
       >
         <Drawer.Overlay />
-        <Drawer.Content
-          onPointerDown={(event) => {
-            drag.current =
-              event.pointerType === "touch"
-                ? { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0 }
-                : null;
-          }}
-          onPointerMove={(event) => {
-            const start = drag.current;
-            if (start?.id !== event.pointerId) return;
-            const dx = Math.min(0, event.clientX - start.x);
-            if (!start.dx && Math.abs(event.clientY - start.y) > Math.abs(dx)) {
-              drag.current = null;
-              return;
-            }
-            start.dx = dx;
-            event.currentTarget.style.transition = "none";
-            event.currentTarget.style.transform = `translateX(${dx}px)`;
-          }}
-          onPointerUp={release}
-          onPointerCancel={release}
-        >
+        <Drawer.Content {...swipe}>
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Group gap="xs" wrap="nowrap">

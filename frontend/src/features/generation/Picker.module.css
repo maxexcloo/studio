@@ -1,8 +1,12 @@
 /* A phone chip popup's content fills the screen under its header, so a picker's footer sits at the
-   safe bottom edge. */
+   safe bottom edge. A drag on the header is the sheet's own, to pull it closed. */
 .sheet {
   display: flex;
   flex-direction: column;
+}
+
+.sheetHeader {
+  touch-action: none;
 }
 
 .sheetBody {
