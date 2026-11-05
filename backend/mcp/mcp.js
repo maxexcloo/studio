@@ -1322,11 +1322,14 @@ export function registerMcpRoutes(
         server,
         "Search",
         "Search Gallery",
-        "Find the user's earlier work by its words or look, with refs for Reuse, Review and Result. uploads: the user's uploads, as reference_asset_ids.",
+        "Find the user's earlier work by its words or look, with refs for Reuse, Review and Result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
         {
           query: z.string().trim().max(200).default(""),
           kind: z.enum(["image", "video"]).optional(),
           starred: z.boolean().default(false),
+          model: z.string().trim().max(200).optional(),
+          lora: z.string().trim().max(200).optional(),
+          aspect: z.enum(["landscape", "portrait", "square"]).optional(),
           uploads: z.boolean().default(false),
           limit: z.number().int().min(1).max(24).default(8),
         },
@@ -1373,7 +1376,7 @@ export function registerMcpRoutes(
           const lines = hits.map((item, position) => {
             const { ref, output_index, link } = results[position];
             return [
-              `- [${ref[0].toUpperCase()}${ref.slice(1)}${output_index ? ` output ${output_index}` : ""}](${link})`,
+              `- [${ref[0].toUpperCase()}${ref.slice(1)}${output_index ? ` output ${output_index}` : ""}](${link})${item.favorite ? " ★" : ""}`,
               item.title && shortPrompt(item.title),
               item.settings?.modelName || item.model || item.settings?.profileId,
               String(item.createdAt || "").slice(0, 10),

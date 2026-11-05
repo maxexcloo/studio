@@ -891,10 +891,17 @@ export class McpMedia {
    * words, Image Search's "looks like", kind and starred), newest first. Each hit's job joins this
    * scope's refs, so Reuse, Review and Result take it; a job another MCP owner holds is left out.
    */
-  async search(owner, scope, { query, kind, starred, uploads, limit }, { signal } = {}) {
+  async search(
+    owner,
+    scope,
+    { query, kind, starred, model, lora, aspect, uploads, limit },
+    { signal } = {},
+  ) {
     const params = new URLSearchParams({ q: query, includeFailed: "0", limit: "200" });
     if (kind) params.set("type", kind);
     if (starred) params.set("favorites", "1");
+    for (const [key, value] of Object.entries({ model, lora, aspect }))
+      if (value) params.set(key, value);
     if (uploads) params.set("uploads", "1");
     const { items = [] } = await this.request("GET", `/api/gallery?${params}`, undefined, owner, {
       signal,
