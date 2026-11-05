@@ -186,7 +186,9 @@ export function studioTheme({
       // icons take the glass fill without a backdrop blur of their own: tiles and the viewer show
       // dozens at once, and each blur layer stalls rendering on slow phones.
       ActionIcon: ActionIcon.extend({
-        classNames: { root: classes.actionIcon },
+        classNames: (_theme, props) => ({
+          root: `${classes.actionIcon} ${phone && props.size === bar ? classes.phoneIcons : ""}`,
+        }),
         defaultProps: { size: bar, radius: "xl" },
         vars: (_theme, props) => ({
           root:
@@ -212,7 +214,9 @@ export function studioTheme({
       // their Title Case instead of Mantine's upper case.
       Badge: Badge.extend({ defaultProps: { variant: "light", tt: "none" } }),
       Button: Button.extend({
-        classNames: { root: classes.button },
+        classNames: (_theme, props) => ({
+          root: `${classes.button} ${phone && height(props.size) ? classes.phoneIcons : ""}`,
+        }),
         defaultProps: { size: "md", fw: 500, autoContrast: true },
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
