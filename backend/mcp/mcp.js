@@ -63,6 +63,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { appVersion } from "../data-dir.js";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
+import { compareVariants } from "../../shared/compare.ts";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -522,14 +523,14 @@ export function registerMcpRoutes(
       };
     };
     /**
-     * 2–4 single-image sets become one labelled side-by-side page (/compare/:id), or "" when the run doesn't fit
-     * one (videos, several images per model, a refused set) or the comparison can't be saved.
+     * `compareVariants` single-image sets become one labelled side-by-side page (/compare/:id), or "" when the run
+     * doesn't fit one (videos, several images per model, a refused set) or the comparison can't be saved.
      */
     const comparisonOf = async (sets) => {
       const jobs = sets.map(({ queued }) => queued.jobs || []);
       if (
-        sets.length < 2 ||
-        sets.length > 4 ||
+        sets.length < compareVariants.min ||
+        sets.length > compareVariants.max ||
         sets.some(({ profile, queued }) => profile.kind === "video" || queued.error) ||
         jobs.some((list) => list.length !== 1)
       )

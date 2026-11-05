@@ -365,6 +365,8 @@ primary component reference and verify APIs against the installed version.
   is sent (skipping any already typed). The prompt field never gets them; reusing a result restores the
   prompt as typed, and Details shows the prompt that ran.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
+- Compare runs 2–10 variants (`compareVariants` in `shared/compare.ts`, shared
+  by the dialog, `/api/comparisons` and MCP).
 
 ## Dream & Taste
 
