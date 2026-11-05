@@ -1054,7 +1054,7 @@ export function registerMcpRoutes(
             .max(16)
             .optional()
             .describe(
-              "From Search uploads, Upload or Reuse mode reference; Models gives each profile's references.max.",
+              `From Search uploads, Upload or Reuse mode reference${actor.session ? "" : "; an image attached in chat isn't one until the user uploads it through UploadLink"}. Models gives each profile's references.max.`,
             ),
           reference_role: z.enum(["edit", "reference"]).optional(),
           aspect: z
