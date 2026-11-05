@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -11,12 +11,13 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { Link, useParams } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
+import { usePhone } from "../../ui/usePhone";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
@@ -111,13 +112,7 @@ export function ComparePage() {
           )}
         </Stack>
       )}
-      <SimpleGrid
-        cols={{ base: 2, sm: variants.length }}
-        spacing="sm"
-        className={classes.grid}
-        // Side by side, every variant fits the viewport height.
-        style={{ "--compare-columns": variants.length, "--compare-aspect": aspect }}
-      >
+      <Variants count={variants.length} aspect={aspect}>
         {variants.map(({ jobId, label, item }) => {
           const won = vote === jobId;
           return (
@@ -172,7 +167,7 @@ export function ComparePage() {
             </Stack>
           );
         })}
-      </SimpleGrid>
+      </Variants>
       {winner && (
         <Group justify="center" gap="sm" className={classes.applied}>
           {star.isSuccess && (
@@ -198,6 +193,78 @@ export function ComparePage() {
           close={() => setOpen(null)}
         />
       )}
+    </Stack>
+  );
+}
+
+/** The variants as a grid that fits the viewport on desktop, or a swiped row of one on phones. */
+function Variants({
+  count,
+  aspect,
+  children,
+}: {
+  count: number;
+  aspect: number;
+  children: ReactNode;
+}) {
+  const phone = usePhone();
+  const track = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(0);
+  if (!phone) {
+    const columns = count <= 4 ? count : Math.ceil(count / 2);
+    return (
+      <SimpleGrid
+        cols={columns}
+        spacing="sm"
+        className={classes.grid}
+        style={{
+          "--compare-columns": columns,
+          "--compare-rows": Math.ceil(count / columns),
+          "--compare-aspect": aspect,
+        }}
+      >
+        {children}
+      </SimpleGrid>
+    );
+  }
+  const move = (step: number) => {
+    const element = track.current!;
+    element.scrollTo({ left: (shown + step) * element.clientWidth });
+  };
+  return (
+    <Stack gap="xs">
+      <Group justify="space-between" wrap="nowrap">
+        <ActionIcon
+          variant="default"
+          aria-label="Previous Variant"
+          disabled={shown === 0}
+          onClick={() => move(-1)}
+        >
+          <ChevronLeft size={20} />
+        </ActionIcon>
+        <Text size="sm" c="dimmed" aria-live="polite">
+          {shown + 1} of {count}
+        </Text>
+        <ActionIcon
+          variant="default"
+          aria-label="Next Variant"
+          disabled={shown === count - 1}
+          onClick={() => move(1)}
+        >
+          <ChevronRight size={20} />
+        </ActionIcon>
+      </Group>
+      <div
+        ref={track}
+        className={classes.track}
+        onScroll={(event) =>
+          setShown(
+            Math.round(event.currentTarget.scrollLeft / (event.currentTarget.clientWidth || 1)),
+          )
+        }
+      >
+        {children}
+      </div>
     </Stack>
   );
 }

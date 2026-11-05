@@ -41,11 +41,26 @@
   margin-inline: auto;
 }
 
-@media (min-width: 48em) {
-  .grid {
-    max-width: calc(
-      (100dvh - 15rem) * var(--compare-aspect) * var(--compare-columns) +
-        (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
-    );
-  }
+/* Every row of variants fits the viewport height together. */
+.grid {
+  max-width: calc(
+    (100dvh - 15rem) / var(--compare-rows) * var(--compare-aspect) * var(--compare-columns) +
+      (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
+  );
+}
+
+/* Phones: one variant per swipe, snapping to each. */
+.track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.track > * {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
 }

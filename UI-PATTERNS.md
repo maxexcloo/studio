@@ -366,7 +366,10 @@ primary component reference and verify APIs against the installed version.
   prompt as typed, and Details shows the prompt that ran.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 - Compare runs 2–10 variants (`compareVariants` in `shared/compare.ts`, shared
-  by the dialog, `/api/comparisons` and MCP).
+  by the dialog, `/api/comparisons` and MCP). On desktop its page fits every
+  variant in the viewport, in one row of up to four, else two rows; phones show
+  one variant at a time at full width, moved by swiping or the arrows beside
+  its position.
 
 ## Dream & Taste
 
