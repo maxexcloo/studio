@@ -128,8 +128,8 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   assert.match((await readMediaInfo(store.importedImageFile(item))).prompt, /a landscape/);
   const clean = Buffer.from(await (await fetch(base + item.url + "?clean=1")).arrayBuffer());
   assert.ok(clean.length < full.length);
-  const asset = references.referenceAssetFromGallery({}, item.id);
-  const reference = await references.bytesForReference({}, asset.id);
+  const asset = references.referenceAssetForAccount(undefined, item.id);
+  const reference = await references.bytesForReferenceAccount(undefined, asset.id);
   assert.deepEqual(reference.buffer, full);
 
   assert.equal(imported.body.preset.resources[0].status, "missing");

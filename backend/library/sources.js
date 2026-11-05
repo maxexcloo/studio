@@ -11,8 +11,6 @@ import { hfFetch } from "../hf-access.js";
 import { civitaiAvailability } from "./availability.js";
 import { civitaiOffers, hfOffers } from "./offers.js";
 
-export { civitaiAvailability };
-
 const modelFolders = new Set(Object.keys(catalogueKinds));
 /** Plain text from a Civitai description (HTML), for the catalogue. */
 export function plainDescription(html, limit = 10000) {

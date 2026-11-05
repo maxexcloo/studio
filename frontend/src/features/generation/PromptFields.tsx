@@ -65,7 +65,7 @@ export function useDraftChange({
     sendRequest: (request: string) => ask.send(request, { prompt: input.prompt, operation }),
   };
 }
-export type DraftChange = ReturnType<typeof useDraftChange>;
+type DraftChange = ReturnType<typeof useDraftChange>;
 
 /**
  * The composer's prompt and negative prompt with their history and assistant, and the assistant's

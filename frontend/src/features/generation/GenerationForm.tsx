@@ -20,7 +20,7 @@ import classes from "./ComposerDock.module.css";
  * viewer next step); an `embedded` composer stays on its surface rather than opening the Chat.
  * Forms show the error inline; elsewhere (`inlineError` false) it is the default notification.
  */
-export function useDraftSubmit({
+function useDraftSubmit({
   onSubmitted,
   embedded = false,
   inlineError = true,

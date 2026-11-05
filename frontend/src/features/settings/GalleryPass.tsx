@@ -8,7 +8,7 @@ import { SettingRow } from "../../ui/SettingRows";
 
 type PassScope = "all" | "outdated" | "missing";
 /** An administrator's pass over idle gallery work (backend/domain/idle-work.ts). */
-export interface PassStatus {
+interface PassStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
   active: boolean;
   reason: string;

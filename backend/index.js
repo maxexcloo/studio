@@ -115,7 +115,6 @@ import {
   filterVisibleGallery,
   flushGalleryStrict,
   isGalleryHidden,
-  galleryKey,
   flushPendingGallery,
   makePendingItems,
   gallery,
@@ -133,6 +132,7 @@ import {
   reloadGallerySizes,
   reloadGallerySources,
 } from "./gallery/store.js";
+import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { jobs, setTerminalJob } from "./jobs.js";
@@ -176,7 +176,7 @@ import {
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
-import { isCloudProfile } from "./cloud-profiles.js";
+import { isCloudProfile } from "../shared/profiles.ts";
 
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer(), flush: flushPendingGallery });

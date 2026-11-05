@@ -14,7 +14,7 @@ const words = (prompt: unknown) =>
   );
 
 /** The share of distinct words two prompts have in common, 1 when both are empty. */
-export function promptOverlap(a: unknown, b: unknown) {
+function promptOverlap(a: unknown, b: unknown) {
   const left = words(a);
   const right = words(b);
   const union = new Set([...left, ...right]).size;

@@ -4,7 +4,7 @@ import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
   bytesForReferenceAccount,
   readMultipartUpload,
-  referenceAssetFromGallery,
+  referenceAssetForAccount,
   referenceAssetMetadataForAccount,
   saveUpload,
 } from "./references.js";
@@ -55,9 +55,13 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     if (!req.studioAccount && !requireLocal(req, res)) return;
     const frame = req.body?.frame;
     try {
-      const reference = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
-        frame: Number.isInteger(frame) && frame >= 0 ? frame : "last",
-      });
+      const reference = referenceAssetForAccount(
+        req.studioAccount,
+        String(req.body?.galleryItemId || ""),
+        {
+          frame: Number.isInteger(frame) && frame >= 0 ? frame : "last",
+        },
+      );
       const { item, asset } = await saveUpload(
         await bytesForReferenceAccount(req.studioAccount, reference.id),
         ownerIdForRequest(req),
@@ -72,13 +76,17 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   app.post("/api/reference-assets/from-gallery", (req, res) => {
     if (!req.studioAccount && !requireLocal(req, res)) return;
     try {
-      const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
-        // A video's last frame, or the one at a time in milliseconds.
-        frame:
-          req.body?.frame === "last" || (Number.isInteger(req.body?.frame) && req.body.frame >= 0)
-            ? req.body.frame
-            : "",
-      });
+      const asset = referenceAssetForAccount(
+        req.studioAccount,
+        String(req.body?.galleryItemId || ""),
+        {
+          // A video's last frame, or the one at a time in milliseconds.
+          frame:
+            req.body?.frame === "last" || (Number.isInteger(req.body?.frame) && req.body.frame >= 0)
+              ? req.body.frame
+              : "",
+        },
+      );
       res.json({ ok: true, asset });
     } catch (error) {
       res.status(404).json({ ok: false, error: error.message });

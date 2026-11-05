@@ -29,7 +29,7 @@ import { getCustomWorkflow } from "./custom-workflows.js";
 import { markWorkflowUsed } from "./workflow-catalog.js";
 
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
-import { referenceExistsForAccount, stageReferenceAssets } from "./references.js";
+import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
@@ -364,8 +364,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
-      body.referenceAssets = await stageReferenceAssets(
-        req,
+      body.referenceAssets = await stageReferenceAssetsForAccount(
+        req.studioAccount,
         [{ slot: "reference", assetId: body.startImageId }],
         { unique: Boolean(body.ownerId), generation: body },
       ).catch(() => []);
@@ -376,10 +376,14 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       !body.referenceAssets.every((item) => item.comfyName)
     ) {
       try {
-        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, {
-          unique: Boolean(body.ownerId),
-          generation: body,
-        });
+        body.referenceAssets = await stageReferenceAssetsForAccount(
+          req.studioAccount,
+          body.referenceAssets,
+          {
+            unique: Boolean(body.ownerId),
+            generation: body,
+          },
+        );
       } catch (error) {
         res.status(400).json({ ok: false, error: error.message });
         return;
@@ -409,7 +413,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssets(req, [first], {
+        const [replacement] = await stageReferenceAssetsForAccount(req.studioAccount, [first], {
           unique: Boolean(body.ownerId),
           generation: body,
         });

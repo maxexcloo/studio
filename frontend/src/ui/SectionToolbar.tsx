@@ -49,12 +49,12 @@ export function ToolbarAction({
 }
 
 /** Separates a toolbar's groups of actions, as in the viewer and selection bars. */
-export function ToolbarDivider() {
+function ToolbarDivider() {
   return <Divider orientation="vertical" className={classes.divider} />;
 }
 
 /** A toolbar action shown as an icon with a tooltip, or by name under More on phones. */
-export interface ToolbarMoreAction {
+interface ToolbarMoreAction {
   label: string;
   icon: LucideIcon;
   onClick?: () => void;

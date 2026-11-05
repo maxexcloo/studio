@@ -41,9 +41,12 @@ test("an upload becomes its owner's uploaded gallery image, listed only under Up
     pageGallery({ uploads: true }).items.map((listed) => listed.id),
     [item.id],
   );
-  assert.deepEqual((await referenceAssets.bytesForReference({}, asset.id)).buffer, buffer);
   assert.deepEqual(
-    (await referenceAssets.bytesForReference({}, item.id)).buffer,
+    (await referenceAssets.bytesForReferenceAccount(undefined, asset.id)).buffer,
+    buffer,
+  );
+  assert.deepEqual(
+    (await referenceAssets.bytesForReferenceAccount(undefined, item.id)).buffer,
     buffer,
     "a reference saved with the upload's own id still resolves",
   );
@@ -64,7 +67,7 @@ test("uploaded images and byte reads are limited to their account owner", async 
   assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetA.id), true);
   assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetB.id), false);
   await assert.rejects(
-    referenceAssets.bytesForReference(ownerA, assetB.id),
+    referenceAssets.bytesForReferenceAccount(ownerA.studioAccount, assetB.id),
     /no longer in the gallery/,
   );
 });
@@ -92,7 +95,10 @@ test("a multipart upload streams to disk and its temporary file is moved into pl
   const { asset } = await referenceAssets.saveUpload(upload, "account-s");
   assert.equal(fs.existsSync(upload.file), false);
   const owner = { studioAccount: { userId: "account-s", role: "user" } };
-  assert.deepEqual((await referenceAssets.bytesForReference(owner, asset.id)).buffer, image);
+  assert.deepEqual(
+    (await referenceAssets.bytesForReferenceAccount(owner.studioAccount, asset.id)).buffer,
+    image,
+  );
 });
 
 test("non-image uploads are rejected", async () => {
@@ -134,7 +140,9 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     { slot: "reference", assetId: asset.id },
   ];
   const generation = { family: "sdxl", width: 1024, height: 1024 };
-  const staged = await referenceAssets.stageReferenceAssets({}, refs, { generation });
+  const staged = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
+    generation,
+  });
   assert.equal(staged.length, 2);
   assert.equal(staged[0].comfyName, staged[1].comfyName, "content-named resized uploads");
   for (const item of staged) {
@@ -144,17 +152,20 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     assert.equal(item.height % 8, 0);
   }
   assert.ok((await sharp(uploads[0].buffer).metadata()).hasAlpha);
-  assert.deepEqual((await referenceAssets.bytesForReference({}, asset.id)).buffer, source);
+  assert.deepEqual(
+    (await referenceAssets.bytesForReferenceAccount(undefined, asset.id)).buffer,
+    source,
+  );
 
-  const off = await referenceAssets.stageReferenceAssets({}, refs.slice(0, 1), {
+  const off = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs.slice(0, 1), {
     generation: { ...generation, autoResizeInputs: false },
   });
   assert.equal(off[0].temporary, undefined);
   assert.deepEqual(uploads.at(-1).buffer, source);
-  await referenceAssets.stageReferenceAssets({}, refs.slice(0, 1));
+  await referenceAssets.stageReferenceAssetsForAccount(undefined, refs.slice(0, 1));
   assert.deepEqual(uploads.at(-1).buffer, source, "upscale operations keep full resolution");
 
-  const painted = await referenceAssets.stageReferenceAssets({}, refs, {
+  const painted = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
     generation: { ...generation, inpaint: { mask: "painted" } },
   });
   assert.deepEqual(
@@ -163,7 +174,10 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     "inpaint source and mask retain their coordinate system",
   );
   assert.notDeepEqual(uploads.at(-1).buffer, source, "additional references still resize");
-  const owned = await referenceAssets.stageReferenceAssets({}, refs, { generation, unique: true });
+  const owned = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
+    generation,
+    unique: true,
+  });
   assert.notEqual(owned[0].comfyName, owned[1].comfyName, "an owner's run gets its own copies");
   assert.equal(owned[0].temporary, true);
 });
@@ -195,7 +209,7 @@ test("a video’s last frame is referenced only by its owner and only for finish
   ];
   gallery.push(...items);
   try {
-    const asset = referenceAssets.referenceAssetFromGallery(owner, "extend-video", {
+    const asset = referenceAssets.referenceAssetForAccount(owner.studioAccount, "extend-video", {
       frame: "last",
     });
     assert.match(asset.id, /^gallery:.+:last-frame$/);
@@ -203,20 +217,26 @@ test("a video’s last frame is referenced only by its owner and only for finish
     assert.equal(asset.name, "extend last frame.png");
     assert.equal(asset.galleryItemId, "extend-video");
     assert.throws(
-      () => referenceAssets.referenceAssetFromGallery(other, "extend-video", { frame: "last" }),
+      () =>
+        referenceAssets.referenceAssetForAccount(other.studioAccount, "extend-video", {
+          frame: "last",
+        }),
       /no longer in the gallery/,
     );
     assert.throws(
-      () => referenceAssets.referenceAssetFromGallery(owner, "extend-image", { frame: "last" }),
+      () =>
+        referenceAssets.referenceAssetForAccount(owner.studioAccount, "extend-image", {
+          frame: "last",
+        }),
       /no longer in the gallery/,
     );
     assert.throws(
-      () => referenceAssets.referenceAssetFromGallery(owner, "extend-video"),
+      () => referenceAssets.referenceAssetForAccount(owner.studioAccount, "extend-video"),
       /no longer in the gallery/,
       "a video is never a plain image reference",
     );
     await assert.rejects(
-      referenceAssets.bytesForReference(other, asset.id),
+      referenceAssets.bytesForReferenceAccount(other.studioAccount, asset.id),
       /no longer in the gallery/,
     );
   } finally {
@@ -257,7 +277,7 @@ test("a video upload is an uploaded gallery video, used by its first frame and r
   assert.match(asset.id, /^gallery:.+:frame-0$/);
   assert.equal(asset.mime, "image/png");
   const owner = { studioAccount: { userId: "account-v", role: "user" } };
-  const frame = await referenceAssets.bytesForReference(owner, asset.id);
+  const frame = await referenceAssets.bytesForReferenceAccount(owner.studioAccount, asset.id);
   assert.equal(frame.buffer.readUInt32BE(0), 0x89504e47, "the reference is the frame as a PNG");
   const still = await referenceAssets.galleryStill(item);
   assert.deepEqual([...still.subarray(0, 3)], [0xff, 0xd8, 0xff], "captions read its JPEG poster");

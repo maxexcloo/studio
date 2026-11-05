@@ -162,7 +162,7 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
 }
 
 /** Removes an installed model file, only when it is still the one recorded (by checksum when known). */
-export async function removeInstalled(want) {
+async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
     throw new Error("That isn’t a model file Studio manages.");
   const names = subfolders[want.folder] || [want.folder];

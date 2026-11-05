@@ -17,7 +17,6 @@ import {
   importedImageFile,
   filterVisibleGallery,
   gallery,
-  galleryKey,
 } from "./gallery/store.js";
 
 import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
@@ -28,6 +27,7 @@ import { families } from "./family-catalog.js";
 import { imageMimes, mimeExtension, referenceInputName } from "./reference-names.js";
 import { uploadedGalleryItem } from "./uploads.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
+import { galleryKey } from "./persistence/gallery-rows.ts";
 
 export const maxUploadBytes = Math.max(
   1024,
@@ -429,10 +429,6 @@ async function frameBytes(account, { videoId, at }) {
   };
 }
 
-export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {}) {
-  return referenceAssetForAccount(req?.studioAccount, galleryItemId, { frame });
-}
-
 /**
  * The local file and time of a video frame reference the owner may use (an Extend's start), or
  * null for any other reference.
@@ -504,11 +500,6 @@ export function referenceExistsForAccount(account, id) {
   );
 }
 
-/** The bytes a run gets for a reference (exported for tests). */
-export async function bytesForReference(req, id) {
-  return bytesForReferenceAccount(req?.studioAccount, id);
-}
-
 /**
  * An image reference's gallery caption (domain/captions.ts), or "" for a video frame, whose caption
  * describes the video's first frame rather than this one.
@@ -519,6 +510,7 @@ export function captionForReferenceAccount(account, id) {
   return typeof caption === "string" ? caption.trim() : "";
 }
 
+/** The bytes a run gets for a reference. */
 export async function bytesForReferenceAccount(account, id) {
   const frame = frameReference(id);
   if (frame) return frameBytes(account, frame);
@@ -546,10 +538,6 @@ export async function uploadBufferToComfy({ buffer, mime, name }, { unique = fal
   form.append("overwrite", "false");
   const uploaded = await comfy("/upload/image", { method: "POST", body: form });
   return { comfyName: uploaded.name || filename, name: safeName(name), mime };
-}
-
-export function stageReferenceAssets(req, references = [], options = {}) {
-  return stageReferenceAssetsForAccount(req?.studioAccount, references, options);
 }
 
 export async function stageReferenceAssetsForAccount(
