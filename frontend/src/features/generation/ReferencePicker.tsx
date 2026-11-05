@@ -259,9 +259,8 @@ export function ReferencePicker({
       }}
       gap="sm"
       // Phones fill the popup below its header; the grid owns scrolling and keeps its position.
-      flex={phone ? 1 : undefined}
       mih={0}
-      h={phone ? undefined : "min(70dvh, 620px)"}
+      h={phone ? "calc(100dvh - 5rem)" : "min(70dvh, 620px)"}
     >
       <ReferenceSlots
         references={references}
@@ -317,9 +316,8 @@ export function ReferencePicker({
           {search ? "No Matches" : "No Images"}
         </EmptyState>
       ) : (
-        <ScrollArea
-          flex={1}
-          mih={0}
+        <ScrollArea.Autosize
+          style={{ flex: 1, minHeight: 0 }}
           offsetScrollbars="present"
           viewportRef={setViewport}
           onScrollPositionChange={({ y }) => {
@@ -362,7 +360,7 @@ export function ReferencePicker({
             ))}
           </PickerGrid>
           {more}
-        </ScrollArea>
+        </ScrollArea.Autosize>
       )}
     </Stack>
   );
