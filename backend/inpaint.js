@@ -1,4 +1,4 @@
-import { bytesForReference, uploadBufferToComfy } from "./references.js";
+import { bytesForReferenceAccount, uploadBufferToComfy } from "./references.js";
 import { loadSharp } from "./sharp-loader.js";
 
 /**
@@ -182,7 +182,7 @@ export async function prepareInpaint(req, body) {
     throw new Error(
       "Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the Studio folder, then restart.",
     );
-  const source = await bytesForReference(req, reference.assetId);
+  const source = await bytesForReferenceAccount(req.studioAccount, reference.assetId);
   const files = await inpaintFiles(sharp, source.buffer, maskBufferFromDataUrl(body.inpaint.mask), {
     targetPixels: Number(body.width) * Number(body.height),
     feather: body.inpaint.feather,

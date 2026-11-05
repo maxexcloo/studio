@@ -54,7 +54,7 @@ const decode = (text) =>
   );
 
 /** A Redlib post page's title and full-size image paths (one for an image post, each of a gallery's). */
-export function redditPostImages(html) {
+function redditPostImages(html) {
   const heading = html.match(/<h1 class="post_title">([\s\S]*?)<\/h1>/)?.[1] || "";
   // The flair is a link inside the heading.
   const title = decode(

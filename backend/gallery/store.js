@@ -79,7 +79,7 @@ function loadMarkerKey() {
 }
 
 /** The stored form of a gallery key's marker. */
-export function markerOf(key) {
+function markerOf(key) {
   const text = String(key || "");
   if (!text) return "";
   let marker = markerCache.get(text);
@@ -121,8 +121,6 @@ function loadHiddenGalleryIds() {
   return markers;
 }
 
-export { galleryKey };
-
 export function galleryRevisionValue() {
   return galleryRevision;
 }
@@ -162,7 +160,7 @@ export function setGallery(items, options = {}) {
   if (options.persist !== false) saveGallery();
 }
 
-export function isComfyOutputItem(item) {
+function isComfyOutputItem(item) {
   return Boolean(item?.url && String(item.url).startsWith("/comfy/view?"));
 }
 
@@ -750,7 +748,7 @@ function saveHiddenGalleryIds() {
   persistHiddenMarkers(Object.fromEntries(entries));
 }
 
-export function promptTitle(text = "") {
+function promptTitle(text = "") {
   const oneLine = String(text).replace(/\s+/g, " ").trim();
   return oneLine.length > 68 ? `${oneLine.slice(0, 65)}...` : oneLine || "Untitled prompt";
 }

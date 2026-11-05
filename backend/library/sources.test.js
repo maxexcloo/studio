@@ -3,7 +3,6 @@ import fs from "node:fs";
 import test from "node:test";
 import { versionResource } from "../civitai/import.js";
 import {
-  civitaiAvailability,
   civitaiUncensored,
   detectLink,
   hfFolder,
@@ -12,6 +11,7 @@ import {
   resolveCivitaiModel,
   resolveHuggingFace,
 } from "./sources.js";
+import { civitaiAvailability } from "./availability.js";
 
 const fixture = JSON.parse(
   fs.readFileSync(new URL("../fixtures/civitai/model-versions.json", import.meta.url), "utf8"),

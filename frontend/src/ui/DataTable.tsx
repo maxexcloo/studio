@@ -15,7 +15,7 @@ import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 
-export interface DataColumn<T> {
+interface DataColumn<T> {
   key: string;
   header: string;
   cell: (row: T) => ReactNode;

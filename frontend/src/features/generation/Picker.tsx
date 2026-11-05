@@ -427,7 +427,7 @@ export const savedSortLabels: Record<SavedSort, string> = {
   newest: "Newest First",
   oldest: "Oldest First",
 };
-export interface SavedItem {
+interface SavedItem {
   id: string;
   name: string;
   /** When it was saved; older records without one sort by their place in the list. */
