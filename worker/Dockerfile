@@ -10,7 +10,7 @@ RUN python3 -m pip install --no-cache-dir \
     # renovate: datasource=pypi depName=peft
     peft==0.21.2 \
     # renovate: datasource=pypi depName=rotary_embedding_torch
-    rotary_embedding_torch==0.9.1 \
+    rotary_embedding_torch==0.9.2 \
     && rm -rf /root/ComfyUI
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
 RUN python3 /opt/studio/install_nodes.py /opt/studio/source.json /opt/studio/sources.json /root/ComfyUI
