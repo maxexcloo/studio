@@ -54,7 +54,8 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   variant="subtle"
                   color={active ? undefined : "gray"}
                   className={classes.mode}
-                  px={{ base: 12 }}
+                  // Phones size it to the 44 px touch target; wider screens pad its label.
+                  px={{ base: 8, sm: 12 }}
                   size="sm"
                   radius="xl"
                 >
@@ -81,10 +82,11 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       justify="space-between"
       wrap="nowrap"
       w="100%"
+      className={classes.bar}
       mx="auto"
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
-      <Group gap="xs" wrap="nowrap">
+      <Group gap="xs" wrap="nowrap" className={classes.bar}>
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />
         </Link>
