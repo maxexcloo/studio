@@ -2,6 +2,8 @@
 import "./env.js";
 // Then: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
+// Then: refuses to start on data migrate-runtime has not brought current.
+import "./storage-check.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
