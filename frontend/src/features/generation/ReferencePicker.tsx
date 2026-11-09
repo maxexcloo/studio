@@ -14,19 +14,13 @@ import {
 import { useDebouncedValue } from "@mantine/hooks";
 import { ChevronDown, ImagePlus } from "lucide-react";
 import { icons } from "../../ui/icons";
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
-import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../types";
+import type { ReferenceAsset, Profile, GenerationInput } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import {
   GalleryFilterPanel,
-  appendGalleryFilters,
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
@@ -40,6 +34,7 @@ import {
   referenceKey,
   referenceLabel,
   uploadTypes,
+  useGalleryImages,
   useReferenceList,
   useReferencePlacement,
   type ReferenceTarget,
@@ -50,6 +45,13 @@ import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { chipProps, iconChipProps } from "./chip";
 import { ChipPopup, ChipContent, PickerGrid, PickerHeader, PickerTile } from "./Picker";
+import { useGroupFeature } from "../auth/AccountGate";
+import { CharacterChoices } from "../characters/CharacterChoices";
+
+const referenceTabs = [
+  { value: "gallery" as const, label: "Gallery" },
+  { value: "characters" as const, label: "Characters" },
+];
 
 export function ReferencePicker({
   compact = false,
@@ -60,8 +62,11 @@ export function ReferencePicker({
   opened: controlled,
   onOpenedChange,
   browser: controlledBrowser,
+  prompt: ownPrompt,
 }: {
   browser?: ReferenceBrowser;
+  /** The text a character's description joins: the editor's prompt or Chat's message. */
+  prompt?: { value: string; onChange: (value: string) => void };
   compact?: boolean;
   value?: ReferenceAsset[];
   onChange?: (references: ReferenceAsset[]) => void;
@@ -77,7 +82,15 @@ export function ReferencePicker({
     onOpenedChange?.(opened);
   };
   const phone = usePhone();
-  const { draft } = useGeneration();
+  const { draft, setDraft } = useGeneration();
+  const prompt = ownPrompt || {
+    value: String(draft.input.prompt || ""),
+    onChange: (prompt: string) =>
+      setDraft((previous) => ({ ...previous, input: { ...previous.input, prompt } })),
+  };
+  const charactersOn = useGroupFeature("characters");
+  const [characterQuery, setCharacterQuery] = useState("");
+  const [characterLayer, setCharacterLayer] = useState(false);
   const list = useReferenceList({
     value,
     onChange,
@@ -93,6 +106,7 @@ export function ReferencePicker({
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
   const { target: chosen, query, filters } = browser.state;
+  const tab = charactersOn ? browser.state.tab : "gallery";
   const { uploads } = filters;
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
@@ -169,34 +183,19 @@ export function ReferencePicker({
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
-  // Uploads are gallery images too, behind the gallery's Uploads filter. The key and request match
-  // the gallery's Images view, so pages it already loaded show at once.
-  const listing = useInfiniteQuery({
-    queryKey: ["gallery", search, "image", filters],
-    enabled: opened,
-    // Searching and filtering keep the current tiles until the new ones arrive.
-    placeholderData: keepPreviousData,
-    initialPageParam: "",
-    queryFn: ({ pageParam }) =>
-      api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
-        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search }), filters)}`,
-      ),
-    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
-  });
-  const listed = (listing.data?.pages.flatMap((page) => page.items) || [])
-    .filter((item) => item.type === "image" && item.status === "done")
-    .map((item, index) => ({
-      id: item.id,
-      name: item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result",
-      uploaded: Boolean(item.uploaded),
-      thumbnailUrl: item.thumbnailUrl || item.url,
-      drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })] as [
-        string,
-        string,
-      ],
-      choose: () => placement.addGalleryItem(item, chosen),
-      matches: (reference: ReferenceAsset) => reference.galleryItemId === item.id,
-    }));
+  const { listing, items } = useGalleryImages(search, filters, opened);
+  const listed = items.map((item, index) => ({
+    id: item.id,
+    name: item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result",
+    uploaded: Boolean(item.uploaded),
+    thumbnailUrl: item.thumbnailUrl || item.url,
+    drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })] as [
+      string,
+      string,
+    ],
+    choose: () => placement.addGalleryItem(item, chosen),
+    matches: (reference: ReferenceAsset) => reference.galleryItemId === item.id,
+  }));
   // A selected image removes on a second click, except into a chosen slot, so one image can
   // still play several roles.
   const choices = listed.map((item) => {
@@ -275,93 +274,125 @@ export function ReferencePicker({
         }}
         onDrop={dropData}
       />
-      {!target && (
+      {!target && tab === "gallery" && (
         <Text size="xs" c="dimmed">
           All slots are filled. Choose a reference to replace it, or a selected image to remove it.
         </Text>
       )}
-      <PickerHeader
-        label="References"
-        searched={uploads ? "Uploads" : "Gallery"}
-        query={query}
-        onQueryChange={(query) => browse({ query })}
-        filterCount={activeFilters.length}
-        onClearFilters={() => browse({ filters: emptyGalleryFilters })}
-        actions={uploadButton}
-        filters={
-          <GalleryFilterPanel
-            kind="image"
-            value={filters}
-            onChange={(filters) => browse({ filters })}
+      {tab === "characters" ? (
+        <>
+          <PickerHeader
+            label="References"
+            searched="Characters"
+            tabs={referenceTabs}
+            tab={tab}
+            onTabChange={(tab) => browse({ tab })}
+            query={characterQuery}
+            onQueryChange={setCharacterQuery}
           />
-        }
-      />
-      {/* Loading and empty states fill the space under the header, centred in it. */}
-      {listing.isPending ? (
-        <LoadingState fill label="Loading References" />
-      ) : listing.error ? (
-        <Alert color="red">{listing.error.message}</Alert>
-      ) : !choices.length ? (
-        <EmptyState
-          fill
-          action={
-            <>
-              {uploads && (
-                <Text size="xs">
-                  {search ? "No matching uploads." : "Upload, paste or drop images."}
-                </Text>
-              )}
-              {more}
-            </>
-          }
-        >
-          {search ? "No Matches" : "No Images"}
-        </EmptyState>
+          <CharacterChoices
+            query={characterQuery}
+            references={references}
+            prompt={prompt.value}
+            profile={profile}
+            onChange={(next) => {
+              list.set(next.references);
+              if (next.prompt !== prompt.value) prompt.onChange(next.prompt);
+              settle();
+            }}
+            onLayer={setCharacterLayer}
+          />
+        </>
       ) : (
-        <ScrollArea.Autosize
-          style={{ flex: 1, minHeight: 0 }}
-          viewportRef={setViewport}
-          onScrollPositionChange={({ y }) => {
-            if (!restoreScroll.current) browser.scroll.current = y;
-          }}
-        >
-          <PickerGrid label="Reference Choices">
-            {choices.map((item, index) => (
-              <PickerTile
-                key={item.id}
-                label={`${item.removes ? "Remove" : "Use"} reference: ${item.name}`}
-                selected={item.selected}
-                disabled={!target}
-                image={item.thumbnailUrl}
-                drag={item.drag}
-                onToggle={() => {
-                  if (item.removes) list.set(list.get().filter((asset) => !item.matches(asset)));
-                  else {
-                    item.choose();
-                    if (single) setOpened(false);
-                  }
-                  settle();
-                }}
-                action={
-                  item.uploaded && (
-                    <ActionIcon
-                      variant="default"
-                      color="red"
-                      aria-label={`Delete Upload ${index + 1}`}
-                      onClick={() => {
-                        deletion.reset();
-                        setDeleteId(item.id);
-                      }}
-                    >
-                      <icons.delete size={14} />
-                    </ActionIcon>
-                  )
-                }
+        <>
+          <PickerHeader
+            label="References"
+            tabs={charactersOn ? referenceTabs : undefined}
+            tab={tab}
+            onTabChange={(tab) => browse({ tab })}
+            searched={uploads ? "Uploads" : "Gallery"}
+            query={query}
+            onQueryChange={(query) => browse({ query })}
+            filterCount={activeFilters.length}
+            onClearFilters={() => browse({ filters: emptyGalleryFilters })}
+            actions={uploadButton}
+            filters={
+              <GalleryFilterPanel
+                kind="image"
+                value={filters}
+                onChange={(filters) => browse({ filters })}
               />
-            ))}
-          </PickerGrid>
-          {more}
-        </ScrollArea.Autosize>
+            }
+          />
+          {/* Loading and empty states fill the space under the header, centred in it. */}
+          {listing.isPending ? (
+            <LoadingState fill label="Loading References" />
+          ) : listing.error ? (
+            <Alert color="red">{listing.error.message}</Alert>
+          ) : !choices.length ? (
+            <EmptyState
+              fill
+              action={
+                <>
+                  {uploads && (
+                    <Text size="xs">
+                      {search ? "No matching uploads." : "Upload, paste or drop images."}
+                    </Text>
+                  )}
+                  {more}
+                </>
+              }
+            >
+              {search ? "No Matches" : "No Images"}
+            </EmptyState>
+          ) : (
+            <ScrollArea.Autosize
+              style={{ flex: 1, minHeight: 0 }}
+              viewportRef={setViewport}
+              onScrollPositionChange={({ y }) => {
+                if (!restoreScroll.current) browser.scroll.current = y;
+              }}
+            >
+              <PickerGrid label="Reference Choices">
+                {choices.map((item, index) => (
+                  <PickerTile
+                    key={item.id}
+                    label={`${item.removes ? "Remove" : "Use"} reference: ${item.name}`}
+                    selected={item.selected}
+                    disabled={!target}
+                    image={item.thumbnailUrl}
+                    drag={item.drag}
+                    onToggle={() => {
+                      if (item.removes)
+                        list.set(list.get().filter((asset) => !item.matches(asset)));
+                      else {
+                        item.choose();
+                        if (single) setOpened(false);
+                      }
+                      settle();
+                    }}
+                    action={
+                      item.uploaded && (
+                        <ActionIcon
+                          variant="default"
+                          color="red"
+                          aria-label={`Delete Upload ${index + 1}`}
+                          onClick={() => {
+                            deletion.reset();
+                            setDeleteId(item.id);
+                          }}
+                        >
+                          <icons.delete size={14} />
+                        </ActionIcon>
+                      )
+                    }
+                  />
+                ))}
+              </PickerGrid>
+              {more}
+            </ScrollArea.Autosize>
+          )}
+        </>
       )}
     </Stack>
   );
@@ -417,7 +448,7 @@ export function ReferencePicker({
         width={560}
         opened={opened}
         onOpenedChange={setOpened}
-        trap={deleteId === null}
+        trap={deleteId === null && !characterLayer}
         target={trigger}
         footer={{
           end: (

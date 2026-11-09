@@ -77,6 +77,7 @@ export async function fixtures(page: Page) {
   const messages: any[] = [];
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
+  const characters: any[] = [];
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -703,6 +704,39 @@ export async function fixtures(page: Page) {
       );
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
+    // Character cards, their images shown as reference assets.
+    if (path.startsWith("/api/characters")) {
+      const card = (fields: any, id: string) => ({
+        id,
+        name: fields.name,
+        description: fields.description,
+        referenceIds: fields.referenceIds,
+        references: fields.referenceIds.map((asset: string) => ({
+          id: asset,
+          name: "Character Image",
+          thumbnailUrl: image,
+          url: image,
+          width: 1024,
+          height: 1024,
+        })),
+        missing: 0,
+      });
+      const id = decodeURIComponent(path.split("/")[3] || "");
+      const index = characters.findIndex((item) => item.id === id);
+      if (method === "POST") {
+        characters.push(card(body, `chr-${characters.length + 1}`));
+        return respond({ ok: true, character: characters.at(-1) }, 201);
+      }
+      if (method === "PUT") {
+        characters[index] = card(body, id);
+        return respond({ ok: true, character: characters[index] });
+      }
+      if (method === "DELETE") {
+        characters.splice(index, 1);
+        return respond({ ok: true });
+      }
+      return respond({ characters });
+    }
     if (method === "GET" && path.startsWith("/api/reference-assets/")) {
       const id = decodeURIComponent(path.split("/")[3]);
       return respond({
@@ -852,6 +886,7 @@ export async function fixtures(page: Page) {
     messages,
     chatRequests,
     referenceRequests,
+    characters,
     galleryRequests,
     loraLibrary,
     loraOperations,
