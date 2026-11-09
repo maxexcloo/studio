@@ -123,8 +123,8 @@ the primary component reference and verify APIs against the installed version.
   and disabled entries. Trigger words are applied when submitting, without
   altering the typed prompt; reuse restores the typed prompt and Details
   shows what ran.
-- Preserve actual model/provider metadata. Wait for the selected backend unless
-  the user permits fallback. Animate displays its choice before queuing. Its
+- Preserve actual model/provider metadata. Worker defaults to Automatic; wait
+  for an explicitly picked worker unless the user permits fallback. Animate displays its choice before queuing. Its
   menus offer Local GPU or Cloud when the account has both (Cloud needs the
   Cloud Models grant), then Fast or Quality when the chosen pool has two tiers.
   Both are remembered; until Local GPU or Cloud is picked, Animate runs locally

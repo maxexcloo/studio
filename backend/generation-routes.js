@@ -473,7 +473,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
   return {
     submitGeneration,
     async validateInput(input, account) {
-      const routed = await routeGeneration(input, account, input?.backendId, true);
+      const routed = await routeGeneration(input, account, input?.workerId, true);
       if (routed.payload) return routed;
       if (routed.offline) {
         if (!String(input?.prompt || "").trim())
