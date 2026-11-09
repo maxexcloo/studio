@@ -30,8 +30,9 @@ import {
 import { dataDir } from "../gallery/store.js";
 import { profileNameParts } from "../../shared/profiles.ts";
 import { writeJsonFile } from "../json-store.js";
+import { ownerDocumentFile, ownerDocuments, savedDocument } from "../persistence/runtime.ts";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
-import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
+import { repointLoraStacks } from "../combined-profiles.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { renameTimingKeys } from "../timings.js";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
@@ -241,13 +242,13 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
     fs.writeFileSync(path.join(backup, `${id}.json`), readEditableProfile(id).text, {
       mode: 0o600,
     });
-  for (const file of [guideStore().file, path.join(dataDir, "timings.json")])
-    if (fs.existsSync(file)) fs.copyFileSync(file, path.join(backup, path.basename(file)));
-  for (const file of loraStackFiles(dataDir)) {
-    const target = path.join(backup, path.relative(dataDir, file));
-    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-    fs.copyFileSync(file, target);
-  }
+  if (fs.existsSync(guideStore().file))
+    fs.copyFileSync(guideStore().file, path.join(backup, path.basename(guideStore().file)));
+  const timings = savedDocument(dataDir, "timings");
+  if (timings !== undefined)
+    writeJsonFile(path.join(backup, "timings.json"), timings, { mode: 0o600 });
+  for (const { name, value } of ownerDocuments(dataDir, "lora-stacks"))
+    writeJsonFile(path.join(backup, ownerDocumentFile(name)), value, { mode: 0o600 });
 
   const guides = guideStore();
   const timingKeys = {};

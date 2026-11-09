@@ -25,7 +25,8 @@ import { dataDir } from "../gallery/store.js";
 import { writeJsonFile } from "../json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
-import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
+import { repointLoraStacks } from "../combined-profiles.js";
+import { ownerDocumentFile, ownerDocuments } from "../persistence/runtime.ts";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { isObject } from "../values.js";
 
@@ -174,11 +175,13 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
     },
     { mode: 0o600 },
   );
-  for (const file of [guideStore().file, ...loraStackFiles(dataDir)].filter(fs.existsSync)) {
-    const target = path.join(backup, path.relative(dataDir, file));
+  if (fs.existsSync(guideStore().file)) {
+    const target = path.join(backup, path.relative(dataDir, guideStore().file));
     fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-    fs.copyFileSync(file, target);
+    fs.copyFileSync(guideStore().file, target);
   }
+  for (const { name, value } of ownerDocuments(dataDir, "lora-stacks"))
+    writeJsonFile(path.join(backup, ownerDocumentFile(name)), value, { mode: 0o600 });
   for (const { from } of plan.merges) {
     const { text } = readEditableProfile(from);
     fs.writeFileSync(path.join(backup, `${from}.json`), text, { mode: 0o600 });

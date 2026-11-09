@@ -8,6 +8,12 @@ import test from "node:test";
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const { setGallery } = await import("./gallery/store.js");
 const history = await import("./prompt-history.js");
+const { deleteRuntimeDocument, ownerDocumentName, readRuntimeDocument } =
+  await import("./persistence/runtime.ts");
+const dataDir = process.env.STUDIO_DATA_DIR;
+const saved = (name) => JSON.stringify(readRuntimeDocument(dataDir, ownerDocumentName(name)));
+const removeNegatives = () =>
+  deleteRuntimeDocument(dataDir, ownerDocumentName("negative-prompt-history"));
 
 test("the first list starts from the gallery's finished runs", () => {
   setGallery(
@@ -43,7 +49,7 @@ test("the first list starts from the gallery's finished runs", () => {
     ["A  red fox", "a blue owl"],
   );
   assert.equal(list[0].uses, 2, "spacing and case do not make a new prompt");
-  assert.ok(fs.existsSync(history.promptHistoryPath));
+  assert.ok(saved("prompt-history").includes("a blue owl"));
 });
 
 test("account prompt histories are stored separately from each other and legacy history", () => {
@@ -92,8 +98,7 @@ test("forgetting spares prompts the gallery still shows", () => {
   const texts = history.listPrompts().map((entry) => entry.text);
   assert.ok(!texts.includes("a green frog"));
   assert.ok(texts.includes("a blue owl"));
-  // Nor in the backup the store keeps of the file before.
-  assert.ok(!fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("a green frog"));
+  assert.ok(!saved("prompt-history").includes("a green frog"));
 });
 
 test("clearing keeps pinned prompts unless asked not to", () => {
@@ -110,10 +115,7 @@ test("clearing keeps pinned prompts unless asked not to", () => {
     [],
     "the saved file is read back, and an empty list is not re-seeded",
   );
-  assert.ok(
-    !fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("red fox"),
-    "cleared from the backup too",
-  );
+  assert.ok(!saved("prompt-history").includes("red fox"), "cleared from the saved list too");
 });
 
 test("turned off, nothing new is kept and the recent prompts go; starred ones stay, and it survives a restart", () => {
@@ -133,9 +135,9 @@ test("turned off, nothing new is kept and the recent prompts go; starred ones st
     ["a kept star"],
   );
   assert.equal(
-    fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("a passing thought"),
+    saved("prompt-history").includes("a passing thought"),
     false,
-    "gone from the backup too",
+    "gone from the saved list too",
   );
 
   history.resetPromptHistoryCache();
@@ -162,8 +164,7 @@ test("negative history is independent of the positive one", () => {
     ],
     { persist: false },
   );
-  fs.rmSync(history.negativePromptHistoryPath, { force: true });
-  fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });
+  removeNegatives();
   history.resetPromptHistoryCache();
   const positives = history.listPrompts();
   assert.deepEqual(
@@ -174,9 +175,7 @@ test("negative history is independent of the positive one", () => {
   history.setPromptPinned("Extra fingers", true, "negative");
   assert.deepEqual(history.listPrompts(), positives);
   history.forgetPrompts(["Blur and noise"], new Set(), "negative");
-  assert.ok(
-    !fs.readFileSync(`${history.negativePromptHistoryPath}.bak`, "utf8").includes("Blur and noise"),
-  );
+  assert.ok(!saved("negative-prompt-history").includes("Blur and noise"));
   history.setPromptHistoryEnabled(false);
   history.recordPrompt("Do not save", "negative");
   assert.deepEqual(
@@ -190,8 +189,7 @@ test("negative history is independent of the positive one", () => {
 
 test("new negative history honours an existing disabled history preference", () => {
   history.setPromptHistoryEnabled(false);
-  fs.rmSync(history.negativePromptHistoryPath, { force: true });
-  fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });
+  removeNegatives();
   history.resetPromptHistoryCache();
   assert.equal(history.promptHistoryEnabled("negative"), false);
   assert.deepEqual(history.listPrompts("negative"), []);

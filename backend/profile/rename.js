@@ -13,18 +13,24 @@
  * them follow.
  *
  * Plans by default, listing the mapping, conflicts (a new id already held by another profile or
- * guide, left as it is) and the references it rewrites; `apply` copies every file and the accounts
- * document it changes to `.backups/profile-ids-*` with a `mapping.json` (restorable with
- * `--restore`), then renames. It may run while Studio runs: profile files, aliases and guides are
- * read afresh, and runtime-migrations.js reloads the accounts, workflow preferences and timings it
+ * guide, left as it is) and the references it rewrites; `apply` copies every file and document it
+ * changes to `.backups/profile-ids-*` with a `mapping.json` (restorable with `--restore`), then
+ * renames. It may run while Studio runs: profile files, aliases, guides and LoRA stacks are read
+ * afresh, and runtime-migrations.js reloads the accounts, workflow preferences and timings it
  * holds. An interrupted apply finishes on the next run; a second run finds nothing.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { repointedPreferences, repointLoraState, loraStackFiles } from "../combined-profiles.js";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { repointedPreferences, repointLoraState } from "../combined-profiles.js";
+import { readJsonFile } from "../json-store.js";
 import { verifiedBackup } from "../persistence/migration.ts";
-import { withOfflineDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
+import {
+  ownerDocumentFile,
+  ownerDocuments,
+  savedDocument,
+  withOfflineDatabase,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import { createGuideStore, createProfileStore } from "./store.js";
 import { digest, isObject } from "../values.js";
 
@@ -149,8 +155,7 @@ export function profileIds(dataDir, { apply = false } = {}) {
       if (moved) result.grants[group] = moved;
     }
 
-  const preferencesFile = path.join(dataDir, "workflow-preferences.json");
-  const preferences = fs.existsSync(preferencesFile) ? readJsonFile(preferencesFile) : null;
+  const preferences = savedDocument(dataDir, "workflow-preferences");
   const before = {
     favorites: Array.isArray(preferences?.favorites) ? preferences.favorites : [],
     lastUsed: isObject(preferences?.lastUsed) ? preferences.lastUsed : {},
@@ -160,18 +165,17 @@ export function profileIds(dataDir, { apply = false } = {}) {
   ).length;
 
   const stacks = [];
-  for (const file of loraStackFiles(dataDir)) {
-    const state = readJsonFile(file);
+  for (const { name, value: state } of ownerDocuments(dataDir, "lora-stacks")) {
     if (!isObject(state)) continue;
+    const text = JSON.stringify(state);
     const moved = repointLoraState(state, follow);
     if (!moved) continue;
-    result.loraStacks[path.relative(dataDir, file)] = moved;
-    stacks.push({ file, state });
+    result.loraStacks[name] = moved;
+    stacks.push({ name, text, state });
   }
 
   // Run timings are keyed `<kind>:<model>[@<backend>]` (generation-timing.js timingKey).
-  const timingsFile = path.join(dataDir, "timings.json");
-  const timings = fs.existsSync(timingsFile) ? readJsonFile(timingsFile) : null;
+  const timings = savedDocument(dataDir, "timings");
   const timingKey = (key) => {
     const [, kind, model, backend = ""] = /^(image|video):([^@]*)(@.*)?$/.exec(key) || [];
     return kind ? `${kind}:${follow(model)}${backend}` : key;
@@ -202,20 +206,24 @@ export function profileIds(dataDir, { apply = false } = {}) {
     "workflows/.studio-meta.json",
     "workflows/.studio-edits.json",
     "guides/prompting.json",
-    "workflow-preferences.json",
-    "timings.json",
-    ...stacks.map(({ file }) => path.relative(dataDir, file)),
   ]
     .filter((source) => fs.existsSync(path.join(dataDir, source)))
     .map((source) => ({ source, bytes: fs.readFileSync(path.join(dataDir, source)) }));
-  if (Object.keys(result.grants).length)
-    copies.push({ source: "accounts.json", bytes: Buffer.from(accountsText) });
+  // Documents are copied as the files they were, so --restore writes them back as such.
+  for (const [name, text] of [
+    ["accounts", Object.keys(result.grants).length ? accountsText : undefined],
+    ["workflow-preferences", preferences && JSON.stringify(preferences)],
+    ["timings", timings && JSON.stringify(timings)],
+    ...stacks.map(({ name, text }) => [name, text]),
+  ])
+    if (text)
+      copies.push({
+        source: name.includes(":") ? ownerDocumentFile(name) : `${name}.json`,
+        target: `studio_documents/${name}`,
+        bytes: Buffer.from(text),
+      });
   for (const copy of copies) copy.hash = digest(copy.bytes);
-  const mappings = copies.map(({ source, hash }) => ({
-    source,
-    target: source === "accounts.json" ? "studio_documents/accounts" : source,
-    hash,
-  }));
+  const mappings = copies.map(({ source, target = source, hash }) => ({ source, target, hash }));
   result.backup = verifiedBackup(dataDir, "profile-ids", copies, {
     mappings,
     profiles: result.profiles,
@@ -239,10 +247,13 @@ export function profileIds(dataDir, { apply = false } = {}) {
     writeRuntimeDocument(dataDir, "accounts", accounts);
   }
   if (result.preferences)
-    writeJsonFile(preferencesFile, { ...preferences, ...repointedPreferences(before, follow) });
-  for (const { file, state } of stacks) writeJsonFile(file, state);
+    writeRuntimeDocument(dataDir, "workflow-preferences", {
+      ...preferences,
+      ...repointedPreferences(before, follow),
+    });
+  for (const { name, state } of stacks) writeRuntimeDocument(dataDir, name, state);
   if (result.timings)
-    writeJsonFile(timingsFile, {
+    writeRuntimeDocument(dataDir, "timings", {
       ...timings,
       runs: timings.runs.map((run) =>
         typeof run?.key === "string" ? { ...run, key: timingKey(run.key) } : run,

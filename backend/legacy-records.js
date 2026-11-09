@@ -1,19 +1,25 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loraStackFiles } from "./combined-profiles.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readJsonFile } from "./json-store.js";
 import { verifiedBackup } from "./persistence/migration.ts";
-import { runtimeDatabase, withOfflineDatabase } from "./persistence/runtime.ts";
+import {
+  ownerDocumentFile,
+  ownerDocuments,
+  runtimeDatabase,
+  savedDocument,
+  withOfflineDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import { createProfileStore } from "./profile/store.js";
 import { digest, isObject } from "./values.js";
 
 /**
  * The migrate-runtime step that rewrites records older builds left in shapes Studio no longer
  * reads:
- * - `loraStacks`: saved LoRA stacks keyed by a profile id (in every `lora-stacks.json`) move to
+ * - `loraStacks`: saved LoRA stacks keyed by a profile id (in every `lora-stacks:<key>`) move to
  *   that profile's family key (`family:<family>`), as stacks are saved now. A key whose profile
  *   file is gone is listed under `unresolved` and left as it is.
- * - `modelChoices`: the coarse "Use as" types in `model-types.json` become today's families
+ * - `modelChoices`: the coarse "Use as" types in the `model-types` document become today's families
  *   (`z-image` → `zimage`, `wan` → `wan22_5b`); `checkpoint`, which chose nothing, goes.
  * - `galleryReferences`: gallery rows lose the single-reference keys (`startImageId`,
  *   `referenceImage`, `referenceImageName`); a row without recorded references gets its one as
@@ -38,8 +44,7 @@ function planLoraStacks(dataDir) {
   };
   const changes = [];
   const unresolved = [];
-  for (const file of loraStackFiles(dataDir)) {
-    const state = readJsonFile(file);
+  for (const { name, value: state } of ownerDocuments(dataDir, "lora-stacks")) {
     const snapshots = state?.library?.snapshots;
     if (!isObject(snapshots)) continue;
     const moves = [];
@@ -47,9 +52,9 @@ function planLoraStacks(dataDir) {
       if (key.startsWith("family:")) continue;
       const to = familyOf(key);
       if (to) moves.push({ from: key, to, stacks: Array.isArray(stacks) ? stacks.length : 0 });
-      else unresolved.push({ file: path.relative(dataDir, file), key });
+      else unresolved.push({ document: name, key });
     }
-    if (moves.length) changes.push({ file, source: path.relative(dataDir, file), state, moves });
+    if (moves.length) changes.push({ name, state, moves });
   }
   return { changes, unresolved };
 }
@@ -67,8 +72,7 @@ function movedStacks(state, moves) {
 }
 
 function planModelChoices(dataDir) {
-  const file = path.join(dataDir, "model-types.json");
-  const choices = fs.existsSync(file) ? readJsonFile(file) : null;
+  const choices = savedDocument(dataDir, "model-types");
   if (!isObject(choices)) return null;
   const counts = {};
   for (const value of Object.values(choices))
@@ -76,7 +80,7 @@ function planModelChoices(dataDir) {
       const mapping = `${value} → ${modelChoices[value] || "(removed)"}`;
       counts[mapping] = (counts[mapping] || 0) + 1;
     }
-  return Object.keys(counts).length ? { file, choices, counts } : null;
+  return Object.keys(counts).length ? { choices, counts } : null;
 }
 
 function currentChoices(choices) {
@@ -158,7 +162,7 @@ export function legacyRecords(dataDir, { apply = false } = {}) {
     ...currentGalleryItem(JSON.parse(value)),
   }));
   const plan = {
-    loraStacks: Object.fromEntries(lora.changes.map(({ source, moves }) => [source, moves])),
+    loraStacks: Object.fromEntries(lora.changes.map(({ name, moves }) => [name, moves])),
     unresolved: lora.unresolved,
     modelChoices: models?.counts || {},
     galleryReferences: {
@@ -171,8 +175,13 @@ export function legacyRecords(dataDir, { apply = false } = {}) {
   if (!apply || !pending) return { ...plan, applied: false, backup: "" };
 
   const copies = [
-    ...lora.changes.map(({ file, source }) => ({ source, bytes: fs.readFileSync(file) })),
-    ...(models ? [{ source: "model-types.json", bytes: fs.readFileSync(models.file) }] : []),
+    ...lora.changes.map(({ name, state }) => ({
+      source: ownerDocumentFile(name),
+      bytes: Buffer.from(JSON.stringify(state)),
+    })),
+    ...(models
+      ? [{ source: "model-types.json", bytes: Buffer.from(JSON.stringify(models.choices)) }]
+      : []),
     ...(gallery.length
       ? [
           {
@@ -213,7 +222,8 @@ export function legacyRecords(dataDir, { apply = false } = {}) {
     db.exec("ROLLBACK");
     throw error;
   }
-  for (const { file, state, moves } of lora.changes) writeJsonFile(file, movedStacks(state, moves));
-  if (models) writeJsonFile(models.file, currentChoices(models.choices));
+  for (const { name, state, moves } of lora.changes)
+    writeRuntimeDocument(dataDir, name, movedStacks(state, moves));
+  if (models) writeRuntimeDocument(dataDir, "model-types", currentChoices(models.choices));
   return { ...plan, applied: true, backup };
 }
