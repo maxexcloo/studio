@@ -14,7 +14,7 @@ import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { upscaleQualities } from "./upscale.js";
-import { capabilityForProfile, listWorkers, workerSource } from "./workers.js";
+import { capabilityForProfile } from "./workers.js";
 
 // Whether ComfyUI runs on this machine, for the bug report.
 const comfyIsLocal = () => {
@@ -48,13 +48,6 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
         ...(administrator ? { loads: workerLoads(queue) } : {}),
       }),
     );
-  });
-
-  // Settings › Workers: the deployment's workers and where they come from; Studio never edits them.
-  app.get("/api/workers", (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ source: workerSource(), workers: listWorkers() });
   });
 
   // Liveness, for the container health check and the test servers.
