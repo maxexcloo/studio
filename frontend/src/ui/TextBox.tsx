@@ -1,5 +1,4 @@
 import {
-  Children,
   useEffect,
   useRef,
   useState,
@@ -14,38 +13,45 @@ import {
   Button,
   FocusTrap,
   Group,
+  Loader,
+  Menu,
   Modal,
-  Text,
   Textarea,
   Tooltip,
   type ModalProps,
   type TextareaProps,
   useProps,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { ArrowUp, Check } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import { ActionBarGroups, ActionMenuItems, type Action } from "../features/gallery/ActionBar";
+import { menuWidth } from "../theme";
 import { icons } from "./icons";
-import { useCopy } from "./clipboard";
+import { copyText } from "./clipboard";
 import { useKeyboard } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
 
-// Pressing Copy or Clear keeps focus (and the phone keyboard) in the text.
+// Pressing ⋯ or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that
+// follows the focus (a sheet's header) moves the control from under the press.
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
- * Every multi-line text box. `tools` adds compact Copy, Clear (undoable) and the box's own actions
- * beside the text, in a column where the box is tall enough and otherwise in pairs side by side
- * (2×2 for four), on every breakpoint. On phones the box is a summary of its text: tapping
- * it opens it full screen with the same right section or tools and Done, and `below` under the
- * text; Done, Escape or dismissing the keyboard returns to the page. `submit` adds its send arrow
- * there too, so typing and sending take one tap. An `inline` box edits in place on phones too, as
- * on desktop.
+ * Every multi-line text box. Beside the text stand only `send` and, with `tools`, a ⋯ menu of the
+ * box's own tools, then Copy (unless `copy` is off, where the page offers it) and Clear, which
+ * turns into Undo until the text next changes. On phones the box is a summary of its text: tapping it opens it full screen with
+ * those tools as buttons, since menus are awkward over the keyboard, then Done, and `below` under
+ * the text; Done, Escape or dismissing the keyboard returns to the page. `submit` adds its send
+ * arrow there too, so typing and sending take one tap. An `inline` box edits in place on phones
+ * too, as on desktop.
  */
 export function TextBox({
   value,
   onChange,
   tools,
+  copy = true,
+  send,
+  busy,
+  popups,
   hideTools = false,
   overlay,
   below,
@@ -58,8 +64,16 @@ export function TextBox({
   ref?: Ref<HTMLTextAreaElement>;
   value: string;
   onChange: (value: string) => void;
-  /** The box's own actions, after Copy and Clear. */
-  tools?: ReactNode[];
+  /** The box's own tools, in its ⋯ menu before Copy and Clear. */
+  tools?: Action[];
+  /** Offers Copy among the tools; off where the page already has it (the viewer's bar). */
+  copy?: boolean;
+  /** The send, and a proposal's Undo, which stay beside the text. */
+  send?: ReactNode;
+  /** Popups its tools open (Recent Prompts), anchored at the box's end where the ⋯ stands. */
+  popups?: ReactNode;
+  /** What a tool is doing (Improving the prompt…): the ⋯ spins, its menu still open to use. */
+  busy?: string;
   /** Leaves the tools out beside the text (a collapsed composer), keeping the text mounted. */
   hideTools?: boolean;
   /** Floats over the text, such as prompt ideas; the phone editor shows it under its text. */
@@ -74,12 +88,11 @@ export function TextBox({
   const phone = usePhone() && !inline;
   const [editing, setEditing] = useState(false);
   const content = useRef<HTMLDivElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  const [menuOpened, setMenuOpened] = useState(false);
   const keyboard = useKeyboard(editing, content);
   const deepest = useRef(0);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
-  const latest = useRef({ value, onChange });
-  const { copied, copy } = useCopy();
-  latest.current = { value, onChange };
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   // How far the visible viewport is shorter than the editor, wherever iOS has scrolled it.
   const shortened = keyboard.top + keyboard.inset;
@@ -88,63 +101,72 @@ export function TextBox({
     // Android hides the keyboard (Back) without blurring the field; the viewport grows back.
     if (deepest.current - shortened > 120) setEditing(false);
   }, [editing, shortened]);
-  function clear() {
-    const previous = value;
-    onChange("");
-    const notification = notifications.show({
-      message: (
-        <Group justify="space-between" wrap="nowrap">
-          <Text size="sm">{title} cleared</Text>
-          <Button
-            data-composer-layer
-            size="compact-sm"
-            variant="subtle"
-            onClick={() => {
-              notifications.hide(notification);
-              // Only an untouched clear is undone, so later typing is never overwritten.
-              if (!latest.current.value) latest.current.onChange(previous);
-            }}
-          >
-            Undo
-          </Button>
-        </Group>
-      ),
-    });
-  }
-  const actions = tools && [
-    <Tooltip key="copy" label={copied ? "Copied" : `Copy ${title}`}>
-      <ActionIcon
-        aria-label={`Copy ${title}`}
-        variant="subtle"
-        color="gray"
-        disabled={!value}
-        onMouseDown={keepFocus}
-        onClick={() => copy(value)}
-      >
-        {copied ? <Check size={16} /> : <icons.copy size={16} />}
-      </ActionIcon>
-    </Tooltip>,
-    <Tooltip key="clear" label={`Clear ${title}`}>
-      <ActionIcon
-        aria-label={`Clear ${title}`}
-        variant="subtle"
-        color="gray"
-        disabled={!value || props.readOnly}
-        onMouseDown={keepFocus}
-        onClick={clear}
-      >
-        <icons.clear size={16} />
-      </ActionIcon>
-    </Tooltip>,
-    ...Children.toArray(tools),
+  // Clear turns into Undo, which restores the text, until the text next changes.
+  const [cleared, setCleared] = useState<string | null>(null);
+  useEffect(() => {
+    if (value) setCleared(null);
+  }, [value]);
+  const actions: Action[] | undefined = tools && [
+    ...tools,
+    ...(copy
+      ? [
+          {
+            id: "copy",
+            label: `Copy ${title}`,
+            icon: icons.copy,
+            disabled: !value,
+            onClick: () => void copyText(value, title),
+          },
+        ]
+      : []),
+    cleared !== null && !value
+      ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared) }
+      : {
+          id: "clear",
+          label: `Clear ${title}`,
+          icon: icons.clear,
+          disabled: !value || props.readOnly,
+          onClick: () => {
+            setCleared(value);
+            onChange("");
+          },
+        },
   ];
-  const pairs =
-    actions &&
-    Array.from({ length: Math.ceil(actions.length / 2) }, (_, index) => (
-      <div key={index} className={classes.pair}>
-        {actions.slice(index * 2, index * 2 + 2)}
-      </div>
-    ));
+  const menu = actions && (
+    <Menu
+      position="top-end"
+      width={menuWidth}
+      opened={menuOpened}
+      onChange={setMenuOpened}
+      // An item that moves focus itself (Custom… selects the text) keeps it; otherwise it returns.
+      returnFocus={false}
+      onClose={() =>
+        setTimeout(() => {
+          if (!document.activeElement || document.activeElement === document.body)
+            more.current?.focus({ preventScroll: true });
+        })
+      }
+    >
+      <Tooltip label={busy || "More Actions"} disabled={menuOpened}>
+        <Menu.Target>
+          <ActionIcon
+            ref={more}
+            onMouseDown={keepFocus}
+            variant="subtle"
+            color="gray"
+            aria-label={`More ${title} Actions`}
+            aria-busy={Boolean(busy) || undefined}
+            aria-description={busy}
+          >
+            {busy ? <Loader size={16} /> : <icons.more size={18} />}
+          </ActionIcon>
+        </Menu.Target>
+      </Tooltip>
+      <Menu.Dropdown>
+        <ActionMenuItems groups={[actions]} />
+      </Menu.Dropdown>
+    </Menu>
+  );
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -173,19 +195,16 @@ export function TextBox({
   );
   return (
     <>
-      {pairs ? (
-        <div
-          className={classes.columned}
-          style={
-            { "--tool-pair-rows": hideTools ? 0 : Math.ceil(pairs.length / 2) } as CSSProperties
-          }
-        >
+      {menu || send ? (
+        <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
             <div className={classes.tools}>
-              <div className={classes.toolGrid}>{pairs}</div>
+              {menu}
+              {send}
             </div>
           )}
+          {popups && <div className={classes.anchor}>{popups}</div>}
         </div>
       ) : (
         textarea
@@ -229,7 +248,14 @@ export function TextBox({
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
               <Group gap={4} wrap="nowrap">
-                {actions || rightSection}
+                {actions || send ? (
+                  <Group gap={4} wrap="nowrap" onMouseDown={keepFocus}>
+                    {actions && <ActionBarGroups groups={[actions]} menuPosition="bottom-end" />}
+                    {send}
+                  </Group>
+                ) : (
+                  rightSection
+                )}
                 <Button size="compact-sm" variant={submit ? "default" : undefined} onClick={close}>
                   Done
                 </Button>

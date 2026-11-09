@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, openTheme, stamp } from "./fixtures";
+import { create, fixtures, image, openTheme, promptTool, stamp } from "./fixtures";
 
 test("A click outside an open popup only closes it", async ({ page }) => {
   await fixtures(page);
@@ -44,7 +44,7 @@ test("Popups anchored to the composer stay put while the gallery scrolls", async
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  await promptTool(page, "Prompt", "Recent Prompts");
   const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await expect(panel.getByText("Earlier landscape")).toBeVisible();
   // Once its scale-in has finished; measured in one task, before any scroll handler could move it back.

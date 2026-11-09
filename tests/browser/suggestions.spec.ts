@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, fixtures, image, stamp } from "./fixtures";
+import { create, fixtures, image, promptOptions, stamp } from "./fixtures";
 
 const ideas = [
   "A lighthouse in rolling fog at blue hour",
@@ -63,17 +63,21 @@ async function openViewer(page: Page) {
   return state;
 }
 
-test("Suggestions lists ideas for the empty, focused composer prompt", async ({
+test("Suggestions lists ideas for the empty composer prompt from its chip row", async ({
   page,
 }, testInfo) => {
   await fixtures(page);
   const asked = await suggest(page);
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  const chip = page.getByRole("combobox", { name: "Suggestions", exact: true });
+  const chip = page
+    .getByRole("group", { name: "Generation Inputs", exact: true })
+    .getByRole("combobox", { name: "Suggestions", exact: true });
   await expect(chip).toHaveCount(0);
   expect(asked).toHaveLength(0);
   await prompt.click();
+  // The phone sheet gives typing the whole screen; its chip row returns as the keyboard drops.
+  if (testInfo.project.use.isMobile) await prompt.blur();
   await chip.click();
   await expect(page.getByRole("option")).toHaveText(ideas);
   expect(asked).toEqual([{ surface: "composer", kind: "image" }]);
@@ -100,7 +104,9 @@ test("A suggestion fills the empty Chat message with a request to create it", as
   await page.goto("/chat/chat-a");
   const message = page.getByRole("textbox", { name: "Message", exact: true });
   await message.click();
-  const chip = page.getByRole("combobox", { name: "Suggestions", exact: true });
+  const chip = page
+    .getByRole("group", { name: "Chat Inputs", exact: true })
+    .getByRole("combobox", { name: "Suggestions", exact: true });
   await chip.click();
   await page.getByRole("option", { name: ideas[0] }).click();
   await expect(message).toHaveValue(`Create an image: ${ideas[0]}`);
@@ -126,8 +132,7 @@ test("Viewer Suggestions load in the menu, Refresh replaces them and Custom… h
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
-  const menu = page.getByRole("menu");
+  const menu = await promptOptions(viewer, "Prompt", "Suggestions");
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeVisible();
   release[0]();
@@ -142,9 +147,12 @@ test("Viewer Suggestions load in the menu, Refresh replaces them and Custom… h
   release[1]();
   await expect(menu.getByRole("menuitem")).toHaveText(["Snowfall", "Refresh", "Custom…"]);
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
-  // Custom… selects the prompt for a change typed over it; phones open the editor for it.
+  // Custom… selects the prompt for a change typed over it; phones open the editor for it. A
+  // shorter list can leave the pointer outside the submenu, so a mouse returns to Suggestions.
+  if (!test.info().project.use.hasTouch)
+    await page.getByRole("menuitem", { name: "Suggestions", exact: true }).hover();
   await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
-  await expect(menu).toBeHidden();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   if (page.viewportSize()!.width >= 768) {
     await expect(field).toBeFocused();
@@ -158,11 +166,10 @@ test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
-  const menu = page.getByRole("menu");
+  const menu = await promptOptions(viewer, "Prompt", "Suggestions");
   await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(menu).toBeHidden();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await create(page);
