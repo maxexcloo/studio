@@ -64,7 +64,8 @@ the primary component reference and verify APIs against the installed version.
   an icon; the phone Chats list keeps it open, with New Chat at the row's end.
   Controls opening a picker or menu show ▾, small beside an action bar's icon;
   icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
-  action first and Delete last, and share their sizing and item style.
+  action first and Delete last, and share their sizing and item style. An option whose label
+  alone is ambiguous carries a one-line `description` under it.
 
 ## Layers, Focus & Phones
 
@@ -159,7 +160,10 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order; menu options expand in place on phones and
+  and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download | Star,
+  Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
+  like), then reuses its prompt: Edit Prompt and Use as Reference stage the
+  composer, Run Again and Repeat Exactly queue from where they are; menu options expand in place on phones and
   touch screens. On phones and touch screens the viewer bar shows every action,
   wrapping onto another row rather than using More or scrolling; the phone bar
   drops its prompt field while Details is open. Gallery selection uses the shared

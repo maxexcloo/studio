@@ -8,7 +8,7 @@ import { icons } from "../../ui/icons";
 import type { Action } from "./ActionBar";
 
 /**
- * Recreate › Edit Prompt for an item made without a prompt (an upload), once its suggested prompt is
+ * Edit › Edit Prompt for an item made without a prompt (an upload), once its suggested prompt is
  * written: the composer opens on that prompt with the model it has for the item's kind, and the run
  * is one of the item's versions (backend/gallery/recreate.js).
  */
@@ -48,8 +48,9 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
-    id: "recreate-upload",
+    id: "prompt-composer",
     label: "Edit Prompt",
+    description: "Open its suggested prompt in the composer",
     icon: icons.prompt,
     disabled: !item.suggestedPrompt || recreate.isPending,
     loading: recreate.isPending,

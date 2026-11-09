@@ -168,6 +168,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
+    description: `Add ${video ? "this frame" : "it"} to the composer's references`,
     icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
@@ -216,7 +217,7 @@ export function useChatAction(item: MediaItem, onApplied: () => void) {
 interface MediaActionOptions {
   transfer: MediaTransferActions;
   sessionId?: string;
-  /** Action IDs a surface leaves out. */
+  /** Action and option IDs a surface leaves out. */
   omit?: string[];
   compare?: boolean;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
@@ -429,29 +430,6 @@ export function useMediaActions(
           [...(reference ? [reference] : []), saveFrame],
         ],
       }),
-    image &&
-      itemAction("edit", {
-        disabled: action.isPending,
-        onClick: () => action.mutate("refine"),
-      }),
-    // A video's edits each save a new version; the original stays.
-    ready &&
-      item.type === "video" &&
-      itemAction("edit", {
-        loading: videoEdit.isPending,
-        menu: [
-          [
-            { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-            editAction("reverse", "Reverse", Rewind, "reverse"),
-            editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-          ],
-          // Interpolated edits, the slowest to make.
-          [
-            editAction("slow-motion", "Slow Motion", Snail, "slow"),
-            editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-          ],
-        ],
-      }),
     ready &&
       chatOn &&
       itemAction("chat", {
@@ -459,42 +437,73 @@ export function useMediaActions(
         disabled: chat.isPending,
         onClick: () => chat.mutate(),
       }),
-    // Recreate reuses the item's prompt and settings: Edit Prompt opens them in the composer (its
-    // first option) and the others run it again from here. An upload has only its suggested prompt.
-    itemAction("recreate", {
-      disabled: action.isPending,
-      loading: running === "regenerate" || running === "repeat",
+    // Edit changes the item itself first, then reuses its prompt and settings: in the composer, or
+    // run again from here. An upload has only its suggested prompt; unfinished work opens its prompt.
+    itemAction("edit", {
+      disabled: !ready && action.isPending,
+      loading: videoEdit.isPending || running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
-      menu: !ready
-        ? undefined
-        : item.uploaded
-          ? [[recreate, ...(image && reference ? [reference] : [])]]
-          : [
-              [
-                {
-                  id: "prompt-composer",
-                  label: "Edit Prompt",
-                  icon: icons.prompt,
-                  disabled: action.isPending,
-                  onClick: () => action.mutate("image"),
-                },
-                ...(image && reference ? [reference] : []),
-              ],
-              [
-                {
-                  id: "new-seed",
-                  label: "Run Again",
-                  icon: Shuffle,
-                  onClick: () => run({ kind: "regenerate" }),
-                },
-                {
-                  id: "exact-repeat",
-                  label: "Run Again (Same Seed)",
-                  icon: Repeat,
-                  onClick: () => run({ kind: "repeat" }),
-                },
-              ],
+      menu: ready
+        ? [
+            ...(image
+              ? [
+                  [
+                    {
+                      id: "edit-image",
+                      label: "Edit Image",
+                      description: "Change this image in the composer",
+                      icon: icons.edit,
+                      disabled: action.isPending,
+                      onClick: () => action.mutate("refine"),
+                    },
+                  ],
+                ]
+              : // A video's edits each save a new version; the original stays.
+                [
+                  [
+                    { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
+                    editAction("reverse", "Reverse", Rewind, "reverse"),
+                    editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
+                  ],
+                  // Interpolated edits, the slowest to make.
+                  [
+                    editAction("slow-motion", "Slow Motion", Snail, "slow"),
+                    editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                  ],
+                ]),
+            [
+              item.uploaded
+                ? recreate
+                : {
+                    id: "prompt-composer",
+                    label: "Edit Prompt",
+                    description: "Open its prompt and settings in the composer",
+                    icon: icons.prompt,
+                    disabled: action.isPending,
+                    onClick: () => action.mutate("image"),
+                  },
+              ...(image && reference ? [reference] : []),
             ],
+            item.uploaded
+              ? []
+              : [
+                  {
+                    id: "new-seed",
+                    label: "Run Again",
+                    description: "Same prompt and settings, new seed",
+                    icon: Shuffle,
+                    onClick: () => run({ kind: "regenerate" }),
+                  },
+                  {
+                    id: "exact-repeat",
+                    label: "Repeat Exactly",
+                    description: "Same prompt, settings and seed",
+                    icon: Repeat,
+                    onClick: () => run({ kind: "repeat" }),
+                  },
+                ],
+          ]
+        : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
@@ -559,10 +568,19 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
+  const kept = (action: Action): Action =>
+    action.menu
+      ? {
+          ...action,
+          menu: action.menu.map((group) =>
+            group.filter((option) => !omit.includes(option.id)).map(kept),
+          ),
+        }
+      : action;
   return itemActionGroups(
     actions
       .filter((entry): entry is Action => !!entry && !omit.includes(entry.id))
-      .map(withoutLoneOption),
+      .map((entry) => withoutLoneOption(kept(entry))),
   );
 }
 

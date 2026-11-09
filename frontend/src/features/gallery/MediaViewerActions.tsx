@@ -12,9 +12,9 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Recreate, Upscale, Copy and Download beside their icons; phones show
-// every action as an icon.
-const labelled = ["animate", "edit", "recreate", "upscale", "copy", "download"];
+// Desktop names Animate, Edit, Upscale, Copy and Download beside their icons; phones show every
+// action as an icon.
+const labelled = ["animate", "edit", "upscale", "copy", "download"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {

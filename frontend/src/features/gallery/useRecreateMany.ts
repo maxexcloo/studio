@@ -7,9 +7,9 @@ import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 /**
- * Recreate for several uploads at once: each with a suggested prompt queues that prompt with the
- * composer's model and settings, as a version of the upload (backend/gallery/recreate.js), as
- * Prompt › Recreate would once run. The notice counts those still without a prompt.
+ * Edit › Run Suggested Prompts for several uploads at once: each with a suggested prompt queues that
+ * prompt with the composer's model and settings, as a version of the upload
+ * (backend/gallery/recreate.js). The notice counts those still without a prompt.
  */
 export function useRecreateMany() {
   const { input, profile } = useGeneration();

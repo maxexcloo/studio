@@ -28,11 +28,11 @@ const model = (input: GenerationInput) => String(input.profileId || input.model 
  * Whether a run made from a result (its recorded `parentItemId`) is one of that result's versions,
  * an iteration of it, rather than a new image derived from it. Every iteration is, whatever model
  * or operation it uses: an edit or animation (Edit, Animate, the viewer's prompt, a Chat edit)
- * works on the result itself, and a fresh run from its settings (Prompt, Run Again, Exact Repeat,
+ * works on the result itself, and a fresh run from its settings (Edit Prompt, Run Again, Repeat Exactly,
  * on any model) keeps at least `versionPromptOverlap` of its prompt. Only a fresh run that replaces
  * most of the prompt, using the result as a reference or starting point for something new, is
  * derived. A source no model made (an upload, gallery/recreate.js) has no prompt to keep, so every
- * run from it (Recreate) is a version.
+ * run from it (Edit Prompt on its suggested prompt) is a version.
  */
 export function isVersion(
   run: { operation: GenerationOperation; input: GenerationInput },

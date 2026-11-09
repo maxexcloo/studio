@@ -197,7 +197,7 @@ export async function mediaDraft(
         workerId: profile.workerIds?.includes(String(source?.input.workerId))
           ? source?.input.workerId
           : undefined,
-        // Reused drafts draw a new seed; only Exact Repeat keeps the recorded one.
+        // Reused drafts draw a new seed; only Repeat Exactly keeps the recorded one.
         seed: "",
         prompt: typedPrompt(item),
         negative: item.negative || "",
