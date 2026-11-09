@@ -35,7 +35,7 @@ test("the migrations route plans, then applies online-safe steps into the runnin
   const lines = [];
   registerMigrationRoutes(
     { post: (route, handler) => (routes[route] = handler) },
-    { dataDir, requireAdmin: () => true, log: { info: (line) => lines.push(line) } },
+    { dataDir, adminRefusal: () => null, log: { info: (line) => lines.push(line) } },
   );
   const post = async (body) => {
     const res = { json: (value) => (res.body = value), status: () => res };

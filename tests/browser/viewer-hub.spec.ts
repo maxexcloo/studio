@@ -99,11 +99,12 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   await expect(
     viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
   ).toHaveCount(2);
-  // The bar stays in reach while phone details are open.
+  // The bar stays in reach while phone details are open, without its prompt field.
   if (page.viewportSize()!.width < 768) {
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
-    await expect(field).toBeInViewport();
+    await expect(field).toBeHidden();
+    await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeInViewport();
     await viewer.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(viewer).toBeHidden();
   }
@@ -250,7 +251,7 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's field carries a change typed over the prompt into the Chat; phones list it under More.
+  // Desktop's field carries a change typed over the prompt into the Chat; phones show it on the bar.
   if (desktop)
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
   await viewerAction(page, "Continue in Chat");
@@ -895,8 +896,23 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   );
 });
 
-test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
+test("Details show the caption and its tags, fold long sections and copy each one", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    document.execCommand = (command: string) => {
+      const selected = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = selected.value;
+      return true;
+    };
+  });
+  const negative = Array.from({ length: 12 }, (_, line) => `Unwanted detail ${line + 1}`).join(
+    "\n",
+  );
   const { viewer } = await seed(page, {
+    negative,
     caption: {
       text: "A small amber bird perched on a mossy branch, soft morning light.",
       tags: ["branch", "bird"],
@@ -916,13 +932,21 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
     }),
   ).toBeVisible();
   const tags = details.getByLabel("Caption Tags", { exact: true });
-  // The caption starts folded; Show More brings its tags and Show Less folds it again.
-  await expect(tags).toBeHidden();
-  await details.getByRole("button", { name: "Show More", exact: true }).click();
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
-  await details.getByRole("button", { name: "Show Less", exact: true }).click();
-  await expect(tags).toBeHidden();
-  await details.getByRole("button", { name: "Show More", exact: true }).click();
+  // Short sections show in full; a long one folds until Expand and folds again on Collapse.
+  await expect(details.getByRole("button", { name: /^Expand (Caption|Prompt)$/ })).toHaveCount(0);
+  const expand = details.getByRole("button", { name: "Expand Negative Prompt", exact: true });
+  await expand.click();
+  await details.getByRole("button", { name: "Collapse Negative Prompt", exact: true }).click();
+  await expect(expand).toBeVisible();
+  // Each section's Copy copies its own text.
+  const copied = () => page.evaluate(() => (window as any).copied);
+  await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
+  await expect.poll(copied).toBe("An amber bird");
+  await details.getByRole("button", { name: "Copy Negative Prompt", exact: true }).click();
+  await expect.poll(copied).toBe(negative);
+  await details.getByRole("button", { name: "Copy Settings", exact: true }).click();
+  await expect.poll(copied).toBe("Count: 2\nMode: Generate\nSeed: 1234567\nSteps: 28");
   // A tag searches the gallery for it and closes the viewer.
   await tags.getByRole("link", { name: "Search branch", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -1151,15 +1175,10 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     viewport = page.viewportSize()!;
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
-  // Phones list Download under More.
   const phone = viewport.width < 768;
-  if (phone) await dialog.getByRole("button", { name: "More", exact: true }).click();
-  const download = phone
-    ? page.getByRole("menuitem", { name: "Download", exact: true })
-    : dialog.getByRole("link", { name: "Download", exact: true });
+  const download = dialog.getByRole("link", { name: "Download", exact: true });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
-  if (phone) await page.keyboard.press("Escape");
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);

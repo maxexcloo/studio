@@ -1,7 +1,7 @@
-import { ownerIdForRequest } from "../account-ownership.js";
+import { directRoute } from "../domain/direct-route.ts";
 import { imageMimes } from "../reference-names.js";
 import { maxUploadBytes, saveUpload } from "../references.js";
-import { requireLocal } from "../route-access.js";
+import { localRefusal } from "../route-access.js";
 
 /**
  * Import from Reddit: a post's images saved as the caller's uploads, each recording the post's link
@@ -151,24 +151,28 @@ export function registerRedditImportRoute(
   app,
   { uploaded = () => {}, fetch: fetcher = fetch } = {},
 ) {
-  app.post("/api/gallery/import/reddit", async (req, res) => {
-    if (!req.studioAccount && !requireLocal(req, res)) return;
+  directRoute(app, "POST", "/api/gallery/import/reddit", async (account, { body }) => {
+    const refused = account ? null : localRefusal(account);
+    if (refused) return refused;
     try {
-      const result = await importRedditPost(req.body?.url, ownerIdForRequest(req), {
+      const result = await importRedditPost(body?.url, account?.userId || "", {
         fetch: fetcher,
       });
       for (const item of result.items) uploaded(item);
-      res.status(result.items.length ? 201 : 422).json({
-        ok: result.items.length > 0,
-        title: result.title,
-        imported: result.items.length,
-        failed: result.failed,
-        ...(result.items.length
-          ? {}
-          : { error: `None of that post’s images could be saved: ${result.failed[0].error}` }),
-      });
+      return {
+        status: result.items.length ? 201 : 422,
+        payload: {
+          ok: result.items.length > 0,
+          title: result.title,
+          imported: result.items.length,
+          failed: result.failed,
+          ...(result.items.length
+            ? {}
+            : { error: `None of that post’s images could be saved: ${result.failed[0].error}` }),
+        },
+      };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 }

@@ -350,7 +350,7 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
   registerMaintenanceRoutes(app as unknown as Parameters<typeof registerMaintenanceRoutes>[0], {
     store,
     queue,
-    requireAdmin: (_req, res) => admin || (res.status(403).json({ error: "Admins only." }), false),
+    adminRefusal: () => (admin ? null : { status: 403, payload: { error: "Admins only." } }),
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");

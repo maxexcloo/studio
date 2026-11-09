@@ -4,17 +4,14 @@ import {
   Button,
   Collapse,
   Divider,
-  Loader,
   Menu,
   Paper,
   SegmentedControl,
   Tooltip,
-  UnstyledButton,
   type FloatingPosition,
   type PaperProps,
 } from "@mantine/core";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
-import { icons } from "../../ui/icons";
 import { menuWidth } from "../../theme";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
@@ -200,8 +197,8 @@ function OptionsMenu({
 }
 
 /**
- * A bar action: an icon with a tooltip, or `labelled` its name beside its icon with ▾ when it has
- * options. A control with options opens them on click.
+ * A bar action: an icon with a tooltip, or `labelled` its name beside its icon. A control with
+ * options shows ▾ and opens them on click.
  */
 function ActionControl({
   action,
@@ -227,18 +224,31 @@ function ActionControl({
         ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
         : { onClick }),
   } as const;
+  const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const control = labelled ? (
     <Button
       size="sm"
-      leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
+      leftSection={icon}
       rightSection={options ? <ChevronDown size={14} /> : undefined}
       {...props}
     >
       {label}
     </Button>
+  ) : options ? (
+    // The icon with a small ▾, as round as the plain icons beside it.
+    <Button
+      size="sm"
+      radius="xl"
+      aria-label={label}
+      rightSection={<ChevronDown size={12} />}
+      classNames={{ root: classes.options, section: classes.chevron }}
+      {...props}
+    >
+      {icon}
+    </Button>
   ) : (
     <ActionIcon aria-label={label} {...props}>
-      <Icon size={18} fill={pressed ? "currentColor" : "none"} />
+      {icon}
     </ActionIcon>
   );
   const tip = (opened: boolean, target: ReactNode) => (
@@ -257,21 +267,23 @@ function ActionControl({
 }
 
 /**
- * The action bar shared by the viewer and gallery selection: icon controls in divided groups,
- * scrolling sideways when they overflow; the `labelled` ones (the viewer's primaries) show their
- * names. Menus open above it unless `menuPosition` says otherwise.
+ * The action bar shared by the viewer and gallery selection: icon controls in divided groups; the
+ * `labelled` ones show their names. Controls that overflow scroll sideways, or `wrap` onto another
+ * row. Menus open above it unless `menuPosition` says otherwise.
  */
 export function ActionBarGroups({
   groups,
   labelled = [],
   menuPosition = "top",
+  wrap = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
   menuPosition?: FloatingPosition;
+  wrap?: boolean;
 }) {
   return (
-    <div className={classes.actions}>
+    <div className={classes.actions} data-wrap={wrap || undefined}>
       {shown(groups).map((group, index) => (
         <Fragment key={group[0].id}>
           {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
@@ -285,62 +297,6 @@ export function ActionBarGroups({
           ))}
         </Fragment>
       ))}
-    </div>
-  );
-}
-
-/** A phone viewer control: its icon over its label; with options a tap opens them. */
-function StackedControl({ action }: { action: Action }) {
-  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick } = action;
-  const content = (
-    <>
-      {loading ? (
-        <Loader size={20} color="gray" />
-      ) : (
-        <Icon size={20} fill={pressed ? "currentColor" : "none"} />
-      )}
-      <span>{label}</span>
-    </>
-  );
-  const props = {
-    className: classes.stacked,
-    "aria-pressed": pressed,
-    "data-color": color,
-    disabled: disabled || loading,
-  };
-  if (hasOptions(action))
-    return (
-      <OptionsMenu
-        action={action}
-        position="top"
-        target={() => (
-          <Menu.Target>
-            <UnstyledButton {...props}>{content}</UnstyledButton>
-          </Menu.Target>
-        )}
-      />
-    );
-  return link && !disabled ? (
-    <UnstyledButton component="a" {...props} {...link}>
-      {content}
-    </UnstyledButton>
-  ) : (
-    <UnstyledButton {...props} onClick={onClick}>
-      {content}
-    </UnstyledButton>
-  );
-}
-
-/** The phone viewer bar: the primary actions labelled under their icons, every other one under More. */
-export function StackedActionBar({ primary, more }: { primary: Action[]; more: ActionGroups }) {
-  return (
-    <div className={classes.stackedBar}>
-      {primary.map((action) => (
-        <StackedControl key={action.id} action={action} />
-      ))}
-      {shown(more).length > 0 && (
-        <StackedControl action={{ id: "more", label: "More", icon: icons.more, menu: more }} />
-      )}
     </div>
   );
 }

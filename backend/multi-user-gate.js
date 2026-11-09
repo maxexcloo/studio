@@ -1,7 +1,7 @@
 import { gatedPath } from "./gated-path.js";
 import { signInHeader } from "./request-guard.js";
 // Sign-in, plus the liveness and readiness probes a container platform calls without an account.
-const publicAccountPaths = new Set([
+export const publicAccountPaths = new Set([
   "/api/ping",
   "/api/ready",
   "/api/accounts/status",
@@ -71,27 +71,39 @@ export function ordinaryRouteAllowed(method, routePath) {
   return ordinaryRoutes.some(([allowed, pattern]) => allowed === verb && pattern.test(routePath));
 }
 
-/** Account mode requires identity even on loopback; ordinary accounts reach only reviewed routes. */
-export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
-  if (!gatedPath(req.path)) return next();
-  if (publicAccountPaths.has(req.path)) return next();
-  const account = accountForRequest(req);
-  if (!account) {
-    res.setHeader(signInHeader, "1");
-    res.status(401).json({
+/**
+ * Why account mode refuses `account` a gated route, as `{ status, payload }`, or null: it requires
+ * identity even on loopback, and ordinary accounts reach only reviewed routes. MCP's in-process
+ * calls (mcp/studio-requests.js) meet the same gate.
+ */
+export function multiUserRefusal(account, method, routePath) {
+  if (!account)
+    return {
+      status: 401,
+      payload: {
+        ok: false,
+        reason: "sign-in",
+        error: "Sign in with an approved account to continue.",
+      },
+    };
+  if (account.role === "administrator") return null;
+  if (ordinaryRouteAllowed(String(method || "GET").toUpperCase(), routePath)) return null;
+  return {
+    status: 403,
+    payload: {
       ok: false,
-      reason: "sign-in",
-      error: "Sign in with an approved account to continue.",
-    });
-    return;
-  }
-  if (account.role === "administrator") return next();
-  if (ordinaryRouteAllowed(String(req.method || "GET").toUpperCase(), req.path)) return next();
-  res.status(403).json({
-    ok: false,
-    reason: "administrator",
-    error: req.path.startsWith("/comfy")
-      ? "Raw ComfyUI access is restricted to administrators."
-      : "This action is restricted to administrators.",
-  });
+      reason: "administrator",
+      error: routePath.startsWith("/comfy")
+        ? "Raw ComfyUI access is restricted to administrators."
+        : "This action is restricted to administrators.",
+    },
+  };
+}
+
+export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
+  if (!gatedPath(req.path) || publicAccountPaths.has(req.path)) return next();
+  const refusal = multiUserRefusal(accountForRequest(req), req.method, req.path);
+  if (!refusal) return next();
+  if (refusal.status === 401) res.setHeader(signInHeader, "1");
+  res.status(refusal.status).json(refusal.payload);
 }

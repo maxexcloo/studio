@@ -62,8 +62,8 @@ the primary component reference and verify APIs against the installed version.
   shell stays mounted. Empty, loading and failure remain distinct states.
 - Search clears only its query. Filters preserve it. Toolbars open search from
   an icon; the phone Chats list keeps it open, with New Chat at the row's end.
-  Controls opening a picker or menu show ▾ when labelled; icon-only controls
-  use accessible names and tooltips. Menus group related actions, put the usual
+  Controls opening a picker or menu show ▾, small beside an action bar's icon;
+  icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style.
 
 ## Layers, Focus & Phones
@@ -93,7 +93,7 @@ the primary component reference and verify APIs against the installed version.
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`. Keep unrelated layout stationary.
 - Use semantic buttons and links with accessible names. Phone actions need
-  visible names where tooltips cannot explain them. Preserve focus trapping,
+  visible names where their icons alone are ambiguous. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
   another overlay. On phones, Chats rows and gallery tiles without Tile Captions
@@ -145,8 +145,13 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and order; menu options expand in place on phones. Gallery selection uses
-  the shared contextual selection bar and confirms deletion.
+  and order; menu options expand in place on phones. The phone viewer bar shows
+  every action, wrapping onto another row rather than using More, and drops its
+  prompt field while Details is open. Gallery selection uses the shared
+  contextual selection bar and confirms deletion.
+- Details sections show short content in full and fold longer content under
+  Expand rather than scrolling it in a box. Each heading's Copy copies its
+  section.
 - Version grouping has one owner in `gallery/versions.ts`; sharing a Chat or
   prompt alone does not group results. Keep source and derived relationships
   visible, even when a result stands alone.

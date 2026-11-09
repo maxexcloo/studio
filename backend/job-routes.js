@@ -1,11 +1,11 @@
 import { ownerIdForRequest } from "./account-ownership.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { unconfirmedCancel } from "./domain/routes.ts";
 import { pausedReason, terminalStatuses } from "../shared/queue.ts";
 
 /**
  * A job's status and its cancellation, and cancelling all of an account's unfinished work, read
- * from the queue's records. Answers `generationJobResponse(account, id)`, which MCP reads a job
- * through.
+ * from the queue's records. MCP reads and cancels a job through the first two.
  */
 export function registerJobRoutes(app, { store, queue }) {
   function generationJobResponse(account, id) {
@@ -36,20 +36,22 @@ export function registerJobRoutes(app, { store, queue }) {
         : {}),
     };
   }
-  app.get("/api/jobs/:id", (req, res) => {
-    res.json(generationJobResponse(req.studioAccount, req.params.id));
-  });
+  directRoute(app, "GET", "/api/jobs/:id", (account, { params }) => ({
+    status: 200,
+    payload: generationJobResponse(account, params.id),
+  }));
 
-  app.post("/api/jobs/:id/cancel", async (req, res) => {
+  directRoute(app, "POST", "/api/jobs/:id/cancel", async (account, { params }) => {
+    const ownerId = ownerIdForRequest({ studioAccount: account });
     // Another account's job answers exactly like an unknown one.
-    if (!store.job(ownerIdForRequest(req), req.params.id))
-      return res.json({ ok: true, stale: true, changed: false });
+    if (!store.job(ownerId, params.id))
+      return { status: 200, payload: { ok: true, stale: true, changed: false } };
     try {
-      await queue.cancel(ownerIdForRequest(req), req.params.id);
+      await queue.cancel(ownerId, params.id);
     } catch {
-      return res.status(503).json({ ok: false, error: unconfirmedCancel });
+      return { status: 503, payload: { ok: false, error: unconfirmedCancel } };
     }
-    return res.json({ ok: true });
+    return { status: 200, payload: { ok: true } };
   });
 
   app.post("/api/queue/cancel", async (req, res) => {
@@ -63,5 +65,4 @@ export function registerJobRoutes(app, { store, queue }) {
     );
     res.json({ ok: true });
   });
-  return { generationJobResponse };
 }
