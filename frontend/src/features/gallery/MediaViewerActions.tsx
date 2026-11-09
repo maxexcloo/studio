@@ -1,7 +1,7 @@
 import { useState, type Ref, type RefObject } from "react";
 import type { MediaItem } from "../../types";
 import { Box } from "@mantine/core";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { usePhone } from "../../ui/usePhone";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
@@ -26,13 +26,11 @@ export interface ViewerActions {
 }
 
 /**
- * The bar's controls in divided groups. Phones and touch screens, whose touch targets outgrow the
- * bar, show every one, wrapping onto another row rather than scrolling actions out of sight.
+ * The bar's controls in groups. Every one stays in sight, wrapping onto another row rather than
+ * scrolling where they outgrow the bar (phones, touch screens and narrow windows with Details open).
  */
 export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
-  const phone = usePhone();
-  const touch = useTouch();
-  return <ActionBarGroups groups={groups} labelled={labelled} wrap={phone || touch} />;
+  return <ActionBarGroups groups={groups} labelled={labelled} wrap />;
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */

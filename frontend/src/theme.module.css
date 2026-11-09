@@ -36,3 +36,37 @@
 .dialogContent:not([data-full-screen]) {
   max-height: 100% !important;
 }
+
+/* Touch targets (44 px, the theme's touch bar size) for small controls on touch screens. A sort
+   header's button fills its header cell's height. */
+.touchHeader > button {
+  min-height: 44px;
+  margin-block: calc(-1 * var(--table-vertical-spacing));
+}
+
+/* A linked badge (a caption tag) grows a little; its hit area spreads into margins that space
+   neighbouring badges 44 px apart, so the areas never overlap. */
+.touchBadge:where(a, button) {
+  height: 28px;
+  font-size: var(--mantine-font-size-xs);
+  line-height: 26px;
+  position: relative;
+  min-width: 36px;
+  margin: 6px 2px;
+  overflow: visible;
+}
+
+.touchBadge:where(a, button)::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
+}
+
+.touchSpoiler:where([data-has-spoiler]) {
+  margin-bottom: 44px;
+}
+
+.touchSpoilerControl {
+  height: 44px;
+  min-width: 44px;
+}
