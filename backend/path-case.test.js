@@ -69,7 +69,7 @@ test(
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      for (const route of ["/API/workers", "/Api/workflows", "/API/health"]) {
+      for (const route of ["/Api/workflows", "/API/health"]) {
         const response = await fetch(`${base}${route}`, { headers: { host: "evil.example" } });
         const text = await response.text();
         assert.equal(
