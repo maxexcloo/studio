@@ -105,7 +105,7 @@ export function createGenerationQueue({
     return true;
   }
   const queueAdapter = createGenerationQueueAdapter({
-    generate: generationRoutes.generate,
+    submitGeneration: generationRoutes.submitGeneration,
     jobs,
     gallery: () => gallery,
     accountForOwner: accountAccessForId,

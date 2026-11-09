@@ -12,7 +12,6 @@ import {
 } from "./store.js";
 import { galleryFilter, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
-import { jobs } from "../jobs.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import {
   recordBelongsToRequest,
@@ -24,8 +23,8 @@ import { canonicalProfileId } from "../profile/store.js";
 import { requireAdmin } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 
-export function galleryJobResponse(account, id, settings = false) {
-  cleanupGalleryState(jobs);
+export function galleryJobResponse(store, account, id, settings = false) {
+  cleanupGalleryState(store);
   const items = filterVisibleGallery(
     galleryJobItems(id).filter((item) => recordBelongsToAccount(item, account)),
   );
@@ -53,7 +52,7 @@ export function galleryJobResponse(account, id, settings = false) {
  * carry it as `sessionId`, and `chat` (repeatable) filters by it. `near(q)` resolves to a test for
  * items that look like the search (domain/image-search.ts), or null.
  */
-export function registerGalleryReadRoutes(app, { jobChats, near }) {
+export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`
    * and `aspect` may repeat (any of them matches); `q` and `workflow` are
@@ -80,7 +79,12 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
 
   // Exact job reads avoid sorting and paging the full gallery for MCP results.
   app.get("/api/gallery/jobs/:id", (req, res) => {
-    const result = galleryJobResponse(req.studioAccount, req.params.id, req.query.settings === "1");
+    const result = galleryJobResponse(
+      store,
+      req.studioAccount,
+      req.params.id,
+      req.query.settings === "1",
+    );
     res.status(result.status).json(result.payload);
   });
 
@@ -138,7 +142,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
   });
 
   app.get("/api/gallery", async (req, res) => {
-    cleanupGalleryState(jobs);
+    cleanupGalleryState(store);
     const type = String(req.query.type || "");
     const limit = Number(req.query.limit || 0);
     const cursor = String(req.query.cursor || "");

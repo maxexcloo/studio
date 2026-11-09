@@ -174,7 +174,7 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
  * ComfyUI. Returns null when nothing was painted, so the run goes ahead as a
  * plain edit.
  */
-export async function prepareInpaint(req, body) {
+export async function prepareInpaint(account, body) {
   const reference = body.referenceAssets?.[0];
   if (!body.inpaint?.mask || !reference?.assetId || !reference.comfyName) return null;
   const sharp = await loadSharp();
@@ -182,7 +182,7 @@ export async function prepareInpaint(req, body) {
     throw new Error(
       "Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the Studio folder, then restart.",
     );
-  const source = await bytesForReferenceAccount(req.studioAccount, reference.assetId);
+  const source = await bytesForReferenceAccount(account, reference.assetId);
   const files = await inpaintFiles(sharp, source.buffer, maskBufferFromDataUrl(body.inpaint.mask), {
     targetPixels: Number(body.width) * Number(body.height),
     feather: body.inpaint.feather,

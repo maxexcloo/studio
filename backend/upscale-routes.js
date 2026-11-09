@@ -232,23 +232,26 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     });
     const ownerId = account?.userId || "";
     const parent = item.jobId && store.job(ownerId, item.jobId);
-    const session = parent
-      ? store.session(ownerId, parent.sessionId)
-      : store.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-    const queued = store.enqueue(
+    const [queued] = store.enqueueAll(
       ownerId,
-      session.id,
-      {
-        prompt: item.prompt || "",
-        galleryItemId: item.id,
-        upscaleBody: body,
-        upscalePlan: plan,
-      },
-      "upscale",
-      parent?.id,
-      `worker:${currentComfyBackend()}`,
-      undefined,
-      origin,
+      () =>
+        parent
+          ? parent.sessionId
+          : store.createSession(ownerId, "Upscale", { prompt: item.prompt || "" }).id,
+      [
+        {
+          input: {
+            prompt: item.prompt || "",
+            galleryItemId: item.id,
+            upscaleBody: body,
+            upscalePlan: plan,
+          },
+          operation: "upscale",
+          parentJobId: parent?.id,
+          resource: `worker:${currentComfyBackend()}`,
+          origin,
+        },
+      ],
     );
     updateGalleryJob(item.id, {
       upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
