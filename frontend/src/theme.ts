@@ -347,6 +347,17 @@ export function studioTheme({
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,
         },
+        // Each choice is a touch target too.
+        styles: touch
+          ? {
+              label: {
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: rem(bar),
+              },
+            }
+          : {},
       }),
       // Every control that opens a picker shows ▾, as the chips do (UI-PATTERNS.md).
       MultiSelect: MultiSelect.extend({
