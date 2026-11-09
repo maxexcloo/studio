@@ -132,6 +132,8 @@ export function ChipPopup({
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
           <Modal.Content {...layer} {...swipe} onKeyDownCapture={onKeyDown}>
+            {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
+            <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
               <Modal.Title>{title}</Modal.Title>
               <Group gap="xs" wrap="nowrap">
