@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Badge,
@@ -19,6 +19,7 @@ import {
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Check,
   ImageOff,
   KeyRound,
   Plus,
@@ -29,6 +30,7 @@ import {
   UserX,
 } from "lucide-react";
 import { api, post } from "../../api";
+import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
@@ -409,7 +411,16 @@ export const galleryOwnersQuery = queryOptions({
   queryFn: () => api<{ owners: Record<string, number> }>("/api/gallery/owners"),
 });
 
-/** Reset Password: an administrator sets a new one, which ends the account's sessions. */
+/** 16 random URL-safe characters. */
+const generatedPassword = () =>
+  btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(12))))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
+/**
+ * Reset Password: an administrator types a new one or generates one, which ends the account's
+ * sessions. A generated password shows once, after the reset, only while the dialog stays open.
+ */
 function ResetPassword({
   account,
   saved,
@@ -420,26 +431,56 @@ function ResetPassword({
   onCancel: () => void;
 }) {
   const [password, setPassword] = useState("");
+  const [generated, setGenerated] = useState("");
+  // Passwords stay in this dialog, never in the mutation cache's variables.
+  const issuing = useRef("");
+  const { copied, copy } = useCopy();
   const reset = useMutation({
     meta: { inlineError: true },
-    mutationFn: () =>
+    mutationFn: (generate: boolean) =>
       api(`/api/accounts/users/${encodeURIComponent(account.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: generate ? issuing.current : password }),
       }),
-    onSuccess: saved,
+    onSuccess: (_result, generate) => (generate ? setGenerated(issuing.current) : saved()),
   });
+  if (generated)
+    return (
+      <Stack>
+        <Text size="sm">
+          {account.username} now signs in with this password. It isn’t shown again; give it to them
+          yourself.
+        </Text>
+        <TextInput
+          label="Generated Password"
+          value={generated}
+          readOnly
+          autoComplete="off"
+          onFocus={(event) => event.currentTarget.select()}
+        />
+        <Group justify="flex-end">
+          <Button
+            variant="default"
+            leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
+            onClick={() => copy(generated, "password")}
+          >
+            {copied ? "Copied" : "Copy Password"}
+          </Button>
+          <Button onClick={saved}>Done</Button>
+        </Group>
+      </Stack>
+    );
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        reset.mutate();
+        reset.mutate(false);
       }}
     >
       <Stack>
         <Text size="sm">
-          Set a new password for {account.username}. It signs them out everywhere; tell them the new
-          one yourself.
+          Set a new password for {account.username}, or generate one. It signs them out everywhere;
+          tell them the new one yourself.
         </Text>
         <PasswordInput
           label="New Password"
@@ -449,6 +490,19 @@ function ResetPassword({
           value={password}
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
+        <Group>
+          <Button
+            variant="default"
+            size="compact-sm"
+            disabled={reset.isPending}
+            onClick={() => {
+              issuing.current = generatedPassword();
+              reset.mutate(true);
+            }}
+          >
+            Generate Password
+          </Button>
+        </Group>
         {reset.error && <Alert color="red">{reset.error.message}</Alert>}
         <DialogFooter pending={reset.isPending} onCancel={onCancel}>
           <Button type="submit" loading={reset.isPending} disabled={password.length < 8}>
