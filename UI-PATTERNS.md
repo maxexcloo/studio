@@ -64,7 +64,9 @@ the primary component reference and verify APIs against the installed version.
   an icon; the phone Chats list keeps it open, with New Chat at the row's end.
   Controls opening a picker or menu show ▾, small beside an action bar's icon;
   icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
-  action first and Delete last, and share their sizing and item style.
+  action first and Delete last, and share their sizing and item style. An option whose label
+  alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
+  menu as segmented choices and checked options above its run, not in a separate dialog.
 
 ## Layers, Focus & Phones
 
@@ -98,9 +100,12 @@ the primary component reference and verify APIs against the installed version.
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor. Its `tools` stand
-  beside the text: Copy, Clear, then the box's own (Improve Prompt, Recent
-  Prompts), in one column where the box is tall enough and 2×2 otherwise.
+  other phone text boxes open the shared full-screen editor. Only the send
+  stands beside the text, with one ⋯ menu of its `tools`: the box's own
+  (Suggestions, Ask for a Change or Improve Prompt, Recent Prompts, Continue in
+  Chat), then Copy where the page has no other, then Clear, which turns into
+  Undo until the text next changes. The phone editor shows them as buttons, not
+  a menu, and a box without tools has no ⋯.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -138,16 +143,18 @@ the primary component reference and verify APIs against the installed version.
   shows what ran.
 - Preserve actual model/provider metadata. Worker defaults to Automatic; wait
   for an explicitly picked worker unless the user permits fallback. Animate displays its choice before queuing. Its
-  menus offer Local GPU or Cloud when the account has both (Cloud needs the
-  Cloud Models grant), then Fast or Quality when the chosen pool has two tiers.
-  Both are remembered; until Local GPU or Cloud is picked, Animate runs locally
-  and falls back to Cloud while local video is stopped, and an explicit pick
-  never falls back. Extend keeps its video's model unless Cloud is picked.
+  menus show one choice, Cloud | Fast | Quality, where the account prefers
+  videos to run: an account preference, not a menu setting, so Settings can
+  show it too. Cloud shows with the Cloud Models grant, Fast and Quality for
+  the local tiers a profile offers, and the choice only when there are two.
+  The preferred side falls back to the other, saying so; Extend keeps its
+  video's model unless Cloud is preferred.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
-  Ideas for an empty, focused prompt or Chat message float over it as one
-  Suggestions chip listing them (`usePromptIdeas`), never as a row of ideas.
+  Ideas for an empty prompt or Chat message are one Suggestions ▾ chip in the
+  box's chip row, after References (`usePromptIdeas`); nothing floats over the
+  text and ideas never show as a row of their own.
 - Queue access belongs to the header status action. Report actual endpoint
   health: configuration alone does not prove readiness. A deliberately parked
   worker reads Stopped, not failing; an unexpectedly unavailable one remains
@@ -162,7 +169,10 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order; menu options expand in place on phones and
+  and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download | Star,
+  Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
+  like), then reuses its prompt: Edit Prompt and Use as Reference stage the
+  composer, Run Again and Repeat Exactly queue from where they are; menu options expand in place on phones and
   touch screens. On phones and touch screens the viewer bar shows every action,
   wrapping onto another row rather than using More or scrolling; the phone bar
   drops its prompt field while Details is open. Gallery selection uses the shared
@@ -194,7 +204,11 @@ the primary component reference and verify APIs against the installed version.
 ## Data & Feedback
 
 - Switching modes preserves unsent prompts, references and settings. Use
-  `useRemembered` for settled UI state per account; do not persist open popups,
+  `useRemembered` for settled UI state per account, including every setting in
+  an action menu (Animate's Review Prompt First, Upscale's quality, size and
+  Face Detail), shared by every surface showing that menu; a setting Settings
+  also shows, such as where videos run, is an account preference instead. Do
+  not persist open popups,
   selection or search queries. Keep credentials and private account records
   out of browser storage. An issued MCP token or generated password shows once,
   in the view that issued it, and never enters a query cache. Typing must not rerender unchanged media or history;

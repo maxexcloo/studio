@@ -16,14 +16,6 @@
   padding: calc(var(--mantine-spacing-md) - 8px);
 }
 
-/* Suggestions float above the composer while the message is empty, so the thread never moves. */
-.ideas {
-  left: 0;
-  right: 0;
-  bottom: calc(100% + var(--mantine-spacing-md));
-  justify-content: center;
-}
-
 .message {
   flex: 1 1 0;
   min-width: 0;

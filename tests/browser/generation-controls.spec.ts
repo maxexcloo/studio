@@ -9,6 +9,7 @@ import {
   image,
   loadSaved,
   openPresets,
+  promptTool,
   profiles,
   saveCurrent,
   savedAction,
@@ -555,6 +556,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   // Edit opens the composer on the staged draft.
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
@@ -774,13 +776,23 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
     await expect(prompt).toBeFocused();
   }
   await prompt.fill("A lantern in fog");
-  await page.getByRole("button", { name: "Copy Prompt", exact: true }).click();
+  await promptTool(page, "Prompt", "Copy Prompt");
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
-  await page.getByRole("button", { name: "Clear Prompt", exact: true }).click();
+  // Clear turns into Undo, which restores the text; typing turns it back into Clear.
+  await promptTool(page, "Prompt", "Clear Prompt");
   await expect(prompt).toHaveValue("");
-  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await promptTool(page, "Prompt", "Undo");
   await expect(prompt).toHaveValue("A lantern in fog");
+  await promptTool(page, "Prompt", "Clear Prompt");
+  await prompt.fill("A");
+  await page.getByRole("button", { name: "More Prompt Actions", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Clear Prompt", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Undo", exact: true })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await prompt.fill("A lantern in fog");
   if (!phone) return;
+  // A tap on the text, rather than the fill's focus, starts the sheet's typing layout.
+  await prompt.blur();
   await prompt.click();
   await prompt.evaluate((text: HTMLTextAreaElement) =>
     text.setSelectionRange(text.value.length, text.value.length),
@@ -948,18 +960,19 @@ test("Composer popups on a tablet open with the keyboard down", async ({ page },
   await expect(page.locator("[data-popup] input[type=text]:focus")).toHaveCount(0);
 });
 
-test("A phone held sideways keeps the open composer's prompt above the keyboard and the header", async ({
+test("A tablet keeps the open composer's prompt above the keyboard and the header", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Touch screens only");
   await fixtures(page);
-  await page.setViewportSize({ width: 844, height: 390 });
+  // A phone held sideways types in the Generate sheet; a tablet types in the floating composer.
+  await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto("/images");
   await page.locator("[data-composer-prompt]").click();
   const prompt = page.locator("[data-expanded-prompt]");
   await expect(prompt).toBeFocused();
   await page.evaluate(() => {
-    const height = window.innerHeight - 200;
+    const height = window.innerHeight - 450;
     Object.defineProperty(window.visualViewport, "height", { get: () => height });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
@@ -969,7 +982,7 @@ test("A phone held sideways keeps the open composer's prompt above the keyboard 
       prompt.evaluate((element) => {
         const { top, bottom, left } = element.getBoundingClientRect();
         const shown = element.contains(document.elementFromPoint(left + 24, top + 12));
-        return shown && top >= 0 && bottom <= 190;
+        return shown && top >= 0 && bottom <= 370;
       }),
     )
     .toBe(true);

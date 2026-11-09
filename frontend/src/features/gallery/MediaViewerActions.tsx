@@ -6,15 +6,14 @@ import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBa
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
-import { UpscaleDialog } from "./UpscaleControls";
 import type { AnimateTheme, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Recreate, Upscale, Copy and Download beside their icons; phones show
-// every action as an icon.
-const labelled = ["animate", "edit", "recreate", "upscale", "copy", "download"];
+// Desktop names Animate, Edit, Upscale, Copy and Download beside their icons; phones show every
+// action as an icon.
+const labelled = ["animate", "edit", "upscale", "copy", "download"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -72,7 +71,6 @@ export function MediaViewerActions({
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
   const [animating, setAnimating] = useState<AnimateTheme | null>(null);
-  const [upscaling, setUpscaling] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const groups = useMediaActions(item, {
     transfer,
@@ -88,7 +86,6 @@ export function MediaViewerActions({
     onDelete,
     onRetried,
     onTrim: () => setTrimming(true),
-    onUpscale: () => setUpscaling(true),
     onVersionChange,
   });
   if (shortcuts) shortcuts.current = groups;
@@ -127,9 +124,6 @@ export function MediaViewerActions({
           theme={animating}
           onClose={() => setAnimating(null)}
         />
-      )}
-      {item.status === "done" && (
-        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </ActionBarSurface>

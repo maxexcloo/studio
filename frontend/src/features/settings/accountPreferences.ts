@@ -3,6 +3,8 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { api } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
 
+/** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
+export type VideosPreference = "cloud" | "fast" | "quality";
 /** The account's own preferences (backend/account-preferences.js). */
 export interface Preferences {
   cloudModels: boolean;
@@ -10,6 +12,8 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
+  /** Unsaved, Fast where the account has local video, otherwise Cloud. */
+  videos?: VideosPreference;
 }
 interface PreferencesStatus {
   preferences: Preferences;
@@ -46,6 +50,8 @@ export function useSavePreferences() {
       // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
       if ("spicyPrompts" in patch || "uncensoredModels" in patch)
         void client.invalidateQueries({ queryKey: ["suggestions"] });
+      // Animate's model follows where videos run.
+      if ("videos" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });
@@ -68,5 +74,14 @@ export function useTileCaptions() {
   return [
     status?.preferences.tileCaptions ?? false,
     (tileCaptions: boolean) => save.mutate({ tileCaptions }),
+  ] as const;
+}
+
+/** Where the account prefers videos to run, as Animate's menus and Settings show it. */
+export function useVideosPreference() {
+  const save = useSavePreferences();
+  return [
+    useQuery(preferencesQuery).data?.preferences.videos,
+    (videos: VideosPreference) => save.mutate({ videos }),
   ] as const;
 }

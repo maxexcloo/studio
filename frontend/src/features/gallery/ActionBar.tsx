@@ -1,4 +1,4 @@
-import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
+import { Fragment, useId, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
@@ -7,6 +7,7 @@ import {
   Menu,
   Paper,
   SegmentedControl,
+  Text,
   Tooltip,
   type FloatingPosition,
   type PaperProps,
@@ -21,7 +22,10 @@ export interface Action {
   id: string;
   /** The menu label, and the bar control's accessible name and tooltip. */
   label: string;
-  icon: LucideIcon;
+  /** A short line under its menu label saying what it does. */
+  description?: string;
+  /** Every bar action has one; a menu option may go without (a suggested change). */
+  icon?: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
   /** An on/off option (Show Upscale): a checked menu item. */
@@ -39,7 +43,7 @@ export interface Action {
    * first is its usual action, so a control with options has no click of its own.
    */
   menu?: ActionGroups;
-  /** A setting between a few values (Fast or Quality), a segmented control in menus. */
+  /** A setting between a few values (Cloud, Fast or Quality), a segmented control in menus. */
   choice?: {
     value: string;
     options: { value: string; label: string }[];
@@ -82,6 +86,24 @@ const note = (action: Action) =>
   );
 
 /**
+ * A menu item's label with its description, if any, under it; the label stays its accessible name
+ * and the description describes it.
+ */
+const itemLabel = ({ label, description }: Action, describedBy: string) =>
+  description ? (
+    <>
+      {label}
+      <Text id={describedBy} size="xs" c="dimmed">
+        {description}
+      </Text>
+    </>
+  ) : (
+    label
+  );
+const described = ({ label, description }: Action, describedBy: string) =>
+  description ? { "aria-label": label, "aria-describedby": describedBy } : {};
+
+/**
  * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
  * phones and touch screens expand in place under their item, never as a second floating layer.
  */
@@ -90,11 +112,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   const touch = useTouch();
   const inline = phone || touch;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const uid = useId();
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
       {group.map((action) => {
         const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
+        const describedBy = `${uid}-${id}`;
         if (action.choice)
           return (
             <div key={id} className={classes.choice}>
@@ -107,6 +131,11 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 onChange={action.choice.onChange}
                 data={action.choice.options}
               />
+              {action.description && (
+                <Text size="xs" c="dimmed" mt={4} px={4}>
+                  {action.description}
+                </Text>
+              )}
             </div>
           );
         if (action.menu && inline) {
@@ -115,15 +144,16 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             <Fragment key={id}>
               <Menu.Item
                 color={color}
-                leftSection={<Icon size={16} />}
+                leftSection={Icon && <Icon size={16} />}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
                 aria-expanded={open}
+                {...described(action, describedBy)}
                 data-expanded={open || undefined}
                 disabled={disabled}
                 closeMenuOnClick={false}
                 onClick={() => setExpanded(open ? null : id)}
               >
-                {label}
+                {itemLabel(action, describedBy)}
               </Menu.Item>
               {/* Unmounted when closed, so arrow keys skip the hidden options. */}
               <Collapse expanded={open} keepMounted={false}>
@@ -139,8 +169,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           return (
             <Menu.Sub key={id} position="right-start">
               <Menu.Sub.Target>
-                <Menu.Sub.Item color={color} leftSection={<Icon size={16} />} disabled={disabled}>
-                  {label}
+                <Menu.Sub.Item
+                  color={color}
+                  leftSection={Icon && <Icon size={16} />}
+                  disabled={disabled}
+                  {...described(action, describedBy)}
+                >
+                  {itemLabel(action, describedBy)}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
               <Menu.Sub.Dropdown w={menuWidth}>
@@ -153,15 +188,16 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           <Menu.Item
             key={id}
             color={color}
-            leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
+            leftSection={Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />}
             rightSection={checked ? <Check size={14} /> : undefined}
             role={checked === undefined ? undefined : "menuitemcheckbox"}
             aria-checked={checked}
+            {...described(action, describedBy)}
             disabled={disabled}
             closeMenuOnClick={!action.keepOpen}
             {...(link && !disabled ? { component: "a" as const, ...link } : { onClick })}
           >
-            {label}
+            {itemLabel(action, describedBy)}
           </Menu.Item>
         );
       })}
@@ -226,7 +262,7 @@ function ActionControl({
         ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
         : { onClick }),
   } as const;
-  const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
+  const icon = Icon && <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const control = labelled ? (
     <Button
       size="sm"

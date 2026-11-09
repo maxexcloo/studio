@@ -58,17 +58,19 @@ Direct cloud work is independent of GPU admission. Studio records asynchronous v
 
 Cloud Models and uncensored access remain per-user permissions. Credentials never reach the browser or media-download URLs.
 
-**Animate** uses the account's default local first-frame video profile (otherwise
-the normal local first-frame choice) while the local video worker answers,
-otherwise a Grok video profile the account may use. It shows the choice before queuing; Chat and MCP replies name it too.
+**Animate** runs where the account prefers videos to run: Cloud (a Grok video
+profile, with Cloud Models), or the local Fast or Quality tier of its
+first-frame video profiles, preferring its default family. Unsaved, the
+preference is Fast where the account has local video, otherwise Cloud. When the
+preferred side can't run (the local video worker is stopped, or the account has
+no Grok profile), Animate runs on the other and says so. It shows the choice before queuing; Chat and MCP replies name it too.
 With neither available, nothing queues. An explicitly chosen profile always
 wins. Output follows the source image's proportions at the profile's default
 size, constrained to provider-supported aspects. Themes write a motion prompt
 from the visible image and its context; on a video they continue the action
-from its last frame. Choose Local GPU or Cloud when the account has both, then
-Fast or Quality when they offer different profiles there; MCP `reuse` takes
-`runs_on` the same way. A picked Local GPU or Cloud never falls back, and Extend
-keeps its video's model unless Cloud is picked.
+from its last frame, keeping the video's model unless videos run on Cloud.
+Animate's menus set the preference (the `videos` account preference). MCP
+`reuse` takes `runs_on` and `tier` instead, and a `runs_on` never falls back.
 Review Prompt First shows the model and lets you edit the written prompt before Run;
 Custom prompts and Animate in Composer remain available.
 
@@ -132,6 +134,8 @@ MCP clients connect in one of three ways in multi-user mode:
 - **Trusted gateway:** a chat gateway such as Bifrost sends the shared `STUDIO_MCP_API_KEY` together with its own user ID in `x-ai-user-id`. Studio acts for that user only once the ID is linked to an account. When the gateway also forwards the user's email in `x-ai-user-email` and it matches an enabled ordinary account's username (ignoring case), Studio links the ID to that account on its first request, recorded like an administrator's link; an unknown email creates an account on the default group and links it. Administrators, and accounts that changed their email themselves, are linked only by an administrator. Otherwise an administrator links the ID under **Settings › Users › Chat Gateway**, where unlinked IDs are listed; **Dismiss** removes one from the list until the gateway sends it again. Unlinked IDs still see the tools, but every call only returns a message asking for the link, so the chat explains the problem instead of reporting no tools. A linked account's row in **Settings › Users** carries a Chat Gateway badge and its ⋯ menu unlinks the ID. Its **Admin Tools** switch there gives linked administrators the admin tools through the gateway; while it is off, only an administrator's personal token gets them. Unlinking an ID whose email matches an enabled account lets it link again on its next request; disable the account to stop it.
 - **GPU control:** `CONTROL_MCP_API_KEY` (header-only, distinct from `STUDIO_MCP_API_KEY`) gets only the GPU tools (`gpu_status`, `workloads`, `preview`, `apply`, `mode`, `restart`, `operation`) and reaches no galleries or accounts. They drive Studio's own [runtime control](#queue-sessions--runtime-control), so the key needs `STUDIO_KUBERNETES_NAMESPACES`.
 
+The host in `STUDIO_MCP_PUBLIC_URL` is the internet-facing one: requests to it take only personal tokens, even when `STUDIO_ALLOWED_HOSTS` also lists it. The shared gateway and control keys work only on the other allowed hosts, such as the in-cluster service name, and on the public host get the same 401 as a wrong credential. Signed result, upload and export links are unaffected.
+
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
 ### MCP Admin Tools & External Chat
@@ -140,12 +144,12 @@ Administrator MCP tools retain their published names and permission boundaries. 
 
 #### MCP & UI Parity
 
-Every MCP action calls the route its UI action calls, with the caller's own credential, so ownership, group features and administrator checks apply as in the app. Media tools work on the caller's own results only: a ref or job ID another MCP identity holds is refused before any request.
+Every MCP action calls the route its UI action calls, with the caller's own credential, so ownership, group features and administrator checks apply as in the app. Media tools work on the caller's own results only: a ref or job ID another MCP identity holds is refused before any request. Result numbers ("result 3"), `result` with `all`, `handover` and the All Results page cover one chat: the conversation the client names in `x-studio-conversation-id` (LibreChat), else the MCP session id Studio hands out on `initialize` and the client resends (a Grok connector), else the whole account. `search` and `queue` cover the account's whole gallery and queue.
 
 | UI action                                                                       | MCP tool and action                                                        |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Composer generation, variations, sizes, LoRAs, references                       | `generate` (`models` to look up), `upload`, `upload_link`                  |
-| Recreate, Run Again (Same Seed), Animate, Extend, Use as Reference              | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
+| Edit › Run Again and Repeat Exactly, Animate, Extend, Use as Reference          | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
 | Upscale                                                                         | `reuse` `upscale`                                                          |
 | Compare models side by side                                                     | `generate` with several profiles (a comparison page)                       |
 | Gallery search, Starred, uploads                                                | `search`                                                                   |
@@ -293,9 +297,9 @@ returns to the list; started work finishes.
 prompt's first words stand in; items without prompts get no title.
 **Suggested Prompts** describe how to recreate uploads and other items without
 a prompt, using the image (a video's first frame) when the text model reads
-images, otherwise its caption. An item with neither waits. Recreate stages the
-suggested prompt; bulk Recreate queues the selected uploads that have one and
-reports those still waiting.
+images, otherwise its caption. An item with neither waits. Edit › Edit Prompt
+stages the suggested prompt; the selection's Edit › Run Suggested Prompts queues
+the selected uploads that have one and reports those still waiting.
 
 **Gallery Captions** let search match visible image content and tags alongside
 prompts. They need a running text model that reads images, with no cloud
@@ -375,7 +379,7 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block then hold
 
 Each backend's fields (`controls`, `mediaInputs`, `loraStack`, `defaults`, `capabilities`, `aspectRatios`, `imageModes`, `requiredNodes`, `description` and the rest) replace the shared ones of the same name, so the profile runs as the single-graph profile they make together. `backend` must name one of `backends`, which take `comfyui` and `radiance`; saving checks every backend's graph and connections.
 
-Readiness, worker routing, validation, the graph, timings and labels follow the backend a run uses. A backend that isn't ready shows the profile as Needs Setup with the reason; Studio never runs it on the other backend instead. Switching `backend` (the Backend select in Library › Profiles) is an ordinary versioned edit. Jobs and gallery records keep `profileBackend`: Exact Repeat, Recreate and MCP's Reuse run on the backend that ran while the profile still has it, otherwise on its current one, with a note.
+Readiness, worker routing, validation, the graph, timings and labels follow the backend a run uses. A backend that isn't ready shows the profile as Needs Setup with the reason; Studio never runs it on the other backend instead. Switching `backend` (the Backend select in Library › Profiles) is an ordinary versioned edit. Jobs and gallery records keep `profileBackend`: Repeat Exactly, Edit Prompt and MCP's Reuse run on the backend that ran while the profile still has it, otherwise on its current one, with a note.
 
 **Combine Backends** in Library › Profiles (or the `combine_backends` MCP tool)
 previews Radiance/ComfyUI pairs for an administrator to select, name and choose

@@ -29,17 +29,22 @@ export const serviceState = (backend) =>
       : backend.parked
         ? "Stopped"
         : "Offline";
-/** What MCP says about stopped local services: stopped on purpose, so an administrator can start them. */
-export const stoppedServices = (kinds) =>
-  `${[kinds]
+const serviceNames = (kinds) =>
+  [kinds]
     .flat()
     .map((kind) => serviceLabels[kind] || kind)
-    .join(" and ")} are Stopped; an administrator can start them in Settings › Workers.`;
-/** What MCP says while local video isn't running and the account has no cloud profile to go to. */
-export const localVideoUnavailable = (parked = false) =>
-  parked
-    ? `${stoppedServices("video")} Tell the user.`
-    : "Videos are Offline: the video worker isn't answering. Tell the user to try again later.";
+    .join(" and ");
+/** What MCP says about local services that aren't running: generate still queues on them, and the jobs wait. */
+export const waitingServices = (kinds, state) =>
+  `${serviceNames(kinds)} are ${state}${state === "Stopped" ? " (an administrator can start them in Settings › Workers)" : " (the worker isn't answering, often a brief restart)"}; generate still queues on them and the jobs start when a worker is back.`;
+// A profile whose worker isn't running, as Settings › Workers names that state.
+export const workerState = { parked: "Stopped", offline: "Offline" };
+/** A queued job's note while its profile's worker isn't running: it waits, and Cloud is only a suggestion. */
+export const waitingNote = (profile, cloudOffered = false) => {
+  const state = workerState[profile.availability];
+  if (!state) return "";
+  return `${profile.label || profile.id} is ${state}${state === "Stopped" ? " (an administrator can start it in Settings › Workers)" : ""}, so this waits in the queue and starts when its worker is back. Tell the user it's queued and waiting${cloudOffered ? "; if it stays down, offer Cloud, and run it there only if they ask" : ""}. `;
+};
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 const preferredTiers = ["fast", "turbo", "standard", "quality"];
 const labels = { "super fast": "turbo", fast: "fast", quality: "quality", standard: "standard" };
