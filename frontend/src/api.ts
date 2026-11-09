@@ -9,7 +9,8 @@ export async function request(url: string, options: RequestInit = {}): Promise<R
   if (response.status === 401) window.dispatchEvent(new Event("studio:signed-out"));
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || `Studio returned ${response.status}`);
+    // The body stays as the cause, for refusals that say more than their message.
+    throw new Error(data.error || `Studio returned ${response.status}`, { cause: data });
   }
   return response;
 }

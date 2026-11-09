@@ -62,7 +62,10 @@ With neither available, nothing queues. An explicitly chosen profile always
 wins. Output follows the source image's proportions at the profile's default
 size, constrained to provider-supported aspects. Themes write a motion prompt
 from the visible image and its context; on a video they continue the action
-from its last frame. Choose Fast or Quality when they offer different profiles.
+from its last frame. Choose Local GPU or Cloud when the account has both, then
+Fast or Quality when they offer different profiles there; MCP `reuse` takes
+`runs_on` the same way. A picked Local GPU or Cloud never falls back, and Extend
+keeps its video's model unless Cloud is picked.
 Review Prompt First shows the model and lets you edit the written prompt before Run;
 Custom prompts and Animate in Composer remain available.
 

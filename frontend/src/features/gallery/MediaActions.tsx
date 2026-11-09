@@ -56,10 +56,13 @@ import {
   mediaDraft,
   useAnimateReview,
   useAnimateTier,
+  useAnimateWhere,
   useAnimateWriter,
   useMediaAction,
   useMediaIteration,
+  type AnimateOffers,
   type AnimateTheme,
+  type AnimateWhere,
   type Iteration,
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -338,13 +341,62 @@ export function useMediaActions(
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
   const [tier, setTier] = useAnimateTier();
+  const [where, setWhere] = useAnimateWhere();
   const [review, setReview] = useAnimateReview();
   // The menu keeps its choice while a switch between Fast and Quality loads.
   const animation = useQuery({
-    ...animateProfileQuery(item, tier),
-    enabled: image,
+    ...animateProfileQuery(item, { tier, where }),
+    enabled: image || (ready && item.type === "video"),
     placeholderData: keepPreviousData,
   });
+  // A refusal still says which pools the account has, so a stopped Local GPU can be switched off.
+  const offers =
+    animation.data?.offers ??
+    (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
+  const bothOffered = Boolean(offers?.local && offers.cloud);
+  // A pick no longer offered (Cloud Models revoked, no local profile) returns to Auto.
+  useEffect(() => {
+    if (offers && !bothOffered && where !== "auto") setWhere("auto");
+  }, [Boolean(offers), bothOffered, where]);
+  const whereChoice = bothOffered
+    ? [
+        {
+          id: "animate-where",
+          label: "Local GPU or Cloud",
+          icon: icons.animate,
+          choice: {
+            // Auto shows the pool it took.
+            value: where === "auto" ? (animation.data?.cloud ? "cloud" : "local") : where,
+            options: [
+              { value: "local", label: "Local GPU" },
+              { value: "cloud", label: "Cloud" },
+            ],
+            onChange: (value: string) => setWhere(value as AnimateWhere),
+          },
+        },
+      ]
+    : [];
+  // Fast or Quality picks the video model in the chosen pool for the themes and the composer.
+  const tierChoice =
+    (animation.data?.tiers.length ?? 0) > 1
+      ? [
+          {
+            id: "animate-tier",
+            label: "Fast or Quality",
+            icon: icons.animate,
+            choice: {
+              value: tier,
+              options: [
+                { value: "fast", label: "Fast" },
+                { value: "quality", label: "Quality" },
+              ],
+              onChange: (value: string) => setTier(value as typeof tier),
+            },
+          },
+        ]
+      : [];
+  // An explicit pick that can't run says why.
+  const refusal = where === "auto" ? undefined : animation.error?.message;
   const cache = useQueryClient();
   const version = useMutation({
     mutationFn: (active: boolean) =>
@@ -392,29 +444,10 @@ export function useMediaActions(
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        // When nothing can animate, the options stay disabled without an explanation.
+        // When nothing can animate, the options stay disabled, explained only for an explicit pick.
+        note: refusal,
         menu: [
-          [
-            // Fast or Quality picks the video model for the themes and the composer below.
-            ...((animation.data?.tiers.length ?? 0) > 1
-              ? [
-                  {
-                    id: "animate-tier",
-                    label: "Fast or Quality",
-                    icon: icons.animate,
-                    choice: {
-                      value: tier,
-                      options: [
-                        { value: "fast", label: "Fast" },
-                        { value: "quality", label: "Quality" },
-                      ],
-                      onChange: (value: string) => setTier(value as typeof tier),
-                    },
-                  },
-                ]
-              : []),
-            ...reviewItems,
-          ],
+          [...whereChoice, ...tierChoice, ...reviewItems],
           [...themeItems(!animation.data)],
           [
             {
@@ -432,9 +465,11 @@ export function useMediaActions(
       itemAction("animate", {
         label: "Extend",
         loading: running === "animate" || action.isPending,
-        // A theme continues the clip from its last frame at once; the composer shows it first.
+        // A theme continues the clip from its last frame at once; the composer shows it first. It
+        // keeps the clip's own model, so Fast or Quality applies only once Cloud is picked.
+        note: refusal,
         menu: [
-          reviewItems,
+          [...whereChoice, ...(where === "cloud" ? tierChoice : []), ...reviewItems],
           [
             ...themeItems(action.isPending),
             {
@@ -790,6 +825,7 @@ export function AnimateDialog({
                 <Text size="sm" c="dimmed">
                   {written.profileLabel}
                   {written.tier ? ` · ${written.tier === "fast" ? "Fast" : "Quality"}` : ""}
+                  {written.cloud ? " · Cloud" : ""}
                 </Text>
               </>
             )}
