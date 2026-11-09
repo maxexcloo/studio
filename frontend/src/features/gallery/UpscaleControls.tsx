@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { Alert, Button, FocusTrap, Modal, Select, Stack, Switch, Text } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   UpscaleQuality,
   UpscaleRequest,
@@ -9,8 +7,6 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
-import { DialogFooter } from "../../ui/ConfirmDialog";
-import { LoadingState } from "../../ui/LoadingState";
 import { Eye, ScanFace } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
@@ -23,140 +19,27 @@ const statusQuery = (quality: UpscaleQuality) => ({
   queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
 });
 
-function UpscaleForm({ item, onClose }: { item: MediaItem; onClose: () => void }) {
-  const [quality, setQuality] = useState<UpscaleQuality>("balanced");
-  const [target, setTarget] = useState("0");
-  const [faceDetail, setFaceDetail] = useState(false);
-  const cache = useQueryClient();
-  const status = useQuery(statusQuery(quality));
-  const upscale = useMutation({
-    meta: { inlineError: true },
-    mutationFn: () =>
-      post<UpscaleResponse>("/api/upscale", {
-        galleryItemId: item.id,
-        quality,
-        target: Number(target) as UpscaleRequest["target"],
-        faceDetail: faceDetail && Boolean(faceAvailable),
-      } satisfies UpscaleRequest),
-    onSuccess: () => {
-      onClose();
-      void Promise.all(
-        ["gallery", "queue", "session", "sessions"].map((key) =>
-          cache.invalidateQueries({ queryKey: [key] }),
-        ),
-      );
-    },
-  });
-  const faceAvailable =
-    item.type === "image" &&
-    status.data?.faceDetail.nodesInstalled &&
-    Boolean(status.data.faceDetail.detectors.length);
-  return (
-    <Stack gap="sm">
-      {status.isPending && <LoadingState fill label="Checking Upscale Worker" />}
-      {status.error && (
-        <Alert color="red" title="Upscale Unavailable">
-          {status.error.message}
-          <Button variant="subtle" size="compact-sm" onClick={() => void status.refetch()}>
-            Retry
-          </Button>
-        </Alert>
-      )}
-      {status.data && (
-        <>
-          <Select
-            label="Upscale Quality"
-            comboboxProps={{ withinPortal: false }}
-            value={quality}
-            data={status.data.qualities.map((value) => ({
-              value,
-              label: value[0].toUpperCase() + value.slice(1),
-            }))}
-            allowDeselect={false}
-            disabled={upscale.isPending}
-            onChange={(value) => {
-              if (value) setQuality(value as UpscaleQuality);
-            }}
-          />
-          <Select
-            label="Upscale Size"
-            comboboxProps={{ withinPortal: false }}
-            description="Keeps the aspect ratio and never reduces the source."
-            value={target}
-            data={[
-              { value: "0", label: "Automatic" },
-              ...status.data.targets.map((value) => ({
-                value: String(value),
-                label: `${value / 1024}K · ${value}px Long Edge`,
-              })),
-            ]}
-            allowDeselect={false}
-            disabled={upscale.isPending}
-            onChange={(value) => {
-              if (value) setTarget(value);
-            }}
-          />
-          {item.type === "image" && (
-            <Switch
-              label="Face Detail"
-              description={
-                faceAvailable
-                  ? "Refine faces using this image’s original model."
-                  : "Face Detail needs the worker’s face detector and Impact Pack nodes."
-              }
-              checked={faceDetail && Boolean(faceAvailable)}
-              disabled={!faceAvailable || upscale.isPending}
-              onChange={(event) => setFaceDetail(event.currentTarget.checked)}
-            />
-          )}
-          {status.data.substituting && (
-            <Text size="xs" c="dimmed">
-              Uses installed model {status.data.fallbackFile}.
-            </Text>
-          )}
-          {!status.data.ready && (
-            <Alert color="yellow">
-              {status.data.nodesInstalled
-                ? "This worker has no upscale models."
-                : `The worker is missing ${status.data.missingNodes.join(", ")}.`}
-            </Alert>
-          )}
-        </>
-      )}
-      {upscale.error && <Alert color="red">{upscale.error.message}</Alert>}
-      <DialogFooter pending={upscale.isPending} onCancel={onClose}>
-        <Button
-          loading={upscale.isPending}
-          disabled={!status.data?.ready || status.isFetching}
-          onClick={() => upscale.mutate()}
-        >
-          {item.type === "image" ? "Upscale Image" : "Upscale Video"}
-        </Button>
-      </DialogFooter>
-    </Stack>
-  );
-}
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
+type UpscaleTarget = NonNullable<UpscaleRequest["target"]>;
 /**
- * Upscale's menu runs at the automatic size with its remembered quality (Balanced until chosen) and
- * Face Detail (off until chosen, and only where the worker can run it).
+ * Upscale's menu runs with its remembered settings: quality (Balanced until chosen), size (Automatic
+ * until chosen, and only a size the worker offers) and Face Detail (off until chosen, and only where
+ * the worker can run it). `status` says whether the worker can run it at that quality.
  */
 export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const [quality, setQuality] = useRemembered<UpscaleQuality>("upscale-quality", "balanced");
+  const [size, setSize] = useRemembered<UpscaleTarget>("upscale-size", 0);
   const [face, setFace] = useRemembered<boolean>("upscale-face-detail", false);
   const cache = useQueryClient();
-  const status = useQuery({
-    ...statusQuery("balanced"),
-    enabled: enabled && item.type === "image",
-  });
+  // The menu keeps its settings in place while another quality's status loads.
+  const status = useQuery({ ...statusQuery(quality), enabled, placeholderData: keepPreviousData });
+  const target = status.data?.targets.includes(size as Exclude<UpscaleTarget, 0>) ? size : 0;
   const queue = useMutation({
-    mutationFn: ({ quality, faceDetail }: { quality: UpscaleQuality; faceDetail: boolean }) =>
+    mutationFn: (request: Omit<UpscaleRequest, "galleryItemId">) =>
       post<UpscaleResponse>("/api/upscale", {
         galleryItemId: item.id,
-        quality,
-        target: 0,
-        faceDetail,
+        ...request,
       } satisfies UpscaleRequest),
     onSuccess: () =>
       void Promise.all(
@@ -171,35 +54,20 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const faceDetail = face && faceAvailable;
   return {
     queue,
+    status,
     quality,
     setQuality,
+    target,
+    setTarget: setSize,
     faceAvailable,
     faceDetail,
     setFaceDetail: setFace,
-    run: () => queue.mutate({ quality, faceDetail }),
+    run: () => queue.mutate({ quality, target, faceDetail }),
   };
 }
-/** The same settings for the Upscale item in tile and Chat result menus. */
-export function UpscaleDialog({
-  item,
-  opened,
-  onClose,
-}: {
-  item: MediaItem;
-  opened: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <Modal opened={opened} onClose={onClose} title="Upscale" centered size="sm">
-      <FocusTrap.InitialFocus />
-      <UpscaleForm item={item} onClose={onClose} />
-    </Modal>
-  );
-}
-
 /**
- * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, the quick
- * settings, then the run (MediaActions.tsx places it).
+ * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
+ * settings, then the run (MediaActions.tsx places it). Why the worker can't run it shows above them.
  */
 export function useUpscaleAction(
   item: MediaItem,
@@ -207,13 +75,11 @@ export function useUpscaleAction(
     ready,
     compare,
     onCompare,
-    onUpscale,
     onVersionChange,
   }: {
     ready: boolean;
     compare?: boolean;
     onCompare?: () => void;
-    onUpscale?: () => void;
     onVersionChange?: (id: string, active: boolean) => void;
   },
 ): Action | false {
@@ -233,6 +99,14 @@ export function useUpscaleAction(
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
   const quick = useQuickUpscale(item, ready);
   const upscaleBusy = upscaling(item) || quick.queue.isPending;
+  const { data: status, error } = quick.status;
+  const unavailable =
+    error?.message ??
+    (status && !status.ready
+      ? status.nodesInstalled
+        ? "This worker has no upscale models."
+        : `The worker is missing ${status.missingNodes.join(", ")}.`
+      : undefined);
   return (
     ready &&
     itemAction("upscale", {
@@ -243,6 +117,7 @@ export function useUpscaleAction(
       pressed: upscaled && Boolean(item.upscaleActive),
       loading: upscaleBusy && !upscaled,
       disabled: upscaled ? version.isPending : upscaleBusy,
+      note: unavailable,
       menu: [
         upscaled
           ? [
@@ -274,20 +149,43 @@ export function useUpscaleAction(
             icon: icons.upscale,
             choice: {
               value: quick.quality,
-              options: [
-                { value: "fast", label: "Fast" },
-                { value: "balanced", label: "Balanced" },
-                { value: "high", label: "High" },
-              ],
+              options: (status?.qualities ?? (["fast", "balanced", "high"] as const)).map(
+                (value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }),
+              ),
               onChange: (value: string) => quick.setQuality(value as typeof quick.quality),
             },
           },
+          ...(status?.targets.length
+            ? [
+                {
+                  id: "upscale-size",
+                  label: "Upscale Size",
+                  description: "The long edge; keeps the aspect ratio and never shrinks it",
+                  icon: icons.upscale,
+                  choice: {
+                    value: String(quick.target),
+                    options: [
+                      { value: "0", label: "Auto" },
+                      ...status.targets.map((value) => ({
+                        value: String(value),
+                        label: `${value / 1024}K`,
+                      })),
+                    ],
+                    onChange: (value: string) =>
+                      quick.setTarget(Number(value) as typeof quick.target),
+                  },
+                },
+              ]
+            : []),
           // Face Detail joins every run from here once checked; disabled where the worker can't.
           ...(image
             ? [
                 {
                   id: "upscale-face",
                   label: "Face Detail",
+                  description: quick.faceAvailable
+                    ? "Refine faces with this image's model"
+                    : "Needs the worker's face detector and Impact Pack nodes",
                   icon: ScanFace,
                   checked: quick.faceDetail,
                   disabled: !quick.faceAvailable,
@@ -296,29 +194,25 @@ export function useUpscaleAction(
                 },
               ]
             : []),
-          // The rest of the settings, under the quick ones.
-          {
-            id: "upscale-options",
-            label: "Upscale Options…",
-            icon: icons.settings,
-            disabled: upscaleBusy,
-            onClick: onUpscale,
-          },
         ],
         [
-          upscaled
+          error
             ? {
-                id: "upscale-again",
-                label: "Regenerate Upscale",
-                icon: icons.retry,
-                disabled: upscaleBusy,
-                onClick: quick.run,
+                id: "upscale-check",
+                label: "Check Again",
+                icon: icons.refresh,
+                disabled: quick.status.isFetching,
+                keepOpen: true,
+                onClick: () => void quick.status.refetch(),
               }
             : {
-                id: "upscale-run",
-                label: image ? "Upscale Image" : "Upscale Video",
-                icon: icons.upscale,
-                disabled: upscaleBusy,
+                id: upscaled ? "upscale-again" : "upscale-run",
+                label: upscaled ? "Regenerate Upscale" : image ? "Upscale Image" : "Upscale Video",
+                description: status?.substituting
+                  ? `Uses installed model ${status.fallbackFile}`
+                  : undefined,
+                icon: upscaled ? icons.retry : icons.upscale,
+                disabled: upscaleBusy || (status && !status.ready),
                 onClick: quick.run,
               },
         ],

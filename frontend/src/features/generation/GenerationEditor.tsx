@@ -18,6 +18,7 @@ import { defaultProfile, useGeneration, type Draft } from "./GenerationProvider"
 import { GenerationInputControls } from "./GenerationInputControls";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails, usesNegative } from "./payload";
+import { usePromptIdeas } from "./PromptIdeas";
 import { PromptFields, useDraftChange } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
@@ -164,7 +165,7 @@ export function GenerationEditor({
    * of the wrapping chips and actions, and a text box being edited takes it alone.
    */
   fill?: boolean;
-  /** Offers taste-led prompt ideas while the prompt is empty and focused. */
+  /** Offers taste-led prompt ideas as a Suggestions chip while the prompt is empty. */
   ideas?: boolean;
 }) {
   const { models, profiles } = useGeneration();
@@ -194,6 +195,11 @@ export function GenerationEditor({
     ask.done();
     submitDraft();
   };
+  const ideas = usePromptIdeas({
+    kind: input.kind,
+    empty: !input.prompt.trim(),
+    onPick: (prompt) => onChange({ prompt }),
+  });
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
@@ -246,6 +252,7 @@ export function GenerationEditor({
       hasReferences={!!details.length}
       mask={mask}
       presets={presets}
+      ideas={offerIdeas && ideas.chip}
       settings={settings}
       onCompare={onCompare}
     />
@@ -281,7 +288,7 @@ export function GenerationEditor({
             negative={usesNegative(profile)}
             autoFocus={autoFocusPrompt}
             fill={fill}
-            ideas={offerIdeas}
+            ideaFocus={offerIdeas ? ideas.focusProps : undefined}
             ask={onOperationChange && ask}
           />
           {!fill && inputs}

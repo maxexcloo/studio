@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -25,6 +25,7 @@ import { api, post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
+import type { Action } from "../gallery/ActionBar";
 import { ChipPopup } from "./Picker";
 
 type PromptKind = "positive" | "negative";
@@ -122,7 +123,11 @@ export function useKeepRecentPrompts(enabled = true) {
   return { history, change };
 }
 
-export function PromptHistory({
+/**
+ * A prompt box's Recent Prompts: its tool, and the popup the tool opens, which the box anchors
+ * where the tool stands (`TextBox` `popups`).
+ */
+export function usePromptHistory({
   kind,
   value,
   onPick,
@@ -130,7 +135,7 @@ export function PromptHistory({
   kind: PromptKind;
   value: string;
   onPick: (text: string) => void;
-}) {
+}): { action: Action; popup: ReactNode } {
   const [opened, setOpened] = useState(false),
     [query, setQuery] = useState("");
   const combobox = useCombobox({ opened });
@@ -169,25 +174,20 @@ export function PromptHistory({
   useEffect(() => {
     if (opened) combobox.selectFirstOption();
   }, [opened, optionsKey]);
-  return (
+  const action: Action = {
+    id: "history",
+    label: title,
+    icon: History,
+    onClick: () => setOpened(true),
+  };
+  const popup = (
     <ChipPopup
       title={title}
-      tooltip
       position="top-end"
       width={500}
       opened={opened}
       onOpenedChange={setOpened}
-      target={
-        <ActionIcon
-          aria-label={title}
-          aria-expanded={opened}
-          variant="subtle"
-          color="gray"
-          onClick={() => setOpened(!opened)}
-        >
-          <History size={16} />
-        </ActionIcon>
-      }
+      target={<span />}
       headerEnd={
         <Switch
           // Remounts once loaded so the saved state appears without the thumb sliding.
@@ -304,4 +304,5 @@ export function PromptHistory({
       </Combobox>
     </ChipPopup>
   );
+  return { action, popup };
 }

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "Flux.1", sdxl: "SDXL" };
@@ -183,7 +183,7 @@ export async function fixtures(page: Page) {
       spicyPrompts: false,
       tileCaptions: false,
       uncensoredModels: true,
-    },
+    } as Record<string, unknown>,
     saved: [] as string[],
     grants: { cloudModels: false, loras: false, spicyPrompts: false, uncensoredModels: false },
   };
@@ -291,8 +291,7 @@ export async function fixtures(page: Page) {
         profileId: "video:test",
         label: "Motion Quality",
         cloud: false,
-        tiers: [],
-        offers: { local: true, cloud: false },
+        offers: { cloud: false, fast: false, quality: true },
       });
     if (path === "/api/chat/status")
       return respond({
@@ -973,6 +972,31 @@ export async function compareUpscale(page: Page) {
 }
 
 /** Clicks a viewer action on its bar; a control with options opens its menu for the test to pick. */
+/** Chooses a text box's tool from its ⋯ menu, such as Recent Prompts from the Prompt's. */
+export async function promptTool(scope: Page | Locator, box: string, label: string) {
+  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  const page = "page" in scope ? scope.page() : scope;
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
+}
+
+/**
+ * Opens a ⋯ tool's options, such as the Prompt's Suggestions: tapped, they expand in place on touch
+ * screens; hovered, they open as a submenu with a mouse. Returns where the options are.
+ */
+export async function promptOptions(scope: Page | Locator, box: string, label: string) {
+  await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
+  const page = "page" in scope ? scope.page() : scope;
+  // The submenu may open on hover before the item is clicked, adding a same-named option.
+  const item = page.getByRole("menuitem", { name: label, exact: true }).first();
+  if (test.info().project.use.hasTouch) {
+    await item.click();
+    return page.getByRole("group", { name: label, exact: true });
+  }
+  await item.hover();
+  await expect(page.getByRole("menu")).toHaveCount(2);
+  return page.getByRole("menu").last();
+}
+
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   await viewer
