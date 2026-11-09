@@ -31,6 +31,8 @@ export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
+  /** What Dream has made today, counted against the daily caps. */
+  today: { images: number; videos: number };
   spicyAvailable: boolean;
   status: DreamStatus;
   /** Why Dream is waiting or can't run, where the backend says. */
@@ -69,3 +71,11 @@ export const dreamItemPath = (item: { id: string }, action: string) =>
   `/api/dream/${encodeURIComponent(item.id)}/${action}`;
 export const pairAnswerPath = (pairId: string) =>
   `/api/dream/pairs/${encodeURIComponent(pairId)}/answer`;
+
+/** When Dream works and how much of today's share it has made, such as "Dream keeps 6 ready … · 12 of 40 today". */
+export const dreamWhen = ({ settings, today }: Dream) =>
+  [
+    `Dream keeps ${settings.buffer} ready and makes more when the queue is free`,
+    `${today.images} of ${settings.dailyImages} today`,
+    ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
+  ].join(" · ");
