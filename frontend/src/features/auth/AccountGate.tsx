@@ -140,7 +140,12 @@ export function AccountGate({ children }: { children: ReactNode }) {
                   Create the recovery administrator for your workspace.
                 </Text>
               )}
-              {outcome && <Alert>{outcome}</Alert>}
+              {/* Signing out is news, not a problem; the other outcomes are failures. */}
+              {outcome && (
+                <Alert color={query.get("sign-in") === "signed-out" ? "gray" : "red"}>
+                  {outcome}
+                </Alert>
+              )}
               {status.data?.oidc && (
                 <>
                   <Button component="a" href="/api/accounts/oidc/start" variant="default" fullWidth>
