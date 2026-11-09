@@ -67,24 +67,28 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
   });
   const workloads = [
     workload("comfyui", "image", "http://comfyui:8188", {
+      label: "Primary",
       worker: "primary",
-      capabilities: ["image", "upscale", "models"],
+      capabilities: ["image", "video", "upscale", "models"],
     }),
-    workload("comfyui-video", "video", "http://comfyui-video:8188/", { worker: "video" }),
-    workload("comfyui-video-tp2", "video", "http://comfyui-video:8188", { gpus: 2 }),
+    workload("comfyui-video", "video", "http://comfyui-video:8188/", { label: "Video" }),
+    workload("comfyui-video-tp2", "video", "http://comfyui-video:8188", {
+      label: "Video · 2 GPUs",
+      gpus: 2,
+    }),
     workload("text-qwen", "text", "http://qwen:8000", { model: "local/auto" }),
   ];
   const list = deploymentWorkers({}, workloads);
   assert.deepEqual(list, [
     {
       id: "primary",
-      name: "Image Worker",
+      name: "Primary",
       url: "http://comfyui:8188",
-      capabilities: ["image", "upscale", "models"],
+      capabilities: ["image", "video", "upscale", "models"],
     },
     {
-      id: "video",
-      name: "Video Worker",
+      id: "comfyui-video",
+      name: "Video",
       url: "http://comfyui-video:8188",
       capabilities: ["video"],
     },
