@@ -6,7 +6,6 @@ export interface Profile {
   id: string;
   label: string;
   displayName?: string;
-  description?: string;
   kind: MediaKind;
   model: string;
   workflow: string;

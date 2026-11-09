@@ -250,7 +250,7 @@ test("Desktop nested pickers retain gallery controls until keyboard focus leaves
   const controls = page.getByRole("region", { name: "Generate", exact: true });
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
-  await page.getByRole("option", { name: "Image Fast", exact: true }).click();
+  await page.getByRole("option", { name: /^Image Fast\b/ }).click();
   await expect(profile).toHaveText("Image Fast");
   await expect(controls).toBeVisible();
   const size = page.getByRole("button", { name: "Aspect", exact: true });

@@ -15,6 +15,10 @@
   margin-inline-start: auto;
 }
 
+.more[data-hidden] {
+  visibility: hidden;
+}
+
 *:hover > .actions .control,
 *:focus-within > .actions .control,
 .actions[data-opened] .control,

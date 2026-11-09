@@ -95,7 +95,11 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   ).toBeVisible();
   await expandComposer(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await page.getByRole("option", { name: "Image Fast", exact: true }).click();
+  // Each profile option names its model, kind and backend in short facts.
+  await expect(page.getByRole("option", { name: /^Image Fast\b/ })).toContainText(
+    "Studio Image · Image · Local GPU",
+  );
+  await page.getByRole("option", { name: /^Image Fast\b/ }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.profileId).toBe("image:fast");
