@@ -2,13 +2,12 @@ import { useMutation, useQueryClient, type Query } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 
-/** Caches that hold media records: gallery pages, the reference picker, Chats and the queue. */
-const mediaCaches = new Set(["gallery", "reference-gallery", "session", "queue"]);
+/** Caches that hold media records: gallery pages (the reference picker's too), Chats and the queue. */
+const mediaCaches = new Set(["gallery", "session", "queue"]);
 const holdsMedia = (query: Query) => mediaCaches.has(String(query.queryKey[0]));
-/** Lists filtered to starred items (key position 3 in both list keys), which a change alters. */
+/** Lists filtered to starred items (key position 3), which a change alters. */
 const starredList = (query: Query) =>
-  ["gallery", "reference-gallery"].includes(String(query.queryKey[0])) &&
-  query.queryKey[3] === true;
+  String(query.queryKey[0]) === "gallery" && query.queryKey[3] === true;
 
 /** Sets `favorite` on every listed media record in a cached response, keeping unchanged parts. */
 function withFavorite(value: unknown, ids: Set<string>, favorite: boolean): unknown {

@@ -116,7 +116,6 @@ export function ReferencePicker({
     mutationFn: (id: string) => api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: async (_result, id) => {
       list.set(list.get().filter((asset) => asset.galleryItemId !== id));
-      await client.invalidateQueries({ queryKey: ["reference-gallery"] });
       await client.invalidateQueries({ queryKey: ["gallery"] });
       setDeleteId(null);
     },
@@ -170,9 +169,10 @@ export function ReferencePicker({
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
-  // Uploads are gallery images too, behind the gallery's Uploads filter.
+  // Uploads are gallery images too, behind the gallery's Uploads filter. The key and request match
+  // the gallery's Images view, so pages it already loaded show at once.
   const listing = useInfiniteQuery({
-    queryKey: ["reference-gallery", search, filters],
+    queryKey: ["gallery", search, "image", filters],
     enabled: opened,
     // Searching and filtering keep the current tiles until the new ones arrive.
     placeholderData: keepPreviousData,
