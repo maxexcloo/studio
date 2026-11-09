@@ -22,12 +22,13 @@ permissions:
   contents: read
 
 # Only pull requests cancel superseded runs: every main commit must publish its sha image, which
-# Studio's release job tags latest and versioned.
+# Studio's release job tags latest and versioned when the worker changed since the last release.
 concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: worker-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
 
 env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}-worker
   PUBLISH: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
@@ -55,12 +56,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           flavor: latest=false
-          images: ghcr.io/${{ github.repository }}-worker
+          images: ${{ env.IMAGE_NAME }}
           tags: type=sha,format=long,enable={{is_default_branch}}
       - name: Build Worker For Verification
         uses: docker/build-push-action@v7
         with:
-          # Reuse this job's BuildKit cache for publication without exporting the GPU image to GHA.
+          # The GPU image's layers exceed the GHA cache, so main publishes them to a registry cache
+          # tag that later runs and pull requests reuse.
+          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           context: .
           file: worker/Dockerfile
           load: true
@@ -85,6 +88,7 @@ jobs:
         if: env.PUBLISH == 'true'
         uses: docker/build-push-action@v7
         with:
+          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max,ignore-error=true
           context: .
           file: worker/Dockerfile
           labels: ${{ steps.metadata.outputs.labels }}
