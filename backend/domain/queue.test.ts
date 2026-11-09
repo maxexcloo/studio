@@ -296,6 +296,74 @@ test("an idle worker takes waiting manual work before background work", async ()
   }
 });
 
+test("work goes to an idle worker with its model loaded until that worker goes offline", async () => {
+  const queue = fixture();
+  const { store, observations } = queue;
+  queue.adapter.alternatives = () => ["worker:primary", "worker:video"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string) =>
+      store.enqueue("alice", session.id, { profileId: "flux" }, "image", undefined, resource).id;
+    const where = (id: string) => store.job("alice", id)!.resource;
+    const first = enqueue("worker:video");
+    await queue.queue.tick();
+    observations.set(first, { status: "completed" });
+    await queue.queue.tick();
+    // Both workers are idle; the video worker has the model loaded.
+    const second = enqueue("worker:primary");
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [first, second]);
+    assert.equal(where(second), "worker:video");
+    observations.set(second, { status: "completed" });
+    await queue.queue.tick();
+    queue.queue.unload("worker:video");
+    const third = enqueue("worker:primary");
+    await queue.queue.tick();
+    assert.equal(where(third), "worker:primary");
+  } finally {
+    store.close();
+  }
+});
+
+test("a waiting job moves to the idle worker with its model loaded, manual work first", async () => {
+  const queue = fixture();
+  const { store, observations } = queue;
+  queue.adapter.alternatives = () => ["worker:a", "worker:b", "worker:c"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string, profileId: string, origin = {}) =>
+      store.enqueue(
+        "alice",
+        session.id,
+        { profileId },
+        "image",
+        undefined,
+        resource,
+        undefined,
+        origin,
+      ).id;
+    const where = (id: string) => store.job("alice", id)!;
+    const loads = [enqueue("worker:b", "sdxl"), enqueue("worker:c", "flux")];
+    await queue.queue.tick();
+    for (const id of loads) observations.set(id, { status: "completed" });
+    await queue.queue.tick();
+    // Worker a gets busy with a model no idle worker has loaded, so it stays there.
+    enqueue("worker:a", "wan");
+    await queue.queue.tick();
+    const background = enqueue("worker:a", "flux", mcp("a"));
+    const manual = enqueue("worker:a", "flux");
+    await queue.queue.tick();
+    // The manual job skips the idle worker b for c, which has flux loaded; background work waits.
+    assert.equal(where(manual).resource, "worker:c");
+    assert.equal(where(background).resource, "worker:a");
+    // With no manual work waiting, background work takes the remaining idle worker.
+    await queue.queue.tick();
+    assert.equal(where(background).resource, "worker:b");
+  } finally {
+    store.close();
+  }
+});
+
 test("a started MCP set stays ahead of other MCP work but not manual work, across a restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");

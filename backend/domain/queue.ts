@@ -103,10 +103,12 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
       : {}),
   };
 }
+/** The model a job loads on its resource; empty when it names none. */
+const modelOf = (job: OwnedJob) => String(job.input.profileId || job.input.model || "");
 /** What a job loads on its resource: the model and its enabled LoRAs at their strengths. */
 const loadKey = (job: OwnedJob) =>
   JSON.stringify([
-    job.input.profileId || job.input.model || "",
+    modelOf(job),
     (Array.isArray(job.input.loras) ? job.input.loras : [])
       .filter((lora) => lora && lora.enabled !== false)
       .map((lora) => `${lora.name}@${lora.strength ?? ""}`)
@@ -122,8 +124,11 @@ export class GenerationQueue {
   private checkingEligibility = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private acceptedIds = new Set<string>();
-  /** Load key of the last job started on each resource. */
-  private loaded = new Map<string, string>();
+  /**
+   * The job last started or finished on each resource: what its worker has loaded. Forgotten when
+   * the worker stops, restarts or goes offline (`unload`).
+   */
+  private loaded = new Map<string, OwnedJob>();
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
   private stopped = false;
@@ -143,7 +148,12 @@ export class GenerationQueue {
       if (started(job) && !(job.updatedAt < (latest.get(job.resource)?.updatedAt ?? "")))
         latest.set(job.resource, job);
     }
-    for (const [resource, job] of latest) this.loaded.set(resource, loadKey(job));
+    this.loaded = latest;
+  }
+
+  /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
+  unload(resource: string) {
+    this.loaded.delete(resource);
   }
 
   start() {
@@ -305,6 +315,7 @@ export class GenerationQueue {
               const saved = await this.adapter.saveOutputs(job);
               // A cancellation that raced saving cannot discard already saved results.
               const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
+              this.loaded.set(completed.resource, completed);
               await this.adapter.settled?.(completed);
             } else {
               this.store.save(job);
@@ -373,8 +384,9 @@ export class GenerationQueue {
       const fifo = new Set(
         candidates.filter((job) => overtaken(job) >= reuseBypassLimit).map(rank),
       );
+      const loaded = this.loaded.get(resource);
       const reuses = (job: OwnedJob) =>
-        fifo.has(rank(job)) || loadKey(job) !== this.loaded.get(resource) ? 1 : 0;
+        fifo.has(rank(job)) || !loaded || loadKey(job) !== loadKey(loaded) ? 1 : 0;
       candidates.sort((a, b) => rank(a) - rank(b) || reuses(a) - reuses(b));
     }
     await Promise.all(
@@ -406,7 +418,7 @@ export class GenerationQueue {
             job = this.store.save({ ...job, status: "starting", reason: "" });
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
             this.acceptedIds.add(job.id);
-            this.loaded.set(resource, loadKey(job));
+            this.loaded.set(resource, job);
             try {
               const observation = await this.adapter.submit(job);
               const latest = this.store.job(job.ownerId, job.id)!;
@@ -452,9 +464,10 @@ export class GenerationQueue {
 
   /**
    * A job waiting behind another job on a busy worker moves to an idle one that can run it, one per
-   * idle worker, higher tiers first. Background work moves only while no manual work waits, so the
-   * worker manual work prefers stays free for it; a job never moves behind higher-ranked work.
-   * Updates `all` in place.
+   * idle worker, higher tiers first; an idle worker with the job's model loaded goes first. A job on
+   * an idle worker without its model moves only to an idle worker that has it. Background work moves
+   * only while no manual work waits, so the worker manual work prefers stays free for it; a job never
+   * moves behind higher-ranked work. Updates `all` in place.
    */
   private rebalance(
     all: OwnedJob[],
@@ -471,21 +484,26 @@ export class GenerationQueue {
         (pending(job) || (job.status === "writing" && !held(job))) &&
         tier(job) === queuePriority.manual,
     );
+    // An unknown model never matches, so without model information nothing moves for affinity.
+    const hasModel = (resource: string, job: OwnedJob) => {
+      const loaded = this.loaded.get(resource);
+      return Boolean(modelOf(job)) && loaded !== undefined && modelOf(loaded) === modelOf(job);
+    };
     const taken = new Set<string>();
-    const stuck = all
+    const movable = all
       .map((job, index) => ({ job, index }))
       .filter(
         ({ job }) =>
           pending(job) &&
-          occupied.has(job.resource) &&
+          (occupied.has(job.resource) || (modelOf(job) && !hasModel(job.resource, job))) &&
           !this.scheduling.has(job.resource) &&
           (tier(job) === queuePriority.manual || !manualWaits),
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
-    for (const { job, index } of stuck) {
-      const target = this.adapter
+    for (const { job, index } of movable) {
+      const targets = this.adapter
         .alternatives(job)
-        .find(
+        .filter(
           (resource) =>
             resource !== job.resource &&
             !taken.has(resource) &&
@@ -495,6 +513,9 @@ export class GenerationQueue {
               (other) => other.resource === resource && pending(other) && rank(other) < rank(job),
             ),
         );
+      const target =
+        targets.find((resource) => hasModel(resource, job)) ??
+        (occupied.has(job.resource) ? targets[0] : undefined);
       if (!target) continue;
       taken.add(target);
       all[index] = this.store.save({

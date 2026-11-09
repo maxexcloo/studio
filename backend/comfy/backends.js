@@ -40,9 +40,14 @@ export function backendUrl() {
  */
 const reachable = new Map();
 const inventories = new Map();
+const offlineListeners = new Set();
 export const noteWorkerReachable = (id, up) => {
-  if (id) reachable.set(id, Boolean(up));
+  if (!id) return;
+  reachable.set(id, Boolean(up));
+  if (!up) for (const listener of offlineListeners) listener(id);
 };
+/** Hears the id of each worker found offline. */
+export const onWorkerOffline = (listener) => offlineListeners.add(listener);
 const workerReachable = (id) => (reachable.has(id) ? reachable.get(id) : null);
 /** How a worker's inventory names a profile on one backend of a combined profile. */
 export const profileOnBackendKey = (profileId, backend = "") =>

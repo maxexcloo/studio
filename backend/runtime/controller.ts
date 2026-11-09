@@ -110,6 +110,7 @@ export class RuntimeController {
   /** When each workload last finished or took work, for parking idle ones. */
   private lastUsed = new Map<string, number>();
   private stopping = new Set<string>();
+  private stopListeners = new Set<(id: string) => void>();
   private current?: RuntimeOperation;
   private claimed = false;
   private record: RuntimeRecord;
@@ -373,6 +374,11 @@ export class RuntimeController {
     }
   }
 
+  /** Hears the id of each workload Studio stops, including to restart it. */
+  onStop(listener: (id: string) => void) {
+    this.stopListeners.add(listener);
+  }
+
   /** Stop a running workload and start it again in place: scale to 0, wait for its pod to go, scale to 1. */
   async restart(id: string, requestedBy: string) {
     const workload = this.workload(id);
@@ -460,6 +466,7 @@ export class RuntimeController {
       for (const id of plan.stop) {
         this.step(operation, `Stopping ${label(id)}.`);
         await this.engine.scale(this.workload(id), 0);
+        for (const listener of this.stopListeners) listener(id);
       }
       // A GPU claim is released only when the pod is gone, so nothing starts before that.
       const leaving = [...new Set([...plan.stop, ...plan.start])];
