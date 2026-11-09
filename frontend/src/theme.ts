@@ -262,17 +262,20 @@ export function studioTheme({
         defaultProps: { size: "md" },
         vars: (_theme, props) => ({ wrapper: { "--input-height": height(props.size) } }),
       }),
-      // One row height for every menu's items. Phones expand options in place, so a menu stays
-      // within the screen and scrolls when they outgrow it.
+      // One row height for every menu's items. Phones and touch screens expand options in place,
+      // so a menu stays within the screen and scrolls when they outgrow it (a phone held sideways).
       Menu: Menu.extend({
         defaultProps: {
           transitionProps: popupTransition,
-          ...(phone && { middlewares: { ...popupMiddlewares, size: { padding: 12 } } }),
+          ...((phone || touch) && {
+            middlewares: { ...popupMiddlewares, size: { padding: 12 } },
+          }),
         },
         styles: {
-          dropdown: phone
-            ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
-            : dropdown,
+          dropdown:
+            phone || touch
+              ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
+              : dropdown,
           item: { minHeight: touch ? bar : 36 },
         },
       }),
