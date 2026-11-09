@@ -11,7 +11,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Room for focus rings inside the scroller, outset so the conversation lines up with its title
+     and composer. */
   padding: 0.25rem 0.25rem 1rem;
+  margin-inline: -0.25rem;
   --chat-media-height: 420px;
 }
 
