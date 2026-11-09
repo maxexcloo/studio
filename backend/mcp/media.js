@@ -105,10 +105,6 @@ const aborted = (signal) => {
   error.aborted = true;
   return error;
 };
-// A job read answers in milliseconds; one that takes longer than this is stalled, and Status says so instead of waiting on.
-const statusReadTimeoutMs = 15000;
-const statusStalledMessage =
-  "Studio did not answer this status check in time. The generation keeps running: share its link and check again later, without resubmitting.";
 const pause = (milliseconds, signal) =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(aborted(signal));
@@ -179,23 +175,21 @@ export class McpMedia {
     dataDir,
     // A profile's resolved prompting (profile/store.js livePrompting); tests may leave it out.
     prompting = (profile) => profile.prompting ?? null,
-    baseUrl,
     publicUrl,
     signingKey,
-    fetchImpl = fetch,
     resolveSignedResult,
+    // Studio's routes, called in process (mcp/studio-requests.js createMcpDomainRequest).
     domainRequest,
     cloudVideoFailures = () => [],
     profileTtl = 60000,
   }) {
     this.profileTtl = profileTtl;
     this.prompting = prompting;
-    this.baseUrl = baseUrl;
     this.publicBase = publicUrl;
-    this.fetch = fetchImpl;
     this.resolveSignedResult = resolveSignedResult;
     this.domainRequest = domainRequest;
     this.cloudVideoFailures = cloudVideoFailures;
+    // Each account owner's credential (multi-user-auth.js mcpAccount): `{ token }` or `{ internal: true }`.
     this.credentials = new Map();
     // Open upload links (uploadUrl): nonce → expiry time.
     this.uploadLinks = new Map();
@@ -280,84 +274,47 @@ export class McpMedia {
         `Choose ${kind === "jobs" ? "a job" : "a reference"} submitted by this account to this studio.`,
       );
   }
-  async response(
-    method,
-    route,
-    body,
-    owner = "",
-    { credential: override, signal, timeoutMs = 60000, stalled = "" } = {},
-  ) {
-    const base = new URL(typeof this.baseUrl === "function" ? this.baseUrl() : this.baseUrl);
-    if (!["127.0.0.1", "[::1]", "localhost"].includes(base.hostname) || base.protocol !== "http:")
-      throw new Error("MCP requires the studio’s private HTTP loopback endpoint.");
-    let response;
-    const credential = override || this.credentials.get(owner);
-    // An account's credential is a header set: its personal bearer, or MCP's internal loopback credential.
-    const headers = {
-      ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      "X-Studio": "1",
-      ...(credential || {}),
-    };
-    try {
-      const direct = await this.domainRequest?.(method, route, body, owner);
-      response = direct
-        ? Response.json(direct.payload, { status: direct.status })
-        : await this.fetch(new URL(route, base), {
-            method,
-            headers,
-            ...(body === undefined
-              ? {}
-              : { body: body instanceof FormData ? body : JSON.stringify(body) }),
-            redirect: "error",
-            signal: signal
-              ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
-              : AbortSignal.timeout(timeoutMs),
-          });
-    } catch {
-      if (signal?.aborted) throw aborted(signal);
-      // A status read that stalls says so in time for the chat, rather than holding it past the client's own deadline.
-      if (stalled) throw new Error(stalled);
-      const error = new Error(
-        "The studio connection was interrupted. Check the returned job before retrying.",
-      );
-      error.submissionUncertain = true;
-      throw error;
-    }
-    if (!response.ok) {
-      // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
-      let reason = "";
-      if ([400, 403, 404, 409, 422, 429].includes(response.status))
-        try {
-          const answer = await response.json();
-          reason =
-            typeof answer?.error === "string"
-              ? answer.error.replace(/\s+/g, " ").trim().slice(0, 400)
-              : "";
-        } catch {
-          /* No JSON reason. */
-        }
-      throw new Error(
-        reason
-          ? `Studio refused the request: ${reason}`
-          : `Studio refused the request (HTTP ${response.status}). Check the selected profile and studio availability.`,
-      );
-    }
-    return response;
+  /**
+   * Calls Studio's `route` in process as `owner`, with its credential unless `credential` gives
+   * one; answers `{ status, payload }`, or a file's `{ status, content, mime, headers }`. A refusal
+   * throws with the route's own reason. A cancelled call ends its wait at once, and work that
+   * watches `signal` (the prompt assistant's) stops too.
+   */
+  async call(method, route, body, owner = "", { credential, signal } = {}) {
+    if (signal?.aborted) throw aborted(signal);
+    const pending = this.domainRequest(
+      method,
+      route,
+      body,
+      owner,
+      credential || this.credentials.get(owner),
+      signal,
+    );
+    const answer = signal
+      ? await Promise.race([
+          pending,
+          new Promise((_resolve, reject) =>
+            signal.addEventListener("abort", () => reject(aborted(signal)), { once: true }),
+          ),
+        ])
+      : await pending;
+    if (answer.status >= 200 && answer.status < 300) return answer;
+    // The studio's own validation message names the problem (a LoRA policy, a reference); keep it short.
+    const reason =
+      [400, 403, 404, 409, 422, 429].includes(answer.status) &&
+      typeof answer.payload?.error === "string"
+        ? answer.payload.error.replace(/\s+/g, " ").trim().slice(0, 400)
+        : "";
+    throw new Error(
+      reason
+        ? `Studio refused the request: ${reason}`
+        : `Studio refused the request (HTTP ${answer.status}). Check the selected profile and studio availability.`,
+    );
   }
+  /** A route's JSON answer, the caller's own copy. */
   async request(method, route, body, owner = "", options = {}) {
-    const response = await this.response(method, route, body, owner, options);
-    try {
-      return await response.json();
-    } catch (failure) {
-      if (options.signal?.aborted) throw aborted(options.signal);
-      if (options.stalled && ["AbortError", "TimeoutError"].includes(failure?.name))
-        throw new Error(options.stalled);
-      const error = new Error(
-        "Studio returned an invalid response. Check job status before retrying.",
-      );
-      error.submissionUncertain = true;
-      throw error;
-    }
+    const { payload } = await this.call(method, route, body, owner, options);
+    return JSON.parse(JSON.stringify(payload));
   }
   /** Forget every cached catalogue when the studio's model list changes. */
   invalidateProfiles() {
@@ -703,7 +660,7 @@ export class McpMedia {
           // A prompt written in the queue is not known yet; its outputs carry it.
           const ran = writing ? undefined : prompt;
           try {
-            // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
+            // Persist the client id before dispatch, so a failed call cannot lose job ownership.
             this.state.jobs[id] = owner;
             this.save();
             const result = await this.request(
@@ -742,20 +699,6 @@ export class McpMedia {
             });
             images += size;
           } catch (error) {
-            if (error.submissionUncertain) {
-              queued.push({
-                job_id: id,
-                ...this.handle(owner, scope, id),
-                status: "unknown",
-                ...(ran ? { prompt: ran } : {}),
-              });
-              return {
-                status: "partially_queued",
-                jobs: queued,
-                error:
-                  "The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.",
-              };
-            }
             if (cloud && this.noteCloudRefusal(error.message))
               error.message = `${cloudQuotaMessage} ${error.message}`;
             // The studio's reason tells the agent why the rest did not queue.
@@ -799,9 +742,7 @@ export class McpMedia {
     try {
       const [one, two] = await Promise.all(
         (runs > 1 ? [1, 2] : [1]).map((count) =>
-          this.request("GET", `/api/estimate?${query(count)}`, undefined, owner, {
-            timeoutMs: 3000,
-          }),
+          this.request("GET", `/api/estimate?${query(count)}`, undefined, owner),
         ),
       );
       if (!one?.ms || (runs > 1 && !(two?.ms > one.ms))) return null;
@@ -1015,12 +956,7 @@ export class McpMedia {
     const number = entry && Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
     return number ? `result ${number}` : undefined;
   }
-  async job(
-    owner,
-    jobId,
-    seconds = 0,
-    { signal, credential, interval = 2000, timeoutMs = statusReadTimeoutMs } = {},
-  ) {
+  async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
@@ -1028,17 +964,10 @@ export class McpMedia {
       let job = await this.request("GET", `/api/jobs/${safeId(jobId)}`, undefined, owner, {
         signal,
         credential,
-        timeoutMs,
-        stalled: statusStalledMessage,
       });
       if (job.status === "missing" || finished.has(job.status)) {
         // A subsequently deleted output is revoked even while its terminal job remains cached.
-        const visible = await this.galleryJob(jobId, owner, {
-          signal,
-          credential,
-          timeoutMs,
-          stalled: statusStalledMessage,
-        });
+        const visible = await this.galleryJob(jobId, owner, { signal, credential });
         job =
           job.status === "missing"
             ? visible
@@ -1562,30 +1491,19 @@ export class McpMedia {
     return { content, mime: "image/jpeg" };
   }
   async readOutput(output, owner = "") {
-    const response = await this.response("GET", output.url, undefined, owner);
-    const chunks = [];
-    let bytes = 0;
-    for await (const chunk of response.body) {
-      bytes += chunk.length;
-      if (bytes > 128000000) throw new Error("Download large results directly from Studio.");
-      chunks.push(Buffer.from(chunk));
-    }
-    return {
-      content: Buffer.concat(chunks),
-      mime: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream",
-    };
+    const { content, mime } = await this.call("GET", output.url, undefined, owner);
+    if (content.length > 128000000) throw new Error("Download large results directly from Studio.");
+    return { content, mime };
   }
   /** The size a profile framed by its reference draws for reference `id`: its proportions at the profile's pixel count. */
   async referenceFrame(owner, profile, id) {
-    const response = await this.response(
+    const { content } = await this.call(
       "GET",
       `/api/reference-assets/${encodeURIComponent(id)}/media`,
       undefined,
       owner,
     );
-    const { width, height } = await sharp(Buffer.from(await response.arrayBuffer()), {
-      limitInputPixels: 80000000,
-    }).metadata();
+    const { width, height } = await sharp(content, { limitInputPixels: 80000000 }).metadata();
     return (width > 0 && height > 0 && frameSize(profile, width, height)) || {};
   }
   async upload(owner, base64, filename = "reference.png") {
@@ -1625,13 +1543,12 @@ export class McpMedia {
     // A chat model without the image's bytes tends to send a made-up few-pixel image, which a model's encoder rejects.
     if (Math.min(metadata.width, metadata.height) < 32)
       throw new Error(`This image is only a few pixels, so it is not the real picture.${advice}`);
-    const form = new FormData();
-    form.append(
-      "image",
-      new Blob([content], { type: `image/${metadata.format}` }),
-      path.basename(filename),
-    );
-    const result = await this.request("POST", "/api/reference-assets/upload", form, owner, {
+    const upload = {
+      buffer: content,
+      name: path.basename(filename),
+      mime: `image/${metadata.format}`,
+    };
+    const result = await this.request("POST", "/api/reference-assets/upload", { upload }, owner, {
       credential,
     });
     if (!result.asset?.id) throw new Error("Studio could not accept this reference image.");
@@ -1948,7 +1865,7 @@ export class McpMedia {
       .join("");
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
   }
-  /** The watch page behind a p2 link; account mode reads as the signed owner through MCP's loopback credential. */
+  /** The watch page behind a p2 link; account mode reads as the signed owner with Studio's own credential. */
   async page(claims, credential) {
     let job;
     try {

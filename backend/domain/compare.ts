@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
+import { directRoute } from "./direct-route.ts";
 import type { Store, QueueOrigin } from "./store.ts";
 
 /**
@@ -169,10 +170,15 @@ export function registerCompareRoutes(
       ? res.json(show(record, items))
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
   });
-  app.post("/api/comparisons", (req, res) => {
-    const items = gallery(req, res);
-    if (!items) return;
-    const { jobIds, labels } = req.body || {};
+  // MCP records its multi-model runs through this one.
+  directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
+    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    if (!items)
+      return {
+        status: 403,
+        payload: { ok: false, error: "Gallery access is disabled for this account." },
+      };
+    const { jobIds, labels } = body || {};
     if (
       !Array.isArray(jobIds) ||
       !sized(jobIds) ||
@@ -180,8 +186,11 @@ export function registerCompareRoutes(
       new Set(jobIds).size !== jobIds.length ||
       !labelsValid(labels, jobIds.length)
     )
-      return res.status(400).json({ ok: false, error: `Choose ${range} different image jobs.` });
-    const ownerId = owner(req);
+      return {
+        status: 400,
+        payload: { ok: false, error: `Choose ${range} different image jobs.` },
+      };
+    const ownerId = account?.userId || "";
     const image = (id: string) => {
       const job = store.job(ownerId, id);
       return job
@@ -189,9 +198,9 @@ export function registerCompareRoutes(
         : items.some((item) => item.jobId === id && item.type === "image");
     };
     if (!jobIds.every(image))
-      return res.status(404).json({ ok: false, error: "A comparison image is unavailable." });
+      return { status: 404, payload: { ok: false, error: "A comparison image is unavailable." } };
     const record = create(ownerId, jobIds, labels as string[] | undefined);
-    return res.status(201).json(show(record, items));
+    return { status: 201, payload: show(record, items) };
   });
   // Every variant shares the seed and runs as one queue set; a refused variant cancels the rest.
   app.post("/api/comparisons/run", async (req, res) => {

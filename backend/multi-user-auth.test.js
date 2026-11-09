@@ -14,7 +14,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
+const { registerMultiUserAuthRoutes, accountForRequest, mcpAccount } =
+  await import("./multi-user-auth.js");
 const { readRuntimeDocument } = await import("./persistence/runtime.ts");
 
 const routes = {};
@@ -57,6 +58,8 @@ function call(handler, req) {
       return this;
     },
   };
+  // As the gate does before any account route (multi-user-gate.js).
+  accountForRequest(req);
   return Promise.resolve(handler(req, res)).then(() => res);
 }
 
@@ -291,9 +294,8 @@ test("session cookies are Secure behind a TLS-terminating proxy", async () => {
   assert.match([].concat(signedIn.headers["Set-Cookie"])[0], /; Secure/);
 });
 
-test("gateway identities map to accounts only through administrator links, and the internal credential stays on loopback MCP routes", async () => {
+test("gateway identities map to accounts only through administrator links, and Studio's own MCP credential reaches only MCP's routes", async () => {
   const { gatewayAccountAccess, noteGatewayIdentity } = await import("./account-store.js");
-  const { internalMcpHeaders } = await import("./multi-user-auth.js");
   const signedIn = await call(
     routes["POST /api/accounts/sign-in"],
     local({ username: "recovery", password: "a secure recovery password" }),
@@ -335,36 +337,12 @@ test("gateway identities map to accounts only through administrator links, and t
   assert.equal(access.userId, artist.id);
   assert.equal(access.credential, "mcp-token");
 
-  const internal = (method, routePath, extra = {}) => ({
-    ...local(),
-    method,
-    path: routePath,
-    headers: {
-      ...local().headers,
-      ...Object.fromEntries(
-        Object.entries(internalMcpHeaders(artist.id)).map(([name, value]) => [
-          name.toLowerCase(),
-          value,
-        ]),
-      ),
-      ...extra,
-    },
-  });
-  assert.equal(accountForRequest(internal("POST", "/api/generate")).userId, artist.id);
-  assert.equal(accountForRequest(internal("POST", "/api/jobs/job-1/cancel")).userId, artist.id);
-  assert.equal(accountForRequest(internal("GET", "/api/accounts/admin")), null);
-  // Behind a proxy the request is not this computer, so the credential is refused.
-  assert.equal(
-    accountForRequest(internal("POST", "/api/generate", { "x-forwarded-for": "203.0.113.9" })),
-    null,
-  );
-  assert.equal(
-    accountForRequest({
-      ...internal("POST", "/api/generate"),
-      headers: { ...internal("POST", "/api/generate").headers, "x-studio-mcp-internal": "guessed" },
-    }),
-    null,
-  );
+  const internal = (method, routePath) =>
+    mcpAccount(artist.id, { internal: true }, method, routePath);
+  assert.equal(internal("POST", "/api/generate").userId, artist.id);
+  assert.equal(internal("POST", "/api/jobs/job-1/cancel").userId, artist.id);
+  assert.equal(internal("GET", "/api/accounts/admin"), null);
+  assert.equal(mcpAccount(artist.id, undefined, "POST", "/api/generate"), null);
 
   await call(routes["PATCH /api/accounts/users/:id"], {
     ...admin,
@@ -372,7 +350,7 @@ test("gateway identities map to accounts only through administrator links, and t
     body: { disabled: true },
   });
   assert.equal(gatewayAccountAccess("librechat-user-1"), null);
-  assert.equal(accountForRequest(internal("POST", "/api/generate")), null);
+  assert.equal(internal("POST", "/api/generate"), null);
   await call(routes["PATCH /api/accounts/users/:id"], {
     ...admin,
     params: { id: artist.id },
@@ -509,7 +487,7 @@ test("administrators can dismiss a pending gateway identity, which returns only 
 
 test("MCP admin routes take only an administrator's own token, or a gateway-linked administrator while Chat Gateway Admin Tools is on", async () => {
   const { rotateAccountMcpToken } = await import("./account-store.js");
-  const { internalMcpHeaders, mcpAdminRouteAllowed } = await import("./multi-user-auth.js");
+  const { mcpAdminRouteAllowed } = await import("./multi-user-auth.js");
   const { canAdmin } = await import("./access.js");
   const { fromChat } = await import("./route-access.js");
   const signedIn = await call(
@@ -533,20 +511,8 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
     path: routePath,
     headers: { ...local().headers, authorization: `Bearer ${token}` },
   });
-  const internal = (accountId, method, routePath) => ({
-    ...local(),
-    method,
-    path: routePath,
-    headers: {
-      ...local().headers,
-      ...Object.fromEntries(
-        Object.entries(internalMcpHeaders(accountId)).map(([name, value]) => [
-          name.toLowerCase(),
-          value,
-        ]),
-      ),
-    },
-  });
+  const internal = (accountId, method, routePath) =>
+    mcpAccount(accountId, { internal: true }, method, routePath);
 
   assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
@@ -568,7 +534,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   const asAdmin = accountForRequest(bearer(adminToken, "POST", "/api/library/imports"));
   assert.equal(asAdmin.credential, "mcp-admin");
   assert.equal(canAdmin({ studioAccount: asAdmin }), true);
-  assert.equal(fromChat({ studioAccount: asAdmin }), true);
+  assert.equal(fromChat(asAdmin), true);
   assert.equal(accountForRequest(bearer(adminToken, "POST", "/api/accounts/users")), null);
   assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/models")).credential, "mcp-token");
   assert.equal(
@@ -618,16 +584,13 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
     );
   }
 
-  // The switch is off by default: a gateway-linked administrator's loopback calls stay out.
+  // The switch is off by default: a gateway-linked administrator's MCP calls stay out.
   assert.equal(
     (await call(routes["GET /api/accounts/admin"], admin)).body.gateway.adminTools,
     false,
   );
-  assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")), null);
-  assert.equal(
-    accountForRequest(internal(adminId, "POST", "/api/generate")).credential,
-    "mcp-token",
-  );
+  assert.equal(internal(adminId, "POST", "/api/library/imports"), null);
+  assert.equal(internal(adminId, "POST", "/api/generate").credential, "mcp-token");
   const refused = await call(routes["POST /api/accounts/gateway-admin"], {
     ...local({ on: true }),
     socket: { remoteAddress: "192.168.1.30" },
@@ -643,13 +606,10 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
       .adminTools,
     true,
   );
-  assert.equal(
-    accountForRequest(internal(adminId, "POST", "/api/library/imports")).credential,
-    "mcp-admin",
-  );
-  assert.equal(accountForRequest(internal(artist.id, "POST", "/api/library/imports")), null);
+  assert.equal(internal(adminId, "POST", "/api/library/imports").credential, "mcp-admin");
+  assert.equal(internal(artist.id, "POST", "/api/library/imports"), null);
   await call(routes["POST /api/accounts/gateway-admin"], { ...admin, body: { on: false } });
-  assert.equal(accountForRequest(internal(adminId, "POST", "/api/library/imports")), null);
+  assert.equal(internal(adminId, "POST", "/api/library/imports"), null);
 });
 
 test("behind the proxy, one client's wrong passwords lock out only that client", async () => {
@@ -674,4 +634,36 @@ test("behind the proxy, one client's wrong passwords lock out only that client",
     via("198.51.100.2", "a secure recovery password"),
   );
   assert.equal(other.statusCode, 200, other.body.error);
+});
+
+test("MCP's in-process calls meet the gate a request with the same credential meets", async () => {
+  const { listAccounts, rotateAccountMcpToken } = await import("./account-store.js");
+  const { directRoute } = await import("./domain/direct-route.ts");
+  const { createMcpDomainRequest } = await import("./mcp/studio-requests.js");
+  const artist = listAccounts().find((account) => account.username === "artist");
+  const token = rotateAccountMcpToken(artist.id).token;
+  const app = {};
+  for (const route of ["/api/queue/:id/move", "/api/maintenance/unfinished"])
+    directRoute(app, "POST", route, (account, { params, query, body }) => ({
+      status: 200,
+      payload: { owner: account.userId, params, query: { ...query }, body },
+    }));
+  const call = createMcpDomainRequest({ app });
+  assert.deepEqual(
+    await call("POST", "/api/queue/job-1/move?at=1", { to: 0 }, artist.id, { token }),
+    {
+      status: 200,
+      payload: { owner: artist.id, params: { id: "job-1" }, query: { at: "1" }, body: { to: 0 } },
+    },
+  );
+  assert.equal(
+    (await call("POST", "/api/queue/job-1/move", {}, artist.id, { internal: true })).status,
+    200,
+  );
+  // An administrator's route, or no credential at all, is refused as a request would be.
+  assert.equal(
+    (await call("POST", "/api/maintenance/unfinished", {}, artist.id, { token })).status,
+    401,
+  );
+  assert.equal((await call("POST", "/api/queue/job-1/move", {}, artist.id)).status, 401);
 });

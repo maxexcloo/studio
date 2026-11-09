@@ -7,6 +7,7 @@ import {
   type UnfinishedJob,
 } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
+import { directRoute, type RouteAccount } from "./direct-route.ts";
 import { GenerationQueue } from "./queue.ts";
 import { everyone, publicJob, queuePriority, Store, type OwnedJob } from "./store.ts";
 
@@ -28,6 +29,7 @@ interface Router {
   delete(path: string, handler: Handler): unknown;
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
+const ownerOf = (account: RouteAccount) => account?.userId || "";
 /**
  * The person's queue: Dream's background jobs stay out of it (Dream's own pause stops them), and
  * so do failed jobs the person cleared.
@@ -36,6 +38,7 @@ const listed = (store: Store, ownerId: string) =>
   store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream && !job.cleared);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
+const notFound = { status: 404, payload: { error: "Not found." } };
 // A cancel the worker could not confirm yet (busy, or a proxy answering for it); recovery finishes it.
 export const unconfirmedCancel =
   "Cancellation could not be confirmed. The recorded job remains available for recovery.";
@@ -248,35 +251,39 @@ export function registerRewriteRoutes(
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
   });
-  app.get("/api/queue", (req, res) => {
+  directRoute(app, "GET", "/api/queue", (account) => {
+    const ownerId = ownerOf(account);
     const pauses = store.pauses();
-    return res.json({
-      // Polled while work runs: a job with gallery records drops the adapter's copies of them,
-      // which every reader passes over for the records.
-      jobs: shown(owner(req), listed(store, owner(req))).map((job) =>
-        job.items.length ? { ...job, outputs: [] } : job,
-      ),
-      paused: { mine: pauses.has(owner(req)), all: pauses.has(everyone) },
-    } satisfies QueueResponse);
+    return {
+      status: 200,
+      payload: {
+        // Polled while work runs: a job with gallery records drops the adapter's copies of them,
+        // which every reader passes over for the records.
+        jobs: shown(ownerId, listed(store, ownerId)).map((job) =>
+          job.items.length ? { ...job, outputs: [] } : job,
+        ),
+        paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
+      } satisfies QueueResponse,
+    };
   });
   // The account's own pause: nothing new of its work starts; started work finishes.
   for (const [action, paused] of [
     ["pause", true],
     ["resume", false],
   ] as const)
-    app.post(`/api/queue/${action}`, (req, res) => {
-      store.setPaused(owner(req), paused);
+    directRoute(app, "POST", `/api/queue/${action}`, (account) => {
+      store.setPaused(ownerOf(account), paused);
       void queue.tick();
-      return res.json({ ok: true });
+      return { status: 200, payload: { ok: true } };
     });
-  app.post("/api/queue/:id/move", (req, res) => {
-    const to = req.body?.to;
+  directRoute(app, "POST", "/api/queue/:id/move", (account, { params, body }) => {
+    const to = body?.to;
     if (typeof to !== "number" || !Number.isInteger(to) || to < 0)
-      return res.status(400).json({ error: "Move to a place in the queue." });
-    if (!store.job(owner(req), req.params.id)) return missing(res);
-    return store.move(owner(req), req.params.id, to)
-      ? res.json({ ok: true })
-      : res.status(409).json({ error: "Only waiting generations can be moved." });
+      return { status: 400, payload: { error: "Move to a place in the queue." } };
+    if (!store.job(ownerOf(account), params.id)) return notFound;
+    return store.move(ownerOf(account), params.id, to)
+      ? { status: 200, payload: { ok: true } }
+      : { status: 409, payload: { error: "Only waiting generations can be moved." } };
   });
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
@@ -287,8 +294,8 @@ export function registerRewriteRoutes(
     }
     return res.json({ cancelled });
   });
-  app.post("/api/queue/cancel-all", async (req, res) => {
-    const ownerId = owner(req);
+  directRoute(app, "POST", "/api/queue/cancel-all", async (account) => {
+    const ownerId = ownerOf(account);
     const outcomes = await Promise.all(
       listed(store, ownerId)
         .filter((job) => !terminalStatuses.has(job.status))
@@ -307,19 +314,19 @@ export function registerRewriteRoutes(
           };
         }),
     );
-    return res.json({ outcomes } satisfies QueueCancelAllResponse);
+    return { status: 200, payload: { outcomes } satisfies QueueCancelAllResponse };
   });
-  app.post("/api/queue/clear-failed", (req, res) => {
-    const failed = listed(store, owner(req)).filter((job) => job.status === "failed");
+  directRoute(app, "POST", "/api/queue/clear-failed", (account) => {
+    const failed = listed(store, ownerOf(account)).filter((job) => job.status === "failed");
     failed.forEach((job) => clear(store, job));
-    return res.json({ cleared: failed.length });
+    return { status: 200, payload: { cleared: failed.length } };
   });
-  app.post("/api/queue/:id/clear", (req, res) => {
-    const job = store.job(owner(req), req.params.id);
-    if (!job) return missing(res);
+  directRoute(app, "POST", "/api/queue/:id/clear", (account, { params }) => {
+    const job = store.job(ownerOf(account), params.id);
+    if (!job) return notFound;
     if (job.status !== "failed")
-      return res.status(409).json({ error: "Only failed generations can be cleared." });
-    return res.json({ job: publicJob(clear(store, job)) });
+      return { status: 409, payload: { error: "Only failed generations can be cleared." } };
+    return { status: 200, payload: { job: publicJob(clear(store, job)) } };
   });
   app.post("/api/queue/:id/cancel", async (req, res) => {
     let job;
@@ -330,12 +337,12 @@ export function registerRewriteRoutes(
     }
     return job ? res.json({ job: publicJob(job) }) : missing(res);
   });
-  app.post("/api/queue/:id/retry", (req, res) => {
-    if (!store.job(owner(req), req.params.id)) return missing(res);
-    const job = queue.retry(owner(req), req.params.id);
-    if (!job) return res.status(409).json({ error: "Only failed generations can be retried." });
+  directRoute(app, "POST", "/api/queue/:id/retry", (account, { params }) => {
+    if (!store.job(ownerOf(account), params.id)) return notFound;
+    const job = queue.retry(ownerOf(account), params.id);
+    if (!job) return { status: 409, payload: { error: "Only failed generations can be retried." } };
     void queue.tick();
-    return res.status(202).json({ job: publicJob(job) });
+    return { status: 202, payload: { job: publicJob(job) } };
   });
 }
 
@@ -349,15 +356,16 @@ export function registerMaintenanceRoutes(
   {
     store,
     queue,
-    requireAdmin,
+    adminRefusal,
   }: {
     store: Store;
     queue: GenerationQueue;
-    requireAdmin(req: Request, res: Response): boolean;
+    /** route-access.js's: why the account may not, or null. */
+    adminRefusal(account: RouteAccount): DomainResponse | null;
   },
 ) {
-  const target = (req: Request) =>
-    store.job(String(req.body?.ownerId ?? ""), String(req.body?.id ?? ""));
+  const target = (body: Record<string, unknown> | undefined) =>
+    store.job(String(body?.ownerId ?? ""), String(body?.id ?? ""));
   const end = async (job: OwnedJob) => {
     await queue.abandon(job.ownerId, job.id);
     return clear(store, store.job(job.ownerId, job.id)!);
@@ -367,14 +375,16 @@ export function registerMaintenanceRoutes(
     ["pause-all", true],
     ["resume-all", false],
   ] as const)
-    app.post(`/api/queue/${action}`, (req, res) => {
-      if (!requireAdmin(req, res)) return;
+    directRoute(app, "POST", `/api/queue/${action}`, (account) => {
+      const refusal = adminRefusal(account);
+      if (refusal) return refusal;
       store.setPaused(everyone, paused);
       void queue.tick();
-      return res.json({ ok: true });
+      return { status: 200, payload: { ok: true } };
     });
-  app.get("/api/maintenance/unfinished", (req, res) => {
-    if (!requireAdmin(req, res)) return;
+  directRoute(app, "GET", "/api/maintenance/unfinished", (account) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
     const jobs: UnfinishedJob[] = store
       .jobs()
       .filter((job) => !terminalStatuses.has(job.status) && !job.cleared)
@@ -383,21 +393,23 @@ export function registerMaintenanceRoutes(
         ownerId: job.ownerId,
         dream: job.priority === queuePriority.dream,
       }));
-    return res.json({ jobs });
+    return { status: 200, payload: { jobs } };
   });
-  app.post("/api/maintenance/unfinished/retry", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const job = target(req);
-    if (!job) return missing(res);
+  directRoute(app, "POST", "/api/maintenance/unfinished/retry", async (account, { body }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const job = target(body);
+    if (!job) return notFound;
     await end(job);
     const retried = queue.requeue(job);
     void queue.tick();
-    return res.status(202).json({ job: publicJob(retried) });
+    return { status: 202, payload: { job: publicJob(retried) } };
   });
-  app.post("/api/maintenance/unfinished/delete", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const job = target(req);
-    if (!job) return missing(res);
-    return res.json({ job: publicJob(await end(job)) });
+  directRoute(app, "POST", "/api/maintenance/unfinished/delete", async (account, { body }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const job = target(body);
+    if (!job) return notFound;
+    return { status: 200, payload: { job: publicJob(await end(job)) } };
   });
 }

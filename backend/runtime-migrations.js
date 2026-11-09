@@ -1,5 +1,6 @@
 import { migrateGalleryRows, migrateRuntime } from "./persistence/migration.ts";
 import { accountAccess } from "./account-migration.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { reloadAccountStore } from "./account-store.js";
 import { combinedProfiles } from "./combined-profiles.js";
 import { dreamOwnership } from "./dream-ownership.js";
@@ -198,17 +199,18 @@ function summary(results, apply) {
  * it returns every step's plan; with it, it applies the online-safe steps against Studio's data
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
-export function registerMigrationRoutes(app, { dataDir, requireAdmin, reload, log = console }) {
-  app.post("/api/maintenance/migrations", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const apply = req.body?.apply === true;
+export function registerMigrationRoutes(app, { dataDir, adminRefusal, reload, log = console }) {
+  directRoute(app, "POST", "/api/maintenance/migrations", async (account, { body }) => {
+    const refused = adminRefusal(account);
+    if (refused) return refused;
+    const apply = body?.apply === true;
     try {
       const results = await runtimeMigrations(dataDir, { apply, online: true, reload });
       log.info?.(`[migrations] ${apply ? "Apply" : "Dry run"}: ${summary(results, apply)}`);
-      return res.json({ ok: true, apply, steps: results });
+      return { status: 200, payload: { ok: true, apply, steps: results } };
     } catch (error) {
       log.warn?.(`[migrations] ${apply ? "Apply" : "Dry run"} failed: ${error.message}`);
-      return res.status(500).json({ ok: false, error: error.message });
+      return { status: 500, payload: { ok: false, error: error.message } };
     }
   });
 }

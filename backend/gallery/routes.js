@@ -13,14 +13,11 @@ import {
 import { galleryFilter, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
-import {
-  recordBelongsToRequest,
-  recordBelongsToAccount,
-  recordsForRequest,
-} from "../account-ownership.js";
+import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
 import { galleryAspects, gallerySizeBands } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
-import { requireAdmin } from "../route-access.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { adminRefusal } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 
 export function galleryJobResponse(store, account, id, settings = false) {
@@ -63,30 +60,24 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
       .map((item) => String(item ?? "").slice(0, 200))
       .filter(Boolean)
       .slice(0, 50);
-  async function searchFilter(req) {
+  async function searchFilter(query) {
     const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
-    const q = one(req.query.q);
+    const q = one(query.q);
     return galleryFilter({
       q,
       near: await near(q),
-      favorites: req.query.favorites === "1",
-      workflow: one(req.query.workflow),
+      favorites: query.favorites === "1",
+      workflow: one(query.workflow),
       ...Object.fromEntries(
-        ["lora", "model", "size", "aspect"].map((key) => [key, many(req.query[key])]),
+        ["lora", "model", "size", "aspect"].map((key) => [key, many(query[key])]),
       ),
     });
   }
 
   // Exact job reads avoid sorting and paging the full gallery for MCP results.
-  app.get("/api/gallery/jobs/:id", (req, res) => {
-    const result = galleryJobResponse(
-      store,
-      req.studioAccount,
-      req.params.id,
-      req.query.settings === "1",
-    );
-    res.status(result.status).json(result.payload);
-  });
+  directRoute(app, "GET", "/api/gallery/jobs/:id", (account, { params, query }) =>
+    galleryJobResponse(store, account, params.id, query.settings === "1"),
+  );
 
   app.get("/api/gallery/filters", (req, res) => {
     const type = String(req.query.type || "");
@@ -141,39 +132,42 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
     });
   });
 
-  app.get("/api/gallery", async (req, res) => {
+  directRoute(app, "GET", "/api/gallery", async (account, { query }) => {
     cleanupGalleryState(store);
-    const type = String(req.query.type || "");
-    const limit = Number(req.query.limit || 0);
-    const cursor = String(req.query.cursor || "");
-    const includeFailed = req.query.includeFailed !== "0";
-    const chats = jobChats(req);
-    const chatIds = many(req.query.chat);
-    const search = await searchFilter(req);
+    const type = String(query.type || "");
+    const limit = Number(query.limit || 0);
+    const cursor = String(query.cursor || "");
+    const includeFailed = query.includeFailed !== "0";
+    const chats = jobChats({ studioAccount: account });
+    const chatIds = many(query.chat);
+    const search = await searchFilter(query);
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
-    const since = req.query.since ? Date.parse(String(req.query.since)) : 0;
+    const since = query.since ? Date.parse(String(query.since)) : 0;
     const page = pageGallery({
       type,
       limit: limit || 200,
       cursor,
       includeFailed,
-      uploads: req.query.uploads === "1",
+      uploads: query.uploads === "1",
       filter: (item) =>
-        recordBelongsToRequest(item, req) &&
+        recordBelongsToAccount(item, account) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });
     // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every page.
     const listed = ({ nextSteps: _steps, ...item }) => item;
-    res.json({
-      ...page,
-      items: page.items.map((item) =>
-        chats.has(item.jobId)
-          ? { ...listed(item), sessionId: chats.get(item.jobId).id }
-          : listed(item),
-      ),
-    });
+    return {
+      status: 200,
+      payload: {
+        ...page,
+        items: page.items.map((item) =>
+          chats.has(item.jobId)
+            ? { ...listed(item), sessionId: chats.get(item.jobId).id }
+            : listed(item),
+        ),
+      },
+    };
   });
 }
 
@@ -197,42 +191,42 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
 
   /* ------------------------------------------ Favourites, prompts, earlier work */
 
-  app.post("/api/gallery/favorite", (req, res) => {
-    const requested = new Set(
-      (Array.isArray(req.body?.ids) ? req.body.ids : []).map(String).slice(0, 500),
-    );
-    const ids = recordsForRequest(gallery, req)
+  directRoute(app, "POST", "/api/gallery/favorite", (account, { body }) => {
+    const requested = new Set((Array.isArray(body?.ids) ? body.ids : []).map(String).slice(0, 500));
+    const ids = gallery
+      .filter((item) => recordBelongsToAccount(item, account))
       .filter((item) =>
         [item.id, item.url, galleryKey(item)].some((key) => requested.has(String(key))),
       )
       .flatMap((item) => [item.id, item.url, galleryKey(item)]);
-    const changed = setGalleryFavorites(ids, Boolean(req.body?.favorite));
-    starred(req, changed, Boolean(req.body?.favorite));
-    res.json({ ok: true, items: changed, revision: galleryRevisionValue() });
+    const changed = setGalleryFavorites(ids, Boolean(body?.favorite));
+    starred({ studioAccount: account }, changed, Boolean(body?.favorite));
+    return { status: 200, payload: { ok: true, items: changed, revision: galleryRevisionValue() } };
   });
 }
 
 export function registerGalleryErrorRoutes(app) {
   // `owner` (administrators only) clears another account's failed items, or "all" every account's.
-  app.post("/api/gallery/errors/clear", (req, res) => {
-    const owner = req.body?.owner;
-    if (owner !== undefined && !requireAdmin(req, res)) return;
+  directRoute(app, "POST", "/api/gallery/errors/clear", (account, { body }) => {
+    const owner = body?.owner;
+    const refusal = owner !== undefined && adminRefusal(account);
+    if (refusal) return refusal;
+    const mine = (item) => recordBelongsToAccount(item, account);
     const owned =
-      owner === undefined
-        ? (item) => recordBelongsToRequest(item, req)
-        : owner === "all"
-          ? () => true
-          : (item) => item.ownerId === owner;
+      owner === undefined ? mine : owner === "all" ? () => true : (item) => item.ownerId === owner;
     const clears = (item) => owned(item) && (item.status === "error" || item.status === "canceled");
     const cleared = gallery.filter(clears);
     hideGalleryItems(cleared);
     setGallery(gallery.filter((item) => !clears(item)));
     saveGallery();
-    res.json({
-      ok: true,
-      cleared: cleared.length,
-      outputs: filterVisibleGallery(recordsForRequest(gallery, req)),
-    });
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        cleared: cleared.length,
+        outputs: filterVisibleGallery(gallery.filter(mine)),
+      },
+    };
   });
 }
 
@@ -249,9 +243,12 @@ function deleteRequested(req, ids) {
 
 export function registerGalleryDeleteRoute(app) {
   // Many items in one request: one store change and one save, however many there are.
-  app.post("/api/gallery/delete", (req, res) => {
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-    res.json({ ok: true, ...deleteRequested(req, ids) });
+  directRoute(app, "POST", "/api/gallery/delete", (account, { body }) => {
+    const ids = Array.isArray(body?.ids) ? body.ids : [];
+    return {
+      status: 200,
+      payload: { ok: true, ...deleteRequested({ studioAccount: account }, ids) },
+    };
   });
   app.delete("/api/gallery/:id", (req, res) => {
     // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.

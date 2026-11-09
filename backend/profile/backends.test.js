@@ -439,7 +439,6 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
   const sent = [];
   const media = new McpMedia({
     dataDir: dir,
-    baseUrl: "http://127.0.0.1:8790",
     publicUrl: "https://studio.example.test",
     async domainRequest(method, route, body) {
       if (route.startsWith("/api/models"))

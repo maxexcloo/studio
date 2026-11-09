@@ -43,7 +43,8 @@ import { createImportEngine, importStore, publicImport } from "./imports.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
 import { familyFromName } from "../family-catalogue.js";
 import { downloadState } from "../model/downloads.js";
-import { fromChat, requireLocal } from "../route-access.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { fromChat, localRefusal } from "../route-access.js";
 import { forgetLora } from "../lora/stacks.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
@@ -518,106 +519,88 @@ export function registerLibraryRoutes(
       updates.settle().catch(() => undefined);
     }, 30 * 1000).unref?.();
   }
-  const by = (req) =>
-    String(req.studioAccount?.userId || req.studioAccount?.id || req.studioAccount?.username || "");
-  const route =
-    (handler, { imports = true } = {}) =>
-    async (req, res) => {
-      if (!requireLocal(req, res)) return;
-      if (imports && !presetsEnabled()) {
-        res.status(404).json({ ok: false, error: "Imports are off for this deployment." });
-        return;
-      }
-      res.setHeader("Cache-Control", "no-store");
+  const by = (account) => String(account?.userId || account?.id || account?.username || "");
+  const origin = (account, other) => (fromChat(account) ? "chat" : other);
+  const ok = (payload) => ({ status: 200, payload: { ok: true, ...payload } });
+  const refusal = (account, imports) => {
+    const refused = localRefusal(account);
+    if (refused) return refused;
+    if (imports && !presetsEnabled())
+      return { status: 404, payload: { ok: false, error: "Imports are off for this deployment." } };
+    return null;
+  };
+  /** A Library route: administrators only, imports' routes only while imports are on; a failure answers 400. */
+  const route = (method, path, run, { imports = true } = {}) =>
+    directRoute(app, method, path, async (account, input) => {
+      const refused = refusal(account, imports);
+      if (refused) return refused;
       try {
-        await handler(req, res);
+        return await run(account, input);
       } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
+        return { status: 400, payload: { ok: false, error: error.message } };
       }
-    };
+    });
+  app.use(
+    [
+      "/api/library/imports",
+      "/api/library/items",
+      "/api/library/lookup",
+      "/api/library/placement",
+      "/api/library/catalogue",
+      "/api/library/updates",
+    ],
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", "no-store");
+      next();
+    },
+  );
 
-  app.get(
-    "/api/library/imports",
-    route(async (_req, res) => {
-      res.json({
-        ok: true,
-        imports: (await engine.list()).map(publicImport),
-        vision: await visionNow(),
-      });
+  route("GET", "/api/library/imports", async () =>
+    ok({ imports: (await engine.list()).map(publicImport), vision: await visionNow() }),
+  );
+  route("POST", "/api/library/imports/image", async (account, { body }) => {
+    const record = await engine.createFromImage({
+      data: imageFromUpload(body?.image),
+      name: String(body?.name || ""),
+      by: by(account),
+      origin: origin(account, "ui"),
+    });
+    return ok({ import: publicImport(record) });
+  });
+  app.get("/api/library/imports/:id/picture", (req, res) => {
+    const refused = refusal(req.studioAccount, true);
+    if (refused) return res.status(refused.status).json(refused.payload);
+    const file = store.get(req.params.id)?.picture ? pictures.file(req.params.id) : "";
+    if (!file || !fs.existsSync(file)) return res.sendStatus(404);
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    res.type("webp").sendFile(file, { dotfiles: "allow" });
+  });
+  route("POST", "/api/library/imports/:id/describe", async (account, { params }) =>
+    ok({
+      import: publicImport(
+        await engine.describeImport(params.id, { by: by(account), origin: origin(account, "ui") }),
+      ),
     }),
   );
-  app.post(
-    "/api/library/imports/image",
-    route(async (req, res) => {
-      const record = await engine.createFromImage({
-        data: imageFromUpload(req.body?.image),
-        name: String(req.body?.name || ""),
-        by: by(req),
-        origin: fromChat(req) ? "chat" : "ui",
-      });
-      res.json({ ok: true, import: publicImport(record) });
-    }),
+  route("POST", "/api/library/imports/:id/exact", async (_account, { params, body }) =>
+    ok({ import: publicImport(await engine.useExact(params.id, Number(body?.index))) }),
   );
-  app.get(
-    "/api/library/imports/:id/picture",
-    route(async (req, res) => {
-      const file = store.get(req.params.id)?.picture ? pictures.file(req.params.id) : "";
-      if (!file || !fs.existsSync(file)) {
-        res.sendStatus(404);
-        return;
-      }
-      res.setHeader("Cache-Control", "private, max-age=86400");
-      res.type("webp").sendFile(file, { dotfiles: "allow" });
-    }),
-  );
-  app.post(
-    "/api/library/imports/:id/describe",
-    route(async (req, res) => {
-      res.json({
-        ok: true,
-        import: publicImport(
-          await engine.describeImport(req.params.id, {
-            by: by(req),
-            origin: fromChat(req) ? "chat" : "ui",
-          }),
-        ),
-      });
-    }),
-  );
-  app.post(
-    "/api/library/imports/:id/exact",
-    route(async (req, res) => {
-      res.json({
-        ok: true,
-        import: publicImport(await engine.useExact(req.params.id, Number(req.body?.index))),
-      });
-    }),
-  );
-  app.post(
-    "/api/library/imports/:id/offers",
-    route(async (req, res) => {
-      const result = await engine.acceptOffer(req.params.id, Number(req.body?.index), {
-        by: by(req),
-      });
-      res.json({
-        ok: true,
-        import: publicImport(result.record),
-        queued: result.queued,
-        failures: result.failures,
-      });
-    }),
-  );
-  app.post(
-    "/api/library/imports",
-    route(async (req, res) => {
-      const record = await engine.create(String(req.body?.url || ""), {
-        by: by(req),
-        origin: fromChat(req) ? "chat" : "ui",
-      });
-      // A failed resolve is still a record (with its reason), so it answers like any other.
-      res.json({ ok: true, import: publicImport(record) });
-    }),
-  );
+  route("POST", "/api/library/imports/:id/offers", async (account, { params, body }) => {
+    const result = await engine.acceptOffer(params.id, Number(body?.index), { by: by(account) });
+    return ok({
+      import: publicImport(result.record),
+      queued: result.queued,
+      failures: result.failures,
+    });
+  });
+  route("POST", "/api/library/imports", async (account, { body }) => {
+    const record = await engine.create(String(body?.url || ""), {
+      by: by(account),
+      origin: origin(account, "ui"),
+    });
+    // A failed resolve is still a record (with its reason), so it answers like any other.
+    return ok({ import: publicImport(record) });
+  });
   /** Forgets a record and its picture; downloaded model files stay. */
   const forgetImport = (id) => {
     if (!store.remove(id)) return false;
@@ -625,227 +608,174 @@ export function registerLibraryRoutes(
     if (picture) fs.rmSync(picture, { force: true });
     return true;
   };
-  app.post(
-    "/api/library/imports/clear-failed",
-    route(async (_req, res) => {
-      const failed = store.list().filter((record) => record.state === "failed");
-      res.json({ ok: true, cleared: failed.filter((record) => forgetImport(record.id)).length });
+  route("POST", "/api/library/imports/clear-failed", async () => {
+    const failed = store.list().filter((record) => record.state === "failed");
+    return ok({ cleared: failed.filter((record) => forgetImport(record.id)).length });
+  });
+  route("DELETE", "/api/library/imports/:id", async (_account, { params }) =>
+    forgetImport(params.id)
+      ? ok({})
+      : { status: 404, payload: { ok: false, error: "That import is gone." } },
+  );
+  route("GET", "/api/library/imports/:id", async (_account, { params }) => {
+    const record = await engine.open(params.id);
+    if (!record) return { status: 404, payload: { ok: false, error: "That import is gone." } };
+    return ok({ import: publicImport(record) });
+  });
+  route("POST", "/api/library/imports/:id/download", async (account, { params, body }) => {
+    const indices = Array.isArray(body?.indices)
+      ? body.indices.filter((value) => Number.isSafeInteger(value) && value >= 0)
+      : null;
+    const result = await engine.downloadMissing(params.id, { indices, by: by(account) });
+    return ok({
+      import: publicImport(result.record),
+      queued: result.queued,
+      failures: result.failures,
+    });
+  });
+  route("POST", "/api/library/imports/:id/folder", async (_account, { params, body }) =>
+    ok({
+      import: publicImport(
+        await engine.setFolder(params.id, Number(body?.index), String(body?.folder || "")),
+      ),
     }),
   );
-  app.delete(
-    "/api/library/imports/:id",
-    route(async (req, res) => {
-      if (!forgetImport(req.params.id)) {
-        res.status(404).json({ ok: false, error: "That import is gone." });
-        return;
-      }
-      res.json({ ok: true });
-    }),
-  );
-  app.get(
-    "/api/library/imports/:id",
-    route(async (req, res) => {
-      const record = await engine.open(req.params.id);
-      if (!record) {
-        res.status(404).json({ ok: false, error: "That import is gone." });
-        return;
-      }
-      res.json({ ok: true, import: publicImport(record) });
-    }),
-  );
-  app.post(
-    "/api/library/imports/:id/download",
-    route(async (req, res) => {
-      const indices = Array.isArray(req.body?.indices)
-        ? req.body.indices.filter((value) => Number.isSafeInteger(value) && value >= 0)
-        : null;
-      const result = await engine.downloadMissing(req.params.id, { indices, by: by(req) });
-      res.json({
-        ok: true,
-        import: publicImport(result.record),
-        queued: result.queued,
-        failures: result.failures,
+  route("POST", "/api/library/imports/:id/draft-profile", async (account, { params, body }) => {
+    const index = Number.isSafeInteger(body?.index) && body.index >= 0 ? body.index : null;
+    return ok({ import: publicImport(await engine.draft(params.id, { by: by(account), index })) });
+  });
+  route(
+    "GET",
+    "/api/library/items",
+    async () => {
+      const { files, current } = await latestInstalled().catch(() => ({
+        files: {},
+        current: false,
+      }));
+      const [info, definitions] = await Promise.all([
+        // A worker that isn't answering is not asked for each LoRA's metadata.
+        loraInfo(files.loras || [], { remote: current }).catch(() => ({})),
+        profileDefinitions().catch(() => []),
+      ]);
+      const state = await updates.settle().catch(() => updates.summary());
+      const items = libraryItems({
+        installed: files,
+        entries: catalogue().entries({ throttleMs: 5000 }),
+        loraInfo: info,
+        profiles: definitions,
+      }).map((item) => {
+        const update = item.installed ? state.byEntry[item.key] : null;
+        const applied = state.applied[item.key];
+        return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
       });
-    }),
+      return ok({ items, updates: { checkedAt: state.checkedAt, available: state.available } });
+    },
+    { imports: false },
   );
-  app.post(
-    "/api/library/imports/:id/folder",
-    route(async (req, res) => {
-      res.json({
-        ok: true,
-        import: publicImport(
-          await engine.setFolder(
-            req.params.id,
-            Number(req.body?.index),
-            String(req.body?.folder || ""),
-          ),
+  route(
+    "POST",
+    "/api/library/lookup",
+    async (_account, { body }) => {
+      const found = await lookupLibrary(
+        {
+          url: String(body?.url || "").trim(),
+          query: String(body?.query || ""),
+          type: ["lora", "checkpoint"].includes(body?.type) ? body.type : "",
+          baseModel: String(body?.baseModel || ""),
+        },
+        { json, hfRequest, inspect, families, profiles: readyProfiles },
+      );
+      return ok({ lookup: found });
+    },
+    { imports: false },
+  );
+  route(
+    "GET",
+    "/api/library/placement",
+    async (_account, { query }) => {
+      await refreshWorkerModels().catch(() => null);
+      return ok({
+        placement: libraryPlacement(
+          { key: String(query.key || "") },
+          { inventory: workerInventory },
         ),
       });
-    }),
-  );
-  app.post(
-    "/api/library/imports/:id/draft-profile",
-    route(async (req, res) => {
-      const index =
-        Number.isSafeInteger(req.body?.index) && req.body.index >= 0 ? req.body.index : null;
-      res.json({
-        ok: true,
-        import: publicImport(await engine.draft(req.params.id, { by: by(req), index })),
-      });
-    }),
-  );
-  app.get(
-    "/api/library/items",
-    route(
-      async (_req, res) => {
-        const { files, current } = await latestInstalled().catch(() => ({
-          files: {},
-          current: false,
-        }));
-        const [info, definitions] = await Promise.all([
-          // A worker that isn't answering is not asked for each LoRA's metadata.
-          loraInfo(files.loras || [], { remote: current }).catch(() => ({})),
-          profileDefinitions().catch(() => []),
-        ]);
-        const state = await updates.settle().catch(() => updates.summary());
-        const items = libraryItems({
-          installed: files,
-          entries: catalogue().entries({ throttleMs: 5000 }),
-          loraInfo: info,
-          profiles: definitions,
-        }).map((item) => {
-          const update = item.installed ? state.byEntry[item.key] : null;
-          const applied = state.applied[item.key];
-          return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
-        });
-        res.json({
-          ok: true,
-          items,
-          updates: { checkedAt: state.checkedAt, available: state.available },
-        });
-      },
-      { imports: false },
-    ),
-  );
-  app.post(
-    "/api/library/lookup",
-    route(
-      async (req, res) => {
-        const found = await lookupLibrary(
-          {
-            url: String(req.body?.url || "").trim(),
-            query: String(req.body?.query || ""),
-            type: ["lora", "checkpoint"].includes(req.body?.type) ? req.body.type : "",
-            baseModel: String(req.body?.baseModel || ""),
-          },
-          { json, hfRequest, inspect, families, profiles: readyProfiles },
-        );
-        res.json({ ok: true, lookup: found });
-      },
-      { imports: false },
-    ),
-  );
-  app.get(
-    "/api/library/placement",
-    route(
-      async (req, res) => {
-        await refreshWorkerModels().catch(() => null);
-        res.json({
-          ok: true,
-          placement: libraryPlacement(
-            { key: String(req.query.key || "") },
-            { inventory: workerInventory },
-          ),
-        });
-      },
-      { imports: false },
-    ),
+    },
+    { imports: false },
   );
   // One entry's edit, as Studio's catalogue keeps it: the previous values come back, so it can be undone.
-  app.patch(
+  route(
+    "PATCH",
     "/api/library/catalogue",
-    route(
-      async (req, res) => {
-        const key = String(req.body?.key || "");
-        const { entry, previous } = catalogue().edit(key, req.body?.patch, {
-          by: by(req),
-          origin: fromChat(req) ? "chat" : "admin",
-        });
-        res.json({ ok: true, key, entry, previous });
-      },
-      { imports: false },
-    ),
+    async (account, { body }) => {
+      const key = String(body?.key || "");
+      const { entry, previous } = catalogue().edit(key, body?.patch, {
+        by: by(account),
+        origin: origin(account, "admin"),
+      });
+      return ok({ key, entry, previous });
+    },
+    { imports: false },
   );
-  app.post(
+  route(
+    "POST",
     "/api/library/catalogue/undo",
-    route(
-      async (req, res) => {
-        const key = String(req.body?.key || "");
-        res.json({ ok: true, key, entry: catalogue().undo(key, { by: by(req) }) });
-      },
-      { imports: false },
-    ),
+    async (account, { body }) => {
+      const key = String(body?.key || "");
+      return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
+    },
+    { imports: false },
   );
   // Removes an entry and its installed file, unless a profile still uses it; a LoRA leaves every
   // account's stacks, strengths, ratings and recents first.
-  app.post(
+  route(
+    "POST",
     "/api/library/catalogue/remove",
-    route(
-      async (req, res) => {
-        const key = String(req.body?.key || "");
-        const entry = catalogue().entry(key);
-        if (!entry)
-          return res.status(404).json({ ok: false, error: "That entry isn’t in the catalogue." });
-        const { folder, file } = splitCatalogueKey(key);
-        if (folder === "loras") forget(file);
-        const users = await references({ folder, file });
-        if (users.length)
-          return res
-            .status(409)
-            .json({ ok: false, error: `Still used by ${users.join(", ")}.`, users });
-        const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
-        catalogue().edit(
-          key,
-          { removed: true },
-          {
-            by: by(req),
-            origin: fromChat(req) ? "chat" : "admin",
-          },
-        );
-        res.json({ ok: true, key, fileRemoved: removed });
-      },
-      { imports: false },
-    ),
+    async (account, { body }) => {
+      const key = String(body?.key || "");
+      const entry = catalogue().entry(key);
+      if (!entry)
+        return { status: 404, payload: { ok: false, error: "That entry isn’t in the catalogue." } };
+      const { folder, file } = splitCatalogueKey(key);
+      if (folder === "loras") forget(file);
+      const users = await references({ folder, file });
+      if (users.length)
+        return {
+          status: 409,
+          payload: { ok: false, error: `Still used by ${users.join(", ")}.`, users },
+        };
+      const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
+      catalogue().edit(
+        key,
+        { removed: true },
+        { by: by(account), origin: origin(account, "admin") },
+      );
+      return ok({ key, fileRemoved: removed });
+    },
+    { imports: false },
   );
-  app.get(
+  route(
+    "GET",
     "/api/library/updates",
-    route(
-      async (_req, res) => {
-        res.json({ ok: true, ...(await updates.settle().catch(() => updates.summary())) });
-      },
-      { imports: false },
-    ),
+    async () => ok(await updates.settle().catch(() => updates.summary())),
+    { imports: false },
   );
-  app.post(
+  route(
+    "POST",
     "/api/library/updates/check",
-    route(
-      async (req, res) => {
-        const keys = Array.isArray(req.body?.keys) ? req.body.keys.map(String).slice(0, 300) : null;
-        res.json({ ok: true, ...(await updates.check({ keys })) });
-      },
-      { imports: false },
-    ),
+    async (_account, { body }) => {
+      const keys = Array.isArray(body?.keys) ? body.keys.map(String).slice(0, 300) : null;
+      return ok(await updates.check({ keys }));
+    },
+    { imports: false },
   );
-  app.post(
-    "/api/library/updates/apply",
-    route(async (req, res) => {
-      const applied = await updates.apply(String(req.body?.key || ""), {
-        alternative: req.body?.alternative === true,
-        by: by(req),
-      });
-      // `applied` is this key's record; the summary's map of every applied update would hide it.
-      res.json({ ok: true, ...updates.summary(), applied });
-    }),
-  );
+  route("POST", "/api/library/updates/apply", async (account, { body }) => {
+    const applied = await updates.apply(String(body?.key || ""), {
+      alternative: body?.alternative === true,
+      by: by(account),
+    });
+    // `applied` is this key's record; the summary's map of every applied update would hide it.
+    return ok({ ...updates.summary(), applied });
+  });
   return { engine, updates };
 }

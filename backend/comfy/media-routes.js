@@ -72,6 +72,73 @@ async function sendWithoutSettings(req, res) {
 }
 
 /**
+ * Whether /comfy/`proxyPath` serves `query`'s file: only ComfyUI's image route, for images, videos
+ * and sound among its outputs, inputs and previews, and for an account only its own outputs. Its
+ * other GET routes (settings, logs, Manager's) are not for the studio's visitors, and neither are
+ * dot folders among the outputs (such as an old `.studio-trash`).
+ */
+function viewable(account, proxyPath, query) {
+  const type = String(query.type || "output");
+  const filename = String(query.filename || "");
+  return (
+    proxyPath === "view" &&
+    (!account ||
+      (ownerMediaTypes.has(type) &&
+        outputFilenameBelongsToRequest(filename, String(query.subfolder || ""), {
+          studioAccount: account,
+        }))) &&
+    ["output", "input", "temp", mediaType].includes(type) &&
+    outputMediaPattern.test(filename) &&
+    !inDotFolder(query.subfolder)
+  );
+}
+
+const mimes = {
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".m4v": "video/mp4",
+  ".mkv": "video/x-matroska",
+  ".mov": "video/quicktime",
+  ".mp4": "video/mp4",
+  ".png": "image/png",
+  ".webm": "video/webm",
+  ".webp": "image/webp",
+};
+/** A served output's type by its file name. */
+export const outputMime = (filename) =>
+  mimes[path.extname(filename).toLowerCase()] || "application/octet-stream";
+
+/**
+ * GET /comfy/view's file for MCP, read whole: `{ status, content, mime }`, or the route's refusal
+ * as `{ status, payload }`.
+ */
+export async function comfyView(account, query) {
+  if (!viewable(account, "view", query))
+    return { status: 404, payload: { ok: false, error: "Not an output." } };
+  const filename = String(query.filename);
+  if (String(query.type || "") === mediaType) {
+    const file = localOutputFile(filename, String(query.subfolder || ""), mediaType);
+    return file
+      ? { status: 200, content: await fs.promises.readFile(file), mime: outputMime(file) }
+      : { status: 404, payload: { ok: false, error: "This file is no longer available." } };
+  }
+  let response;
+  try {
+    response = await fetch(`${comfyUrl}/view?${new URLSearchParams(query)}`);
+    noteComfyReachable();
+  } catch (error) {
+    noteComfyFetchError(error);
+    return { status: 502, payload: { ok: false, error: error.message } };
+  }
+  if (!response.ok) return { status: response.status, payload: {} };
+  return {
+    status: 200,
+    content: Buffer.from(await response.arrayBuffer()),
+    mime: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream",
+  };
+}
+
+/**
  * Outputs, inputs and previews through /comfy: video previews, thumbnails and ComfyUI's image
  * route, each limited to what the account owns. Studio media is served from its own folder.
  */
@@ -215,25 +282,7 @@ export function registerComfyMediaRoutes(app) {
       const proxyPath = Array.isArray(req.params.path)
         ? req.params.path.join("/")
         : req.params.path;
-      const filename = String(req.query.filename || "");
-      if (
-        req.studioAccount &&
-        (proxyPath !== "view" ||
-          !ownerMediaTypes.has(String(req.query.type || "output")) ||
-          !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))
-      ) {
-        res.status(404).json({ ok: false, error: "Not an output." });
-        return;
-      }
-      // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
-      // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
-      // and neither are dot folders among the outputs (such as an old `.studio-trash`).
-      if (
-        proxyPath !== "view" ||
-        !["output", "input", "temp", mediaType].includes(String(req.query.type || "output")) ||
-        !outputMediaPattern.test(String(req.query.filename || "")) ||
-        inDotFolder(req.query.subfolder)
-      ) {
+      if (!viewable(req.studioAccount, proxyPath, req.query)) {
         res.status(404).json({ ok: false, error: "Not an output." });
         return;
       }
