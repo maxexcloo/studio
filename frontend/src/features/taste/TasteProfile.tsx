@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Alert, Button, Group, Stack, Text } from "@mantine/core";
+import { Alert, Button, Group, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { TextBox } from "../../ui/TextBox";
 import { SettingGroup } from "../../ui/SettingRows";
-import { maxTasteSummary } from "../../../../shared/taste";
+import { maxAvoid, maxAvoids } from "../../../../shared/taste";
 import classes from "./TasteProfile.module.css";
 
 export interface Taste {
+  /** The profile in plain sentences, written by Studio from what it learnt. */
   summary: string;
-  source: "studio" | "user";
+  /** What the person asked Studio to avoid. */
+  addedAvoid: string[];
   updatedAt: string;
   /** How many signals (stars, comparisons, iterations) the profile holds. */
   signals: number;
@@ -33,22 +34,18 @@ const learnt = (taste: Taste) =>
     .join(" · ");
 
 /**
- * Dream › Taste: the summary Studio keeps of what this account likes, editable by its owner. `fill`
- * fits it to the page's height, the text taking the room above its actions.
+ * Dream › Taste: what Studio learnt this account likes, and what its owner asks it to avoid. `fill`
+ * fits it to the page's height, the summary taking the room above its actions.
  */
 export function TasteProfile({ fill = false }: { fill?: boolean }) {
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
-  const [draft, setDraft] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
-  const saved = (next: Taste) => {
-    client.setQueryData(tasteQuery.queryKey, next);
-    setDraft(null);
-  };
-  const save = useMutation({
+  const saved = (next: Taste) => client.setQueryData(tasteQuery.queryKey, next);
+  const avoid = useMutation({
     meta: { inlineError: true },
-    mutationFn: (summary: string) =>
-      api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ summary }) }),
+    mutationFn: (next: string[]) =>
+      api<Taste>("/api/taste", { method: "PUT", body: JSON.stringify({ avoid: next }) }),
     onSuccess: saved,
   });
   const refresh = useMutation({
@@ -65,51 +62,45 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
     },
   });
   const data = taste.data;
-  const value = draft ?? data?.summary ?? "";
-  const changed = !!data && draft !== null && draft.trim() !== data.summary;
-  const error = save.error || refresh.error || taste.error;
+  const error = avoid.error || refresh.error || taste.error;
   return (
     <SettingGroup title="Taste Profile" fill={fill}>
       <Stack gap="xs" pt="xs" flex={fill ? 1 : undefined} mih={fill ? 0 : undefined}>
-        {/* The autosized minimum reserves the field's height while the profile loads. */}
-        <TextBox
-          aria-label="Taste Profile"
-          autosize={!fill}
-          minRows={4}
-          classNames={
-            fill ? { root: classes.fill, wrapper: classes.fill, input: classes.fill } : undefined
-          }
-          maxLength={maxTasteSummary}
-          disabled={!data || refresh.isPending}
-          placeholder="Describe your taste"
-          value={value}
-          onChange={setDraft}
+        {/* The minimum reserves the summary's height while the profile loads. */}
+        <Text
+          size="sm"
+          mih="4lh"
+          c={data?.summary ? undefined : "dimmed"}
+          className={fill ? classes.fill : undefined}
+        >
+          {data &&
+            (data.summary ||
+              "Nothing learnt yet. Star, compare or iterate on results and Studio picks up your taste.")}
+        </Text>
+        <TagsInput
+          label="Avoid"
+          placeholder={data?.addedAvoid.length ? undefined : "Add something to avoid"}
+          disabled={!data}
+          maxTags={maxAvoids}
+          maxLength={maxAvoid}
+          value={avoid.isPending ? avoid.variables : (data?.addedAvoid ?? [])}
+          onChange={(next) => {
+            refresh.reset();
+            avoid.mutate(next);
+          }}
         />
         <Text size="xs" c="dimmed" mih="1lh">
-          {data &&
-            (learnt(data) ||
-              "Nothing learnt yet. Star, compare or iterate on results and Studio picks up your taste.")}
+          {data && learnt(data)}
         </Text>
         {error && <Alert color="red">{error.message}</Alert>}
         <Group gap="xs">
-          {changed && (
-            <Button
-              loading={save.isPending}
-              onClick={() => {
-                refresh.reset();
-                save.mutate(value);
-              }}
-            >
-              Save
-            </Button>
-          )}
           {data?.writer && (
             <Button
               variant="default"
               loading={refresh.isPending}
-              disabled={changed || (!data.summary && !data.signals)}
+              disabled={!data.signals}
               onClick={() => {
-                save.reset();
+                avoid.reset();
                 refresh.mutate();
               }}
             >
@@ -138,7 +129,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
           clear.reset();
         }}
       >
-        Studio forgets this summary and what it learnt. Your gallery and stars stay.
+        Studio forgets what it learnt and what you asked it to avoid. Your gallery and stars stay.
       </ConfirmDialog>
     </SettingGroup>
   );

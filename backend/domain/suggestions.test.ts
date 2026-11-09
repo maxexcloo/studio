@@ -62,14 +62,8 @@ function fixture(
   };
   const suggestions = createSuggestions({
     taste: {
-      read: (owner) => ({
-        summary: "",
-        source: "studio",
-        updatedAt: "",
-        signals: [],
-        since: 0,
-        ...records[owner],
-      }),
+      // Suggestions read only the summary and the signals.
+      read: (owner) => ({ summary: "", signals: [], ...records[owner] }) as TasteRecord,
     },
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
