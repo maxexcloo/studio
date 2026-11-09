@@ -43,9 +43,9 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
     };
     if (live?.status === "done" || (outputs.length && (!live || live.terminalAt)))
       return { ...details, status: "completed" };
-    if (live?.status === "error")
+    if (live?.status === "failed")
       return { ...details, status: "failed", reason: live.error || "Generation failed." };
-    if (live?.status === "canceled")
+    if (live?.status === "cancelled")
       return { ...details, status: "cancelled", reason: "Generation cancelled." };
     if (live)
       return {
@@ -54,7 +54,7 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
         reason:
           live.status === "queued"
             ? "Accepted by the worker; waiting for execution."
-            : live.status === "canceling"
+            : live.status === "cancelling"
               ? live.error || "Cancelling the recorded generation."
               : "",
       };
@@ -84,7 +84,7 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
     },
     async cancel(job) {
       const live = current(job);
-      if (live && !live.terminalAt) options.jobs.set(job.id, { ...live, status: "canceling" });
+      if (live && !live.terminalAt) options.jobs.set(job.id, { ...live, status: "cancelling" });
       const promptId = live?.promptId || job.providerJobId;
       const stopped = promptId
         ? await options.cancelPrompt({ promptId, backend: live?.comfyBackend || job.backend })

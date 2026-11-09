@@ -213,7 +213,7 @@ function refreshQueueEstimates(
 ) {
   const queues = new Map();
   for (const [id, job] of jobs) {
-    if (!["queued", "running", "canceling"].includes(job.status)) continue;
+    if (!["queued", "running", "cancelling"].includes(job.status)) continue;
     const key = job.comfyBackend || defaultWorkerId();
     if (!queues.has(key)) queues.set(key, { cursor: now, known: true });
     const queue = queues.get(key);
@@ -342,7 +342,7 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
   if (!socket) return null;
   const terminal = () => {
     const job = jobs.get(id);
-    return !job || job.terminalAt || ["done", "error", "canceled"].includes(job.status);
+    return !job || job.terminalAt || ["done", "failed", "cancelled"].includes(job.status);
   };
   socket.addEventListener("message", async (event) => {
     if (terminal()) return;
@@ -385,7 +385,7 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
         jobs.set(id, {
           ...current,
           status:
-            current.status === "canceling" || current.status === "canceled"
+            current.status === "cancelling" || current.status === "cancelled"
               ? current.status
               : "running",
           progress,
@@ -429,13 +429,13 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       ) {
         run.missed =
           message.type === "execution_interrupted"
-            ? { canceled: true }
+            ? { cancelled: true }
             : { error: normalizeComfyError(data.exception_message || "") };
         run.wake?.();
         return;
       }
       if (message.type === "execution_interrupted") {
-        jobs.set(id, { ...jobs.get(id), status: "canceling" });
+        jobs.set(id, { ...jobs.get(id), status: "cancelling" });
         run.finished = true;
         run.wake?.();
       }
@@ -450,8 +450,8 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
           }),
           jobBodies.get(id),
         );
-        setTerminalJob(id, { status: "error", error: failure.summary, failure });
-        updateGalleryJob(id, { status: "error", filename: failure.title, failure });
+        setTerminalJob(id, { status: "failed", error: failure.summary, failure });
+        updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
       }
     } catch {
       // Ignore malformed websocket messages from Comfy extensions.
@@ -484,7 +484,7 @@ async function pause(run, ms) {
  */
 function showReconnecting(id, run, on) {
   const current = jobs.get(id);
-  if (!current || current.status === "canceling" || current.status === "canceled") return;
+  if (!current || current.status === "cancelling" || current.status === "cancelled") return;
   if (on === Boolean(current.progress?.reconnecting)) return;
   let progress;
   if (on) {
@@ -549,9 +549,9 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     // `saved`: Smart upscale's source pictures, by save node, as ComfyUI reported them; `missed`: why their upscale did not finish.
     const run = { promptId: null, wake: null, alive: null, pairs, saved: new Map(), missed: null };
     watchProgress(id, run, socket, prompt);
-    if (["canceling", "canceled"].includes(jobs.get(id)?.status)) {
-      setTerminalJob(id, { status: "canceled" });
-      updateGalleryJob(id, { status: "canceled" });
+    if (["cancelling", "cancelled"].includes(jobs.get(id)?.status)) {
+      setTerminalJob(id, { status: "cancelled" });
+      updateGalleryJob(id, { status: "cancelled" });
       socket?.close();
       return;
     }
@@ -587,7 +587,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     run.promptId = queued.prompt_id;
     jobs.set(id, {
       ...jobs.get(id),
-      status: ["canceling", "canceled"].includes(jobs.get(id)?.status) ? "canceling" : "running",
+      status: ["cancelling", "cancelled"].includes(jobs.get(id)?.status) ? "cancelling" : "running",
       promptId: queued.prompt_id,
     });
     const tracker = promptTracker(queued.prompt_id);
@@ -610,10 +610,10 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           : null;
       const outputs = results.map((result) => result.output);
       const kept = missed
-        ? keptMessage({ canceled: Boolean(missed.canceled), count: outputs.length })
+        ? keptMessage({ cancelled: Boolean(missed.cancelled), count: outputs.length })
         : "";
       const skipped = upscale?.skipped
-        ? { status: "error", quality: upscale.quality, progress: null, error: upscale.skipped }
+        ? { status: "failed", quality: upscale.quality, progress: null, error: upscale.skipped }
         : null;
       // Every upscale it made teaches the next estimate.
       const clock = timing.upscale;
@@ -661,7 +661,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         await deliver(savedResults(), run.missed);
         return;
       }
-      if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
+      if (jobs.get(id)?.status === "cancelling" || jobs.get(id)?.status === "cancelled") {
         // A cancel acknowledgement does not prove execution stopped. Track the own prompt to its end.
         if (!cancelSent)
           await cancelPrompt(queued.prompt_id)
@@ -671,26 +671,26 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
             .catch(() => null);
       }
       // The socket already recorded the failure; history would only add an empty result.
-      if (jobs.get(id)?.status === "error") {
+      if (jobs.get(id)?.status === "failed") {
         socket?.close();
         return;
       }
       const checked = await tracker
         .check({
-          verify: ["canceling", "canceled"].includes(jobs.get(id)?.status),
+          verify: ["cancelling", "cancelled"].includes(jobs.get(id)?.status),
         })
         .catch((error) => {
-          if (["canceling", "canceled"].includes(jobs.get(id)?.status)) {
+          if (["cancelling", "cancelled"].includes(jobs.get(id)?.status)) {
             if (error.lostConnection) return { state: "reconnecting", delayMs: 5000 };
             if (error.droppedRun) return { state: "cancelled" };
           }
           throw error;
         });
       if (checked.state === "cancelled") {
-        if (run.saved.size) await deliver(savedResults(), { canceled: true });
+        if (run.saved.size) await deliver(savedResults(), { cancelled: true });
         else {
-          updateGalleryJob(id, { status: "canceled" });
-          setTerminalJob(id, { status: "canceled" });
+          updateGalleryJob(id, { status: "cancelled" });
+          setTerminalJob(id, { status: "cancelled" });
           socket?.close();
         }
         return;
@@ -715,12 +715,12 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         }
       }
       const entry = checked.state === "done" ? checked.entry : null;
-      if (entry && ["canceling", "canceled"].includes(jobs.get(id)?.status)) {
+      if (entry && ["cancelling", "cancelled"].includes(jobs.get(id)?.status)) {
         const results = pairRunOutputs(entry.outputs, pairs);
-        if (results.length) await deliver(results, { canceled: true });
+        if (results.length) await deliver(results, { cancelled: true });
         else {
-          updateGalleryJob(id, { status: "canceled" });
-          setTerminalJob(id, { status: "canceled" });
+          updateGalleryJob(id, { status: "cancelled" });
+          setTerminalJob(id, { status: "cancelled" });
           socket?.close();
         }
         return;
@@ -735,7 +735,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           await deliver(
             results,
             interrupted
-              ? { canceled: true }
+              ? { cancelled: true }
               : { error: normalizeComfyError(failed.exception_message || "") },
           );
           return;
@@ -766,7 +766,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
   } catch (error) {
     if (
       submissionStarted &&
-      ["canceling", "canceled"].includes(jobs.get(id)?.status) &&
+      ["cancelling", "cancelled"].includes(jobs.get(id)?.status) &&
       !error.comfyFailure &&
       !error.noOutput &&
       !(error.status >= 400 && error.status < 500)
@@ -774,7 +774,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       // A lost acknowledgement is not a stopped provider. Recovery follows only this recorded job.
       jobs.set(id, {
         ...jobs.get(id),
-        status: "canceling",
+        status: "cancelling",
         recovered: true,
         terminalAt: undefined,
         error: "Checking the recorded generation before confirming cancellation.",
@@ -803,8 +803,8 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         }),
         body,
       );
-    setTerminalJob(id, { status: "error", error: failure.summary, failure });
-    updateGalleryJob(id, { status: "error", filename: failure.title, failure });
+    setTerminalJob(id, { status: "failed", error: failure.summary, failure });
+    updateGalleryJob(id, { status: "failed", filename: failure.title, failure });
     socket?.close();
   } finally {
     // The progress socket can report an error a moment after this loop ends.
@@ -888,11 +888,11 @@ function generateMockImageDataUrl(prompt = "", width = 1024, height = 1024, kind
 export function runMockJob(id, body) {
   const isCanceled = () => {
     const status = jobs.get(id)?.status;
-    return status === "canceling" || status === "canceled";
+    return status === "cancelling" || status === "cancelled";
   };
   if (isCanceled()) {
-    setTerminalJob(id, { status: "canceled" });
-    updateGalleryJob(id, { status: "canceled" });
+    setTerminalJob(id, { status: "cancelled" });
+    updateGalleryJob(id, { status: "cancelled" });
     return;
   }
   const steps = Number(body.steps || 4) || 4;
@@ -908,8 +908,8 @@ export function runMockJob(id, body) {
   const interval = setInterval(() => {
     if (isCanceled()) {
       clearInterval(interval);
-      if (jobs.get(id)?.status === "canceling") setTerminalJob(id, { status: "canceled" });
-      updateGalleryJob(id, { status: "canceled" });
+      if (jobs.get(id)?.status === "cancelling") setTerminalJob(id, { status: "cancelled" });
+      updateGalleryJob(id, { status: "cancelled" });
       return;
     }
     currentStep += Math.max(1, Math.ceil(steps / 4));
@@ -929,8 +929,8 @@ export function runMockJob(id, body) {
 
       setTimeout(async () => {
         if (isCanceled()) {
-          if (jobs.get(id)?.status === "canceling") setTerminalJob(id, { status: "canceled" });
-          updateGalleryJob(id, { status: "canceled" });
+          if (jobs.get(id)?.status === "cancelling") setTerminalJob(id, { status: "cancelled" });
+          updateGalleryJob(id, { status: "cancelled" });
           return;
         }
         const completedAt = new Date().toISOString();

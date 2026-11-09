@@ -42,8 +42,6 @@ export function iterationTiles(job: QueueJob): MediaItem[] {
       ? 0
       : 1
     : Math.max(1, Number(job.input.count) || 1) - saved.length;
-  const status =
-    job.status === "failed" ? "error" : job.status === "cancelled" ? "canceled" : job.status;
   return [
     ...saved,
     ...Array.from({ length: Math.max(0, expected) }, (_, index) => ({
@@ -52,7 +50,7 @@ export function iterationTiles(job: QueueJob): MediaItem[] {
       index: saved.length + index,
       type: job.input.kind === "video" ? ("video" as const) : ("image" as const),
       url: "",
-      status,
+      status: job.status,
       prompt,
       width: Number(job.input.width) || 1024,
       height: Number(job.input.height) || 1024,
@@ -88,7 +86,7 @@ function ResultTile({
           aspectRatio: `${width} / ${height}`,
           "--ratio": width / height,
           // A failed or cancelled run without results stays a compact notice.
-          ...(["error", "canceled"].includes(item.status) && { "--chat-media-height": "12rem" }),
+          ...(["failed", "cancelled"].includes(item.status) && { "--chat-media-height": "12rem" }),
         } as CSSProperties
       }
       onOpen={() => open(item)}

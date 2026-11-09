@@ -135,7 +135,7 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
     id: "failed-item",
     jobId: job.id,
     type: "image",
-    status: "error",
+    status: "failed",
     url: "",
     prompt: "Failed Study",
     settings: job.input,

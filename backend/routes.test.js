@@ -144,7 +144,7 @@ test("a ready profile runs a generate request to the gallery", async () => {
   let job;
   for (let attempt = 0; attempt < 100; attempt += 1) {
     job = (await api(`/api/jobs/${jobId}`)).body;
-    if (job.status === "done" || job.status === "error") break;
+    if (job.status === "done" || job.status === "failed") break;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.equal(job.status, "done", JSON.stringify(job.failure || job));

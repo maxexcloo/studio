@@ -30,7 +30,7 @@ test("structured filters match their own metadata and combine across fields", ()
     "a prompt mention is not a model match",
   );
   assert.equal(matchesGalleryFilters(item, { model: "flux", lora: "portrait" }), false);
-  assert.equal(matchesGalleryFilters({ status: "error" }, { model: "flux" }), false);
+  assert.equal(matchesGalleryFilters({ status: "failed" }, { model: "flux" }), false);
   assert.equal(matchesGalleryFilters(item, { workflow: "   " }), true);
 });
 

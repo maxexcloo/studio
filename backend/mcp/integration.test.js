@@ -369,7 +369,7 @@ async function fixture(
           (job) =>
             job.provider === "cliproxyapi" &&
             job.kind === "video" &&
-            job.status === "error" &&
+            job.status === "failed" &&
             Date.parse(job.updatedAt) >= since,
         )
         .map((job) => ({ reason: job.error, at: Date.parse(job.updatedAt) })),
@@ -4571,7 +4571,7 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   );
   assert.equal(first.profile.remote, true);
   Object.assign(f.jobs.get(first.jobs[0].job_id), {
-    status: "error",
+    status: "failed",
     error: "CLIProxyAPI returned HTTP 401; inspect provider health.",
     provider: "cliproxyapi",
     updatedAt: new Date().toISOString(),
@@ -4622,7 +4622,7 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   );
   // Other failures are ordinary failures and do not pause cloud video.
   Object.assign(f.jobs.get(f.submitted.at(-1).clientJobId), {
-    status: "error",
+    status: "failed",
     error: "Prompt was moderated",
   });
   assert.equal(

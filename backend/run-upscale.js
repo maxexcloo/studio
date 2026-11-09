@@ -116,13 +116,13 @@ export function pairRunOutputs(entryOutputs = {}, pairs = []) {
 }
 
 /** Said on a picture whose upscale did not happen; the tile's upscale arrow is back to try again. */
-export function missedUpscaleState(embed, { canceled = false, error = "" } = {}) {
+export function missedUpscaleState(embed, { cancelled = false, error = "" } = {}) {
   return {
-    status: canceled ? "canceled" : "error",
+    status: cancelled ? "cancelled" : "failed",
     quality: embed?.quality || "balanced",
     progress: null,
     kept: true,
-    error: canceled ? "" : error || "Smart upscale failed",
+    error: cancelled ? "" : error || "Smart upscale failed",
   };
 }
 
@@ -147,9 +147,9 @@ export function runUpscaleState(embed, upscale) {
 }
 
 /** The toast for a run whose pictures were kept without their upscale. */
-export function keptMessage({ canceled = false, count = 1 } = {}) {
+export function keptMessage({ cancelled = false, count = 1 } = {}) {
   const what = count > 1 ? "The pictures are" : "The picture is";
-  return canceled
+  return cancelled
     ? `Upscale stopped. ${what} kept at the generated size.`
     : `The upscale failed. ${what} kept at the generated size.`;
 }

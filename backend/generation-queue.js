@@ -164,7 +164,7 @@ export function createGenerationQueue({
     recover: async (job) => {
       if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
         jobs.set(job.id, {
-          status: job.cancelRequested ? "canceling" : "running",
+          status: job.cancelRequested ? "cancelling" : "running",
           recovered: true,
           promptId: job.providerJobId,
           comfyBackend: job.backend,
@@ -193,8 +193,9 @@ export function createGenerationQueue({
       }
     },
     settled: async (job) => {
-      if (job.status === "failed") updateGalleryJob(job.id, { status: "error", error: job.reason });
-      if (job.status === "cancelled") updateGalleryJob(job.id, { status: "canceled" });
+      if (job.status === "failed")
+        updateGalleryJob(job.id, { status: "failed", error: job.reason });
+      if (job.status === "cancelled") updateGalleryJob(job.id, { status: "cancelled" });
       mediaLeases.get(job.id)?.release();
       mediaLeases.delete(job.id);
     },
@@ -266,7 +267,7 @@ export function createGenerationQueue({
         updateGalleryJob(item.id, {
           upscale: {
             ...item.upscale,
-            status: job.status === "failed" ? "error" : "canceled",
+            status: job.status,
             error: job.reason,
             progress: null,
           },

@@ -36,7 +36,7 @@ function fixture() {
   });
   return state;
 }
-const tile = (id, status = "error") => ({
+const tile = (id, status = "failed") => ({
   id: `${id}-0`,
   jobId: id,
   status,
@@ -169,7 +169,7 @@ test("offline backends do not mark jobs failed; a missing recovered prompt requi
   await s.recover();
   assert.equal(s.jobs.get("one").status, "running");
   await s.recover();
-  assert.equal(s.jobs.get("one").status, "error");
+  assert.equal(s.jobs.get("one").status, "failed");
 });
 
 test("an untracked pending tile fails only after two complete backend scans", async () => {
@@ -179,8 +179,8 @@ test("an untracked pending tile fails only after two complete backend scans", as
   assert.equal(s.gallery[0].status, "pending");
   assert.equal(s.jobs.size, 0);
   await s.recover();
-  assert.equal(s.gallery[0].status, "error");
-  assert.equal(s.jobs.get("lost").status, "error");
+  assert.equal(s.gallery[0].status, "failed");
+  assert.equal(s.jobs.get("lost").status, "failed");
 });
 
 test("an old error tile becomes terminal only after every backend confirms absence twice", async () => {
@@ -194,7 +194,7 @@ test("an old error tile becomes terminal only after every backend confirms absen
   await s.recover();
   assert.equal(s.jobs.has("old-error"), false);
   await s.recover();
-  assert.equal(s.jobs.get("old-error").status, "error");
+  assert.equal(s.jobs.get("old-error").status, "failed");
   assert.equal(s.jobs.get("old-error").terminalAt, 1);
 });
 
@@ -229,7 +229,7 @@ test("deleted and cancelled tiles stay absent; live delivery stays with its runn
   const s = fixture();
   s.gallery = [
     { ...tile("removed"), deleted: true },
-    tile("cancelled", "canceled"),
+    tile("cancelled", "cancelled"),
     tile("live", "pending"),
   ];
   s.jobs.set("live", { status: "running", comfyBackend: "video" });
@@ -239,8 +239,8 @@ test("deleted and cancelled tiles stay absent; live delivery stays with its runn
   s.snapshots.video.history = { "live-prompt": result("live") };
   await s.recover();
   assert.equal(s.jobs.size, 1);
-  assert.equal(s.gallery[0].status, "error");
-  assert.equal(s.gallery[1].status, "canceled");
+  assert.equal(s.gallery[0].status, "failed");
+  assert.equal(s.gallery[1].status, "cancelled");
   assert.equal(s.gallery[2].status, "pending");
 });
 
@@ -255,8 +255,8 @@ test("an available backend recovers even when the other backend is offline", asy
 
 test("a completed recovered video racing cancellation retains its saved output", async () => {
   const s = fixture();
-  s.gallery = [tile("one", "canceled")];
-  s.jobs.set("one", { recovered: true, status: "canceling", comfyBackend: "video" });
+  s.gallery = [tile("one", "cancelled")];
+  s.jobs.set("one", { recovered: true, status: "cancelling", comfyBackend: "video" });
   s.snapshots.video.history = { "one-prompt": result("one") };
   await s.recover();
   assert.equal(s.jobs.get("one").status, "done");
@@ -267,17 +267,17 @@ test("a completed recovered video racing cancellation retains its saved output",
 test("cancel recovery without an acknowledgement waits for its exact recorded job and saves late completion", async () => {
   const s = fixture();
   s.gallery = [tile("own", "pending")];
-  s.jobs.set("own", { recovered: true, status: "canceling", comfyBackend: "video" });
+  s.jobs.set("own", { recovered: true, status: "cancelling", comfyBackend: "video" });
   s.snapshots.video.history = { "foreign-prompt": result("foreign") };
   await s.recover();
   await s.recover();
-  assert.equal(s.jobs.get("own").status, "canceling");
+  assert.equal(s.jobs.get("own").status, "cancelling");
   assert.equal(s.jobs.get("own").terminalAt, undefined);
   assert.equal(s.jobs.has("foreign"), false);
   s.snapshots.video.queue = { queue_running: [queued("own", "late-provider-id")] };
   await s.recover();
   assert.equal(s.jobs.get("own").promptId, "late-provider-id");
-  assert.equal(s.jobs.get("own").status, "canceling");
+  assert.equal(s.jobs.get("own").status, "cancelling");
   assert.deepEqual(s.cancellations, [{ promptId: "late-provider-id", backend: "video" }]);
   s.snapshots.video.queue = {};
   await s.recover();
@@ -298,7 +298,7 @@ test("an untracked job reported lost can still accept a late backend result", as
   s.gallery = [tile("late", "pending")];
   await s.recover();
   await s.recover();
-  assert.equal(s.gallery[0].status, "error");
+  assert.equal(s.gallery[0].status, "failed");
   s.snapshots.video.history = { "late-prompt": result("late") };
   await s.recover();
   assert.equal(s.gallery[0].url, "late.mp4");
@@ -396,9 +396,9 @@ test("a restored long video keeps its index, request time, settings and elapsed 
 
 test("a run its runner gave up on (busy worker) is followed again and delivered from history at once", async () => {
   const s = fixture();
-  s.gallery = [{ ...tile("busy", "error"), index: 0 }];
+  s.gallery = [{ ...tile("busy", "failed"), index: 0 }];
   s.jobs.set("busy", {
-    status: "error",
+    status: "failed",
     error: "ComfyUI stopped answering for over a minute, so this run was given up.",
     terminalAt: 1,
     comfyBackend: "video",
@@ -423,9 +423,9 @@ test("a run its runner gave up on (busy worker) is followed again and delivered 
 
 test("a failure its runner recorded keeps its reason when ComfyUI has no output either", async () => {
   const s = fixture();
-  s.gallery = [{ ...tile("failed", "error"), failure: { summary: "Out of memory" } }];
+  s.gallery = [{ ...tile("failed", "failed"), failure: { summary: "Out of memory" } }];
   s.jobs.set("failed", {
-    status: "error",
+    status: "failed",
     error: "Out of memory",
     terminalAt: 1,
     comfyBackend: "video",
