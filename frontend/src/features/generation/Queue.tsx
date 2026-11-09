@@ -1,6 +1,7 @@
 import {
   ActionIcon,
   Alert,
+  Badge,
   Button,
   Collapse,
   Group,
@@ -155,8 +156,9 @@ export const statusLabels: Record<QueueJob["status"], string> = {
 /** A generation's progress as a percentage, or 0 while it has no steps to count. */
 export const progressPercent = (progress: QueueJob["progress"]) =>
   progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
-/** Not yet started: the items a pause holds and dragging reorders. */
-const waiting = (job: QueueJob) => ["writing", "queued", "waiting"].includes(job.status);
+/** What dragging reorders: the account's own work not yet started; Dream's waits at its own tier. */
+const movableJob = (job: QueueJob) =>
+  !job.dream && ["writing", "queued", "waiting"].includes(job.status);
 const loadSortable = () => import("./SortableQueue");
 const SortableQueue = lazy(loadSortable);
 /**
@@ -271,9 +273,16 @@ function QueueRow({
               style={{ flexShrink: 0 }}
             />
             <Stack gap={2} flex={1} miw={0}>
-              <Text size="sm" lineClamp={1}>
-                {String(job.input?.prompt || "Generation")}
-              </Text>
+              <Group wrap="nowrap" gap={6}>
+                <Text size="sm" lineClamp={1}>
+                  {String(job.input?.prompt || "Generation")}
+                </Text>
+                {job.dream && (
+                  <Badge size="xs" color="gray" miw="max-content">
+                    Dream
+                  </Badge>
+                )}
+              </Group>
               <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
                 {[
                   profile && profileName(profile),
@@ -373,7 +382,10 @@ export function QueueActions() {
   const pause = pauseControl(queue.data.paused, everyone);
   const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
     jobs.some((job) =>
-      key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
+      // Stop All leaves Dream's work to Dream's own pause.
+      key === "cancel-all"
+        ? !job.dream && !terminalStatuses.has(job.status)
+        : job.status === "failed",
     ),
   );
   const queueAction = (label: string, Icon: LucideIcon, onClick: () => void) => (
@@ -469,16 +481,16 @@ export function Queue() {
       </EmptyState>
     );
   }
-  const movable = jobs.filter(waiting);
+  const movable = jobs.filter(movableJob);
   const sortable = movable.length > 1;
   const row = (job: QueueJob, drag?: QueueRowDrag) => (
-    <QueueRow key={job.id} job={job} sortable={sortable && waiting(job)} drag={drag} />
+    <QueueRow key={job.id} job={job} sortable={sortable && movableJob(job)} drag={drag} />
   );
   // The new order shows at once; the refetch after the move settles it, a failed one included.
   function move(job: QueueJob, to: number) {
     client.setQueryData(queueQuery.queryKey, (data) => {
       if (!data) return data;
-      const pending = data.jobs.filter(waiting);
+      const pending = data.jobs.filter(movableJob);
       const slots = pending.map((item) => data.jobs.indexOf(item));
       const jobs = [...data.jobs];
       arrayMove(pending, pending.indexOf(job), to).forEach((item, index) => {

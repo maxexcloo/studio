@@ -197,8 +197,10 @@ the primary component reference and verify APIs against the installed version.
   The deck's bar offers only large Pass and Like, or a comparison's A and B
   larger than Neither and Both; the viewer's bar offers every choice.
   Calibration uses only the account's own Studio generations and leaves the
-  gallery unchanged apart from an explicit Star. Dream yields to user and text
-  work and respects its buffer and caps.
+  gallery unchanged apart from an explicit Star. Dream starts work only while
+  Studio is idle and respects its buffer and caps. Its jobs show in the
+  person's queue with a Dream badge, wait below everyone's own work and are not
+  reordered; Stop All leaves them to Dream's own pause.
 
 ## Motion & Verification
 
