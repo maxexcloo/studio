@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeReferences, create, fixtures, image, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, signIn, stamp } from "./fixtures";
 
 const mara = {
   id: "chr-mara",
@@ -98,4 +98,85 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(
     references.getByRole("button", { name: "Use character: Mara", exact: true }),
   ).toBeVisible();
+});
+
+test("Make Character starts a card from a gallery image in Library › Characters, described by the assistant", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "ranger",
+    jobId: "ranger-job",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A ranger in a green cloak",
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({ json: { available: true, vision: true, presets: [] } }),
+  );
+  const described: unknown[] = [];
+  await page.route("**/api/assistant/character", (route) => {
+    described.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true, description: "red-haired ranger, green cloak" } });
+  });
+  await page.goto("/images");
+  await page
+    .getByRole("button", { name: "Open image: A ranger in a green cloak", exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Make Character/ }).click();
+  await expect(page).toHaveURL(/\/library#characters$/);
+  const editor = page.getByRole("dialog", { name: "New Character", exact: true });
+  await expect(editor.getByRole("img", { name: "Image 1", exact: true })).toBeVisible();
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
+  await editor.getByRole("button", { name: "Describe Image", exact: true }).click();
+  await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
+    "red-haired ranger, green cloak",
+  );
+  expect(described).toEqual([{ assetId: "asset-ranger" }]);
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  const cards = page.getByRole("list", { name: "Characters", exact: true });
+  await expect(cards.getByRole("listitem", { name: "Mara", exact: true })).toContainText(
+    "red-haired ranger, green cloak",
+  );
+  // Delete asks first and leaves the gallery image.
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete Character", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Character", exact: true })
+    .getByRole("button", { name: "Delete Character", exact: true })
+    .click();
+  await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
+  expect(state.characters).toEqual([]);
+});
+
+test("A member sees only Characters in the Library, and a group without Characters has neither tab nor Library", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "member", role: "user", features: {} });
+  await page.goto("/library");
+  await expect(page.getByText("No Characters", { exact: true })).toBeVisible();
+  // The administration sections stay hidden.
+  const select = page.getByRole("combobox", { name: "Library Section", exact: true });
+  const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
+  await expect(select.or(nav)).toBeVisible();
+  if (await nav.isVisible()) await expect(nav.getByRole("link")).toHaveText(["Characters"]);
+  else await expect(select).toHaveValue("Characters");
+  await signIn(page, { id: "member", role: "user", features: { characters: false } });
+  await page.goto("/library");
+  await expect(page).toHaveURL(/\/images$/);
+  await page.goto("/images?compose=1");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "References", exact: true }).getByText("Characters", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });

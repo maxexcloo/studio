@@ -169,7 +169,7 @@ the primary component reference and verify APIs against the installed version.
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download | Star,
   Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
   like), then reuses its prompt: Edit Prompt and Use as Reference stage the
-  composer, Run Again and Repeat Exactly queue from where they are; menu options expand in place on phones and
+  composer, Make Character starts a card in Library › Characters, Run Again and Repeat Exactly queue from where they are; menu options expand in place on phones and
   touch screens. On phones and touch screens the viewer bar shows every action,
   wrapping onto another row rather than using More or scrolling; the phone bar
   drops its prompt field while Details is open. Gallery selection uses the shared

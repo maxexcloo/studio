@@ -13,6 +13,7 @@ import {
   libraryItemCategory,
   type LibraryItem,
 } from "./LibraryCatalogueTable";
+import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
@@ -27,6 +28,7 @@ export function LibraryPage() {
   const catalogueActive = ["models", "loras"].includes(activeSection);
   const catalogue = useQuery({
     queryKey: ["library"],
+    enabled: admin,
     queryFn: () =>
       api<{ items: LibraryItem[]; updates?: { checkedAt?: string; available: number } }>(
         "/api/library/items",
@@ -102,6 +104,7 @@ export function LibraryPage() {
         label="Library"
         sections={options}
         content={{
+          characters: (heading) => <LibraryCharacters heading={heading} />,
           imports: (heading) => (
             <LibraryImports
               heading={heading}
