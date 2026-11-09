@@ -114,6 +114,36 @@ test("conflicting work waits until outputs save; independent cloud work proceeds
   }
 });
 
+test("one local video runs at a time across workers; images and cloud videos go alongside", async () => {
+  const { store, queue, submitted, observations } = fixture();
+  try {
+    const session = store.createSession("alice");
+    const video = { kind: "video" as const };
+    const first = store.enqueue("alice", session.id, video, "image", undefined, "worker:primary");
+    const second = store.enqueue(
+      "alice",
+      session.id,
+      video,
+      "image",
+      undefined,
+      "worker:secondary",
+    );
+    const image = store.enqueue("alice", session.id, {}, "image", undefined, "worker:secondary");
+    const cloud = store.enqueue("alice", session.id, video, "image", undefined, "cloud");
+    await queue.tick();
+    assert.deepEqual([...submitted].sort(), [first.id, image.id, cloud.id].sort());
+    observations.set(image.id, { status: "completed" });
+    await queue.tick();
+    assert.equal(store.job("alice", second.id)?.reason, "Waiting for another video to finish.");
+    assert.deepEqual([...submitted].sort(), [first.id, image.id, cloud.id].sort());
+    observations.set(first.id, { status: "completed" });
+    await queue.tick();
+    assert.equal(submitted.at(-1), second.id);
+  } finally {
+    store.close();
+  }
+});
+
 test("failed output persistence retains saving state and blocks conflicting work", async () => {
   const { store, queue, adapter, observations, submitted } = fixture();
   try {
