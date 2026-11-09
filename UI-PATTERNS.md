@@ -152,9 +152,10 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order; menu options expand in place on phones and touch screens. The phone viewer bar shows
-  every action, wrapping onto another row rather than using More, and drops its
-  prompt field while Details is open. Gallery selection uses the shared
+  and `itemActions.ts` the order; menu options expand in place on phones and
+  touch screens. On phones and touch screens the viewer bar shows every action,
+  wrapping onto another row rather than using More or scrolling; the phone bar
+  drops its prompt field while Details is open. Gallery selection uses the shared
   contextual selection bar and confirms deletion.
 - Details sections show short content in full and fold longer content under
   Expand rather than scrolling it in a box. Each heading's Copy copies its
