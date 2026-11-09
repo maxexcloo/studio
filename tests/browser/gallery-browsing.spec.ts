@@ -750,3 +750,24 @@ test("The phone Generations drawer fills the screen height and swipes away", asy
   await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await expect(drawer).toBeHidden();
 });
+
+test("On a phone held sideways, Gallery Filters fits the screen and scrolls", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+  await fixtures(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const filters = page.locator("[data-chip-popup]");
+  await expect(filters).toBeVisible();
+  const bottom = async () => {
+    const box = (await filters.boundingBox())!;
+    return box.y + box.height;
+  };
+  await expect.poll(bottom).toBeLessThanOrEqual(390);
+  // The last filter is reachable by scrolling inside the popup.
+  const square = filters.getByRole("button", { name: "Square", exact: true });
+  await square.scrollIntoViewIfNeeded();
+  await expect(square).toBeInViewport();
+});

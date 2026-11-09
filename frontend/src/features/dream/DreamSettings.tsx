@@ -6,6 +6,7 @@ import { api } from "../../api";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { fittedPopup } from "../generation/chip";
 import { dreamQuery, dreamWhen, type Dream, type DreamSettings } from "./queries";
 
 /** Saves part of the Dream settings and shows the result at once. */
@@ -113,7 +114,14 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
       </>
     );
   return (
-    <Popover opened={opened} onChange={setOpened} position="bottom-end" width={400} trapFocus>
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      position="bottom-end"
+      width={400}
+      trapFocus
+      {...fittedPopup}
+    >
       <Popover.Target>{button}</Popover.Target>
       <Popover.Dropdown aria-label="Dream Settings" role="dialog">
         <SettingsForm dream={dream} />

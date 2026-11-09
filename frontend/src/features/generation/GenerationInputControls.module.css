@@ -62,7 +62,7 @@
   }
 }
 
-/* A phone chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
+/* A chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
    doesn't clip, so a nested Select's list, positioned against it, still shows in full. */
 .fitted {
   display: flex;

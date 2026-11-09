@@ -21,7 +21,7 @@ export const iconChipProps = {
   className: `${classes.chip} ${classes.iconChip}`,
 } as const;
 
-/** A phone chip's floating popup fits the screen and scrolls inside when it is taller. */
+/** A chip's floating popup fits the screen and scrolls inside when it is taller (a phone held sideways). */
 export const fittedPopup = {
   middlewares: { ...popupMiddlewares, size: { padding: 12 } },
   classNames: { dropdown: classes.fitted },
