@@ -173,7 +173,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     width: 64,
     height: 64,
     steps: 2,
-    workerId: "chosen",
   });
   assert.equal(accepted.status, 200);
   const prompt = await (lostAcknowledgement ? providerAccepted : submitted);

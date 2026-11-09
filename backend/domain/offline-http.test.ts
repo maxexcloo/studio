@@ -105,9 +105,7 @@ test(
       objectInfo: info,
       outputFiles: new Map([["own.png", png]]),
     });
-    const other = await startFakeComfy({ objectInfo: info });
     chosen.setDown(true);
-    other.setDown(true);
     // The chosen worker's deployment is stopped, and its pod cannot get a GPU until allowed.
     const kube = fakeKubernetes(
       [
@@ -154,7 +152,6 @@ test(
               url: serviceUrl("comfyui", "chosen", chosen.url),
               capabilities: ["image"],
             },
-            { id: "other", name: "Other Worker", url: other.url, capabilities: ["image"] },
           ]),
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -237,8 +234,6 @@ test(
         workflow: profile.workflow,
         kind: "image",
         prompt: "Neutral white teapot",
-        workerId: "chosen",
-        allowFallback: false,
         referenceAssets: references,
       };
       assert.equal((await request("/api/generate", { ...input, prompt: "" })).status, 400);
@@ -302,7 +297,6 @@ test(
       const waiting = await waitFor(accepted.jobId, (job) => job.status === "waiting");
       assert.equal(waiting.backend, "chosen");
       await stop();
-      other.setDown(false);
       await start();
       const restored = await waitFor(
         accepted.jobId,
@@ -311,7 +305,7 @@ test(
       assert.equal(restored.backend, "chosen");
       assert.match(restored.reason, /^Waiting for chosen to start\. Waiting for a GPU: 0\/1 nodes/);
       assert.deepEqual(restored.input.referenceAssets, references);
-      assert.equal(chosen.prompts.length + other.prompts.length, 0);
+      assert.equal(chosen.prompts.length, 0);
       const nextPrompt = chosen.nextPrompt();
       delete deployment.unschedulable;
       const submitted = await nextPrompt;
@@ -325,7 +319,6 @@ test(
       const acknowledged = await waitFor(accepted.jobId, (job) => Boolean(job.providerJobId));
       assert.equal(acknowledged.backend, "chosen");
       assert.equal(starts(), 1);
-      assert.equal(other.prompts.length, 0);
       chosen.finish(submitted.id, {
         outputs: { 8: { images: [{ filename: "own.png", type: "output", subfolder: "" }] } },
       });
@@ -334,7 +327,6 @@ test(
       assert.equal(chosen.prompts.length, 1);
       await stop();
       chosen.setDown(true);
-      other.setDown(true);
       deployment.replicas = 0;
       deployment.pods = [];
       writeFileSync(
@@ -359,7 +351,7 @@ test(
       assert.equal(current.ready, undefined);
     } finally {
       await stop();
-      await Promise.all([chosen.close(), other.close()]);
+      await chosen.close();
       engine.closeAllConnections();
       await new Promise<void>((resolve) => engine.close(() => resolve()));
       rmSync(temporary, { recursive: true, force: true });

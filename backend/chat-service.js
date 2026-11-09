@@ -187,7 +187,6 @@ export function createSessionChat({
           ...draft.input,
           kind: draft.operation === "animate" ? "video" : "image",
           clientJobId: turnId,
-          allowFallback: draft.input.allowFallback === true,
         },
         account || undefined,
         { sessionId, operation: draft.operation, parentJobId: draft.parentJobId },

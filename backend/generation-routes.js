@@ -133,7 +133,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
             error: `${backend.label} isn’t ready for ${profile.label}: ${backend.reason}`,
           },
         };
-      // A draft carried over from another kind (an image's worker on an Animate) is not a pin.
+      // A queued job submits to the worker the queue gave it, if that worker can still run it.
       const pinned =
         pinnedBackend && workerHas(pinnedBackend, capabilityForProfile(profile))
           ? pinnedBackend
@@ -471,7 +471,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
   return {
     submitGeneration,
     async validateInput(input, account) {
-      const routed = await routeGeneration(input, account, input?.workerId, true);
+      const routed = await routeGeneration(input, account, undefined, true);
       if (routed.payload) return routed;
       if (routed.offline) {
         if (!String(input?.prompt || "").trim())

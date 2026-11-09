@@ -95,8 +95,6 @@ export interface GenerationInput extends Record<string, unknown> {
   resolutionTier?: Resolution;
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
-  /** The worker picked to run it, which it waits for; Automatic when absent. */
-  workerId?: string;
 }
 export interface MediaItem {
   id: string;
@@ -199,6 +197,5 @@ export interface Models {
     /** The Studio workloads serving it, which an administrator can start. */
     workloads?: string[];
     capabilities: string[];
-    gpuDevices?: string[];
   }[];
 }
