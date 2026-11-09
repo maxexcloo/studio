@@ -1404,7 +1404,7 @@ export class McpMedia {
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
         tier,
-        cloud,
+        where: cloud ? "cloud" : "auto",
       });
       base = choice.profile;
       note = choice.note ? `${choice.note} Tell the user. ` : "";

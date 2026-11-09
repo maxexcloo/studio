@@ -42,10 +42,38 @@ test("Animate takes a local first-frame profile, Fast unless Quality is asked, w
   const one = profiles.filter((profile) => profile.id !== "fl-fast");
   assert.equal(choose({ localRunning: true }, one).profile.id, "fl-quality");
   assert.deepEqual(choose({ localRunning: true }, one).tiers, []);
-  // Asking for Grok goes to Grok without a note.
-  assert.deepEqual(
-    [choose({ localRunning: true, cloud: true }).profile.id, choose({ cloud: true }).note],
-    ["grok-video", ""],
+  assert.deepEqual(choice.offers, { local: true, cloud: true });
+});
+
+test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather than fall back", () => {
+  // Cloud goes to Grok without a note, even while local video runs.
+  const cloud = choose({ localRunning: true, where: "cloud" });
+  assert.deepEqual([cloud.profile.id, cloud.note, cloud.tiers], ["grok-video", "", []]);
+  // Cloud offers Fast or Quality only when two Grok profiles differ by tier.
+  const grokFast = { ...grok, id: "grok-fast", label: "Grok · Fast" };
+  const tiered = choose({ localRunning: true, where: "cloud", tier: "quality" }, [
+    ...profiles,
+    { ...grok, label: "Grok · Quality" },
+    grokFast,
+  ]);
+  assert.deepEqual([tiered.profile.id, tiered.tiers], ["grok-video", ["fast", "quality"]]);
+  assert.equal(choose({ localRunning: true, where: "local" }).profile.id, "fl-fast");
+  // A stopped worker refuses with its reason, and the refusal still says what is offered.
+  assert.throws(
+    () => choose({ localRunning: false, localParked: true, where: "local" }),
+    (error) =>
+      /^Videos are Stopped .*, so Local GPU can't animate this right now\.$/.test(error.message) &&
+      error.offers.local &&
+      error.offers.cloud,
+  );
+  const offline = profiles.map((p) => (p.family ? p : { ...p, availability: "offline" }));
+  assert.throws(
+    () => choose({ localRunning: true, where: "local" }, offline),
+    /^Error: Local video isn't running, so Local GPU/,
+  );
+  assert.throws(
+    () => choose({ localRunning: true, where: "local" }, [grok]),
+    (error) => /no local video profile/.test(error.message) && !error.offers.local,
   );
 });
 
@@ -66,7 +94,10 @@ test("Animate refuses clearly when neither local video nor Grok is available", (
     () => choose({ localRunning: false }, local),
     /^Error: Local video isn't running and this account has no Grok access \(Cloud Models\)/,
   );
-  assert.throws(() => choose({ localRunning: true, cloud: true }, local), /no Grok video profile/);
+  assert.throws(
+    () => choose({ localRunning: true, where: "cloud" }, local),
+    (error) => /no Grok video profile/.test(error.message) && !error.offers.cloud,
+  );
   assert.throws(
     () => choose({ localRunning: true }, [profiles[0]]),
     /No video profile that takes a starting image/,
