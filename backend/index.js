@@ -11,7 +11,7 @@ import {
   registerGalleryErrorRoutes,
   registerGalleryDeleteRoute,
 } from "./gallery/routes.js";
-import { registerGenerationRoutes } from "./generation-routes.js";
+import { createGenerationSubmission } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
@@ -572,7 +572,7 @@ registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed(
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, runtime, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
-const generationRoutes = registerGenerationRoutes(app, {
+const generationRoutes = createGenerationSubmission({
   loadComfyContext,
   mediaModels: (force) =>
     mediaModels(force).catch((error) => {
@@ -627,6 +627,10 @@ const admitGeneration = createGenerationAdmission({
     return input.kind === "image" && Boolean(workflow) && !workflow.controls?.count;
   },
   admitted: jobAdmitted,
+});
+app.post("/api/generate", async (req, res) => {
+  const result = await admitGeneration(req.body || {}, req.studioAccount);
+  res.status(result.status).json(result.payload);
 });
 registerRewriteRoutes(app, {
   store,
@@ -949,10 +953,6 @@ const nextSteps = createNextStepWork({
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
-});
-generationRoutes.setAdmission(async (req, res) => {
-  const result = await admitGeneration(req.body || {}, req.studioAccount);
-  res.status(result.status).json(result.payload);
 });
 
 // Studio Chat (chat-service.js).

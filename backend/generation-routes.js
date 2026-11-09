@@ -32,39 +32,11 @@ import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
-import { ownerIdForRequest } from "./account-ownership.js";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { loraAllowed } from "./model/catalogue.js";
 
-export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
-  const submissions = new Map();
-  const generate = async (req, res) => {
-    const id = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
-    // Serialise retries before any asynchronous image staging or backend work.
-    // Once acknowledged, the job below answers repeats without staging again.
-    let release;
-    if (id) {
-      while (submissions.has(id)) await submissions.get(id);
-      submissions.set(
-        id,
-        new Promise((resolve) => {
-          release = resolve;
-        }),
-      );
-    }
-    try {
-      await dispatchGenerate(req, res);
-    } finally {
-      if (id) {
-        submissions.delete(id);
-        release();
-      }
-    }
-  };
-  let admission;
-  app.post("/api/generate", (req, res) => (admission ? admission(req, res) : generate(req, res)));
-
+export function createGenerationSubmission({ loadComfyContext, mediaModels, comfyDownMessage }) {
   /**
    * Which worker runs this generation (workers.js): one that has the
    * capability its profile needs, preferring an online one with the model, and
@@ -206,10 +178,12 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
   }
 
-  async function dispatchGenerate(req, res) {
-    const routed = await routeGeneration(req.body, req.studioAccount, req.studioQueueBackend);
-    if (routed.payload) return res.status(routed.status).json(routed.payload);
-    return withComfyBackend(routed.backend, () => generateOnBackend(req, res));
+  /** Starts a queued job on its worker (domain/generation-adapter.ts); answers `{ status, payload }`. */
+  async function submitGeneration(job, account) {
+    const input = { ...job.input, clientJobId: job.id };
+    const routed = await routeGeneration(input, account, job.backend);
+    if (routed.payload) return routed;
+    return withComfyBackend(routed.backend, () => generateOnBackend(job, input, account));
   }
 
   async function prepareGenerationBody(input) {
@@ -287,48 +261,52 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     return { body, isMockJob };
   }
 
-  async function generateOnBackend(req, res) {
-    const duplicateId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
-    const existing = duplicateId && jobs.get(duplicateId);
+  async function generateOnBackend(job, input, account) {
+    const id = job.id;
+    const existing = jobs.get(id);
     // In account mode a job ID belongs to one owner for good: a reused ID must never touch
     // another account's live job or saved outputs, and the answer must not reveal which.
-    if (duplicateId && req.studioAccount) {
-      const ownerId = ownerIdForRequest(req);
+    if (account) {
       const foreign =
-        (existing && (existing.ownerId || "") !== ownerId) ||
-        gallery.some((item) => item.jobId === duplicateId && (item.ownerId || "") !== ownerId);
+        (existing && (existing.ownerId || "") !== job.ownerId) ||
+        gallery.some((item) => item.jobId === id && (item.ownerId || "") !== job.ownerId);
       if (foreign)
-        return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
+        return {
+          status: 409,
+          payload: { ok: false, error: "That generation ID is already in use." },
+        };
     }
-    if (existing) {
-      return res.json({
-        jobId: duplicateId,
-        items: existing.items || existing.outputs || [],
-        revision: galleryRevisionValue(),
-      });
-    }
-    const prepared = await prepareGenerationBody(req.body);
-    if (prepared.payload) return res.status(prepared.status).json(prepared.payload);
+    if (existing)
+      return {
+        status: 200,
+        payload: {
+          jobId: id,
+          items: existing.items || existing.outputs || [],
+          revision: galleryRevisionValue(),
+        },
+      };
+    const prepared = await prepareGenerationBody(input);
+    if (prepared.payload) return prepared;
     let { body, isMockJob } = prepared;
     body.comfyBackend = currentComfyBackend();
-    body.ownerId = ownerIdForRequest(req);
+    body.ownerId = job.ownerId;
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details.
-    const assistant = assistantRecord(req.body?.assistant, body.loras);
+    const assistant = assistantRecord(input.assistant, body.loras);
     if (assistant) body.assistant = assistant;
     else delete body.assistant;
     // The queue's writing stage wrote the prompt (prompt-stage.js): its results keep the thinking.
-    const writing = storedWritingRecord(req.body?.writing);
+    const writing = storedWritingRecord(input.writing);
     if (writing) body.writing = writing;
     else delete body.writing;
     // The chat conversation that asked for it (Studio MCP), so the gallery can link back to it.
-    const chat = storedChatRecord(req.body?.chat);
+    const chat = storedChatRecord(input.chat);
     if (chat) body.chat = chat;
     else delete body.chat;
     // A Dream job's results stay out of the gallery until kept (domain/dream.ts); only its queue record sets this.
-    if (req.studioDream) body.dream = { state: "unseen", ...req.studioDream };
+    if (job.dream) body.dream = { state: "unseen", ...job.dream };
     else delete body.dream;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
-    const autoUpscale = req.body?.autoUpscale;
+    const autoUpscale = input.autoUpscale;
     // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.
     body.autoUpscale =
       body.kind === "image" &&
@@ -365,7 +343,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
       body.referenceAssets = await stageReferenceAssetsForAccount(
-        req.studioAccount,
+        account,
         [{ slot: "reference", assetId: body.startImageId }],
         { unique: Boolean(body.ownerId), generation: body },
       ).catch(() => []);
@@ -376,27 +354,21 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       !body.referenceAssets.every((item) => item.comfyName)
     ) {
       try {
-        body.referenceAssets = await stageReferenceAssetsForAccount(
-          req.studioAccount,
-          body.referenceAssets,
-          {
-            unique: Boolean(body.ownerId),
-            generation: body,
-          },
-        );
+        body.referenceAssets = await stageReferenceAssetsForAccount(account, body.referenceAssets, {
+          unique: Boolean(body.ownerId),
+          generation: body,
+        });
       } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
-        return;
+        return { status: 400, payload: { ok: false, error: error.message } };
       }
     }
     // A painted mask becomes a crop, its masks and where to stitch them back (inpaint.js).
     // The mask itself goes no further: it is never stored with the run.
     if (body.inpaint) {
       try {
-        body.inpaint = isMockJob ? null : await prepareInpaint(req, body);
+        body.inpaint = isMockJob ? null : await prepareInpaint(account, body);
       } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
-        return;
+        return { status: 400, payload: { ok: false, error: error.message } };
       }
     }
     // An empty painted mask falls back to a normal run, so apply normal sizing too.
@@ -407,20 +379,19 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       );
     }
     // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
-    const inpaintSkipped = Boolean(!isMockJob && req.body?.inpaint?.mask && !body.inpaint);
+    const inpaintSkipped = Boolean(!isMockJob && input.inpaint?.mask && !body.inpaint);
     // Kept with the result, so Details says the mask went unused.
     body.maskSkipped = inpaintSkipped;
-    if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
+    if (!isMockJob && input.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssetsForAccount(req.studioAccount, [first], {
+        const [replacement] = await stageReferenceAssetsForAccount(account, [first], {
           unique: Boolean(body.ownerId),
           generation: body,
         });
         body.referenceAssets = [replacement, ...others];
       } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
-        return;
+        return { status: 400, payload: { ok: false, error: error.message } };
       }
     }
     // Plain img2img samples at the staged image's size, irrespective of the empty latent controls.
@@ -453,8 +424,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       body.seed = String(crypto.randomInt(1, 2 ** 31));
       body.seedRandom = true;
     }
-    const clientJobId = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
-    const id = clientJobId || crypto.randomUUID();
     body.clientJobId = id;
     body.createdAt = new Date().toISOString();
     body.startedAt = Date.now();
@@ -471,17 +440,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       items,
       startedAt: body.startedAt,
     });
-    res.json({
-      jobId: id,
-      items,
-      revision: galleryRevisionValue(),
-      ...(inpaintSkipped
-        ? {
-            notice:
-              "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture.",
-          }
-        : {}),
-    });
     if (isMockJob) {
       setTimeout(() => runMockJob(id, body), 0);
     } else {
@@ -493,6 +451,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         0,
       );
     }
+    return { status: 200, payload: { jobId: id, items, revision: galleryRevisionValue() } };
   }
 
   /**
@@ -513,10 +472,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     return planRunUpscale(graph, body, info, customWorkflow);
   }
   return {
-    generate,
-    setAdmission(handler) {
-      admission = handler;
-    },
+    submitGeneration,
     async validateInput(input, account) {
       const routed = await routeGeneration(input, account, input?.backendId, true);
       if (routed.payload) return routed;
