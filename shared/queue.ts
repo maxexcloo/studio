@@ -81,6 +81,8 @@ export interface QueueJob {
   progress?: Record<string, unknown>;
   providerJobId?: string;
   backend?: string;
+  /** Dream's background work, queued below every account's own work. */
+  dream?: true;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +99,4 @@ export interface QueueCancelAllResponse {
 /** Settings › Generation › Unfinished Items: any account's job that has not finished. */
 export interface UnfinishedJob extends QueueJob {
   ownerId: string;
-  /** Dream's background work, outside the person's queue. */
-  dream: boolean;
 }

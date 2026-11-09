@@ -67,7 +67,6 @@ function fixture(t: TestContext, catalogue = profiles) {
     /** Rolls for the next chance draws (out of 100); every other draw is 0. */
     rolls: [] as number[],
   };
-  let dream: ReturnType<typeof createDream>;
   const admission = createGenerationAdmission({
     store,
     queue: { tick: async () => undefined } as unknown as GenerationQueue,
@@ -77,9 +76,8 @@ function fixture(t: TestContext, catalogue = profiles) {
       { id: `${id}-0`, jobId: id, status: "pending", prompt: input.prompt },
     ],
     revision: () => 0,
-    admitted: (job) => dream.admitted(job),
   });
-  dream = createDream({
+  const dream = createDream({
     dataDir,
     store,
     taste,
@@ -206,7 +204,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   };
 }
 
-test("Dream is off until turned on, queues one hidden job only while Studio is idle and yields at once", async (t) => {
+test("Dream is off until turned on, queues one hidden job per account only while Studio is idle and waits below other work", async (t) => {
   const { dream, store, state, admission, dreamJobs, live } = fixture(t);
   assert.deepEqual(dream.read("alice").settings, {
     enabled: false,
@@ -265,24 +263,31 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   assert.equal(store.session("alice", job.sessionId)?.hidden, true);
   assert.equal(store.sessions("alice").length, 0);
   assert.equal(dream.status("alice").status, "generating");
-  // One Dream job at a time across Studio.
+  // One Dream job per account: Alice gets no second one, but Bob gets his own.
   await dream.tick();
-  assert.equal(live().length, 1);
+  assert.equal(live("alice").length, 1);
+  await dream.save("bob", { enabled: true });
+  await dream.tick();
+  assert.equal(live("bob").length, 1);
+  // Turning Dream off cancels its waiting job; cancelled Dream work doesn't count towards the day.
+  await dream.save("bob", { enabled: false });
+  assert.equal(live("bob").length, 0);
+  assert.deepEqual(dream.today("bob"), { images: 0, videos: 0 });
 
-  // A person's request cancels the waiting Dream job before the queue can start it.
+  // A person's request leaves the waiting Dream job waiting below it, and Dream queues no more.
   const mine = await admission({ prompt: "now" }, { userId: "bob", role: "user" });
   assert.equal(mine.status, 200);
-  assert.equal(store.job("alice", job.id)?.status, "cancelled");
-  // Cancelled Dream work doesn't count towards the day.
-  assert.deepEqual(dream.today("alice"), { images: 0, videos: 0 });
-  // A started Dream job is never pre-empted.
-  store.save({ ...store.job("bob", String(mine.payload.jobId))!, status: "completed" });
   await dream.tick();
-  const [next] = live("alice");
-  store.save({ ...next, status: "running" });
+  assert.deepEqual(
+    live().map((each) => [each.id, each.status]),
+    [[job.id, "queued"]],
+  );
+  // A started Dream job finishes.
+  store.save({ ...store.job("bob", String(mine.payload.jobId))!, status: "completed" });
+  store.save({ ...store.job("alice", job.id)!, status: "running" });
   await admission({ prompt: "later" }, { userId: "bob", role: "user" });
-  assert.equal(store.job("alice", next.id)?.status, "running");
-  // The person's queue never lists Dream jobs.
+  assert.equal(store.job("alice", job.id)?.status, "running");
+  // The person's queue lists their Dream job, marked as Dream's.
   const app = express();
   app.use((req, _res, nextHandler) => {
     Object.assign(req, { studioAccount: { userId: "alice", role: "user" } });
@@ -300,7 +305,12 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   await once(server, "listening");
   t.after(() => server.close());
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  assert.deepEqual((await (await fetch(`${base}/api/queue`)).json()).jobs, []);
+  assert.deepEqual(
+    (await (await fetch(`${base}/api/queue`)).json()).jobs.map(
+      (each: { id: string; dream?: true }) => [each.id, each.dream],
+    ),
+    [[job.id, true]],
+  );
   assert.deepEqual((await (await fetch(`${base}/api/sessions`)).json()).sessions, []);
   for (let index = 0; index < 10; index++)
     assert.equal(
@@ -310,7 +320,7 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   // Cancel Pending and Cancel All act on the person's own work and leave Dream alone.
   for (const route of ["cancel-pending", "cancel-all"])
     assert.equal((await fetch(`${base}/api/queue/${route}`, { method: "POST" })).status, 200);
-  assert.equal(store.job("alice", next.id)?.status, "running");
+  assert.equal(store.job("alice", job.id)?.status, "running");
   assert.ok(
     store
       .jobs("alice")
