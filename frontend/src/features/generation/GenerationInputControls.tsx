@@ -1,13 +1,12 @@
 import type { ReactNode } from "react";
 import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
-import { Bookmark, Brush, ChevronDown } from "lucide-react";
+import { Brush, ChevronDown } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
 import { backendLabel, controlRange } from "./payload";
-import { ChipPopup } from "./Picker";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
 import classes from "./GenerationInputControls.module.css";
@@ -162,11 +161,8 @@ export function GenerationInputControls({
   hasReferences?: boolean;
   /** Painting a mask on the first reference, for profiles that can inpaint. */
   mask?: MaskControl;
-  presets?: {
-    opened: boolean;
-    onOpenedChange: (opened: boolean) => void;
-    content: ReactNode;
-  };
+  /** The Presets chip (`PresetPicker`). */
+  presets?: ReactNode;
   loraPicker: LoraPickerState;
   expert: { opened: boolean; onOpenedChange: (opened: boolean) => void };
   /** Opens Compare from this draft; the gallery composer passes it. */
@@ -236,28 +232,7 @@ export function GenerationInputControls({
           </Button>
         </Tooltip>
       )}
-      {presets && (
-        <ChipPopup
-          title="Presets"
-          tooltip
-          position="top-end"
-          width={360}
-          opened={presets.opened}
-          onOpenedChange={presets.onOpenedChange}
-          target={
-            <Button
-              {...iconChipProps}
-              aria-label="Presets"
-              aria-expanded={presets.opened}
-              onClick={() => presets.onOpenedChange(!presets.opened)}
-            >
-              <Bookmark size={16} />
-            </Button>
-          }
-        >
-          {presets.content}
-        </ChipPopup>
-      )}
+      {presets}
     </div>
   );
 }
