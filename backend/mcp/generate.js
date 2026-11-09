@@ -138,7 +138,7 @@ export function registerGenerateTools({
   chatAssistant,
 }) {
   const { owner, refs, conversation } = actor;
-  // A guide goes to each conversation once (each account and profile without a conversation header).
+  // A guide goes to each conversation once (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
   const review = (refs, profileId) => {

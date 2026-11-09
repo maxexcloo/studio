@@ -2494,6 +2494,79 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
 });
 
+test("a client without a conversation header gets its MCP session's own result numbers; the header still wins", async (t) => {
+  const f = await fixture(t);
+  const connect = async (id) => {
+    const client = new Client({ name: "studio-session-fixture", version: "1.0.0" });
+    t.after(() => client.close());
+    const transport = new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), {
+      requestInit: {
+        headers: {
+          Authorization: `Bearer ${mediaKey}`,
+          "x-ai-user-id": "alice",
+          ...(id ? { "x-studio-conversation-id": id } : {}),
+        },
+      },
+    });
+    await client.connect(transport);
+    assert.ok(transport.sessionId, "initialize hands out a session id");
+    return client;
+  };
+  const handover = async (client) =>
+    texts(await call(client, "handover", { summary: "Carry on." }));
+  // Two chats like a Grok connector's: no header, each with its own session, numbering from 1.
+  const [first, second] = [await connect(), await connect()];
+  const queued = await generate(first);
+  const one = jobId(queued);
+  assert.deepEqual(
+    queued.jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(first)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+  const other = await call(second, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A lake"],
+    count: 1,
+  });
+  const two = jobId(data(other));
+  assert.deepEqual(
+    data(other).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.equal(data(await call(first, "status", { job_id: "result 1" })).job_id, one);
+  assert.equal(data(await call(second, "status", { job_id: "result 1" })).job_id, two);
+  await failure(second, "status", { job_id: "result 2" });
+  assert.match(await handover(first), new RegExp(one));
+  assert.doesNotMatch(await handover(first), new RegExp(two));
+  assert.doesNotMatch(await handover(second), new RegExp(one));
+  // Each chat's All Results page lists only that chat's results.
+  const allPage = async (reply) => {
+    const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
+    return [
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(Result \d+)<\/h2>/g),
+    ].map((match) => match[1]);
+  };
+  assert.deepEqual(await allPage(other), ["Result 1"]);
+  assert.deepEqual(
+    await allPage(
+      await call(first, "generate", { profile_id: imageProfile.id, prompts: ["A hill"], count: 1 }),
+    ),
+    ["Result 1", "Result 2", "Result 3"],
+  );
+  // LibreChat's conversation header scopes by itself, whatever session carries it.
+  const [left, right] = [await connect("conversation-x"), await connect("conversation-x")];
+  assert.deepEqual(
+    (await generate(left)).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(right)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+});
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
   const f = await fixture(t);
   const lookups = () => f.requests.filter((request) => request.path.startsWith("/jobs/")).length;
@@ -4364,7 +4437,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
     guideOf(await call(first, "generate", { profile_id: "krea-turbo", prompts: ["An egg"] })),
     undefined,
   );
-  // Another conversation of the same account has not seen it; without a conversation, the account and profile decide.
+  // Another conversation of the same account has not seen it; without a conversation header, the MCP session decides.
   assert.ok(
     guideOf(
       await call(await chat(t, f, "alice", "chat-2"), "generate", {
@@ -4376,13 +4449,16 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   const plain = await chat(t, f, "alice");
   assert.ok(guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })));
   assert.equal(
+    guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })),
+    undefined,
+  );
+  assert.ok(
     guideOf(
       await call(await chat(t, f, "alice"), "generate", {
         profile_id: "flux 3",
         prompts: ["A plush"],
       }),
     ),
-    undefined,
   );
   // A refused submission delivered nothing, so the next call still carries the guide.
   const third = await chat(t, f, "alice", "chat-3");

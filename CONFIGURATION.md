@@ -144,7 +144,7 @@ Administrator MCP tools retain their published names and permission boundaries. 
 
 #### MCP & UI Parity
 
-Every MCP action calls the route its UI action calls, with the caller's own credential, so ownership, group features and administrator checks apply as in the app. Media tools work on the caller's own results only: a ref or job ID another MCP identity holds is refused before any request.
+Every MCP action calls the route its UI action calls, with the caller's own credential, so ownership, group features and administrator checks apply as in the app. Media tools work on the caller's own results only: a ref or job ID another MCP identity holds is refused before any request. Result numbers ("result 3"), `result` with `all`, `handover` and the All Results page cover one chat: the conversation the client names in `x-studio-conversation-id` (LibreChat), else the MCP session id Studio hands out on `initialize` and the client resends (a Grok connector), else the whole account. `search` and `queue` cover the account's whole gallery and queue.
 
 | UI action                                                                       | MCP tool and action                                                        |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
