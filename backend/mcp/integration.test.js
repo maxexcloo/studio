@@ -10,7 +10,7 @@ import express from "express";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
+import { generateWaitSeconds, presetPlacement, registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./media.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { adminToolNames } from "./admin.js";
@@ -990,6 +990,42 @@ test("control Mode previews preset placements and Restart restarts only a runnin
   const stopped = await call(admin, "restart", { workload: "comfyui-image" });
   assert.equal(stopped.isError, true);
   assert.match(stopped.content[0].text, /comfyui-image is not running/);
+});
+
+test("Mode maps its presets onto pooled workloads by what they run", () => {
+  const media = (id, gpus, capabilities) => ({
+    id,
+    kind: "image",
+    pool: "gpu",
+    gpus,
+    capabilities,
+  });
+  const configured = [
+    media("primary", 1, ["image", "video", "upscale"]),
+    media("secondary", 1, ["image", "video", "upscale"]),
+    { id: "tp2", kind: "video", pool: "gpu", gpus: 2 },
+    { id: "gemma", kind: "text", pool: "gpu", gpus: 1 },
+  ];
+  const phases = (...running) =>
+    configured.map(({ id, pool }) => ({
+      id,
+      pool,
+      phase: running.includes(id) ? "running" : "stopped",
+    }));
+  assert.deepEqual(presetPlacement("image_video", undefined, configured, phases()), [
+    "secondary",
+    "primary",
+  ]);
+  // A running workload is kept where it fits, so the switch stops and starts less.
+  assert.deepEqual(presetPlacement("image_text", "gemma", configured, phases("secondary")), [
+    "gemma",
+    "secondary",
+  ]);
+  assert.deepEqual(presetPlacement("video", undefined, configured, phases("primary")), ["tp2"]);
+  assert.throws(
+    () => presetPlacement("image_video", undefined, configured.slice(0, 1), phases()),
+    /No other 1-GPU workload that runs images/,
+  );
 });
 
 test("Models uses only this studio, filters readiness and kind, and returns detailed capabilities on request", async (t) => {
