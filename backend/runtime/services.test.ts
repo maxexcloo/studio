@@ -380,3 +380,46 @@ test("the local text route follows the running text workloads, briefly cached", 
   time += 30_000;
   assert.equal(await local(), null, "an unreadable cluster takes no local route");
 });
+
+test("administrators get each worker's work and loaded model; a mixed worker is asked once", async () => {
+  const calls: string[] = [];
+  const observe = createServicesObserver({
+    workers: () => [
+      {
+        id: "pool",
+        name: "Pool Worker",
+        url: "http://pool.invalid",
+        capabilities: ["image", "video"],
+      },
+    ],
+    fetchImpl: async (input) => {
+      calls.push(String(input));
+      return Response.json({
+        system: {},
+        devices: [{ name: "GPU", vram_total: 100, vram_free: 40 }],
+      });
+    },
+  });
+  const loads = new Map([
+    ["pool", { busy: true, current: "job-1", queued: 2, model: "image:flux", freeAt: 5000 }],
+  ]);
+  const admin = await observe({ allowed: ["image", "video"], administrator: true, loads });
+  assert.deepEqual(calls, ["http://pool.invalid/system_stats"]);
+  assert.deepEqual(admin.workers, [
+    {
+      id: "pool",
+      label: "Pool Worker",
+      capabilities: ["image", "video"],
+      state: "healthy",
+      reason: "The direct media worker is ready.",
+      currentJob: "job-1",
+      queued: 2,
+      loadedModel: "image:flux",
+      memoryTotal: 100,
+      memoryFree: 40,
+      freeAt: 5000,
+    },
+  ]);
+  const member = await observe({ allowed: ["image", "video"], loads });
+  assert.equal(member.workers, undefined);
+});

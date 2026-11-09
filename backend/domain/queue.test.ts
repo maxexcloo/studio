@@ -365,18 +365,19 @@ test("a waiting job moves to the idle worker with its model loaded, manual work 
   }
 });
 
-test("each resource's load counts running and queued work and the model it last ran", async () => {
+test("each resource's load names its running job and counts queued work and the model it last ran", async () => {
   const queue = fixture();
   const { store } = queue;
   try {
     const session = store.createSession("alice");
     const enqueue = (resource: string) =>
       store.enqueue("alice", session.id, { profileId: "flux" }, "image", undefined, resource).id;
-    enqueue("worker:primary");
+    const running = enqueue("worker:primary");
     enqueue("worker:primary");
     await queue.queue.tick();
     assert.deepEqual(queue.queue.loads().get("worker:primary"), {
       busy: true,
+      current: running,
       queued: 1,
       model: "flux",
     });

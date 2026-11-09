@@ -3,6 +3,7 @@ import type {
   ServiceKind,
   ServiceStatus,
   ServicesStatus,
+  WorkerStatus,
 } from "../../shared/services.ts";
 import type { RuntimeController } from "./controller.ts";
 
@@ -15,15 +16,16 @@ interface Worker {
 type Environment = Record<string, string | undefined>;
 type Probe = Pick<
   ServiceEndpoint,
-  | "state"
-  | "reason"
-  | "checkedAt"
-  | "device"
-  | "version"
-  | "memoryTotal"
-  | "memoryFree"
-  | "loadedModel"
+  "state" | "reason" | "checkedAt" | "device" | "version" | "memoryTotal" | "memoryFree"
 >;
+/** A worker's work from the queue (queue-eta.js workerLoads); `freeAt` is null while unknown. */
+interface WorkerLoad {
+  busy: boolean;
+  current?: string;
+  queued: number;
+  model: string;
+  freeAt: number | null;
+}
 interface Options {
   workers: () => Worker[];
   controller?: RuntimeController;
@@ -111,7 +113,8 @@ export function createServicesObserver({
   const managed = controller?.workloads ?? [];
   function probe(endpoint: string, kind: ServiceKind): Promise<Probe> {
     for (const [key, entry] of cache) if (entry.until <= now()) cache.delete(key);
-    const key = `${kind}:${endpoint}`;
+    // A worker that runs images and videos answers one health check for both.
+    const key = kind === "text" ? `text:${endpoint}` : endpoint;
     const previous = cache.get(key);
     if (previous && previous.until > now()) return previous.result;
     const result = (async (): Promise<Probe> => {
@@ -185,13 +188,70 @@ export function createServicesObserver({
     allowed,
     administrator = false,
     waitingWorkers = [],
+    loads,
   }: {
     allowed: ServiceKind[];
     administrator?: boolean;
     waitingWorkers?: string[];
+    /** Each worker's work, by id; administrators then get `workers`. */
+    loads?: Map<string, WorkerLoad>;
   }): Promise<ServicesStatus> => {
     const services: ServicesStatus["services"] = {};
     const parked = (await controller?.parked()) ?? new Set<string>();
+    const observe = async (
+      { url, ...target }: { id: string; label: string; url: string; workloads?: string[] },
+      kind: ServiceKind,
+    ): Promise<ServiceEndpoint> => {
+      let endpoint: string | undefined;
+      try {
+        endpoint = url
+          ? directAddress(url, kind === "text" ? "health" : "system_stats")
+          : undefined;
+        const gateway = environment.STUDIO_ASSISTANT_URL;
+        if (
+          kind === "text" &&
+          endpoint &&
+          gateway &&
+          new URL(endpoint).origin === new URL(gateway).origin
+        )
+          endpoint = undefined;
+      } catch {
+        endpoint = undefined;
+      }
+      // A parked worker has no pod to ask; probing it would only wait out the refusal.
+      const observed: Probe = target.workloads?.every((id) => parked.has(id))
+        ? {
+            state: "parked",
+            reason: "Stopped on purpose. An administrator can start it.",
+            checkedAt: new Date(now()).toISOString(),
+          }
+        : endpoint
+          ? { ...(await probe(endpoint, kind)) }
+          : {
+              state: "unknown",
+              reason: "No direct runtime health endpoint is configured for this workload.",
+            };
+      if (observed.state === "offline" && waitingWorkers.includes(target.id)) {
+        observed.state = "waiting";
+        observed.reason = "Your accepted work is waiting for this worker to become ready.";
+      }
+      return {
+        ...target,
+        ...observed,
+        ...(administrator && endpoint ? { endpoint } : {}),
+      };
+    };
+    /** A media worker as a health target, with the Studio workloads serving its address. */
+    const mediaTarget = (worker: Worker) => {
+      // One- and two-GPU video deployments can serve one worker address.
+      const matches = managed.filter((workload) => sameUrl(workload.url, worker.url));
+      return {
+        id: worker.id,
+        label: worker.name,
+        url: worker.url,
+        ...(matches.length ? { workloads: matches.map((item) => item.id) } : {}),
+      };
+    };
     await Promise.all(
       allowed.map(async (kind) => {
         // Text endpoints are the managed text deployments; media endpoints are the workers, matched to theirs by URL.
@@ -207,58 +267,8 @@ export function createServicesObserver({
                 }))
             : workers()
                 .filter((worker) => worker.capabilities.includes(kind))
-                .map((worker) => {
-                  // One- and two-GPU video deployments can serve one worker address.
-                  const matches = managed.filter((workload) => sameUrl(workload.url, worker.url));
-                  return {
-                    id: worker.id,
-                    label: worker.name,
-                    url: worker.url,
-                    ...(matches.length ? { workloads: matches.map((item) => item.id) } : {}),
-                  };
-                });
-        const endpoints = await Promise.all(
-          targets.map(async ({ url, ...target }): Promise<ServiceEndpoint> => {
-            let endpoint: string | undefined;
-            try {
-              endpoint = url
-                ? directAddress(url, kind === "text" ? "health" : "system_stats")
-                : undefined;
-              const gateway = environment.STUDIO_ASSISTANT_URL;
-              if (
-                kind === "text" &&
-                endpoint &&
-                gateway &&
-                new URL(endpoint).origin === new URL(gateway).origin
-              )
-                endpoint = undefined;
-            } catch {
-              endpoint = undefined;
-            }
-            // A parked worker has no pod to ask; probing it would only wait out the refusal.
-            const observed: Probe = target.workloads?.every((id) => parked.has(id))
-              ? {
-                  state: "parked",
-                  reason: "Stopped on purpose. An administrator can start it.",
-                  checkedAt: new Date(now()).toISOString(),
-                }
-              : endpoint
-                ? { ...(await probe(endpoint, kind)) }
-                : {
-                    state: "unknown",
-                    reason: "No direct runtime health endpoint is configured for this workload.",
-                  };
-            if (observed.state === "offline" && waitingWorkers.includes(target.id)) {
-              observed.state = "waiting";
-              observed.reason = "Your accepted work is waiting for this worker to become ready.";
-            }
-            return {
-              ...target,
-              ...observed,
-              ...(administrator && endpoint ? { endpoint } : {}),
-            };
-          }),
-        );
+                .map(mediaTarget);
+        const endpoints = await Promise.all(targets.map((target) => observe(target, kind)));
         const bound = endpoints.filter((endpoint) => endpoint.checkedAt);
         // Parked endpoints are neither failures nor readiness: the service is parked only when all are.
         const active = bound.filter((endpoint) => endpoint.state !== "parked");
@@ -290,8 +300,35 @@ export function createServicesObserver({
         };
       }),
     );
+    const statuses =
+      administrator && loads
+        ? await Promise.all(
+            workers().map(async (worker): Promise<WorkerStatus> => {
+              const { state, reason, memoryTotal, memoryFree } = await observe(
+                mediaTarget(worker),
+                "image",
+              );
+              const load = loads.get(worker.id);
+              const working = load && (load.busy || load.queued > 0);
+              return {
+                id: worker.id,
+                label: worker.name,
+                capabilities: worker.capabilities,
+                state,
+                reason,
+                ...(load?.current ? { currentJob: load.current } : {}),
+                queued: load?.queued ?? 0,
+                ...(load?.model ? { loadedModel: load.model } : {}),
+                ...(memoryTotal !== undefined ? { memoryTotal } : {}),
+                ...(memoryFree !== undefined ? { memoryFree } : {}),
+                ...(working && load.freeAt !== null ? { freeAt: load.freeAt } : {}),
+              };
+            }),
+          )
+        : undefined;
     return {
       services,
+      ...(statuses ? { workers: statuses } : {}),
       runtime: {
         configured: Boolean(controller),
         automaticLifecycle: controller?.automaticLifecycle === true,

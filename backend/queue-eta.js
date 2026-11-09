@@ -70,3 +70,24 @@ export function queueSchedule(queue, { now = Date.now(), ahead = () => true } = 
     }));
   return listSchedule(freeAt, waiting);
 }
+
+/**
+ * Each worker's work for its status (runtime/services.ts), by worker id: the queue's load and when
+ * it should be free of its running and waiting work, null when unknown.
+ */
+export function workerLoads(queue, now = Date.now()) {
+  const loads = queue.loads();
+  const { freeAt } = queueSchedule(queue, { now });
+  return new Map(
+    listWorkers().map((worker) => {
+      const resource = `worker:${worker.id}`;
+      return [
+        worker.id,
+        {
+          ...(loads.get(resource) ?? { busy: false, queued: 0, model: "" }),
+          freeAt: freeAt.get(resource) ?? null,
+        },
+      ];
+    }),
+  );
+}

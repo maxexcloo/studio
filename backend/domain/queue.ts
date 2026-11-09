@@ -107,9 +107,13 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
 /** The model a job's input loads on its resource; empty when it names none. */
 export const modelOf = (input: GenerationInput) => String(input.profileId || input.model || "");
 
-/** A resource's load: whether work runs there, how many jobs wait for it and the model it last ran. */
+/**
+ * A resource's load: whether work runs there (`current`, its job's id), how many jobs wait for it
+ * and the model it last ran.
+ */
 export interface ResourceLoad {
   busy: boolean;
+  current?: string;
   queued: number;
   model: string;
 }
@@ -174,7 +178,8 @@ export class GenerationQueue {
     for (const resource of this.loaded.keys()) at(resource);
     for (const job of this.store.schedulable()) {
       if (terminalStatuses.has(job.status)) continue;
-      if (this.acceptedIds.has(job.id)) at(job.resource).busy = true;
+      if (this.acceptedIds.has(job.id))
+        Object.assign(at(job.resource), { busy: true, current: job.id });
       else at(job.resource).queued += 1;
     }
     return loads;
