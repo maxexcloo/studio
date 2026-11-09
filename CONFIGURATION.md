@@ -238,8 +238,8 @@ starred prompts while Studio is idle, using only ready local profiles the
 account may use. Its settings control the unseen buffer, daily image and video
 caps, videos and Spicy (which also needs Uncensored Models). Each account has
 at most one Dream job at a time, shown in its queue with a Dream badge. It waits
-at the lowest queue tier but one (only finishing upscales sit lower), below
-every account's own and MCP work, and runs once that work is done; Dream starts
+at the lowest queue tier, below every account's own and MCP work and finishing
+upscales, and runs once that work is done; Dream starts
 a new one only while Studio is idle. A waiting Dream job doesn't hold up
 idle-time work such as captions and Finish Starred Images. Pausing Dream cancels its waiting job; queue Stop All
 and Cancel Pending leave Dream alone. Offline or parked text/media workers make
@@ -268,8 +268,8 @@ worker rather than the cloud. Choose Fast, Balanced or High quality and Face
 Detail; automatic sizing applies. Face Detail requires a full-body person and
 the worker's detector and Impact Pack support. Missing worker, nodes or models
 leave the list waiting. Unstar removes work that has not started; disabling
-clears the list. Waiting work yields to other work and returns to the list;
-started work finishes.
+clears the list. Waiting work ranks above Dream but yields to other new work and
+returns to the list; started work finishes.
 
 **Gallery Titles** summarise finished media's prompts. Until titled, the
 prompt's first words stand in; items without prompts get no title.
