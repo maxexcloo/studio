@@ -228,9 +228,12 @@ Every account whose group has **Prompt Assistant** may use the prompt assistant.
 Dream has no switch here: it is off for each account until turned on, and a group's Dream feature turns it off for its members.
 
 Each account's **Taste Profile** (Dream › Taste) learns from stars, comparison
-votes, iterations and Dream choices, including their prompts, profiles and
-LoRAs. It can be edited, refreshed or reset. Background updates revise manual
-edits rather than replacing them and wait while the text runtime is offline.
+votes, iterations and Dream choices. Each of its latest 200 signals keeps the
+result (and the one passed over): its prompt, negative, profile, LoRAs with
+strengths, settings, seed, title and caption tags, a comparison's axis and
+values, and the Dream arm. It can be edited, refreshed or reset. Background
+updates revise manual edits rather than replacing them and wait while the text
+runtime is offline.
 
 **Dream** is off for each account until turned on and also needs its group's
 Dream permission. It makes images and optional videos from taste and recent

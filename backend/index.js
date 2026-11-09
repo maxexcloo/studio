@@ -22,7 +22,13 @@ import {
   createSuggestions,
   registerSuggestionRoutes,
 } from "./domain/suggestions.ts";
-import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
+import {
+  createTaste,
+  itemValues,
+  preferenceSignal,
+  registerTasteRoutes,
+  tasteSignal,
+} from "./domain/taste.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { queuePriority, Store } from "./domain/store.ts";
 import { createCaptioner } from "./domain/captions.ts";
@@ -548,12 +554,7 @@ registerGalleryHistoryRoutes(app, {
     );
     taste.record(
       ownerId,
-      items.map((item) =>
-        tasteSignal(favorite ? "star" : "unstar", item.jobId, {
-          ...item.settings,
-          prompt: item.prompt,
-        }),
-      ),
+      items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
     );
   },
 });
@@ -670,7 +671,7 @@ registerCompareRoutes(app, {
   voted: (ownerId, jobId, others) => {
     const values = (id) => {
       const item = gallery.find((entry) => entry.jobId === id && (entry.ownerId || "") === ownerId);
-      return store.job(ownerId, id)?.input || { ...item?.settings, prompt: item?.prompt };
+      return item ? itemValues(item) : store.job(ownerId, id)?.input;
     };
     const winner = { jobId, values: values(jobId) };
     taste.record(ownerId, [
