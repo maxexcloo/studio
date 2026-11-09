@@ -1,5 +1,4 @@
 import {
-  assertCurrentStorage,
   readRuntimeDocument,
   runtimeDatabase,
   writeRuntimeDocument,
@@ -22,7 +21,6 @@ import { hasReferenceImage } from "../workflow-modes.js";
 import { replyTitle } from "../../shared/titles.ts";
 
 export const dataDir = currentDataDir();
-assertCurrentStorage(dataDir);
 export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
 let galleryRevision = Date.now();
