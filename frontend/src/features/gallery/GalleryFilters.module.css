@@ -15,9 +15,14 @@
   }
 }
 
+/* The search gives up width first; the toolbar's buttons keep their labels whole. */
 .search {
   flex: 0 1 18rem;
-  min-width: 10rem;
+  min-width: 6rem;
+}
+
+.mode > :global(.mantine-Button-root) {
+  flex-shrink: 0;
 }
 
 .searchOpen {
