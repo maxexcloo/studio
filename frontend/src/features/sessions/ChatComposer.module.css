@@ -1,11 +1,22 @@
-/* Prompt ideas float above the composer while the message is empty, so the thread never moves. */
+/*
+ * Collapsed, the message and Send share one row, Send keeping to the last line as the message
+ * grows; expanded, the message takes its own row above the chip rail and Send.
+ */
 .form {
   position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--mantine-spacing-xs);
 }
 
+/* Expanded, the dock's surface pads the form as the gallery's expanded composer is padded. */
+.form[data-expanded] {
+  align-items: center;
+  padding: calc(var(--mantine-spacing-md) - 8px);
+}
+
+/* Suggestions float above the composer while the message is empty, so the thread never moves. */
 .ideas {
   left: 0;
   right: 0;
@@ -13,30 +24,27 @@
   justify-content: center;
 }
 
-/* The actions keep to the last line as the message grows, centred with a single line. */
-.row {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--mantine-spacing-xs);
-}
-
 .message {
-  flex: 1 1 50%;
+  flex: 1 1 0;
   min-width: 0;
 }
 
-/* One line of text (with its 1 px border) is as tall as the bar's 44 px actions. */
+.form[data-expanded] .message {
+  flex-basis: 100%;
+}
+
+/* One line of text (with its 1 px border) is as tall as the 44 px Send. */
 .writing textarea {
   padding: 9px var(--mantine-spacing-xs);
   line-height: 24px;
 }
 
-/* The model chip gives way to the message, its name shortening first. */
-.actions {
-  min-width: 0;
-  height: 44px;
+.form[data-expanded] .writing textarea {
+  padding: var(--mantine-spacing-xs);
+  line-height: 1.55;
 }
 
 .starting {
+  flex-basis: 100%;
   padding-inline: var(--mantine-spacing-xs);
 }

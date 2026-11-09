@@ -55,6 +55,7 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   await galleryPrompt.fill("Independent gallery direction");
   await page.getByRole("link", { name: "Chat", exact: true }).first().click();
   await expect(message).toHaveValue("Create a blue bird");
+  await message.focus();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Send Message", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
