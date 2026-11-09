@@ -481,20 +481,21 @@ export function useMediaActions(
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     upscale,
+    // Its options sort alphabetically.
     itemAction("copy", {
       menu: [
         [
-          {
-            id: "copy-prompt",
-            label: "Prompt",
-            icon: TextQuote,
-            onClick: () => void copyText(item.prompt || "", "Prompt"),
-          },
           {
             id: "copy-details",
             label: "Details",
             icon: ListChecks,
             onClick: () => void copyText(settingsText(), "Details"),
+          },
+          {
+            id: "copy-prompt",
+            label: "Prompt",
+            icon: TextQuote,
+            onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
         ],
       ],
