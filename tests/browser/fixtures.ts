@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
@@ -1177,4 +1179,24 @@ export async function serveDream(
     return route.fulfill({ json: { ok: true, items: [] } });
   });
   return state;
+}
+
+/**
+ * A one-second WebM clip the browser can play (WebKit's test builds may not decode it), or
+ * undefined when no encoder runs: ffmpeg-static's binary download can fail on install, and the
+ * system ffmpeg is the fallback.
+ */
+export function videoClip() {
+  let encoder = "ffmpeg";
+  try {
+    encoder = createRequire(import.meta.url)("ffmpeg-static");
+  } catch {}
+  try {
+    return execFileSync(encoder, [
+      ...["-hide_banner", "-loglevel", "error", "-f", "lavfi"],
+      ...["-i", "testsrc=size=160x90:rate=24:duration=1", "-c:v", "libvpx", "-f", "webm", "pipe:1"],
+    ]);
+  } catch {
+    return undefined;
+  }
 }
