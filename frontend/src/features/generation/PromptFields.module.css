@@ -1,4 +1,4 @@
-/* Even padding all round, clear of a right section where the box keeps its tools inside. */
+/* The prompt and negative prompt share even padding all round. */
 .input {
   font-size: 1rem;
   line-height: 1.55;
@@ -18,7 +18,7 @@
   bottom: 4px;
 }
 
-/* The phone sheet's prompt (its text box, tools column and suggestions) takes the room left. */
+/* The phone sheet's prompt (its text box, tools and suggestions) takes the room left. */
 .area[data-fill] {
   flex: 1;
   min-height: 0;
@@ -31,7 +31,8 @@
   min-height: 0;
 }
 
-.area[data-fill] .input {
+.area[data-fill] .input,
+.negative[data-fill] .input {
   min-height: 0;
   font-size: 1.0625rem;
   resize: none;
@@ -45,14 +46,7 @@
   flex-direction: column;
 }
 
-:global([data-typing]) .negative:focus-within .negativeWrapper {
+:global([data-typing]) .negative:focus-within > :first-child {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-:global([data-typing]) .negative:focus-within textarea {
-  flex: 1;
-  resize: none;
 }

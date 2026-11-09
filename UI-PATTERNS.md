@@ -85,7 +85,9 @@ the primary component reference and verify APIs against the installed version.
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor.
+  other phone text boxes open the shared full-screen editor. Its `tools` stand
+  beside the text: Copy, Clear, then the box's own (Improve Prompt, Recent
+  Prompts), in one column where the box is tall enough and 2×2 otherwise.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`. Keep unrelated layout stationary.
