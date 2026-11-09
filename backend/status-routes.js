@@ -3,17 +3,17 @@ import path from "node:path";
 import { canAdmin } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { profileOnBackendKey, routeJob } from "./comfy/backends.js";
+import { earliest } from "./domain/eta.ts";
+import { queuePriority } from "./domain/store.ts";
+import { profileOnBackendKey, readyWorkers } from "./comfy/backends.js";
 import { comfyUrl, isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { dataDir, gallery, visibleGallery } from "./gallery/store.js";
-import { queueClearsAt } from "./jobs.js";
 import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
-import { generationEstimate, upscaleEstimate } from "./timings.js";
-import { upscaleWork } from "./upscale-timing.js";
-import { upscalePlan, upscaleQualities } from "./upscale.js";
+import { queueSchedule, runEstimate } from "./queue-eta.js";
+import { upscaleQualities } from "./upscale.js";
 import { capabilityForProfile, listWorkers, workerSource } from "./workers.js";
 
 // Whether ComfyUI runs on this machine, for the bug report.
@@ -27,12 +27,13 @@ const comfyIsLocal = () => {
 
 /**
  * Health, service status, estimates, stats and diagnostics. `observeServices` is
- * runtime/services.ts's observer; `store` the queue, for the workers its jobs wait on.
+ * runtime/services.ts's observer; `queue` the generation queue, for the workers its jobs wait on
+ * and how long its waiting work takes.
  */
-export function registerStatusRoutes(app, { observeServices, store }) {
+export function registerStatusRoutes(app, { observeServices, queue }) {
   app.get("/api/services/status", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    const waitingWorkers = store
+    const waitingWorkers = queue.store
       .jobs(ownerIdForRequest(req))
       .filter((job) => ["waiting", "starting"].includes(job.status))
       .map((job) => job.backend)
@@ -72,12 +73,13 @@ export function registerStatusRoutes(app, { observeServices, store }) {
   });
 
   /**
-   * What a generation with these settings should take here, for the composer:
-   * `ms` once this model's estimates are trusted, and `queueMs` when Studio's own
-   * queue has to finish first. Empty when there is nothing honest to say.
+   * What a generation with these settings should take here: `ms` once this model's estimates are
+   * trusted, and `queueMs` when work in Studio's queue that would go before it has to finish first,
+   * on whichever worker that could run it frees first. Empty when there is nothing honest to say.
    */
   directRoute(app, "GET", "/api/estimate", (_account, { query }) => {
-    const body = {
+    const upscale = upscaleQualities.includes(query.upscale) ? query.upscale : "";
+    const input = {
       kind: query.kind === "video" ? "video" : "image",
       model: String(query.model || ""),
       profileId: String(query.profileId || ""),
@@ -91,50 +93,39 @@ export function registerStatusRoutes(app, { observeServices, store }) {
       // What else changes the time: images it reads, and a native size's tiled decode.
       refs: Number(query.refs) || 0,
       tiledDecode: query.tiled === "1",
+      ...(upscale
+        ? {
+            autoUpscale: {
+              quality: upscale,
+              faceDetail: query.faceDetail === "1",
+              target: Number(query.upscaleTarget) || 0,
+            },
+          }
+        : {}),
     };
     const now = Date.now();
-    const estimate = generationEstimate(body, { now });
     // Variations run one after another as separate runs: the first as things stand, the rest with the model loaded.
     const runs = Math.max(1, Math.min(8, Number(query.runs) || 1));
-    const rest = runs > 1 ? generationEstimate(body, { now, warm: true }) : null;
-    // Smart upscale is part of each run: its time, from the upscales this machine has made, is added to every one.
-    const upscaleQuality =
-      body.kind === "image" && upscaleQualities.includes(query.upscale) ? query.upscale : "";
-    const plan = upscaleQuality
-      ? upscalePlan({
-          width: body.width,
-          height: body.height,
-          quality: upscaleQuality,
-          target: Number(query.upscaleTarget) || 0,
-        })
-      : null;
-    const upscale = plan
-      ? upscaleEstimate({
-          quality: upscaleQuality,
-          faceDetail: query.faceDetail === "1",
-          work: upscaleWork({
-            width: plan.estimatedWidth,
-            height: plan.estimatedHeight,
-            count: body.count,
-          }),
-        })
-      : null;
-    const trusted =
-      estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
-    const backend =
-      routeJob(capabilityForProfile(body), {
-        profileId: profileOnBackendKey(body.profileId, body.profileBackend),
-      })?.id || "";
-    const clears = backend ? queueClearsAt(now, backend) : null;
-    const queueMs = clears === null ? null : Math.max(0, clears - now);
-    const upscaleMs = upscale?.totalMs || 0;
+    const first = runEstimate(input, { now });
+    const rest = runs > 1 ? runEstimate(input, { now, warm: true }) : 0;
+    // New manual work goes before waiting background work, so only manual work is ahead of it.
+    const { freeAt } = queueSchedule(queue, {
+      now,
+      ahead: (job) => (job.priority ?? queuePriority.manual) === queuePriority.manual,
+    });
+    const free = earliest(
+      freeAt,
+      readyWorkers(
+        capabilityForProfile(input),
+        profileOnBackendKey(input.profileId, input.profileBackend),
+      ).map((worker) => `worker:${worker.id}`),
+    );
+    const queueMs = free === null ? null : Math.max(0, free - now);
     return {
       status: 200,
       payload: {
         ok: true,
-        ...(trusted
-          ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) }
-          : {}),
+        ...(first !== null && rest !== null ? { ms: first + (runs - 1) * rest } : {}),
         ...(queueMs ? { queueMs } : {}),
       },
     };

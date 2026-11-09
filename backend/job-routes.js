@@ -2,6 +2,7 @@ import { ownerIdForRequest } from "./account-ownership.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { unconfirmedCancel } from "./domain/routes.ts";
 import { pausedReason, terminalStatuses } from "../shared/queue.ts";
+import { queueSchedule } from "./queue-eta.js";
 
 /**
  * A job's status and its cancellation, and cancelling all of an account's unfinished work, read
@@ -11,6 +12,12 @@ export function registerJobRoutes(app, { store, queue }) {
   function generationJobResponse(account, id) {
     const queued = store.job(account?.userId || "", id);
     if (!queued) return { status: "missing" };
+    // Work still waiting in Studio's queue has no end from its worker yet: list-schedule one.
+    const waitingEnd =
+      ["starting", "queued", "waiting"].includes(queued.status) &&
+      !Number.isFinite(queued.progress?.endsAt)
+        ? queueSchedule(queue).endsAt.get(queued.id)
+        : undefined;
     // MCP clients read these words; they predate the queue's own.
     const status =
       {
@@ -30,7 +37,12 @@ export function registerJobRoutes(app, { store, queue }) {
       // A paused queue's hold is the one waiting reason a chat hears.
       ...(queued.reason === pausedReason ? { reason: pausedReason } : {}),
       // The prompt's thinking stays in Studio; a chat hears only the status.
-      progress: queued.status === "writing" ? undefined : queued.progress,
+      progress:
+        queued.status === "writing"
+          ? undefined
+          : Number.isFinite(waitingEnd)
+            ? { ...queued.progress, endsAt: waitingEnd }
+            : queued.progress,
       ...(queued.resource.startsWith("provider:cliproxyapi")
         ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
         : {}),
