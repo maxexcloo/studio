@@ -21,9 +21,9 @@ import {
   flushGalleryStrict,
   gallery,
   replaceGalleryJob,
-  storedWritingRecord,
   updateGalleryJob,
 } from "./gallery/store.js";
+import { storedWritingRecord } from "./gallery/records.js";
 import { jobs } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";

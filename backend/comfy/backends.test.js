@@ -28,6 +28,7 @@ writeTestWorkflows(temporary);
 const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("../gallery/store.js");
+const { makePendingItems } = await import("../gallery/records.js");
 const { cancelPrompt } = await import("./queue.js");
 
 test.after(async () => {
@@ -82,7 +83,7 @@ function request(backend) {
 }
 
 function queue(id, body) {
-  const items = store.makePendingItems(id, body);
+  const items = makePendingItems(id, body);
   store.setGallery([...items, ...store.gallery], { persist: false });
   jobs.set(id, {
     status: "queued",
@@ -154,7 +155,7 @@ test(
       model: "cloud/text",
       source: "chat",
     });
-    assert.deepEqual(store.makePendingItems("x", imageBody)[0].assistant, imageBody.assistant);
+    assert.deepEqual(makePendingItems("x", imageBody)[0].assistant, imageBody.assistant);
   },
 );
 

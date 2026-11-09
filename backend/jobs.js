@@ -13,13 +13,8 @@ import { describeFailure } from "./failures.js";
 import { withFixes } from "./failure-fixes.js";
 import { nextProgress } from "./progress-phase.js";
 import { customWorkflowGraph } from "./graphs.js";
-import {
-  generationSettings,
-  outputsFrom,
-  replaceGalleryJob,
-  updateGalleryJob,
-  updateGalleryJobPreviews,
-} from "./gallery/store.js";
+import { replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from "./gallery/store.js";
+import { generationSettings, outputsFrom } from "./gallery/records.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
