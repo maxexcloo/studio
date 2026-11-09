@@ -3790,6 +3790,31 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
     "cloud-video",
   );
   assert.equal(f.submitted.at(-1).profileId, "cloud-video");
+  // runs_on cloud asks for the cloud as the user's words do; runs_on local refuses rather than switch.
+  const cloud = await call(client, "reuse", {
+    job_id: "result 1",
+    mode: "animate",
+    runs_on: "cloud",
+    prompt: "The heron takes flight",
+  });
+  assert.equal(data(cloud).profile.id, "cloud-video-fast");
+  assert.doesNotMatch(texts(cloud), /isn't running/);
+  const local = await call(client, "reuse", {
+    job_id: "result 1",
+    mode: "animate",
+    runs_on: "local",
+    prompt: "The heron takes flight",
+  });
+  assert.equal(local.isError, true);
+  assert.match(texts(local), /^This account has no local video profile that takes a starting/);
+  await failure(client, "reuse", {
+    job_id: "result 1",
+    mode: "animate",
+    runs_on: "local",
+    profile_id: "cloud-video",
+    prompt: "The heron takes flight",
+  });
+  assert.equal(f.submitted.at(-1).profileId, "cloud-video-fast");
 });
 
 test("video stays local while the worker is up, and a plain request never reaches the cloud", async (t) => {

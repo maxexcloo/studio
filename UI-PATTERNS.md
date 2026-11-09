@@ -124,8 +124,12 @@ the primary component reference and verify APIs against the installed version.
   altering the typed prompt; reuse restores the typed prompt and Details
   shows what ran.
 - Preserve actual model/provider metadata. Wait for the selected backend unless
-  the user permits fallback; Animate follows the shared local/cloud selection
-  rule and displays its choice before queuing.
+  the user permits fallback. Animate displays its choice before queuing. Its
+  menus offer Local GPU or Cloud when the account has both (Cloud needs the
+  Cloud Models grant), then Fast or Quality when the chosen pool has two tiers.
+  Both are remembered; until Local GPU or Cloud is picked, Animate runs locally
+  and falls back to Cloud while local video is stopped, and an explicit pick
+  never falls back. Extend keeps its video's model unless Cloud is picked.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.

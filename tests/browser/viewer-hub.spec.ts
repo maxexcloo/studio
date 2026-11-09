@@ -620,10 +620,52 @@ async function offline(page: Page) {
         cloud: true,
         size: { width: 960, height: 960 },
         tiers: [],
+        offers: { local: true, cloud: true },
       },
     }),
   );
 }
+
+test("Animate offers Local GPU or Cloud when the account has both, and runs on the pick", async ({
+  page,
+}) => {
+  const asked: string[] = [];
+  const { state, viewer } = await seed(page, {}, async (page) => {
+    await serveProfiles(page, [...profiles, grok]);
+    await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
+      const where = new URL(route.request().url()).searchParams.get("where") || "";
+      asked.push(where);
+      const cloud = where === "cloud";
+      return route.fulfill({
+        json: {
+          profileId: cloud ? grok.id : "video:test",
+          label: cloud ? grok.label : "Motion Fast",
+          cloud,
+          tiers: cloud ? [] : ["fast", "quality"],
+          offers: { local: true, cloud: true },
+        },
+      });
+    });
+  });
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  const where = page.getByRole("radiogroup", { name: "Local GPU or Cloud", exact: true });
+  const tier = page.getByRole("radiogroup", { name: "Fast or Quality", exact: true });
+  // Auto shows the pool it took.
+  await expect(where.getByRole("radio", { name: "Local GPU", exact: true })).toBeChecked();
+  expect(asked[0]).toBe("auto");
+  await expect(tier).toBeVisible();
+  await where.getByText("Cloud", { exact: true }).click();
+  await expect(where.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
+  // Cloud has one tier here, so there is no Fast or Quality.
+  await expect(tier).toBeHidden();
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(asked.at(-1)).toBe("cloud");
+  expect(state.jobs[1]).toMatchObject({
+    operation: "animate",
+    input: { kind: "video", profileId: grok.id },
+  });
+});
 
 test("With local video stopped, an Animate theme queues on Grok", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, offline);
