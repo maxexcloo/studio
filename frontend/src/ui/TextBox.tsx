@@ -1,4 +1,5 @@
 import {
+  Children,
   useEffect,
   useRef,
   useState,
@@ -14,7 +15,6 @@ import {
   FocusTrap,
   Group,
   Modal,
-  Stack,
   Text,
   Textarea,
   Tooltip,
@@ -34,31 +34,31 @@ import classes from "./TextBox.module.css";
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
- * Every multi-line text box. `tools` adds compact Copy and Clear (undoable) beside the box's own
- * right section: a multi-row box on desktop lines them all up in one column beside the text, so
- * the text keeps the box's full height; a one-row box and the phone summary keep them inside. On
- * phones the box is a summary of its text: tapping it (or `edit`) opens it full screen with the
- * same right section, Copy, Clear and Done, and `below` under the text; Done, Escape or
- * dismissing the keyboard returns to the page. `submit` adds its send arrow there too,
- * so typing and sending take one tap. An `inline` box edits in place on phones too, as on desktop.
+ * Every multi-line text box. `tools` adds compact Copy, Clear (undoable) and the box's own actions
+ * beside the text, in a column where the box is tall enough and otherwise in pairs side by side
+ * (2×2 for four), on every breakpoint. On phones the box is a summary of its text: tapping
+ * it opens it full screen with the same right section or tools and Done, and `below` under the
+ * text; Done, Escape or dismissing the keyboard returns to the page. `submit` adds its send arrow
+ * there too, so typing and sending take one tap. An `inline` box edits in place on phones too, as
+ * on desktop.
  */
 export function TextBox({
   value,
   onChange,
-  tools = false,
+  tools,
   overlay,
   below,
   inline = false,
   submit,
   rightSection,
-  rightSectionWidth,
   onClick,
   ...props
 }: Omit<TextareaProps, "value" | "onChange"> & {
   ref?: Ref<HTMLTextAreaElement>;
   value: string;
   onChange: (value: string) => void;
-  tools?: boolean;
+  /** The box's own actions, after Copy and Clear. */
+  tools?: ReactNode[];
   /** Floats over the text, such as prompt ideas; the phone editor shows it under its text. */
   overlay?: ReactNode;
   /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
@@ -108,7 +108,7 @@ export function TextBox({
       ),
     });
   }
-  const actions = [
+  const actions = tools && [
     <Tooltip key="copy" label={copied ? "Copied" : `Copy ${title}`}>
       <ActionIcon
         aria-label={`Copy ${title}`}
@@ -133,10 +133,15 @@ export function TextBox({
         <icons.clear size={16} />
       </ActionIcon>
     </Tooltip>,
+    ...Children.toArray(tools),
   ];
-  // Multi-row boxes stack their actions in a column; a one-row box lines them up.
-  const stacked = (props.minRows ?? 1) > 1;
-  const column = tools && stacked && !phone;
+  const pairs =
+    actions &&
+    Array.from({ length: Math.ceil(actions.length / 2) }, (_, index) => (
+      <div key={index} className={classes.pair}>
+        {actions.slice(index * 2, index * 2 + 2)}
+      </div>
+    ));
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -160,35 +165,22 @@ export function TextBox({
         if (phone && !props.readOnly && !props.disabled) setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
-      rightSection={
-        editing || column ? undefined : tools ? (
-          <Group gap={stacked ? 4 : 0} wrap="nowrap" align="flex-start">
-            {stacked ? <Stack gap={4}>{rightSection}</Stack> : rightSection}
-            {stacked ? <Stack gap={4}>{actions}</Stack> : actions}
-          </Group>
-        ) : (
-          rightSection
-        )
-      }
-      rightSectionWidth={
-        column
-          ? undefined
-          : tools
-            ? Number(rightSectionWidth ?? 36) + (stacked ? 40 : 72)
-            : rightSectionWidth
-      }
-      rightSectionPointerEvents={tools ? "all" : props.rightSectionPointerEvents}
+      rightSection={editing ? undefined : rightSection}
     />
   );
   return (
     <>
-      {column ? (
-        <div className={classes.columned}>
+      {pairs ? (
+        <div
+          className={classes.columned}
+          style={{ "--tool-pair-rows": Math.ceil(pairs.length / 2) } as CSSProperties}
+        >
           {textarea}
-          <div className={classes.tools}>
-            {rightSection}
-            {actions}
-          </div>
+          {!editing && (
+            <div className={classes.tools}>
+              <div className={classes.toolGrid}>{pairs}</div>
+            </div>
+          )}
         </div>
       ) : (
         textarea
@@ -229,8 +221,7 @@ export function TextBox({
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
               <Group gap={4} wrap="nowrap">
-                {rightSection}
-                {actions}
+                {actions || rightSection}
                 <Button size="compact-sm" variant={submit ? "default" : undefined} onClick={close}>
                   Done
                 </Button>

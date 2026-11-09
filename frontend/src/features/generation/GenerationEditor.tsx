@@ -152,8 +152,8 @@ export function GenerationEditor({
   blockedReason?: string;
   error?: unknown;
   assistantScope: string;
-  /** The Presets picker; `close` dismisses it after a preset loads. */
-  presets?: (close: () => void) => ReactNode;
+  /** The Presets chip (`PresetPicker`). */
+  presets?: ReactNode;
   onCompare?: () => void;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
@@ -171,7 +171,6 @@ export function GenerationEditor({
   const [maskOpen, setMaskOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
-  const [presetsOpen, setPresetsOpen] = useState(false);
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
@@ -246,13 +245,7 @@ export function GenerationEditor({
       references={supportsReferences ? referencePicker : undefined}
       hasReferences={!!details.length}
       mask={mask}
-      presets={
-        presets && {
-          opened: presetsOpen,
-          onOpenedChange: setPresetsOpen,
-          content: presets(() => setPresetsOpen(false)),
-        }
-      }
+      presets={presets}
       expert={expert}
       onCompare={onCompare}
     />

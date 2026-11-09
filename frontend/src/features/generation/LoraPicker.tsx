@@ -32,7 +32,6 @@ import { chipProps } from "./chip";
 import {
   ChipPopup,
   ChipContent,
-  PickerFooter,
   PickerGrid,
   PickerHeader,
   PickerTile,
@@ -159,6 +158,8 @@ interface LoraPickerProps {
 export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
+  const clear = () =>
+    onChange ? onChange({ ...input, loras: [] }) : context.update({ loras: [] });
   // The picker's data loads with the chip, so its first frame is final.
   const info = useQuery(loraInfoQuery);
   useQuery(loraLibraryQuery);
@@ -200,6 +201,14 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}
+      footer={{
+        end: (
+          <Button variant="default" disabled={!input.loras.length} onClick={clear}>
+            Clear LoRAs
+          </Button>
+        ),
+        apply: true,
+      }}
     >
       <Stack
         role="region"
@@ -419,14 +428,21 @@ function LoraControls({
   const stack = (
     <>
       <Group justify="space-between" gap="xs">
-        <Text size="sm" fw={600}>
-          Stack
-        </Text>
-        {!!profile?.maxLoras && (
-          <Text size="xs" c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}>
-            {enabledCount} of {profile.maxLoras} Enabled
+        <Group gap="xs">
+          <Text size="sm" fw={600}>
+            Stack
           </Text>
-        )}
+          {!!profile?.maxLoras && (
+            <Text size="xs" c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}>
+              {enabledCount} of {profile.maxLoras} Enabled
+            </Text>
+          )}
+        </Group>
+        <SaveCurrent
+          noun="Stack"
+          disabled={!input.loras.length || !stacks.ready}
+          onSave={(name) => stacks.save(name, input.loras)}
+        />
       </Group>
       {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
         <Text size="xs" c="yellow">
@@ -492,22 +508,6 @@ function LoraControls({
       )}
     </>
   );
-  const footer = (
-    <PickerFooter
-      start={
-        <SaveCurrent
-          noun="Stack"
-          disabled={!input.loras.length || !stacks.ready}
-          onSave={(name) => stacks.save(name, input.loras)}
-        />
-      }
-      end={
-        <Button variant="default" disabled={!input.loras.length} onClick={() => update([])}>
-          Clear LoRAs
-        </Button>
-      }
-    />
-  );
   // Phones list the choices in a fixed-height pane above the stack, so adding one never moves them.
   if (phone)
     return (
@@ -521,29 +521,22 @@ function LoraControls({
           </ScrollArea>
         )}
         <Stack gap="xs">{stack}</Stack>
-        {footer}
       </>
     );
   return (
-    <Stack gap="sm">
-      <div className={classes.panel}>
-        <div className={classes.column}>
-          {header}
-          {state || (
-            <ScrollArea flex={1} offsetScrollbars="present">
-              {choices}
-            </ScrollArea>
-          )}
-        </div>
-        <ScrollArea
-          className={`${classes.column} ${classes.stackColumn}`}
-          offsetScrollbars="present"
-        >
-          <Stack gap="xs">{stack}</Stack>
-        </ScrollArea>
+    <div className={classes.panel}>
+      <div className={classes.column}>
+        {header}
+        {state || (
+          <ScrollArea flex={1} offsetScrollbars="present">
+            {choices}
+          </ScrollArea>
+        )}
       </div>
-      {footer}
-    </Stack>
+      <ScrollArea className={`${classes.column} ${classes.stackColumn}`} offsetScrollbars="present">
+        <Stack gap="xs">{stack}</Stack>
+      </ScrollArea>
+    </div>
   );
 }
 

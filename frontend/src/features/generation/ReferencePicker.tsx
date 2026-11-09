@@ -258,9 +258,11 @@ export function ReferencePicker({
         dropData(event.dataTransfer);
       }}
       gap="sm"
-      // Phones fill the popup below its header; the grid owns scrolling and keeps its position.
+      // Phones fill the sheet between its header and footer; the grid owns scrolling and keeps its
+      // position.
+      flex={phone ? 1 : undefined}
       mih={0}
-      h={phone ? "calc(100dvh - 5rem)" : "min(70dvh, 620px)"}
+      h={phone ? undefined : "min(70dvh, 620px)"}
     >
       <ReferenceSlots
         references={references}
@@ -418,20 +420,21 @@ export function ReferencePicker({
         onOpenedChange={setOpened}
         trap={deleteId === null}
         target={trigger}
-        headerEnd={
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            color="gray"
-            disabled={!references.length}
-            onClick={() => {
-              list.set([]);
-              settle();
-            }}
-          >
-            Clear References
-          </Button>
-        }
+        footer={{
+          end: (
+            <Button
+              variant="default"
+              disabled={!references.length}
+              onClick={() => {
+                list.set([]);
+                settle();
+              }}
+            >
+              Clear References
+            </Button>
+          ),
+          apply: true,
+        }}
       >
         {content}
       </ChipPopup>
