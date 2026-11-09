@@ -7,21 +7,18 @@ import test from "node:test";
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 process.env.STUDIO_DEMO = "1";
 process.env.STUDIO_WORKERS = "[]";
-const { registerGenerationRoutes } = await import("./generation-routes.js");
+const { createGenerationSubmission } = await import("./generation-routes.js");
 
 const granted = { id: "custom:granted", kind: "image", workflow: "custom:granted" };
 const other = { id: "custom:other", kind: "image", workflow: "custom:other", uncensored: true };
 for (const profile of [granted, other]) profile.model = profile.id;
-const routes = registerGenerationRoutes(
-  { post() {} },
-  {
-    loadComfyContext: async () => {
-      throw new Error("No ComfyUI in this fixture.");
-    },
-    mediaModels: async () => ({ models: { profiles: [granted, other] } }),
-    comfyDownMessage: (message) => message,
+const routes = createGenerationSubmission({
+  loadComfyContext: async () => {
+    throw new Error("No ComfyUI in this fixture.");
   },
-);
+  mediaModels: async () => ({ models: { profiles: [granted, other] } }),
+  comfyDownMessage: (message) => message,
+});
 const artist = {
   authenticated: true,
   userId: "artist",

@@ -693,10 +693,9 @@ test("a running job whose worker refuses connections cancels at once; one that t
   const queue = new GenerationQueue(
     store,
     createGenerationQueueAdapter({
-      async generate(req, res) {
-        const id = req.body.clientJobId;
-        live.set(id, { status: "running", promptId: `p-${id}`, ownerId: "alice" });
-        res.json({ ok: true });
+      async submitGeneration(job) {
+        live.set(job.id, { status: "running", promptId: `p-${job.id}`, ownerId: "alice" });
+        return { status: 200, payload: { ok: true } };
       },
       jobs: live,
       gallery: () => [],

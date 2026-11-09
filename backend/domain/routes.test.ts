@@ -5,6 +5,7 @@ import test from "node:test";
 import express from "express";
 import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
+import { createGenerationAdmission } from "./admission.ts";
 import { ChatStore } from "./chat-store.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
@@ -158,9 +159,18 @@ test("A run from an item records it as its source, only when the item is the own
     Object.assign(req, { studioAccount: { userId: "alice" } });
     next();
   });
+  const queue = new GenerationQueue(store, {} as never);
   registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
     store,
-    queue: new GenerationQueue(store, {} as never),
+    queue,
+    admit: createGenerationAdmission({
+      store,
+      queue,
+      validate: async () => ({ status: 200, payload: { ok: true } }),
+      resourceFor: async () => "local-media",
+      pendingItems: () => [],
+      revision: () => 0,
+    }),
     ownsItem: (ownerId, id) => items.get(id) === ownerId,
   });
   const server = app.listen(0, "127.0.0.1");

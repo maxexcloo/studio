@@ -88,6 +88,7 @@ export function createMcpDomainRequest({ admit, jobResponse, store }) {
       };
     if (galleryMatch)
       return galleryJobResponse(
+        store,
         account,
         decodeURIComponent(galleryMatch[1]),
         url.searchParams.get("settings") === "1",

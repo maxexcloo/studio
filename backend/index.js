@@ -11,7 +11,7 @@ import {
   registerGalleryErrorRoutes,
   registerGalleryDeleteRoute,
 } from "./gallery/routes.js";
-import { registerGenerationRoutes } from "./generation-routes.js";
+import { createGenerationSubmission } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
@@ -332,7 +332,7 @@ setInterval(() => recoverRunningJobs(), 5000).unref();
 async function recoverGalleryFromHistory() {
   // Recovery follows only jobs already recorded in this runtime's gallery.
   await recoverRunningJobs();
-  cleanupGalleryState(jobs);
+  cleanupGalleryState(store);
 }
 
 /**
@@ -486,6 +486,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 });
 
 registerGalleryReadRoutes(app, {
+  store,
   near: (text) => imageSearch.near(text),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
@@ -572,7 +573,7 @@ registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed(
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, runtime, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
-const generationRoutes = registerGenerationRoutes(app, {
+const generationRoutes = createGenerationSubmission({
   loadComfyContext,
   mediaModels: (force) =>
     mediaModels(force).catch((error) => {
@@ -615,29 +616,6 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
 function chatTitle(account, sessionId, prompt) {
   return sessionChat.title(account?.userId || "", sessionId, prompt);
 }
-registerRewriteRoutes(app, {
-  store,
-  queue: generationQueue,
-  resourceFor: queueResourceFor,
-  validate: validateGenerationInput,
-  deleteMedia: deleteOwnedGalleryItems,
-  media: (ownerId, jobId) =>
-    galleryJobItems(jobId).filter(
-      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
-    ),
-  ownsItem: (ownerId, id) => {
-    const item = galleryItem(id);
-    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
-  },
-  title: chatTitle,
-  admitted: jobAdmitted,
-});
-registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
-registerMigrationRoutes(app, {
-  dataDir,
-  requireAdmin,
-  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
-});
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
@@ -650,6 +628,31 @@ const admitGeneration = createGenerationAdmission({
     return input.kind === "image" && Boolean(workflow) && !workflow.controls?.count;
   },
   admitted: jobAdmitted,
+});
+app.post("/api/generate", async (req, res) => {
+  const result = await admitGeneration(req.body || {}, req.studioAccount);
+  res.status(result.status).json(result.payload);
+});
+registerRewriteRoutes(app, {
+  store,
+  queue: generationQueue,
+  admit: admitGeneration,
+  deleteMedia: deleteOwnedGalleryItems,
+  media: (ownerId, jobId) =>
+    galleryJobItems(jobId).filter(
+      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
+    ),
+  ownsItem: (ownerId, id) => {
+    const item = galleryItem(id);
+    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
+  },
+  title: chatTitle,
+});
+registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
+registerMigrationRoutes(app, {
+  dataDir,
+  requireAdmin,
+  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {
@@ -951,10 +954,6 @@ const nextSteps = createNextStepWork({
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
-});
-generationRoutes.setAdmission(async (req, res) => {
-  const result = await admitGeneration(req.body || {}, req.studioAccount);
-  res.status(result.status).json(result.payload);
 });
 
 // Studio Chat (chat-service.js).

@@ -15,6 +15,9 @@ const {
   updateGalleryJob,
 } = await import("./gallery/store.js");
 const { galleryJobResponse } = await import("./gallery/routes.js");
+const { openDatabase } = await import("./persistence/runtime.ts");
+const { Store } = await import("./domain/store.ts");
+const queue = new Store(openDatabase(":memory:"));
 
 const mark = { prompt: "a fox at dawn", why: "You star foxes.", at: new Date().toISOString() };
 const item = (id, dream) => ({
@@ -48,7 +51,7 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
     ["b", "c"],
   );
   const alice = { userId: "alice", role: "user", authenticated: true, features: { gallery: true } };
-  assert.deepEqual(galleryJobResponse(alice, "job-unseen").payload.items, []);
+  assert.deepEqual(galleryJobResponse(queue, alice, "job-unseen").payload.items, []);
 
   // A change to an unkept result keeps it out of the gallery.
   updateGalleryJob("unseen", { favorite: true });
@@ -56,5 +59,5 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
   // Keeping it makes it an ordinary gallery item everywhere.
   updateGalleryJob("unseen", { dream: { ...mark, state: "kept" } });
   assert.deepEqual(shown().sort(), ["mine", "unseen"]);
-  assert.equal(galleryJobResponse(alice, "job-unseen").payload.items.length, 1);
+  assert.equal(galleryJobResponse(queue, alice, "job-unseen").payload.items.length, 1);
 });
