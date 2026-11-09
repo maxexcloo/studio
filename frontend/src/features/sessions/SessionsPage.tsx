@@ -98,6 +98,8 @@ function SessionPage() {
     }
   }, [sendingSession, id]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
+  // The iteration whose results the viewer flips through; unset, it flips through the whole Chat.
+  const [turn, setTurn] = useState<string>();
   const session = useQuery(sessionQuery(id!));
   // Each staging (Edit, Animate, Recreate) starts a fresh card form.
   const stagings = useRef(0);
@@ -158,6 +160,7 @@ function SessionPage() {
   const jobIndex = new Map(jobs.map((job, index) => [job.id, index]));
   // Running and failed work opens too, showing its status and the prompt once written.
   const tiles = jobs.flatMap(iterationTiles);
+  const turnJob = turn && jobs.find((job) => job.id === turn);
   // A reply that started a generation shows its card directly below its text.
   const replies = new Map(
     messages.flatMap((message) =>
@@ -170,7 +173,10 @@ function SessionPage() {
       job={job}
       index={jobIndex.get(job.id)!}
       parentIndex={job.parentJobId ? (jobIndex.get(job.parentJobId) ?? -1) : -1}
-      open={setSelected}
+      open={(item, scope) => {
+        setTurn(scope);
+        setSelected(item);
+      }}
     />
   );
   const timeline = [
@@ -267,7 +273,8 @@ function SessionPage() {
         {selected && (
           <MediaViewer
             item={currentMedia(tiles, selected)}
-            items={tiles}
+            items={turnJob ? iterationTiles(turnJob) : tiles}
+            related={tiles}
             navigate={setSelected}
             sessionId={id}
             close={() => setSelected(null)}

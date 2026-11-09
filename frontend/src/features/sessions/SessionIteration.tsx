@@ -1,5 +1,17 @@
 import { useRef, useState, type CSSProperties } from "react";
-import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import {
+  ActionIcon,
+  Anchor,
+  Button,
+  Group,
+  Image,
+  Menu,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import { ChevronDown, FastForward } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
@@ -207,7 +219,8 @@ export function SessionIteration({
 }: {
   job: QueueJob;
   index: number;
-  open: (item: MediaItem) => void;
+  /** Opens an item in the viewer; `turn`, a job id, keeps its flipping to that job's results. */
+  open: (item: MediaItem, turn?: string) => void;
   parentIndex: number;
 }) {
   const [editing, setEditing] = useState(false);
@@ -295,21 +308,34 @@ export function SessionIteration({
                   </Text>
                 ))}
               </Group>
-              {job.operation !== "upscale" && (
-                <Button
-                  ref={editButton}
-                  variant="subtle"
-                  color="gray"
-                  size="compact-sm"
-                  radius="xl"
-                  leftSection={<icons.edit size={14} />}
-                  style={{ flexShrink: 0 }}
-                  aria-label={`Edit Iteration ${number}`}
-                  onClick={() => setEditing(true)}
-                >
-                  Edit
-                </Button>
-              )}
+              <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                {tiles.length > 1 && (
+                  <Tooltip label="Open All">
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      aria-label={`Open All in Iteration ${number}`}
+                      onClick={() => open(tiles[0], job.id)}
+                    >
+                      <icons.openAll size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+                {job.operation !== "upscale" && (
+                  <Button
+                    ref={editButton}
+                    variant="subtle"
+                    color="gray"
+                    size="compact-sm"
+                    radius="xl"
+                    leftSection={<icons.edit size={14} />}
+                    aria-label={`Edit Iteration ${number}`}
+                    onClick={() => setEditing(true)}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </Group>
             </Group>
           </>
         )}
@@ -332,7 +358,8 @@ export function SessionIteration({
                 sessionId={job.sessionId}
                 single={false}
                 hold={hold}
-                open={open}
+                // A result of several flips through its siblings; a single result through the Chat.
+                open={(item) => open(item, job.id)}
               />
             ))}
           </SimpleGrid>

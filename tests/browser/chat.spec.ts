@@ -159,6 +159,54 @@ test("Chat cards show their request, settings and every output beneath the reply
   expect(warnings.filter((text) => /unique "key" prop/.test(text))).toEqual([]);
 });
 
+test("Open All flips through one iteration's results, as does opening one of them", async ({
+  page,
+}, testInfo) => {
+  await savedChat(page);
+  await page.goto("/chat/chat-a");
+  await expect(
+    page
+      .getByRole("article", { name: "Iteration 1", exact: true })
+      .getByRole("button", { name: /^Open All/ }),
+  ).toHaveCount(0);
+  const edited = page.getByRole("article", { name: "Iteration 2", exact: true });
+  await edited.getByRole("button", { name: "Open All in Iteration 2", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
+  const { isMobile, browserName } = testInfo.project.use;
+  const touch = isMobile && browserName !== "webkit" && (await page.context().newCDPSession(page));
+  // Desktop uses Next and the arrow key; Chromium phones swipe; WebKit phones take the key.
+  async function flip() {
+    if (touch) {
+      const picture = viewer.getByRole("img", { name: "A watercolour bird", exact: true }).first();
+      const box = (await picture.boundingBox())!;
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: x - 150, y }],
+      });
+      await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    } else if (isMobile) await page.keyboard.press("ArrowRight");
+    else await viewer.getByRole("button", { name: "Next Generation", exact: true }).click();
+  }
+  await flip();
+  await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
+  if (!isMobile) await page.keyboard.press("ArrowRight");
+  else await flip();
+  await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
+  // The iteration's last result is the end, not Iteration 1.
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await edited
+    .getByRole("button", { name: /^Open image: / })
+    .nth(1)
+    .click();
+  await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
+});
+
 test("Chats can be renamed and deleted with an opt-in results checklist", async ({
   page,
   isMobile,

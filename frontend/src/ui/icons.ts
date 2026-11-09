@@ -8,6 +8,7 @@ import {
   Copy,
   Download,
   Ellipsis,
+  GalleryHorizontalEnd,
   Heart,
   ImageUpscale,
   Info,
@@ -68,6 +69,8 @@ export const icons = {
   loras: Puzzle,
   more: Ellipsis,
   moreLikeThis: Wand,
+  /** Opening every result of a run or Chat iteration in the viewer. */
+  openAll: GalleryHorizontalEnd,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */

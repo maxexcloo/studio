@@ -19,7 +19,8 @@ import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 
 export interface GalleryViewProps {
   items: MediaItem[];
-  open: (item: MediaItem) => void;
+  /** Opens an item in the viewer; `run`, a job id, keeps its flipping to that run's results. */
+  open: (item: MediaItem, run?: string) => void;
   selection: GallerySelection;
   focusItem: string | null;
   caption: "hover" | "pinned" | "none";

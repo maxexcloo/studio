@@ -4,6 +4,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { MessageCircle, X } from "lucide-react";
 import { Link } from "react-router";
 import type { MediaItem } from "../../types";
+import { icons } from "../../ui/icons";
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
 import { layerAbove } from "../../ui/popupClicks";
@@ -259,6 +260,7 @@ const RunsRow = memo(function RunsRow({
       chat={row.panel.items[0].sessionId}
       chatTitle={chatTitle}
       detail={detail}
+      onOpenAll={() => open(row.panel.items[0], row.panel.items[0].jobId)}
       onClose={() => collapse(row.panel)}
     >
       {row.panel.items.map((item) => (
@@ -271,7 +273,7 @@ const RunsRow = memo(function RunsRow({
           detail={detail(item)}
           style={{ aspectRatio: `${item.width || 1} / ${item.height || 1}` }}
           className={classes.fanned}
-          onOpen={() => open(item)}
+          onOpen={() => open(item, item.jobId)}
           onMenu={() => setMenuItem(item.id)}
           onSelectionMenu={onSelectionMenu}
           onTryAgain={onTryAgain}
@@ -360,6 +362,7 @@ function RunPanel({
   chat,
   chatTitle,
   detail,
+  onOpenAll,
   onClose,
   children,
 }: {
@@ -369,6 +372,7 @@ function RunPanel({
   chat?: string;
   chatTitle: (id: string) => string | undefined;
   detail: (item: MediaItem) => string;
+  onOpenAll: () => void;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -410,11 +414,18 @@ function RunPanel({
             )}
           </Group>
         </Stack>
-        <Tooltip label="Close Run">
-          <ActionIcon aria-label="Close Run" variant="subtle" color="gray" onClick={onClose}>
-            <X size={18} />
-          </ActionIcon>
-        </Tooltip>
+        <Group gap={4} wrap="nowrap">
+          <Tooltip label="Open All">
+            <ActionIcon aria-label="Open All" variant="subtle" color="gray" onClick={onOpenAll}>
+              <icons.openAll size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Close Run">
+            <ActionIcon aria-label="Close Run" variant="subtle" color="gray" onClick={onClose}>
+              <X size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
       <div
         className={classes.panelGrid}
