@@ -11,6 +11,7 @@ import {
 import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
+import { displayEdge } from "../shared/media.ts";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
 // only has to pull a full-resolution image when it actually opens the viewer.
@@ -22,7 +23,7 @@ const thumbnailDir = path.join(dataDir, ".thumbnails");
  */
 export const RENDITIONS = {
   thumb: { longestEdge: 768, quality: 72 },
-  display: { longestEdge: 2560, quality: 90 },
+  display: { longestEdge: displayEdge, quality: 90 },
 };
 const { longestEdge, quality } = RENDITIONS.thumb;
 const renditionOf = (size) => RENDITIONS[size] || RENDITIONS.thumb;
