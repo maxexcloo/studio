@@ -19,7 +19,7 @@
   color: var(--input-color);
 }
 
-/* Phones raise bar and form controls to 40 px touch targets; their icons grow to match. A
+/* Phones raise bar and form controls to 44 px touch targets; their icons grow to match. A
    button's ▾ in its right section keeps its size. */
 .phoneIcons :global(svg.lucide):not(:global(.mantine-Button-section[data-position="right"] *)) {
   width: 20px;

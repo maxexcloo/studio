@@ -58,14 +58,6 @@
   min-width: 8rem;
 }
 
-/* Phone chips are 44 px touch targets; the search matches them. */
-@media (max-width: 48em) {
-  .search input {
-    height: 44px;
-    min-height: 44px;
-  }
-}
-
 .reveal {
   animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
