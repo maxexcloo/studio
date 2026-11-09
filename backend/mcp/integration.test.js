@@ -431,7 +431,8 @@ async function fixture(
       profiles = value;
       if (chosen) defaults = chosen;
       if (filter) visibleTo = filter;
-      if (videoAvailable !== undefined) backends = { video: { available: videoAvailable } };
+      if (videoAvailable !== undefined)
+        backends = { video: { configured: true, available: videoAvailable } };
       await fetch(`${base}/api/models`);
     },
     client: async (user = "alice", key = mediaKey) => {
@@ -3681,31 +3682,48 @@ const videoCatalogue = (local = true) => [
   cloudVideo("cloud-video-fast", "Cloud Video · Fast · Cloud"),
 ];
 
-test("while the local video worker is off, video runs on a granted cloud profile and says so", async (t) => {
+test("while local workers are Offline or Stopped, generate queues on them and says the jobs wait", async (t) => {
   const f = await fixture(t);
-  await f.profiles(videoCatalogue(false), {
+  // As the studio's catalogue lists them while their workers restart or are stopped on purpose.
+  const waiting = videoCatalogue().map((profile) =>
+    profile.family === "grok"
+      ? profile
+      : { ...profile, availability: profile.kind === "image" ? "parked" : "offline" },
+  );
+  await f.profiles(waiting, {
     defaults: { image: imageProfile.id, video: "cloud-video" },
     videoAvailable: false,
   });
   const client = await f.client();
-  const fallback = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.match(texts(fallback), /Videos are Offline, so this went to the cloud/);
-  assert.equal(data(fallback).profile.remote, true);
+  const video = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
+  assert.equal(data(video).status, "queued");
+  assert.equal(data(video).profile.remote, undefined, "never moved to the cloud");
+  assert.match(texts(video), /is Offline, so this waits in the queue and starts when its worker/);
+  // Cloud is only offered, for the user to ask for.
+  assert.match(texts(video), /if it stays down, offer Cloud, and run it there only if they ask/);
+  const image = await call(client, "generate", { prompts: ["A heron"], count: 1 });
+  assert.match(texts(image), /is Stopped \(an administrator can start it .*\), so this waits/);
+  assert.doesNotMatch(texts(image), /Cloud/, "no cloud image profile to offer");
+  assert.deepEqual(
+    f.submitted.map((body) => body.profileId),
+    ["fl-fast", imageProfile.id],
+  );
+  assert.match(
+    data(await call(client, "models", { kind: "video" })).services_note,
+    /^Videos are Offline .*; generate still queues on them/,
+  );
 });
 
-test("with no cloud profile granted, video is refused while the local video worker is off, and named cloud profiles run", async (t) => {
+test("with no local or cloud video profile, video is refused, and named cloud profiles run", async (t) => {
   const f = await fixture(t);
-  // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
+  // With no profile to queue on, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
   await f.profiles(
     videoCatalogue(false).filter((profile) => !/^cloud/.test(profile.id)),
     { defaults: { image: imageProfile.id }, videoAvailable: false },
   );
   const client = await f.client();
   const none = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.equal(
-    texts(none),
-    "Videos are Offline: the video worker isn't answering. Tell the user to try again later.",
-  );
+  assert.equal(texts(none), "No ready video profile is available to this account.");
   const listing = data(await call(client, "models", { kind: "video" }));
   assert.equal("cloud" in listing || "cloud_note" in listing, false);
   await f.profiles(videoCatalogue(false), {
@@ -3779,7 +3797,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(pending.isError, true);
   assert.match(texts(pending), /^This result is still /);
   finish(f);
-  // Unlike Generate, Animate needs no Video Cloud Fallback: it goes to Grok and says so.
+  // Animate goes to Grok and says so.
   const moved = await call(client, "reuse", {
     job_id: "result 1",
     mode: "animate",
@@ -3932,7 +3950,7 @@ test("video stays local while the worker is up, and a plain request never reache
   const restricted = await f.client("", Object.keys(tokens)[0]);
   const refused = await call(restricted, "generate", { kind: "video", prompts: ["A wave"] });
   assert.equal(refused.isError, true);
-  assert.match(refused.content[0].text, /^Videos are Offline/);
+  assert.match(refused.content[0].text, /^No ready video profile/);
   data(await call(restricted, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
   const nowhere = await call(restricted, "reuse", { job_id: "result 1", mode: "animate" });
