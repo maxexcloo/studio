@@ -1,7 +1,8 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy/comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy/queue.js";
-import { flushGalleryStrict, gallery, outputsFrom, updateGalleryJob } from "./gallery/store.js";
+import { flushGalleryStrict, gallery, updateGalleryJob } from "./gallery/store.js";
+import { outputsFrom } from "./gallery/records.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
