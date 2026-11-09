@@ -159,7 +159,7 @@ test("Starring queues finishable images once, unstarring takes them off, and one
   assert.equal(finishing.waiting("alice"), 0);
 });
 
-test("Finishing waits for idle time, yields a waiting upscale to new work and skips an unready worker", async (t) => {
+test("Finishing waits for idle time, yields a waiting upscale to new work above Dream and skips an unready worker", async (t) => {
   const { finishing, store, state, live, session } = fixture(t);
   await finishing.save("alice", { enabled: true });
   state.items.push(image("a"));
@@ -188,6 +188,14 @@ test("Finishing waits for idle time, yields a waiting upscale to new work and sk
   const [job] = live();
   assert.equal(job.priority, queuePriority.finishing);
   assert.equal(finishing.waiting("alice"), 0);
+  // A Dream job ranks below it, so it keeps its place.
+  finishing.admitted(
+    store.enqueue("bob", session("bob").id, {}, "image", undefined, undefined, undefined, {
+      priority: queuePriority.dream,
+    }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(store.job("alice", job.id)?.status, job.status);
   // Someone's work arrives before the queue starts it: it is cancelled and waits again.
   finishing.admitted(store.enqueue("bob", session("bob").id, { prompt: "next" }, "image"));
   await new Promise((resolve) => setImmediate(resolve));
