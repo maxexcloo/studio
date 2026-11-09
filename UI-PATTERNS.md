@@ -107,6 +107,10 @@ the primary component reference and verify APIs against the installed version.
   remains independent. Editing an old Chat card sends its source job and full
   normalised input through the assistant and creates a new iteration without
   changing the original; do not bypass it with a direct queue request.
+- The collapsed Chat composer holds only its message and Send. Focusing the
+  message expands it in place, built as the gallery composer: the text with its
+  tools, then a `ChipRail` (the text model where there is a choice, and
+  References) beside Send. Pressing outside, Escape or tabbing away collapses it.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
   Profile options carry short facts (model or family · kind · Cloud or Local
@@ -125,6 +129,8 @@ the primary component reference and verify APIs against the installed version.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
+  Ideas for an empty, focused prompt or Chat message float over it as one
+  Suggestions chip listing them (`usePromptIdeas`), never as a row of ideas.
 - Queue access belongs to the header status action. Report actual endpoint
   health: configuration alone does not prove readiness. A deliberately parked
   worker reads Stopped, not failing; an unexpectedly unavailable one remains

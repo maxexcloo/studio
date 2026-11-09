@@ -45,7 +45,7 @@ import classes from "./Picker.module.css";
  * A chip's popup: a title row with its few controls, the content, then any `footer` actions.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
  * between the header and the footer, pinned above the safe area, so a popover never opens a second
- * level there, unless the popup is `floating`: a small form, such as Expert Settings, stays a
+ * level there, unless the popup is `floating`: a small form, such as Settings, stays a
  * popover fitted to the screen, as the rail's other dropdowns. Escape closes nested layers first.
  */
 export function ChipPopup({

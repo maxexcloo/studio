@@ -29,8 +29,8 @@ const selections = [
 // Nested pickers stay inside the popover so choosing an option keeps it open.
 const nested = { withinPortal: false } as const;
 
-/** The Expert chip: only the settings the selected profile lets the user change. */
-export function ExpertSettings({
+/** The Settings chip: only the settings the selected profile lets the user change. */
+export function GenerationSettings({
   input,
   profile,
   onChange,
@@ -286,7 +286,7 @@ export function ExpertSettings({
   );
   return (
     <ChipPopup
-      title="Expert Settings"
+      title="Settings"
       tooltip
       floating
       position="top"
@@ -296,7 +296,7 @@ export function ExpertSettings({
       target={
         <Button
           {...iconChipProps}
-          aria-label="Expert Settings"
+          aria-label="Settings"
           aria-expanded={opened}
           onClick={() => onOpenedChange(!opened)}
         >

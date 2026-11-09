@@ -132,7 +132,6 @@ export function PromptFields({
     empty: !input.prompt.trim(),
     onPick: (prompt) => onChange({ prompt }),
     className: classes.ideas,
-    stacked: fill,
   });
   return (
     <>

@@ -12,7 +12,7 @@ import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/pop
 import { useKeyboard } from "../../ui/useKeyboard";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
-const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
+export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
 export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
