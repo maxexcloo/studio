@@ -1,6 +1,7 @@
 .dock {
   position: fixed;
-  z-index: 90;
+  /* Above the header, which the open panel reaches on a short screen with the keyboard up. */
+  z-index: calc(var(--mantine-z-index-app) + 1);
   left: 50%;
   transform: translateX(-50%);
   width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
