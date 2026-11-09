@@ -16,7 +16,7 @@ import {
 } from "./controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
-import { choicePool, chooseProfile, localVideoUnavailable, stoppedServices } from "./tiers.js";
+import { choicePool, chooseProfile } from "./tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { withResolution } from "../../shared/resolution.ts";
 import { imageMimes } from "../reference-names.js";
@@ -357,31 +357,24 @@ export class McpMedia {
   }
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
-   * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
-   * unavailable, video goes to a granted cloud profile with a `note` to pass on, as Animate does
-   * (animate-profile.js), or is refused with what to tell the user when none is granted.
+   * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). A local profile whose worker is
+   * Offline or Stopped is still chosen: its jobs wait in the queue until a worker is back, never moved to the cloud.
    */
   async choose(owner, options = {}) {
-    const { profile, note } = await this.choices(owner, options);
-    return { profile, note };
+    const { profile } = await this.choices(owner, options);
+    return { profile, note: "" };
   }
-  /** The profiles choose() picks from (`pool`), its usual pick (`profile`) and any `note`, so Generate can pick by the request. */
+  /** The profiles choose() picks from (`pool`) and its usual pick (`profile`), so Generate can pick by the request. */
   async choices(owner, { kind = "image", tier, references = 0, loras = [], cloud = false } = {}) {
     const models = await this.catalogue(owner);
     const ready = await this.profiles(kind, owner);
     let profiles = ready;
-    let note = "";
     if (!cloud) {
-      const cloudOffered = ready.some(isCloudProfile);
       profiles = ready.filter((profile) => !isCloudProfile(profile));
-      const parked = models.backends?.[kind]?.parked === true;
-      if (kind === "video" && models.backends?.video?.available === false) {
-        if (!cloudOffered) throw new Error(localVideoUnavailable(parked));
-        profiles = ready.filter(isCloudProfile);
-        note = `Videos are ${parked ? "Stopped" : "Offline"}, so this went to the cloud. Tell the user. `;
-      } else if (parked)
-        // Queued work would wait until an administrator starts it, so say why now.
-        throw new Error(`${stoppedServices(kind)} Tell the user.`);
+      if (!profiles.length && ready.length)
+        throw new Error(
+          `No local ${kind} profile is available to this account; Cloud is, if the user asks for it. Tell the user.`,
+        );
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
@@ -407,7 +400,6 @@ export class McpMedia {
     return {
       pool: choicePool(profiles, options),
       profile: chooseProfile(profiles, { ...options, defaultId }),
-      note,
     };
   }
   async catalogue(owner = "") {
