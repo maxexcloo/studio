@@ -52,6 +52,12 @@ select {
 .mantine-Notifications-root[data-position="bottom-right"] {
   bottom: calc(10rem + env(safe-area-inset-bottom));
 }
+/* A tablet's touch-sized composer rail wraps to two rows, so they clear it too. */
+@media (pointer: coarse) {
+  :root:not([data-phone]) .mantine-Notifications-root[data-position="bottom-right"] {
+    bottom: calc(13rem + env(safe-area-inset-bottom));
+  }
+}
 :root[data-phone] {
   --studio-composer-gap: 0.5rem;
 }
