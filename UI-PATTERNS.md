@@ -176,10 +176,12 @@ the primary component reference and verify APIs against the installed version.
   Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
   like), then reuses its prompt: Edit Prompt and Use as Reference stage the
   composer, Run Again and Repeat Exactly queue from where they are; menu options
-  expand in place on phones and touch screens. The viewer bar shows every
-  action, wrapping onto another row rather than using More or scrolling; the
-  phone bar drops its prompt field while Details is open. Gallery selection uses
-  the shared contextual selection bar and confirms deletion.
+  expand in place on phones and touch screens. The phone viewer bar keeps to one
+  row: Retry, Stop, Animate, Edit, Upscale and Star, then ⋯ More with the rest
+  in their sections, Delete last. Elsewhere the viewer bar shows every action,
+  wrapping onto another row rather than using More or scrolling. The phone bar
+  drops its prompt field while Details is open. Gallery selection uses the
+  shared contextual selection bar and confirms deletion.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds under Expand; its tags always show. Prompt and
   Negative Prompt alone have a Copy beside their heading.

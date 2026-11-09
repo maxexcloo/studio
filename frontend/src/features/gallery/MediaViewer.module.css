@@ -291,10 +291,6 @@
 :where(:root[data-phone]) .dock {
   padding-inline: var(--mantine-spacing-sm);
 }
-/* The phone bar spans the width, its actions centred in rows. */
-:where(:root[data-phone]) .dock > .actions {
-  align-items: stretch;
-}
 /* A phone held sideways keeps the full height for the media: the strip, prompt and actions stand
    beside it, at a portrait phone's width, below the top bar's buttons. */
 :where(:root[data-phone="sideways"]) .main {
