@@ -144,15 +144,20 @@ export function deploymentWorkers(environment = process.env, kubernetes = worklo
 
 /**
  * One worker per address of the image and video workloads (runtime/workloads.ts), which the
- * deployments at that address share: its id is the `worker` they give, else the first one's id, and
- * it runs their `capabilities`, else their kinds.
+ * deployments at that address share: its id is the `worker` they give, else the first one's id, its
+ * name the first one's label, and it runs their `capabilities`, else their kinds.
  */
 function workloadWorkers(kubernetes) {
   const groups = new Map();
   for (const workload of kubernetes) {
     if (workload.kind === "text") continue;
     const url = normalizeWorkerUrl(workload.url);
-    const group = groups.get(url) || { first: workload.id, id: "", capabilities: [] };
+    const group = groups.get(url) || {
+      first: workload.id,
+      name: workload.label,
+      id: "",
+      capabilities: [],
+    };
     if (workload.worker && group.id && workload.worker !== group.id)
       throw new WorkerConfigError(
         `Deployment ${workload.namespace}/${workload.id} names worker ${workload.worker}, but its address's worker is ${group.id}.`,
@@ -164,7 +169,7 @@ function workloadWorkers(kubernetes) {
   const taken = new Set();
   return [...groups].map(([url, group]) =>
     normalizeWorker(
-      { id: group.id || group.first, url, capabilities: group.capabilities },
+      { id: group.id || group.first, name: group.name, url, capabilities: group.capabilities },
       { taken, where: `Deployment ${group.first}` },
     ),
   );
