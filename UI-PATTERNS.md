@@ -155,10 +155,13 @@ the primary component reference and verify APIs against the installed version.
   Ideas for an empty prompt or Chat message are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own.
-- Queue access belongs to the header status action. Report actual endpoint
-  health: configuration alone does not prove readiness. A deliberately parked
-  worker reads Stopped, not failing; an unexpectedly unavailable one remains
-  a failure. Runtime controls belong in Settings › Workers.
+- Queue access belongs to the header status action. Under the queue, its popup
+  summarises each kind in one quiet, read-only line for everyone: Images and
+  Videos as their workers and Idle, N running or Stopped; Text as its local
+  models and state, or Cloud only. Report actual endpoint health:
+  configuration alone does not prove readiness. A deliberately parked worker
+  reads Stopped, not failing; an unexpectedly unavailable one remains a
+  failure. Runtime controls belong in Settings › Workers.
 - Keep recorded provider work and saving visible. Retry uses the shared queue
   command; bulk retry deduplicates IDs, retains unsuccessful items and preserves
   unrelated selection. Stop requests cancellation but accepted work may remain
