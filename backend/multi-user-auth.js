@@ -61,6 +61,8 @@ function guessLane(req) {
 
 // Personal MCP tokens reach only the routes MCP itself calls, never account or studio administration.
 const mcpBearerRoutes = [
+  // The account's own role and features (mcp/media.js access), as the status route reports them.
+  ["GET", /^\/api\/accounts\/status$/],
   ["GET", /^\/api\/models$/],
   ["GET", /^\/api\/loras\/info$/],
   // The account's LoRA thumbs up and down, which order every LoRA list MCP shows.
@@ -145,6 +147,7 @@ const mcpAdminRoutes = [
   ["POST", /^\/api\/accounts\/default-profile$/],
   ["DELETE", new RegExp(`^/api/accounts/profiles/${routeId}$`)],
   ["PATCH", new RegExp(`^/api/accounts/users/${routeId}$`)],
+  ["DELETE", new RegExp(`^/api/accounts/users/${routeId}$`)],
   // Removing one import record (its files stay) and Library › Import's Reddit posts.
   ["DELETE", new RegExp(`^/api/library/imports/${routeId}$`)],
   ["POST", /^\/api\/gallery\/import\/reddit$/],
@@ -297,7 +300,7 @@ export function registerMultiUserAuthRoutes(
         ? handler(req, res)
         : res.status(404).json({ ok: false, error: "Accounts are disabled." }),
     );
-  const [get, post, patch, del] = ["get", "post", "patch", "delete"].map(route);
+  const [get, post, patch] = ["get", "post", "patch"].map(route);
   /** An administrator's account route that MCP's admin tools also call. */
   const admin = (method, path, run) =>
     directRoute(app, method, path, (account, input) => {
@@ -687,13 +690,12 @@ export function registerMultiUserAuthRoutes(
     }
   });
 
-  del("/api/accounts/users/:id", (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  admin("DELETE", "/api/accounts/users/:id", (actor, { params }) => {
     try {
-      deleteAccount(req.params.id, req.studioAccount?.userId);
-      res.json({ ok: true });
+      deleteAccount(params.id, actor?.userId);
+      return { status: 200, payload: { ok: true } };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 }

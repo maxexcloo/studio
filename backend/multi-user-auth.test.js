@@ -520,6 +520,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(mcpAdminRouteAllowed("GET", "/api/accounts/admin"), true);
   assert.equal(mcpAdminRouteAllowed("DELETE", "/api/accounts/profiles/artists"), true);
   assert.equal(mcpAdminRouteAllowed("PATCH", "/api/accounts/users/a1"), true);
+  assert.equal(mcpAdminRouteAllowed("DELETE", "/api/accounts/users/a1"), true);
   // Nothing that deletes or replaces files, creates accounts or tokens, or administers GPUs.
   for (const [method, routePath] of [
     ["DELETE", "/api/loras"],
@@ -536,7 +537,23 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(canAdmin({ studioAccount: asAdmin }), true);
   assert.equal(fromChat(asAdmin), true);
   assert.equal(accountForRequest(bearer(adminToken, "POST", "/api/accounts/users")), null);
+  // delete_user with an administrator's token still never removes its own account.
+  const own = await call(routes["DELETE /api/accounts/users/:id"], {
+    ...bearer(adminToken, "DELETE", `/api/accounts/users/${adminId}`),
+    params: { id: adminId },
+  });
+  assert.equal(own.statusCode, 400, own.body.error);
   assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/models")).credential, "mcp-token");
+  assert.equal(
+    (
+      await call(
+        routes["GET /api/accounts/status"],
+        bearer(adminToken, "GET", "/api/accounts/status"),
+      )
+    ).body.account.role,
+    "administrator",
+    "MCP's access() reads the account's own role and features",
+  );
   assert.equal(
     accountForRequest(bearer(adminToken, "GET", "/api/reference-assets/asset-1/media")).credential,
     "mcp-token",
