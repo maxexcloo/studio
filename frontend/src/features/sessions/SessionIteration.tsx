@@ -1,15 +1,5 @@
 import { useRef, useState, type CSSProperties } from "react";
-import {
-  Anchor,
-  Button,
-  Group,
-  Image,
-  Menu,
-  Paper,
-  SimpleGrid,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { ChevronDown, FastForward } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
