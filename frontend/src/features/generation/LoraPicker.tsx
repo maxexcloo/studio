@@ -513,13 +513,7 @@ function LoraControls({
     return (
       <>
         {header}
-        {state ? (
-          <Stack h="45dvh">{state}</Stack>
-        ) : (
-          <ScrollArea h="45dvh">
-            {choices}
-          </ScrollArea>
-        )}
+        {state ? <Stack h="45dvh">{state}</Stack> : <ScrollArea h="45dvh">{choices}</ScrollArea>}
         <Stack gap="xs">{stack}</Stack>
       </>
     );
@@ -527,11 +521,7 @@ function LoraControls({
     <div className={classes.panel}>
       <div className={classes.column}>
         {header}
-        {state || (
-          <ScrollArea flex={1}>
-            {choices}
-          </ScrollArea>
-        )}
+        {state || <ScrollArea flex={1}>{choices}</ScrollArea>}
       </div>
       <ScrollArea className={`${classes.column} ${classes.stackColumn}`}>
         <Stack gap="xs">{stack}</Stack>
