@@ -182,7 +182,8 @@ the primary component reference and verify APIs against the installed version.
 - Switching modes preserves unsent prompts, references and settings. Use
   `useRemembered` for settled UI state per account; do not persist open popups,
   selection or search queries. Keep credentials and private account records
-  out of browser storage. Typing must not rerender unchanged media or history;
+  out of browser storage. An issued MCP token or generated password shows once,
+  in the view that issued it, and never enters a query cache. Typing must not rerender unchanged media or history;
   shared provider commands retain their identity.
 - Account groups own grants. Runtime definition edits retain administrator
   approval and conflict handling; read back saved changes.

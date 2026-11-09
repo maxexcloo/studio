@@ -18,7 +18,8 @@ const app = express();
 app.use(express.json());
 app.use((req, _res, next) => {
   const userId = String(req.headers["x-user"]);
-  req.studioAccount = { userId, authenticated: true, features: { gallery: true } };
+  const role = req.headers["x-role"] || "user";
+  req.studioAccount = { userId, role, authenticated: true, features: { gallery: true } };
   next();
 });
 registerGalleryDeleteRoute(app);
@@ -84,4 +85,32 @@ test("one request deletes many of the account's own items and leaves another own
     false,
   );
   assert.equal(fs.existsSync(other.file), true);
+});
+
+test("only an administrator counts and deletes another account's gallery", async () => {
+  const alice = [finishedItem("alice", "alice-one"), finishedItem("alice", "alice-two")];
+  const bob = finishedItem("bob", "bob-one");
+  store.setGallery([...alice, bob].map(({ item }) => item));
+  const as = (user, role = "user") => ({ "x-user": user, "x-role": role });
+
+  const peek = await fetch(`${base}/owners`, { headers: as("bob") });
+  assert.equal(peek.status, 403);
+  const refused = await fetch(`${base}/owners/alice`, { method: "DELETE", headers: as("bob") });
+  assert.equal(refused.status, 403);
+  assert.equal(store.gallery.length, 3);
+
+  const counts = await fetch(`${base}/owners`, { headers: as("admin", "administrator") });
+  assert.deepEqual((await counts.json()).owners, { alice: 2, bob: 1 });
+  const removed = await fetch(`${base}/owners/alice`, {
+    method: "DELETE",
+    headers: as("admin", "administrator"),
+  });
+  assert.equal(removed.status, 200);
+  assert.equal((await removed.json()).removed, 2);
+  assert.deepEqual(store.gallery, [bob.item]);
+  assert.equal(
+    alice.some(({ file }) => fs.existsSync(file)),
+    false,
+  );
+  assert.equal(fs.existsSync(bob.file), true);
 });

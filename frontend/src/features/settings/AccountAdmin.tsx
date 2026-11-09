@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Badge,
@@ -18,8 +18,19 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Plus, ShieldCheck, Unlink, UserCheck, UserRound, UserX } from "lucide-react";
+import {
+  Check,
+  ImageOff,
+  KeyRound,
+  Plus,
+  ShieldCheck,
+  Unlink,
+  UserCheck,
+  UserRound,
+  UserX,
+} from "lucide-react";
 import { api, post } from "../../api";
+import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
@@ -392,9 +403,24 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-type UserAction = "delete" | "disable" | "password" | "role";
+type UserAction = "delete" | "disable" | "gallery" | "password" | "role";
 
-/** Reset Password: an administrator sets a new one, which ends the account's sessions. */
+/** Each account's visible gallery size, by account ID (administrators only). */
+export const galleryOwnersQuery = queryOptions({
+  queryKey: ["gallery-owners"],
+  queryFn: () => api<{ owners: Record<string, number> }>("/api/gallery/owners"),
+});
+
+/** 16 random URL-safe characters. */
+const generatedPassword = () =>
+  btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(12))))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
+/**
+ * Reset Password: an administrator types a new one or generates one, which ends the account's
+ * sessions. A generated password shows once, after the reset, only while the dialog stays open.
+ */
 function ResetPassword({
   account,
   saved,
@@ -405,26 +431,56 @@ function ResetPassword({
   onCancel: () => void;
 }) {
   const [password, setPassword] = useState("");
+  const [generated, setGenerated] = useState("");
+  // Passwords stay in this dialog, never in the mutation cache's variables.
+  const issuing = useRef("");
+  const { copied, copy } = useCopy();
   const reset = useMutation({
     meta: { inlineError: true },
-    mutationFn: () =>
+    mutationFn: (generate: boolean) =>
       api(`/api/accounts/users/${encodeURIComponent(account.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: generate ? issuing.current : password }),
       }),
-    onSuccess: saved,
+    onSuccess: (_result, generate) => (generate ? setGenerated(issuing.current) : saved()),
   });
+  if (generated)
+    return (
+      <Stack>
+        <Text size="sm">
+          {account.username} now signs in with this password. It isn’t shown again; give it to them
+          yourself.
+        </Text>
+        <TextInput
+          label="Generated Password"
+          value={generated}
+          readOnly
+          autoComplete="off"
+          onFocus={(event) => event.currentTarget.select()}
+        />
+        <Group justify="flex-end">
+          <Button
+            variant="default"
+            leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
+            onClick={() => copy(generated, "password")}
+          >
+            {copied ? "Copied" : "Copy Password"}
+          </Button>
+          <Button onClick={saved}>Done</Button>
+        </Group>
+      </Stack>
+    );
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        reset.mutate();
+        reset.mutate(false);
       }}
     >
       <Stack>
         <Text size="sm">
-          Set a new password for {account.username}. It signs them out everywhere; tell them the new
-          one yourself.
+          Set a new password for {account.username}, or generate one. It signs them out everywhere;
+          tell them the new one yourself.
         </Text>
         <PasswordInput
           label="New Password"
@@ -434,6 +490,19 @@ function ResetPassword({
           value={password}
           onChange={(event) => setPassword(event.currentTarget.value)}
         />
+        <Group>
+          <Button
+            variant="default"
+            size="compact-sm"
+            disabled={reset.isPending}
+            onClick={() => {
+              issuing.current = generatedPassword();
+              reset.mutate(true);
+            }}
+          >
+            Generate Password
+          </Button>
+        </Group>
         {reset.error && <Alert color="red">{reset.error.message}</Alert>}
         <DialogFooter pending={reset.isPending} onCancel={onCancel}>
           <Button type="submit" loading={reset.isPending} disabled={password.length < 8}>
@@ -480,6 +549,14 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       api(`/api/accounts/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => setActing(null),
     onSettled: refresh,
+  });
+  const galleries = useQuery(galleryOwnersQuery);
+  const galleryOf = (account: Account) => galleries.data?.owners[account.id] || 0;
+  const removeGallery = useMutation({
+    mutationFn: (id: string) =>
+      api(`/api/gallery/owners/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: () => setActing(null),
+    onSettled: () => client.invalidateQueries({ queryKey: galleryOwnersQuery.queryKey }),
   });
   const policy = useMutation({
     mutationFn: (accessProfileId: string) =>
@@ -635,6 +712,20 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       Disable User
                     </Menu.Item>
                   )}
+                  {galleryOf(account) > 0 && (
+                    <Menu.Item
+                      color="red"
+                      leftSection={<ImageOff size={16} />}
+                      rightSection={
+                        <Text size="xs" c="dimmed">
+                          {galleryOf(account)}
+                        </Text>
+                      }
+                      onClick={act("gallery")}
+                    >
+                      Delete Gallery
+                    </Menu.Item>
+                  )}
                   <Menu.Item
                     color="red"
                     leftSection={<icons.delete size={16} />}
@@ -723,6 +814,17 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         enable them again.
       </ConfirmDialog>
       <ConfirmDialog
+        opened={acting?.action === "gallery"}
+        title="Delete Gallery"
+        action="Delete"
+        pending={removeGallery.isPending}
+        onConfirm={() => target && removeGallery.mutate(target.id)}
+        onClose={() => setActing(null)}
+      >
+        Delete all {target && galleryOf(target)} of {target?.username}’s gallery items? Their images
+        and videos are deleted for good, as if they deleted them themselves.
+      </ConfirmDialog>
+      <ConfirmDialog
         opened={acting?.action === "delete"}
         title="Delete User"
         action="Delete"
@@ -731,7 +833,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         onClose={() => setActing(null)}
       >
         Delete {target?.username}? Their account, sign-ins and MCP token are removed for good. Their
-        images and videos stay on disk but no longer show in Studio.
+        images and videos stay on disk but no longer show in Studio; use Delete Gallery first to
+        remove them.
       </ConfirmDialog>
     </Stack>
   );
