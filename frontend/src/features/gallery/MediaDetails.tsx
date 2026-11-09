@@ -1,26 +1,29 @@
 import {
+  ActionIcon,
   Anchor,
   Badge,
   Group,
   Image,
-  ScrollArea,
+  Spoiler,
   Stack,
   Table,
   Text,
   Title,
+  Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { Link } from "react-router";
 import type { MediaItem, Profile } from "../../types";
+import { useCopy } from "../../ui/clipboard";
+import { icons } from "../../ui/icons";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { mediaTitle } from "./mediaLabels";
 import { useDerivations } from "./versions";
 import { WritingThinking } from "../generation/PromptWriting";
-import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
 
 const fileStem = (name: unknown) =>
@@ -197,6 +200,9 @@ function useGenerationDetails(item: MediaItem, size?: number | null) {
   });
 }
 
+const referenceText = ({ role, strength }: RanReference) =>
+  strength ? `${role} (${strength})` : role;
+
 /** Copy Settings: the prompts and every input that was set, one per line. */
 export function useSettingsText(item: MediaItem) {
   const details = useGenerationDetails(item);
@@ -208,7 +214,7 @@ export function useSettingsText(item: MediaItem) {
       details.loras.length &&
         `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,
       details.references.length &&
-        `References: ${details.references.map(({ role, strength }) => (strength ? `${role} (${strength})` : role)).join(", ")}`,
+        `References: ${details.references.map(referenceText).join(", ")}`,
       ...details.unused.map((note) => `Not Used: ${note}`),
       ...[
         ...details.settings,
@@ -221,19 +227,12 @@ export function useSettingsText(item: MediaItem) {
       .join("\n");
 }
 
-/**
- * A prompt or caption on a subtle surface; long text scrolls within a bounded height, or `clamped`
- * shows its first two lines ending in "…".
- */
-function PromptText({ clamped, children }: { clamped?: boolean; children: React.ReactNode }) {
+/** A prompt or caption with its line breaks. */
+function DetailText({ children }: { children: React.ReactNode }) {
   return (
-    <div className={classes.promptText}>
-      <ScrollArea.Autosize mah="12rem">
-        <Text size="sm" lineClamp={clamped ? 2 : undefined} style={{ whiteSpace: "pre-wrap" }}>
-          {children}
-        </Text>
-      </ScrollArea.Autosize>
-    </div>
+    <Text size="sm" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+      {children}
+    </Text>
   );
 }
 
@@ -253,68 +252,88 @@ function useMediaSize(url: string) {
   });
 }
 
-/** One Details section: its heading, with any `action` at its end, over its content. */
+/**
+ * One Details section: its heading and Copy, which copies `copy`, over its content; content taller
+ * than a few lines folds until Expand. Any `after` (the prompt's thinking) stays outside the fold.
+ */
 function DetailSection({
   title,
-  action,
+  copy,
+  after,
   children,
 }: {
   title: string;
-  action?: React.ReactNode;
+  copy: string;
+  after?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const copier = useCopy();
   return (
     <Stack gap={6}>
       <Group justify="space-between" wrap="nowrap">
         <Title order={6}>{title}</Title>
-        {action}
+        <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            color="gray"
+            aria-label={`Copy ${title}`}
+            disabled={!copy}
+            onClick={() => copier.copy(copy)}
+          >
+            {copier.copied ? <Check size={14} /> : <icons.copy size={14} />}
+          </ActionIcon>
+        </Tooltip>
       </Group>
-      {children}
+      <Spoiler
+        maxHeight={120}
+        showLabel="Expand"
+        hideLabel="Collapse"
+        showAriaLabel={`Expand ${title}`}
+        hideAriaLabel={`Collapse ${title}`}
+      >
+        <Stack gap={6}>{children}</Stack>
+      </Spoiler>
+      {after}
     </Stack>
   );
 }
 
-/** The gallery caption in the prompt's style, expanded until Show Less folds it to two lines. */
+/** Label and value lines, as a section copies its rows. */
+const rowsText = (rows: Row[]) =>
+  rows
+    .filter(([, value]) => value !== pendingValue)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join("\n");
+
+/** The gallery caption in the prompt's style, then its tags. */
 function Caption({ item }: { item: MediaItem }) {
-  // Two lines until asked for the rest, so the prompt below stays in view.
-  const [open, setOpen] = useState(false);
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
+  const tags = [...(caption.tags || [])].sort((a, b) => a.localeCompare(b));
   return (
     <DetailSection
       title="Caption"
-      action={
-        <Anchor
-          component="button"
-          type="button"
-          size="xs"
-          c="dimmed"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? "Show Less" : "Show More"}
-        </Anchor>
-      }
+      copy={[caption.text, tags.join(", ")].filter(Boolean).join("\n")}
     >
-      {caption.text && <PromptText clamped={!open}>{caption.text}</PromptText>}
-      {open && !!caption.tags?.length && (
+      {caption.text && <DetailText>{caption.text}</DetailText>}
+      {!!tags.length && (
         <Group gap={4} aria-label="Caption Tags">
-          {[...caption.tags]
-            .sort((a, b) => a.localeCompare(b))
-            .map((tag) => (
-              <Badge
-                key={tag}
-                component={Link}
-                to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
-                aria-label={`Search ${tag}`}
-                variant="default"
-                radius="sm"
-                size="sm"
-                fw={400}
-                style={{ cursor: "pointer" }}
-              >
-                {tag}
-              </Badge>
-            ))}
+          {tags.map((tag) => (
+            <Badge
+              key={tag}
+              component={Link}
+              to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
+              aria-label={`Search ${tag}`}
+              variant="default"
+              radius="sm"
+              size="sm"
+              fw={400}
+              style={{ cursor: "pointer" }}
+            >
+              {tag}
+            </Badge>
+          ))}
         </Group>
       )}
     </DetailSection>
@@ -325,13 +344,16 @@ function Caption({ item }: { item: MediaItem }) {
 function DetailsPrompt({ item }: { item: MediaItem }) {
   return (
     <>
-      <DetailSection title="Prompt">
-        <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
-        <WritingThinking writing={item.writing} />
+      <DetailSection
+        title="Prompt"
+        copy={item.prompt || ""}
+        after={<WritingThinking writing={item.writing} />}
+      >
+        <DetailText>{item.prompt || "No prompt recorded."}</DetailText>
       </DetailSection>
       {item.negative && (
-        <DetailSection title="Negative Prompt">
-          <PromptText>{item.negative}</PromptText>
+        <DetailSection title="Negative Prompt" copy={item.negative}>
+          <DetailText>{item.negative}</DetailText>
         </DetailSection>
       )}
     </>
@@ -342,7 +364,7 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
 function Section({ title, rows }: { title: string; rows: Row[] }) {
   if (!rows.length) return null;
   return (
-    <DetailSection title={title}>
+    <DetailSection title={title} copy={rowsText(rows)}>
       <Table
         variant="vertical"
         layout="fixed"
@@ -393,7 +415,7 @@ function Related({
 }) {
   if (!items.length) return null;
   return (
-    <DetailSection title={title}>
+    <DetailSection title={title} copy={items.map(mediaTitle).join("\n")}>
       {items.map((related) =>
         open ? (
           <Anchor
@@ -441,7 +463,7 @@ export function MediaDetails({
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
       {item.source && (
-        <DetailSection title="Source">
+        <DetailSection title="Source" copy={item.source.url}>
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
           </Anchor>
@@ -449,12 +471,15 @@ export function MediaDetails({
       )}
       <Related title="Derived" items={related.derived} open={open} />
       {details.profile && (
-        <DetailSection title="Model">
+        <DetailSection title="Model" copy={details.profile}>
           <Text size="sm">{details.profile}</Text>
         </DetailSection>
       )}
       {!!details.loras.length && (
-        <DetailSection title="LoRAs">
+        <DetailSection
+          title="LoRAs"
+          copy={details.loras.map((lora) => `${lora.name} ${lora.strength}`).join("\n")}
+        >
           {details.loras.map((lora) => (
             <Group key={lora.name} justify="space-between" wrap="nowrap" gap="xs">
               <Text size="sm" truncate>
@@ -468,7 +493,13 @@ export function MediaDetails({
         </DetailSection>
       )}
       {!!(details.references.length || details.unused.length) && (
-        <DetailSection title="References">
+        <DetailSection
+          title="References"
+          copy={[
+            ...details.references.map(referenceText),
+            ...details.unused.map((note) => `Not used: ${note}`),
+          ].join("\n")}
+        >
           {details.references.map((reference) => {
             const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
             const source = galleryReference(reference.id, [

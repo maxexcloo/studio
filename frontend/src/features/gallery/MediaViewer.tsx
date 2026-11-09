@@ -267,7 +267,7 @@ export function MediaViewer({
     getInitialValueInEffect: false,
   });
   const [sheet, setSheet] = useState(false);
-  // The phone details sheet opens above the action bar, which stays in reach.
+  // The phone details sheet opens above the action bar, which stays in reach without its prompt.
   const bar = useRef<HTMLDivElement>(null);
   const [barOffset, setBarOffset] = useState(0);
   useLayoutEffect(() => {
@@ -670,6 +670,7 @@ export function MediaViewer({
                     onVersionChange={(id, active) => setVersion({ id, active })}
                     shortcuts={shortcutActions}
                     ref={bar}
+                    promptHidden={phone && sheet}
                     onApplied={() => {
                       restoreFocus.current = false;
                       close();

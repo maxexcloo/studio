@@ -21,6 +21,7 @@ import {
   ScrollArea,
   SegmentedControl,
   Select,
+  Spoiler,
   Switch,
   Tooltip,
   type CSSProperties,
@@ -326,6 +327,7 @@ export function studioTheme({
       Select: Select.extend({
         defaultProps: { checkIconPosition: "right", rightSection: chevron },
       }),
+      Spoiler: Spoiler.extend({ defaultProps: { transitionDuration: motionDuration } }),
       Switch: Switch.extend({
         styles: {
           thumb: {
