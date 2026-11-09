@@ -211,7 +211,7 @@ test(
         width: 256,
         height: 256,
         seed: 42,
-        backendId: "",
+        workerId: "",
         allowFallback: true,
       };
       await chat(session.id, "Explain depth of field.", { operation: "image", input });

@@ -237,7 +237,7 @@ test(
         workflow: profile.workflow,
         kind: "image",
         prompt: "Neutral white teapot",
-        backendId: "chosen",
+        workerId: "chosen",
         allowFallback: false,
         referenceAssets: references,
       };

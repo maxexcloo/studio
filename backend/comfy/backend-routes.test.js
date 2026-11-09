@@ -489,7 +489,7 @@ test(
       const submitted = primary.prompts.length;
       const accepted = await api("/api/generate", {
         ...generation(h3),
-        backendId: "video",
+        workerId: "video",
         allowFallback: false,
       });
       assert.equal(accepted.status, 200);

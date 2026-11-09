@@ -104,7 +104,7 @@ const contextKeys = [
   "resolutionTier",
   "denoise",
   "referenceRole",
-  "backendId",
+  "workerId",
   "allowFallback",
   "textEncoder",
   "vae",

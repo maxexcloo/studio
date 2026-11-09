@@ -70,12 +70,20 @@ export const noteWorkerProfiles = (id, profiles = []) => {
 
 /**
  * The worker for a job: `capability` it needs, the `profileId` it runs (a
- * worker that already has it wins) and capabilities it would rather have
- * (`prefers`, such as upscale for Smart upscale). Null when none can.
+ * worker that already has it wins), capabilities it would rather have
+ * (`prefers`, such as upscale for Smart upscale) and, for queued work, the
+ * queue's `loads` by resource with the job's `model` and whether it is
+ * background work (`last`); see pickWorker. Null when none can.
  */
-export function routeJob(capability, { profileId = "", prefers = [] } = {}) {
+export function routeJob(
+  capability,
+  { profileId = "", prefers = [], loads = new Map(), model = "", last = false } = {},
+) {
   return pickWorker(capability, {
     prefers,
+    load: (id) => loads.get(`worker:${id}`) || null,
+    model,
+    last,
     online: workerReachable,
     hasModel: (id) =>
       profileId && inventories.has(id) ? inventories.get(id).has(profileId) : null,

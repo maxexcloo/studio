@@ -180,7 +180,7 @@ export function GenerationForm({
           references: [],
           input: {
             ...(profile
-              ? inputForProfile({ ...initialInput, backendId: previous.input.backendId }, profile)
+              ? inputForProfile({ ...initialInput, workerId: previous.input.workerId }, profile)
               : { ...initialInput, kind: previous.input.kind }),
             seed: "",
           },

@@ -365,6 +365,27 @@ test("a waiting job moves to the idle worker with its model loaded, manual work 
   }
 });
 
+test("each resource's load counts running and queued work and the model it last ran", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string) =>
+      store.enqueue("alice", session.id, { profileId: "flux" }, "image", undefined, resource).id;
+    enqueue("worker:primary");
+    enqueue("worker:primary");
+    await queue.queue.tick();
+    assert.deepEqual(queue.queue.loads().get("worker:primary"), {
+      busy: true,
+      queued: 1,
+      model: "flux",
+    });
+    assert.equal(queue.queue.loads().get("worker:video"), undefined);
+  } finally {
+    store.close();
+  }
+});
+
 test("a started MCP set stays ahead of other MCP work but not manual work, across a restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");
