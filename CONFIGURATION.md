@@ -145,7 +145,7 @@ Every MCP action calls the route its UI action calls, with the caller's own cred
 | UI action                                                                       | MCP tool and action                                                        |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Composer generation, variations, sizes, LoRAs, references                       | `generate` (`models` to look up), `upload`, `upload_link`                  |
-| Recreate, Run Again (Same Seed), Animate, Extend, Use as Reference              | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
+| Edit › Run Again and Repeat Exactly, Animate, Extend, Use as Reference          | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
 | Upscale                                                                         | `reuse` `upscale`                                                          |
 | Compare models side by side                                                     | `generate` with several profiles (a comparison page)                       |
 | Gallery search, Starred, uploads                                                | `search`                                                                   |
@@ -293,9 +293,9 @@ returns to the list; started work finishes.
 prompt's first words stand in; items without prompts get no title.
 **Suggested Prompts** describe how to recreate uploads and other items without
 a prompt, using the image (a video's first frame) when the text model reads
-images, otherwise its caption. An item with neither waits. Recreate stages the
-suggested prompt; bulk Recreate queues the selected uploads that have one and
-reports those still waiting.
+images, otherwise its caption. An item with neither waits. Edit › Edit Prompt
+stages the suggested prompt; the selection's Edit › Run Suggested Prompts queues
+the selected uploads that have one and reports those still waiting.
 
 **Gallery Captions** let search match visible image content and tags alongside
 prompts. They need a running text model that reads images, with no cloud
@@ -375,7 +375,7 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block then hold
 
 Each backend's fields (`controls`, `mediaInputs`, `loraStack`, `defaults`, `capabilities`, `aspectRatios`, `imageModes`, `requiredNodes`, `description` and the rest) replace the shared ones of the same name, so the profile runs as the single-graph profile they make together. `backend` must name one of `backends`, which take `comfyui` and `radiance`; saving checks every backend's graph and connections.
 
-Readiness, worker routing, validation, the graph, timings and labels follow the backend a run uses. A backend that isn't ready shows the profile as Needs Setup with the reason; Studio never runs it on the other backend instead. Switching `backend` (the Backend select in Library › Profiles) is an ordinary versioned edit. Jobs and gallery records keep `profileBackend`: Exact Repeat, Recreate and MCP's Reuse run on the backend that ran while the profile still has it, otherwise on its current one, with a note.
+Readiness, worker routing, validation, the graph, timings and labels follow the backend a run uses. A backend that isn't ready shows the profile as Needs Setup with the reason; Studio never runs it on the other backend instead. Switching `backend` (the Backend select in Library › Profiles) is an ordinary versioned edit. Jobs and gallery records keep `profileBackend`: Repeat Exactly, Edit Prompt and MCP's Reuse run on the backend that ran while the profile still has it, otherwise on its current one, with a note.
 
 **Combine Backends** in Library › Profiles (or the `combine_backends` MCP tool)
 previews Radiance/ComfyUI pairs for an administrator to select, name and choose

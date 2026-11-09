@@ -55,7 +55,7 @@ export function dreamChoices(card: DeckCard): Choice[][] {
               id: "variations",
               label: "Variations",
               tip: "Like & Variations",
-              icon: icons.recreate,
+              icon: icons.variations,
               hint: "↑",
             },
             {

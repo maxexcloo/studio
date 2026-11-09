@@ -75,8 +75,8 @@ export const icons = {
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
-  /** Recreate: running an item again from its prompt and settings. */
-  recreate: WandSparkles,
+  /** Running an item again from its prompt with new seeds (Dream's Variations). */
+  variations: WandSparkles,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
   rename: TextCursorInput,
