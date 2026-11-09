@@ -28,8 +28,8 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its actions stand in one column beside the text, the send last. Continue in Chat (desktop; phones list it under
- * More) takes the item, and any change typed, to a new Chat.
+ * Its actions stand in one column beside the text, the send last. Continue in Chat (desktop; phones
+ * show it on the action bar) takes the item, and any change typed, to a new Chat.
  */
 export function ViewerPrompt({
   item,
@@ -167,7 +167,7 @@ export function ViewerPrompt({
       readOnly={change?.action === "upscale"}
       onChange={setPrompt}
       onKeyDown={keys}
-      // Phones list Continue in Chat under More.
+      // Phones show Continue in Chat on the action bar.
       rightSection={
         <ChangeActions row={phone} grid={grid}>
           {actions}
