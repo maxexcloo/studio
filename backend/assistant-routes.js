@@ -22,6 +22,7 @@ import {
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { loadSharp } from "./sharp-loader.js";
 
@@ -35,7 +36,7 @@ export const assistantSettingKeys = Object.freeze([assistantModelKey]);
 export const promptAssistantOff = "The prompt assistant is off for this account.";
 
 /** Whether an account (or single-user Studio, with no account) has a feature. */
-const allowed = (req, feature) => !req.studioAccount || mayUseFeature(req.studioAccount, feature);
+const allowed = (account, feature) => !account || mayUseFeature(account, feature);
 
 const disconnectSignal = (res) => {
   const controller = new AbortController();
@@ -188,40 +189,35 @@ export function registerAssistantRoutes(
     caption = () => "",
   } = {},
 ) {
-  const fail = (res, error) => {
+  const failure = (error) => {
     const status = error instanceof AssistantError ? error.status : Number(error?.status) || 400;
-    res.status(status >= 400 && status < 600 ? status : 502).json({
-      ok: false,
-      error:
-        error instanceof AssistantError && error.status >= 500
-          ? `The prompt assistant is unavailable (${error.reason}).`
-          : error.message,
-    });
+    return {
+      status: status >= 400 && status < 600 ? status : 502,
+      payload: {
+        ok: false,
+        error:
+          error instanceof AssistantError && error.status >= 500
+            ? `The prompt assistant is unavailable (${error.reason}).`
+            : error.message,
+      },
+    };
   };
-  /** The engine and the account's profile, or an answer explaining why not. */
-  const ready = async (req, res, { profileRequired = true } = {}) => {
-    res.setHeader("Cache-Control", "no-store");
-    if (!allowed(req, "promptAssistant")) {
-      res.status(403).json({ ok: false, error: promptAssistantOff });
-      return null;
-    }
-    if (!engine) {
-      res.status(503).json({ ok: false, error: "The prompt assistant is not configured." });
-      return null;
-    }
-    const id = String(req.body?.profileId || "");
-    if (!id && !profileRequired) return { profile: {}, guide: null };
-    const profile = (await profiles(req)).find((item) => item.id === id);
-    if (!profile) {
-      res.status(404).json({ ok: false, error: "Choose a model this account can use." });
-      return null;
-    }
+  const refuse = (status, error) => ({ refusal: { status, payload: { ok: false, error } } });
+  /** The engine and the account's profile, or `refusal`: the answer explaining why not. */
+  const ready = async (account, body) => {
+    if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff);
+    if (!engine) return refuse(503, "The prompt assistant is not configured.");
+    const id = String(body?.profileId || "");
+    const profile = (await profiles({ studioAccount: account })).find((item) => item.id === id);
+    if (!profile) return refuse(404, "Choose a model this account can use.");
     return { profile, guide: guide(profile) };
   };
-  const stackFrom = async (req, names) => {
-    if (!Array.isArray(names) || !names.length || !allowed(req, "loras"))
+  const stackFrom = async (account, names) => {
+    if (!Array.isArray(names) || !names.length || !allowed(account, "loras"))
       return { stack: [], infos: {} };
-    const known = new Map((await loras(req)).map((item) => [item.name, item.info || {}]));
+    const known = new Map(
+      (await loras({ studioAccount: account })).map((item) => [item.name, item.info || {}]),
+    );
     const stack = names
       .map((item) => String(typeof item === "string" ? item : item?.name || ""))
       .filter((name) => known.has(name))
@@ -229,14 +225,37 @@ export function registerAssistantRoutes(
       .map((name) => ({ name, triggers: known.get(name).triggers || [] }));
     return { stack, infos: Object.fromEntries(stack.map(({ name }) => [name, known.get(name)])) };
   };
+  /**
+   * An assistant route that writes with the account's profile: `write(account, body, context,
+   * stop)` runs once `ready` passes; `stop` ends the work when the caller goes away.
+   */
+  const writer = (path, write) =>
+    directRoute(app, "POST", path, async (account, { body, stop }) => {
+      const context = await ready(account, body);
+      // A caller that went away during the checks starts nothing; no one reads this answer.
+      if (stop?.aborted) return { status: 499, payload: {} };
+      if (context.refusal) return context.refusal;
+      try {
+        return await write(account, body, context, stop);
+      } catch (error) {
+        return failure(error);
+      }
+    });
+
+  // Assistant answers are never cached, and a caller that goes away ends the work it asked for.
+  app.use("/api/assistant", (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    req.stop = disconnectSignal(res);
+    next();
+  });
 
   app.get("/api/assistant", async (req, res) => {
-    res.setHeader("Cache-Control", "no-store");
+    const account = req.studioAccount;
     // Without the feature the app hides every assistant control, as without a gateway.
-    if (!engine || !allowed(req, "promptAssistant"))
+    if (!engine || !allowed(account, "promptAssistant"))
       return res.json({ ok: true, available: false, presets: [] });
     try {
-      const spicy = allowed(req, "uncensoredModels");
+      const spicy = allowed(account, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
       const noNegative = (await profiles(req))
         .filter((profile) => {
@@ -257,58 +276,69 @@ export function registerAssistantRoutes(
           .filter((preset) => !preset.spicy || spicy)
           .map(({ id, label, description }) => ({ id, label, description })),
         spicy,
-        loras: allowed(req, "loras"),
+        loras: allowed(account, "loras"),
         noNegative,
       });
     } catch (error) {
-      fail(res, error);
+      const { status, payload } = failure(error);
+      res.status(status).json(payload);
     }
   });
 
-  app.post("/api/assistant/rewrite", async (req, res) => {
-    const signal = disconnectSignal(res);
-    const context = await ready(req, res);
-    if (!context || signal.aborted) return;
-    const preset = String(req.body?.preset || defaultPreset);
-    if (preset === "spicy" && !allowed(req, "uncensoredModels"))
+  /** Rewrite's engine call, after its checks; `begin()` runs just before the model writes. */
+  const rewrite = async (account, body, context, { signal, begin, onDelta } = {}) => {
+    const references = await downscaleReferences(body?.references);
+    const { stack } = await stackFrom(account, body?.loras);
+    // Learning from stars: the account's starred prompts on this family, computed per request.
+    const examples = (await starred({ studioAccount: account }, context.profile)).examples || [];
+    begin?.();
+    return engine.rewrite({
+      profile: context.profile,
+      guide: context.guide,
+      prompt: body?.prompt,
+      preset: String(body?.preset || defaultPreset),
+      instruction: body?.instruction,
+      explicit: allowed(account, "uncensoredModels"),
+      references,
+      stack,
+      examples,
+      negative: context.profile.capabilities?.negativePrompt !== false,
+      signal,
+      onDelta,
+    });
+  };
+  const spicyRefused = (account, body) =>
+    String(body?.preset || defaultPreset) === "spicy" && !allowed(account, "uncensoredModels");
+  // A streamed rewrite (text/event-stream: delta, done, error) answers here; a JSON one below.
+  app.post("/api/assistant/rewrite", async (req, res, next) => {
+    if (req.body?.stream !== true && !/text\/event-stream/i.test(String(req.headers.accept || "")))
+      return next();
+    const signal = req.stop;
+    const account = req.studioAccount;
+    const context = await ready(account, req.body);
+    if (signal.aborted) return;
+    if (context.refusal) return res.status(context.refusal.status).json(context.refusal.payload);
+    if (spicyRefused(account, req.body))
       return res
         .status(403)
         .json({ ok: false, error: "Spicy needs Uncensored Models for this account." });
-    const streaming =
-      req.body?.stream === true || /text\/event-stream/i.test(String(req.headers.accept || ""));
+    const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     try {
-      const references = await downscaleReferences(req.body?.references);
-      const { stack } = await stackFrom(req, req.body?.loras);
-      // Learning from stars: the account's starred prompts on this family, computed per request.
-      const examples = (await starred(req, context.profile)).examples || [];
-      const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      if (streaming) {
-        res.writeHead(200, {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-store",
-          "X-Accel-Buffering": "no",
-          Connection: "keep-alive",
-        });
-        res.flushHeaders?.();
-      }
-      const result = await engine.rewrite({
-        profile: context.profile,
-        guide: context.guide,
-        prompt: req.body?.prompt,
-        preset,
-        instruction: req.body?.instruction,
-        explicit: allowed(req, "uncensoredModels"),
-        references,
-        stack,
-        examples,
-        negative: context.profile.capabilities?.negativePrompt !== false,
+      const result = await rewrite(account, req.body, context, {
         signal,
-        onDelta: streaming ? (text) => send("delta", { text }) : undefined,
+        begin: () => {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+            Connection: "keep-alive",
+          });
+          res.flushHeaders?.();
+        },
+        onDelta: (text) => send("delta", { text }),
       });
-      if (streaming) {
-        send("done", result);
-        res.end();
-      } else res.json({ ok: true, ...result });
+      send("done", result);
+      res.end();
     } catch (error) {
       if (signal.aborted) return res.end();
       if (res.headersSent) {
@@ -316,86 +346,83 @@ export function registerAssistantRoutes(
         res.end();
         return;
       }
-      fail(res, error);
+      const { status, payload } = failure(error);
+      res.status(status).json(payload);
     }
+  });
+  writer("/api/assistant/rewrite", async (account, body, context, signal) => {
+    if (spicyRefused(account, body))
+      return {
+        status: 403,
+        payload: { ok: false, error: "Spicy needs Uncensored Models for this account." },
+      };
+    return {
+      status: 200,
+      payload: { ok: true, ...(await rewrite(account, body, context, { signal })) },
+    };
   });
 
   // The queue's writing stage writes the same prompt (prompt-stage.js); this one returns it unqueued.
-  app.post("/api/assistant/animate", async (req, res) => {
-    const signal = disconnectSignal(res);
-    const context = await ready(req, res);
-    if (!context || signal.aborted) return;
-    const writing = animateRequest(req.body);
-    const issue = animateIssue(writing, { allowed: (feature) => allowed(req, feature) });
-    if (issue) return res.status(issue.status).json({ ok: false, error: issue.error });
-    try {
-      const assetId = String(req.body?.assetId || "");
-      res.json({
+  writer("/api/assistant/animate", async (account, body, context, signal) => {
+    const writing = animateRequest(body);
+    const issue = animateIssue(writing, { allowed: (feature) => allowed(account, feature) });
+    if (issue) return { status: issue.status, payload: { ok: false, error: issue.error } };
+    const assetId = String(body?.assetId || "");
+    return {
+      status: 200,
+      payload: {
         ok: true,
         ...(await writeAnimatePrompt({
           ...context,
           engine,
           writing,
-          clip: animateClip(req.body, context.profile),
-          explicit: allowed(req, "uncensoredModels"),
-          frame: () => frame(req, assetId),
-          caption: () => caption(req, assetId),
+          clip: animateClip(body, context.profile),
+          explicit: allowed(account, "uncensoredModels"),
+          frame: () => frame({ studioAccount: account }, assetId),
+          caption: () => caption({ studioAccount: account }, assetId),
           signal,
         })),
-      });
-    } catch (error) {
-      if (signal.aborted) return res.end();
-      fail(res, error);
-    }
+      },
+    };
   });
 
-  app.post("/api/assistant/negative", async (req, res) => {
-    const signal = disconnectSignal(res);
-    const context = await ready(req, res);
-    if (!context || signal.aborted) return;
-    try {
-      const { stack, infos } = await stackFrom(req, req.body?.loras);
-      const cfg = Number(req.body?.cfg);
-      res.json({
+  writer("/api/assistant/negative", async (account, body, context, signal) => {
+    const { stack, infos } = await stackFrom(account, body?.loras);
+    const cfg = Number(body?.cfg);
+    return {
+      status: 200,
+      payload: {
         ok: true,
         ...(await engine.negative({
           signal,
           profile: context.profile,
           guide: context.guide,
-          prompt: req.body?.prompt,
+          prompt: body?.prompt,
           cfg: Number.isFinite(cfg) ? cfg : undefined,
           stack,
           infos,
         })),
-      });
-    } catch (error) {
-      if (signal.aborted) return res.end();
-      fail(res, error);
-    }
+      },
+    };
   });
 
-  app.post("/api/assistant/loras", async (req, res) => {
-    const signal = disconnectSignal(res);
-    const context = await ready(req, res);
-    if (!context || signal.aborted) return;
-    if (!allowed(req, "loras"))
-      return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
-    try {
-      const favourite = await starred(req, context.profile);
-      res.json({
+  writer("/api/assistant/loras", async (account, body, context, signal) => {
+    if (!allowed(account, "loras"))
+      return { status: 403, payload: { ok: false, error: "LoRAs are off for this account." } };
+    const favourite = await starred({ studioAccount: account }, context.profile);
+    return {
+      status: 200,
+      payload: {
         ok: true,
         ...(await engine.matchLoras({
           signal,
           profile: context.profile,
-          prompt: req.body?.prompt,
-          loras: await loras(req),
+          prompt: body?.prompt,
+          loras: await loras({ studioAccount: account }),
           starred: favourite.loras || [],
         })),
-      });
-    } catch (error) {
-      if (signal.aborted) return res.end();
-      fail(res, error);
-    }
+      },
+    };
   });
 
   return engine;
