@@ -15,6 +15,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { LoadingState } from "./LoadingState";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 import { SectionHeading } from "./SectionHeading";
+import { usePhone } from "./usePhone";
 import classes from "./WorkspaceSections.module.css";
 
 /**
@@ -126,6 +127,7 @@ export function WorkspaceSections({
   sections: WorkspaceSection[];
   content: Record<string, ReactNode | ((heading: ReactNode) => ReactNode)>;
 }) {
+  const phone = usePhone();
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));
@@ -146,40 +148,40 @@ export function WorkspaceSections({
   return (
     // Fills the modal body, so a section's loading and empty states centre in what it leaves.
     <Grid gap="xl" classNames={{ root: classes.grid, inner: classes.inner }}>
-      <Grid.Col span={3} visibleFrom="sm">
-        <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
-          {groupSections(sections.filter((section) => !section.apart)).map(([group, items]) => (
-            <Stack
-              key={group || items[0].value}
-              gap={4}
-              role={group ? "group" : undefined}
-              aria-label={group || undefined}
-            >
-              {group && (
-                <Text size="xs" fw={600} c="dimmed" px="sm" pt="xs">
-                  {group}
-                </Text>
-              )}
-              {items.map(link)}
-            </Stack>
-          ))}
-          {apart.length > 0 && (
-            <>
-              <Divider my="xs" />
-              {apart.map(link)}
-            </>
-          )}
-        </Stack>
-      </Grid.Col>
-      <Grid.Col span={{ base: 12, sm: 9 }} className={classes.body}>
+      {!phone && (
+        <Grid.Col span={3}>
+          <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
+            {groupSections(sections.filter((section) => !section.apart)).map(([group, items]) => (
+              <Stack
+                key={group || items[0].value}
+                gap={4}
+                role={group ? "group" : undefined}
+                aria-label={group || undefined}
+              >
+                {group && (
+                  <Text size="xs" fw={600} c="dimmed" px="sm" pt="xs">
+                    {group}
+                  </Text>
+                )}
+                {items.map(link)}
+              </Stack>
+            ))}
+            {apart.length > 0 && (
+              <>
+                <Divider my="xs" />
+                {apart.map(link)}
+              </>
+            )}
+          </Stack>
+        </Grid.Col>
+      )}
+      <Grid.Col span={phone ? 12 : 9} className={classes.body}>
         {sections.map((section) => {
           const body = content[section.value];
           const heading = (
             <div>
               {/* Phones name the section in the header's Section Select already. */}
-              <Box visibleFrom="sm">
-                <SectionHeading>{section.label}</SectionHeading>
-              </Box>
+              {!phone && <SectionHeading>{section.label}</SectionHeading>}
               <Text size="sm" c="dimmed">
                 {section.description}
               </Text>

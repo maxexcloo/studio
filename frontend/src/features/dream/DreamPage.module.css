@@ -211,9 +211,7 @@
   top: var(--mantine-spacing-sm);
   right: var(--mantine-spacing-sm);
 }
-@media (max-width: 48em) {
-  .pair {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
-  }
+:where(:root[data-phone]) .pair {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
 }

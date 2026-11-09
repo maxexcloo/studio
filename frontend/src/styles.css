@@ -52,11 +52,10 @@ select {
 .mantine-Notifications-root[data-position="bottom-right"] {
   bottom: calc(10rem + env(safe-area-inset-bottom));
 }
-@media (max-width: 48em) {
-  :root {
-    --studio-composer-gap: 0.5rem;
-  }
+:root[data-phone] {
+  --studio-composer-gap: 0.5rem;
 }
+
 /* The phone Generate Drawer fills the screen, so notifications sit over its prompt text, below the
    header and the prompt's own actions, and never cover its Close button, chips or actions. */
 :root:has([data-generate-drawer]) .mantine-Notifications-root {

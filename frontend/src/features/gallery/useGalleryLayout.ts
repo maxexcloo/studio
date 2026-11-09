@@ -4,7 +4,7 @@ import { useMantineTheme } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useSideways } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import type { GallerySelection } from "./useGallerySelection";
 
@@ -42,21 +42,25 @@ function anchorAt(x: number, y: number, columns: number, scale: number): ZoomAnc
 }
 
 /**
- * Grid and Runs share one column count: two on phones, three or five wider, until zoomed. Each
- * account remembers its zoom, separately for phones and wider screens.
+ * Grid and Runs share one column count: two on phones, four on a phone held sideways, three or five
+ * wider, until zoomed. Each account remembers its zoom, separately for each of these.
  */
 export function useGalleryColumns() {
   const phone = usePhone();
+  const sideways = useSideways();
   const { breakpoints } = useMantineTheme();
   const compact = useMediaQuery(`(max-width: ${breakpoints.lg})`, false, {
     getInitialValueInEffect: false,
   });
   const [saved, setSaved] = useRemembered<number | null>(
-    phone ? "gallery-columns-phone" : "gallery-columns",
+    sideways ? "gallery-columns-sideways" : phone ? "gallery-columns-phone" : "gallery-columns",
     null,
   );
-  const [min, max] = phone ? [1, 4] : [2, 8];
-  const columns = Math.min(Math.max(saved ?? (phone ? 2 : compact ? 3 : 5), min), max);
+  const [min, max] = sideways ? [2, 6] : phone ? [1, 4] : [2, 8];
+  const columns = Math.min(
+    Math.max(saved ?? (sideways ? 4 : phone ? 2 : compact ? 3 : 5), min),
+    max,
+  );
   /**
    * Changes the columns. A pinch or wheel holds the tile under its `point` in place; the toolbar's
    * slider and buttons pass none and keep the scroll position, so the toolbar stays where it is.

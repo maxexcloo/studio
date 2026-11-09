@@ -32,9 +32,7 @@
   }
 }
 
-@media (max-width: 48em) {
-  .download,
-  .favorite:not([data-starred]) {
-    display: none;
-  }
+:where(:root[data-phone]) .download,
+:where(:root[data-phone]) .favorite:not([data-starred]) {
+  display: none;
 }
