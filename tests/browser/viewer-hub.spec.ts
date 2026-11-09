@@ -259,8 +259,8 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones show it on the
-  // bar.
+  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones list it under
+  // the bar's More.
   if (desktop) {
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
     await promptTool(viewer, "Prompt", "Continue in Chat");
@@ -1227,9 +1227,29 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
-  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  if (phone) {
+    // Phones keep the bar to one row, with the rest under More and Delete last.
+    const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
+    const row = ["Animate", "Edit", "Upscale", "Star", "More"].map((name) =>
+      bar.getByRole("button", { name, exact: true }),
+    );
+    const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
+    expect(new Set(tops).size).toBe(1);
+    await row[4].click();
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Continue in Chat",
+      "Copy",
+      "Download",
+      "Delete",
+    ]);
+  }
+  const download = (phone ? page : dialog).getByRole(phone ? "menuitem" : "link", {
+    name: "Download",
+    exact: true,
+  });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  if (phone) await page.keyboard.press("Escape");
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);

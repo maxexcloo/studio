@@ -7,7 +7,7 @@ import { failure } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, withMore } from "./ActionBar";
 import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { itemAction, itemActionGroups } from "./itemActions";
@@ -20,7 +20,7 @@ import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
-// Phones keep what acts on several items on the bar, in this order, and the rest under More.
+// Phones keep what acts on several items on the bar and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
@@ -216,18 +216,8 @@ export function GallerySelectionBar({
         selection.select((item) => ids.has(item.id));
       },
     }));
-  const primary = primaryIds.flatMap((id) => actions.flat().filter((action) => action.id === id));
-  const more = actions.map((group) => group.filter((action) => !primaryIds.includes(action.id)));
   const bar = phone ? (
-    <ActionBarGroups
-      groups={[
-        // More shows only while it has something to list.
-        more.some((group) => group.length)
-          ? [...primary, { id: "more", label: "More", icon: icons.more, menu: more }]
-          : primary,
-      ]}
-      menuPosition="top-end"
-    />
+    <ActionBarGroups groups={[withMore(actions, primaryIds).flat()]} menuPosition="top-end" />
   ) : (
     <ActionBarGroups groups={actions} menuPosition="bottom-end" />
   );
