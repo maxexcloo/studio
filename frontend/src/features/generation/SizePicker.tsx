@@ -10,7 +10,7 @@ import {
 } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { chipProps, fittedPopup } from "./chip";
 import { primaryReference } from "./payload";
 import {
@@ -34,6 +34,7 @@ export function SizePicker({
   onChange: (patch: Partial<GenerationInput>) => void;
 }) {
   const phone = usePhone();
+  const touch = useTouch();
   const presets = profile?.aspectPresets || [];
   const reference = primaryReference(input.referenceDetails || [], profile);
   const framed =
@@ -85,8 +86,8 @@ export function SizePicker({
           (event.target as HTMLElement).setAttribute("data-mantine-stop-propagation", "true");
         }}
       >
-        {/* Phones focus the popup itself, as ChipPopup does, so Width doesn't raise the keyboard. */}
-        {phone && <FocusTrap.InitialFocus />}
+        {/* Touch screens focus the popup itself, as ChipPopup does, so Width doesn't raise the keyboard. */}
+        {touch && <FocusTrap.InitialFocus />}
         {framed ? (
           <Stack gap="xs">
             <Text size="sm">The reference sets the output framing to {aspect}.</Text>
