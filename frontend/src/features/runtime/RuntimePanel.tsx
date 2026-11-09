@@ -12,9 +12,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useIsAdmin } from "../auth/AccountGate";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { profileName } from "../generation/payload";
-import { RuntimeWorkloads } from "./RuntimeWorkloads";
+import { AutomaticControl, RuntimeWorkloads } from "./RuntimeWorkloads";
 import { useWorkloadStart } from "./WorkloadStart";
 
 const services = [
@@ -70,15 +68,6 @@ function ParkedStart({ label, workloads }: { label: string; workloads: string[] 
     </Stack>
   );
 }
-/** The deployment's workers (backend/workers.js), which Studio lists but never edits. */
-export const workersQuery = queryOptions({
-  queryKey: ["workers"],
-  queryFn: () =>
-    api<{
-      source: "STUDIO_WORKERS" | "Kubernetes";
-      workers: { id: string; name: string; url: string; capabilities: string[] }[];
-    }>("/api/workers"),
-});
 const capabilityLabels: Record<string, string> = {
   image: "Images",
   models: "Model Library",
@@ -86,59 +75,62 @@ const capabilityLabels: Record<string, string> = {
   video: "Videos",
 };
 
-/** "Free in about 3 min" from a worker's `freeAt`. */
-const freeIn = (freeAt: number) => {
-  const minutes = Math.ceil((freeAt - Date.now()) / 60_000);
-  return minutes <= 1 ? "Free in under a minute" : `Free in about ${minutes} min`;
-};
+/** "11.2 GiB Free" from a worker's free memory in bytes. */
+const gibFree = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB Free`;
 
 /**
- * Each media worker with its health and work: what runs there, how much waits, the profile it last
- * ran, its free memory and when it should be free. Read-only: the deployment lists the workers, and
- * those in STUDIO_WORKERS show their address.
+ * Each media worker on one compact line: its health dot and name, then what it runs, its state,
+ * how much waits for it and its free memory. Its reason is the line's tooltip. Read-only: the
+ * deployment lists the workers.
  */
 function WorkerList({ workers }: { workers: WorkerStatus[] }) {
-  const list = useQuery(workersQuery).data;
-  const profiles = useQuery(modelsQuery).data?.profiles ?? [];
-  const listed = list?.source === "STUDIO_WORKERS";
-  const model = (id: string) => {
-    const profile = profiles.find((profile) => profile.id === id);
-    return profile ? profileName(profile) : id;
-  };
   return (
     <SettingGroup title="Workers">
-      <Text size="xs" c="dimmed">
-        {workers.length
-          ? `Listed by the deployment${listed ? " in STUDIO_WORKERS" : ""}. Studio doesn’t edit them.`
-          : "The deployment lists no workers, so Studio can’t generate."}
-      </Text>
-      {workers.map((worker) => {
-        const url = listed ? list.workers.find((item) => item.id === worker.id)?.url : undefined;
-        const work = [
-          healthLabel(worker.state),
-          worker.currentJob ? "Busy" : "Idle",
-          `${worker.queued} Queued`,
-          worker.loadedModel && `Last Ran ${model(worker.loadedModel)}`,
-          worker.memoryFree !== undefined &&
-            `${(worker.memoryFree / 1024 ** 3).toFixed(1)} GiB Free`,
-          worker.freeAt && freeIn(worker.freeAt),
-        ].filter(Boolean);
-        return (
-          <SettingRow
-            key={worker.id}
-            label={worker.label}
-            description={
-              <>
-                {[worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "), url]
-                  .filter(Boolean)
-                  .join(" · ")}
-                <br />
-                <span title={worker.reason}>{work.join(" · ")}</span>
-              </>
-            }
-          />
-        );
-      })}
+      {workers.length ? (
+        <Stack gap={0} component="ul" m={0} p={0} style={{ listStyle: "none" }}>
+          {workers.map((worker) => (
+            <Group
+              key={worker.id}
+              component="li"
+              gap="xs"
+              py={6}
+              wrap="nowrap"
+              align="baseline"
+              title={worker.reason}
+            >
+              <CircleDot
+                size={12}
+                color={`var(--mantine-color-${healthColour(worker.state)}-6)`}
+                style={{ flexShrink: 0, alignSelf: "center" }}
+              />
+              <Text size="sm">
+                <Text span fw={500}>
+                  {worker.label}
+                </Text>
+                <Text span c="dimmed">
+                  {[
+                    "",
+                    worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "),
+                    worker.state !== "healthy"
+                      ? healthLabel(worker.state)
+                      : worker.currentJob
+                        ? "Busy"
+                        : "Idle",
+                    `${worker.queued} Queued`,
+                    worker.memoryFree !== undefined && gibFree(worker.memoryFree),
+                  ]
+                    .filter((part) => part !== false)
+                    .join(" · ")}
+                </Text>
+              </Text>
+            </Group>
+          ))}
+        </Stack>
+      ) : (
+        <Text size="sm" c="dimmed">
+          The deployment lists no workers, so Studio can’t generate.
+        </Text>
+      )}
     </SettingGroup>
   );
 }
@@ -223,7 +215,10 @@ export function ServiceHealthSummary() {
     </Stack>
   );
 }
-/** Settings › Workers: one line of service health, then the GPU workloads Studio controls. */
+/**
+ * Settings › Workers: each worker's status first, then the GPU workloads Studio controls, then the
+ * rarely changed parts: service health in one line, and automatic control.
+ */
 export function RuntimePanel() {
   const status = useQuery(servicesStatusQuery);
   if (status.isPending) return <LoadingState label="Loading Workers" />;
@@ -239,19 +234,7 @@ export function RuntimePanel() {
   const shown = services.filter(({ kind }) => observed[kind]);
   return (
     <Stack gap="md" aria-label="Runtime">
-      <Text size="sm" component="section" aria-label="Services">
-        {/* A service's reason is its tooltip; the workloads table carries the detail. */}
-        {shown.length
-          ? shown.map(({ kind, label }, index) => (
-              <span key={kind}>
-                {index > 0 && " · "}
-                <span title={observed[kind]!.reason}>
-                  {`${label}: ${healthLabel(observed[kind]!.state)}`}
-                </span>
-              </span>
-            ))
-          : "No Services"}
-      </Text>
+      {status.data.workers && <WorkerList workers={status.data.workers} />}
       {runtime.configured ? (
         <RuntimeWorkloads reasons={reasons} />
       ) : (
@@ -259,7 +242,27 @@ export function RuntimePanel() {
           {runtime.reason}
         </Text>
       )}
-      {status.data.workers && <WorkerList workers={status.data.workers} />}
+      <SettingGroup title="Services & Control">
+        <SettingRow
+          label="Services"
+          description={
+            // A service's reason is its tooltip; the workloads table carries the detail.
+            <span role="status" aria-label="Services">
+              {shown.length
+                ? shown.map(({ kind, label }, index) => (
+                    <span key={kind}>
+                      {index > 0 && " · "}
+                      <span title={observed[kind]!.reason}>
+                        {`${label}: ${healthLabel(observed[kind]!.state)}`}
+                      </span>
+                    </span>
+                  ))
+                : "No Services"}
+            </span>
+          }
+        />
+        {runtime.configured && <AutomaticControl />}
+      </SettingGroup>
     </Stack>
   );
 }
