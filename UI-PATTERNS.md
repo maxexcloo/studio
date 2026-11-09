@@ -87,8 +87,11 @@ the primary component reference and verify APIs against the installed version.
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; compact choices may use a
-  fitted popover. Its heading holds the title, then its actions, such as
-  Clear, at the end (beside Close on phones). A side column, such as the LoRA
+  fitted popover. Its heading (`PopupHeading`) holds the title, then its
+  actions at the end (beside Close on phones, wrapping under the title when they
+  don't fit): every popup's or sheet's Clear
+  and Save, such as Save Stack or Save Preset, sit there, not in its footer, as
+  compact subtle buttons with Clear first. A side column, such as the LoRA
   stack, has its own heading with its actions; desktop shows it beside the
   content, divided to the top, and phones under it. The phone sheet's footer
   (other actions, then Apply where choices apply as made) stays pinned

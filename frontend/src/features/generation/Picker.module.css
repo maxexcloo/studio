@@ -3,7 +3,22 @@
    does, so the sheet itself never scrolls. A drag on the header is the sheet's own, to pull it
    closed. */
 .sheetHeader {
+  gap: var(--mantine-spacing-xs);
   touch-action: none;
+}
+
+.sheetHeading {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-width: 0;
+}
+
+/* A field in the heading, such as a name being saved, gives way before its buttons. */
+.sheetHeading button {
+  flex-shrink: 0;
 }
 
 .sheetBody {

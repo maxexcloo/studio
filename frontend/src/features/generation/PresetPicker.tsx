@@ -39,7 +39,7 @@ const json = (method: string, value: unknown) => ({ method, body: JSON.stringify
 /**
  * The Presets chip and its popup for any generation editor, built on the same picker as LoRA
  * stacks: search, sort, load (asking before replacing a written prompt), rename, update and
- * delete, with Save Preset and Clear Preset in the footer. `onLoad` replaces that editor's draft,
+ * delete, with Clear and Save Preset in its heading. `onLoad` replaces that editor's draft,
  * then the popup closes.
  */
 export function PresetPicker({
@@ -130,10 +130,20 @@ export function PresetPicker({
           <Bookmark size={16} />
         </Button>
       }
-      footer={{
-        start: (
+      headerEnd={
+        <>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label="Clear Preset"
+            disabled={!selection.presetId}
+            onClick={() => onSelectionChange({ presetId: undefined, presetTitle: undefined })}
+          >
+            Clear
+          </Button>
           <SaveCurrent
             noun="Preset"
+            compact
             disabled={!input.prompt.trim()}
             onSave={(title) =>
               change.mutate({
@@ -142,17 +152,8 @@ export function PresetPicker({
               })
             }
           />
-        ),
-        end: (
-          <Button
-            variant="default"
-            disabled={!selection.presetId}
-            onClick={() => onSelectionChange({ presetId: undefined, presetTitle: undefined })}
-          >
-            Clear Preset
-          </Button>
-        ),
-      }}
+        </>
+      }
     >
       <Stack gap="sm" flex={1} mih={0}>
         <PickerHeader
