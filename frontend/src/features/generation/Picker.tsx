@@ -160,7 +160,7 @@ export function ChipPopup({
       returnFocus
       shadow="md"
       withinPortal={withinPortal}
-      {...(phone && fittedPopup)}
+      {...fittedPopup}
     >
       <Tooltip label={title} disabled={!tooltip || opened}>
         <Popover.Target>{target}</Popover.Target>
