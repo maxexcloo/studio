@@ -169,7 +169,6 @@ export function useReferencePlacement(list: ReferenceList) {
     },
     // An upload is a gallery image or video, listed under the Uploads filter.
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["reference-gallery"] });
       await client.invalidateQueries({ queryKey: ["gallery"] });
     },
   });
