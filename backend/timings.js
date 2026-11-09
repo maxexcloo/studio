@@ -1,6 +1,5 @@
-import path from "node:path";
 import { dataDir } from "./gallery/store.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { addRun, estimateRun, isWarm, timingKey } from "./generation-timing.js";
 import { addUpscale, estimateUpscale } from "./upscale-timing.js";
 
@@ -8,19 +7,18 @@ import { addUpscale, estimateUpscale } from "./upscale-timing.js";
  * How long things take on this machine, kept only for Studio's own
  * estimates. Nothing here leaves the data folder.
  */
-const timingsPath = path.join(dataDir, "timings.json");
-
 let timings = null;
 
 function load() {
   if (timings) return timings;
   try {
-    const raw = readJsonFile(timingsPath);
+    const raw = readRuntimeDocument(dataDir, "timings");
     timings = {
       runs: Array.isArray(raw?.runs) ? raw.runs : [],
       upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
     };
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     timings = { runs: [], upscales: [] };
   }
   return timings;
@@ -28,7 +26,7 @@ function load() {
 
 function save(label) {
   try {
-    writeJsonFile(timingsPath, timings);
+    writeRuntimeDocument(dataDir, "timings", timings);
   } catch (error) {
     console.warn(`[Studio] Could not save ${label} timing: ${error.message}`);
   }

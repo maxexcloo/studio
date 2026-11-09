@@ -116,6 +116,7 @@ import { appVersion } from "./data-dir.js";
 import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
 import { flagEnabled } from "./deployment-settings.js";
 import { hfFetch } from "./hf-access.js";
+import { flushWorkflowPreferences } from "./workflow-catalogue.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -1097,5 +1098,7 @@ drainServer = async () => {
   });
   await Promise.all([generationQueue.stop(), closed]);
   await flushGalleryStrict();
+  flushWorkflowPreferences();
+  // The runtime database's one connection; nothing may write after this.
   store.close();
 };

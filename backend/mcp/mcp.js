@@ -272,9 +272,7 @@ export function registerMcpRoutes(
   // ... and the account's Prompt Assistant feature (the routes they call refuse without it too).
   const assistantFor = (account) =>
     assistantGateway && (!account || mayUseFeature(account, "promptAssistant"));
-  const chatAssistant = createChatAssistantMemory({
-    file: dataDir ? path.join(dataDir, "mcp-assistant.json") : "",
-  });
+  const chatAssistant = createChatAssistantMemory({ dataDir });
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
   app.use("/api/models", (req, _res, next) => {
     if (req.method !== "GET" ? true : req.path === "/" && req.query.cached !== "1")

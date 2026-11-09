@@ -8,29 +8,27 @@ import path from "node:path";
 import test from "node:test";
 import express from "express";
 import sharp from "sharp";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, ".env");
 process.env.STUDIO_ENABLE_PRESETS = "1";
 delete process.env.CIVITAI_API_TOKEN;
-fs.writeFileSync(
-  path.join(dir, "presets.json"),
-  JSON.stringify([
-    {
-      id: "43",
-      name: "Legacy Landscape",
-      previewUrl: "https://image.civitai.com/legacy.png",
-      sourceUrl: "https://civitai.com/images/43",
-      prompt: "an older saved landscape",
-      negative: "",
-      settings: { seed: "0" },
-      resources: [],
-      warnings: [],
-      savedAt: "2025-01-01T00:00:00Z",
-    },
-  ]),
-);
+writeRuntimeDocument(dir, "presets", [
+  {
+    id: "43",
+    name: "Legacy Landscape",
+    previewUrl: "https://image.civitai.com/legacy.png",
+    sourceUrl: "https://civitai.com/images/43",
+    prompt: "an older saved landscape",
+    negative: "",
+    settings: { seed: "0" },
+    resources: [],
+    warnings: [],
+    savedAt: "2025-01-01T00:00:00Z",
+  },
+]);
 const { registerPresetRoutes } = await import("./preset-routes.js");
 const { downloadPresetImage } = await import("./civitai/library.js");
 const bytes = Buffer.from("model");
@@ -248,7 +246,7 @@ test("saved recipes migrate into gallery images without a duplicate recipe store
   assert.equal(item.prompt, "an older saved landscape");
   assert.equal(item.settings.seed, "0");
   assert.ok(fs.existsSync(store.importedImageFile(item)));
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, "presets.json"), "utf8")), []);
+  assert.deepEqual(readRuntimeDocument(dir, "presets"), []);
   await api("/api/presets/43", null, "DELETE");
 });
 

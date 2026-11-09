@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
 import { createCatalogueStore } from "./catalogue.js";
 import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
 
@@ -76,7 +77,10 @@ test("a Hugging Face file with a new checksum on main is an update under its own
 
 function harness(t, { references = async () => [], repoint } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-updates-"));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.after(() => {
+    closeRuntimeDatabase(dir);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
   const catalogue = createCatalogueStore({
     dataDir: dir,
     familiesFromMetadata: ({ base_model: base }) => familiesOf(base),
@@ -137,7 +141,7 @@ test("Check Updates marks Update Available, and nothing downloads on its own", a
   assert.equal(summary.available, 1);
   assert.equal(summary.byEntry["checkpoints/nightfall-v1-fp8.safetensors"].state, "available");
   assert.equal(h.started.length, 0, "never downloads automatically");
-  assert.ok(fs.existsSync(path.join(h.dir, "library", "updates.json")));
+  assert.ok(readRuntimeDocument(h.dir, "library-updates"));
   await assert.rejects(
     h.checker.apply("checkpoints/nightfall-v1-fp8.safetensors"),
     /Downloads cost 800 Buzz/,
