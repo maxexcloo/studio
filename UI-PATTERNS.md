@@ -92,8 +92,8 @@ the primary component reference and verify APIs against the installed version.
   Prompts), in one column where the box is tall enough and 2×2 otherwise.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
-  the visual viewport through `useKeyboard`, centred dialogs included. Keep
-  unrelated layout stationary.
+  the visual viewport through `useKeyboard`, centred dialogs and the floating
+  composer included. Keep unrelated layout stationary.
 - Use semantic buttons and links with accessible names. Phone actions need
   visible names where their icons alone are ambiguous. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
