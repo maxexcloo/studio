@@ -136,11 +136,12 @@ the primary component reference and verify APIs against the installed version.
   shows what ran.
 - Preserve actual model/provider metadata. Worker defaults to Automatic; wait
   for an explicitly picked worker unless the user permits fallback. Animate displays its choice before queuing. Its
-  menus offer Local GPU or Cloud when the account has both (Cloud needs the
-  Cloud Models grant), then Fast or Quality when the chosen pool has two tiers.
-  Both are remembered; until Local GPU or Cloud is picked, Animate runs locally
-  and falls back to Cloud while local video is stopped, and an explicit pick
-  never falls back. Extend keeps its video's model unless Cloud is picked.
+  menus show one choice, Cloud | Fast | Quality, where the account prefers
+  videos to run: an account preference, not a menu setting, so Settings can
+  show it too. Cloud shows with the Cloud Models grant, Fast and Quality for
+  the local tiers a profile offers, and the choice only when there are two.
+  The preferred side falls back to the other, saying so; Extend keeps its
+  video's model unless Cloud is preferred.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.

@@ -58,17 +58,19 @@ Direct cloud work is independent of GPU admission. Studio records asynchronous v
 
 Cloud Models and uncensored access remain per-user permissions. Credentials never reach the browser or media-download URLs.
 
-**Animate** uses the account's default local first-frame video profile (otherwise
-the normal local first-frame choice) while the local video worker answers,
-otherwise a Grok video profile the account may use. It shows the choice before queuing; Chat and MCP replies name it too.
+**Animate** runs where the account prefers videos to run: Cloud (a Grok video
+profile, with Cloud Models), or the local Fast or Quality tier of its
+first-frame video profiles, preferring its default family. Unsaved, the
+preference is Fast where the account has local video, otherwise Cloud. When the
+preferred side can't run (the local video worker is stopped, or the account has
+no Grok profile), Animate runs on the other and says so. It shows the choice before queuing; Chat and MCP replies name it too.
 With neither available, nothing queues. An explicitly chosen profile always
 wins. Output follows the source image's proportions at the profile's default
 size, constrained to provider-supported aspects. Themes write a motion prompt
 from the visible image and its context; on a video they continue the action
-from its last frame. Choose Local GPU or Cloud when the account has both, then
-Fast or Quality when they offer different profiles there; MCP `reuse` takes
-`runs_on` the same way. A picked Local GPU or Cloud never falls back, and Extend
-keeps its video's model unless Cloud is picked.
+from its last frame, keeping the video's model unless videos run on Cloud.
+Animate's menus set the preference (the `videos` account preference). MCP
+`reuse` takes `runs_on` and `tier` instead, and a `runs_on` never falls back.
 Review Prompt First shows the model and lets you edit the written prompt before Run;
 Custom prompts and Animate in Composer remain available.
 

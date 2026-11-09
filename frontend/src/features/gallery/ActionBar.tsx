@@ -42,7 +42,7 @@ export interface Action {
    * first is its usual action, so a control with options has no click of its own.
    */
   menu?: ActionGroups;
-  /** A setting between a few values (Fast or Quality), a segmented control in menus. */
+  /** A setting between a few values (Cloud, Fast or Quality), a segmented control in menus. */
   choice?: {
     value: string;
     options: { value: string; label: string }[];
