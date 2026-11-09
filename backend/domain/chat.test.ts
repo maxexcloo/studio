@@ -3,7 +3,7 @@ import test from "node:test";
 import { openDatabase } from "../persistence/runtime.ts";
 import { Store } from "./store.ts";
 import { ChatStore } from "./chat-store.ts";
-import { ChatService } from "./chat.ts";
+import { ChatService, chatModelName } from "./chat.ts";
 import type { ChatEvent } from "../../shared/chat.ts";
 import type { QueueJob } from "../../shared/queue.ts";
 import fs from "node:fs";
@@ -624,15 +624,21 @@ test("the system context carries the owner's taste summary as data, and nothing 
   fixture.db.close();
 });
 
+test("readable names come from model IDs, in their group", () => {
+  assert.equal(chatModelName("local/auto"), "Local · Auto");
+  assert.equal(chatModelName("cloud/glm-flash-uncensored"), "Cloud · GLM Flash Uncensored");
+  assert.equal(chatModelName("local/text", "qwen3.6-27b"), "Local · Qwen3.6 27B");
+});
+
 test("a model without a name of its own is labelled with the model that last answered for it", async () => {
   const fixture = setup([
     frame({ model: "qwen3.6-27b", choices: [{ delta: { content: "Hi" } }] }),
     "data: [DONE]\n\n",
   ]);
-  assert.equal((await fixture.service.status("alice")).models[0].label, "selected-text");
+  assert.equal((await fixture.service.status("alice")).models[0].label, "Selected Text");
   await fixture.service.stream("alice", fixture.session.id, { content: "Hello" }, () => {});
   assert.deepEqual((await fixture.service.status("alice")).models, [
-    { id: "selected-text", label: "qwen3.6-27b" },
+    { id: "selected-text", label: "Qwen3.6 27B" },
   ]);
   fixture.db.close();
 });
