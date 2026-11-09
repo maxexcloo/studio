@@ -37,7 +37,7 @@ import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
-import { mediaDetail } from "./mediaLabels";
+import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
@@ -68,7 +68,6 @@ export function GalleryPage() {
   const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [pagingFailed, setPagingFailed] = useState(false);
-  useEffect(() => setPagingFailed(false), [search, kind, filters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
@@ -77,6 +76,23 @@ export function GalleryPage() {
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
+  // Find Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
+  // within the filters, until its chip is removed.
+  const similar = params.get("similar") || "";
+  const removeSimilar = useCallback(
+    () =>
+      setParams((next) => {
+        next.delete("similar");
+        return next;
+      }),
+    [setParams],
+  );
+  useEffect(() => setPagingFailed(false), [search, kind, filters, similar]);
+  useEffect(() => {
+    if (!similar) return;
+    setSelected(null);
+    window.scrollTo(0, 0);
+  }, [similar]);
   useEffect(() => {
     if (linkedQuery === null) return;
     setQuery(linkedQuery);
@@ -100,14 +116,18 @@ export function GalleryPage() {
       active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
     }),
   }).data;
-  const galleryKey = useMemo(() => ["gallery", search, kind, filters], [search, kind, filters]);
+  const galleryKey = useMemo(
+    () => ["gallery", search, kind, filters, similar],
+    [search, kind, filters, similar],
+  );
   const galleryPage = useCallback(
     (cursor: string) => {
       const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
+      if (similar) params.set("similar", similar);
       return api<Page>(`/api/gallery?${params}`);
     },
-    [search, kind, filters],
+    [search, kind, filters, similar],
   );
   const gallery = useInfiniteQuery({
     queryKey: galleryKey,
@@ -189,12 +209,16 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
-  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters]));
-  const hasFilters = JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped;
+  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters, similar]));
+  const hasFilters =
+    JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
     setAllVersions(true);
+    removeSimilar();
   };
+  // The image ranks first, being most like itself, unless the filters leave it out.
+  const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
@@ -238,7 +262,8 @@ export function GalleryPage() {
   }
   // New uploads show at once under the Uploads filter.
   const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
-  const View = view === "runs" ? RunsView : MediaGrid;
+  // A ranking has no runs to group: it shows as a grid.
+  const View = view === "runs" && !similar ? RunsView : MediaGrid;
   return (
     <Stack
       gap="sm"
@@ -283,11 +308,20 @@ export function GalleryPage() {
           value={filters}
           onChange={setFilters}
           count={gallery.data?.pages.at(-1)?.totalApprox}
-          extraChips={
-            grouped
+          extraChips={[
+            ...(similar
+              ? [
+                  {
+                    key: "similar",
+                    label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
+                    remove: removeSimilar,
+                  },
+                ]
+              : []),
+            ...(grouped
               ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
-              : []
-          }
+              : []),
+          ]}
           view={
             <SegmentedControl
               aria-label="Gallery View"
@@ -371,7 +405,13 @@ export function GalleryPage() {
             )
           }
         >
-          {search || hasFilters ? "No Matches" : kind === "video" ? "No Videos" : "No Images"}
+          {similar
+            ? "No Similar Images Yet"
+            : search || hasFilters
+              ? "No Matches"
+              : kind === "video"
+                ? "No Videos"
+                : "No Images"}
         </EmptyState>
       )}
       {gallery.hasNextPage && (

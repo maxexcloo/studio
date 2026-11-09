@@ -1237,6 +1237,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     expect(new Set(tops).size).toBe(1);
     await row[4].click();
     await expect(page.getByRole("menuitem")).toHaveText([
+      "Find Similar",
       "Continue in Chat",
       "Copy",
       "Download",

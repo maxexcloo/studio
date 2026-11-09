@@ -280,6 +280,7 @@ export function useMediaActions(
     onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
   });
   const chat = useChatAction(item, onApplied);
+  const navigate = useNavigate();
   const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
@@ -480,6 +481,14 @@ export function useMediaActions(
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
+    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
+    image &&
+      itemAction("similar", {
+        onClick: () => {
+          onApplied();
+          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+        },
+      }),
     upscale,
     // Its options sort alphabetically.
     itemAction("copy", {

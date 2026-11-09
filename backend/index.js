@@ -504,6 +504,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 registerGalleryReadRoutes(app, {
   store,
   near: (text) => imageSearch.near(text),
+  similar: (item) => imageSearch.similar(item),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));

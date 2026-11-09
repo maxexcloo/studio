@@ -23,6 +23,7 @@ import {
   RefreshCw,
   RotateCw,
   Rows2,
+  ScanSearch,
   ScrollText,
   Settings,
   Share,
@@ -84,6 +85,8 @@ export const icons = {
   retry: RotateCw,
   settings: Settings,
   share: Share,
+  /** Find Similar: the gallery ranked by likeness to an image. */
+  similar: ScanSearch,
   star: Star,
   stop: Square,
   /** Short changes offered for an image or draft. */
