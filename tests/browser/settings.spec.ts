@@ -53,19 +53,17 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
+  // Each worker's status comes first, one line each: what it runs, its state, what waits for it
+  // and its free memory.
+  const workers = page.getByRole("region", { name: "Workers", exact: true });
+  await expect(workers.getByRole("listitem")).toHaveText([
+    "Image Worker · Images, Upscale, Model Library · Busy · 2 Queued · 8.0 GiB Free",
+    /^Video Worker · Videos · Offline · 0 Queued/,
+  ]);
+  // Service health sits below, with the rarely changed controls.
+  await expect(page.getByRole("status", { name: "Services", exact: true })).toHaveText(
     "Text: Running · Images: Running · Videos: Offline",
   );
-  // Workers listed by the deployment show read-only with where they come from.
-  const workers = page.getByRole("region", { name: "Workers", exact: true });
-  await expect(workers).toContainText("Listed by the deployment in STUDIO_WORKERS");
-  await expect(workers).toContainText("Image Worker");
-  await expect(workers).toContainText("Images, Upscale, Model Library · http://comfyui-image:8188");
-  // Each worker's health and work: what runs, what waits, what it last ran and when it frees up.
-  await expect(workers).toContainText(
-    /Running · Busy · 2 Queued · Last Ran .+ · 8\.0 GiB Free · Free in about [45] min/,
-  );
-  await expect(workers).toContainText("Offline · Idle · 0 Queued");
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);
@@ -375,7 +373,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   ).toBeVisible();
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Services", exact: true })).toContainText(
+  await expect(page.getByRole("status", { name: "Services", exact: true })).toContainText(
     "Images: Running",
   );
   await section(page, "Settings", "About");
@@ -412,7 +410,7 @@ test("Status summarises service health and opens Workers over the current page",
   await expect(drawer).toBeHidden();
   const settings = page.getByRole("dialog", { name: /^Settings/ });
   // Observe-only Workers shows the service line and why nothing can be switched.
-  await expect(settings.getByRole("region", { name: "Services", exact: true })).toContainText(
+  await expect(settings.getByRole("status", { name: "Services", exact: true })).toContainText(
     "Videos: Offline",
   );
   await expect(settings.getByText(/runtime control is not configured/)).toBeVisible();
