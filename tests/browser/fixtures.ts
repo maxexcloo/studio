@@ -1132,13 +1132,15 @@ export async function serveDream(
     calibration?: any[];
     /** Why Dream can't run, which makes it unavailable. */
     reason?: string;
+    /** The taste profile `/api/taste` serves; `PUT` replaces its avoids. */
+    taste?: Record<string, unknown>;
   } = {},
 ) {
   const state = {
     settings: {
       enabled: options.enabled ?? true,
       paused: false,
-      buffer: 12,
+      buffer: 6,
       dailyImages: 40,
       dailyVideos: 4,
       videos: false,
@@ -1154,6 +1156,7 @@ export async function serveDream(
   const show = () => ({
     settings: state.settings,
     unseen: state.unseen,
+    today: { images: 12, videos: 1 },
     spicyAvailable: state.spicyAvailable,
     status: !state.settings.enabled
       ? "off"
@@ -1163,6 +1166,28 @@ export async function serveDream(
           ? "unavailable"
           : "waiting",
     reason: options.reason,
+  });
+  const taste = {
+    summary: "",
+    likes: [],
+    styles: [],
+    avoid: [],
+    addedAvoid: [],
+    note: "",
+    profiles: { image: [], video: [] },
+    loras: [],
+    updatedAt: "",
+    signals: 0,
+    writer: false,
+    ...options.taste,
+  };
+  await page.route(/\/api\/taste$/, (route) => {
+    const request = route.request();
+    if (request.method() === "PUT") {
+      state.requests.push({ method: "PUT", path: "/api/taste", body: request.postDataJSON() });
+      taste.addedAvoid = request.postDataJSON().avoid;
+    }
+    return route.fulfill({ json: taste });
   });
   await page.route(/\/api\/dream(?:\/.*)?$/, (route) => {
     const request = route.request();

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Text, Tooltip } from "@mantine/core";
 import { icons } from "../../ui/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
-import { dreamQuery, type Dream, type DreamSettings } from "./queries";
+import { dreamQuery, dreamWhen, type Dream, type DreamSettings } from "./queries";
 
 /** Saves part of the Dream settings and shows the result at once. */
 export function useDreamSettings() {
@@ -57,6 +57,9 @@ function SettingsForm({ dream }: { dream: Dream }) {
   );
   return (
     <Stack gap="xs">
+      <Text size="xs" c="dimmed">
+        {dreamWhen(dream)}
+      </Text>
       <div>
         {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
         {/* Spicy sits under the main switch; the rest run A–Z. */}

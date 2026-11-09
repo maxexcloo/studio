@@ -21,7 +21,7 @@ import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
-import { dreamQuery, type Dream } from "./queries";
+import { dreamQuery, dreamWhen, type Dream } from "./queries";
 import classes from "./DreamPage.module.css";
 
 /**
@@ -70,7 +70,11 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
         Dream Is Paused
       </EmptyState>
     );
-  return <EmptyState fill>Nothing New Yet</EmptyState>;
+  return (
+    <EmptyState fill action={<Text size="xs">{dreamWhen(dream)}</Text>}>
+      Nothing New Yet
+    </EmptyState>
+  );
 }
 
 /** Dream: the deck with its pause and settings, the discards or the taste profile. */

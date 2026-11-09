@@ -64,6 +64,11 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Dream keeps 6 ready and makes more when the queue is free · 12 of 40 today", {
+      exact: true,
+    }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
   const settings = page.getByRole("dialog", { name: "Dream Settings" });
@@ -71,6 +76,7 @@ test("Dream explains itself while off and saves its settings on the deck", async
   // The row's accessible name is on the visually hidden input, which the phone drawer scrolls.
   await videos.dispatchEvent("click");
   await expect(videos).toBeChecked();
+  await expect(settings).toContainText("12 of 40 today · 1 of 4 videos");
   const buffer = settings.getByRole("textbox", { name: "Unseen Buffer" });
   await buffer.fill("20");
   await buffer.press("Enter");
@@ -82,6 +88,46 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
+});
+
+test("The taste read-out fits the screen and adds what to avoid", async ({ page }) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    taste: {
+      likes: ["misty harbours", "foxes in snow", "lighthouses", "quiet streets", "old boats"],
+      styles: ["film grain", "muted colour", "long exposure"],
+      avoid: ["crowds"],
+      note: "Quiet coastal scenes in soft, misty light.",
+      profiles: {
+        image: [
+          { id: "image:test", score: 4 },
+          { id: "gone", score: -1 },
+        ],
+        video: [],
+      },
+      loras: [{ name: "detail.safetensors", strength: 0.8, score: 2 }],
+      signals: 40,
+    },
+  });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Taste", exact: true }).click();
+  const profile = page.getByRole("region", { name: "Taste Profile" });
+  await expect(profile.getByRole("list", { name: "Likes" })).toContainText("foxes in snow");
+  // Only liked models and LoRAs show, by their names.
+  await expect(profile.getByRole("list", { name: "Models" })).toHaveText(
+    /^Models\s*Image Quality$/,
+  );
+  await expect(profile.getByRole("list", { name: "LoRAs" })).toContainText("Detail Slider 0.8");
+  await profile.getByLabel("Always Avoid").fill("clowns");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => dream.requests.at(-1)?.body).toEqual({ avoid: ["clowns"] });
+  // Everything, Refresh and Clear included, fits without scrolling.
+  await expect(profile.getByRole("button", { name: "Clear", exact: true })).toBeInViewport({
+    ratio: 1,
+  });
+  expect(
+    await page.evaluate(() => document.scrollingElement!.scrollHeight <= window.innerHeight),
+  ).toBe(true);
 });
 
 test("Dream says why it can't run", async ({ page }) => {
