@@ -127,6 +127,10 @@ const loadKey = (job: OwnedJob) =>
       .sort(),
   ]);
 const reuseBypassLimit = 3;
+/** A local video job: on a worker, not a cloud provider. */
+const localVideo = (job: OwnedJob) =>
+  job.resource.startsWith("worker:") && job.input.kind === "video";
+const videoWaitReason = "Waiting for another video to finish.";
 
 /** Only this database's recorded IDs reach the provider adapter. Restart never resubmits accepted work. */
 export class GenerationQueue {
@@ -445,6 +449,10 @@ export class GenerationQueue {
             }
             // Paused while its eligibility was checked: the next tick marks it Paused.
             if (this.held()(job)) continue;
+            // One local video runs at a time across workers: two at once on one-GPU workers sharing a
+            // node run it out of system memory. A two-GPU worker holds the node alone, so it never
+            // meets this. Synchronous from here to "starting", so two workers' passes can't both start.
+            if (!reason && localVideo(job) && this.videoRunning(job.id)) reason = videoWaitReason;
             if (reason) {
               this.store.save({ ...job, status: "waiting", reason });
               continue;
@@ -494,6 +502,19 @@ export class GenerationQueue {
         }
       }),
     );
+  }
+
+  /** Whether another local video job has started and not yet finished and saved. */
+  private videoRunning(id: string) {
+    return this.store
+      .schedulable()
+      .some(
+        (job) =>
+          job.id !== id &&
+          !terminalStatuses.has(job.status) &&
+          this.acceptedIds.has(job.id) &&
+          localVideo(job),
+      );
   }
 
   /**
