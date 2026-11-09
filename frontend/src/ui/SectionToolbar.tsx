@@ -70,6 +70,7 @@ const link = (href?: string) => (href ? { component: "a" as const, href, downloa
  * icons with tooltips (phones, which show no tooltips, list them by name under More), then
  * `actions`, ending with the labelled create action. Escape closes search, keeping the query, or the
  * filters; `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
+ * `searchOpen` keeps the search field open at the start of the row instead.
  */
 export function SectionToolbar({
   label,
@@ -83,6 +84,7 @@ export function SectionToolbar({
   onClearFilters,
   more = [],
   actions,
+  searchOpen = false,
 }: {
   label: string;
   views?: { value: string; label: string }[];
@@ -95,6 +97,7 @@ export function SectionToolbar({
   onClearFilters?: () => void;
   more?: ToolbarMoreAction[];
   actions?: ReactNode;
+  searchOpen?: boolean;
 }) {
   const phone = usePhone();
   const [searching, setSearching] = useState(false);
@@ -141,8 +144,17 @@ export function SectionToolbar({
           className={classes.views}
         />
       )}
+      {onQueryChange && searchOpen && (
+        <SearchInput
+          aria-label={`Search ${label}`}
+          value={query}
+          onChange={(event) => onQueryChange(event.currentTarget.value)}
+          onClear={() => onQueryChange("")}
+          flex={1}
+        />
+      )}
       <Group gap={4} ml="auto" wrap="nowrap">
-        {onQueryChange && (
+        {onQueryChange && !searchOpen && (
           <Tooltip label={`Search ${label}`}>
             <ActionIcon
               ref={trigger}
@@ -205,7 +217,9 @@ export function SectionToolbar({
             </Popover.Dropdown>
           </Popover>
         )}
-        {(onQueryChange || filters) && (more.length > 0 || actions) && <ToolbarDivider />}
+        {((onQueryChange && !searchOpen) || filters) && (more.length > 0 || actions) && (
+          <ToolbarDivider />
+        )}
         {more.length > 0 &&
           (phone ? (
             <Menu position="bottom-end">

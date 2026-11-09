@@ -8,8 +8,16 @@ import {
   selectionAction,
   serveProfiles,
   stamp,
+  touch,
   viewerAction,
 } from "./fixtures";
+/** Opens the tile's menu by context click, which every breakpoint has (phones may hide More). */
+async function tileMenu(page: Page) {
+  await page
+    .getByRole("button", { name: "Open image: A copper bird", exact: true })
+    .click({ button: "right" });
+}
+
 async function galleryFixture(page: Page) {
   const state = await fixtures(page);
   const input = {
@@ -89,11 +97,10 @@ test("A tile can be starred and read back without opening the viewer", async ({
 
 test("The same tile menu opens by context click and More, with keyboard navigation", async ({
   page,
-}) => {
+}, testInfo) => {
+  test.skip(!!testInfo.project.use.isMobile, "Phones without captions hide More (tested below)");
   await galleryFixture(page);
-  await page
-    .getByRole("button", { name: "Open image: A copper bird", exact: true })
-    .click({ button: "right" });
+  await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
   // The viewer's sections and order, plus Compare: Animate, Edit, Recreate, Upscale | Compare,
@@ -127,12 +134,37 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(more).toBeFocused();
 });
 
+test("Phones without captions hide More and open the tile menu by holding or the Menu key", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phones only");
+  await galleryFixture(page);
+  const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
+  await expect(
+    page.getByRole("button", { name: "More Actions for A copper bird", exact: true }),
+  ).toBeHidden();
+  const menu = page.getByRole("menu");
+  await touch(tile, "touchstart");
+  await expect(menu).toBeVisible();
+  // The release neither closes the menu nor opens the viewer.
+  await touch(tile, "touchend");
+  await tile.dispatchEvent("click");
+  await expect(menu).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+  await expect(page.getByRole("group", { name: "Gallery Selection", exact: true })).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await tile.focus();
+  await tile.press("Shift+F10");
+  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toBeVisible();
+});
+
 for (const operation of ["Edit", "Animate"] as const) {
   test(`Tile ${operation} stages its owned result as a reference without submitting`, async ({
     page,
   }) => {
     const state = await galleryFixture(page);
-    await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+    await tileMenu(page);
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
     if (operation === "Animate")
       await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
@@ -171,7 +203,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
     ...profiles.slice(1),
   ]);
   await page.reload();
-  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
@@ -202,7 +234,7 @@ test("A reference placed by hand applies the profile's reference-mode settings",
     ...profiles.slice(1),
   ]);
   await page.reload();
-  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  await tileMenu(page);
   await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
@@ -241,7 +273,7 @@ test("A failed tile retries its owned durable job and refreshes the gallery", as
   });
   try {
     await page.reload();
-    await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+    await tileMenu(page);
     const retry = page.getByRole("menuitem", { name: "Retry", exact: true });
     await retry.click();
     await expect(retry).toBeDisabled();
@@ -285,9 +317,7 @@ for (const surface of ["tile", "viewer"]) {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
       await viewerAction(page, "Recreate");
     } else {
-      await page
-        .getByRole("button", { name: "More Actions for A copper bird", exact: true })
-        .click();
+      await tileMenu(page);
       await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
     }
     await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();

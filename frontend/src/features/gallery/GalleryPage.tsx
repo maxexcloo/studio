@@ -200,7 +200,24 @@ export function GalleryPage() {
     setFocusItem(null);
     setSelected(item);
   }, []);
-  const detail = useCallback((item: MediaItem) => mediaDetail(item, profiles), [profiles]);
+  // Phones leave out the time, keeping a pinned caption to two lines.
+  const detail = useCallback(
+    (item: MediaItem) => mediaDetail(item, profiles, !phone),
+    [profiles, phone],
+  );
+  // Phones without captions hold a tile for its menu instead of showing More.
+  const hideMore = phone && !captions;
+  const renderTileActions = useCallback(
+    (item: MediaItem, opened: boolean, onOpenedChange: (opened: boolean) => void) => (
+      <MediaTileActions
+        item={item}
+        opened={opened}
+        onOpenedChange={onOpenedChange}
+        hideMore={hideMore}
+      />
+    ),
+    [hideMore],
+  );
   const chatTitle = useCallback(
     (id: string) => facets.data?.chats.find((chat) => chat.value === id)?.label,
     [facets.data],
@@ -399,14 +416,6 @@ export function GalleryPage() {
       )}
     </Stack>
   );
-}
-
-function renderTileActions(
-  item: MediaItem,
-  opened: boolean,
-  onOpenedChange: (opened: boolean) => void,
-) {
-  return <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />;
 }
 
 function ViewLabel({ icon, text }: { icon: React.ReactNode; text: string }) {

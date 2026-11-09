@@ -170,7 +170,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   ).toBeVisible();
   await closeLoras(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await page.getByRole("option", { name: "Other Quality", exact: true }).click();
+  await page.getByRole("option", { name: /^Other Quality\b/ }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();

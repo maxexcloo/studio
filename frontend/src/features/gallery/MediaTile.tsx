@@ -351,7 +351,8 @@ export function MediaTile({
         {item.status === "done"
           ? caption !== "none" && (
               <div className={classes.caption} data-pinned={caption === "pinned" || undefined}>
-                <Text size="sm" fw={500} lineClamp={2}>
+                {/* A pinned (phone) caption keeps to two lines in all. */}
+                <Text size="sm" fw={500} lineClamp={caption === "pinned" && detail ? 1 : 2}>
                   {title}
                 </Text>
                 {detail && (

@@ -202,17 +202,22 @@ export function ChatMenu({
   session,
   onRename,
   className,
+  opened,
+  onChange,
 }: {
   session: Session;
   onRename: () => void;
   className?: string;
+  /** Controlled by a list row, which also opens it by holding, right-clicking or the Menu key. */
+  opened?: boolean;
+  onChange?: (opened: boolean) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
   const archive = useArchiveChats();
   const title = chatTitle(session);
   return (
     <>
-      <Menu position="bottom-end" width={menuWidth}>
+      <Menu position="bottom-end" width={menuWidth} opened={opened} onChange={onChange}>
         <Menu.Target>
           <ActionIcon
             className={className}

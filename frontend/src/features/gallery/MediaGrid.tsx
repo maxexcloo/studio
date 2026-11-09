@@ -71,7 +71,8 @@ export function MediaGrid({
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
-  const hold = useHoldToSelect(items, selection);
+  // Without captions, phone tiles hide their menu button and open the menu by holding.
+  const hold = useHoldToSelect(items, selection, caption === "none" ? setMenuItem : undefined);
   const dimensions = useMemo(
     () => items.map((item) => `${item.id}:${item.width}:${item.height}`).join("|"),
     [items],

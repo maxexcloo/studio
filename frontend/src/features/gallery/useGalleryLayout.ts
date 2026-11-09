@@ -177,18 +177,31 @@ export function useGalleryLayout() {
   return { phone, columns, host, width, cell, gap, anchor };
 }
 
+/** No click or mouse events follow a hold, so a menu it opened doesn't take them as outside presses. */
+export const endHold = (event: React.MouseEvent | React.TouchEvent) => event.preventDefault();
+
 /**
  * Phone hold-to-select over any tile with `data-media-id`, using Mantine's touch gesture with
- * movement cancellation. `held` marks the tile whose release must not also open it. The result
- * stays the same object while `items` and `selection` do, so memoised tiles skip scroll renders.
+ * movement cancellation. With `onMenu` (tiles without a menu button), holding a single tile outside
+ * a selection opens its menu instead. `held` marks the tile whose release must not also open it.
+ * The result stays the same object while its arguments do, so memoised tiles skip scroll renders.
  */
-export function useHoldToSelect(items: MediaItem[], selection: GallerySelection | undefined) {
+export function useHoldToSelect(
+  items: MediaItem[],
+  selection: GallerySelection | undefined,
+  onMenu?: (id: string) => void,
+) {
   const phone = usePhone();
   const held = useRef<string | null>(null);
   const select = useCallback(
     (event: React.MouseEvent | React.TouchEvent) => {
       if (!phone || !selection) return;
       const element = (event.target as Element).closest<HTMLElement>("[data-media-id]");
+      if (onMenu && element && !selection.selecting && !element.dataset.mediaGroup) {
+        held.current = element.dataset.mediaId!;
+        onMenu(held.current);
+        return;
+      }
       const ids = element?.dataset.mediaGroup?.split(" ") || [element?.dataset.mediaId];
       const group = items.filter((item) => ids.includes(item.id));
       if (!group.length) return;
@@ -196,12 +209,17 @@ export function useHoldToSelect(items: MediaItem[], selection: GallerySelection 
       if (!selection.selecting) selection.start();
       selection.toggle(group);
     },
-    [phone, selection, items],
+    [phone, selection, items, onMenu],
   );
   const onStart = useCallback(() => {
     held.current = null;
   }, []);
-  const handlers = useLongPress(select, { events: ["touch"], cancelOnMove: true, onStart });
+  const handlers = useLongPress(select, {
+    events: ["touch"],
+    cancelOnMove: true,
+    onStart,
+    onFinish: endHold,
+  });
   return useMemo(
     () => ({
       handlers,

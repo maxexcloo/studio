@@ -8,6 +8,7 @@ import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvide
 import type { GenerationInput, Models, Profile } from "../../types";
 import { backendLabel, isProfile, profileName } from "./payload";
 import { modelFamilyLabel } from "../../ui/modelFamily";
+import { isCloudProfile } from "../../../../shared/profiles";
 import { ChipOption, ChipSelect } from "./ChipSelect";
 
 /**
@@ -27,6 +28,14 @@ function profileReadiness(profile: Profile, workers: Models["workers"]) {
       }
     : { label: "Offline", color: "red" };
 }
+
+/** A profile's short facts for its option: model (else family), kind and where it runs. */
+const profileFacts = (profile: Profile) =>
+  [
+    profile.recipe?.modelLabel || modelFamilyLabel(profile.family, profile.familyName),
+    profile.kind === "video" ? "Video" : "Image",
+    isCloudProfile(profile) ? "Cloud" : "Local GPU",
+  ].join(" · ");
 
 /** A shared name gains the part of the profile ID that differs, such as "· fp8" or "· comfyui". */
 function profileLabel(profile: Profile, profiles: Profile[]) {
@@ -102,7 +111,7 @@ export function ProfilePicker({
           return (
             <ChipOption
               label={option.label}
-              description={profile?.description}
+              description={profile && profileFacts(profile)}
               checked={checked}
               badges={
                 <>

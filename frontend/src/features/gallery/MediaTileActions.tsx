@@ -20,12 +20,15 @@ export function MediaTileActions({
   onOpenedChange,
   sessionId,
   omit,
+  hideMore,
 }: {
   item: MediaItem;
   opened: boolean;
   onOpenedChange: (value: boolean) => void;
   sessionId?: string;
   omit?: string[];
+  /** Hides More for a tile whose menu opens by holding; the hidden button still anchors it. */
+  hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
@@ -76,6 +79,7 @@ export function MediaTileActions({
           <Menu.Target>
             <ActionIcon
               className={`${classes.control} ${classes.more}`}
+              data-hidden={hideMore || undefined}
               aria-label={`More Actions for ${name}`}
               variant="default"
             >
