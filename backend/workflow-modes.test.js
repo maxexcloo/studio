@@ -290,3 +290,69 @@ test("a profile without a CFG control (distilled) takes no CFG and records none"
   const generated = await customWorkflowGraph(body);
   assert.equal(generated[2].inputs.cfg, undefined);
 });
+
+test("a MOSS-Image edit drops the references it was not given from both encoders", async () => {
+  const slots = [10, 11, 12, 13];
+  const images = () =>
+    Object.fromEntries(slots.map((id, index) => [`images.image_${index}`, [String(id + 10), 0]]));
+  const encode = (prompt) => ({
+    class_type: "TextEncodeMOSSImageEdit",
+    inputs: { prompt, edit_format: "Moss-Image-Edit", vae: ["2", 0], ...images() },
+  });
+  const edit = {
+    1: { class_type: "LoraLoaderModelOnly", inputs: { lora_name: "moss_image_edit.safetensors" } },
+    2: { class_type: "VAELoader", inputs: {} },
+    ...Object.fromEntries(
+      slots.flatMap((id) => [
+        [id, { class_type: "LoadImage", inputs: { image: "example.png" } }],
+        [id + 10, { class_type: "ImageScaleToTotalPixels", inputs: { image: [String(id), 0] } }],
+      ]),
+    ),
+    30: encode(""),
+    31: encode("worst quality"),
+    40: {
+      class_type: "KSampler",
+      inputs: { seed: 1, model: ["1", 0], positive: ["30", 0], negative: ["31", 0] },
+    },
+    41: { class_type: "SaveImage", inputs: { images: ["40", 0], filename_prefix: "moss" } },
+  };
+  const controls = { prompt: { node: "30", input: "prompt" }, seed: { node: "40", input: "seed" } };
+  saveImportedWorkflow({
+    graph: generate,
+    studio: {
+      id: "moss-edit",
+      family: "moss_image",
+      controls: { prompt: { node: "1", input: "text" }, seed: { node: "2", input: "seed" } },
+      mediaInputs: slots.map((id, index) => ({
+        id: index ? `reference-${index + 1}` : "reference",
+        kind: "image",
+        required: !index,
+        control: { node: String(id), input: "image" },
+      })),
+      imageModes: { reference: { graph: edit, controls } },
+    },
+  });
+  const mossInfo = { ...info };
+  for (const node of Object.values(edit)) mossInfo[node.class_type] ||= list();
+  const body = sanitizeGenerateBody(
+    {
+      kind: "image",
+      workflow: "custom:moss-edit",
+      model: "custom:moss-edit",
+      prompt: "Change only the coat to black wool.",
+      referenceAssets: [{ slot: "reference", assetId: "image" }],
+    },
+    mossInfo,
+  );
+  body.referenceAssets[0].comfyName = "staged.png";
+  const graph = await customWorkflowGraph(body);
+  validateGraph(graph);
+  assert.equal(graph[10].inputs.image, "staged.png");
+  assert.match(graph[30].inputs.prompt, /Change only the coat/);
+  for (const id of [11, 12, 13, 21, 22, 23]) assert.equal(graph[id], undefined);
+  for (const id of [30, 31])
+    assert.deepEqual(
+      Object.keys(graph[id].inputs).filter((name) => name.startsWith("images.")),
+      ["images.image_0"],
+    );
+});
