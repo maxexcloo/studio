@@ -56,7 +56,7 @@ export function registerResultTools({ tool, server, media, actor, resolve }) {
     server,
     "result",
     "show result",
-    'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for all). A running job returns its link: share it and stop; never poll, repeat or background this.',
+    'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for this chat\u2019s). A running job returns its link: share it and stop; never poll, repeat or background this.',
     {
       job_id: z.string().min(1).max(200),
       wait_seconds: wait,
@@ -71,7 +71,7 @@ export function registerResultTools({ tool, server, media, actor, resolve }) {
     server,
     "search",
     "search gallery",
-    "Find the user's earlier work by its words or look, with refs for reuse, review and result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words or look, with refs for reuse, review and result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
