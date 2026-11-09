@@ -241,8 +241,8 @@ starred prompts while Studio is idle, using only ready local profiles the
 account may use. Its settings control the unseen buffer, daily image and video
 caps, videos and Spicy (which also needs Uncensored Models). Each account has
 at most one Dream job at a time, shown in its queue with a Dream badge. It waits
-at the lowest queue tier but one (only finishing upscales sit lower), below
-every account's own and MCP work, and runs once that work is done; Dream starts
+at the lowest queue tier, below every account's own and MCP work and finishing
+upscales, and runs once that work is done; Dream starts
 a new one only while Studio is idle. A waiting Dream job doesn't hold up
 idle-time work such as captions and Finish Starred Images. Pausing Dream cancels its waiting job; queue Stop All
 and Cancel Pending leave Dream alone. Offline or parked text/media workers make
@@ -271,8 +271,8 @@ worker rather than the cloud. Choose Fast, Balanced or High quality and Face
 Detail; automatic sizing applies. Face Detail requires a full-body person and
 the worker's detector and Impact Pack support. Missing worker, nodes or models
 leave the list waiting. Unstar removes work that has not started; disabling
-clears the list. Waiting work yields to other work and returns to the list;
-started work finishes.
+clears the list. Waiting work ranks above Dream but yields to other new work and
+returns to the list; started work finishes.
 
 **Gallery Titles** summarise finished media's prompts. Until titled, the
 prompt's first words stand in; items without prompts get no title.
@@ -303,7 +303,7 @@ Image Search is disabled in demo mode.
 
 MCP's `search` tool (Studio Chat's too) runs this gallery search, with its kind and Starred filters, over the account's own finished results, newest first. Each match gets a result ref in the conversation, so `reuse`, `review` and `result` take it; a job another MCP identity holds is left out. With `uploads: true` it searches the account's uploads instead (by file name, caption or suggested prompt) and returns each as a `reference_asset_id` that Generate takes; a reference another MCP identity uploaded is left out.
 
-A chat host such as LibreChat cannot pass an attached file to a tool, so MCP's `upload_link` tool returns a one-time page at `/mcp/results/upload/…` under `STUDIO_MCP_PUBLIC_URL`, sealed like a result link and needing no sign-in. It takes one PNG, JPEG or WebP image (or a HEIC photo sharp can read, saved as JPEG) of up to 20 MB as the caller's upload within 15 minutes, then closes; open links live in memory, so a restart ends them. The chat then finds the image with Search `uploads: true`.
+A chat host such as LibreChat cannot pass an attached file to a tool, so MCP's `upload_link` tool returns a one-time page at `/mcp/results/upload/…` under `STUDIO_MCP_PUBLIC_URL`, sealed like a result link and needing no sign-in. It takes one PNG, JPEG or WebP image (or a HEIC photo sharp can read, saved as JPEG) of up to 20 MB as the caller's upload within 15 minutes, then closes; open links live in memory, so a restart ends them. The tool also returns the `reference_asset_id` the image becomes, so the chat passes it straight to Generate once the user has uploaded it; until then Generate refuses it with that advice.
 
 **Suggestions** offers prompt ideas, next steps and taste context. Next steps
 are written ahead while idle and can be refreshed in the viewer. Explicit

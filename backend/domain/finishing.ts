@@ -46,8 +46,8 @@ const finishingJob = (job: OwnedJob) => job.priority === queuePriority.finishing
 /**
  * Finish Starred Images: an image an account stars is queued for smart upscale while Studio is idle,
  * by the captioner's rule (no live job, Dream's included, and no text work). One runs at a time,
- * at the lowest queue tier, on the upscale worker only; a waiting one is cancelled and requeued the
- * moment other work arrives, and a started one finishes. Settings and the waiting list live per
+ * at the tier above Dream's, on the upscale worker only; a waiting one is cancelled and requeued the
+ * moment higher-tier work arrives, and a started one finishes. Settings and the waiting list live per
  * account in the runtime document store as `finishing:<ownerId>`.
  */
 export function createFinishing(options: {
@@ -180,9 +180,9 @@ export function createFinishing(options: {
     allowed: (ownerId: string) => options.allowed(ownerId),
     /** How many starred images wait to be finished. */
     waiting: (ownerId: string) => pending(ownerId).length,
-    /** Hears every admitted job: other work makes a waiting finishing upscale step aside at once. */
+    /** Hears every admitted job: higher-tier work makes a waiting finishing upscale step aside at once. */
     admitted(job: OwnedJob) {
-      if (!finishingJob(job)) void stopWaiting();
+      if ((job.priority ?? queuePriority.manual) < queuePriority.finishing) void stopWaiting();
     },
     /** Turning it off forgets the waiting list and cancels a finishing upscale that has not started. */
     async save(ownerId: string, patch: Partial<FinishingSettings>) {
