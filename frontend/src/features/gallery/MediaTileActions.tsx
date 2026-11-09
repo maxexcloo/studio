@@ -10,7 +10,6 @@ import type { AnimateTheme } from "./useMediaAction";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
-import { UpscaleDialog } from "./UpscaleControls";
 import { TrimVideoDialog } from "./videoEdits";
 import classes from "./MediaTileActions.module.css";
 
@@ -32,7 +31,6 @@ export function MediaTileActions({
   hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
-  const [upscaling, setUpscaling] = useState(false);
   const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const [trimming, setTrimming] = useState(false);
   const favorite = useMediaFavorite(item);
@@ -98,7 +96,6 @@ export function MediaTileActions({
                 onAnimate={setAnimating}
                 onDelete={() => setDeleting(true)}
                 onTrim={() => setTrimming(true)}
-                onUpscale={() => setUpscaling(true)}
               />
             )}
           </Menu.Dropdown>
@@ -117,9 +114,6 @@ export function MediaTileActions({
           theme={animating}
           onClose={() => setAnimating(null)}
         />
-      )}
-      {item.status === "done" && (
-        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>
