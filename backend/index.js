@@ -16,7 +16,8 @@ import {
 import { createGenerationSubmission } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
-import { createDream, registerDreamRoutes } from "./domain/dream.ts";
+import { createDream } from "./domain/dream.ts";
+import { registerDreamRoutes } from "./domain/dream-routes.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { fullBodyPerson } from "./mcp/prompt-checks.js";
 import {

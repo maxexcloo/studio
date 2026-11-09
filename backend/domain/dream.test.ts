@@ -10,13 +10,13 @@ import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import {
   createDream,
-  registerDreamRoutes,
   type DreamAccess,
   type DreamInspiration,
   type DreamItem,
   type DreamLoraLibrary,
   type DreamProfile,
 } from "./dream.ts";
+import { registerDreamRoutes } from "./dream-routes.ts";
 import { writtenJob, type GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
 import { queuePriority, Store } from "./store.ts";
