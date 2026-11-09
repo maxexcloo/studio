@@ -346,8 +346,8 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
 /**
  * Dream: while nothing else runs, Studio makes images (and, if asked, videos) for each account that
  * turned it on, from its taste profile and starred prompts, exploring new models, LoRAs and
- * imports by `shares`. One Dream job runs at a time across Studio, at the lowest queue tier, and a
- * waiting one is cancelled the moment other work arrives.
+ * imports by `shares`. Each account has at most one Dream job at a time, queued below every
+ * account's own work, where it waits until that work is done.
  * Results stay in Dream's pool, out of every gallery listing, until the person keeps them.
  * Settings live per account in the runtime document store as `dream:<ownerId>`.
  */
@@ -519,7 +519,7 @@ export function createDream(options: {
     if (!others.length || chance(100 - shares.otherProfile)) return { profile: chosen, note: "" };
     const runs = new Map<string, number>();
     const ever = new Set<string>();
-    // A job cancelled before it ran (Dream yielding to other work) tried nothing.
+    // A job cancelled before it ran (Dream paused, or its worker went away) tried nothing.
     for (const job of store.jobs(ownerId)) {
       if (job.status === "cancelled") continue;
       const id = String(job.input.profileId || "");
@@ -1179,13 +1179,11 @@ export function createDream(options: {
     if (ticking) return;
     ticking = true;
     try {
-      const jobs = live();
-      if (busy(jobs)) return await stopWaiting();
       // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
       // Dream up; Dream makes new work for that kind once the worker is back.
       const reach = new Map<Kind, Promise<Reach>>();
       const stranded = await Promise.all(
-        jobs
+        live()
           .filter((job) => dreamJob(job) && waiting(job))
           .map(async (job) => {
             const kind = kindOf(job.input);
@@ -1199,12 +1197,15 @@ export function createDream(options: {
       );
       for (const job of stranded)
         if (job) await options.cancel(job.ownerId, job.id).catch(() => undefined);
-      if (live().some(dreamJob)) return;
+      // Waiting Dream jobs keep their place below other work; new ones wait until Studio is idle.
+      if (busy()) return;
       const owners = options.owners();
       // Accounts take turns: the search starts after the one served last.
       for (let step = 0; step < owners.length; step++) {
         const index = (next + step) % owners.length;
         const ownerId = owners[index];
+        // An account already holding a Dream job waits its turn; the others may still get theirs.
+        if (live().some((job) => dreamJob(job) && job.ownerId === ownerId)) continue;
         let state: { status: DreamStatus; reason?: string };
         try {
           state = await consider(ownerId);
@@ -1285,10 +1286,6 @@ export function createDream(options: {
     },
     get started() {
       return Boolean(timer);
-    },
-    /** Hears every admitted job: other work makes waiting Dream jobs step aside at once. */
-    admitted(job: OwnedJob) {
-      if (!dreamJob(job)) void stopWaiting();
     },
     access: (ownerId: string) => options.access(ownerId),
     status(ownerId: string): { status: DreamStatus; reason?: string } {

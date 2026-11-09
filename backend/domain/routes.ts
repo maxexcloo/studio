@@ -30,12 +30,11 @@ interface Router {
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
 const ownerOf = (account: RouteAccount) => account?.userId || "";
-/**
- * The person's queue: Dream's background jobs stay out of it (Dream's own pause stops them), and
- * so do failed jobs the person cleared.
- */
-const listed = (store: Store, ownerId: string) =>
-  store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream && !job.cleared);
+/** The person's queue, Dream's background jobs included, without failed jobs the person cleared. */
+const listed = (store: Store, ownerId: string) => store.jobs(ownerId).filter((job) => !job.cleared);
+/** What Stop All and Cancel Pending act on: the person's own work, as Dream's pause stops Dream's. */
+const ownWork = (store: Store, ownerId: string) =>
+  listed(store, ownerId).filter((job) => job.priority !== queuePriority.dream);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const notFound = { status: 404, payload: { error: "Not found." } };
@@ -287,7 +286,7 @@ export function registerRewriteRoutes(
   });
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
-    for (const job of listed(store, owner(req)).filter((item) =>
+    for (const job of ownWork(store, owner(req)).filter((item) =>
       ["writing", "queued", "waiting"].includes(item.status),
     )) {
       if ((await queue.cancel(owner(req), job.id))?.status === "cancelled") cancelled++;
@@ -297,7 +296,7 @@ export function registerRewriteRoutes(
   directRoute(app, "POST", "/api/queue/cancel-all", async (account) => {
     const ownerId = ownerOf(account);
     const outcomes = await Promise.all(
-      listed(store, ownerId)
+      ownWork(store, ownerId)
         .filter((job) => !terminalStatuses.has(job.status))
         .map(async (initial) => {
           let error: string | undefined;
@@ -388,11 +387,7 @@ export function registerMaintenanceRoutes(
     const jobs: UnfinishedJob[] = store
       .jobs()
       .filter((job) => !terminalStatuses.has(job.status) && !job.cleared)
-      .map((job) => ({
-        ...publicJob(job),
-        ownerId: job.ownerId,
-        dream: job.priority === queuePriority.dream,
-      }));
+      .map((job) => ({ ...publicJob(job), ownerId: job.ownerId }));
     return { status: 200, payload: { jobs } };
   });
   directRoute(app, "POST", "/api/maintenance/unfinished/retry", async (account, { body }) => {

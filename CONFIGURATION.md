@@ -236,10 +236,14 @@ edits rather than replacing them and wait while the text runtime is offline.
 Dream permission. It makes images and optional videos from taste and recent
 starred prompts while Studio is idle, using only ready local profiles the
 account may use. Its settings control the unseen buffer, daily image and video
-caps, videos and Spicy (which also needs Uncensored Models). Waiting Dream work
-yields when user or text work arrives; started work finishes. Pausing Dream
-cancels its waiting job; queue Cancel All and Cancel Pending leave Dream alone.
-Offline or parked text/media workers make it wait.
+caps, videos and Spicy (which also needs Uncensored Models). Each account has
+at most one Dream job at a time, shown in its queue with a Dream badge. It waits
+at the lowest queue tier but one (only finishing upscales sit lower), below
+every account's own and MCP work, and runs once that work is done; Dream starts
+a new one only while Studio is idle. A waiting Dream job doesn't hold up
+idle-time work such as captions and Finish Starred Images. Pausing Dream cancels its waiting job; queue Stop All
+and Cancel Pending leave Dream alone. Offline or parked text/media workers make
+it wait.
 
 Dream explores models, compatible LoRAs and prompt variations. It favours
 thumbs-up LoRAs, may try unrated ones and never loads thumbs-down ones. Import

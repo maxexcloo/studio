@@ -220,6 +220,31 @@ test("manual requests run before queued MCP work, FIFO within each tier", async 
   }
 });
 
+test("another account's direct job admitted after a waiting Dream job runs first; Dream still runs", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const enqueue = (ownerId: string, origin = {}) =>
+      store.enqueue(
+        ownerId,
+        store.createSession(ownerId).id,
+        {},
+        "image",
+        undefined,
+        undefined,
+        undefined,
+        origin,
+      ).id;
+    const dream = enqueue("alice", { priority: queuePriority.dream });
+    const direct = enqueue("bob");
+    await drain(queue);
+    assert.deepEqual(queue.submitted, [direct, dream]);
+    assert.equal(store.job("alice", dream)?.status, "completed");
+  } finally {
+    store.close();
+  }
+});
+
 test("an idle worker takes waiting work, but background work only while no manual work waits", async () => {
   const queue = fixture();
   const { store, observations } = queue;
