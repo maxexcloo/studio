@@ -209,7 +209,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
   assert.deepEqual(dream.read("alice").settings, {
     enabled: false,
     paused: false,
-    buffer: 12,
+    buffer: 6,
     dailyImages: 40,
     dailyVideos: 4,
     videos: false,

@@ -193,7 +193,7 @@ const shares = {
 const defaultDreamSettings: DreamSettings = {
   enabled: false,
   paused: false,
-  buffer: 12,
+  buffer: 6,
   dailyImages: 40,
   dailyVideos: 4,
   videos: false,

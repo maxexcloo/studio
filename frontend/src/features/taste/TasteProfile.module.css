@@ -1,6 +1,0 @@
-/* A filling profile's summary takes the room it is given and scrolls within it. */
-.fill {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
