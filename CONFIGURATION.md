@@ -287,6 +287,7 @@ prompts. They need a running text model that reads images, with no cloud
 fallback. Administrators can run **Settings › Generation › Caption Gallery**
 for Out of Date, Missing or All captions and stop a pass. Passes resume after
 restart, yield to other work and skip failed images until the next start.
+Unkept Dream results are captioned too, so their verdicts teach what they show.
 Titles, suggested prompts and captions skip disabled or removed accounts.
 
 **Image Search** adds visual matches to text search using

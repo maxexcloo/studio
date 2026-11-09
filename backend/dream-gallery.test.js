@@ -9,6 +9,7 @@ process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-drea
 const {
   filterVisibleGallery,
   galleryRevisionValue,
+  hasGalleryMedia,
   makePendingItems,
   pageGallery,
   setGallery,
@@ -50,6 +51,8 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
     ),
     ["b", "c"],
   );
+  // Captions still read Dream's pool, so a discard teaches what it showed.
+  assert.ok(hasGalleryMedia(item("d", "discarded")));
   const alice = { userId: "alice", role: "user", authenticated: true, features: { gallery: true } };
   assert.deepEqual(galleryJobResponse(queue, alice, "job-unseen").payload.items, []);
 

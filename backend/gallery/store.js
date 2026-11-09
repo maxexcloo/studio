@@ -192,11 +192,14 @@ export function isGalleryHidden(item) {
 /** A Dream result the person has not kept: it lives in Dream's own pool (domain/dream.ts), not the gallery. */
 const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept");
 
+/** Whether an item's media is there: not hidden and its file present, in the gallery or Dream's pool. */
+export function hasGalleryMedia(item) {
+  if (isGalleryHidden(item)) return false;
+  return isComfyOutputItem(item) ? hasExistingOutputFile(item) : true;
+}
+
 export function filterVisibleGallery(items) {
-  return items.filter((item) => {
-    if (isGalleryHidden(item) || inDreamPool(item)) return false;
-    return isComfyOutputItem(item) ? hasExistingOutputFile(item) : true;
-  });
+  return items.filter((item) => !inDreamPool(item) && hasGalleryMedia(item));
 }
 
 /**

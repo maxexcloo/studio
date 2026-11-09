@@ -119,6 +119,7 @@ import { hfFetch } from "./hf-access.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
+  hasGalleryMedia,
   flushGalleryStrict,
   isGalleryHidden,
   flushPendingGallery,
@@ -900,7 +901,8 @@ const captioner = createCaptioner({
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => gallery,
-  visible: (item) => filterVisibleGallery([item]).length > 0,
+  // Dream's pool too, so a Dream verdict's taste signal carries what the image shows.
+  visible: hasGalleryMedia,
   image: smallImage,
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
   load: runtimeLoad("captions"),
