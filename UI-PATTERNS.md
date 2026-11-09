@@ -197,7 +197,11 @@ the primary component reference and verify APIs against the installed version.
 ## Data & Feedback
 
 - Switching modes preserves unsent prompts, references and settings. Use
-  `useRemembered` for settled UI state per account; do not persist open popups,
+  `useRemembered` for settled UI state per account, including every setting in
+  an action menu (Animate's Review Prompt First, Upscale's quality, size and
+  Face Detail), shared by every surface showing that menu; a setting Settings
+  also shows, such as where videos run, is an account preference instead. Do
+  not persist open popups,
   selection or search queries. Keep credentials and private account records
   out of browser storage. An issued MCP token or generated password shows once,
   in the view that issued it, and never enters a query cache. Typing must not rerender unchanged media or history;

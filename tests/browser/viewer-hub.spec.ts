@@ -760,7 +760,7 @@ test("With neither local video nor Grok, Animate's options are disabled", async 
   expect(state.jobs).toHaveLength(1);
 });
 
-test("Copy ▾ copies the prompt first and Details copies every input", async ({ page }) => {
+test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ page }) => {
   await page.addInitScript(() => {
     // Copying happens within the tap, as iOS Safari needs: the copy command, not the clipboard API.
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
@@ -783,9 +783,10 @@ test("Copy ▾ copies the prompt first and Details copies every input", async ({
     },
   });
   await viewerAction(page, "Copy");
+  // Its options sort alphabetically.
   await expect(page.getByRole("menuitem", { name: /^(Prompt|Details)$/ })).toHaveText([
-    "Prompt",
     "Details",
+    "Prompt",
   ]);
   await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
