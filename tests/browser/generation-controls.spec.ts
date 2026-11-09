@@ -949,18 +949,19 @@ test("Composer popups on a tablet open with the keyboard down", async ({ page },
   await expect(page.locator("[data-popup] input[type=text]:focus")).toHaveCount(0);
 });
 
-test("A phone held sideways keeps the open composer's prompt above the keyboard and the header", async ({
+test("A tablet keeps the open composer's prompt above the keyboard and the header", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Touch screens only");
   await fixtures(page);
-  await page.setViewportSize({ width: 844, height: 390 });
+  // A phone held sideways types in the Generate sheet; a tablet types in the floating composer.
+  await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto("/images");
   await page.locator("[data-composer-prompt]").click();
   const prompt = page.locator("[data-expanded-prompt]");
   await expect(prompt).toBeFocused();
   await page.evaluate(() => {
-    const height = window.innerHeight - 200;
+    const height = window.innerHeight - 450;
     Object.defineProperty(window.visualViewport, "height", { get: () => height });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
@@ -970,7 +971,7 @@ test("A phone held sideways keeps the open composer's prompt above the keyboard 
       prompt.evaluate((element) => {
         const { top, bottom, left } = element.getBoundingClientRect();
         const shown = element.contains(document.elementFromPoint(left + 24, top + 12));
-        return shown && top >= 0 && bottom <= 190;
+        return shown && top >= 0 && bottom <= 370;
       }),
     )
     .toBe(true);
