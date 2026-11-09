@@ -96,7 +96,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide (sent once, with models or a model's first generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To find earlier work, call search. For an attached image, call upload_link. To animate or extend, pass reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide (sent once, with models or a model's first generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To find earlier work, call search. For an attached image, call upload_link; once the user uploads it, generate takes its reference_asset_id. To animate or extend, pass reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a preview or mode preview and get approval before apply. Call restart only for what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -1051,7 +1051,7 @@ export function registerMcpRoutes(
             .max(16)
             .optional()
             .describe(
-              `From search uploads, upload or reuse mode reference${actor.session ? "" : "; an image attached in chat isn't one until the user uploads it through upload_link"}. models gives each profile's references.max.`,
+              `From search uploads, upload${actor.session ? "" : ", upload_link"} or reuse mode reference. models gives each profile's references.max.`,
             ),
           reference_role: z.enum(["edit", "reference"]).optional(),
           aspect: z
@@ -1104,6 +1104,8 @@ export function registerMcpRoutes(
           each_profile,
           ...args
         } = structuredClone(input);
+        if (args.reference_asset_ids)
+          args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
         if (!args.prompts)
           throw new Error(
             "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
@@ -1515,18 +1517,22 @@ export function registerMcpRoutes(
           server,
           "upload_link",
           "upload link",
-          "A one-time page where the user uploads an image attached in chat.",
+          "A one-time page where the user uploads an image attached in chat, with its reference_asset_id.",
           {},
           async () => {
-            const { url, expires } = media.uploadUrl(owner);
+            const { url, expires, reference } = media.uploadUrl(owner);
             return {
               content: [
                 {
                   type: "text",
-                  text: `Ask the user to open this link and upload the photo they attached, then call search with uploads to use it as a reference. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
+                  text: `Ask the user to open this link and upload the photo they attached. Once they have, pass ${reference} to generate in reference_asset_ids. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
                 },
               ],
-              structuredContent: { link: url, expires_at: new Date(expires).toISOString() },
+              structuredContent: {
+                link: url,
+                reference_asset_id: reference,
+                expires_at: new Date(expires).toISOString(),
+              },
             };
           },
         );

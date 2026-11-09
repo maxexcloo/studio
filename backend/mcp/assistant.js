@@ -113,7 +113,8 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
   const ask = (route, body, signal) =>
     media.request("POST", `/api/assistant/${route}`, body, owner, { signal });
   /** A reference the account uploaded, as the data URL the assistant reads (a vision model only). */
-  const reference = async (id, signal) => {
+  const reference = async (value, signal) => {
+    const id = media.referenceId(value);
     media.own(owner, id, "assets");
     const { content, mime } = await media.call(
       "GET",
