@@ -523,10 +523,9 @@ const taste = {
       ),
     ),
 };
-// Every admitted job teaches the taste profile (iterations) and makes waiting Dream work step aside.
+// Every admitted job teaches the taste profile (iterations) and makes a waiting finishing upscale step aside.
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
-  dream.admitted(job);
   finishing.admitted(job);
   captioner.interrupt();
   imageSearch.interrupt();
@@ -830,14 +829,16 @@ const dream = createDream({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerDreamRoutes(app, { dream });
-// Dream's idle rule (domain/dream.ts), with Dream's own jobs counting as work: no live job, no text work.
+// Dream's idle rule (domain/dream.ts): no live job and no text work. A Dream job waiting for a worker
+// doesn't count, so captions and finishing still run while Dream keeps one ready.
 const studioIdle = () =>
   !textBusy() &&
   !store.db
     .prepare(
-      "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
+      `SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled')
+        AND NOT (status IN ('queued', 'waiting') AND json_extract(record, '$.priority') = ?) LIMIT 1`,
     )
-    .get();
+    .get(queuePriority.dream);
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
 // Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.

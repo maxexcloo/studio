@@ -20,8 +20,11 @@ export interface QueueOrigin {
   queueSet?: string;
   dream?: DreamOrigin;
 }
-/** `cleared` takes a failed job out of the queue panel; its chat card and record stay. */
-export type OwnedJob = QueueJob &
+/**
+ * `cleared` takes a failed job out of the queue panel; its chat card and record stay. `dream` is
+ * the Dream origin here; `publicJob` shows only that the job is Dream's.
+ */
+export type OwnedJob = Omit<QueueJob, "dream"> &
   QueueOrigin & {
     ownerId: string;
     resource: string;
@@ -420,7 +423,7 @@ export class Store {
 
   /**
    * Moves one of the owner's pending queue items to place `to` (from 0) among the owner's pending
-   * items (Dream's stay out, as in the queue panel). The items trade their places in the queue
+   * items (Dream's stay out: they wait at their own tier). The items trade their places in the queue
    * order (`created_at, rowid`), so other accounts' work keeps its place. Returns false when the
    * item is not one of the owner's pending items.
    */
@@ -593,10 +596,10 @@ export function publicJob({
   resource: _resource,
   cancelRequested: _cancelRequested,
   cleared: _cleared,
-  priority: _priority,
+  priority,
   queueSet: _queueSet,
   dream: _dream,
   ...job
 }: OwnedJob): QueueJob {
-  return job;
+  return priority === queuePriority.dream ? { ...job, dream: true } : job;
 }
