@@ -29,3 +29,19 @@
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* The narrowest phones (375 px) tighten the bar so More Options stays on screen beside the modes. */
+@media (max-width: 25rem) {
+  /* Group sets its gap inline. */
+  .bar {
+    gap: 4px !important;
+  }
+
+  .modes {
+    padding: 2px;
+  }
+
+  .home :global(.mantine-Title-root) {
+    font-size: 1.25rem;
+  }
+}
