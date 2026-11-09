@@ -43,7 +43,12 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.up();
   await expect(current(page)).toContainText("Dream prompt five");
 
-  await page.getByRole("button", { name: "Star", exact: true }).click();
+  // The deck's bar offers Pass and Like; Star and the rest are in the viewer.
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Star", exact: true })
+    .click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual([
     "POST /api/dream/one/keep",
@@ -86,7 +91,11 @@ test("Animate keeps a Dream image and stages it in the Videos composer", async (
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
   await page.goto("/dream");
-  await page.getByRole("button", { name: "Animate", exact: true }).click();
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Animate", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/video/);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Dream prompt fox",
@@ -108,7 +117,6 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
-  await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
   await page.getByRole("button", { name: "Pass", exact: true }).click();
@@ -172,8 +180,11 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("group", { name: "Which Steps?" })).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Current Dream", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "More Like This", exact: true }).click();
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "More Like This", exact: true })
+    .click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(
     dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`),
@@ -245,7 +256,7 @@ test("Full screen switches between a comparison's sides and judges from its bar"
   await expect(actions).toBeVisible();
   await expect(viewer.getByRole("img", { name: "Dream prompt solo" })).toBeVisible();
   await expect(shown).toBeHidden();
-  await actions.getByRole("button", { name: "Keep", exact: true }).click();
+  await actions.getByRole("button", { name: "Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual([

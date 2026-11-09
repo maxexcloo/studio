@@ -156,17 +156,6 @@
   flex-shrink: 0;
   padding-bottom: env(safe-area-inset-bottom);
 }
-/* A phone action's short name sits under its icon. */
-.labelled {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 48px;
-  color: var(--mantine-color-dimmed);
-  font-size: 11px;
-  font-weight: 500;
-}
 .thumb {
   display: block;
   width: 100%;

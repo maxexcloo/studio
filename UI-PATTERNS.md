@@ -187,7 +187,9 @@ the primary component reference and verify APIs against the installed version.
   typography. Defer parsing streamed changes; keep scroll anchored only while
   the user remains at the bottom. Preserve partial replies, thinking and tool
   history without mixing connection status into the conversation.
-- Dream results stay in their own pool until kept; keep and discard teach taste.
+- Dream results stay in their own pool until liked; Like and Pass teach taste.
+  The deck's bar offers only large Pass and Like, or a comparison's A and B
+  larger than Neither and Both; the viewer's bar offers every choice.
   Calibration uses only the account's own Studio generations and leaves the
   gallery unchanged apart from an explicit Star. Dream yields to user and text
   work and respects its buffer and caps.
