@@ -98,7 +98,8 @@ function ResultTile({
             opened={menu}
             onOpenedChange={setMenu}
             sessionId={sessionId}
-            omit={single ? ["edit", "animate"] : []}
+            // The card's own Edit and Animate buttons stand beside a single result.
+            omit={single ? ["edit-image", "animate"] : []}
           />
         )
       }

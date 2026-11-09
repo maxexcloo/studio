@@ -103,12 +103,11 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // The viewer's sections and order, plus Compare: Animate, Edit, Recreate, Upscale | Compare,
+  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Compare,
   // Continue in Chat | Copy, Download | Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Animate",
     "Edit",
-    "Recreate",
     "Upscale",
     "Compare",
     "Continue in Chat",
@@ -166,8 +165,12 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await tileMenu(page);
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    if (operation === "Animate")
-      await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
+    await page
+      .getByRole("menuitem", {
+        name: operation === "Animate" ? "Animate in Composer" : "Edit Image",
+        exact: true,
+      })
+      .click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
@@ -205,6 +208,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.reload();
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
@@ -235,7 +239,7 @@ test("A reference placed by hand applies the profile's reference-mode settings",
   ]);
   await page.reload();
   await tileMenu(page);
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
@@ -315,10 +319,10 @@ for (const surface of ["tile", "viewer"]) {
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
-      await viewerAction(page, "Recreate");
+      await viewerAction(page, "Edit");
     } else {
       await tileMenu(page);
-      await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     }
     await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
