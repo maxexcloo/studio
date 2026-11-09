@@ -1,12 +1,8 @@
 import { useState, type Ref, type RefObject } from "react";
 import type { MediaItem } from "../../types";
+import { Box } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import {
-  ActionBarGroups,
-  ActionBarSurface,
-  StackedActionBar,
-  type ActionGroups,
-} from "./ActionBar";
+import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
 import { AnimateDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
@@ -15,30 +11,22 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Recreate, Upscale, Copy and Download beside their icons; phones keep
-// Retry or Stop, Animate, Edit and Recreate on the bar, labelled under their icons, and list the
-// rest under More.
+// Desktop names Animate, Edit, Recreate, Upscale, Copy and Download beside their icons; phones show
+// every action as an icon.
 const labelled = ["animate", "edit", "recreate", "upscale", "copy", "download"];
-const primary = ["retry", "stop", "animate", "edit", "recreate"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
   /** The bar's accessible name. */
   label: string;
   groups: ActionGroups;
-  /** The actions desktop names beside their icons. */
+  /** The actions named beside their icons. */
   labelled: string[];
-  /** The actions phones keep on the bar, labelled under their icons; the rest go under More. */
-  primary: string[];
 }
 
-/** The bar's controls: desktop's divided groups, or the phone's labelled primaries and More. */
-export function ViewerActionGroups({ groups, labelled, primary }: Omit<ViewerActions, "label">) {
-  const phone = usePhone();
-  if (!phone) return <ActionBarGroups groups={groups} labelled={labelled} />;
-  const primaries = primary.flatMap((id) => groups.flat().filter((action) => action.id === id));
-  const more = groups.map((group) => group.filter((action) => !primary.includes(action.id)));
-  return <StackedActionBar primary={primaries} more={more} />;
+/** The bar's controls in divided groups; phones show every one, wrapping onto another row. */
+export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
+  return <ActionBarGroups groups={groups} labelled={labelled} wrap={usePhone()} />;
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */
@@ -55,6 +43,7 @@ export function MediaViewerActions({
   onVersionChange,
   shortcuts,
   ref,
+  promptHidden,
 }: {
   item: MediaItem;
   sessionId?: string;
@@ -71,6 +60,8 @@ export function MediaViewerActions({
   shortcuts?: RefObject<ActionGroups>;
   /** The bar, which the phone details sheet stays above. */
   ref?: Ref<HTMLDivElement>;
+  /** Hides the prompt field, keeping what was typed (the phone details sheet). */
+  promptHidden?: boolean;
 }) {
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
@@ -104,22 +95,23 @@ export function MediaViewerActions({
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (
-        <ViewerPrompt
-          key={item.id}
-          item={item}
-          groups={groups}
-          iterate={iterate}
-          pending={pending}
-          onApplied={onApplied}
-        />
+        <Box display={promptHidden ? "none" : "contents"}>
+          <ViewerPrompt
+            key={item.id}
+            item={item}
+            groups={groups}
+            iterate={iterate}
+            pending={pending}
+            onApplied={onApplied}
+          />
+        </Box>
       )}
       <ViewerActionGroups
         // Desktop's prompt field carries Continue in Chat.
         groups={
           phone ? groups : groups.map((group) => group.filter((action) => action.id !== "chat"))
         }
-        labelled={labelled}
-        primary={primary}
+        labelled={phone ? [] : labelled}
       />
       {animating && (
         <AnimateDialog

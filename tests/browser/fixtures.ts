@@ -936,20 +936,13 @@ export async function compareUpscale(page: Page) {
   await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
-/**
- * Clicks a viewer action on its bar. Phones keep Retry or Stop, Animate, Edit and Recreate there and
- * list the rest under More. A control with options opens its menu (under More, it expands in
- * place), and the test picks the item.
- */
+/** Clicks a viewer action on its bar; a control with options opens its menu for the test to pick. */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const control = viewer
+  await viewer
     .getByRole("button", { name: label, exact: true })
-    .or(viewer.getByRole("link", { name: label, exact: true }));
-  if ((page.viewportSize()?.width || 1440) >= 768 || (await control.count()))
-    return control.click();
-  await viewer.getByRole("button", { name: "More", exact: true }).click();
-  await page.getByRole("menuitem", { name: label, exact: true }).click();
+    .or(viewer.getByRole("link", { name: label, exact: true }))
+    .click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {
