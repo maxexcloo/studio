@@ -256,16 +256,20 @@ idle-time work such as captions and Finish Starred Images. Pausing Dream cancels
 and Cancel Pending leave Dream alone. Offline or parked text/media workers make
 it wait.
 
-Dream explores models, compatible LoRAs and prompt variations. It favours
-thumbs-up LoRAs, may try unrated ones and never loads thumbs-down ones. Import
-and Inspiration ideas need administrator access, Uncensored Models and enabled
-imports. Results stay outside the gallery, search, exports and MCP until kept;
-Star also keeps them. Discards remain available. Variations keeps a result and
-queues new seeds as user work; More Like This keeps it and steers upcoming
-ideas toward it. Comparison cards vary one thing and accept A, B, Both or
-Neither. Calibration cards use older Studio generations owned by the account,
-never uploads or imports, without GPU work; their answers teach taste without
-changing the gallery unless explicitly starred.
+Three in four Dream ideas exploit taste: the profile, a compatible LoRA (a
+thumbs up counts in its favour) at its learnt strength, steps, guidance, aspect
+ratio and a liked caption tag are drawn by their scores. The rest explore
+exactly one thing, in turn: a little-used profile, an unrated LoRA no result has
+taught yet, or new ground for the prompt (half from an import, where allowed).
+Thumbs-down LoRAs are never loaded. Import and Inspiration ideas need
+administrator access, Uncensored Models and enabled imports. Results stay
+outside the gallery, search, exports and MCP until kept; Star also keeps them.
+Discards remain available. Variations keeps a result and queues new seeds as
+user work; More Like This keeps it and steers upcoming ideas toward it.
+Comparison cards vary one thing and accept A, B, Both or Neither, and ask about
+what taste is least sure of. Calibration cards use older Studio generations
+owned by the account, never uploads or imports, without GPU work; their answers
+teach taste without changing the gallery unless explicitly starred.
 
 **Settings › Preferences** follow the account: Tile Captions, Cloud Models,
 LoRAs, Uncensored Models and Spicy Prompts. Feature switches can only narrow the

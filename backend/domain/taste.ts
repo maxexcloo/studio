@@ -44,7 +44,7 @@ interface TasteSettings {
  * settings, seed, title and caption tags. Older signals keep only the job, a prompt cut to 300
  * characters, the profile and LoRA names.
  */
-interface TasteChoice {
+export interface TasteChoice {
   jobId?: string;
   itemId?: string;
   /** Image or video; older signals leave it out, and those with a duration were videos. */
@@ -260,6 +260,18 @@ function attributes(choice: TasteChoice) {
   );
 }
 
+/** The attributes a comparison on `axis` covers that only side `a` has, and those only `b` has. */
+export function pairAttributes(axis: string, a: TasteChoice, b: TasteChoice) {
+  const prefix = axisAttributes[axis] ?? "";
+  const [mine, theirs] = [a, b].map((choice) =>
+    [...attributes(choice)].filter((attribute) => attribute.startsWith(prefix)),
+  );
+  return [
+    mine.filter((attribute) => !theirs.includes(attribute)),
+    theirs.filter((attribute) => !mine.includes(attribute)),
+  ];
+}
+
 /** Each attribute's score from the signals, each signal halving in weight every 60 days. */
 export function tasteScores(signals: TasteSignal[], at: number) {
   const scores = new Map<string, TasteScore>();
@@ -271,17 +283,12 @@ export function tasteScores(signals: TasteSignal[], at: number) {
       entry.count += 1;
       scores.set(attribute, entry);
     };
-    const prefix = signal.axis && axisAttributes[signal.axis];
     const other = signal.over || signal.also;
-    if (prefix && other) {
-      const pick = (choice: TasteChoice) =>
-        [...attributes(choice)].filter((attribute) => attribute.startsWith(prefix));
-      const mine = pick(signal);
-      const theirs = pick(other);
+    if (signal.axis && axisAttributes[signal.axis] && other) {
+      const [mine, theirs] = pairAttributes(signal.axis, signal, other);
       const step = signalWeights[signal.kind];
-      for (const attribute of mine) if (!theirs.includes(attribute)) add(attribute, step);
-      for (const attribute of theirs)
-        if (!mine.includes(attribute)) add(attribute, signal.kind === "preferred" ? -step : step);
+      for (const attribute of mine) add(attribute, step);
+      for (const attribute of theirs) add(attribute, signal.kind === "preferred" ? -step : step);
       continue;
     }
     for (const attribute of new Set([
