@@ -16,6 +16,8 @@ export interface GenerationScope {
   sessionId: string;
   operation: Exclude<GenerationOperation, "upscale">;
   parentJobId?: string;
+  /** The owner's result the run is made from, as the caller checked it. */
+  parentItemId?: string;
 }
 interface AdmissionOptions {
   store: Store;
@@ -106,8 +108,8 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             origin: {
               ...origin,
               ...(queueSet ? { queueSet } : {}),
-              // A Chat run is made from its parent's result only when it uses it as its reference.
-              parentItemId: parent && referencedResult(input, parent),
+              // Otherwise a Chat run is made from its parent's result only when it uses it as its reference.
+              parentItemId: scope?.parentItemId ?? (parent && referencedResult(input, parent)),
             },
           });
         let jobs: OwnedJob[];

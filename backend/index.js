@@ -615,29 +615,6 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
 function chatTitle(account, sessionId, prompt) {
   return sessionChat.title(account?.userId || "", sessionId, prompt);
 }
-registerRewriteRoutes(app, {
-  store,
-  queue: generationQueue,
-  resourceFor: queueResourceFor,
-  validate: validateGenerationInput,
-  deleteMedia: deleteOwnedGalleryItems,
-  media: (ownerId, jobId) =>
-    galleryJobItems(jobId).filter(
-      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
-    ),
-  ownsItem: (ownerId, id) => {
-    const item = galleryItem(id);
-    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
-  },
-  title: chatTitle,
-  admitted: jobAdmitted,
-});
-registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
-registerMigrationRoutes(app, {
-  dataDir,
-  requireAdmin,
-  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
-});
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
@@ -650,6 +627,27 @@ const admitGeneration = createGenerationAdmission({
     return input.kind === "image" && Boolean(workflow) && !workflow.controls?.count;
   },
   admitted: jobAdmitted,
+});
+registerRewriteRoutes(app, {
+  store,
+  queue: generationQueue,
+  admit: admitGeneration,
+  deleteMedia: deleteOwnedGalleryItems,
+  media: (ownerId, jobId) =>
+    galleryJobItems(jobId).filter(
+      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
+    ),
+  ownsItem: (ownerId, id) => {
+    const item = galleryItem(id);
+    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
+  },
+  title: chatTitle,
+});
+registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
+registerMigrationRoutes(app, {
+  dataDir,
+  requireAdmin,
+  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {

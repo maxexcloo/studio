@@ -1,12 +1,12 @@
 import {
   terminalStatuses,
   type GenerationInput,
-  type GenerationOperation,
   type QueueCancelAllResponse,
   type QueueMedia,
   type QueueResponse,
   type UnfinishedJob,
 } from "../../shared/queue.ts";
+import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { GenerationQueue } from "./queue.ts";
 import { everyone, publicJob, queuePriority, Store, type OwnedJob } from "./store.ts";
 
@@ -54,21 +54,20 @@ export function registerRewriteRoutes(
   {
     store,
     queue,
-    resourceFor = () => "local-media",
-    validate,
+    admit,
     deleteMedia,
     media,
     ownsItem,
     title,
-    admitted,
   }: {
     store: Store;
     queue: GenerationQueue;
-    resourceFor?: (input: GenerationInput) => string | Promise<string>;
-    validate?: (
+    /** domain/admission.ts's: a Chat's generations are admitted as every other request. */
+    admit?: (
       input: GenerationInput,
-      account?: Request["studioAccount"],
-    ) => Promise<{ status: number; payload: unknown }>;
+      account?: GenerationAccount,
+      scope?: GenerationScope,
+    ) => Promise<DomainResponse>;
     /** Viewer deletion of the owner's gallery items; returns the IDs it removed. */
     deleteMedia?: (
       ownerId: string,
@@ -84,8 +83,6 @@ export function registerRewriteRoutes(
     ownsItem?: (ownerId: string, id: string) => boolean;
     /** Titles a chat started by its first generation; must not reject. */
     title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
-    /** Hears each newly queued job, for the taste profile; must not throw. */
-    admitted?: (job: OwnedJob) => void;
   },
 ) {
   const shown = (ownerId: string, jobs: OwnedJob[]) =>
@@ -235,27 +232,17 @@ export function registerRewriteRoutes(
         ))
     )
       return res.status(400).json({ error: "Parent result must be one of your items." });
-    const checked = await validate?.(input, req.studioAccount);
-    if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);
-    const job = store.enqueue(
-      owner(req),
-      req.params.id,
-      input,
-      operation as GenerationOperation,
-      parentJobId as string | undefined,
-      await resourceFor(input),
-      undefined,
-      { parentItemId: parentItemId as string | undefined },
-    );
-    admitted?.(job);
-    // The scheduler is also driven by its timer; responses acknowledge durable acceptance.
-    void queue.tick();
-    if (
-      title &&
-      typeof input.prompt === "string" &&
-      input.prompt.trim() &&
-      store.jobs(owner(req), req.params.id).length === 1
-    )
+    if (!admit) return res.status(501).json({ error: "Generation is unavailable." });
+    const first = !store.jobs(owner(req), req.params.id).length;
+    const admitted = await admit(input, req.studioAccount as GenerationAccount | undefined, {
+      sessionId: req.params.id,
+      operation: operation as GenerationScope["operation"],
+      parentJobId: parentJobId as string | undefined,
+      parentItemId: parentItemId as string | undefined,
+    });
+    if (admitted.status >= 400) return res.status(admitted.status).json(admitted.payload);
+    const job = store.job(owner(req), String(admitted.payload.jobId))!;
+    if (title && typeof input.prompt === "string" && input.prompt.trim() && first)
       void title(req.studioAccount, req.params.id, input.prompt);
     return res
       .status(202)
