@@ -47,6 +47,7 @@ globalThis.fetch = async (url, options = {}) => {
 };
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery/store.js");
+const { makePendingItems } = await import("./gallery/records.js");
 test.after(async () => {
   releaseCleanup();
   globalThis.fetch = nativeFetch;
@@ -88,7 +89,7 @@ test(
       seed: "1234",
       weightDtype: "default",
     };
-    const items = store.makePendingItems(id, body);
+    const items = makePendingItems(id, body);
     store.setGallery(items, { persist: false });
     jobs.set(id, { status: "queued", kind: "image", outputs: [], items, startedAt: Date.now() });
     const queued = fake.nextPrompt();

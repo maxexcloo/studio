@@ -125,7 +125,6 @@ import {
   flushGalleryStrict,
   isGalleryHidden,
   flushPendingGallery,
-  makePendingItems,
   gallery,
   galleryItem,
   galleryJobItems,
@@ -141,6 +140,7 @@ import {
   reloadGallerySizes,
   reloadGallerySources,
 } from "./gallery/store.js";
+import { makePendingItems } from "./gallery/records.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";

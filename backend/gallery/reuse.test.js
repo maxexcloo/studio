@@ -10,14 +10,9 @@ import test from "node:test";
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-const {
-  galleryRevisionValue,
-  hideGalleryItems,
-  makePendingItems,
-  pageGallery,
-  replaceGalleryJob,
-  setGallery,
-} = await import("./store.js");
+const { galleryRevisionValue, hideGalleryItems, pageGallery, replaceGalleryJob, setGallery } =
+  await import("./store.js");
+const { makePendingItems } = await import("./records.js");
 
 const url = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "media" })}`;
@@ -389,7 +384,7 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
 });
 
 test("Radiance reference settings omit unsupported denoise", async () => {
-  const { generationSettings } = await import("./store.js");
+  const { generationSettings } = await import("./records.js");
   const reference = {
     kind: "image",
     modelName: "qwen-image.rad",

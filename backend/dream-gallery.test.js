@@ -10,11 +10,11 @@ const {
   filterVisibleGallery,
   galleryRevisionValue,
   hasGalleryMedia,
-  makePendingItems,
   pageGallery,
   setGallery,
   updateGalleryJob,
 } = await import("./gallery/store.js");
+const { makePendingItems } = await import("./gallery/records.js");
 const { galleryJobResponse } = await import("./gallery/routes.js");
 const { openDatabase } = await import("./persistence/runtime.ts");
 const { Store } = await import("./domain/store.ts");

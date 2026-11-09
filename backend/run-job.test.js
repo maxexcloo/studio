@@ -18,6 +18,7 @@ process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-
 writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery/store.js");
+const { makePendingItems } = await import("./gallery/records.js");
 const { registerJobRoutes } = await import("./job-routes.js");
 const { openDatabase } = await import("./persistence/runtime.ts");
 const { createGenerationQueueAdapter } = await import("./domain/generation-adapter.ts");
@@ -50,7 +51,7 @@ function sdxlRequest(overrides = {}) {
 }
 
 function queue(id, body) {
-  const items = store.makePendingItems(id, body);
+  const items = makePendingItems(id, body);
   store.setGallery([...items, ...store.gallery], { persist: false });
   jobs.set(id, {
     status: "queued",

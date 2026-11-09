@@ -17,12 +17,10 @@ import {
   dedupeGallery,
   gallery,
   galleryLimit,
-  makePendingItems,
   setGallery,
   galleryRevisionValue,
-  storedChatRecord,
-  storedWritingRecord,
 } from "./gallery/store.js";
+import { makePendingItems, storedChatRecord, storedWritingRecord } from "./gallery/records.js";
 import { recordPrompt } from "./prompt-history.js";
 import { jobs, runJob, runMockJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
