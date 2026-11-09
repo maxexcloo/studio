@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { menuWidth } from "../../theme";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
 /** One media or selection action, shown as a menu item or an action bar control. */
@@ -35,7 +35,7 @@ export interface Action {
   /** The menu stays open for actions that finish in place. */
   keepOpen?: boolean;
   /**
-   * Its options: a click opens them (a submenu in menus, expanded in place on phones), and the
+   * Its options: a click opens them (a submenu in menus, expanded in place on touch screens), and the
    * first is its usual action, so a control with options has no click of its own.
    */
   menu?: ActionGroups;
@@ -83,10 +83,12 @@ const note = (action: Action) =>
 
 /**
  * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
- * phones expand in place under their item, never as a second floating layer.
+ * phones and touch screens expand in place under their item, never as a second floating layer.
  */
 export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   const phone = usePhone();
+  const touch = useTouch();
+  const inline = phone || touch;
   const [expanded, setExpanded] = useState<string | null>(null);
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
@@ -107,7 +109,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
               />
             </div>
           );
-        if (action.menu && phone) {
+        if (action.menu && inline) {
           const open = expanded === id;
           return (
             <Fragment key={id}>
