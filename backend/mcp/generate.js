@@ -42,6 +42,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
+import { withCharacter } from "../../shared/characters.ts";
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
@@ -460,7 +461,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features. With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -538,6 +539,11 @@ export function registerGenerateTools({
         }
         const catalogue = await media.catalogue(owner);
         const access = await media.access(owner);
+        // Characters are an extra here: a failed listing leaves them out rather than the models.
+        const { characters = [] } =
+          !access || access.features.characters
+            ? await media.request("GET", "/api/characters", undefined, owner).catch(() => ({}))
+            : {};
         const shown = (value) => kind === "all" || kind === value;
         const services = catalogue.backends
           ? Object.fromEntries(
@@ -581,6 +587,16 @@ export function registerGenerateTools({
                   role: access.role,
                   features: accessFeatures.filter((feature) => access.features[feature]),
                 },
+              }
+            : {}),
+          ...(characters.length
+            ? {
+                characters: characters.map((card) => ({
+                  id: card.id,
+                  name: card.name,
+                  description: card.description,
+                  images: card.references.length,
+                })),
               }
             : {}),
         });
@@ -755,6 +771,8 @@ export function registerGenerateTools({
           `From search uploads, upload${actor.session ? "" : ", upload_link"} or reuse mode reference. models gives each profile's references.max.`,
         ),
       reference_role: z.enum(["edit", "reference"]).optional(),
+      // A character's name or id (models lists them).
+      character: z.string().min(1).optional(),
       aspect: z
         .string()
         .optional()
@@ -794,6 +812,22 @@ export function registerGenerateTools({
       return reply;
     },
   );
+  /** The account's character by id or name, with the images it still has, owned for this call. */
+  const characterFor = async (value, signal) => {
+    const { characters = [] } = await media.request("GET", "/api/characters", undefined, owner, {
+      signal,
+    });
+    const wanted = value.trim().toLowerCase();
+    const card =
+      characters.find((item) => item.id === value.trim()) ||
+      characters.find((item) => item.name.toLowerCase() === wanted);
+    if (!card) throw new Error(`No character "${value}". Call models to list them.`);
+    const referenceIds = card.references.map((asset) => asset.id);
+    if (!referenceIds.length)
+      throw new Error(`${card.name} has no images left. Ask the user to add some in Studio.`);
+    media.adopt(owner, refs, { assets: referenceIds });
+    return { ...card, referenceIds };
+  };
   const generateOnce = async (input, signal) => {
     const {
       kind,
@@ -807,6 +841,8 @@ export function registerGenerateTools({
     } = structuredClone(input);
     if (args.reference_asset_ids)
       args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
+    const card = args.character ? await characterFor(args.character, signal) : null;
+    delete args.character;
     if (!args.prompts)
       throw new Error(
         "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
@@ -825,6 +861,8 @@ export function registerGenerateTools({
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
     }
+    // A character's description joins each prompt, as picking its card does in the composer.
+    if (card) args.prompts = args.prompts.map((prompt) => withCharacter(prompt, card.description));
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
       args.count > 1 &&
@@ -835,7 +873,9 @@ export function registerGenerateTools({
     const count = args.count ?? 1;
     // Checked before any prompt is written, so an oversized call costs nothing and says how to split.
     assertJobCount(args.prompts?.length || 1, count);
-    const references = args.reference_asset_ids?.length || 0;
+    const named = args.reference_asset_ids || [];
+    // A character needs a model that takes references; its images then fill what room each has.
+    const references = named.length + (card ? 1 : 0);
     // Cloud (Grok) profiles only when the user asks for Grok or the cloud.
     const cloud = asksForCloud(request);
     let targets;
@@ -903,13 +943,21 @@ export function registerGenerateTools({
               const sized = mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
                 throw new Error("Pass aspect or width and height, not both.");
+              const room = Math.max(0, referenceCount(profile).max - named.length);
               const plan = {
                 ...args,
                 ...sized,
+                ...(card
+                  ? { reference_asset_ids: [...named, ...card.referenceIds.slice(0, room)] }
+                  : {}),
                 profile_id: profile.id,
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
-              return { profile, note, plan, source: "exact" };
+              const fewer =
+                card && room < card.referenceIds.length
+                  ? `${card.name}: ${room} of ${card.referenceIds.length} images fit this model. `
+                  : "";
+              return { profile, note: `${note || ""}${fewer}`, plan, source: "exact" };
             }),
           );
     if (preview) {
