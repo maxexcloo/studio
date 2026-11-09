@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -15,7 +15,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedValue, useLongPress } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { SquareCheck, SquarePen, X } from "lucide-react";
 import { Link, useMatch, useNavigate } from "react-router";
@@ -26,6 +26,7 @@ import { SectionToolbar } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
 import type { Session } from "../../types";
 import { ActionBarGroups } from "../gallery/ActionBar";
+import { endHold } from "../gallery/useGalleryLayout";
 import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 import { ChatMenu, ChatRename, chatTitle, DeleteChatsDialog, useArchiveChats } from "./ChatActions";
 import { sessionSearchQuery, sessionsQuery } from "./queries";
@@ -64,6 +65,21 @@ function ChatRow({
   toggle: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
+  const [menu, setMenu] = useState(false);
+  // Phones hide the menu button: holding the row opens its menu, and the release opens nothing.
+  const held = useRef(false);
+  const hold = useLongPress(
+    () => {
+      held.current = true;
+      setMenu(true);
+    },
+    {
+      events: ["touch"],
+      cancelOnMove: true,
+      onStart: () => (held.current = false),
+      onFinish: endHold,
+    },
+  );
   const description = [session.mcp && "MCP", updated(session.updatedAt)]
     .filter(Boolean)
     .join(" · ");
@@ -91,10 +107,31 @@ function ChatRow({
         description={description}
         active={active}
         aria-current={active ? "page" : undefined}
-        onClick={close}
+        {...hold}
+        onClick={(event) => {
+          if (held.current) {
+            held.current = false;
+            event.preventDefault();
+          } else close();
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenu(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+          event.preventDefault();
+          setMenu(true);
+        }}
         classNames={{ root: classes.link, label: classes.label }}
       />
-      <ChatMenu session={session} onRename={() => setRenaming(true)} className={classes.menu} />
+      <ChatMenu
+        session={session}
+        opened={menu}
+        onChange={setMenu}
+        onRename={() => setRenaming(true)}
+        className={classes.menu}
+      />
     </div>
   );
 }
@@ -109,8 +146,8 @@ function useNewChat() {
   };
 }
 
-/** New Chat as a small icon action beside the Chats heading; `onDone` closes the phone sheet. */
-export function NewChatAction({ onDone }: { onDone?: () => void }) {
+/** New Chat as a small icon action at the end of the list's toolbar; `onDone` closes the phone Drawer. */
+function NewChatAction({ onDone }: { onDone: () => void }) {
   const newChat = useNewChat();
   return (
     <Tooltip label="New Chat">
@@ -120,7 +157,7 @@ export function NewChatAction({ onDone }: { onDone?: () => void }) {
         aria-label="New Chat"
         onClick={() => {
           newChat();
-          onDone?.();
+          onDone();
         }}
       >
         <SquarePen size={18} />
@@ -228,9 +265,10 @@ function ChatSelectionBar({
 }
 
 /**
- * The account's Chats under date headings, in the desktop sidebar (`heading`: the Chats heading
- * and New Chat), the phone Chat page and the phone Drawer. Its toolbar searches titles and messages
- * on the server, shows All or Archived chats, and selects chats to archive or delete together.
+ * The account's Chats under date headings, in the desktop sidebar (`heading`: the Chats heading),
+ * the phone Chat page and the phone Drawer. Its toolbar searches titles and messages on the server
+ * (an open field on phones), shows All or Archived chats, selects chats to archive or delete
+ * together and ends with New Chat.
  */
 export function SessionList({
   close = () => {},
@@ -240,6 +278,7 @@ export function SessionList({
   heading?: boolean;
 }) {
   const id = useMatch("/chat/:id")?.params.id;
+  const phone = usePhone();
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query.trim(), 200);
   const [show, setShow] = useState<"all" | "archived">("all");
@@ -303,6 +342,7 @@ export function SessionList({
         label="Chats"
         query={query}
         onQueryChange={setQuery}
+        searchOpen={phone}
         filterCount={archived ? 1 : 0}
         onClearFilters={() => setShow("all")}
         filters={
@@ -335,7 +375,7 @@ export function SessionList({
                 <SquareCheck size={18} />
               </ActionIcon>
             </Tooltip>
-            {heading && <NewChatAction />}
+            {(heading || phone) && <NewChatAction onDone={close} />}
           </>
         }
       />

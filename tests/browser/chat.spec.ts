@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   fixtures,
   image,
@@ -8,6 +8,7 @@ import {
   signIn,
   stamp,
   expectNoChatOpen,
+  touch,
 } from "./fixtures";
 
 const at = (seconds: number) => new Date(Date.parse(stamp) + seconds * 1000).toISOString();
@@ -117,6 +118,19 @@ async function chats(page: Page, isMobile: boolean) {
   return drawer;
 }
 
+/** Opens a listed chat's menu: its options button on desktop, or holding the row on phones. */
+async function chatMenu(list: Locator, title: string, isMobile: boolean) {
+  if (!isMobile)
+    return list.getByRole("button", { name: `Chat Options for ${title}`, exact: true }).click();
+  const row = list.getByRole("link", { name: new RegExp(title) });
+  await expect(
+    list.getByRole("button", { name: `Chat Options for ${title}`, exact: true }),
+  ).toBeHidden();
+  await touch(row, "touchstart");
+  await expect(list.page().getByRole("menu")).toBeVisible();
+  await touch(row, "touchend");
+}
+
 test("Chat cards show their request, settings and every output beneath the reply", async ({
   page,
 }) => {
@@ -154,9 +168,7 @@ test("Chats can be renamed and deleted with an opt-in results checklist", async 
   // The Chat settles its focus once loaded; open row menus after that.
   await expect(page.getByText("Three watercolour variations.")).toBeVisible();
   let list = await chats(page, isMobile);
-  await list
-    .getByRole("button", { name: "Chat Options for Blue Bird Studies", exact: true })
-    .click();
+  await chatMenu(list, "Blue Bird Studies", isMobile);
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   const title = list.getByRole("textbox", { name: "Chat Title", exact: true });
   await title.fill("Watercolour Birds");
@@ -244,7 +256,8 @@ test("Chats are searched by title and message, and archived out of the list unti
   isMobile,
 }) => {
   const { state, list, row } = await threeChats(page, isMobile);
-  await list.getByRole("button", { name: "Search Chats", exact: true }).click();
+  // Phones keep the search field open.
+  if (!isMobile) await list.getByRole("button", { name: "Search Chats", exact: true }).click();
   const search = list.getByRole("textbox", { name: "Search Chats", exact: true });
   await search.fill("golden hour");
   await expect(row("Sunset Notes")).toBeVisible();
@@ -254,11 +267,9 @@ test("Chats are searched by title and message, and archived out of the list unti
   await expect(row("Sunset Notes")).toBeHidden();
   await list.getByRole("button", { name: "Clear Search", exact: true }).click();
   await expect(row("Sunset Notes")).toBeVisible();
-  await search.press("Escape");
+  if (!isMobile) await search.press("Escape");
 
-  await list
-    .getByRole("button", { name: "Chat Options for Blue Bird Studies", exact: true })
-    .click();
+  await chatMenu(list, "Blue Bird Studies", isMobile);
   await page.getByRole("menuitem", { name: "Archive", exact: true }).click();
   await expect(row("Blue Bird Studies")).toBeHidden();
   expect(state.sessions[0].archived).toBe(true);
@@ -267,9 +278,8 @@ test("Chats are searched by title and message, and archived out of the list unti
   await showArchived(page);
   await expect(row("Blue Bird Studies")).toBeVisible();
   await expect(row("Sunset Notes")).toBeHidden();
-  await list
-    .getByRole("button", { name: "Chat Options for Blue Bird Studies", exact: true })
-    .click();
+  // Right-click opens the same menu everywhere.
+  await row("Blue Bird Studies").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Unarchive", exact: true }).click();
   await expect(list.getByText("No Matches", { exact: true })).toBeVisible();
   expect(state.sessions[0].archived).toBeUndefined();
@@ -518,10 +528,13 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   expect(
     Math.abs(message!.y + message!.height / 2 - (send!.y + send!.height / 2)),
   ).toBeLessThanOrEqual(2);
-  // Without a sidebar, phones list the chats in place of the empty state; the header's Chats
-  // drawer offers New Chat.
+  // Without a sidebar, phones list the chats in place of the empty state, as does the header's
+  // Chats drawer, each with an open search and New Chat.
   await expectNoChatOpen(page);
   if (testInfo.project.use.isMobile) {
+    const list = page.getByRole("region", { name: "Chats", exact: true });
+    await expect(list.getByRole("textbox", { name: "Search Chats", exact: true })).toBeVisible();
+    await expect(list.getByRole("button", { name: "New Chat", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Open Chats", exact: true }).click();
     const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
     await expect(drawer.getByRole("button", { name: "New Chat", exact: true })).toBeVisible();
