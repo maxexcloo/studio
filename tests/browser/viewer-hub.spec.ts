@@ -938,7 +938,7 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   );
 });
 
-test("Details show the caption and its tags, fold long sections and copy each one", async ({
+test("Details fold only a long caption, keep its tags in sight and copy the prompts", async ({
   page,
 }, testInfo) => {
   await page.addInitScript(() => {
@@ -953,10 +953,11 @@ test("Details show the caption and its tags, fold long sections and copy each on
   const negative = Array.from({ length: 12 }, (_, line) => `Unwanted detail ${line + 1}`).join(
     "\n",
   );
+  const caption = Array.from({ length: 12 }, (_, line) => `Caption line ${line + 1}`).join("\n");
   const { viewer } = await seed(page, {
     negative,
     caption: {
-      text: "A small amber bird perched on a mossy branch, soft morning light.",
+      text: caption,
       tags: ["branch", "bird"],
       model: "vision-model",
       at: stamp,
@@ -968,27 +969,23 @@ test("Details show the caption and its tags, fold long sections and copy each on
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     details = page.getByRole("dialog", { name: "An amber bird", exact: true });
   }
-  await expect(
-    details.getByText("A small amber bird perched on a mossy branch, soft morning light.", {
-      exact: true,
-    }),
-  ).toBeVisible();
+  // A long caption folds until Expand and folds again on Collapse; its tags stay in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
-  // Short sections show in full; a long one folds until Expand and folds again on Collapse.
-  await expect(details.getByRole("button", { name: /^Expand (Caption|Prompt)$/ })).toHaveCount(0);
-  const expand = details.getByRole("button", { name: "Expand Negative Prompt", exact: true });
+  await expect(tags).toBeVisible();
+  const expand = details.getByRole("button", { name: "Expand Caption", exact: true });
   await expand.click();
-  await details.getByRole("button", { name: "Collapse Negative Prompt", exact: true }).click();
+  await details.getByRole("button", { name: "Collapse Caption", exact: true }).click();
   await expect(expand).toBeVisible();
-  // Each section's Copy copies its own text.
+  // Every other section shows in full, however long.
+  await expect(details.getByRole("button", { name: /^Expand / })).toHaveCount(1);
+  // Only the prompts have Copy.
   const copied = () => page.evaluate(() => (window as any).copied);
+  await expect(details.getByRole("button", { name: /^Copy / })).toHaveCount(2);
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(copied).toBe("An amber bird");
   await details.getByRole("button", { name: "Copy Negative Prompt", exact: true }).click();
   await expect.poll(copied).toBe(negative);
-  await details.getByRole("button", { name: "Copy Settings", exact: true }).click();
-  await expect.poll(copied).toBe("Count: 2\nMode: Generate\nSeed: 1234567\nSteps: 28");
   // A tag searches the gallery for it and closes the viewer.
   await tags.getByRole("link", { name: "Search branch", exact: true }).click();
   await expect(viewer).toBeHidden();

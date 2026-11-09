@@ -253,8 +253,8 @@ function useMediaSize(url: string) {
 }
 
 /**
- * One Details section: its heading and Copy, which copies `copy`, over its content; content taller
- * than a few lines folds until Expand. Any `after` (the prompt's thinking) stays outside the fold.
+ * One Details section: its heading over its content, shown in full. Prompt and Negative Prompt take
+ * a Copy beside the heading, which copies `copy`. Any `after` (the prompt's thinking) follows.
  */
 function DetailSection({
   title,
@@ -263,7 +263,7 @@ function DetailSection({
   children,
 }: {
   title: string;
-  copy: string;
+  copy?: string;
   after?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -272,51 +272,45 @@ function DetailSection({
     <Stack gap={6}>
       <Group justify="space-between" wrap="nowrap">
         <Title order={6}>{title}</Title>
-        <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="gray"
-            aria-label={`Copy ${title}`}
-            disabled={!copy}
-            onClick={() => copier.copy(copy)}
-          >
-            {copier.copied ? <Check size={14} /> : <icons.copy size={14} />}
-          </ActionIcon>
-        </Tooltip>
+        {copy !== undefined && (
+          <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="gray"
+              aria-label={`Copy ${title}`}
+              disabled={!copy}
+              onClick={() => copier.copy(copy)}
+            >
+              {copier.copied ? <Check size={14} /> : <icons.copy size={14} />}
+            </ActionIcon>
+          </Tooltip>
+        )}
       </Group>
-      <Spoiler
-        maxHeight={120}
-        showLabel="Expand"
-        hideLabel="Collapse"
-        showAriaLabel={`Expand ${title}`}
-        hideAriaLabel={`Collapse ${title}`}
-      >
-        <Stack gap={6}>{children}</Stack>
-      </Spoiler>
+      {children}
       {after}
     </Stack>
   );
 }
 
-/** Label and value lines, as a section copies its rows. */
-const rowsText = (rows: Row[]) =>
-  rows
-    .filter(([, value]) => value !== pendingValue)
-    .map(([label, value]) => `${label}: ${value}`)
-    .join("\n");
-
-/** The gallery caption in the prompt's style, then its tags. */
+/** The gallery caption in the prompt's style, folding until Expand when long, then all its tags. */
 function Caption({ item }: { item: MediaItem }) {
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
   const tags = [...(caption.tags || [])].sort((a, b) => a.localeCompare(b));
   return (
-    <DetailSection
-      title="Caption"
-      copy={[caption.text, tags.join(", ")].filter(Boolean).join("\n")}
-    >
-      {caption.text && <DetailText>{caption.text}</DetailText>}
+    <DetailSection title="Caption">
+      {caption.text && (
+        <Spoiler
+          maxHeight={120}
+          showLabel="Expand"
+          hideLabel="Collapse"
+          showAriaLabel="Expand Caption"
+          hideAriaLabel="Collapse Caption"
+        >
+          <DetailText>{caption.text}</DetailText>
+        </Spoiler>
+      )}
       {!!tags.length && (
         <Group gap={4} aria-label="Caption Tags">
           {tags.map((tag) => (
@@ -364,7 +358,7 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
 function Section({ title, rows }: { title: string; rows: Row[] }) {
   if (!rows.length) return null;
   return (
-    <DetailSection title={title} copy={rowsText(rows)}>
+    <DetailSection title={title}>
       <Table
         variant="vertical"
         layout="fixed"
@@ -415,7 +409,7 @@ function Related({
 }) {
   if (!items.length) return null;
   return (
-    <DetailSection title={title} copy={items.map(mediaTitle).join("\n")}>
+    <DetailSection title={title}>
       {items.map((related) =>
         open ? (
           <Anchor
@@ -463,7 +457,7 @@ export function MediaDetails({
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
       {item.source && (
-        <DetailSection title="Source" copy={item.source.url}>
+        <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
             {item.source.title || item.source.url}
           </Anchor>
@@ -471,15 +465,12 @@ export function MediaDetails({
       )}
       <Related title="Derived" items={related.derived} open={open} />
       {details.profile && (
-        <DetailSection title="Model" copy={details.profile}>
+        <DetailSection title="Model">
           <Text size="sm">{details.profile}</Text>
         </DetailSection>
       )}
       {!!details.loras.length && (
-        <DetailSection
-          title="LoRAs"
-          copy={details.loras.map((lora) => `${lora.name} ${lora.strength}`).join("\n")}
-        >
+        <DetailSection title="LoRAs">
           {details.loras.map((lora) => (
             <Group key={lora.name} justify="space-between" wrap="nowrap" gap="xs">
               <Text size="sm" truncate>
@@ -493,13 +484,7 @@ export function MediaDetails({
         </DetailSection>
       )}
       {!!(details.references.length || details.unused.length) && (
-        <DetailSection
-          title="References"
-          copy={[
-            ...details.references.map(referenceText),
-            ...details.unused.map((note) => `Not used: ${note}`),
-          ].join("\n")}
-        >
+        <DetailSection title="References">
           {details.references.map((reference) => {
             const address = `/api/reference-assets/${encodeURIComponent(reference.id)}`;
             const source = galleryReference(reference.id, [
