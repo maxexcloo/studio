@@ -5,6 +5,8 @@ import {
   fixtures,
   image,
   profiles,
+  promptOptions,
+  promptTool,
   serveProfiles,
   stamp,
   viewerAction,
@@ -169,8 +171,13 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     : viewer.getByRole("group", { name: "Generation Actions", exact: true });
   if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  // The editor shows the tools as buttons; elsewhere they are in the prompt's ⋯.
+  const askForChange = () =>
+    phone
+      ? surface.getByRole("button", { name: "Ask for a Change", exact: true }).click()
+      : promptTool(surface, "Prompt", "Ask for a Change");
   await field.fill("make it night");
-  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await askForChange();
   // The proposal replaces the text in place under the chosen action; Undo restores the request.
   await expect(field).toHaveValue("An amber bird at night");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -185,7 +192,7 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("make it night");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
-  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await askForChange();
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
   await surface.getByRole("button", { name: "Run", exact: true }).click();
@@ -229,8 +236,8 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
       });
     }),
   );
-  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  const options = await promptOptions(viewer, "Prompt", "Suggestions");
+  await options.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -252,10 +259,12 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's field carries a change typed over the prompt into the Chat; phones show it on the bar.
-  if (desktop)
+  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones show it on the
+  // bar.
+  if (desktop) {
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
-  await viewerAction(page, "Continue in Chat");
+    await promptTool(viewer, "Prompt", "Continue in Chat");
+  } else await viewerAction(page, "Continue in Chat");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/chat$/);
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(

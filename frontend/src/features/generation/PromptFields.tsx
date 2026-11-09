@@ -1,4 +1,4 @@
-import { Fragment, type Ref } from "react";
+import type { Ref } from "react";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -13,8 +13,8 @@ import {
 } from "./AskChange";
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
-import { usePromptIdeas } from "./PromptIdeas";
-import { PromptHistory } from "./PromptHistory";
+import type { usePromptIdeas } from "./PromptIdeas";
+import { usePromptHistory } from "./PromptHistory";
 import classes from "./PromptFields.module.css";
 
 type Operation = Draft["operation"];
@@ -82,7 +82,7 @@ export function PromptFields({
   textareaRef,
   autoFocus = false,
   fill = false,
-  ideas: offerIdeas = false,
+  ideaFocus,
   ask,
 }: {
   input: GenerationInput;
@@ -97,8 +97,8 @@ export function PromptFields({
   autoFocus?: boolean;
   /** Fills the phone Generate sheet: the prompt takes the room left above the settings, typed in place. */
   fill?: boolean;
-  /** Offers taste-led prompt ideas while the prompt is empty and focused. */
-  ideas?: boolean;
+  /** Asks for prompt ideas once the prompt is focused (`usePromptIdeas`). */
+  ideaFocus?: ReturnType<typeof usePromptIdeas>["focusProps"];
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
 }) {
@@ -127,31 +127,25 @@ export function PromptFields({
         }
       : undefined,
   });
-  const ideas = usePromptIdeas({
-    kind: input.kind,
-    empty: !input.prompt.trim(),
+  const history = usePromptHistory({
+    kind: "positive",
+    value: input.prompt,
     onPick: (prompt) => onChange({ prompt }),
-    className: classes.ideas,
+  });
+  const negativeHistory = usePromptHistory({
+    kind: "negative",
+    value: input.negative,
+    onPick: (negative) => onChange({ negative }),
   });
   return (
     <>
-      <div
-        className={classes.area}
-        data-fill={fill || undefined}
-        {...(offerIdeas ? ideas.focusProps : {})}
-      >
+      <div className={classes.area} data-fill={fill || undefined} {...ideaFocus}>
         <TextBox
           ref={textareaRef}
-          tools={[
-            assistant.action && <Fragment key="assistant">{assistant.action}</Fragment>,
-            <PromptHistory
-              key="history"
-              kind="positive"
-              value={input.prompt}
-              onPick={(prompt) => onChange({ prompt })}
-            />,
-            proposal && <UndoButton key="undo" onClick={ask.undo} />,
-          ]}
+          tools={assistant.action ? [assistant.action, history.action] : [history.action]}
+          send={proposal && <UndoButton onClick={ask.undo} />}
+          busy={assistant.working}
+          popups={history.popup}
           data-expanded-prompt
           classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
           className={proposal ? proposedClass : undefined}
@@ -177,21 +171,15 @@ export function PromptFields({
               ask.undo();
             }
           }}
-          overlay={offerIdeas && ideas.ideas}
           below={assistant.suggestions}
         />
+        {assistant.dialog}
       </div>
       {negative && (
         <div className={classes.negative} data-fill={fill || undefined}>
           <TextBox
-            tools={[
-              <PromptHistory
-                key="history"
-                kind="negative"
-                value={input.negative}
-                onPick={(negative) => onChange({ negative })}
-              />,
-            ]}
+            tools={[negativeHistory.action]}
+            popups={negativeHistory.popup}
             classNames={{ input: classes.input }}
             variant="unstyled"
             aria-label="Negative Prompt"

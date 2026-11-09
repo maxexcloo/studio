@@ -1,24 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Loader,
-  Menu,
-  Modal,
-  Stack,
-  Text,
-  Tooltip,
-} from "@mantine/core";
+import { Button, Group, Modal, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { Check } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, failure, request } from "../../api";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import classes from "./PromptAssistant.module.css";
+import type { Action as ToolAction } from "../gallery/ActionBar";
 
 interface AssistantStatus {
   available: boolean;
@@ -77,7 +66,10 @@ async function referenceImage(asset: ReferenceAsset, signal: AbortSignal) {
   }
 }
 
-/** The prompt box's assistance action and any LoRA suggestions it produced. */
+/**
+ * The prompt box's assistance tool (Improve Prompt, Stop Assistance while it works), what it is
+ * doing, its Custom… dialog and any LoRA suggestions it produced.
+ */
 export function usePromptAssistant({
   input,
   profile,
@@ -299,7 +291,7 @@ export function usePromptAssistant({
     });
   }
   if (!info?.available || !profile || !info.presets.length)
-    return { action: null, suggestions: null };
+    return { action: null, working: undefined, dialog: null, suggestions: null };
   const disabled = !input.prompt.trim();
   const run = (action: Action, style?: string) => {
     if (style) setPresetId(style);
@@ -310,85 +302,64 @@ export function usePromptAssistant({
   const styles = info.presets
     .filter((item) => item.id !== "custom")
     .sort((a, b) => a.label.localeCompare(b.label));
-  const customItem = custom && (
-    <Menu.Item
-      // A change can write a prompt from nothing; the Custom style rewrites one.
-      disabled={!change && disabled}
-      aria-label="Improve Prompt: Custom…"
-      onClick={() => setAsking(true)}
-    >
-      Custom…
-    </Menu.Item>
-  );
-  const working = assistance.variables && workingLabels[assistance.variables.action];
-  // While it works the action spins; hovering or focusing it offers Stop. A change can't be stopped.
-  const menu = change?.pending ? (
-    <ActionIcon variant="subtle" color="gray" aria-label="Prompt Assistance" loading />
-  ) : assistance.isPending ? (
-    <Tooltip label={`${working} Click to Stop.`}>
-      <ActionIcon
-        className={classes.working}
-        variant="subtle"
-        color="gray"
-        aria-label="Stop Assistance"
-        aria-description={working}
-        onClick={() => controller.current?.abort()}
-      >
-        <span className={classes.icons}>
-          <Loader className={classes.spinner} size={16} />
-          <icons.stop className={classes.stop} size={14} />
-        </span>
-      </ActionIcon>
-    </Tooltip>
-  ) : (
-    <Menu position="top-end" width={240}>
-      <Tooltip label="Prompt Assistance">
-        <Menu.Target>
-          <ActionIcon variant="subtle" color="gray" aria-label="Prompt Assistance">
-            <icons.assistant size={16} />
-          </ActionIcon>
-        </Menu.Target>
-      </Tooltip>
-      <Menu.Dropdown data-composer-layer>
-        {styles.length > 1 ? (
-          <>
-            <Menu.Label>Improve Prompt</Menu.Label>
-            {/* Each style is a choice that runs at once; the last one used carries a check. */}
-            {styles.map((item) => (
-              <Menu.Item
-                key={item.id}
-                disabled={disabled}
-                aria-label={`Improve Prompt: ${item.label}`}
-                rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
-                onClick={() => run("rewrite", item.id)}
-              >
-                {item.label}
-              </Menu.Item>
-            ))}
-            {customItem}
-          </>
-        ) : (
-          <>
-            <Menu.Item disabled={disabled} onClick={() => run("rewrite", preset?.id)}>
-              Improve Prompt
-            </Menu.Item>
-            {customItem}
-          </>
-        )}
-        {(negativeOffered || lorasOffered) && <Menu.Divider />}
-        {lorasOffered && (
-          <Menu.Item disabled={disabled} onClick={() => run("loras")}>
-            Suggest LoRAs
-          </Menu.Item>
-        )}
-        {negativeOffered && (
-          <Menu.Item disabled={disabled} onClick={() => run("negative")}>
-            Write Negative
-          </Menu.Item>
-        )}
-      </Menu.Dropdown>
-    </Menu>
-  );
+  const improve: ToolAction[] = [
+    // Each style is a choice that runs at once; the last one used carries a check.
+    ...(styles.length > 1
+      ? styles.map((item) => ({
+          id: `style:${item.id}`,
+          label: item.label,
+          checked: item.id === preset?.id,
+          disabled,
+          onClick: () => run("rewrite", item.id),
+        }))
+      : [
+          {
+            id: "improve",
+            label: "Improve Prompt",
+            disabled,
+            onClick: () => run("rewrite", preset?.id),
+          },
+        ]),
+    ...(custom
+      ? [
+          {
+            id: "custom",
+            label: "Custom…",
+            // A change can write a prompt from nothing; the Custom style rewrites one.
+            disabled: !change && disabled,
+            onClick: () => setAsking(true),
+          },
+        ]
+      : []),
+  ];
+  const more: ToolAction[] = [
+    ...(lorasOffered
+      ? [{ id: "loras", label: "Suggest LoRAs", disabled, onClick: () => run("loras") }]
+      : []),
+    ...(negativeOffered
+      ? [{ id: "negative", label: "Write Negative", disabled, onClick: () => run("negative") }]
+      : []),
+  ];
+  const working = change?.pending
+    ? "Asking for a Change…"
+    : assistance.isPending && assistance.variables
+      ? workingLabels[assistance.variables.action]
+      : undefined;
+  // While it works the box's ⋯ spins and this offers Stop. A change can't be stopped.
+  const action: ToolAction = assistance.isPending
+    ? {
+        id: "assistant",
+        label: "Stop Assistance",
+        icon: icons.stop,
+        onClick: () => controller.current?.abort(),
+      }
+    : {
+        id: "assistant",
+        label: "Improve Prompt",
+        icon: icons.assistant,
+        disabled: change?.pending,
+        menu: [improve, more],
+      };
   // A change lands in the prompt as a proposal; the Custom style's rewrite, ready to edit.
   function ask(text: string) {
     setAsking(false);
@@ -399,58 +370,54 @@ export function usePromptAssistant({
       assistance.mutate({ action: "rewrite", preset: "custom", instruction: text });
     }
   }
-  const action = (
-    <>
-      {menu}
-      <Modal
-        opened={asking}
-        onClose={() => setAsking(false)}
-        title="Custom Improvement"
-        centered
-        size="sm"
-        fullScreen={phone}
+  const dialog = (
+    <Modal
+      opened={asking}
+      onClose={() => setAsking(false)}
+      title="Custom Improvement"
+      centered
+      size="sm"
+      fullScreen={phone}
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          // React carries a submit through the portal to the composer's own form, which would Generate.
+          event.stopPropagation();
+          if (instruction.trim()) ask(instruction.trim());
+        }}
       >
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            // React carries a submit through the portal to the composer's own form, which would Generate.
-            event.stopPropagation();
-            if (instruction.trim()) ask(instruction.trim());
-          }}
-        >
-          <Stack>
-            <TextBox
-              label="Change"
-              placeholder="What should change, like “make it night”"
-              autosize
-              minRows={3}
-              // The dialog is already full screen on phones.
-              inline
-              data-autofocus
-              value={instruction}
-              onChange={setInstruction}
-              // Enter improves the prompt; Shift+Enter adds a line.
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing)
-                  return;
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }}
-            />
-            <Group justify="flex-end">
-              {/* A suggestion fills the request and asks at once. */}
-              {change?.suggestions?.((request) => {
-                setInstruction(request);
-                ask(request);
-              })}
-              <Button type="submit" disabled={!instruction.trim()}>
-                Improve Prompt
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
-    </>
+        <Stack>
+          <TextBox
+            label="Change"
+            placeholder="What should change, like “make it night”"
+            autosize
+            minRows={3}
+            // The dialog is already full screen on phones.
+            inline
+            data-autofocus
+            value={instruction}
+            onChange={setInstruction}
+            // Enter improves the prompt; Shift+Enter adds a line.
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }}
+          />
+          <Group justify="flex-end">
+            {/* A suggestion fills the request and asks at once. */}
+            {change?.suggestions?.((request) => {
+              setInstruction(request);
+              ask(request);
+            })}
+            <Button type="submit" disabled={!instruction.trim()}>
+              Improve Prompt
+            </Button>
+          </Group>
+        </Stack>
+      </form>
+    </Modal>
   );
   const list = suggestions.length ? (
     <Stack gap="xs">
@@ -483,5 +450,5 @@ export function usePromptAssistant({
       })}
     </Stack>
   ) : null;
-  return { action, suggestions: list };
+  return { action, working, dialog, suggestions: list };
 }
