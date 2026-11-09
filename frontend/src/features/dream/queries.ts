@@ -33,6 +33,8 @@ export interface Dream {
   unseen: DreamItem[];
   spicyAvailable: boolean;
   status: DreamStatus;
+  /** Why Dream is waiting or can't run, where the backend says. */
+  reason?: string;
 }
 
 export const dreamQuery = queryOptions({

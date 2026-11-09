@@ -6,6 +6,7 @@ import {
   ScrollArea,
   SegmentedControl,
   Stack,
+  Text,
   Tooltip,
 } from "@mantine/core";
 import { icons } from "../../ui/icons";
@@ -122,6 +123,11 @@ export function DreamPage() {
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
+      {data?.status === "unavailable" && data.reason && (
+        <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
+          Can’t Run: {data.reason}
+        </Text>
+      )}
       {view === "discarded" ? (
         <DiscardedDreams />
       ) : view === "taste" ? (

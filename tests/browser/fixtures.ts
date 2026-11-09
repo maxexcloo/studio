@@ -1113,6 +1113,8 @@ export async function serveDream(
     spicyAvailable?: boolean;
     /** Older gallery images offered for calibration until judged. */
     calibration?: any[];
+    /** Why Dream can't run, which makes it unavailable. */
+    reason?: string;
   } = {},
 ) {
   const state = {
@@ -1135,9 +1137,15 @@ export async function serveDream(
   const show = () => ({
     settings: state.settings,
     unseen: state.unseen,
-    today: { images: 3, videos: 0 },
     spicyAvailable: state.spicyAvailable,
-    status: !state.settings.enabled ? "off" : state.settings.paused ? "paused" : "waiting",
+    status: !state.settings.enabled
+      ? "off"
+      : state.settings.paused
+        ? "paused"
+        : options.reason
+          ? "unavailable"
+          : "waiting",
+    reason: options.reason,
   });
   await page.route(/\/api\/dream(?:\/.*)?$/, (route) => {
     const request = route.request();

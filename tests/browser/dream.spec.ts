@@ -84,6 +84,15 @@ test("Dream explains itself while off and saves its settings on the deck", async
   expect(dream.settings.paused).toBe(true);
 });
 
+test("Dream says why it can't run", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { reason: "The text model is offline." });
+  await page.goto("/dream");
+  await expect(page.getByRole("status", { name: "Dream Status" })).toContainText(
+    "The text model is offline.",
+  );
+});
+
 test("Animate keeps a Dream image and stages it in the Videos composer", async ({ page }) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
