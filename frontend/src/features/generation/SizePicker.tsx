@@ -66,7 +66,7 @@ export function SizePicker({
       ? `${active.label}${tiered ? ` · ${tier}` : ""}`
       : `${shown.w} × ${shown.h}`;
   return (
-    <Popover position="top-start" width={300} trapFocus {...(phone && fittedPopup)}>
+    <Popover position="top-start" width={300} trapFocus {...fittedPopup}>
       <Popover.Target>
         <Button
           {...chipProps}
