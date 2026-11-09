@@ -110,10 +110,10 @@ export function ChipPopup({
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
   /**
-   * Actions under the content: `start` (such as Save Preset), then `end` (such as Clear LoRAs).
-   * `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
+   * Actions under the content: `start` (such as Pin Current Prompt), with Clear and Save in the
+   * heading. `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
    */
-  footer?: { start?: ReactNode; end?: ReactNode; apply?: boolean };
+  footer?: { start?: ReactNode; apply?: boolean };
   aside?: ReactNode;
   children: ReactNode;
 }) {
@@ -136,10 +136,7 @@ export function ChipPopup({
       <Group gap="xs" wrap="nowrap">
         {footer.start}
       </Group>
-      <Group gap="xs" wrap="nowrap">
-        {footer.end}
-        {phone && footer.apply && <Button onClick={close}>Apply</Button>}
-      </Group>
+      {phone && footer.apply && <Button onClick={close}>Apply</Button>}
     </Group>
   );
   if (phone && !floating)
@@ -163,11 +160,16 @@ export function ChipPopup({
             {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
             <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
-              <Modal.Title>{title}</Modal.Title>
-              <Group gap="xs" wrap="nowrap">
-                {headerEnd}
-                <Modal.CloseButton aria-label={`Close ${title}`} />
-              </Group>
+              {/* The actions wrap under the title when they don't fit beside it; Close stays put. */}
+              <div className={classes.sheetHeading}>
+                <Modal.Title>{title}</Modal.Title>
+                {headerEnd && (
+                  <Group gap="xs" wrap="nowrap" ml="auto" miw={0}>
+                    {headerEnd}
+                  </Group>
+                )}
+              </div>
+              <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
             <Modal.Body className={classes.sheetBody}>
               {children}
@@ -745,10 +747,11 @@ export function SaveCurrent({
       </Button>
     );
   return (
-    <Group className={classes.reveal} gap="xs" wrap="nowrap">
+    <Group className={classes.reveal} gap="xs" wrap="nowrap" miw={0}>
       <TextInput
         autoFocus
         size={compact ? "xs" : undefined}
+        miw={0}
         aria-label={`${noun} Name`}
         placeholder={`${noun} name`}
         value={name}
