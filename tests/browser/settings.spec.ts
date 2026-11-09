@@ -61,6 +61,11 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect(workers).toContainText("Listed by the deployment in STUDIO_WORKERS");
   await expect(workers).toContainText("Image Worker");
   await expect(workers).toContainText("Images, Upscale, Model Library · http://comfyui-image:8188");
+  // Each worker's health and work: what runs, what waits, what it last ran and when it frees up.
+  await expect(workers).toContainText(
+    /Running · Busy · 2 Queued · Last Ran .+ · 8\.0 GiB Free · Free in about [45] min/,
+  );
+  await expect(workers).toContainText("Offline · Idle · 0 Queued");
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);

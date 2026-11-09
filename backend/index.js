@@ -47,6 +47,7 @@ import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
+import { workerLoads } from "./queue-eta.js";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
@@ -219,6 +220,14 @@ const localText = runtime ? createLocalText({ controller: runtime.controller }) 
 const mcp = registerMcpRoutes(app, {
   dataDir,
   runtime: runtime?.controller,
+  workerStatus: async () =>
+    (
+      await observeServices({
+        allowed: [],
+        administrator: true,
+        loads: workerLoads(generationQueue),
+      })
+    ).workers,
   gatewayAdminTools,
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) => hostAllowed(req.headers.host, { network: networkListening }),

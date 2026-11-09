@@ -12,7 +12,7 @@ import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { dataDir, gallery, visibleGallery } from "./gallery/store.js";
 import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
-import { queueSchedule, runEstimate } from "./queue-eta.js";
+import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { upscaleQualities } from "./upscale.js";
 import { capabilityForProfile, listWorkers, workerSource } from "./workers.js";
 
@@ -38,11 +38,14 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       .filter((job) => ["waiting", "starting"].includes(job.status))
       .map((job) => job.backend)
       .filter(Boolean);
+    const administrator = !req.studioAccount || canAdmin(req);
     res.json(
       await observeServices({
         allowed: ["image", "video", "text"],
-        administrator: !req.studioAccount || canAdmin(req),
+        administrator,
         waitingWorkers,
+        // Each worker's work and its loaded model are for administrators only.
+        ...(administrator ? { loads: workerLoads(queue) } : {}),
       }),
     );
   });
