@@ -12,37 +12,59 @@ import {
 } from "../generation/GenerationProvider";
 import { backendLabel, generationInput, isProfile, profileName } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
+import { isCloudProfile } from "../../../../shared/profiles";
 
 type Operation = "image" | "refine" | "animate" | "extend";
 type AnimateTier = "fast" | "quality";
+export type AnimateWhere = "auto" | "local" | "cloud";
+/** Whether the account has local and Cloud video profiles, so Animate offers Local GPU or Cloud. */
+export interface AnimateOffers {
+  local: boolean;
+  cloud: boolean;
+}
 
 interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;
   size?: { width: number; height: number };
-  /** Fast and Quality when they run different profiles, so Animate offers the choice. */
+  /** Fast and Quality when they run different profiles in the pool, so Animate offers the choice. */
   tiers: AnimateTier[];
+  offers: AnimateOffers;
 }
 
 /** Animate's Fast or Quality choice, shared by every Animate menu; Fast until Quality is picked. */
 export const useAnimateTier = () => useRemembered<AnimateTier>("animate-tier", "fast");
+/** Animate's Local GPU or Cloud choice, shared by every Animate and Extend menu; Auto until picked. */
+export const useAnimateWhere = () => useRemembered<AnimateWhere>("animate-where", "auto");
 /** Animate's Review Prompt First: themes write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
 
+/** Animate's remembered choices, as every Animate menu and writer passes them. */
+interface AnimateOptions {
+  tier?: AnimateTier;
+  where?: AnimateWhere;
+}
+/** Animate's remembered Fast or Quality and Local GPU or Cloud. */
+const useAnimateOptions = (): AnimateOptions => {
+  const [tier] = useAnimateTier();
+  const [where] = useAnimateWhere();
+  return { tier, where };
+};
+
 /** The video profile that animates this image (backend/animate-profile.js), or why none can. */
 export const animateProfileQuery = (
   item: Pick<MediaItem, "width" | "height">,
-  tier: AnimateTier = "fast",
+  { tier = "fast", where = "auto" }: AnimateOptions = {},
 ) =>
   queryOptions({
-    queryKey: ["animate-profile", item.width || 0, item.height || 0, tier],
+    queryKey: ["animate-profile", item.width || 0, item.height || 0, tier, where],
     queryFn: () =>
       api<AnimateChoice>(
-        `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}&tier=${tier}`,
+        `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}&tier=${tier}&where=${where}`,
       ),
     staleTime: 5000,
     retry: false,
@@ -55,7 +77,7 @@ export async function mediaDraft(
   profiles: Profile[],
   client: QueryClient,
   sessionId?: string,
-  tier?: AnimateTier,
+  animate: AnimateOptions = {},
 ) {
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
   const priorId = String(item.settings?.profileId || "");
@@ -71,10 +93,11 @@ export async function mediaDraft(
     priorId ? isProfile(profile, priorId) : profile.model === item.model,
   );
   // Animating an image takes Animate's own pick, so the composer shows the model that will run; a
-  // video continues on its own model unless that is unavailable or stopped.
+  // video continues on its own model unless Cloud is picked or its model is unavailable or stopped.
   const choice =
-    targetKind === "video" && (item.type === "image" || original?.ready === false || !original)
-      ? await client.fetchQuery(animateProfileQuery(item, tier))
+    targetKind === "video" &&
+    (item.type === "image" || animate.where === "cloud" || original?.ready === false || !original)
+      ? await client.fetchQuery(animateProfileQuery(item, animate))
       : undefined;
   const profile =
     (choice && profiles.find((profile) => isProfile(profile, choice.profileId))) ||
@@ -198,12 +221,24 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
   const navigate = useNavigate();
   const location = useLocation();
   const client = useQueryClient();
-  const [tier] = useAnimateTier();
+  const animate = useAnimateOptions();
   const openComposer = useOpenComposer();
   return useMutation({
     mutationFn: async (operation: Operation) => {
-      const { draft, note } = await mediaDraft(item, operation, profiles, client, sessionId, tier);
-      if (note) notifications.show({ message: note });
+      const { profile, draft, note } = await mediaDraft(
+        item,
+        operation,
+        profiles,
+        client,
+        sessionId,
+        animate,
+      );
+      // The composer's profile chip doesn't say where a video runs.
+      const cloud =
+        draft.input.kind === "video" && isCloudProfile(profile)
+          ? `This runs on ${profileName(profile)} · Cloud.`
+          : undefined;
+      if (note || cloud) notifications.show({ message: note || cloud });
       // Chat stages a card with its own input; the gallery loads the composer.
       if (location.pathname.startsWith("/chat")) setStaged(draft);
       else setDraft(draft);
@@ -248,7 +283,7 @@ type PromptOperation = "image" | "refine" | "animate";
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
   const client = useQueryClient();
-  const [tier] = useAnimateTier();
+  const options = useAnimateOptions();
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
@@ -260,7 +295,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
         profiles,
         client,
         sessionId,
-        tier,
+        options,
       );
       if (note) notifications.show({ message: note });
       const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
@@ -321,10 +356,11 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
   });
 }
 
-/** The prompt Review Prompt First shows, with the video model (and Fast or Quality) that will run it. */
+/** The prompt Review Prompt First shows, with the video model (Fast or Quality, Cloud) that will run it. */
 interface AnimateReview extends WrittenPrompt {
   profileLabel: string;
   tier?: AnimateTier;
+  cloud: boolean;
 }
 
 /**
@@ -334,7 +370,7 @@ interface AnimateReview extends WrittenPrompt {
 export function useAnimateWriter(item: MediaItem, sessionId?: string) {
   const { profiles } = useGenerationActions();
   const client = useQueryClient();
-  const [tier] = useAnimateTier();
+  const animate = useAnimateOptions();
   return useMutation({
     // Its failure shows in the dialog.
     meta: { inlineError: true },
@@ -353,7 +389,7 @@ export function useAnimateWriter(item: MediaItem, sessionId?: string) {
         profiles,
         client,
         sessionId,
-        tier,
+        animate,
       );
       // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.
       const { duration, frames, fps } = generationInput(
@@ -381,7 +417,8 @@ export function useAnimateWriter(item: MediaItem, sessionId?: string) {
         model: written.model,
         thinking: written.thinking,
         profileLabel: profileName(profile),
-        tier: choice && choice.tiers.length > 1 ? tier : undefined,
+        tier: choice && choice.tiers.length > 1 ? animate.tier : undefined,
+        cloud: isCloudProfile(profile),
       };
     },
   });
