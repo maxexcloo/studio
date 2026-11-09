@@ -354,7 +354,8 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
   test.skip(!testInfo.project.use.isMobile, "Touch screens only");
   await page.setViewportSize({ width: 844, height: 390 });
   await galleryFixture(page);
-  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  // The phone layout hides More on a tile without a caption.
+  await tileMenu(page);
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
   const bottom = async () => {
