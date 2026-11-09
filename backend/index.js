@@ -371,7 +371,6 @@ const observeServices = createServicesObserver({
   workers: listWorkers,
   controller: runtime?.controller,
 });
-registerStatusRoutes(app, { observeServices, store });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
 // Cloud profiles are granted by the Cloud Models feature, so they are listed apart.
 const discoveredProfiles = async () => {
@@ -613,6 +612,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   runtime,
   store,
 });
+registerStatusRoutes(app, { observeServices, queue: generationQueue });
 // Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
 function chatTitle(account, sessionId, prompt) {
   return sessionChat.title(account?.userId || "", sessionId, prompt);
