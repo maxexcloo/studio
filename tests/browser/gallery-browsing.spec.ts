@@ -8,6 +8,7 @@ import {
   selectionAction,
   showOnly,
   stamp,
+  touch,
 } from "./fixtures";
 const results = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
@@ -191,26 +192,11 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   test.skip(!testInfo.project.use.isMobile, "Touch gesture applies to phone projects");
   const state = await fixtures(page);
   state.gallery.push(...results(2));
+  // With captions shown, holding selects; without, it opens the tile's menu (tile-actions.spec.ts).
+  state.preferences.preferences.tileCaptions = true;
   await page.goto("/images");
   const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
   const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
-  async function touch(target: typeof first, type: string, y = 100) {
-    await target.evaluate(
-      (element, { type, y }) => {
-        const contact = { identifier: 1, target: element, clientX: 100, clientY: y };
-        const touches = type === "touchend" ? [] : [contact];
-        const event = document.createEvent("TouchEvent");
-        event.initEvent(type, true, true);
-        Object.defineProperties(event, {
-          touches: { value: touches },
-          targetTouches: { value: touches },
-          changedTouches: { value: [contact] },
-        });
-        element.dispatchEvent(event);
-      },
-      { type, y },
-    );
-  }
   await touch(first, "touchstart");
   await touch(first, "touchmove", 140);
   await touch(first, "touchend", 140);

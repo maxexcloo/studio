@@ -16,7 +16,7 @@ import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
+import { SessionList } from "../sessions/ChatWorkspace";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
@@ -146,7 +146,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Group gap="xs" wrap="nowrap">
-              {chats ? <NewChatAction onDone={close} /> : <QueueActions />}
+              {!chats && <QueueActions />}
               <Drawer.CloseButton aria-label={`Close ${title}`} />
             </Group>
           </Drawer.Header>
