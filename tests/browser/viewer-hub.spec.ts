@@ -1399,3 +1399,32 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
     release();
   }
 });
+
+test("A tablet's viewer bar shows every action without scrolling", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "tablet-study",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Tablet Study",
+    width: 1024,
+    height: 1024,
+  });
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Tablet Study", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const remove = viewer.getByRole("button", { name: "Delete", exact: true });
+  await expect(remove).toBeVisible();
+  // Touch targets outgrow one row, so the bar wraps rather than scrolling Delete out of sight.
+  const clipped = () =>
+    remove.evaluate((button) => {
+      const actions = button.closest('[role="group"] > *')!.getBoundingClientRect();
+      const { left, right } = button.getBoundingClientRect();
+      return left < actions.left || right > actions.right;
+    });
+  await expect.poll(clipped).toBe(false);
+});
