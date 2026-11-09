@@ -84,7 +84,7 @@ function Media({ item, playing }: { item: MediaItem; playing: boolean }) {
     );
   return (
     <img
-      src={item.type === "video" ? source.thumbnailUrl || source.url : source.url}
+      src={item.type === "video" ? source.thumbnailUrl || source.url : source.displayUrl}
       alt={item.prompt || "Dream image"}
       draggable={false}
       decoding="async"
@@ -99,7 +99,7 @@ function usePrefetch(card?: DeckCard) {
     if (!card) return;
     for (const item of card.kind === "pair" ? card.items : [card.item]) {
       const source = mediaSource(item);
-      new Image().src = item.type === "video" ? source.thumbnailUrl || "" : source.url;
+      new Image().src = item.type === "video" ? source.thumbnailUrl || "" : source.displayUrl;
     }
   }, [card]);
 }

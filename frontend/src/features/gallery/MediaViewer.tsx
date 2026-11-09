@@ -201,7 +201,7 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
           .filter((item) => item?.type === "image" && item.status === "done")
-          .map((item) => mediaSource(item).url);
+          .map((item) => mediaSource(item).displayUrl);
   const key = urls.join("\n");
   useEffect(() => {
     const keep = new Map<string, HTMLImageElement>();
@@ -541,7 +541,7 @@ export function MediaViewer({
                         src={
                           candidate.type === "video"
                             ? mediaSource(candidate).thumbnailUrl
-                            : mediaSource(candidate).url
+                            : mediaSource(candidate).displayUrl
                         }
                         alt={candidate.prompt || "Generated Image"}
                         draggable={false}
@@ -626,7 +626,7 @@ export function MediaViewer({
                     <Suspense fallback={<LoadingState label="Loading Image" fill />}>
                       <ZoomImage
                         key={item.id}
-                        src={source.url}
+                        src={source.displayUrl}
                         alt={item.prompt || "Generated Image"}
                         placeholder={source.thumbnailUrl}
                         width={source.width}
