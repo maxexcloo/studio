@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
 import { animateProfile, frameSize } from "../animate-profile.js";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import {
   assertAdjustable,
   maxJobsPerCall,
@@ -198,9 +198,9 @@ export class McpMedia {
     this.stopping = new AbortController();
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
-    this.file = path.join(dataDir, "mcp-ownership.json");
+    this.dataDir = dataDir;
     try {
-      this.state = readJsonFile(this.file);
+      this.state = readRuntimeDocument(dataDir, "mcp-ownership");
     } catch (error) {
       if (error.code !== "ENOENT")
         throw new Error("MCP ownership data could not be read. Restore it before enabling MCP.");
@@ -263,7 +263,7 @@ export class McpMedia {
     return typeof this.publicBase === "function" ? this.publicBase() : this.publicBase;
   }
   save() {
-    writeJsonFile(this.file, this.state, { mode: 0o600 });
+    writeRuntimeDocument(this.dataDir, "mcp-ownership", this.state);
   }
   digest(value) {
     return crypto.createHmac("sha256", this.key).update(value).digest("hex");
