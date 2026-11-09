@@ -111,7 +111,6 @@ export function useGalleryUpload(onUploaded: () => void) {
     });
     if (!uploaded) return;
     void client.invalidateQueries({ queryKey: ["gallery"] });
-    void client.invalidateQueries({ queryKey: ["reference-gallery"] });
     onUploaded();
   }
   return { upload, uploading };

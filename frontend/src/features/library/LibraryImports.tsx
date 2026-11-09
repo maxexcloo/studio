@@ -100,7 +100,6 @@ export function LibraryImports({
     onSuccess: () => {
       setUrl("");
       void client.invalidateQueries({ queryKey: ["gallery"] });
-      void client.invalidateQueries({ queryKey: ["reference-gallery"] });
     },
   });
   const redditLink = isRedditLink(url);
