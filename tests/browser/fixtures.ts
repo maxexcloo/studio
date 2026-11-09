@@ -1074,7 +1074,7 @@ export async function closeReferences(page: Page) {
   await expect(references).toBeHidden();
 }
 
-/** Saves the draft as a named stack or preset from its picker's footer. */
+/** Saves the draft as a named stack or preset from its picker. */
 export async function saveCurrent(page: Page, noun: "Preset" | "Stack", name: string) {
   await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
   const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });
