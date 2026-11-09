@@ -18,6 +18,7 @@ import {
   NavLink,
   Notification,
   Paper,
+  PasswordInput,
   Popover,
   rem,
   ScrollArea,
@@ -301,6 +302,10 @@ export function studioTheme({
       // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
       // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
       // page scrolls, instead of scrolling away and being pulled back a frame later.
+      // The show/hide toggle is a touch target on phones too.
+      PasswordInput: PasswordInput.extend({
+        vars: () => ({ root: phone ? { "--psi-button-size": rem(bar) } : {} }),
+      }),
       Popover: Popover.extend({
         defaultProps: {
           floatingStrategy: "fixed",
