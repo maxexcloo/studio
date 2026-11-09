@@ -1,5 +1,6 @@
 import {
   Button,
+  FocusTrap,
   NumberInput,
   Popover,
   SegmentedControl,
@@ -84,6 +85,8 @@ export function SizePicker({
           (event.target as HTMLElement).setAttribute("data-mantine-stop-propagation", "true");
         }}
       >
+        {/* Phones focus the popup itself, as ChipPopup does, so Width doesn't raise the keyboard. */}
+        {phone && <FocusTrap.InitialFocus />}
         {framed ? (
           <Stack gap="xs">
             <Text size="sm">The reference sets the output framing to {aspect}.</Text>
