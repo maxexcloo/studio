@@ -1535,7 +1535,7 @@ export function registerMcpRoutes(
         server,
         "reuse",
         "reuse result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. runs_on, only if asked, keeps animate or extend local or cloud. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
         {
           ...output,
           job_id: z
@@ -1552,6 +1552,7 @@ export function registerMcpRoutes(
           count: jobCount.default(1),
           theme: theme.optional(),
           length: z.number().optional(),
+          runs_on: z.enum(["local", "cloud"]).optional(),
           upscale_quality: z.enum(["fast", "balanced", "high"]).optional(),
         },
         async (
@@ -1568,6 +1569,7 @@ export function registerMcpRoutes(
             count,
             theme,
             length,
+            runs_on,
           },
           signal,
         ) => {
@@ -1579,6 +1581,8 @@ export function registerMcpRoutes(
             );
           if (length && !animating)
             throw new Error("length is for mode animate or extend. Call reuse again.");
+          if (runs_on && !animating)
+            throw new Error("runs_on is for mode animate or extend. Call reuse again.");
           if (theme === "custom" && !request)
             throw new Error("theme custom needs request: what should happen. Call reuse again.");
           if (upscale_quality && mode !== "upscale")
@@ -1660,11 +1664,15 @@ export function registerMcpRoutes(
             asksForCloud(request) ||
             asksForCloud(prompt) ||
             Boolean(named && isCloudProfile(named.profile));
+          if (named && runs_on && isCloudProfile(named.profile) !== (runs_on === "cloud"))
+            throw new Error(
+              `${named.profile.label || named.profile.id} doesn't run on ${runs_on}. Call reuse again without runs_on or profile_id.`,
+            );
           if (animating)
             plan = await media.animate(owner, id, output_index, item, {
               tier: wanted,
               count,
-              cloud,
+              where: runs_on || (cloud ? "cloud" : "auto"),
               length,
               profile: named?.profile,
               note: named?.note,

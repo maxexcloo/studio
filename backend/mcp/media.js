@@ -1351,7 +1351,7 @@ export class McpMedia {
       tier,
       prompt,
       count = 1,
-      cloud = false,
+      where = "auto",
       length,
       profile: named = null,
       note: namedNote = "",
@@ -1383,16 +1383,18 @@ export class McpMedia {
       ));
     }
     // A named profile picks the video model outright. As in the app, an extension otherwise continues
-    // on its video's own model while that runs, and anything else takes Animate's own pick.
+    // on its video's own model while that runs and is in the pool asked (`where`: auto, local or
+    // cloud, which always takes Animate's pick), and anything else takes Animate's own pick.
     const videos = await this.profiles("video", owner);
     const own =
       item.type === "video" &&
       !tier &&
-      !cloud &&
+      where !== "cloud" &&
       videos.find(
         (profile) =>
           profile.id === canonicalProfileId(item.settings.profileId) &&
           profile.mediaInputs?.length &&
+          !(where === "local" && isCloudProfile(profile)) &&
           !["offline", "parked"].includes(profile.availability),
       );
     let base = named || own;
@@ -1404,7 +1406,7 @@ export class McpMedia {
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
         tier,
-        where: cloud ? "cloud" : "auto",
+        where,
       });
       base = choice.profile;
       note = choice.note ? `${choice.note} Tell the user. ` : "";
