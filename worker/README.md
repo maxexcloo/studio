@@ -6,9 +6,8 @@ Radiance libraries. `source.json` pins ComfyUI; `sources.json` pins custom nodes
 Studio's custom nodes live in `comfyui/` and are copied directly from this
 checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 
-The deployment lives in kubelab. The image starts ComfyUI on port 8188 with the
-arguments in `CLI_ARGS` and retains compatible loaded models. Supply model
-directories and the GPU placement in the deployment.
+The image starts ComfyUI on port 8188 with arguments from `CLI_ARGS`. Supply
+model directories and GPU placement in the deployment, owned by kubelab.
 
 The image sets `HSA_TOOLS_DISABLE_REGISTER=1` to prevent ROCm from consuming a
 CPU core per idle worker. This disables HSA profiler/tool registration; override
@@ -31,6 +30,5 @@ MCP tools does. Runtime status and control are administrator-only at
 `/api/runtime`.
 
 CPU checks: `node --test backend/runtime/*.test.ts` and `mise run test:python`; no
-GPU is needed. The worker workflow performs bridge and packaging smoke checks
-before publication. A GPU startup and actual inference remain separate deployment
+GPU is needed. GPU startup and actual inference need separate deployment
 verification.
