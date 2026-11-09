@@ -101,7 +101,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   allowed(ownerId: string): boolean;
   /** Every gallery record, newest first. */
   items(): Iterable<Item>;
-  /** Whether the record shows in the gallery (not hidden, not in Dream's pool, its file present). */
+  /** Whether the work takes the record: one in the gallery, or also Dream's pool, with its file present. */
   visible(item: Item): boolean;
   /** Whether the item still needs the work; `all` and the pass's `target` during a pass. */
   wanted(item: Item, all: boolean, target?: PassTarget): boolean;

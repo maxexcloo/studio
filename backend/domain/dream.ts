@@ -12,7 +12,7 @@ import type { DomainResponse, GenerationAccount, GenerationScope } from "./admis
 import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts";
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
 import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
-import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
+import { itemValues, pairSignal, tasteSignal, type Taste } from "./taste.ts";
 import { logFailure } from "./log-failure.ts";
 import { contentRule, writerGuide } from "./writing-standard.ts";
 
@@ -35,6 +35,8 @@ export interface DreamOrigin {
   at: string;
   spicy?: true;
   pair?: DreamPair;
+  /** How the idea came about: "exploit", or "explore:<axis>" for the first thing it tried. */
+  arm?: string;
 }
 /**
  * One side of a Dream comparison: two results alike but for one thing (with the same seed), shown
@@ -44,9 +46,14 @@ export interface DreamPair {
   id: string;
   side: 0 | 1;
   question: string;
+  /** What varies: profile, lora, strength, steps, cfg or wording. */
+  axis: PairAxis;
   /** What this side has of the thing that varies, such as "30 Steps". */
   label: string;
+  /** That as a value: a profile id, LoRA name ("none" without), strength, steps, guidance or wording. */
+  value: string | number;
 }
+type PairAxis = "profile" | "lora" | "strength" | "steps" | "cfg" | "wording";
 export type PairAnswer = "a" | "b" | "both" | "neither";
 type DreamState = "unseen" | "kept" | "discarded";
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
@@ -873,6 +880,8 @@ export function createDream(options: {
       // its import's LoRAs where they fit, unless the account gave them a thumbs down.
       const spicy = record.settings.spicy && access.uncensored && chance(shares.spicy);
       const notes = [chosen.note];
+      // An idea may try several things beyond the taste profile; its arm names the first.
+      let arm = chosen.note ? "explore:profile" : "";
       let loras: DreamLora[] = [];
       if (inspiration) {
         const ratings = options.loraLibrary(ownerId)?.ratings;
@@ -885,10 +894,14 @@ export function createDream(options: {
             )
           : [];
         notes.push("Inspired by an import");
+        arm ||= "explore:prompt";
       } else if (chance(shares.lora)) {
         const [fresh] = chance(100 - shares.newLora) ? [] : libraryLoras(ownerId, profile, true);
         loras = fresh ? [fresh] : libraryLoras(ownerId, profile).slice(0, 1);
-        if (fresh) notes.push(`Testing ${loraLabel(fresh.name)}`);
+        if (fresh) {
+          notes.push(`Testing ${loraLabel(fresh.name)}`);
+          arm ||= "explore:lora";
+        }
       }
       const note = notes.filter(Boolean).join(" · ");
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
@@ -929,7 +942,13 @@ export function createDream(options: {
         { sessionId: session(ownerId, record), operation: kind === "video" ? "animate" : "image" },
         {
           priority: queuePriority.dream,
-          dream: { prompt: "", why: "", at: stamp(), ...(spicy ? { spicy: true as const } : {}) },
+          dream: {
+            prompt: "",
+            why: "",
+            at: stamp(),
+            ...(spicy ? { spicy: true as const } : {}),
+            arm: arm || "exploit",
+          },
         },
       );
       if (result.status >= 400) {
@@ -978,6 +997,7 @@ export function createDream(options: {
 
   type Side = {
     label: string;
+    value: string | number;
     profile: DreamProfile;
     loras: DreamLora[];
     settings?: GenerationInput;
@@ -1005,22 +1025,29 @@ export function createDream(options: {
         .filter((key) => input[key] !== undefined && input[key] !== "")
         .map((key) => [key, input[key]]),
     );
-    const same = (label: string, extra: Partial<Side> = {}): Side => ({
+    const same = (label: string, value: string | number, extra: Partial<Side> = {}): Side => ({
       label,
+      value,
       profile,
       loras,
       settings,
       ...extra,
     });
-    const choices: { question: string; sides: [Side, Side] }[] = [];
+    const choices: { question: string; axis: PairAxis; sides: [Side, Side] }[] = [];
     const others = profiles.filter((entry) => kindOf(entry) === "image" && entry.id !== profile.id);
     if (others.length) {
       const other = others[random(others.length)];
       choices.push({
         question: "Which Model?",
+        axis: "profile",
         sides: [
-          same(profile.label || profile.id),
-          { label: other.label || other.id, profile: other, loras: fit(other, loras) },
+          same(profile.label || profile.id, profile.id),
+          {
+            label: other.label || other.id,
+            value: other.id,
+            profile: other,
+            loras: fit(other, loras),
+          },
         ],
       });
     }
@@ -1028,9 +1055,10 @@ export function createDream(options: {
     if (first) {
       choices.push({
         question: "Which LoRA?",
+        axis: "lora",
         sides: [
-          same(`With ${loraLabel(first.name)}`),
-          same(`Without ${loraLabel(first.name)}`, { loras: loras.slice(1) }),
+          same(`With ${loraLabel(first.name)}`, first.name),
+          same(`Without ${loraLabel(first.name)}`, "none", { loras: loras.slice(1) }),
         ],
       });
       const [changed] = fit(profile, [
@@ -1045,9 +1073,10 @@ export function createDream(options: {
       if (changed && changed.strength !== first.strength)
         choices.push({
           question: "Which LoRA Strength?",
+          axis: "strength",
           sides: [
-            same(`${loraLabel(first.name)} ${first.strength}`),
-            same(`${loraLabel(changed.name)} ${changed.strength}`, {
+            same(`${loraLabel(first.name)} ${first.strength}`, first.strength),
+            same(`${loraLabel(changed.name)} ${changed.strength}`, changed.strength, {
               loras: [changed, ...loras.slice(1)],
             }),
           ],
@@ -1057,9 +1086,10 @@ export function createDream(options: {
       if (liked)
         choices.push({
           question: "Which LoRA?",
+          axis: "lora",
           sides: [
-            same(`Without ${loraLabel(liked.name)}`),
-            same(`With ${loraLabel(liked.name)}`, { loras: [liked] }),
+            same(`Without ${loraLabel(liked.name)}`, "none"),
+            same(`With ${loraLabel(liked.name)}`, liked.name, { loras: [liked] }),
           ],
         });
     }
@@ -1069,9 +1099,10 @@ export function createDream(options: {
       const next = steps <= 12 ? steps * 2 : Math.round(steps / 2);
       choices.push({
         question: "Which Steps?",
+        axis: "steps",
         sides: [
-          same(`${steps} Steps`),
-          same(`${next} Steps`, { settings: { ...settings, steps: next } }),
+          same(`${steps} Steps`, steps),
+          same(`${next} Steps`, next, { settings: { ...settings, steps: next } }),
         ],
       });
     }
@@ -1080,15 +1111,17 @@ export function createDream(options: {
       const next = roundTo(cfg >= 4 ? cfg - 2 : cfg + 2, 0.5);
       choices.push({
         question: "Which Guidance?",
+        axis: "cfg",
         sides: [
-          same(`Guidance ${cfg}`),
-          same(`Guidance ${next}`, { settings: { ...settings, cfg: next } }),
+          same(`Guidance ${cfg}`, cfg),
+          same(`Guidance ${next}`, next, { settings: { ...settings, cfg: next } }),
         ],
       });
     }
     choices.push({
       question: "Which Wording?",
-      sides: [same("Original Wording"), same("New Wording", { reword: true })],
+      axis: "wording",
+      sides: [same("Original Wording", "original"), same("New Wording", "new", { reword: true })],
     });
     return choices;
   }
@@ -1106,7 +1139,7 @@ export function createDream(options: {
     const base = pairBase(ownerId, record, profiles);
     if (!base) return null;
     const choices = pairOptions(ownerId, base, profiles);
-    const { question, sides } = choices[random(choices.length)];
+    const { question, axis, sides } = choices[random(choices.length)];
     const ordered = random(2) ? [sides[1], sides[0]] : sides;
     const id = randomUUID();
     const seed = String(random(2 ** 32));
@@ -1130,14 +1163,27 @@ export function createDream(options: {
         allowFallback: false,
         referenceAssets: [],
       };
-      const pair: DreamPair = { id, side: index as 0 | 1, question, label: side.label };
+      const pair: DreamPair = {
+        id,
+        side: index as 0 | 1,
+        question,
+        axis,
+        label: side.label,
+        value: side.value,
+      };
       const result = await options.admit(
         input,
         access.account,
         { sessionId: session(ownerId, record), operation: "image" },
         {
           priority: queuePriority.dream,
-          dream: { prompt: side.reword ? "" : base.prompt, why: "", at, pair },
+          dream: {
+            prompt: side.reword ? "" : base.prompt,
+            why: "",
+            at,
+            pair,
+            arm: `explore:${axis}`,
+          },
         },
       );
       if (result.status >= 400) {
@@ -1264,10 +1310,7 @@ export function createDream(options: {
     options.mark(ownerId, itemId, dream);
     if (teach)
       options.taste.record(ownerId, [
-        tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, {
-          ...item.settings,
-          prompt: item.prompt,
-        }),
+        tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, itemValues(item)),
       ]);
     return { ...item, dream };
   }
@@ -1328,12 +1371,10 @@ export function createDream(options: {
       );
       const side = (item: DreamItem) => ({
         jobId: item.jobId,
-        values: { ...item.settings, prompt: item.prompt },
+        values: itemValues(item),
         label: item.dream!.pair!.label,
       });
-      options.taste.record(ownerId, [
-        pairSignal(a.dream!.pair!.question, answer, side(a), side(b)),
-      ]);
+      options.taste.record(ownerId, [pairSignal(a.dream!.pair!, answer, side(a), side(b))]);
       return items;
     },
     /** Keeps a result and steers the next few ideas toward it. */
@@ -1378,7 +1419,7 @@ export function createDream(options: {
       const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
         const item = pool.get(id);
         if (!item) throw failure("That gallery image is unavailable.", 404);
-        return tasteSignal(kind, item.jobId, { ...item.settings, prompt: item.prompt });
+        return tasteSignal(kind, item.jobId, itemValues(item));
       };
       options.taste.record(ownerId, [
         ...liked.map(signal("calibrate-like")),

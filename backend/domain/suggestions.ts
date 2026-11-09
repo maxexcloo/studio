@@ -317,7 +317,8 @@ export function createSuggestions({
       ...new Set(
         record.signals
           .filter((signal) => ["star", "compare", "keep"].includes(signal.kind) && signal.prompt)
-          .map((signal) => signal.prompt!),
+          // Signals keep whole prompts; a few opening sentences show the taste.
+          .map((signal) => signal.prompt!.slice(0, 300)),
       ),
     ].slice(0, 5);
     return {

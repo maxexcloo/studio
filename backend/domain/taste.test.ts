@@ -7,7 +7,13 @@ import path from "node:path";
 import test, { type TestContext } from "node:test";
 import express from "express";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
-import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./taste.ts";
+import {
+  createTaste,
+  itemValues,
+  preferenceSignal,
+  registerTasteRoutes,
+  tasteSignal,
+} from "./taste.ts";
 
 function tasteFixture(t: TestContext, options: Partial<Parameters<typeof createTaste>[0]> = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-taste-"));
@@ -18,22 +24,59 @@ function tasteFixture(t: TestContext, options: Partial<Parameters<typeof createT
   return createTaste({ dataDir, ...options });
 }
 
-test("signals keep their prompt, profile and enabled LoRAs, newest first, capped per account", (t) => {
+test("signals snapshot the whole result, newest first, capped per account", (t) => {
   const taste = tasteFixture(t);
-  assert.deepEqual(
-    tasteSignal("iterate", "job-1", {
-      prompt: `  ${"a fox ".repeat(80)}`,
+  const item = {
+    id: "item-1",
+    title: "Fox in Snow",
+    prompt: `  ${"a fox ".repeat(80)}`,
+    negative: "blurry",
+    width: 832,
+    height: 1216,
+    settings: {
       profileId: "flux-2",
-      loras: [{ name: "film.safetensors" }, { name: "off", enabled: false }, "grain"],
-    }),
-    {
-      kind: "iterate",
-      jobId: "job-1",
-      prompt: "a fox ".repeat(80).trim().slice(0, 300),
-      profileId: "flux-2",
-      loras: ["film.safetensors", "grain"],
+      loras: [
+        { name: "film.safetensors", strength: 0.7 },
+        { name: "off", enabled: false },
+        "grain",
+      ],
+      steps: 20,
+      cfg: 3.5,
+      sampler: "euler",
+      scheduler: "",
+      seed: 42,
     },
-  );
+    caption: { tags: ["fox", "snow"] },
+    dream: { pair: { value: 20 } },
+  };
+  assert.deepEqual(tasteSignal("keep", "job-1", itemValues(item)), {
+    kind: "keep",
+    jobId: "job-1",
+    itemId: "item-1",
+    title: "Fox in Snow",
+    prompt: "a fox ".repeat(80).trim(),
+    negative: "blurry",
+    profileId: "flux-2",
+    loras: [{ name: "film.safetensors", strength: 0.7 }, { name: "grain" }],
+    settings: {
+      steps: 20,
+      cfg: 3.5,
+      sampler: "euler",
+      width: 832,
+      height: 1216,
+      aspect: 0.68,
+    },
+    seed: "42",
+    tags: ["fox", "snow"],
+    // A Dream result recorded before arms exploited the taste profile.
+    arm: "exploit",
+    value: 20,
+  });
+  // A random seed and a result outside Dream carry neither.
+  assert.deepEqual(tasteSignal("star", "job-2", itemValues({ settings: { seed: "Random" } })), {
+    kind: "star",
+    jobId: "job-2",
+  });
   for (let index = 0; index < 205; index++)
     taste.record("alice", [tasteSignal("star", `job-${index}`)]);
   taste.record("bob", [tasteSignal("unstar", "theirs")]);
@@ -238,7 +281,7 @@ test("a compare winner is preferred over each other variant, which the summary t
     jobId: "won",
     prompt: "a harbour",
     profileId: "flux-2",
-    over: { jobId: "lost", prompt: "a harbour", profileId: "qwen", loras: ["film"] },
+    over: { jobId: "lost", prompt: "a harbour", profileId: "qwen", loras: [{ name: "film" }] },
   });
   taste.record("alice", [signal]);
   await taste.refresh("alice");
