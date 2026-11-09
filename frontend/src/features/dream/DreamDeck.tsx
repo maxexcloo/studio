@@ -9,7 +9,7 @@ import {
   Tooltip,
   type ButtonProps,
 } from "@mantine/core";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { Maximize2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOpenComposer } from "../generation/openComposer";
@@ -279,6 +279,7 @@ export function DreamDeck({
   empty: (calibration: boolean) => ReactNode;
 }) {
   const phone = usePhone();
+  const touch = useTouch();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [counts, setCounts] = useState({ judged: 0, calibrated: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
@@ -504,7 +505,8 @@ export function DreamDeck({
           {button(choice("both"), { size: "sm" })}
         </Group>
       )}
-      {!phone && (
+      {/* Touch screens swipe and tap, so the keyboard hint shows only with a mouse. */}
+      {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? "← A · → B · ↑ Both · ↓ Neither"
