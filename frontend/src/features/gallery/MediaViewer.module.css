@@ -179,9 +179,13 @@
   max-width: none;
 }
 
+/* The prompt and its tools span the bar. */
+.promptRow {
+  align-self: stretch;
+}
+
 /* The padding sits outside the text, so a phone summary clips at a whole line. */
 .prompt {
-  align-self: stretch;
   padding-block: 7px;
   transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }

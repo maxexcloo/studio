@@ -7,9 +7,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import {
   AskButton,
-  ChangeActions,
   ChangeSuggestions,
-  fitActions,
   ProposalLabel,
   proposalText,
   proposedClass,
@@ -28,8 +26,8 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its actions stand in one column beside the text, the send last. Continue in Chat (desktop; phones
- * show it on the action bar) takes the item, and any change typed, to a new Chat.
+ * Its actions are the text box's tools, the send last. Continue in Chat (desktop; phones show it on
+ * the action bar) takes the item, and any change typed, to a new Chat.
  */
 export function ViewerPrompt({
   item,
@@ -148,8 +146,7 @@ export function ViewerPrompt({
         onClick={submit.onSubmit}
       />
     ),
-  ].filter(Boolean);
-  const grid = !phone && actions.length >= 4;
+  ];
   return (
     <TextBox
       ref={field}
@@ -158,8 +155,6 @@ export function ViewerPrompt({
       variant="unstyled"
       autosize
       minRows={1}
-      // The text grows to the height of its actions, in two columns from four of them.
-      {...(phone ? {} : fitActions(grid ? Math.ceil(actions.length / 2) : actions.length))}
       maxRows={phone ? 2 : 4}
       className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
       description={change && <ProposalLabel proposal={change} />}
@@ -167,17 +162,7 @@ export function ViewerPrompt({
       readOnly={change?.action === "upscale"}
       onChange={setPrompt}
       onKeyDown={keys}
-      // Phones show Continue in Chat on the action bar.
-      rightSection={
-        <ChangeActions row={phone} grid={grid}>
-          {actions}
-        </ChangeActions>
-      }
-      // Phones line the actions up in one row (at most three); desktop stands them in one column,
-      // or a 2×2 grid from four.
-      rightSectionWidth={phone ? actions.length * 44 : grid ? 76 : 40}
-      rightSectionPointerEvents="all"
-      rightSectionProps={{ style: { alignItems: "flex-start" } }}
+      tools={actions}
       submit={change ? undefined : submit}
     />
   );

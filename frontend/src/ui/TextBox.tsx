@@ -129,7 +129,7 @@ export function TextBox({
         aria-label={`Clear ${title}`}
         variant="subtle"
         color="gray"
-        disabled={!value}
+        disabled={!value || props.readOnly}
         onMouseDown={keepFocus}
         onClick={clear}
       >
@@ -201,7 +201,10 @@ export function TextBox({
           returnFocus={false}
           // The page returns at once, rather than showing through a fade while the keyboard drops.
           transitionProps={{ ...modal.transitionProps, exitDuration: 0 }}
-          classNames={{ content: classes.content, body: classes.body }}
+          // A column of header and body. Inline, since Paper's `display: block` has a module
+          // class's specificity.
+          styles={{ content: { display: "flex", flexDirection: "column" } }}
+          classNames={{ body: classes.body }}
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so Escape is caught in the capture phase. */}

@@ -95,7 +95,7 @@ export function MediaViewerActions({
       onClick={(event) => event.stopPropagation()}
     >
       {item.jobId && (
-        <Box display={promptHidden ? "none" : "contents"}>
+        <Box className={classes.promptRow} display={promptHidden ? "none" : undefined}>
           <ViewerPrompt
             key={item.id}
             item={item}
