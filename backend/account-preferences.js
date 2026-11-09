@@ -10,6 +10,8 @@ import {
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
  * them. Spicy Prompts starts off and counts only with Uncensored Models (`explicitWording`).
+ * `videos` is where Animate prefers to run (Cloud, or the local Fast or Quality tier); unsaved, it
+ * is Fast where the account has local video, otherwise Cloud (animate-profile.js).
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -18,6 +20,8 @@ export const preferenceDefaults = Object.freeze({
   tileCaptions: false,
   uncensoredModels: true,
 });
+/** Preferences that take one of a few values rather than on or off; they have no default. */
+const preferenceChoices = Object.freeze({ videos: ["cloud", "fast", "quality"] });
 const dataDir = currentDataDir();
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
@@ -45,6 +49,11 @@ export function saveAccountPreferences(ownerId, patch) {
   const entries = Object.entries(patch || {});
   if (!entries.length) throw new Error("Choose a preference to change.");
   for (const [key, value] of entries) {
+    const choices = preferenceChoices[key];
+    if (choices) {
+      if (!choices.includes(value)) throw new Error(`Set ${key} to ${choices.join(", ")}.`);
+      continue;
+    }
     if (!Object.hasOwn(preferenceDefaults, key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
