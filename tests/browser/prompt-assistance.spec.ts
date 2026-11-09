@@ -9,7 +9,7 @@ import {
   savedAction,
   saveCurrent,
   stamp,
-  withExpertSettings,
+  withSettings,
 } from "./fixtures";
 async function assist(page: Page, action: string) {
   await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
@@ -124,7 +124,7 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await prompt.fill("My original copper bird");
   await assist(page, "Improve Prompt");
   await expect(prompt).toHaveValue("A cinematic amber bird");
-  await withExpertSettings(page, () =>
+  await withSettings(page, () =>
     page.getByRole("textbox", { name: "Seed", exact: true }).fill("33"),
   );
   await undoAssistance(page, "Prompt improved");

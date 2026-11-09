@@ -101,6 +101,9 @@ test("Multiple owned references preserve order, role identity and capacity throu
     })),
   ).toEqual(expected);
   await openNav(page, "Chat");
+  await page
+    .getByRole("textbox", { name: "Message", exact: true })
+    .fill("Explain how the selected references fit together");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   for (const name of ["second", "first"])
     await page.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
@@ -108,9 +111,6 @@ test("Multiple owned references preserve order, role identity and capacity throu
   await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
   await closeReferences(page);
-  await page
-    .getByRole("textbox", { name: "Message", exact: true })
-    .fill("Explain how the selected references fit together");
   await page.getByRole("button", { name: "Send Message", exact: true }).click();
   await expect.poll(() => state.chatRequests.length).toBe(1);
   expect(state.chatRequests[0].references).toEqual(["asset-second", "asset-first", "asset-first"]);

@@ -170,7 +170,7 @@ export function GenerationEditor({
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
-  const [expertOpen, setExpertOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
@@ -226,7 +226,7 @@ export function GenerationEditor({
       onChange={onReferencesChange}
     />
   );
-  const expert = { opened: expertOpen, onOpenedChange: setExpertOpen };
+  const settings = { opened: settingsOpen, onOpenedChange: setSettingsOpen };
   const mask = profile?.capabilities?.inpaint
     ? {
         painted: !!input.inpaint,
@@ -246,7 +246,7 @@ export function GenerationEditor({
       hasReferences={!!details.length}
       mask={mask}
       presets={presets}
-      expert={expert}
+      settings={settings}
       onCompare={onCompare}
     />
   );
