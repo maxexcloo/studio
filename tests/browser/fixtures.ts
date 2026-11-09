@@ -278,9 +278,15 @@ export async function fixtures(page: Page) {
     if (path === "/api/models")
       return respond({ profiles, features: { presets: true }, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
-    // Local video is running: Animate takes the local video profile.
+    // Local video is running and the account has no Cloud: Animate takes the local video profile.
     if (path === "/api/animate/profile")
-      return respond({ profileId: "video:test", label: "Motion Quality", cloud: false, tiers: [] });
+      return respond({
+        profileId: "video:test",
+        label: "Motion Quality",
+        cloud: false,
+        tiers: [],
+        offers: { local: true, cloud: false },
+      });
     if (path === "/api/chat/status")
       return respond({
         available: true,
