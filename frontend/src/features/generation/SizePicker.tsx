@@ -10,7 +10,7 @@ import {
 } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { useTouch } from "../../ui/usePhone";
 import { chipProps, fittedPopup } from "./chip";
 import { primaryReference } from "./payload";
 import {
@@ -33,7 +33,6 @@ export function SizePicker({
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
 }) {
-  const phone = usePhone();
   const touch = useTouch();
   const presets = profile?.aspectPresets || [];
   const reference = primaryReference(input.referenceDetails || [], profile);
