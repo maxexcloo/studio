@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -138,4 +139,14 @@ test("json-stores-v1 refuses unreadable stores and leaves everything in place", 
   ]);
   assert.equal(fs.existsSync(path.join(data, "timings.json")), true);
   assert.equal(fs.existsSync(databaseFile(data)), false);
+});
+
+test("migrate-runtime's dry run starts on a folder Studio itself refuses", (t) => {
+  const data = dataFolder(t);
+  const command = path.join(import.meta.dirname, "../commands/migrate-runtime.mjs");
+  const output = execFileSync(process.execPath, [command, "--data-dir", data], {
+    env: { ...process.env, STUDIO_DATA_DIR: data },
+    encoding: "utf8",
+  });
+  assert.match(output, /"source": "timings\.json"/);
 });
