@@ -40,10 +40,6 @@
   flex-shrink: 0;
   min-height: 36px;
 }
-.status {
-  flex: 1;
-  min-width: 0;
-}
 /* Cards grow to a comfortable height, so they and the buttons never move with the content. */
 .stage {
   position: relative;
@@ -156,17 +152,6 @@
   flex-shrink: 0;
   padding-bottom: env(safe-area-inset-bottom);
 }
-/* A phone action's short name sits under its icon. */
-.labelled {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 48px;
-  color: var(--mantine-color-dimmed);
-  font-size: 11px;
-  font-weight: 500;
-}
 .thumb {
   display: block;
   width: 100%;
@@ -227,10 +212,6 @@
   right: var(--mantine-spacing-sm);
 }
 @media (max-width: 48em) {
-  .status {
-    order: 1;
-    flex-basis: 100%;
-  }
   .pair {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
