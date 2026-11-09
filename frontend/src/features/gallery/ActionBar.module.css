@@ -9,7 +9,7 @@
   padding: 4px;
 }
 
-/* The actions scroll sideways when they outgrow the bar (phones); trailing controls stay put. */
+/* Other bars' actions scroll sideways when they outgrow the bar; trailing controls stay put. */
 .actions {
   display: flex;
   align-items: center;
@@ -20,7 +20,7 @@
   scrollbar-width: none;
 }
 
-/* The touch viewer's actions take further centred rows, a whole group at a time, instead of scrolling. */
+/* The viewer's actions take further centred rows, a whole group at a time, instead of scrolling. */
 .actions[data-wrap] {
   flex-wrap: wrap;
   justify-content: center;
