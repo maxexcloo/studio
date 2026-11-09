@@ -44,7 +44,7 @@ Smart upscale supports imported workflows too. Inpainting is available to image 
 and save with `SaveImage`. Set `"inpaint": false` in `capabilities` to hide the
 brush.
 
-## Image-to-image inputs
+## Image-to-Image Inputs
 
 Declare image editing explicitly rather than relying only on a `LoadImage`
 node:
