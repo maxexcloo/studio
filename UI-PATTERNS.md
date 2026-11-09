@@ -97,9 +97,12 @@ the primary component reference and verify APIs against the installed version.
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor. Its `tools` stand
-  beside the text: Copy, Clear, then the box's own (Improve Prompt, Recent
-  Prompts), in one column where the box is tall enough and 2×2 otherwise.
+  other phone text boxes open the shared full-screen editor. Only the send
+  stands beside the text, with one ⋯ menu of its `tools`: the box's own
+  (Suggestions, Ask for a Change or Improve Prompt, Recent Prompts, Continue in
+  Chat), then Copy where the page has no other, then Clear, which turns into
+  Undo until the text next changes. The phone editor shows them as buttons, not
+  a menu, and a box without tools has no ⋯.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -146,8 +149,9 @@ the primary component reference and verify APIs against the installed version.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
-  Ideas for an empty, focused prompt or Chat message float over it as one
-  Suggestions chip listing them (`usePromptIdeas`), never as a row of ideas.
+  Ideas for an empty prompt or Chat message are one Suggestions ▾ chip in the
+  box's chip row, after References (`usePromptIdeas`); nothing floats over the
+  text and ideas never show as a row of their own.
 - Queue access belongs to the header status action. Report actual endpoint
   health: configuration alone does not prove readiness. A deliberately parked
   worker reads Stopped, not failing; an unexpectedly unavailable one remains

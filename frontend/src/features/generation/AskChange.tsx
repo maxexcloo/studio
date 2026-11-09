@@ -1,5 +1,5 @@
 import { useState, type PointerEvent, type ReactNode } from "react";
-import { ActionIcon, Badge, Loader, Menu, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Menu, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   useMutation,
@@ -11,6 +11,7 @@ import {
 import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
+import { ActionMenuItems, type Action } from "../gallery/ActionBar";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
 
@@ -102,11 +103,6 @@ function FieldAction({
   );
 }
 
-/** The Sparkles action that asks for the change typed. */
-export function AskButton(props: { disabled?: boolean; loading?: boolean; onClick: () => void }) {
-  return <FieldAction label="Ask for a Change" icon={<icons.assistant size={16} />} {...props} />;
-}
-
 /** Undo: restores what the proposal replaced. */
 export function UndoButton({ onClick }: { onClick: () => void }) {
   return <FieldAction label="Undo" icon={<icons.undo size={16} />} onClick={onClick} />;
@@ -142,45 +138,76 @@ export function SendButton({
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked. They load when the menu opens and stay cached per item or prompt; Refresh asks for
- * different ones (`fresh`) in their place, and Custom… (where `onCustom` is given) leaves the person
- * to type their own change. A failed or empty answer just says there are none.
+ * picked, as an action whose options are the changes. They load once `enabled` and stay cached
+ * per item or prompt; Refresh asks for different ones (`fresh`) in their place, and Custom…
+ * (where `onCustom` is given) leaves the person to type their own change. A failed or empty answer
+ * just says there are none.
  */
-export function ChangeSuggestions<K extends QueryKey>({
+export function useChangeSuggestions<K extends QueryKey>({
   query,
   fresh,
+  enabled,
   disabled,
   onPick,
   onCustom,
 }: {
   query: UseQueryOptions<Suggestions<NextStep>, Error, Suggestions<NextStep>, K>;
   fresh: () => Promise<Suggestions<NextStep>>;
+  enabled: boolean;
   disabled?: boolean;
   onPick: (request: string) => void;
   onCustom?: () => void;
 }) {
   const client = useQueryClient();
-  const [opened, setOpened] = useState(false);
-  // Custom… focuses the field, which closing the menu mustn't take back.
-  const [returnFocus, setReturnFocus] = useState(true);
-  const steps = useQuery({ ...query, enabled: opened });
+  const steps = useQuery({ ...query, enabled });
   const refresh = useMutation({
     mutationFn: fresh,
     onSuccess: (answer) => client.setQueryData<Suggestions<NextStep>>(query.queryKey, answer),
   });
   const list = steps.data?.suggestions ?? [];
   const loading = refresh.isPending || (steps.isFetching && !list.length);
+  const action: Action = {
+    id: "suggestions",
+    label: "Suggestions",
+    icon: icons.suggestions,
+    disabled,
+    menu: [
+      loading
+        ? [{ id: "thinking", label: "Thinking of Changes", disabled: true }]
+        : list.length
+          ? list.map((step) => ({
+              id: `step:${step.label}`,
+              label: step.label,
+              onClick: () => onPick(step.request),
+            }))
+          : [{ id: "none", label: "No Suggestions", disabled: true }],
+      [
+        {
+          id: "refresh",
+          label: "Refresh",
+          icon: icons.refresh,
+          // Never disabled while it works: a disabled item drops focus, which closes a submenu.
+          keepOpen: true,
+          onClick: () => refresh.mutate(),
+        },
+        ...(onCustom
+          ? [{ id: "custom", label: "Custom…", icon: icons.edit, onClick: onCustom }]
+          : []),
+      ],
+    ],
+  };
+  return { action, loading };
+}
+
+/** Suggestions as their own menu button, beside a field outside a text box's tools. */
+export function ChangeSuggestions<K extends QueryKey>({
+  disabled,
+  ...props
+}: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled">) {
+  const [opened, setOpened] = useState(false);
+  const { action, loading } = useChangeSuggestions({ ...props, disabled, enabled: opened });
   return (
-    <Menu
-      position="top-end"
-      width={240}
-      opened={opened}
-      returnFocus={returnFocus}
-      onChange={(open) => {
-        if (open) setReturnFocus(true);
-        setOpened(open);
-      }}
-    >
+    <Menu position="top-end" width={240} opened={opened} onChange={setOpened}>
       <Tooltip label="Suggestions">
         <Menu.Target>
           <ActionIcon
@@ -196,33 +223,7 @@ export function ChangeSuggestions<K extends QueryKey>({
       </Tooltip>
       <Menu.Dropdown data-composer-layer aria-busy={loading || undefined}>
         <Menu.Label>Suggestions</Menu.Label>
-        {loading ? (
-          <Menu.Item disabled leftSection={<Loader size={14} />}>
-            Thinking of Changes
-          </Menu.Item>
-        ) : list.length ? (
-          list.map((step) => (
-            <Menu.Item key={step.label} title={step.request} onClick={() => onPick(step.request)}>
-              {step.label}
-            </Menu.Item>
-          ))
-        ) : (
-          <Menu.Item disabled>No Suggestions</Menu.Item>
-        )}
-        <Menu.Divider />
-        <Menu.Item closeMenuOnClick={false} disabled={loading} onClick={() => refresh.mutate()}>
-          Refresh
-        </Menu.Item>
-        {onCustom && (
-          <Menu.Item
-            onClick={() => {
-              setReturnFocus(false);
-              onCustom();
-            }}
-          >
-            Custom…
-          </Menu.Item>
-        )}
+        <ActionMenuItems groups={action.menu!} />
       </Menu.Dropdown>
     </Menu>
   );

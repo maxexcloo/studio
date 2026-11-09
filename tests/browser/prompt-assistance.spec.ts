@@ -5,15 +5,18 @@ import {
   create,
   fixtures,
   loadSaved,
+  promptOptions,
+  promptTool,
   openPresets,
   savedAction,
   saveCurrent,
   stamp,
   withSettings,
 } from "./fixtures";
+// A single style is named Improve Prompt too.
 async function assist(page: Page, action: string) {
-  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
-  await page.getByRole("menuitem", { name: action, exact: true }).click();
+  const options = await promptOptions(page, "Prompt", "Improve Prompt");
+  await options.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
 async function undoAssistance(page: Page, message: string) {
@@ -72,10 +75,13 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await assist(page, "Improve Prompt");
     await expect.poll(() => started).toBe(true);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
-    // The action spins and says what it is doing until it finishes or is stopped.
-    const stop = page.getByRole("button", { name: "Stop Assistance", exact: true });
-    await expect(stop).toHaveAccessibleDescription("Improving the prompt…");
-    await stop.click();
+    // The ⋯ spins and says what it is doing until it finishes or its Stop is chosen.
+    const more = page.getByRole("button", { name: "More Prompt Actions", exact: true });
+    await expect(more).toHaveAccessibleDescription("Improving the prompt…");
+    await more.click();
+    await page.getByRole("menuitem", { name: "Stop Assistance", exact: true }).click();
+    // A press while the menu fades out only closes it.
+    await expect(page.getByRole("menu")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     await expect(prompt).toHaveValue("Keep my original bird");
     release();
@@ -122,11 +128,12 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("My original copper bird");
-  await assist(page, "Improve Prompt");
-  await expect(prompt).toHaveValue("A cinematic amber bird");
+  // Set first: the Prompt improved notification covers the Settings chip on this composer.
   await withSettings(page, () =>
     page.getByRole("textbox", { name: "Seed", exact: true }).fill("33"),
   );
+  await assist(page, "Improve Prompt");
+  await expect(prompt).toHaveValue("A cinematic amber bird");
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My original copper bird");
   await expect(page.getByRole("button", { name: "Clear Seed 33", exact: true })).toBeVisible();
@@ -206,8 +213,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("bird");
-  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Improve Prompt", exact: true }).click();
+  await assist(page, "Improve Prompt");
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A cinematic amber bird",
   );
@@ -236,14 +242,15 @@ test("Improve Prompt lists its styles A–Z with Custom… last, which asks what
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
-  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: /^Improve Prompt: / })).toHaveText([
+  const options = await promptOptions(page, "Prompt", "Improve Prompt");
+  await expect(options.getByRole("menuitem")).toHaveText([
     "Candid",
     "Enhance",
     "Portrait",
     "Custom…",
+    "Write Negative",
   ]);
-  await page.getByRole("menuitem", { name: "Improve Prompt: Custom…", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Improve Prompt", exact: true })).toBeDisabled();
@@ -280,7 +287,7 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A castle at noon");
-  await assist(page, "Improve Prompt: Custom…");
+  await assist(page, "Custom…");
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   const request = dialog.getByRole("textbox", { name: "Change", exact: true });
   await request.fill("make it night");
@@ -301,12 +308,12 @@ test("Custom… rewrites the draft's prompt in place, for Generate to run or Und
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(prompt).toHaveValue("A castle at noon");
   await expect(page.getByLabel("Proposed Action", { exact: true })).toBeHidden();
-  await assist(page, "Improve Prompt: Custom…");
+  await assist(page, "Custom…");
   await expect(request).toHaveValue("make it night");
   await request.press("Enter");
   await expect(prompt).toHaveValue("A castle at night");
   // A suggestion fits the draft as it was before the proposal and asks at once.
-  await assist(page, "Improve Prompt: Custom…");
+  await assist(page, "Custom…");
   await dialog.getByRole("button", { name: "Suggestions", exact: true }).click();
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -353,7 +360,7 @@ test("Prompt history reuses positive and negative prompts independently and pers
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
   await negative.fill("Keep these exclusions");
-  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  await promptTool(page, "Prompt", "Recent Prompts");
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
@@ -363,7 +370,7 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await historySearch.press("Enter");
   await expect(prompt).toHaveValue("Earlier landscape");
   await expect(negative).toHaveValue("Keep these exclusions");
-  await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
+  await promptTool(page, "Negative Prompt", "Recent Negative Prompts");
   panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
   await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
   await expect(negative).toHaveValue("Earlier exclusions");
@@ -401,7 +408,7 @@ test("Recent Prompts pins and switches at once, and a refused change is undone",
     return route.fulfill({ json: history });
   });
   await create(page);
-  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  await promptTool(page, "Prompt", "Recent Prompts");
   const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   // The pin shows while the server is still answering.
   await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();

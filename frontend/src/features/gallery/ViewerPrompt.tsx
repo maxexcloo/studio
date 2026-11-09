@@ -1,21 +1,19 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { ActionIcon, Tooltip } from "@mantine/core";
+import { useRef, useState, type KeyboardEvent } from "react";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
+import { icons } from "../../ui/icons";
 import {
-  AskButton,
-  ChangeSuggestions,
   ProposalLabel,
   proposalText,
   proposedClass,
   SendButton,
   UndoButton,
+  useChangeSuggestions,
 } from "../generation/AskChange";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import type { ActionGroups } from "./ActionBar";
+import type { Action, ActionGroups } from "./ActionBar";
 import { itemAction } from "./itemActions";
 import { useChatAction } from "./MediaActions";
 import { typedPrompt, type Iteration } from "./useMediaAction";
@@ -27,8 +25,8 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its actions are the text box's tools, the send last. Continue in Chat (desktop; phones show it on
- * the action bar) takes the item, and any change typed, to a new Chat.
+ * Its tools are the text box's: Suggestions, Ask, then Continue in Chat (desktop; phones show it on
+ * the action bar), which takes the item, and any change typed, to a new Chat. The bar has Copy.
  */
 export function ViewerPrompt({
   item,
@@ -86,68 +84,59 @@ export function ViewerPrompt({
     }
   }
   const continueInChat = itemAction("chat");
-  const ContinueIcon = continueInChat.icon;
   const typed = prompt.trim() !== original.trim() ? prompt.trim() : undefined;
-  // Next steps, which Suggestions offers, are written for images.
+  // Next steps, which Suggestions offers, are written for images; they load as the image opens.
   const offered = ask.available && item.type === "image";
-  // Suggestions start loading in the background as the image opens, so the menu is ready.
-  const client = useQueryClient();
-  useEffect(() => {
-    if (offered && item.jobId) void client.prefetchQuery(nextStepsQuery(item.jobId));
-  }, [client, offered, item.jobId]);
-  const actions = [
-    done && chatOn && !phone && (
-      <Tooltip key="chat" label={continueInChat.label}>
-        <ActionIcon
-          variant="subtle"
-          color="gray"
-          aria-label={continueInChat.label}
-          loading={chat.isPending}
-          onClick={() => chat.mutate(typed)}
-        >
-          <ContinueIcon size={16} />
-        </ActionIcon>
-      </Tooltip>
-    ),
-    ask.available && !change && (
-      <AskButton
-        key="ask"
-        disabled={!prompt.trim()}
-        loading={ask.pending}
-        onClick={() => ask.send(prompt, prompt.trim())}
-      />
-    ),
-    offered && (
-      <ChangeSuggestions
-        key="suggestions"
-        query={nextStepsQuery(item.jobId!)}
-        fresh={() => askNextSteps(item.jobId!, true)}
-        disabled={ask.pending}
-        // The field is the request: a suggestion fills it and asks at once.
-        onPick={(request) => {
-          setPrompt(request);
-          ask.send(request, request);
-        }}
-        // Custom… selects the prompt for a change typed over it; phones open the editor.
-        onCustom={() => {
-          if (phone) return field.current?.click();
-          field.current?.focus();
-          field.current?.select();
-        }}
-      />
-    ),
-    change && <UndoButton key="undo" onClick={ask.undo} />,
-    // Phones generate from the editor's send arrow; a proposal's Run stays in the field.
-    (change || !phone) && (
-      <SendButton
-        key="send"
-        label={submit.label}
-        disabled={submit.disabled}
-        loading={!change && running}
-        onClick={submit.onSubmit}
-      />
-    ),
-  ];
+  const suggestions = useChangeSuggestions({
+    query: nextStepsQuery(item.jobId ?? ""),
+    fresh: () => askNextSteps(item.jobId!, true),
+    enabled: offered && Boolean(item.jobId),
+    disabled: ask.pending,
+    // The field is the request: a suggestion fills it and asks at once.
+    onPick: (request) => {
+      setPrompt(request);
+      ask.send(request, request);
+    },
+    // Custom… selects the prompt for a change typed over it; phones open the editor.
+    onCustom: () => {
+      if (phone) return field.current?.click();
+      field.current?.focus();
+      field.current?.select();
+    },
+  });
+  const tools = [
+    offered && suggestions.action,
+    ask.available &&
+      !change && {
+        id: "ask",
+        label: "Ask for a Change",
+        icon: icons.assistant,
+        disabled: !prompt.trim() || ask.pending,
+        onClick: () => ask.send(prompt, prompt.trim()),
+      },
+    done &&
+      chatOn &&
+      !phone && {
+        ...continueInChat,
+        id: "chat",
+        disabled: chat.isPending,
+        onClick: () => chat.mutate(typed),
+      },
+  ].filter((tool): tool is Action => Boolean(tool));
+  // Phones generate from the editor's send arrow; a proposal's Run stays in the field.
+  const send = (
+    <>
+      {change && <UndoButton onClick={ask.undo} />}
+      {(change || !phone) && (
+        <SendButton
+          label={submit.label}
+          disabled={submit.disabled}
+          loading={!change && running}
+          onClick={submit.onSubmit}
+        />
+      )}
+    </>
+  );
   return (
     <TextBox
       ref={field}
@@ -163,7 +152,10 @@ export function ViewerPrompt({
       readOnly={change?.action === "upscale"}
       onChange={setPrompt}
       onKeyDown={keys}
-      tools={actions}
+      tools={tools}
+      copy={false}
+      send={send}
+      busy={ask.pending ? "Asking for a Change…" : chat.isPending ? "Starting a Chat…" : undefined}
       submit={change ? undefined : submit}
     />
   );

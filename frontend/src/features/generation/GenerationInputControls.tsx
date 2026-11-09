@@ -158,6 +158,7 @@ export function GenerationInputControls({
   hasReferences = false,
   mask,
   presets,
+  ideas,
   loraPicker,
   settings,
   onCompare,
@@ -172,6 +173,8 @@ export function GenerationInputControls({
   mask?: MaskControl;
   /** The Presets chip (`PresetPicker`). */
   presets?: ReactNode;
+  /** The prompt's Suggestions chip (`usePromptIdeas`), after References. */
+  ideas?: ReactNode;
   loraPicker: LoraPickerState;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
   /** Opens Compare from this draft; the gallery composer passes it. */
@@ -189,6 +192,7 @@ export function GenerationInputControls({
       {references && hasReferences && (
         <ReferenceRole input={input} onChange={onChange} mask={mask} />
       )}
+      {ideas}
       {profile?.capabilities.lora && (
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
