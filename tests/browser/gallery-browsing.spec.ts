@@ -297,7 +297,9 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   }
 });
 
-test("Runs fan a stacked run out in place and link its Chat", async ({ page }) => {
+test("Runs fan a stacked run out in place, open it to flip through and link its Chat", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   state.sessions.push({ id: "chat-a", title: "Bird Chat", inputs: {}, createdAt: stamp });
   state.gallery.push(
@@ -326,7 +328,12 @@ test("Runs fan a stacked run out in place and link its Chat", async ({ page }) =
   );
   await run.getByRole("button", { name: "Open image: Bird study 2", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer).toBeVisible();
+  // A run's result flips through that run alone, as Open All does from its first.
+  await expect(viewer.getByText(/^\d \/ 3$/)).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await run.getByRole("button", { name: "Open All", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "Bird study 0", exact: true })).toBeVisible();
+  await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   await run.getByRole("button", { name: "Close Run", exact: true }).click();
   await expect(run).toBeHidden();
