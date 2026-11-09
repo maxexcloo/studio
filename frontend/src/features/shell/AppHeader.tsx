@@ -54,7 +54,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   variant="subtle"
                   color={active ? undefined : "gray"}
                   className={classes.mode}
-                  px={{ base: 8, sm: 12 }}
+                  px={{ base: 12 }}
                   size="sm"
                   radius="xl"
                 >
