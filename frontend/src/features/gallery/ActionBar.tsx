@@ -24,7 +24,8 @@ export interface Action {
   label: string;
   /** A short line under its menu label saying what it does. */
   description?: string;
-  icon: LucideIcon;
+  /** Every bar action has one; a menu option may go without (a suggested change). */
+  icon?: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
   /** An on/off option (Show Upscale): a checked menu item. */
@@ -42,7 +43,7 @@ export interface Action {
    * first is its usual action, so a control with options has no click of its own.
    */
   menu?: ActionGroups;
-  /** A setting between a few values (Fast or Quality), a segmented control in menus. */
+  /** A setting between a few values (Cloud, Fast or Quality), a segmented control in menus. */
   choice?: {
     value: string;
     options: { value: string; label: string }[];
@@ -143,7 +144,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             <Fragment key={id}>
               <Menu.Item
                 color={color}
-                leftSection={<Icon size={16} />}
+                leftSection={Icon && <Icon size={16} />}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
                 aria-expanded={open}
                 {...described(action, describedBy)}
@@ -170,7 +171,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
               <Menu.Sub.Target>
                 <Menu.Sub.Item
                   color={color}
-                  leftSection={<Icon size={16} />}
+                  leftSection={Icon && <Icon size={16} />}
                   disabled={disabled}
                   {...described(action, describedBy)}
                 >
@@ -187,7 +188,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           <Menu.Item
             key={id}
             color={color}
-            leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
+            leftSection={Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />}
             rightSection={checked ? <Check size={14} /> : undefined}
             role={checked === undefined ? undefined : "menuitemcheckbox"}
             aria-checked={checked}
@@ -261,7 +262,7 @@ function ActionControl({
         ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
         : { onClick }),
   } as const;
-  const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
+  const icon = Icon && <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const control = labelled ? (
     <Button
       size="sm"

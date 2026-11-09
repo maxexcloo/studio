@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   ArrowLeftRight,
   Camera,
@@ -50,17 +49,15 @@ import {
   animateThemes,
   mediaDraft,
   useAnimateReview,
-  useAnimateTier,
-  useAnimateWhere,
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
   type AnimateTheme,
-  type AnimateWhere,
   type Iteration,
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
+import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
 import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
@@ -230,7 +227,6 @@ interface MediaActionOptions {
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
-  onUpscale?: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
 }
 
@@ -253,7 +249,6 @@ export function useMediaActions(
     onDelete,
     onRetried,
     onTrim,
-    onUpscale,
     onVersionChange,
   }: MediaActionOptions,
 ): ActionGroups {
@@ -295,68 +290,46 @@ export function useMediaActions(
     ready,
     compare,
     onCompare,
-    onUpscale,
     onVersionChange,
   });
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
-  const [tier, setTier] = useAnimateTier();
-  const [where, setWhere] = useAnimateWhere();
+  const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
-  // The menu keeps its choice while a switch between Fast and Quality loads.
+  // The menu keeps its choice while a switch loads.
   const animation = useQuery({
-    ...animateProfileQuery(item, { tier, where }),
+    ...animateProfileQuery(item),
     enabled: image || (ready && item.type === "video"),
     placeholderData: keepPreviousData,
   });
-  // A refusal still says which pools the account has, so a stopped Local GPU can be switched off.
+  // A refusal still says what is offered.
   const offers =
     animation.data?.offers ??
     (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
-  const bothOffered = Boolean(offers?.local && offers.cloud);
-  // A pick no longer offered (Cloud Models revoked, no local profile) returns to Auto.
-  useEffect(() => {
-    if (offers && !bothOffered && where !== "auto") setWhere("auto");
-  }, [Boolean(offers), bothOffered, where]);
-  const whereChoice = bothOffered
-    ? [
-        {
-          id: "animate-where",
-          label: "Local GPU or Cloud",
-          icon: icons.animate,
-          choice: {
-            // Auto shows the pool it took.
-            value: where === "auto" ? (animation.data?.cloud ? "cloud" : "local") : where,
-            options: [
-              { value: "local", label: "Local GPU" },
-              { value: "cloud", label: "Cloud" },
-            ],
-            onChange: (value: string) => setWhere(value as AnimateWhere),
-          },
-        },
-      ]
-    : [];
-  // Fast or Quality picks the video model in the chosen pool for the themes and the composer.
-  const tierChoice =
-    (animation.data?.tiers.length ?? 0) > 1
+  const offered = (["cloud", "fast", "quality"] as const).filter((value) => offers?.[value]);
+  // Where the account prefers videos to run (also in Settings), where there is more than one place.
+  // Unsaved or no longer offered, it shows Fast where the account has local video, else Cloud.
+  const local = offers?.fast ? "fast" : offers?.quality ? "quality" : "cloud";
+  const modelChoice =
+    offered.length > 1
       ? [
           {
-            id: "animate-tier",
-            label: "Fast or Quality",
+            id: "animate-model",
+            label: "Cloud, Fast or Quality",
             icon: icons.animate,
             choice: {
-              value: tier,
-              options: [
-                { value: "fast", label: "Fast" },
-                { value: "quality", label: "Quality" },
-              ],
-              onChange: (value: string) => setTier(value as typeof tier),
+              value: videos && offers?.[videos] ? videos : local,
+              options: offered.map((value) => ({
+                value,
+                label: { cloud: "Cloud", fast: "Fast", quality: "Quality" }[value],
+              })),
+              onChange: (value: string) => setVideos(value as VideosPreference),
             },
           },
         ]
       : [];
-  // An explicit pick that can't run says why.
-  const refusal = where === "auto" ? undefined : animation.error?.message;
+  // Nothing can animate: say why.
+  const refusal = animation.error?.message;
   const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
@@ -391,10 +364,10 @@ export function useMediaActions(
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        // When nothing can animate, the options stay disabled, explained only for an explicit pick.
+        // When nothing can animate, the options stay disabled and the note says why.
         note: refusal,
         menu: [
-          [...whereChoice, ...tierChoice, ...reviewItems],
+          [...modelChoice, ...reviewItems],
           [...themeItems(!animation.data)],
           [
             {
@@ -413,10 +386,10 @@ export function useMediaActions(
         label: "Extend",
         loading: running === "animate" || action.isPending,
         // A theme continues the clip from its last frame at once; the composer shows it first. It
-        // keeps the clip's own model, so Fast or Quality applies only once Cloud is picked.
+        // keeps the clip's own model unless videos run on Cloud.
         note: refusal,
         menu: [
-          [...whereChoice, ...(where === "cloud" ? tierChoice : []), ...reviewItems],
+          [...modelChoice, ...reviewItems],
           [
             ...themeItems(action.isPending),
             {
@@ -508,20 +481,21 @@ export function useMediaActions(
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     upscale,
+    // Its options sort alphabetically.
     itemAction("copy", {
       menu: [
         [
-          {
-            id: "copy-prompt",
-            label: "Prompt",
-            icon: TextQuote,
-            onClick: () => void copyText(item.prompt || "", "Prompt"),
-          },
           {
             id: "copy-details",
             label: "Details",
             icon: ListChecks,
             onClick: () => void copyText(settingsText(), "Details"),
+          },
+          {
+            id: "copy-prompt",
+            label: "Prompt",
+            icon: TextQuote,
+            onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
         ],
       ],
