@@ -1,8 +1,7 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
-  DEFAULT_THEME,
   SimpleGrid,
   ColorSwatch,
   Group,
@@ -29,6 +28,7 @@ import {
   cssVariablesResolver,
   studioTheme,
 } from "../theme";
+import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const colours = [
   "studio",
@@ -77,11 +77,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const opaque = useMediaQuery("(prefers-reduced-transparency: reduce)", false, {
     getInitialValueInEffect: false,
   });
-  // usePhone() needs the provider below; the theme keeps Mantine's default breakpoints.
-  const phone = useMediaQuery(`(max-width: ${DEFAULT_THEME.breakpoints.sm})`, false, {
-    getInitialValueInEffect: false,
-  });
-  const touch = useMediaQuery("(pointer: coarse)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
+  const sideways = useSideways();
+  const touch = useTouch();
+  // CSS keys its phone layout off this attribute, so it always agrees with usePhone().
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (phone) root.dataset.phone = sideways ? "sideways" : "";
+    else delete root.dataset.phone;
+  }, [phone, sideways]);
   const configured = useMemo(
     () =>
       studioTheme({

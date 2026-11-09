@@ -59,3 +59,19 @@ test("Popups anchored to the composer stay put while the gallery scrolls", async
   // A popup that followed the page would move by the whole scroll.
   expect(Math.abs(moved)).toBeLessThan(1);
 });
+
+test("A phone held sideways keeps the phone layout and an iPad in landscape doesn't", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Only touch screens hold a phone sideways.");
+  await fixtures(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/images");
+  const more = page.getByRole("button", { name: "More Options", exact: true });
+  const settings = page.getByRole("link", { name: "Settings", exact: true });
+  await expect(more).toBeVisible();
+  await expect(settings).toHaveCount(0);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await expect(settings).toBeVisible();
+  await expect(more).toHaveCount(0);
+});
