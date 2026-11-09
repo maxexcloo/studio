@@ -16,7 +16,8 @@ import {
 } from "../generation/AskChange";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { ActionGroups } from "./ActionBar";
-import { itemAction, useChatAction } from "./MediaActions";
+import { itemAction } from "./itemActions";
+import { useChatAction } from "./MediaActions";
 import { typedPrompt, type Iteration } from "./useMediaAction";
 import { useItemChange } from "./useItemChange";
 import classes from "./MediaViewer.module.css";
