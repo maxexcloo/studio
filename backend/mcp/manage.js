@@ -257,10 +257,10 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste profile, when asked: read, save (avoid replaces what they asked Studio to avoid), refresh (summarise stars, Dream and comparisons now) or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
+    "The user's taste profile, when asked: read, save (avoid replaces their avoid list), refresh or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
     {
       action: z.enum(["read", "save", "refresh", "reset", "rate_lora"]).default("read"),
-      avoid: z.array(z.string().trim().min(1).max(maxAvoid)).max(maxAvoids).optional(),
+      avoid: z.array(z.string().trim().max(maxAvoid)).max(maxAvoids).optional(),
       lora: z.string().trim().min(1).max(400).optional(),
       rating: z.enum(["up", "down", "none"]).optional(),
     },
