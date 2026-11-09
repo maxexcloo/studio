@@ -2,12 +2,6 @@
    area. The body scrolls, unless its content fills it and scrolls itself, as the reference grid
    does, so the sheet itself never scrolls. A drag on the header is the sheet's own, to pull it
    closed. */
-.sheet {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-}
-
 .sheetHeader {
   touch-action: none;
 }

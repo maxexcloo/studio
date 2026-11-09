@@ -125,15 +125,13 @@ export function ChipPopup({
           trapFocus={trap}
           closeOnEscape={false}
           returnFocus
+          // A column of header, body and footer. Inline, since Paper's `display: block` has a
+          // module class's specificity and Modal.Content's own class lands on its wrapper too.
+          styles={{ content: { display: "flex", flexDirection: "column" } }}
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
-          <Modal.Content
-            {...layer}
-            {...swipe}
-            className={classes.sheet}
-            onKeyDownCapture={onKeyDown}
-          >
+          <Modal.Content {...layer} {...swipe} onKeyDownCapture={onKeyDown}>
             <Modal.Header className={classes.sheetHeader}>
               <Modal.Title>{title}</Modal.Title>
               <Group gap="xs" wrap="nowrap">

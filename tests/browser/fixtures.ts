@@ -1003,16 +1003,18 @@ export async function showUploads(page: Page) {
 
 /**
  * Closes the References popup, leaving the composer open: Apply in the phone sheet's footer,
- * Escape on desktop. A pick filling the last slot already closed it.
+ * Escape on desktop. A pick filling the last slot closes it already, so it may be fading out.
  */
 export async function closeReferences(page: Page) {
   const references = page.getByRole("dialog", { name: "References", exact: true });
   if (!(await references.isVisible())) return;
   const apply = references.getByRole("button", { name: "Apply", exact: true });
-  if (await apply.isVisible()) {
-    await apply.click();
-    await expect(references).toBeHidden();
-  } else await closePopup(page, "References");
+  await (
+    (await apply.isVisible())
+      ? apply.click({ timeout: 2000 })
+      : references.press("Escape", { timeout: 2000 })
+  ).catch(() => {});
+  await expect(references).toBeHidden();
 }
 
 /** Saves the draft as a named stack or preset from its picker's footer. */
