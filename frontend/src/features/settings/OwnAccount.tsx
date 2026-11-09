@@ -111,7 +111,7 @@ export function OwnAccount() {
     <Stack gap="lg">
       <SettingGroup title="Sign-In">
         {own.accessProfile && (
-          <SettingRow label="Access Group">
+          <SettingRow label="Access Group" description="Set by an administrator.">
             <Text size="sm">{own.accessProfile.name}</Text>
           </SettingRow>
         )}
@@ -137,7 +137,7 @@ export function OwnAccount() {
         >
           <Badge miw="max-content">{admin ? "Administrator" : "User"}</Badge>
         </SettingRow>
-        <SettingRow label="Sign-In Method">
+        <SettingRow label="Sign-In Method" description="The ways you can sign in to Studio.">
           <Text size="sm">
             {[
               own.canChangePassword && "Password",

@@ -62,7 +62,11 @@ export function FinishStarredImages() {
       </SettingRow>
       {settings?.enabled && (
         <>
-          <SettingRow label="Finishing Quality" wide>
+          <SettingRow
+            label="Finishing Quality"
+            description="Higher quality takes longer for each starred image."
+            wide
+          >
             <Select
               aria-label="Finishing Quality"
               w={{ base: "100%", sm: 240 }}
