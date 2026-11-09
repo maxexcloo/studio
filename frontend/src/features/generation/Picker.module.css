@@ -26,6 +26,32 @@
   border-top: 1px solid var(--studio-glass-border);
 }
 
+/* A popup's aside: on desktop a column beside the rest, divided from it to the top, whose own
+   content never sets the popup's height; on phones a section under the content. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--mantine-spacing-md);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  min-height: 0;
+}
+
+.columns > .aside {
+  contain: size;
+  padding-left: var(--mantine-spacing-md);
+  border-left: 1px solid var(--studio-glass-border);
+}
+
+.sheetBody > .aside {
+  flex-shrink: 0;
+  margin-top: var(--mantine-spacing-sm);
+}
+
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
 .header {
   display: flex;
