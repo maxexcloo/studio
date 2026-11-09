@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
+import { Shuffle } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
@@ -115,12 +116,22 @@ export function GallerySelectionBar({
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
   const actions = itemActionGroups([
-    // Selected uploads share Recreate, one run queued for each.
+    // Selected uploads share Edit › Run Suggested Prompts, one run queued for each.
     uploads.length > 0 &&
-      itemAction("recreate", {
-        disabled: recreate.isPending,
+      itemAction("edit", {
         loading: recreate.isPending,
-        onClick: () => recreate.mutate(uploads),
+        menu: [
+          [
+            {
+              id: "run-suggested",
+              label: "Run Suggested Prompts",
+              description: "Queue each upload's suggested prompt",
+              icon: Shuffle,
+              disabled: recreate.isPending,
+              onClick: () => recreate.mutate(uploads),
+            },
+          ],
+        ],
       }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {

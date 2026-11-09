@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import {
   ArrowLeftRight,
   Camera,
@@ -50,17 +49,15 @@ import {
   animateThemes,
   mediaDraft,
   useAnimateReview,
-  useAnimateTier,
-  useAnimateWhere,
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
   type AnimateTheme,
-  type AnimateWhere,
   type Iteration,
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
+import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
 import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
@@ -168,6 +165,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
+    description: `Add ${video ? "this frame" : "it"} to the composer's references`,
     icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
@@ -216,7 +214,7 @@ export function useChatAction(item: MediaItem, onApplied: () => void) {
 interface MediaActionOptions {
   transfer: MediaTransferActions;
   sessionId?: string;
-  /** Action IDs a surface leaves out. */
+  /** Action and option IDs a surface leaves out. */
   omit?: string[];
   compare?: boolean;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
@@ -229,7 +227,6 @@ interface MediaActionOptions {
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
-  onUpscale?: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
 }
 
@@ -252,7 +249,6 @@ export function useMediaActions(
     onDelete,
     onRetried,
     onTrim,
-    onUpscale,
     onVersionChange,
   }: MediaActionOptions,
 ): ActionGroups {
@@ -294,68 +290,46 @@ export function useMediaActions(
     ready,
     compare,
     onCompare,
-    onUpscale,
     onVersionChange,
   });
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
-  const [tier, setTier] = useAnimateTier();
-  const [where, setWhere] = useAnimateWhere();
+  const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
-  // The menu keeps its choice while a switch between Fast and Quality loads.
+  // The menu keeps its choice while a switch loads.
   const animation = useQuery({
-    ...animateProfileQuery(item, { tier, where }),
+    ...animateProfileQuery(item),
     enabled: image || (ready && item.type === "video"),
     placeholderData: keepPreviousData,
   });
-  // A refusal still says which pools the account has, so a stopped Local GPU can be switched off.
+  // A refusal still says what is offered.
   const offers =
     animation.data?.offers ??
     (animation.error?.cause as { offers?: AnimateOffers } | undefined)?.offers;
-  const bothOffered = Boolean(offers?.local && offers.cloud);
-  // A pick no longer offered (Cloud Models revoked, no local profile) returns to Auto.
-  useEffect(() => {
-    if (offers && !bothOffered && where !== "auto") setWhere("auto");
-  }, [Boolean(offers), bothOffered, where]);
-  const whereChoice = bothOffered
-    ? [
-        {
-          id: "animate-where",
-          label: "Local GPU or Cloud",
-          icon: icons.animate,
-          choice: {
-            // Auto shows the pool it took.
-            value: where === "auto" ? (animation.data?.cloud ? "cloud" : "local") : where,
-            options: [
-              { value: "local", label: "Local GPU" },
-              { value: "cloud", label: "Cloud" },
-            ],
-            onChange: (value: string) => setWhere(value as AnimateWhere),
-          },
-        },
-      ]
-    : [];
-  // Fast or Quality picks the video model in the chosen pool for the themes and the composer.
-  const tierChoice =
-    (animation.data?.tiers.length ?? 0) > 1
+  const offered = (["cloud", "fast", "quality"] as const).filter((value) => offers?.[value]);
+  // Where the account prefers videos to run (also in Settings), where there is more than one place.
+  // Unsaved or no longer offered, it shows Fast where the account has local video, else Cloud.
+  const local = offers?.fast ? "fast" : offers?.quality ? "quality" : "cloud";
+  const modelChoice =
+    offered.length > 1
       ? [
           {
-            id: "animate-tier",
-            label: "Fast or Quality",
+            id: "animate-model",
+            label: "Cloud, Fast or Quality",
             icon: icons.animate,
             choice: {
-              value: tier,
-              options: [
-                { value: "fast", label: "Fast" },
-                { value: "quality", label: "Quality" },
-              ],
-              onChange: (value: string) => setTier(value as typeof tier),
+              value: videos && offers?.[videos] ? videos : local,
+              options: offered.map((value) => ({
+                value,
+                label: { cloud: "Cloud", fast: "Fast", quality: "Quality" }[value],
+              })),
+              onChange: (value: string) => setVideos(value as VideosPreference),
             },
           },
         ]
       : [];
-  // An explicit pick that can't run says why.
-  const refusal = where === "auto" ? undefined : animation.error?.message;
+  // Nothing can animate: say why.
+  const refusal = animation.error?.message;
   const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
@@ -390,10 +364,10 @@ export function useMediaActions(
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,
-        // When nothing can animate, the options stay disabled, explained only for an explicit pick.
+        // When nothing can animate, the options stay disabled and the note says why.
         note: refusal,
         menu: [
-          [...whereChoice, ...tierChoice, ...reviewItems],
+          [...modelChoice, ...reviewItems],
           [...themeItems(!animation.data)],
           [
             {
@@ -412,10 +386,10 @@ export function useMediaActions(
         label: "Extend",
         loading: running === "animate" || action.isPending,
         // A theme continues the clip from its last frame at once; the composer shows it first. It
-        // keeps the clip's own model, so Fast or Quality applies only once Cloud is picked.
+        // keeps the clip's own model unless videos run on Cloud.
         note: refusal,
         menu: [
-          [...whereChoice, ...(where === "cloud" ? tierChoice : []), ...reviewItems],
+          [...modelChoice, ...reviewItems],
           [
             ...themeItems(action.isPending),
             {
@@ -429,29 +403,6 @@ export function useMediaActions(
           [...(reference ? [reference] : []), saveFrame],
         ],
       }),
-    image &&
-      itemAction("edit", {
-        disabled: action.isPending,
-        onClick: () => action.mutate("refine"),
-      }),
-    // A video's edits each save a new version; the original stays.
-    ready &&
-      item.type === "video" &&
-      itemAction("edit", {
-        loading: videoEdit.isPending,
-        menu: [
-          [
-            { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-            editAction("reverse", "Reverse", Rewind, "reverse"),
-            editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-          ],
-          // Interpolated edits, the slowest to make.
-          [
-            editAction("slow-motion", "Slow Motion", Snail, "slow"),
-            editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-          ],
-        ],
-      }),
     ready &&
       chatOn &&
       itemAction("chat", {
@@ -459,60 +410,92 @@ export function useMediaActions(
         disabled: chat.isPending,
         onClick: () => chat.mutate(),
       }),
-    // Recreate reuses the item's prompt and settings: Edit Prompt opens them in the composer (its
-    // first option) and the others run it again from here. An upload has only its suggested prompt.
-    itemAction("recreate", {
-      disabled: action.isPending,
-      loading: running === "regenerate" || running === "repeat",
+    // Edit changes the item itself first, then reuses its prompt and settings: in the composer, or
+    // run again from here. An upload has only its suggested prompt; unfinished work opens its prompt.
+    itemAction("edit", {
+      disabled: !ready && action.isPending,
+      loading: videoEdit.isPending || running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
-      menu: !ready
-        ? undefined
-        : item.uploaded
-          ? [[recreate, ...(image && reference ? [reference] : [])]]
-          : [
-              [
-                {
-                  id: "prompt-composer",
-                  label: "Edit Prompt",
-                  icon: icons.prompt,
-                  disabled: action.isPending,
-                  onClick: () => action.mutate("image"),
-                },
-                ...(image && reference ? [reference] : []),
-              ],
-              [
-                {
-                  id: "new-seed",
-                  label: "Run Again",
-                  icon: Shuffle,
-                  onClick: () => run({ kind: "regenerate" }),
-                },
-                {
-                  id: "exact-repeat",
-                  label: "Run Again (Same Seed)",
-                  icon: Repeat,
-                  onClick: () => run({ kind: "repeat" }),
-                },
-              ],
+      menu: ready
+        ? [
+            ...(image
+              ? [
+                  [
+                    {
+                      id: "edit-image",
+                      label: "Edit Image",
+                      description: "Change this image in the composer",
+                      icon: icons.edit,
+                      disabled: action.isPending,
+                      onClick: () => action.mutate("refine"),
+                    },
+                  ],
+                ]
+              : // A video's edits each save a new version; the original stays.
+                [
+                  [
+                    { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
+                    editAction("reverse", "Reverse", Rewind, "reverse"),
+                    editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
+                  ],
+                  // Interpolated edits, the slowest to make.
+                  [
+                    editAction("slow-motion", "Slow Motion", Snail, "slow"),
+                    editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                  ],
+                ]),
+            [
+              item.uploaded
+                ? recreate
+                : {
+                    id: "prompt-composer",
+                    label: "Edit Prompt",
+                    description: "Open its prompt and settings in the composer",
+                    icon: icons.prompt,
+                    disabled: action.isPending,
+                    onClick: () => action.mutate("image"),
+                  },
+              ...(image && reference ? [reference] : []),
             ],
+            item.uploaded
+              ? []
+              : [
+                  {
+                    id: "new-seed",
+                    label: "Run Again",
+                    description: "Same prompt and settings, new seed",
+                    icon: Shuffle,
+                    onClick: () => run({ kind: "regenerate" }),
+                  },
+                  {
+                    id: "exact-repeat",
+                    label: "Repeat Exactly",
+                    description: "Same prompt, settings and seed",
+                    icon: Repeat,
+                    onClick: () => run({ kind: "repeat" }),
+                  },
+                ],
+          ]
+        : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     upscale,
+    // Its options sort alphabetically.
     itemAction("copy", {
       menu: [
         [
-          {
-            id: "copy-prompt",
-            label: "Prompt",
-            icon: TextQuote,
-            onClick: () => void copyText(item.prompt || "", "Prompt"),
-          },
           {
             id: "copy-details",
             label: "Details",
             icon: ListChecks,
             onClick: () => void copyText(settingsText(), "Details"),
+          },
+          {
+            id: "copy-prompt",
+            label: "Prompt",
+            icon: TextQuote,
+            onClick: () => void copyText(item.prompt || "", "Prompt"),
           },
         ],
       ],
@@ -559,10 +542,19 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
+  const kept = (action: Action): Action =>
+    action.menu
+      ? {
+          ...action,
+          menu: action.menu.map((group) =>
+            group.filter((option) => !omit.includes(option.id)).map(kept),
+          ),
+        }
+      : action;
   return itemActionGroups(
     actions
       .filter((entry): entry is Action => !!entry && !omit.includes(entry.id))
-      .map(withoutLoneOption),
+      .map((entry) => withoutLoneOption(kept(entry))),
   );
 }
 
