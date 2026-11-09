@@ -31,10 +31,8 @@ export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
-  today: { images: number; videos: number };
   spicyAvailable: boolean;
   status: DreamStatus;
-  reason?: string;
 }
 
 export const dreamQuery = queryOptions({

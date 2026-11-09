@@ -15,9 +15,6 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await expect(page).toHaveURL(/\/dream$/);
   await expect(current(page)).toContainText("Because you star one.");
   await expect(current(page)).toContainText("Dream prompt one");
-  await expect(page.getByRole("status", { name: "Dream Status" })).toContainText(
-    "Waiting for idle time",
-  );
 
   const batch = page.getByRole("progressbar", { name: "Dream Batch", exact: true });
   await expect(batch).toHaveAttribute("aria-valuetext", "1 of 5");
