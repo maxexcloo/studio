@@ -1606,7 +1606,7 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   // A chat host that can't pass the attachment sends nothing; the refusal says what to do instead.
   const empty = await call(client, "upload", { content_base64: "" });
   assert.equal(empty.isError, true);
-  assert.match(texts(empty), /call upload_link.*search with uploads: true/);
+  assert.match(texts(empty), /call upload_link.*pass its reference_asset_id to generate/);
   const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
     .png()
     .toBuffer();
@@ -3546,7 +3546,13 @@ test("Search with uploads finds only the caller's uploads, an UploadLink adds on
   // UploadLink: a sealed page that takes one image for its owner without a Studio sign-in.
   const linked = await call(alice, "upload_link");
   assert.match(texts(linked), /Ask the user to open this link and upload the photo they attached/);
-  const link = data(linked).link;
+  const { link, reference_asset_id: reference } = data(linked);
+  // Its reference is refused until the image arrives.
+  await failure(alice, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A beach"],
+    reference_asset_ids: [reference],
+  });
   assert.match(link, /^https:\/\/studio\.example\.test\/mcp\/results\/upload\/u2\./);
   const page = localLink(f, link);
   const opened = await fetch(page);
@@ -3573,11 +3579,17 @@ test("Search with uploads finds only the caller's uploads, an UploadLink adds on
   // Used once, the link is closed.
   assert.equal((await post(page, png)).status, 404);
   assert.match(await (await fetch(page)).text(), /has been used or has expired/);
+  // The link's reference is the new upload, which Generate takes directly and Bob can't use.
   const found = await search(alice);
   assert.equal(found.length, 2);
   assert.equal(found[1], "studio-asset");
-  await generate(alice, { reference_asset_ids: [found[0]] });
+  await generate(alice, { reference_asset_ids: [reference] });
   assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, found[0]);
+  await failure(bob, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A beach"],
+    reference_asset_ids: [reference],
+  });
   assert.deepEqual(await search(bob), [bobs]);
   // A link ends after 15 minutes.
   t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
