@@ -131,6 +131,7 @@ async function fixture(
     noteGatewayIdentity,
     resolveSignedResult,
     gatewayAdminTools,
+    allowedHost,
     control = fixtureRuntime(),
   } = {},
 ) {
@@ -362,6 +363,7 @@ async function fixture(
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
+    ...(allowedHost ? { allowedHost } : {}),
     // Like Studio's queue: failed direct cloud video jobs since a time.
     cloudVideoFailures: (since) =>
       [...jobs.values()]
@@ -497,6 +499,62 @@ test("a headerless client connects at /mcp/<token>, and a URL carries only a per
   );
   const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
   assert.equal(saved.jobs[jobId(result)], "url-token-account");
+});
+
+test("the public MCP host takes only personal account tokens, and private hosts keep the shared keys", async (t) => {
+  const token = "account-mcp-token-that-is-long-enough-for-the-fixture";
+  const account = {
+    userId: "public-host-account",
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  };
+  const f = await fixture(t, {
+    accountMode: true,
+    environment: adminEnvironment,
+    authenticateAccountToken: (value) => (value === token ? account : null),
+    authenticateGatewayIdentity: (user) => (user === "librechat-linked" ? account : null),
+    // As deployed, the public host is also an allowed private host; the public rule wins.
+    allowedHost: () => true,
+  });
+  // Fetch normalises Host, so use the native HTTP client.
+  const post = (host, key, url = "/mcp") =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        f.base + url,
+        {
+          method: "POST",
+          headers: {
+            host,
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            "x-ai-user-id": "librechat-linked",
+            "x-ai-user-email": "linked@example.test",
+            ...(key ? { authorization: `Bearer ${key}` } : {}),
+          },
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => (body += chunk));
+          response.once("end", () => resolve({ status: response.statusCode, body }));
+        },
+      );
+      request.once("error", reject);
+      request.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
+    });
+  const refused = await post("studio.example.test", "not-a-real-token");
+  assert.equal(refused.status, 401);
+  // The shared keys are refused exactly like a wrong credential, so a response never confirms one.
+  for (const key of [mediaKey, controlKey])
+    for (const host of ["studio.example.test", "STUDIO.example.test.:443"])
+      assert.deepEqual(await post(host, key), refused, `${host} ${key}`);
+  assert.equal((await post("studio.example.test", token)).status, 200);
+  assert.equal((await post("studio.example.test", "", `/mcp/${token}`)).status, 200);
+  for (const key of [mediaKey, controlKey])
+    assert.equal((await post("studio.studio.svc.cluster.local", key)).status, 200, key);
+  assert.equal(f.requests.length, 0);
 });
 
 test("account MCP tokens map requests and jobs to the stable account identity", async (t) => {
