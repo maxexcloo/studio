@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { useEffect } from "react";
 import {
   ArrowLeftRight,
   Camera,
   Check,
-  Eye,
   FastForward,
   Film,
   ImageDown,
@@ -15,7 +13,6 @@ import {
   PenLine,
   Repeat,
   Rewind,
-  ScanFace,
   ScanText,
   Scissors,
   Shuffle,
@@ -34,10 +31,7 @@ import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
-import { LoadingState } from "../../ui/LoadingState";
-import { TextBox } from "../../ui/TextBox";
 import { useFlash } from "../../ui/useFlash";
-import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
@@ -49,7 +43,8 @@ import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
 import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
-import { upscaling, useQuickUpscale } from "./UpscaleControls";
+import { itemAction, itemActionGroups } from "./itemActions";
+import { useUpscaleAction } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
@@ -57,7 +52,6 @@ import {
   useAnimateReview,
   useAnimateTier,
   useAnimateWhere,
-  useAnimateWriter,
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
@@ -69,46 +63,6 @@ import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
 import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
-
-const definitions = {
-  chat: { label: "Continue in Chat", icon: icons.chat },
-  recreate: { label: "Recreate", icon: icons.recreate },
-  animate: { label: "Animate", icon: icons.animate },
-  edit: { label: "Edit", icon: icons.edit },
-  retry: { label: "Retry", icon: icons.retry },
-  stop: { label: "Stop", icon: icons.stop },
-  compare: { label: "Compare", icon: icons.compare },
-  upscale: { label: "Upscale", icon: icons.upscale },
-  copy: { label: "Copy", icon: icons.copy },
-  download: { label: "Download", icon: icons.download },
-  share: { label: "Share", icon: icons.share },
-  delete: { label: "Delete", icon: icons.delete, color: "red" as const },
-  star: { label: "Star", icon: icons.star },
-};
-type ItemActionId = keyof typeof definitions;
-/**
- * The sections and order everywhere: Animate, Edit, Recreate, Upscale | Compare, Continue in Chat |
- * Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only in
- * menus and the selection bar; Share takes Download's place where phones share.
- */
-const sections: ItemActionId[][] = [
-  ["retry", "stop", "animate", "edit", "recreate", "upscale"],
-  ["compare", "chat"],
-  ["copy", "download", "share"],
-  ["star", "delete"],
-];
-
-/** An item action with its shared label and icon. */
-export const itemAction = (id: ItemActionId, action: Partial<Action> = {}): Action => ({
-  id,
-  ...definitions[id],
-  ...action,
-});
-/** Places actions in the shared sections and order; absent ones are left out. */
-export const itemActionGroups = (actions: (Action | null | false | undefined)[]): ActionGroups =>
-  sections.map((ids) =>
-    ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
-  );
 
 /** An action whose options come to one runs that option itself, so no submenu holds just one. */
 function withoutLoneOption(action: Action): Action {
@@ -313,8 +267,6 @@ export function useMediaActions(
   const reference = useReferenceAction(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
-  // Phones compare an upscale above its original.
-  const phone = usePhone();
   const videoEdit = useVideoEdit(item);
   // A video edit's menu stays open while it saves, then its item says so for a moment.
   const [edited, flashEdited] = useFlash<VideoEdit["kind"]>();
@@ -338,6 +290,13 @@ export function useMediaActions(
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
   const image = ready && item.type === "image";
+  const upscale = useUpscaleAction(item, {
+    ready,
+    compare,
+    onCompare,
+    onUpscale,
+    onVersionChange,
+  });
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
   const [tier, setTier] = useAnimateTier();
@@ -397,22 +356,9 @@ export function useMediaActions(
       : [];
   // An explicit pick that can't run says why.
   const refusal = where === "auto" ? undefined : animation.error?.message;
-  const cache = useQueryClient();
-  const version = useMutation({
-    mutationFn: (active: boolean) =>
-      post<{ upscaleActive: boolean }>("/api/upscale/toggle", { galleryItemId: item.id, active }),
-    onSuccess: (result) => {
-      onVersionChange?.(item.id, result.upscaleActive);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
-      void cache.invalidateQueries({ queryKey: ["session"] });
-    },
-  });
   const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
-  const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
-  const quick = useQuickUpscale(item, ready);
-  const upscaleBusy = upscaling(item) || quick.queue.isPending;
   const themeItems = (disabled: boolean) =>
     assistant.data?.available
       ? themes.map((theme) => ({
@@ -552,96 +498,7 @@ export function useMediaActions(
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
-    ready &&
-      itemAction("upscale", {
-        // Laid out like Animate: with an upscale, switching between it and the original comes
-        // first; then the remembered settings, then the runs. The usual click is the first run
-        // option: Show Upscale, else Upscale at the chosen settings.
-        label: upscaling(item) ? "Upscaling…" : "Upscale",
-        pressed: upscaled && Boolean(item.upscaleActive),
-        loading: upscaleBusy && !upscaled,
-        disabled: upscaled ? version.isPending : upscaleBusy,
-        menu: [
-          upscaled
-            ? [
-                {
-                  id: "show-upscale",
-                  label: "Show Upscale",
-                  icon: Eye,
-                  checked: Boolean(item.upscaleActive),
-                  disabled: version.isPending,
-                  onClick: () => version.mutate(!item.upscaleActive),
-                },
-                ...(onCompare && image
-                  ? [
-                      {
-                        id: "compare-upscale",
-                        label: "Compare Upscale",
-                        icon: phone ? icons.compareStacked : icons.compareSideBySide,
-                        checked: Boolean(compare),
-                        onClick: onCompare,
-                      },
-                    ]
-                  : []),
-              ]
-            : [],
-          [
-            {
-              id: "upscale-quality",
-              label: "Upscale Quality",
-              icon: icons.upscale,
-              choice: {
-                value: quick.quality,
-                options: [
-                  { value: "fast", label: "Fast" },
-                  { value: "balanced", label: "Balanced" },
-                  { value: "high", label: "High" },
-                ],
-                onChange: (value: string) => quick.setQuality(value as typeof quick.quality),
-              },
-            },
-            // Face Detail joins every run from here once checked; disabled where the worker can't.
-            ...(image
-              ? [
-                  {
-                    id: "upscale-face",
-                    label: "Face Detail",
-                    icon: ScanFace,
-                    checked: quick.faceDetail,
-                    disabled: !quick.faceAvailable,
-                    keepOpen: true,
-                    onClick: () => quick.setFaceDetail(!quick.faceDetail),
-                  },
-                ]
-              : []),
-            // The rest of the settings, under the quick ones.
-            {
-              id: "upscale-options",
-              label: "Upscale Options…",
-              icon: icons.settings,
-              disabled: upscaleBusy,
-              onClick: onUpscale,
-            },
-          ],
-          [
-            upscaled
-              ? {
-                  id: "upscale-again",
-                  label: "Regenerate Upscale",
-                  icon: icons.retry,
-                  disabled: upscaleBusy,
-                  onClick: quick.run,
-                }
-              : {
-                  id: "upscale-run",
-                  label: image ? "Upscale Image" : "Upscale Video",
-                  icon: icons.upscale,
-                  disabled: upscaleBusy,
-                  onClick: quick.run,
-                },
-          ],
-        ],
-      }),
+    upscale,
     itemAction("copy", {
       menu: [
         [
@@ -712,138 +569,4 @@ export function useMediaActions(
 /** The shared actions as menu items, mounted while a menu is open. */
 export function MediaActionMenu({ item, ...options }: MediaActionOptions & { item: MediaItem }) {
   return <ActionMenuItems groups={useMediaActions(item, options)} />;
-}
-
-/**
- * Animate's dialog for a theme. Custom Animation first asks for the instruction; under Review
- * Prompt First the assistant then writes the motion prompt for editing (a full-screen sheet on
- * phones), and Run queues exactly the prompt shown. Otherwise the theme queues as the menu would.
- */
-export function AnimateDialog({
-  item,
-  sessionId,
-  iterate,
-  theme,
-  onClose,
-}: {
-  item: MediaItem;
-  sessionId?: string;
-  iterate?: (iteration: Iteration) => void;
-  theme: AnimateTheme;
-  onClose: () => void;
-}) {
-  const phone = usePhone();
-  const iteration = useMediaIteration(item, sessionId);
-  const run = iterate ?? iteration.mutate;
-  const [review] = useAnimateReview();
-  const writer = useAnimateWriter(item, sessionId);
-  const [instruction, setInstruction] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const writing = useRef<AbortController>(null);
-  const asking = theme === "custom" && writer.isIdle;
-  const write = () => {
-    writing.current?.abort();
-    writing.current = new AbortController();
-    writer.mutate(
-      { theme, instruction: instruction.trim() || undefined, signal: writing.current.signal },
-      { onSuccess: (written) => setPrompt(written.prompt) },
-    );
-  };
-  useEffect(() => {
-    if (theme !== "custom") write();
-    return () => writing.current?.abort();
-  }, []);
-  const written = writer.data;
-  return (
-    <Modal
-      opened
-      onClose={onClose}
-      title={asking ? "Custom Animation" : "Review Prompt"}
-      centered
-      size={asking ? "sm" : "md"}
-      fullScreen={phone}
-    >
-      {asking ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!instruction.trim()) return;
-            if (review) return write();
-            run({ kind: "animate", theme, instruction: instruction.trim() });
-            onClose();
-          }}
-        >
-          <Stack>
-            <TextBox
-              label="Instruction"
-              placeholder="What should happen in the video?"
-              autosize
-              minRows={3}
-              data-autofocus
-              value={instruction}
-              onChange={setInstruction}
-            />
-            <Group justify="flex-end">
-              <Button type="submit" disabled={!instruction.trim()}>
-                {review ? "Write Prompt" : "Animate"}
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      ) : writer.isPending ? (
-        <LoadingState label="Writing Prompt…" />
-      ) : (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!written || !prompt.trim()) return;
-            run({
-              kind: "animate",
-              theme,
-              instruction: instruction.trim() || undefined,
-              written: { prompt: prompt.trim(), model: written.model, thinking: written.thinking },
-            });
-            onClose();
-          }}
-        >
-          <Stack>
-            {writer.error && (
-              <Alert color="red" title="Couldn’t Write the Prompt">
-                {writer.error.message}
-              </Alert>
-            )}
-            {written && (
-              <>
-                <TextBox
-                  label="Prompt"
-                  autosize
-                  minRows={4}
-                  data-autofocus
-                  value={prompt}
-                  onChange={setPrompt}
-                />
-                <Text size="sm" c="dimmed">
-                  {written.profileLabel}
-                  {written.tier ? ` · ${written.tier === "fast" ? "Fast" : "Quality"}` : ""}
-                  {written.cloud ? " · Cloud" : ""}
-                </Text>
-              </>
-            )}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={onClose}>
-                Cancel
-              </Button>
-              {written ? (
-                <Button type="submit" disabled={!prompt.trim()}>
-                  Run
-                </Button>
-              ) : (
-                <Button onClick={write}>Retry</Button>
-              )}
-            </Group>
-          </Stack>
-        </form>
-      )}
-    </Modal>
-  );
 }

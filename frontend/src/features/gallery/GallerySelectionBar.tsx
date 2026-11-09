@@ -9,7 +9,7 @@ import { useQueue, useQueueAction } from "../generation/Queue";
 import { ActionBarGroups, ActionMenuItems } from "./ActionBar";
 import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { itemAction, itemActionGroups } from "./MediaActions";
+import { itemAction, itemActionGroups } from "./itemActions";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
