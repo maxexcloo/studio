@@ -19,7 +19,8 @@
   color: var(--mantine-primary-color-light-color);
 }
 
-.iconChip {
+/* Two classes outrank Mantine's own Button padding, which would leave a phone icon a 6 px sliver. */
+.chip.iconChip {
   aspect-ratio: 1;
   padding-inline: 0;
 }
