@@ -6,7 +6,6 @@ import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBa
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
-import { UpscaleDialog } from "./UpscaleControls";
 import type { AnimateTheme, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
@@ -72,7 +71,6 @@ export function MediaViewerActions({
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
   const [animating, setAnimating] = useState<AnimateTheme | null>(null);
-  const [upscaling, setUpscaling] = useState(false);
   const [trimming, setTrimming] = useState(false);
   const groups = useMediaActions(item, {
     transfer,
@@ -88,7 +86,6 @@ export function MediaViewerActions({
     onDelete,
     onRetried,
     onTrim: () => setTrimming(true),
-    onUpscale: () => setUpscaling(true),
     onVersionChange,
   });
   if (shortcuts) shortcuts.current = groups;
@@ -127,9 +124,6 @@ export function MediaViewerActions({
           theme={animating}
           onClose={() => setAnimating(null)}
         />
-      )}
-      {item.status === "done" && (
-        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </ActionBarSurface>

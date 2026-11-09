@@ -25,13 +25,15 @@ import {
   nameWords,
   profileFromRequest,
   serviceState,
-  stoppedServices,
   speedWordList,
   profilesForTier,
   profilesNearTier,
   searchProfiles,
   tierOf,
+  waitingNote,
+  waitingServices,
   withinFamily,
+  workerState,
 } from "./tiers.js";
 import { animateThemes } from "../prompt-animate.js";
 import { output, shortPrompt } from "./results.js";
@@ -136,7 +138,7 @@ export function registerGenerateTools({
   chatAssistant,
 }) {
   const { owner, refs, conversation } = actor;
-  // A guide goes to each conversation once (each account and profile without a conversation header).
+  // A guide goes to each conversation once (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
   const review = (refs, profileId) => {
@@ -146,6 +148,11 @@ export function registerGenerateTools({
     reviewedGuides.set(key, Date.now());
     return true;
   };
+  /** What to say about a queued profile whose worker isn't running; Cloud only as a suggestion the account can take. */
+  const waiting = async (profile) =>
+    workerState[profile.availability]
+      ? waitingNote(profile, (await media.profiles(profile.kind, owner)).some(isCloudProfile))
+      : "";
   /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
   const respond = async (
     submission,
@@ -226,7 +233,7 @@ export function registerGenerateTools({
     ].join(" · ");
     const message =
       submission.status === "queued"
-        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
+        ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}${await waiting(profile)}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
         : `${submission.error} ${note}Share the links; never resubmit.`;
     return {
       content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
@@ -280,11 +287,14 @@ export function registerGenerateTools({
         `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}`,
     );
     const first = sets.find(({ queued }) => queued.jobs?.length)?.queued.jobs[0].ref || "result 1";
+    const waits = [...new Set(await Promise.all(sets.map(({ profile }) => waiting(profile))))].join(
+      "",
+    );
     return {
       content: [
         {
           type: "text",
-          text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+          text: `Queued ${sets.length} sets, one per model. ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
         },
       ],
       structuredContent: {
@@ -304,10 +314,10 @@ export function registerGenerateTools({
     };
   };
   /** Studio's usual pick; with several to choose from, the note says which. */
-  const picked = ({ pool, profile, note }) =>
-    pool.length < 2
-      ? { profile, note }
-      : { profile, note: `${note}Chose ${profile.label || profile.id}, the default. ` };
+  const picked = ({ pool, profile }) => ({
+    profile,
+    note: pool.length < 2 ? "" : `Chose ${profile.label || profile.id}, the default. `,
+  });
   /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
   const namedInTier = (profiles, value, wanted) => {
     // A cloud (Grok) profile only by its exact id or when the name asks for the cloud.
@@ -344,8 +354,6 @@ export function registerGenerateTools({
       note: "From the profile's graph, so it outranks any count its label or description gives.",
     };
   };
-  // A profile whose worker isn't answering, as Settings › Workers names that state.
-  const workerState = { parked: "Stopped", offline: "Offline" };
   /** Profiles as the models tool lists them: "id — label" grouped by kind, marked when their worker isn't running. */
   const listed = (profiles) => {
     const list = {};
@@ -540,15 +548,9 @@ export function registerGenerateTools({
           : null;
         const inState = (state) =>
           Object.keys(services || {}).filter((value) => services[value] === state);
-        const servicesNote = [
-          inState("Stopped").length ? stoppedServices(inState("Stopped")) : "",
-          inState("Offline").length
-            ? `${inState("Offline")
-                .map((value) => (value === "image" ? "Images" : "Videos"))
-                .join(" and ")} are Offline: the worker isn't answering; try again later.`
-            : "",
-        ]
-          .filter(Boolean)
+        const servicesNote = ["Stopped", "Offline"]
+          .filter((state) => inState(state).length)
+          .map((state) => waitingServices(inState(state), state))
           .join(" ");
         const unready = (catalogue.profiles || []).filter(
           (profile) => profile.ready === false && shown(profile.kind),
@@ -714,7 +716,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
     {
       request: z
         .string()

@@ -147,7 +147,6 @@ function ChatComposer() {
     empty: !text.trim(),
     // An idea is an image to make, so Chat asks for it rather than discussing it.
     onPick: (idea) => setText(`Create an image: ${idea}`),
-    className: classes.ideas,
   });
   return (
     <form
@@ -181,7 +180,6 @@ function ChatComposer() {
           ideas.focusProps.onFocus(event);
           setExpanded(true);
         }}
-        onBlur={ideas.focusProps.onBlur}
         onKeyDown={ideas.focusProps.onKeyDown}
       >
         <TextBox
@@ -196,7 +194,6 @@ function ChatComposer() {
           hideTools={!expanded}
           value={text}
           onChange={setText}
-          overlay={ideas.ideas}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -209,6 +206,7 @@ function ChatComposer() {
         <ChipRail label="Chat Inputs">
           {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
           <ReferencePicker />
+          {ideas.chip}
         </ChipRail>
       )}
       {replying ? (
