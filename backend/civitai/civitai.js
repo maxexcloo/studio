@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir } from "../gallery/store.js";
 import { writeBytesFileAsync } from "../json-store.js";
 import { mediaFile, mediaParams } from "../media-paths.js";
 import { withPngText } from "../png-text.js";
@@ -18,13 +17,6 @@ import { appVersion } from "../data-dir.js";
  * It is written into the stored file in Studio media right after a run, so the
  * file you download or share carries it.
  */
-
-// The old on/off switch is gone: a saved choice, "off" included, is dropped quietly.
-try {
-  fs.rmSync(path.join(dataDir, "civitai.json"), { force: true });
-} catch {
-  /* read-only data: nothing to forget */
-}
 
 /* ------------------------------------------------------------ Names */
 
