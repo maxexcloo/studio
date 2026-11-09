@@ -2,7 +2,7 @@
 
 Studio is a media workspace for generating images and video, refining results and continuing an idea through saved visual sessions. It connects to ComfyUI and cloud providers, with account isolation, model imports and native MCP tools.
 
-Images and Videos share a bottom composer; Chat combines streamed conversation with generation inputs, results and saved iterations. Jobs wait in a persistent generation queue, and the interface is built with React and Mantine.
+Use Images and Videos to generate and edit media, or Chat to develop an idea through conversation and saved iterations.
 
 ## Development
 
@@ -13,7 +13,7 @@ mise run setup
 mise run dev
 ```
 
-Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
+Open <http://localhost:5173>. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
 
 `mise run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference.
 
@@ -27,7 +27,7 @@ mise run test:browser
 
 ## Running Studio
 
-The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Every verified `main` commit publishes the application under a `YYYY.M.D.N` version with a [GitHub release](https://github.com/maxexcloo/studio/releases); the worker gets that version only when it changed since the previous release, so deploying an app-only release leaves the GPU workers running. Deploy exact versions.
+Use a [released](https://github.com/maxexcloo/studio/releases) version of `ghcr.io/maxexcloo/studio` and, for local generation, `ghcr.io/maxexcloo/studio-worker`. Deploy exact versions.
 
 Mount a writable Studio data directory for media and editable definitions; it is the only source of live profiles, guides and catalogue data. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [worker operations](worker/README.md) and [profiles](backend/samples/README.md).
 
