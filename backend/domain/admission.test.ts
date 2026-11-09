@@ -42,3 +42,32 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
     [3],
   );
 });
+
+test("a Count whose derived ID is taken queues nothing, then and on retry", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const admit = createGenerationAdmission({
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    validate: async () => ({ status: 200, payload: { ok: true } }),
+    resourceFor: async () => "local-media",
+    pendingItems: () => [],
+    revision: () => 0,
+    separateRuns: () => true,
+  });
+  store.enqueue("bob", store.createSession("bob").id, {}, "image", undefined, undefined, "run-2");
+  const request = (clientJobId: string) =>
+    admit({ kind: "image", prompt: "p", count: 3, clientJobId } as never, {
+      userId: "alice",
+      role: "user",
+    });
+  assert.equal((await request("run")).status, 409);
+  assert.deepEqual(store.jobs("alice"), []);
+  assert.deepEqual(store.sessions("alice"), []);
+  assert.equal((await request("run")).status, 409);
+  assert.deepEqual(store.jobs("alice"), []);
+  assert.equal((await request("other")).status, 200);
+  assert.deepEqual(
+    store.jobs("alice").map((job) => job.id),
+    ["other", "other-2", "other-3"],
+  );
+});

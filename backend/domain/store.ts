@@ -28,6 +28,15 @@ export type OwnedJob = QueueJob &
     cancelRequested?: boolean;
     cleared?: boolean;
   };
+/** One job of a request, as `Store.enqueueAll` queues it. */
+export interface QueuedCopy {
+  input: GenerationInput;
+  operation: GenerationOperation;
+  parentJobId?: string;
+  resource?: string;
+  requestedId?: string;
+  origin?: QueueOrigin & { parentItemId?: string };
+}
 interface UserPreset {
   id: string;
   title: string;
@@ -235,55 +244,72 @@ export class Store {
     input: GenerationInput,
     operation: GenerationOperation,
     parentJobId?: string,
-    resource = "local-media",
+    resource?: string,
     requestedId?: string,
-    origin: QueueOrigin & { parentItemId?: string } = {},
+    origin?: QueuedCopy["origin"],
   ): OwnedJob {
-    if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
-    if (parentJobId && !this.job(ownerId, parentJobId))
-      throw new Error("Parent generation not found.");
-    const stamp = now();
-    const id = requestedId || randomUUID();
-    const jobResource = resource.startsWith("provider:cliproxyapi")
-      ? `provider:cliproxyapi:${id}`
-      : resource;
-    const backend = resource.startsWith("worker:")
-      ? resource.slice(resource.indexOf(":") + 1)
-      : undefined;
-    const job: OwnedJob = {
-      id,
-      jobId: id,
-      ownerId,
-      resource: jobResource,
-      backend,
-      sessionId,
-      parentJobId,
-      ...(origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
-      operation,
-      priority: origin.priority ?? queuePriority.manual,
-      queueSet: origin.queueSet,
-      ...(origin.dream ? { dream: origin.dream } : {}),
-      // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
-      status: awaitsWriting(input) ? "writing" : "queued",
-      reason: "",
-      input: { ...input, clientJobId: id },
-      items: [],
-      outputs: [],
-      createdAt: stamp,
-      updatedAt: stamp,
-    };
+    return this.enqueueAll(ownerId, () => sessionId, [
+      { input, operation, parentJobId, resource, requestedId, origin },
+    ])[0];
+  }
+
+  /**
+   * Queues the copies of one request in one transaction. `session` creates or finds their Chat
+   * inside it, so a failed insert (a requested ID already in use) leaves neither Chat nor copies.
+   */
+  enqueueAll(ownerId: string, session: () => string, copies: QueuedCopy[]): OwnedJob[] {
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.db
-        .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
-        .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
+      const sessionId = session();
+      if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
+      const jobs = copies.map(
+        ({ input, operation, parentJobId, resource = "local-media", requestedId, origin = {} }) => {
+          if (parentJobId && !this.job(ownerId, parentJobId))
+            throw new Error("Parent generation not found.");
+          const stamp = now();
+          const id = requestedId || randomUUID();
+          const jobResource = resource.startsWith("provider:cliproxyapi")
+            ? `provider:cliproxyapi:${id}`
+            : resource;
+          const backend = resource.startsWith("worker:")
+            ? resource.slice(resource.indexOf(":") + 1)
+            : undefined;
+          const job: OwnedJob = {
+            id,
+            jobId: id,
+            ownerId,
+            resource: jobResource,
+            backend,
+            sessionId,
+            parentJobId,
+            ...(origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
+            operation,
+            priority: origin.priority ?? queuePriority.manual,
+            queueSet: origin.queueSet,
+            ...(origin.dream ? { dream: origin.dream } : {}),
+            // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
+            status: awaitsWriting(input) ? "writing" : "queued",
+            reason: "",
+            input: { ...input, clientJobId: id },
+            items: [],
+            outputs: [],
+            createdAt: stamp,
+            updatedAt: stamp,
+          };
+          this.db
+            .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
+            .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
+          return job;
+        },
+      );
+      const [{ input, operation }] = copies;
       this.updateSession(ownerId, sessionId, operation === "upscale" ? {} : { inputs: input });
       this.db.exec("COMMIT");
+      return jobs;
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
-    return job;
   }
 
   /**
