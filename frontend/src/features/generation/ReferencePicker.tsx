@@ -320,7 +320,6 @@ export function ReferencePicker({
       ) : (
         <ScrollArea.Autosize
           style={{ flex: 1, minHeight: 0 }}
-          offsetScrollbars="present"
           viewportRef={setViewport}
           onScrollPositionChange={({ y }) => {
             if (!restoreScroll.current) browser.scroll.current = y;
