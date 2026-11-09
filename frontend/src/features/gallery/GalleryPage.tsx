@@ -337,10 +337,12 @@ export function GalleryPage() {
         <LoadingState fill label="Loading Gallery" />
       ) : gallery.error && !gallery.data ? (
         <Alert color="red" title="Couldn’t Load the Gallery">
-          {gallery.error.message}
-          <Button variant="subtle" onClick={() => void gallery.refetch()}>
-            Retry
-          </Button>
+          <Stack gap="sm" align="flex-start">
+            {gallery.error.message}
+            <Button variant="subtle" onClick={() => void gallery.refetch()}>
+              Retry
+            </Button>
+          </Stack>
         </Alert>
       ) : items.length ? (
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
