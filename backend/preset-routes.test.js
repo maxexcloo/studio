@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -176,9 +177,20 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   );
 });
 
-test("video imports save originals, serve byte ranges and generate thumbnails", async () => {
-  const { default: encoder } = await import("ffmpeg-static");
-  videoBytes = execFileSync(encoder || "ffmpeg", [
+test("video imports save originals, serve byte ranges and generate thumbnails", async (context) => {
+  let encoder;
+  try {
+    encoder = createRequire(import.meta.url)("ffmpeg-static");
+  } catch {
+    encoder = "ffmpeg";
+  }
+  try {
+    execFileSync(encoder, ["-version"], { stdio: "ignore" });
+  } catch {
+    context.skip("Video encoder unavailable");
+    return;
+  }
+  videoBytes = execFileSync(encoder, [
     "-f",
     "lavfi",
     "-i",

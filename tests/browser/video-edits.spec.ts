@@ -1,13 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
-import { fixtures, stamp, viewerAction } from "./fixtures";
+import { fixtures, stamp, videoClip, viewerAction } from "./fixtures";
 
-// A one-second clip the browser can play; WebKit's test builds may not decode it.
-const clip = execFileSync(createRequire(import.meta.url)("ffmpeg-static"), [
-  ...["-hide_banner", "-loglevel", "error", "-f", "lavfi"],
-  ...["-i", "testsrc=size=160x90:rate=24:duration=1", "-c:v", "libvpx", "-f", "webm", "pipe:1"],
-]);
+const clip = videoClip();
+test.skip(!clip, "Video encoder unavailable");
 
 test("A video's Edit menu reverses or trims it into a new version", async ({
   page,
@@ -26,7 +21,7 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
     createdAt: stamp,
   });
   await page.route("**/test-media/clip.webm", (route) =>
-    route.fulfill({ contentType: "video/webm", body: clip }),
+    route.fulfill({ contentType: "video/webm", body: clip! }),
   );
   const edits: unknown[] = [];
   await page.route("**/api/gallery/video-edit", (route) => {

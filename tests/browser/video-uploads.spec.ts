@@ -1,13 +1,17 @@
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, showOnly, showUploads, stamp, viewerAction } from "./fixtures";
+import {
+  create,
+  fixtures,
+  image,
+  showOnly,
+  showUploads,
+  stamp,
+  videoClip,
+  viewerAction,
+} from "./fixtures";
 
-// A one-second clip; WebKit's test builds may not decode it, which only the viewer's player needs.
-const clip = execFileSync(createRequire(import.meta.url)("ffmpeg-static"), [
-  ...["-hide_banner", "-loglevel", "error", "-f", "lavfi"],
-  ...["-i", "testsrc=size=160x90:rate=24:duration=1", "-c:v", "libvpx", "-f", "webm", "pipe:1"],
-]);
+const clip = videoClip();
+test.skip(!clip, "Video encoder unavailable");
 
 test("A video uploads as a reference, and Recreate runs an upload's suggested prompt as its version", async ({
   page,
@@ -38,7 +42,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   await page
     .getByRole("region", { name: "References", exact: true })
     .locator('input[type="file"]')
-    .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip });
+    .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(1);
   expect(uploads[0]).toContain("Content-Type: video/webm");
 
@@ -56,7 +60,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
     createdAt: stamp,
   });
   await page.route("**/test-media/clip.webm", (route) =>
-    route.fulfill({ contentType: "video/webm", body: clip }),
+    route.fulfill({ contentType: "video/webm", body: clip! }),
   );
   const recreated: unknown[] = [];
   await page.route("**/api/gallery/recreate", (route) => {
@@ -79,7 +83,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   await page
     .getByRole("region", { name: "References", exact: true })
     .locator('input[type="file"]')
-    .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip });
+    .setInputFiles({ name: "clip.webm", mimeType: "video/webm", buffer: clip! });
   await expect.poll(() => uploads.length).toBe(2);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Generate Video", exact: true }).click();
