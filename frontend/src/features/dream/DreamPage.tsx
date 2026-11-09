@@ -24,27 +24,6 @@ import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
 import { dreamQuery, type Dream } from "./queries";
 import classes from "./DreamPage.module.css";
 
-/** A short line on what Dream is doing now, and the backend's reason where it gave one. */
-function statusLine(dream: Dream) {
-  const made = `${dream.today.images} ${dream.today.images === 1 ? "image" : "images"}${
-    dream.settings.videos
-      ? `, ${dream.today.videos} ${dream.today.videos === 1 ? "video" : "videos"}`
-      : ""
-  } today`;
-  const label = {
-    off: "Off",
-    paused: "Paused",
-    generating: "Dreaming…",
-    waiting: "Waiting for idle time",
-    capped: "Today’s limit reached",
-    unavailable: "Can’t run",
-  }[dream.status];
-  return {
-    label,
-    detail: [dream.reason, dream.settings.enabled ? made : ""].filter(Boolean).join(" · "),
-  };
-}
-
 /**
  * What the deck shows once every card is judged, or before Dream is on. `onTune` starts
  * calibration with gallery images, which needs no GPU and so works while Dream is off.
@@ -94,7 +73,7 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   return <EmptyState fill>Nothing New Yet</EmptyState>;
 }
 
-/** Dream: the deck with its status, pause and settings, the discards or the taste profile. */
+/** Dream: the deck with its pause and settings, the discards or the taste profile. */
 export function DreamPage() {
   const phone = usePhone();
   const dream = useQuery(dreamQuery);
@@ -103,11 +82,9 @@ export function DreamPage() {
   const [view, setView] = useState<"deck" | "discarded" | "taste">("deck");
   const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
-  const status = data && statusLine(data);
   return (
     <div className={classes.page}>
-      {/* Phones give the status its own line under the views and actions. */}
-      <Group className={classes.toolbar} gap="sm" wrap={phone ? "wrap" : "nowrap"}>
+      <Group className={classes.toolbar} gap="sm" wrap="nowrap">
         <SegmentedControl
           radius="xl"
           aria-label="Dream View"
@@ -118,19 +95,6 @@ export function DreamPage() {
             { value: "discarded", label: "Discarded" },
           ]}
         />
-        <div className={classes.status} role="status" aria-label="Dream Status">
-          {status && (
-            <Text size={phone ? "xs" : "sm"} truncate>
-              {status.label}
-              {status.detail && (
-                <Text span c="dimmed" inherit>
-                  {" · "}
-                  {status.detail}
-                </Text>
-              )}
-            </Text>
-          )}
-        </div>
         <Group gap={4} wrap="nowrap" ml="auto">
           {data?.settings.enabled && (
             <Tooltip label={data.settings.paused ? "Resume Dream" : "Pause Dream"}>
@@ -159,19 +123,28 @@ export function DreamPage() {
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
+      {data?.status === "unavailable" && data.reason && (
+        <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
+          Can’t Run: {data.reason}
+        </Text>
+      )}
       {view === "discarded" ? (
         <DiscardedDreams />
       ) : view === "taste" ? (
-        <ScrollArea
-          flex={1}
-          mih={0}
-          w="100%"
-          maw={760}
-          mx="auto"
-          classNames={{ viewport: classes.taste }}
-        >
-          <TasteProfile />
-        </ScrollArea>
+        phone ? (
+          <TasteProfile fill />
+        ) : (
+          <ScrollArea
+            flex={1}
+            mih={0}
+            w="100%"
+            maw={760}
+            mx="auto"
+            classNames={{ viewport: classes.taste }}
+          >
+            <TasteProfile />
+          </ScrollArea>
+        )
       ) : dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
       ) : dream.isError ? (

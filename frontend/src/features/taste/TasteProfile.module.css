@@ -1,0 +1,7 @@
+/* A filling profile's text box, from its root down to the text, takes the height it is given. */
+.fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
