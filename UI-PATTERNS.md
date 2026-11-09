@@ -164,9 +164,9 @@ the primary component reference and verify APIs against the installed version.
   wrapping onto another row rather than using More or scrolling; the phone bar
   drops its prompt field while Details is open. Gallery selection uses the shared
   contextual selection bar and confirms deletion.
-- Details sections show short content in full and fold longer content under
-  Expand rather than scrolling it in a box. Each heading's Copy copies its
-  section.
+- Details sections show their content in full rather than scrolling it in a
+  box. Only a long caption folds under Expand; its tags always show. Prompt and
+  Negative Prompt alone have a Copy beside their heading.
 - Version grouping has one owner in `gallery/versions.ts`; sharing a Chat or
   prompt alone does not group results. Keep source and derived relationships
   visible, even when a result stands alone.
