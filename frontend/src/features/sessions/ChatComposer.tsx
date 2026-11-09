@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionIcon, Alert, Badge, CloseButton, Group, Loader, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  CloseButton,
+  Group,
+  Loader,
+  Text,
+  Tooltip,
+  Transition,
+} from "@mantine/core";
 import { ArrowUp } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsMutating } from "@tanstack/react-query";
@@ -15,6 +25,7 @@ import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
+import { useMotionDuration } from "../../ui/Appearance";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useChat, useChatMessages } from "./ChatProvider";
 import classes from "./ChatComposer.module.css";
@@ -130,6 +141,7 @@ function ChatComposer() {
   );
   const form = useRef<HTMLFormElement>(null);
   const [expanded, setExpanded] = useState(false);
+  const motionDuration = useMotionDuration();
   // A layer over the composer, such as a chip's popup or its confirmation, is not outside it.
   const outside = (element: Element) =>
     !form.current?.contains(element) && !element.closest(composerLayers);
@@ -202,13 +214,24 @@ function ChatComposer() {
           }}
         />
       </div>
-      {expanded && (
-        <ChipRail label="Chat Inputs">
-          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
-          <ReferencePicker />
-          {ideas.chip}
-        </ChipRail>
-      )}
+      {/* Expanding slides the chip rail up as the gallery composer's panel slides up, at the
+          Animations speed; collapsing is immediate, as the box shrinks at once. */}
+      <Transition
+        mounted={expanded}
+        transition="slide-up"
+        duration={motionDuration}
+        exitDuration={0}
+      >
+        {(styles) => (
+          <div style={styles}>
+            <ChipRail label="Chat Inputs">
+              {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
+              <ReferencePicker />
+              {ideas.chip}
+            </ChipRail>
+          </div>
+        )}
+      </Transition>
       {replying ? (
         <Tooltip label="Stop Response">
           <ActionIcon
