@@ -1,4 +1,8 @@
-"""Install the pinned ComfyUI extensions while building the worker image."""
+"""Fetch the pinned ComfyUI sources and install their requirements while building the worker image.
+
+The two steps run in separate image layers, so a source pin bump reinstalls packages only when it
+changes a requirements file.
+"""
 
 import importlib.metadata
 import json
@@ -9,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 
-def install(core_source, source, target):
+def fetch(core_source, source, target, requirements):
     target = Path(target)
     core = json.loads(Path(core_source).read_text())
     subprocess.run(
@@ -65,14 +69,26 @@ def install(core_source, source, target):
             check=True,
         )
         shutil.rmtree(destination / ".git")
+    # Only the requirements files reach the install layer; none of them refers to another file.
+    for path in [
+        target / "requirements.txt",
+        *(target / "custom_nodes").glob("*/requirements.txt"),
+    ]:
+        copy = Path(requirements) / path.relative_to(target)
+        copy.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, copy)
+
+
+def install(requirements):
+    requirements = Path(requirements)
     # Core and extension dependencies must retain the image's ROCm PyTorch installation.
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as constraints:
         for name in ["torch", "torchaudio", "torchvision"]:
             constraints.write(f"{name}=={importlib.metadata.version(name)}\n")
         constraints.flush()
-        requirements = [
-            target / "requirements.txt",
-            *sorted((target / "custom_nodes").glob("*/requirements.txt")),
+        paths = [
+            requirements / "requirements.txt",
+            *sorted((requirements / "custom_nodes").glob("*/requirements.txt")),
         ]
         subprocess.run(
             [
@@ -85,7 +101,7 @@ def install(core_source, source, target):
                 constraints.name,
                 *[
                     argument
-                    for path in requirements
+                    for path in paths
                     for argument in ("--requirement", str(path))
                 ],
             ],
@@ -94,4 +110,4 @@ def install(core_source, source, target):
 
 
 if __name__ == "__main__":
-    install(*sys.argv[1:])
+    {"fetch": fetch, "install": install}[sys.argv[1]](*sys.argv[2:])

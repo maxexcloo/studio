@@ -1,6 +1,12 @@
 # syntax=docker/dockerfile:1
 FROM docker.io/stilldeadcode/radiance:1.17.0 AS radiance
-FROM docker.io/yanwk/comfyui-boot:rocm-20261104
+FROM docker.io/yanwk/comfyui-boot:rocm-20261104 AS comfyui-boot
+
+FROM comfyui-boot AS sources
+COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
+RUN python3 /opt/studio/install_nodes.py fetch /opt/studio/source.json /opt/studio/sources.json /opt/studio/ComfyUI /opt/studio/requirements
+
+FROM comfyui-boot
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
     PIP_USER=false
@@ -12,8 +18,12 @@ RUN python3 -m pip install --no-cache-dir \
     # renovate: datasource=pypi depName=rotary_embedding_torch
     rotary_embedding_torch==0.9.2 \
     && rm -rf /root/ComfyUI
-COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
-RUN python3 /opt/studio/install_nodes.py /opt/studio/source.json /opt/studio/sources.json /root/ComfyUI
+# The package layer depends only on the requirements files' content, so a source pin bump that
+# leaves them unchanged reuses it and replaces only the small source layer below.
+COPY worker/install_nodes.py /opt/studio/
+COPY --from=sources /opt/studio/requirements /opt/studio/requirements
+RUN python3 /opt/studio/install_nodes.py install /opt/studio/requirements
+COPY --from=sources /opt/studio/ComfyUI /root/ComfyUI
 COPY worker/comfyui/ /root/ComfyUI/custom_nodes/
 COPY worker/patches/ /opt/studio/patches/
 COPY worker/entrypoint.sh /opt/studio/
