@@ -78,8 +78,14 @@ export function DreamPage() {
   const phone = usePhone();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
-  // Dream always opens on the deck; Taste is its own icon beside Settings.
+  // Dream always opens on the deck; Taste is its own control beside Settings.
   const [view, setView] = useState<"deck" | "discarded" | "taste">("deck");
+  const taste = {
+    variant: view === "taste" ? "light" : "subtle",
+    color: view === "taste" ? undefined : "gray",
+    "aria-pressed": view === "taste",
+    onClick: () => setView(view === "taste" ? "deck" : "taste"),
+  } as const;
   const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
   return (
@@ -109,17 +115,18 @@ export function DreamPage() {
               </ActionIcon>
             </Tooltip>
           )}
-          <Tooltip label="Taste">
-            <ActionIcon
-              variant={view === "taste" ? "light" : "subtle"}
-              color={view === "taste" ? undefined : "gray"}
-              aria-label="Taste"
-              aria-pressed={view === "taste"}
-              onClick={() => setView(view === "taste" ? "deck" : "taste")}
-            >
-              <Fingerprint size={18} />
-            </ActionIcon>
-          </Tooltip>
+          {/* Phones name Taste, as its fingerprint alone is ambiguous and they show no tooltips. */}
+          {phone ? (
+            <Button size="sm" leftSection={<Fingerprint size={18} />} {...taste}>
+              Taste
+            </Button>
+          ) : (
+            <Tooltip label="Taste">
+              <ActionIcon aria-label="Taste" {...taste}>
+                <Fingerprint size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
