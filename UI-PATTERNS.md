@@ -138,8 +138,8 @@ the primary component reference and verify APIs against the installed version.
   and disabled entries. Trigger words are applied when submitting, without
   altering the typed prompt; reuse restores the typed prompt and Details
   shows what ran.
-- Preserve actual model/provider metadata. Worker defaults to Automatic; wait
-  for an explicitly picked worker unless the user permits fallback. Animate displays its choice before queuing. Its
+- Preserve actual model/provider metadata. Studio routes work to a worker
+  itself; there is no worker choice. Animate displays its choice before queuing. Its
   menus show one choice, Cloud | Fast | Quality, where the account prefers
   videos to run: an account preference, not a menu setting, so Settings can
   show it too. Cloud shows with the Cloud Models grant, Fast and Quality for

@@ -487,11 +487,7 @@ test(
         assert.equal(body.workers.find((item) => item.id === "video").available, false);
       }
       const submitted = primary.prompts.length;
-      const accepted = await api("/api/generate", {
-        ...generation(h3),
-        workerId: "video",
-        allowFallback: false,
-      });
+      const accepted = await api("/api/generate", generation(h3));
       assert.equal(accepted.status, 200);
       jobId = accepted.body.jobId;
       let waiting;
