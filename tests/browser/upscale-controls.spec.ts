@@ -39,7 +39,6 @@ test("Upscale's menu sets quality and Face Detail like Animate's settings and ru
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  // Phones list Upscale under More, where its options expand in place.
   await viewerAction(page, "Upscale");
   // Quality is a segmented control at the top, Balanced until another is chosen.
   const quality = page.getByRole("radiogroup", { name: "Upscale Quality", exact: true });

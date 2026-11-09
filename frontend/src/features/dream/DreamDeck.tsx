@@ -364,7 +364,7 @@ export function DreamDeck({
       items={shown}
       navigate={(item) => setViewing(item.id)}
       close={() => setViewing(null)}
-      actions={viewerChoices(top, (choice) => void act(choice))}
+      actions={viewerChoices(top, (choice) => void act(choice), phone)}
       itemLabel={top.kind === "pair" ? pairLabel : undefined}
       sideBySide={top.kind === "pair"}
     />

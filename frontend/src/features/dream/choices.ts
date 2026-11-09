@@ -99,10 +99,13 @@ export function dreamChoices(card: DeckCard): Choice[][] {
 
 /**
  * The choices as the viewer's action groups, leaving out what this card can't do: desktop names
- * all but Star, and phones keep the answers, Skip, Edit, Animate and Keep on the bar and the rest
- * under More.
+ * all but Star, and phones name only a comparison's answers and Skip and Keep.
  */
-export function viewerChoices(card: DeckCard, act: (choice: Choice["choice"]) => void) {
+export function viewerChoices(
+  card: DeckCard,
+  act: (choice: Choice["choice"]) => void,
+  phone: boolean,
+) {
   const groups: ActionGroups = dreamChoices(card).map((group) =>
     group
       .filter((choice) => !choice.disabled)
@@ -117,7 +120,8 @@ export function viewerChoices(card: DeckCard, act: (choice: Choice["choice"]) =>
   return {
     label: card.kind === "pair" ? "Comparison Answers" : "Dream Actions",
     groups,
-    labelled: ids.filter((id) => id !== "star"),
-    primary: ids.filter((id) => !["star", "variations", "more-like-this"].includes(id)),
+    labelled: ids.filter((id) =>
+      phone && card.kind !== "pair" ? ["discard", "keep"].includes(id) : id !== "star",
+    ),
   };
 }
