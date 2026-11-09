@@ -239,24 +239,6 @@ export async function fixtures(page: Page) {
         },
       });
     }
-    if (path === "/api/workers")
-      return respond({
-        source: "STUDIO_WORKERS",
-        workers: [
-          {
-            id: "primary",
-            name: "Image Worker",
-            url: "http://comfyui-image:8188",
-            capabilities: ["image", "upscale", "models"],
-          },
-          {
-            id: "video",
-            name: "Video Worker",
-            url: "http://comfyui-video:8188",
-            capabilities: ["video"],
-          },
-        ],
-      });
     if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {
       administration.accessProfiles = administration.accessProfiles.filter(
         (group) => group.id !== decodeURIComponent(path.split("/")[4]),

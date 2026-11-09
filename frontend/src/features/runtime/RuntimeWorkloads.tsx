@@ -308,7 +308,12 @@ const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
 /** Automatic control starts stopped media workloads for queued work and parks idle ones; never text. */
-function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
+export function AutomaticControl() {
+  const settings = useQuery(runtimeStatusQuery).data?.settings;
+  if (!settings) return null;
+  return <AutomaticControlRows settings={settings} />;
+}
+function AutomaticControlRows({ settings }: { settings: RuntimeSettings }) {
   const client = useQueryClient();
   const save = useMutation({
     meta: { inlineError: true },
@@ -399,7 +404,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   });
   if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { workloads, operation, history, settings } = status.data;
+  const { workloads, operation, history } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
   const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
@@ -421,7 +426,6 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   return (
     <>
       <Stack gap="md">
-        <AutomaticControl settings={settings} />
         <DataTable
           label="GPU Workloads"
           rows={workloads}
