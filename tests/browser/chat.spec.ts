@@ -175,7 +175,7 @@ test("Open All flips through one iteration's results, as does opening one of the
   await expect(viewer.getByText("1 / 3", { exact: true })).toBeVisible();
   const { isMobile, browserName } = testInfo.project.use;
   const touch = isMobile && browserName !== "webkit" && (await page.context().newCDPSession(page));
-  // Desktop uses Next and the arrow key; Chromium phones swipe; WebKit phones take the key.
+  // Desktop uses Next, Chromium phones swipe and WebKit phones take the arrow key.
   async function flip() {
     if (touch) {
       const picture = viewer.getByRole("img", { name: "A watercolour bird", exact: true }).first();
@@ -193,8 +193,7 @@ test("Open All flips through one iteration's results, as does opening one of the
   }
   await flip();
   await expect(viewer.getByText("2 / 3", { exact: true })).toBeVisible();
-  if (!isMobile) await page.keyboard.press("ArrowRight");
-  else await flip();
+  await page.keyboard.press("ArrowRight");
   await expect(viewer.getByText("3 / 3", { exact: true })).toBeVisible();
   // The iteration's last result is the end, not Iteration 1.
   await page.keyboard.press("ArrowRight");
