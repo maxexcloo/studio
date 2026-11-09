@@ -1,5 +1,6 @@
 import { localOutputFile } from "../comfy/comfy.js";
-import { describeComfyGraph, gallery, setGallery } from "../gallery/store.js";
+import { gallery, setGallery } from "../gallery/store.js";
+import { describeComfyGraph } from "../gallery/records.js";
 import { parseA1111Parameters, readPngInfo } from "../png-text.js";
 import { loadSharp } from "../sharp-loader.js";
 import { probeVideo } from "../video-previews.js";
