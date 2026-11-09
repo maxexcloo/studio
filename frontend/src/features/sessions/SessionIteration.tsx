@@ -1,6 +1,5 @@
 import { useRef, useState, type CSSProperties } from "react";
 import {
-  ActionIcon,
   Anchor,
   Button,
   Group,
@@ -10,7 +9,6 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  Tooltip,
 } from "@mantine/core";
 import { ChevronDown, FastForward } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -309,17 +307,19 @@ export function SessionIteration({
                 ))}
               </Group>
               <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+                {/* Named like Edit beside it: the icon alone doesn't say what it opens. */}
                 {tiles.length > 1 && (
-                  <Tooltip label="Open All">
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      aria-label={`Open All in Iteration ${number}`}
-                      onClick={() => open(tiles[0], job.id)}
-                    >
-                      <icons.openAll size={18} />
-                    </ActionIcon>
-                  </Tooltip>
+                  <Button
+                    variant="subtle"
+                    color="gray"
+                    size="compact-sm"
+                    radius="xl"
+                    leftSection={<icons.openAll size={14} />}
+                    aria-label={`Open All in Iteration ${number}`}
+                    onClick={() => open(tiles[0], job.id)}
+                  >
+                    Open All
+                  </Button>
                 )}
                 {job.operation !== "upscale" && (
                   <Button
