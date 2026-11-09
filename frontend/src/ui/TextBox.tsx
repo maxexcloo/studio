@@ -129,7 +129,7 @@ export function TextBox({
         aria-label={`Clear ${title}`}
         variant="subtle"
         color="gray"
-        disabled={!value}
+        disabled={!value || props.readOnly}
         onMouseDown={keepFocus}
         onClick={clear}
       >
