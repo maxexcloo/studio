@@ -257,6 +257,8 @@ export function registerMcpRoutes(
     environment = process.env,
     // Studio's RuntimeController (runtime/controller.ts), which the control key's tools drive.
     runtime,
+    // Each media worker's health and work (runtime/services.ts WorkerStatus), for gpu_status.
+    workerStatus = async () => [],
     imageWaitSeconds = generateWaitSeconds,
     etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
@@ -1789,9 +1791,9 @@ export function registerMcpRoutes(
         server,
         "gpu_status",
         "gpu status",
-        "Read each GPU workload's state, the GPUs in use and the current or last runtime change.",
+        "Read each GPU workload's state, the GPUs in use and the current or last runtime change, and each worker's health, running job, queued jobs, loaded model, free memory and when it should be free (freeAt, epoch ms).",
         {},
-        async () => mcpJson(await runtime.observe()),
+        async () => mcpJson({ ...(await runtime.observe()), workers: await workerStatus() }),
         { readOnlyHint: true },
       );
       tool(

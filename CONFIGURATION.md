@@ -37,8 +37,11 @@ STUDIO_WORKERS='[
 jobs, previews, cancellation and recovery after a restart follow a job's
 worker by id. `STUDIO_WORKERS='[]'` runs Studio with no workers: it says so
 plainly and refuses generation. A malformed value stops Studio at start with
-the reason. **Settings › Workers** lists the workers `STUDIO_WORKERS` gives,
-read-only (`GET /api/workers`, administrators), with where they come from.
+the reason. **Settings › Workers** lists every worker read-only for
+administrators, with where it comes from (`GET /api/workers`) and its health
+and work: whether a job runs there, how many wait for it, the profile it last
+ran, its free GPU memory and when it should be free. The control key's
+`gpu_status` tool returns the same list.
 
 On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video
 [workloads](#queue-sessions--runtime-control) Studio finds are the workers, one
