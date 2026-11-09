@@ -1,8 +1,8 @@
 # Security
 
-Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuration › Multi-User Mode](CONFIGURATION.md#multi-user-mode)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-user mode](#single-user-mode).
+Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuration › Multi-User Mode](CONFIGURATION.md#multi-user-mode)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-User Mode](#single-user-mode).
 
-## Who may do what
+## Who May Do What
 
 | Who                                  | Can use the studio                                               | Can look after the studio*              | Can manage accounts and groups                        |
 | ------------------------------------ | ---------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
@@ -22,7 +22,7 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 - **Other websites.** A page you visit shares your browser with Studio and could send it requests. Every `/api` and `/comfy` request has to name Studio's own address (so a hostname rebound to it gets nothing), and anything that changes state has to come from the studio's own page: same origin, and JSON or the studio's `X-Studio` header, which no other site can send without a permission Studio never grants.
 - **Proxies and HTTPS.** Run Studio behind a TLS-terminating proxy and list the name it is reached by in `STUDIO_ALLOWED_HOSTS`; requests naming any host other than that, localhost and the machine's own addresses are turned away. Cookies are marked `Secure` when the request arrived over HTTPS, directly or through a proxy that sends `X-Forwarded-Proto: https`. Plain http sends passwords and cookies unencrypted, so never offer it beyond a network you trust.
 
-## What Studio protects
+## What Studio Protects
 
 - **Deleting.** Deleting a card deletes its file. Studio only deletes inside its own media folder or ComfyUI's output folder, never a file shown from somewhere else, and only ever serves images, videos and sound from those folders (never through a link out of them).
 - **Updates.** Studio doesn't update itself. New versions arrive as container images that CI builds and tests before publishing.
@@ -30,6 +30,6 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 - **Workflows** you import can contain custom nodes that run code, read or write any file, or go online; the import review names them. A workflow runs every node in it with ComfyUI's access to its computer, so only import workflows from people you trust.
 - **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or Civitai when you ask it to download something, and to the catalogue, text and cloud provider endpoints an administrator configures.
 
-## Single-user mode
+## Single-User Mode
 
 Only without accounts (`STUDIO_MULTI_USER` unset), for development on your own computer. It answers only the computer running Studio, which also looks after it; there is no sign-in. A request from any other address, or one that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar proxy header, is refused, even when the proxy runs on the same computer. Use account mode for any other device.
