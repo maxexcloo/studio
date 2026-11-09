@@ -15,6 +15,4 @@ another ComfyUI installation, copy or mount this directory into its
 
 One Radiance worker is reused within the container's serial queue, on a single
 loopback endpoint. Before ComfyUI runs any other GPU node, the node releases
-Radiance's retained weights. LoRA loading in other graphs uses the upstream
-ComfyUI and rgthree nodes. ComfyUI caches the last LoRA per loader instance;
-rgthree's Power LoRA Loader creates fresh instances and may reread weights.
+Radiance's retained weights.
