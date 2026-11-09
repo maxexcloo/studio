@@ -930,3 +930,20 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   expect(state.jobs[0].input.prompt).toContain("A copper fox");
   await expect(sheet).toBeHidden();
 });
+
+test("Composer popups on a tablet open with the keyboard down", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+  await fixtures(page);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto("/images");
+  await page.locator("[data-composer-prompt]").click();
+  const generate = page.getByRole("region", { name: "Generate", exact: true });
+  await generate.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  const search = page.getByRole("textbox", { name: "Search LoRAs", exact: true });
+  await expect(search).toBeVisible();
+  await expect(search).not.toBeFocused();
+  await page.keyboard.press("Escape");
+  await generate.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await expect(page.locator("[data-popup] input[type=text]:focus")).toHaveCount(0);
+});
