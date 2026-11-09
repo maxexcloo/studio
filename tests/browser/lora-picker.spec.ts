@@ -31,7 +31,7 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
   );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  const controls = page.getByRole("region", { name: "LoRA Controls", exact: true });
+  const controls = page.getByRole("dialog", { name: "LoRAs", exact: true });
   // Choices apply at once; the popup closes like any other.
   await expect(page.getByRole("button", { name: "Use LoRAs", exact: true })).toHaveCount(0);
   const up = controls.getByRole("button", { name: "Thumbs Up Soft Style", exact: true });
@@ -103,7 +103,7 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await create(page);
   const chip = page.getByRole("button", { name: "Choose LoRAs", exact: true });
   await chip.click();
-  const controls = page.getByRole("region", { name: "LoRA Controls", exact: true });
+  const controls = page.getByRole("dialog", { name: "LoRAs", exact: true });
   const choices = controls.getByRole("list", { name: "LoRA Choices", exact: true });
   for (const name of ["Detail Slider", "Soft Style"])
     await choices.getByRole("button", { name, exact: true }).click();

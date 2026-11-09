@@ -1,12 +1,5 @@
-/* Desktop: the LoRA choices beside the current stack, at a fixed height so filtering never resizes the popover. */
-.panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18rem;
-  gap: var(--mantine-spacing-md);
-  height: min(30rem, 60dvh);
-}
-
-.column {
+/* Desktop keeps the choices at a fixed height, so filtering never resizes the popover. */
+.choices {
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-xs);
@@ -14,9 +7,15 @@
   min-height: 0;
 }
 
-.stackColumn {
-  padding-left: var(--mantine-spacing-md);
-  border-left: 1px solid var(--studio-glass-border);
+@media (min-width: 48em) {
+  .choices {
+    height: min(30rem, 60dvh);
+  }
+}
+
+.stack {
+  flex: 1;
+  min-height: 0;
 }
 
 /* The title labels the enable switch and truncates beside the remove action. */
