@@ -182,7 +182,7 @@ export function GenerationForm({
           references: [],
           input: {
             ...(profile
-              ? inputForProfile({ ...initialInput, workerId: previous.input.workerId }, profile)
+              ? inputForProfile(initialInput, profile)
               : { ...initialInput, kind: previous.input.kind }),
             seed: "",
           },

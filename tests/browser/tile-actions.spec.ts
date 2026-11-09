@@ -26,7 +26,6 @@ async function galleryFixture(page: Page) {
     prompt: "A copper bird",
     width: 1024,
     height: 1024,
-    workerId: "worker-a",
     loras: [],
     referenceAssets: [],
   };

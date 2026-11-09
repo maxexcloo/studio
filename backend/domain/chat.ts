@@ -104,8 +104,6 @@ const contextKeys = [
   "resolutionTier",
   "denoise",
   "referenceRole",
-  "workerId",
-  "allowFallback",
   "textEncoder",
   "vae",
   "clipType",

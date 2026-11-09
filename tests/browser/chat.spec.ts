@@ -424,7 +424,6 @@ test("Chat keeps discussion, requested generation inputs and variation results t
     first.getByRole("button", { name: "Open image: A blue bird in soft daylight", exact: true }),
   ).toBeVisible();
   expect(state.chatRequests[1].generation.input.profileId).toBe("image:test");
-  expect(state.chatRequests[1].generation.input.workerId).toBeUndefined();
   await first.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   // The card shares the gallery's chip rail: a preset loads into this card only.
   state.presets.push({
