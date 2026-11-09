@@ -483,6 +483,28 @@ export async function fixtures(page: Page) {
             endpoints: [{ id: "text", label: "Text Worker", state: "healthy", reason: "Ready" }],
           },
         },
+        workers: [
+          {
+            id: "primary",
+            label: "Image Worker",
+            capabilities: ["image", "upscale", "models"],
+            state: "healthy",
+            reason: "The direct media worker is ready.",
+            currentJob: "fixture-job",
+            queued: 2,
+            loadedModel: "image:test",
+            memoryFree: 8 * 1024 ** 3,
+            freeAt: Date.now() + 5 * 60_000,
+          },
+          {
+            id: "video",
+            label: "Video Worker",
+            capabilities: ["video"],
+            state: "offline",
+            reason: "The direct runtime could not be reached.",
+            queued: 0,
+          },
+        ],
         runtime: {
           configured: false,
           automaticLifecycle: false,

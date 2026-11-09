@@ -1,12 +1,19 @@
 import { Alert, Button, Group, Stack, Text } from "@mantine/core";
 import { queryOptions, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { CircleDot } from "lucide-react";
-import type { ServiceHealth, ServiceStatus, ServicesStatus } from "../../../../shared/services";
+import type {
+  ServiceHealth,
+  ServiceStatus,
+  ServicesStatus,
+  WorkerStatus,
+} from "../../../../shared/services";
 import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useIsAdmin } from "../auth/AccountGate";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { profileName } from "../generation/payload";
 import { RuntimeWorkloads } from "./RuntimeWorkloads";
 import { useWorkloadStart } from "./WorkloadStart";
 
@@ -79,27 +86,59 @@ const capabilityLabels: Record<string, string> = {
   video: "Videos",
 };
 
+/** "Free in about 3 min" from a worker's `freeAt`. */
+const freeIn = (freeAt: number) => {
+  const minutes = Math.ceil((freeAt - Date.now()) / 60_000);
+  return minutes <= 1 ? "Free in under a minute" : `Free in about ${minutes} min`;
+};
+
 /**
- * The workers a deployment lists in STUDIO_WORKERS, read-only; Kubernetes workloads show in the GPU
- * Workloads table instead.
+ * Each media worker with its health and work: what runs there, how much waits, the profile it last
+ * ran, its free memory and when it should be free. Read-only: the deployment lists the workers, and
+ * those in STUDIO_WORKERS show their address.
  */
-function WorkerList({ runtimeConfigured }: { runtimeConfigured: boolean }) {
+function WorkerList({ workers }: { workers: WorkerStatus[] }) {
   const list = useQuery(workersQuery).data;
-  if (!list || (runtimeConfigured && list.source !== "STUDIO_WORKERS")) return null;
+  const profiles = useQuery(modelsQuery).data?.profiles ?? [];
+  const listed = list?.source === "STUDIO_WORKERS";
+  const model = (id: string) => {
+    const profile = profiles.find((profile) => profile.id === id);
+    return profile ? profileName(profile) : id;
+  };
   return (
     <SettingGroup title="Workers">
       <Text size="xs" c="dimmed">
-        {list.workers.length
-          ? `Listed by the deployment${list.source === "STUDIO_WORKERS" ? " in STUDIO_WORKERS" : ""}. Studio doesn’t edit them.`
+        {workers.length
+          ? `Listed by the deployment${listed ? " in STUDIO_WORKERS" : ""}. Studio doesn’t edit them.`
           : "The deployment lists no workers, so Studio can’t generate."}
       </Text>
-      {list.workers.map((worker) => (
-        <SettingRow
-          key={worker.id}
-          label={worker.name}
-          description={`${worker.capabilities.map((id) => capabilityLabels[id] || id).join(", ")} · ${worker.url}`}
-        />
-      ))}
+      {workers.map((worker) => {
+        const url = listed ? list.workers.find((item) => item.id === worker.id)?.url : undefined;
+        const work = [
+          healthLabel(worker.state),
+          worker.currentJob ? "Busy" : "Idle",
+          `${worker.queued} Queued`,
+          worker.loadedModel && `Last Ran ${model(worker.loadedModel)}`,
+          worker.memoryFree !== undefined &&
+            `${(worker.memoryFree / 1024 ** 3).toFixed(1)} GiB Free`,
+          worker.freeAt && freeIn(worker.freeAt),
+        ].filter(Boolean);
+        return (
+          <SettingRow
+            key={worker.id}
+            label={worker.label}
+            description={
+              <>
+                {[worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "), url]
+                  .filter(Boolean)
+                  .join(" · ")}
+                <br />
+                <span title={worker.reason}>{work.join(" · ")}</span>
+              </>
+            }
+          />
+        );
+      })}
     </SettingGroup>
   );
 }
@@ -220,7 +259,7 @@ export function RuntimePanel() {
           {runtime.reason}
         </Text>
       )}
-      <WorkerList runtimeConfigured={runtime.configured} />
+      {status.data.workers && <WorkerList workers={status.data.workers} />}
     </Stack>
   );
 }
