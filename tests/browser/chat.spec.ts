@@ -734,3 +734,19 @@ test("Others see a parked Chat model as parked and cannot send to it", async ({ 
   await page.getByRole("option", { name: /Studio Assistant/ }).click();
   await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeEnabled();
 });
+
+test("New Chat lists the new chat first, selected, and focuses its message", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await page.goto("/chat");
+  const list = testInfo.project.use.isMobile
+    ? page.getByRole("region", { name: "Chats", exact: true })
+    : page.getByRole("complementary", { name: "Chats", exact: true });
+  await expect(list.getByRole("link", { name: "New Chat", exact: true })).toHaveCount(0);
+  await list.getByRole("button", { name: "New Chat", exact: true }).click();
+  const fresh = list.getByRole("link").first();
+  await expect(fresh).toHaveAccessibleName("New Chat");
+  await expect(fresh).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeFocused();
+});

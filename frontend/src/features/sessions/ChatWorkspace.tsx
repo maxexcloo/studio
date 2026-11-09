@@ -18,7 +18,7 @@ import {
 import { useDebouncedValue, useLongPress } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { SquareCheck, SquarePen, X } from "lucide-react";
-import { Link, useMatch, useNavigate } from "react-router";
+import { Link, useLocation, useMatch, useNavigate } from "react-router";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { SectionHeading } from "../../ui/SectionHeading";
@@ -136,19 +136,33 @@ function ChatRow({
   );
 }
 
-/** Leaves the open chat for an empty draft on `/chat`, where the first message starts a new one. */
-function useNewChat() {
+/** Navigation state marking `/chat` as a new chat, listed and selected until its first message. */
+interface NewChatState {
+  newChat?: boolean;
+}
+/** Whether `/chat` holds a new chat (New Chat) rather than no chat (Close Chat). */
+export function useNewChatOpen() {
+  const state = useLocation().state as NewChatState | null;
+  const open = useMatch("/chat");
+  return Boolean(open && state?.newChat);
+}
+
+/**
+ * Leaves the open chat for an empty draft on `/chat`, where the first message starts a new one:
+ * a new chat (`fresh`), listed and selected with its message box focused, or none (Close Chat).
+ */
+function useNewChat(fresh: boolean) {
   const { setDraft } = useGenerationActions();
   const navigate = useNavigate();
   return () => {
     setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
-    void navigate("/chat");
+    void navigate("/chat", fresh ? { state: { newChat: true } satisfies NewChatState } : {});
   };
 }
 
 /** New Chat as a small icon action at the end of the list's toolbar; `onDone` closes the phone Drawer. */
 function NewChatAction({ onDone }: { onDone: () => void }) {
-  const newChat = useNewChat();
+  const newChat = useNewChat(true);
   return (
     <Tooltip label="New Chat">
       <ActionIcon
@@ -278,6 +292,7 @@ export function SessionList({
   heading?: boolean;
 }) {
   const id = useMatch("/chat/:id")?.params.id;
+  const starting = useNewChatOpen();
   const phone = usePhone();
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query.trim(), 200);
@@ -315,6 +330,8 @@ export function SessionList({
     window.addEventListener("keydown", loose);
     return () => window.removeEventListener("keydown", loose);
   });
+  // A new chat leads the list, selected, until its first message makes it a real one.
+  const fresh = starting && !selected && !archived && !search;
   const groups = new Map<string, Session[]>();
   for (const session of listed) {
     const key = period(session.updatedAt);
@@ -400,10 +417,22 @@ export function SessionList({
       ) : (
         toolbar
       )}
+      {fresh && (
+        <NavLink
+          component={Link}
+          to="/chat"
+          state={{ newChat: true } satisfies NewChatState}
+          label="New Chat"
+          active
+          aria-current="page"
+          onClick={close}
+          classNames={{ root: classes.link, label: classes.label }}
+        />
+      )}
       {sessions.error ? (
         <Alert color="red">{sessions.error.message}</Alert>
       ) : sessions.data && !listed.length ? (
-        <EmptyState fill>{search || archived ? "No Matches" : "No Chats"}</EmptyState>
+        !fresh && <EmptyState fill>{search || archived ? "No Matches" : "No Chats"}</EmptyState>
       ) : (
         [...groups].map(([label, entries]) => (
           <Stack key={label} gap={2} component="section" aria-label={label}>
@@ -450,7 +479,7 @@ export function ChatHeading({ session }: { session: Session }) {
   }).data;
   const current = listed || session;
   const [renaming, setRenaming] = useState(false);
-  const newChat = useNewChat();
+  const closeChat = useNewChat(false);
   return (
     <Group gap={4} wrap="nowrap" mb="sm" mih={36} className={classes.heading}>
       {renaming ? (
@@ -477,7 +506,7 @@ export function ChatHeading({ session }: { session: Session }) {
               color="gray"
               aria-label="Close Chat"
               ml="auto"
-              onClick={newChat}
+              onClick={closeChat}
             >
               <X size={18} />
             </ActionIcon>
