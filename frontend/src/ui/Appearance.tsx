@@ -1,10 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
-  Button,
-  SimpleGrid,
   ColorSwatch,
-  Group,
   MantineProvider,
   Popover,
   SegmentedControl,
@@ -14,7 +11,6 @@ import {
   Tooltip,
   localStorageColorSchemeManager,
   useMantineColorScheme,
-  useComputedColorScheme,
   useMantineTheme,
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
@@ -119,7 +115,6 @@ export function useMotionDuration() {
 export function AppearanceControls() {
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
-  const scheme = useComputedColorScheme("light");
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   return (
     <ScrollArea.Autosize mah="calc(100dvh - 105px)">
@@ -147,38 +142,18 @@ export function AppearanceControls() {
           <Text size="sm" fw={500}>
             Background
           </Text>
-          <SimpleGrid cols={2} spacing="xs">
-            {(Object.keys(backgrounds) as Background[]).map((background) => {
-              const chosen = appearance.background === background;
-              return (
-                <Button
-                  key={background}
-                  variant="default"
-                  aria-label={`Use ${backgrounds[background].label} Background`}
-                  aria-pressed={chosen}
-                  onClick={() => setAppearance((previous) => ({ ...previous, background }))}
-                  size="sm"
-                  px="xs"
-                  justify="flex-start"
-                  // Every tile keeps one bordered style; the chosen one's border takes the colour.
-                  style={
-                    chosen ? { borderColor: "var(--mantine-primary-color-filled)" } : undefined
-                  }
-                >
-                  <Group gap="xs" wrap="nowrap">
-                    <ColorSwatch
-                      color={backgrounds[background][scheme]}
-                      size={20}
-                      withShadow={false}
-                      style={{ border: "1px solid var(--mantine-color-default-border)" }}
-                    />
-                    <Text size="sm">{backgrounds[background].label}</Text>
-                    {chosen && <Check size={14} />}
-                  </Group>
-                </Button>
-              );
-            })}
-          </SimpleGrid>
+          <SegmentedControl
+            aria-label="Background"
+            fullWidth
+            value={appearance.background}
+            onChange={(background) =>
+              setAppearance((previous) => ({ ...previous, background: background as Background }))
+            }
+            data={(Object.keys(backgrounds) as Background[]).map((background) => ({
+              value: background,
+              label: backgrounds[background].label,
+            }))}
+          />
         </Stack>
 
         <Stack gap={6}>

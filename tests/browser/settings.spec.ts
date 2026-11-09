@@ -340,7 +340,10 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
   const popup = await page.locator('.mantine-Popover-dropdown[role="dialog"]').boundingBox();
   expect(popup!.y).toBeGreaterThanOrEqual(68);
   await page.getByRole("button", { name: "Use Blue Colour", exact: true }).click();
-  await page.getByRole("button", { name: "Use Warm Background", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Background", exact: true })
+    .getByText("Warm", { exact: true })
+    .click();
   await page.getByText("Fast", { exact: true }).click();
   await page.getByText("Round", { exact: true }).click();
   await page.getByText("Dark", { exact: true }).click();
@@ -352,9 +355,7 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
     "aria-pressed",
     "true",
   );
-  await expect(
-    page.getByRole("button", { name: "Use Warm Background", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("radio", { name: "Warm", exact: true })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
