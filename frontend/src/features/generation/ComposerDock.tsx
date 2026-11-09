@@ -1,7 +1,7 @@
 import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
-import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
+import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useLocation, useSearchParams } from "react-router";
 import type { OpenComposerState } from "./openComposer";
 import { GenerationForm } from "./GenerationForm";
@@ -10,7 +10,7 @@ import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
 import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
@@ -90,7 +90,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
   // (a phone held sideways, a tablet) only typing in the dock lifts it above the keyboard, and the
   // open panel fits the room left above it (`--dock-room`); a desktop keeps its own scroll.
-  const touch = useMediaQuery("(pointer: coarse)");
+  const touch = useTouch();
   const typingInDock = useTypingIn(!phone && touch, (field) =>
     Boolean(dock.current?.contains(field)),
   );

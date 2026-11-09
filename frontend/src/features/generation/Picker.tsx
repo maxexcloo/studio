@@ -31,7 +31,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
 import { menuWidth } from "../../theme";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import { escapePanel, fittedPopup } from "./chip";
 import classes from "./Picker.module.css";
@@ -86,6 +86,7 @@ export function ChipPopup({
   children: ReactNode;
 }) {
   const phone = usePhone();
+  const touch = useTouch();
   const close = () => onOpenedChange(false);
   // Pulling the phone sheet down by its header, or its content from the top, closes it.
   const swipe = useSwipeClose("down", close);
@@ -170,8 +171,8 @@ export function ChipPopup({
         maw="calc(100vw - 24px)"
         onKeyDown={onKeyDown}
       >
-        {/* Phones focus the popup itself, so its first field doesn't raise the keyboard. */}
-        {phone && <FocusTrap.InitialFocus />}
+        {/* Touch screens focus the popup itself, so its first field doesn't raise the keyboard. */}
+        {touch && <FocusTrap.InitialFocus />}
         <Stack gap="sm">
           <Group justify="space-between" wrap="nowrap" mih={28}>
             <Text fw={500}>{title}</Text>
