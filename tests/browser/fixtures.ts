@@ -996,11 +996,14 @@ export async function closePopup(page: Page, title: string) {
   await expect(popup).toBeHidden();
 }
 
-/** Runs `steps` with Expert Settings open. */
-export async function withExpertSettings(page: Page, steps: () => Promise<void>) {
-  await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
+/** Runs `steps` with the generation Settings open. */
+export async function withSettings(page: Page, steps: () => Promise<void>) {
+  await page
+    .getByRole("group", { name: "Generation Inputs", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
+    .click();
   await steps();
-  await closePopup(page, "Expert Settings");
+  await closePopup(page, "Settings");
 }
 
 /** Chooses what an open Filters popup shows: All, Starred or Uploads. */

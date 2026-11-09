@@ -4,7 +4,7 @@ import { Brush, ChevronDown } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
-import { ExpertSettings } from "./ExpertSettings";
+import { GenerationSettings } from "./GenerationSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
 import { backendLabel, controlRange } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
@@ -138,7 +138,7 @@ function ReferenceRole({
  * The chip rail shared by the gallery composer and timeline cards, in one order on
  * every breakpoint: what runs (Profile), what it starts from (References, then their role and
  * mask as one group), what shapes it (LoRAs), what comes out (Aspect, Count, a video's Length,
- * a set Seed), then the settings (Backend when the profile has several, Expert) and the tools
+ * a set Seed), then the settings (Backend when the profile has several, Settings) and the tools
  * (Compare, Presets).
  */
 export function GenerationInputControls({
@@ -150,7 +150,7 @@ export function GenerationInputControls({
   mask,
   presets,
   loraPicker,
-  expert,
+  settings,
   onCompare,
 }: {
   input: GenerationInput;
@@ -164,7 +164,7 @@ export function GenerationInputControls({
   /** The Presets chip (`PresetPicker`). */
   presets?: ReactNode;
   loraPicker: LoraPickerState;
-  expert: { opened: boolean; onOpenedChange: (opened: boolean) => void };
+  settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
   /** Opens Compare from this draft; the gallery composer passes it. */
   onCompare?: () => void;
 }) {
@@ -224,7 +224,7 @@ export function GenerationInputControls({
           }))}
         />
       )}
-      <ExpertSettings input={input} profile={profile} onChange={onChange} {...expert} />
+      <GenerationSettings input={input} profile={profile} onChange={onChange} {...settings} />
       {onCompare && input.kind === "image" && (
         <Tooltip label="Compare">
           <Button {...iconChipProps} aria-label="Compare" onClick={onCompare}>

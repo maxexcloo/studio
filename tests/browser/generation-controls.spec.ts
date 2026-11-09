@@ -15,7 +15,7 @@ import {
   serveProfiles,
   showUploads,
   stamp,
-  withExpertSettings,
+  withSettings,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
@@ -49,14 +49,14 @@ test("Changing the second encoder and weight type preserves the first encoder in
   await serveProfiles(page, [profile], { presets: true });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An encoder comparison");
-  await withExpertSettings(page, async () => {
+  await withSettings(page, async () => {
     const clip = page.getByRole("combobox", { name: "CLIP Encoder", exact: true });
     await expect(clip).toHaveValue("clip-exact.safetensors");
     await page.getByRole("combobox", { name: "T5 Encoder", exact: true }).click();
     await page.getByRole("option", { name: "t5-selected.safetensors", exact: true }).click();
     await page.getByRole("combobox", { name: "Weight Type", exact: true }).click();
     await page.getByRole("option", { name: "fp8_e4m3fn", exact: true }).click();
-    // Choosing nested options keeps the Expert settings open.
+    // Choosing nested options keeps the Settings open.
     await expect(clip).toHaveValue("clip-exact.safetensors");
   });
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
@@ -369,7 +369,7 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await expandComposer(page);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(prompt).toHaveValue("");
-  await withExpertSettings(page, async () => {
+  await withSettings(page, async () => {
     await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
     await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
   });
@@ -599,10 +599,10 @@ test("The chip composer offers supported sizes and settings, follows the output 
     "Motion Quality",
   );
   await expect(page.getByRole("combobox", { name: "Count", exact: true })).toHaveCount(0);
-  // Length sits on the rail; Expert shows the same value.
+  // Length sits on the rail; Settings shows the same value.
   await page.getByRole("combobox", { name: "Length", exact: true }).click();
   await page.getByRole("option", { name: "8 s", exact: true }).click();
-  await withExpertSettings(page, async () => {
+  await withSettings(page, async () => {
     await expect(
       page.getByRole("textbox", { name: "Duration (Seconds)", exact: true }),
     ).toHaveValue("8");
@@ -610,9 +610,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   });
 });
 
-test("References, masking, expert controls and runtime presets remain editable", async ({
-  page,
-}) => {
+test("References, masking, settings and runtime presets remain editable", async ({ page }) => {
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
@@ -652,7 +650,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page.getByRole("button", { name: "Use Mask", exact: true }).click();
 
-  await withExpertSettings(page, async () => {
+  await withSettings(page, async () => {
     await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
     await page.getByRole("switch", { name: "Allow Fallback to Another Worker" }).check();
   });
@@ -830,16 +828,14 @@ test("Image presets draw at the chosen resolution within profile constraints", a
   });
 });
 
-test("Images and Videos retain independent prompts and expert settings", async ({
-  page,
-}, testInfo) => {
+test("Images and Videos retain independent prompts and settings", async ({ page }, testInfo) => {
   await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Image draft");
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
   const seed = page.getByRole("textbox", { name: "Seed", exact: true });
   await negative.fill("Image exclusions");
-  await withExpertSettings(page, () => seed.fill("777"));
+  await withSettings(page, () => seed.fill("777"));
   // A set seed shows on the options bar.
   await expect(page.getByRole("button", { name: "Clear Seed 777", exact: true })).toBeVisible();
   // Escape closes the composer; a click outside it would only close it.
@@ -854,7 +850,7 @@ test("Images and Videos retain independent prompts and expert settings", async (
   );
   await expandComposer(page);
   await expect(negative).toHaveValue("Image exclusions");
-  await withExpertSettings(page, () => expect(seed).toHaveValue("777"));
+  await withSettings(page, () => expect(seed).toHaveValue("777"));
   // Escape closes the composer; a click outside it would only close it.
   await page.keyboard.press("Escape");
   if (testInfo.project.use.isMobile)
