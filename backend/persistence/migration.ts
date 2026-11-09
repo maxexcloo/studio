@@ -223,7 +223,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
     const { count } = db.prepare("SELECT count(*) AS count FROM studio_gallery").get() as {
       count: number;
     };
-    if (count !== items.length) throw new Error("Gallery row verification failed");
+    // Without a document there is nothing to move, and rows Studio has written since stay.
+    if (text && count !== items.length) throw new Error("Gallery row verification failed");
     db.prepare("DELETE FROM studio_documents WHERE name = 'gallery'").run();
     db.prepare("INSERT INTO studio_migrations(name, applied_at) VALUES (?, ?)").run(
       galleryRowsMigration,
