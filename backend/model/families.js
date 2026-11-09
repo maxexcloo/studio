@@ -1,4 +1,3 @@
-import path from "node:path";
 import { comfy } from "../comfy/comfy.js";
 import { dataDir } from "../gallery/store.js";
 import {
@@ -8,7 +7,7 @@ import {
   refinedFamily,
   variantFor,
 } from "../family-catalogue.js";
-import { readJsonFile } from "../json-store.js";
+import { readRuntimeDocument } from "../persistence/runtime.ts";
 
 /**
  * Which family (and variant) a model file belongs to. Studio never reads the
@@ -29,7 +28,6 @@ const metadataFolders = { unet: "diffusion_models", checkpoint: "checkpoints" };
 
 /* ------------------------------------------------------------ Choices */
 
-const choicesPath = () => path.join(dataDir, "model-types.json");
 let choicesCache = null;
 
 function choiceKey(source, name) {
@@ -39,9 +37,10 @@ function choiceKey(source, name) {
 function loadModelChoices() {
   if (choicesCache) return choicesCache;
   try {
-    const raw = readJsonFile(choicesPath());
+    const raw = readRuntimeDocument(dataDir, "model-types");
     choicesCache = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     choicesCache = {};
   }
   return choicesCache;

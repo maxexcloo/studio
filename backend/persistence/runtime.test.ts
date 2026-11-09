@@ -25,7 +25,13 @@ test("a new data folder starts with every table, the gallery's included", (t) =>
     .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")
     .all()
     .map((row) => row.name);
-  assert.deepEqual(tables, ["studio_documents", "studio_gallery", "studio_migrations"]);
+  assert.deepEqual(tables, [
+    "studio_documents",
+    "studio_gallery",
+    "studio_ingested_jobs",
+    "studio_library_imports",
+    "studio_migrations",
+  ]);
 });
 
 test("migration dry run, verified backup, SQLite authority and restoration preserve identities and result links", (t) => {

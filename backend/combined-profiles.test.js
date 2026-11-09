@@ -4,10 +4,18 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { combinedProfiles } from "./combined-profiles.js";
+import {
+  closeRuntimeDatabase,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 
 test("combines already applied move preferences and LoRA stacks and prune bindings of gone profiles, once", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-combined-profiles-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  t.after(() => {
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
   const write = (rel, value) => {
     fs.mkdirSync(path.dirname(path.join(dataDir, rel)), { recursive: true });
     fs.writeFileSync(path.join(dataDir, rel), JSON.stringify(value, null, 2));
@@ -18,14 +26,14 @@ test("combines already applied move preferences and LoRA stacks and prune bindin
     "image-krea2-turbo-comfyui": { to: "image-krea2-turbo", backend: "comfyui" },
     "image-krea2-turbo-radiance": { to: "image-krea2-turbo", backend: "radiance" },
   });
-  write("workflow-preferences.json", {
+  writeRuntimeDocument(dataDir, "workflow-preferences", {
     favorites: ["custom:image-krea2-turbo-comfyui"],
     lastUsed: {
       "custom:image-krea2-turbo": "2026-10-01T00:00:00.000Z",
       "custom:image-krea2-turbo-radiance": "2026-10-27T00:00:00.000Z",
     },
   });
-  write("accounts/abc/lora-stacks.json", {
+  writeRuntimeDocument(dataDir, "lora-stacks:abc", {
     stacks: { "custom:image-krea2-turbo-comfyui": [{ name: "detail" }] },
     library: { strengths: { "custom:image-krea2-turbo-radiance": { detail: 0.4 } } },
   });
@@ -45,19 +53,19 @@ test("combines already applied move preferences and LoRA stacks and prune bindin
   assert.deepEqual(planned, {
     applied: false,
     preferences: 2,
-    loraStacks: { [path.join("accounts", "abc", "lora-stacks.json")]: 2 },
+    loraStacks: { "lora-stacks:abc": 2 },
     guideBindings: ["custom:image-krea2-turbo-comfyui", "custom:image-krea2-turbo-radiance"],
   });
-  assert.deepEqual(read("workflow-preferences.json").favorites, [
+  assert.deepEqual(readRuntimeDocument(dataDir, "workflow-preferences").favorites, [
     "custom:image-krea2-turbo-comfyui",
   ]);
 
   assert.equal(combinedProfiles(dataDir, { apply: true }).applied, true);
-  assert.deepEqual(read("workflow-preferences.json"), {
+  assert.deepEqual(readRuntimeDocument(dataDir, "workflow-preferences"), {
     favorites: ["custom:image-krea2-turbo"],
     lastUsed: { "custom:image-krea2-turbo": "2026-10-27T00:00:00.000Z" },
   });
-  const stacks = read("accounts/abc/lora-stacks.json");
+  const stacks = readRuntimeDocument(dataDir, "lora-stacks:abc");
   assert.deepEqual(Object.keys(stacks.stacks), ["custom:image-krea2-turbo"]);
   assert.deepEqual(stacks.library.strengths, { "custom:image-krea2-turbo": { detail: 0.4 } });
   const guides = read("guides/prompting.json");

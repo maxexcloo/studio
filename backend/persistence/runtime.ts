@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -8,6 +9,47 @@ const databases = new Map<string, DatabaseSync>();
 /** The JSON stores runtime-json-v1 moves into SQLite. */
 export const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
+/**
+ * The JSON files json-stores-v1 (persistence/json-stores.ts) moves into SQLite, relative to the
+ * data folder, `.bak` copies included: documents, each account's prompt histories and LoRA stacks
+ * (in `accounts/<key>/`, at the top in single-user mode), import records and ingested runs.
+ */
+export const jsonStoreSource =
+  /^(?:(workflow-preferences|timings|model-types|presets|library\/updates|mcp-assistant|comparisons|mcp-ownership)|(?:accounts\/([0-9a-f]{64})\/)?(prompt-history|negative-prompt-history|lora-stacks)|library\/imports\/(imp-[a-z0-9]{6,40})|media-ingested)\.json(\.bak)?$/;
+
+export const jsonStoresMigration = "json-stores-v1";
+
+/** The json-stores-v1 sources in a data folder, sorted. */
+export function jsonStoreFiles(dataDir: string): string[] {
+  const list = (dir: string) => {
+    try {
+      return fs.readdirSync(path.join(dataDir, dir)).map((name) => (dir ? `${dir}/${name}` : name));
+    } catch {
+      return [];
+    }
+  };
+  return [
+    ...list(""),
+    ...list("library"),
+    ...list("library/imports"),
+    ...list("accounts").flatMap(list),
+  ]
+    .filter((source) => jsonStoreSource.test(source))
+    .sort();
+}
+
+/**
+ * An account's own document (prompt histories, LoRA stacks): `<name>:<sha256 of its id>`, the key
+ * of the `accounts/<key>` folder it was a file in, or `<name>:` in single-user mode.
+ */
+export const ownerDocumentName = (name: string, ownerId = "") =>
+  `${name}:${ownerId ? crypto.createHash("sha256").update(String(ownerId)).digest("hex") : ""}`;
+
+/** The file an account's document was (jsonStoreSource), the path backups copy it to. */
+export function ownerDocumentFile(name: string) {
+  const [store, key] = name.split(":");
+  return key ? `accounts/${key}/${store}.json` : `${store}.json`;
+}
 
 /**
  * Runs `read` on a read-only copy of a stopped studio's database (undefined without one), so
@@ -78,6 +120,8 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
     db = openDatabase(filename);
     db.exec(`CREATE TABLE IF NOT EXISTS studio_documents (name TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS studio_library_imports (id TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS studio_ingested_jobs (job_id TEXT PRIMARY KEY, at INTEGER NOT NULL);
       ${createGalleryTable};`);
     databases.set(filename, db);
   }
@@ -85,23 +129,27 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
 }
 
 /**
- * Studio keeps accounts, deletion markers and the gallery only in SQLite. A data folder still on
- * the older JSON files (`runtime-json-v1` not applied) or the single gallery document
- * (`gallery-rows-v1` not applied) must go through migrate-runtime first, so Studio refuses to
- * start on one rather than ignore what it holds.
+ * Studio keeps accounts, deletion markers, the gallery and the stores json-stores-v1 moved only in
+ * SQLite. A data folder still on the older JSON files (`runtime-json-v1` or `json-stores-v1` not
+ * applied) or the single gallery document (`gallery-rows-v1` not applied) must go through
+ * migrate-runtime first, so Studio refuses to start on one rather than ignore what it holds.
  */
 export function assertCurrentStorage(dataDir: string): void {
   const files = legacyFiles.filter((name) => fs.existsSync(path.join(dataDir, name)));
   const db = runtimeDatabase(dataDir);
+  const stores = hasMigration(db, jsonStoresMigration) ? [] : jsonStoreFiles(dataDir);
+  const imports = stores.filter((source) => source.startsWith("library/imports/")).length;
   const pending = [
     ...(files.length && !hasMigration(db, "runtime-json-v1") ? files : []),
     ...(db.prepare("SELECT 1 FROM studio_documents WHERE name = 'gallery'").get()
       ? ["the gallery document"]
       : []),
+    ...stores.filter((source) => !source.startsWith("library/imports/")),
+    ...(imports ? [`${imports} import records in library/imports`] : []),
   ];
   if (pending.length)
     throw new Error(
-      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it.`,
+      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,
     );
 }
 
@@ -119,6 +167,30 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
       "INSERT INTO studio_documents (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value",
     )
     .run(name, JSON.stringify(value));
+}
+
+/**
+ * A document's value, or undefined without one. A folder without a database stays without one, so
+ * migrate-runtime's dry runs read through this.
+ */
+export function savedDocument(dataDir: string, name: string): unknown {
+  if (!fs.existsSync(databaseFile(dataDir))) return undefined;
+  const row = runtimeDatabase(dataDir)
+    .prepare("SELECT value FROM studio_documents WHERE name = ?")
+    .get(name) as { value: string } | undefined;
+  return row ? JSON.parse(row.value) : undefined;
+}
+
+/** Every account's `name` document (ownerDocumentName), read like savedDocument. */
+export function ownerDocuments(dataDir: string, name: string) {
+  if (!fs.existsSync(databaseFile(dataDir))) return [];
+  return (
+    runtimeDatabase(dataDir)
+      .prepare(
+        "SELECT name, value FROM studio_documents WHERE substr(name, 1, ?) = ? ORDER BY name",
+      )
+      .all(name.length + 1, `${name}:`) as { name: string; value: string }[]
+  ).map((row) => ({ name: row.name, value: JSON.parse(row.value) as unknown }));
 }
 
 export function deleteRuntimeDocument(dataDir: string, name: string): void {

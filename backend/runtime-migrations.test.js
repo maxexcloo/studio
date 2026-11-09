@@ -8,6 +8,7 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-runtime-migrations
 process.env.STUDIO_DATA_DIR = dataDir;
 const { catalogueStore } = await import("./library/catalogue.js");
 const { registerMigrationRoutes } = await import("./runtime-migrations.js");
+const { readRuntimeDocument, writeRuntimeDocument } = await import("./persistence/runtime.ts");
 
 const spec = (id, file) => ({ id, file, folder: "loras", label: file });
 
@@ -27,7 +28,7 @@ test("the migrations route plans, then applies online-safe steps into the runnin
     "civitai:2:2": spec("civitai:2:2", "added.safetensors"),
   });
   // A legacy record only the stopped-Studio command may rewrite.
-  write("model-types.json", { "loras/old.safetensors": "wan" });
+  writeRuntimeDocument(dataDir, "model-types", { "loras/old.safetensors": "wan" });
   const catalogue = catalogueStore({ dataDir, environment: {}, log: { info() {} } });
   assert.equal(catalogue.download("civitai:2:2"), null, "the running catalogue is loaded");
 
@@ -66,10 +67,7 @@ test("the migrations route plans, then applies online-safe steps into the runnin
     "a later save keeps what the step wrote",
   );
   assert.match(applied.steps.legacyRecords.refused, /Needs Studio stopped/);
-  assert.equal(
-    fs.readFileSync(file("model-types.json"), "utf8"),
-    '{"loras/old.safetensors":"wan"}',
-  );
+  assert.deepEqual(readRuntimeDocument(dataDir, "model-types"), { "loras/old.safetensors": "wan" });
   assert.ok(lines[1].includes(`downloadSources: 1 applied, backup ${backup}`), lines[1]);
 
   const again = await post({ apply: true });

@@ -1,11 +1,11 @@
 // The prompt assistant's MCP tools: rewrite_prompt, suggest_negative and suggest_loras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
 // share one engine and one set of rules (Prompt Assistant, Uncensored Models for Spicy, LoRAs, the
-// account's profiles). What the chat used is remembered for six hours, on disk (mcp-assistant.json
-// beside MCP's ownership file), so a generate with that prompt records it on the result
-// (`assistant`, source "chat") for Details and Recreate, even across a restart.
+// account's profiles). What the chat used is remembered for six hours, in studio.sqlite (the
+// mcp-assistant document, beside MCP's ownership), so a generate with that prompt records it on the
+// result (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from "zod";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { assistantPresets, defaultPreset } from "../assistant-presets.js";
 import { mcpJson } from "./media.js";
 import { maxPromptCharacters } from "../../shared/queue.ts";
@@ -23,16 +23,17 @@ const key = (owner, prompt) =>
   ]);
 
 /**
- * What each owner's chat recently had written or suggested, for the generation record. With `file`,
- * it is kept there (owners are account ids or MCP's keyed hashes; prompts are already in the results).
+ * What each owner's chat recently had written or suggested, for the generation record. With
+ * `dataDir`, it is kept in its database (owners are account ids or MCP's keyed hashes; prompts are
+ * already in the results).
  */
-export function createChatAssistantMemory({ now = Date.now, file = "", log = console } = {}) {
+export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = console } = {}) {
   const rewrites = new Map();
   const suggested = new Map();
   const fresh = (entry) => (entry && now() - entry.at < rememberMs ? entry : null);
-  if (file) {
+  if (dataDir) {
     try {
-      const saved = readJsonFile(file);
+      const saved = readRuntimeDocument(dataDir, "mcp-assistant");
       for (const [map, entries] of [
         [rewrites, saved?.rewrites],
         [suggested, saved?.suggested],
@@ -48,17 +49,13 @@ export function createChatAssistantMemory({ now = Date.now, file = "", log = con
     }
   }
   const save = () => {
-    if (!file) return;
+    if (!dataDir) return;
     try {
-      writeJsonFile(
-        file,
-        {
-          version: 1,
-          rewrites: [...rewrites].filter(([, value]) => fresh(value)),
-          suggested: [...suggested].filter(([, value]) => fresh(value)),
-        },
-        { mode: 0o600 },
-      );
+      writeRuntimeDocument(dataDir, "mcp-assistant", {
+        version: 1,
+        rewrites: [...rewrites].filter(([, value]) => fresh(value)),
+        suggested: [...suggested].filter(([, value]) => fresh(value)),
+      });
     } catch (error) {
       log.warn?.(`[mcp] The chat assistant records couldn’t be saved: ${error.message}`);
     }

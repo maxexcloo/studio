@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { ownerDocuments, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { createGuideStore, createProfileStore } from "./profile/store.js";
 import { isObject } from "./values.js";
 
@@ -42,8 +42,8 @@ function moveKeys(entries, canonical, join) {
 }
 
 /**
- * A lora-stacks.json state with merged ids' entries on the kept id; the kept id's own active stack
- * and strengths win. Mutates and returns the moved count. Older files are the stacks alone.
+ * A LoRA stacks state with merged ids' entries on the kept id; the kept id's own active stack and
+ * strengths win. Mutates and returns the moved count. Older states are the stacks alone.
  */
 export function repointLoraState(state, canonical) {
   const stacks = isObject(state.stacks) ? state.stacks : isObject(state.library) ? {} : state;
@@ -63,26 +63,18 @@ export function repointLoraState(state, canonical) {
   return moved;
 }
 
-/** The shared and every account's lora-stacks.json in a data folder. */
-export function loraStackFiles(dataDir) {
-  const accounts = path.join(dataDir, "accounts");
-  const owners = fs.existsSync(accounts) ? fs.readdirSync(accounts) : [];
-  return [
-    path.join(dataDir, "lora-stacks.json"),
-    ...owners.map((owner) => path.join(accounts, owner, "lora-stacks.json")),
-  ].filter((file) => fs.existsSync(file));
-}
-
-/** Moves merged ids' LoRA stacks and strengths onto the kept ids. Returns `{<file>: moved}`. */
+/**
+ * Moves merged ids' LoRA stacks and strengths onto the kept ids in every account's stacks.
+ * Returns `{<document>: moved}`.
+ */
 export function repointLoraStacks(dataDir, canonical, { apply = true } = {}) {
   const moved = {};
-  for (const file of loraStackFiles(dataDir)) {
-    const state = readJsonFile(file);
+  for (const { name, value: state } of ownerDocuments(dataDir, "lora-stacks")) {
     if (!isObject(state)) continue;
     const count = repointLoraState(state, canonical);
     if (!count) continue;
-    moved[path.relative(dataDir, file)] = count;
-    if (apply) writeJsonFile(file, state);
+    moved[name] = count;
+    if (apply) writeRuntimeDocument(dataDir, name, state);
   }
   return moved;
 }
@@ -99,9 +91,8 @@ export function combinedProfiles(dataDir, { apply = false } = {}) {
   const { canonical } = createProfileStore({ dataDir, log: quiet });
   const result = { applied: apply, preferences: 0, loraStacks: {}, guideBindings: [] };
 
-  const preferencesFile = path.join(dataDir, "workflow-preferences.json");
-  if (fs.existsSync(preferencesFile)) {
-    const raw = readJsonFile(preferencesFile);
+  const raw = savedDocument(dataDir, "workflow-preferences");
+  if (raw !== undefined) {
     const before = {
       favorites: Array.isArray(raw?.favorites) ? raw.favorites : [],
       lastUsed: isObject(raw?.lastUsed) ? raw.lastUsed : {},
@@ -110,7 +101,8 @@ export function combinedProfiles(dataDir, { apply = false } = {}) {
     result.preferences = [...before.favorites, ...Object.keys(before.lastUsed)].filter(
       (id) => canonical(id) !== id,
     ).length;
-    if (apply && result.preferences) writeJsonFile(preferencesFile, { ...raw, ...next });
+    if (apply && result.preferences)
+      writeRuntimeDocument(dataDir, "workflow-preferences", { ...raw, ...next });
   }
 
   result.loraStacks = repointLoraStacks(dataDir, canonical, { apply });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { userWorkflowsDir } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
+import { ownerDocuments } from "../persistence/runtime.ts";
 
 /** Each saved profile definition: its name, declared family and text. */
 export async function profileDefinitions() {
@@ -45,16 +46,9 @@ export async function modelFileReferences({ file }, presetModels) {
     )
       users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
   }
-  const stacks = [path.join(dataDir, "lora-stacks.json")];
-  try {
-    for (const owner of await fs.promises.readdir(path.join(dataDir, "accounts")))
-      stacks.push(path.join(dataDir, "accounts", owner, "lora-stacks.json"));
-  } catch {
-    /* Single-user. */
-  }
-  let saved = 0;
-  for (const stack of stacks)
-    if ((await fs.promises.readFile(stack, "utf8").catch(() => "")).includes(quoted)) saved += 1;
+  const saved = ownerDocuments(dataDir, "lora-stacks").filter(({ value }) =>
+    JSON.stringify(value).includes(quoted),
+  ).length;
   if (saved) users.push(saved === 1 ? "a saved LoRA stack" : `${saved} saved LoRA stacks`);
   return users;
 }
