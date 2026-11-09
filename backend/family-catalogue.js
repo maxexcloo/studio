@@ -1888,7 +1888,10 @@ export const families = {
   // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
   // It runs on ComfyUI's own nodes (master after 0.41.3, CLIPLoader type moss_image) with
   // Comfy-Org's single files, and takes SkipLayerGuidanceDiTSimple, which skips layer 22 on
-  // the negative pass as the makers sample.
+  // the negative pass as the makers sample. Edits run through the Moss-Image-Edit LoRA
+  // (Comfy-Org/MOSS-Image loras/moss_image_edit_lora_rank_64_bf16) and ComfyUI 0.43's
+  // TextEncodeMOSSImageEdit, which takes up to four references as latents: Comfy-Org's
+  // image_moss_image_edit template samples 30 steps at CFG 4, euler / normal.
   moss_image: {
     label: "MOSS-Image",
     kind: "image",
@@ -1901,7 +1904,7 @@ export const families = {
     latent: "EmptyFlux2LatentImage",
     sizeStep: 16,
     negative: "text",
-    img2img: true,
+    references: 4,
     aspects: square,
     // No shift node on ComfyUI's own nodes: their MOSS-Image samples at shift 5 by itself, with
     // timesteps 0-1. ModelSamplingSD3 would scale those by 1000 and draw only noise.
