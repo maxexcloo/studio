@@ -193,12 +193,10 @@ export async function mediaDraft(
         workflow: profile.workflow,
         // The profile's current checkpoint runs, not the file the original result loaded.
         modelName: undefined,
-        backendId:
-          profile.provider === "cliproxyapi"
-            ? undefined
-            : typeof item.settings?.comfyBackend === "string"
-              ? item.settings.comfyBackend
-              : source?.backend || source?.input.backendId || profile.workerIds?.[0],
+        // A worker the source picked carries over while the profile runs there; otherwise Automatic.
+        workerId: profile.workerIds?.includes(String(source?.input.workerId))
+          ? source?.input.workerId
+          : undefined,
         // Reused drafts draw a new seed; only Exact Repeat keeps the recorded one.
         seed: "",
         prompt: typedPrompt(item),

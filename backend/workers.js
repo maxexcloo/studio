@@ -241,24 +241,40 @@ export function capabilityForProfile(profile) {
 
 /**
  * Which worker runs a job that needs `capability`. With several, an online one
- * that already has the model wins, then an online one with the `prefers`
- * capabilities (Smart upscale), then the first online one in list order; with
- * none online, the first capable one (its own error then says why). Never a
- * worker without the capability, never a cloud fallback, and no GPU changes.
+ * wins, then one that already has the profile, then a free one, then one that
+ * last ran the job's `model`, then the one with the fewest queued jobs, then
+ * one with the `prefers` capabilities (Smart upscale), then list order: the
+ * first, or the last for background work (`last`), keeping the first free for
+ * manual work. With none online, the first capable one (its own error then
+ * says why). Never a worker without the capability, never a cloud fallback,
+ * and no GPU changes.
  *
- * `online(id)` and `hasModel(id)` answer true, false or null (not known yet).
+ * `online(id)` and `hasModel(id)` answer true, false or null (not known yet);
+ * `load(id)` the queue's `{ busy, queued, model }` for it, or null.
  */
 export function pickWorker(
   capability,
-  { workers = listWorkers(), prefers = [], online = () => null, hasModel = () => null } = {},
+  {
+    workers = listWorkers(),
+    prefers = [],
+    online = () => null,
+    hasModel = () => null,
+    load = () => null,
+    model = "",
+    last = false,
+  } = {},
 ) {
   const capable = workers.filter((worker) => worker.capabilities.includes(capability));
   if (!capable.length) return null;
   const score = (worker) => {
     const up = online(worker.id);
+    const work = load(worker.id);
     return [
       up === false ? 0 : up === true ? 2 : 1,
       hasModel(worker.id) === true ? 1 : 0,
+      work?.busy ? 0 : 1,
+      model && work?.model === model ? 1 : 0,
+      -(work?.queued ?? 0),
       prefers.filter((item) => worker.capabilities.includes(item)).length,
     ];
   };
@@ -267,7 +283,7 @@ export function pickWorker(
   for (const worker of capable.slice(1)) {
     const next = score(worker);
     const better = next.findIndex((value, index) => value !== bestScore[index]);
-    if (better >= 0 && next[better] > bestScore[better]) {
+    if (better >= 0 ? next[better] > bestScore[better] : last) {
       best = worker;
       bestScore = next;
     }

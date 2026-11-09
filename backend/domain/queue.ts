@@ -1,5 +1,6 @@
 import {
   terminalStatuses,
+  type GenerationInput,
   type PromptWriting,
   pausedReason,
   type QueueMedia,
@@ -103,12 +104,19 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
       : {}),
   };
 }
-/** The model a job loads on its resource; empty when it names none. */
-const modelOf = (job: OwnedJob) => String(job.input.profileId || job.input.model || "");
+/** The model a job's input loads on its resource; empty when it names none. */
+export const modelOf = (input: GenerationInput) => String(input.profileId || input.model || "");
+
+/** A resource's load: whether work runs there, how many jobs wait for it and the model it last ran. */
+export interface ResourceLoad {
+  busy: boolean;
+  queued: number;
+  model: string;
+}
 /** What a job loads on its resource: the model and its enabled LoRAs at their strengths. */
 const loadKey = (job: OwnedJob) =>
   JSON.stringify([
-    modelOf(job),
+    modelOf(job.input),
     (Array.isArray(job.input.loras) ? job.input.loras : [])
       .filter((lora) => lora && lora.enabled !== false)
       .map((lora) => `${lora.name}@${lora.strength ?? ""}`)
@@ -149,6 +157,27 @@ export class GenerationQueue {
         latest.set(job.resource, job);
     }
     this.loaded = latest;
+  }
+
+  /** Each resource's load, for routing new work (comfy/backends.js routeJob). */
+  loads(): Map<string, ResourceLoad> {
+    const loads = new Map<string, ResourceLoad>();
+    const at = (resource: string) => {
+      if (!loads.has(resource))
+        loads.set(resource, {
+          busy: this.scheduling.has(resource),
+          queued: 0,
+          model: modelOf(this.loaded.get(resource)?.input ?? {}),
+        });
+      return loads.get(resource)!;
+    };
+    for (const resource of this.loaded.keys()) at(resource);
+    for (const job of this.store.schedulable()) {
+      if (terminalStatuses.has(job.status)) continue;
+      if (this.acceptedIds.has(job.id)) at(job.resource).busy = true;
+      else at(job.resource).queued += 1;
+    }
+    return loads;
   }
 
   /** Forgets what a resource has loaded: its worker stopped, restarted or went offline. */
@@ -464,10 +493,11 @@ export class GenerationQueue {
 
   /**
    * A job waiting behind another job on a busy worker moves to an idle one that can run it, one per
-   * idle worker, higher tiers first; an idle worker with the job's model loaded goes first. A job on
-   * an idle worker without its model moves only to an idle worker that has it. Background work moves
-   * only while no manual work waits, so the worker manual work prefers stays free for it; a job never
-   * moves behind higher-ranked work. Updates `all` in place.
+   * idle worker, higher tiers first; an idle worker with the job's model loaded goes first, then the
+   * first idle worker for manual work and the last for background work. A job on an idle worker
+   * without its model moves only to an idle worker that has it. Background work moves only while no
+   * manual work waits, so the worker manual work prefers stays free for it; a job never moves behind
+   * higher-ranked work. Updates `all` in place.
    */
   private rebalance(
     all: OwnedJob[],
@@ -487,7 +517,11 @@ export class GenerationQueue {
     // An unknown model never matches, so without model information nothing moves for affinity.
     const hasModel = (resource: string, job: OwnedJob) => {
       const loaded = this.loaded.get(resource);
-      return Boolean(modelOf(job)) && loaded !== undefined && modelOf(loaded) === modelOf(job);
+      return (
+        Boolean(modelOf(job.input)) &&
+        loaded !== undefined &&
+        modelOf(loaded.input) === modelOf(job.input)
+      );
     };
     const taken = new Set<string>();
     const movable = all
@@ -495,7 +529,7 @@ export class GenerationQueue {
       .filter(
         ({ job }) =>
           pending(job) &&
-          (occupied.has(job.resource) || (modelOf(job) && !hasModel(job.resource, job))) &&
+          (occupied.has(job.resource) || (modelOf(job.input) && !hasModel(job.resource, job))) &&
           !this.scheduling.has(job.resource) &&
           (tier(job) === queuePriority.manual || !manualWaits),
       )
@@ -515,7 +549,11 @@ export class GenerationQueue {
         );
       const target =
         targets.find((resource) => hasModel(resource, job)) ??
-        (occupied.has(job.resource) ? targets[0] : undefined);
+        (!occupied.has(job.resource)
+          ? undefined
+          : tier(job) === queuePriority.manual
+            ? targets[0]
+            : targets.at(-1));
       if (!target) continue;
       taken.add(target);
       all[index] = this.store.save({

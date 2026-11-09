@@ -338,7 +338,7 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
       profileId: profiles[0].id,
       prompt: "A masked copper bird",
       negative: "harsh light",
-      backendId: "worker-b",
+      workerId: "worker-b",
       width: 768,
       height: 768,
       steps: 37,
@@ -378,7 +378,7 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     profileId: profiles[0].id,
-    backendId: "worker-b",
+    workerId: "worker-b",
     seed: "",
     steps: 20,
     cfg: 5,
@@ -652,6 +652,14 @@ test("References, masking, settings and runtime presets remain editable", async 
 
   await withSettings(page, async () => {
     await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
+    // Automatic by default; fallback belongs to an explicitly picked worker.
+    const worker = page.getByRole("combobox", { name: "Worker", exact: true });
+    await expect(worker).toHaveValue("Automatic");
+    await expect(
+      page.getByRole("switch", { name: "Allow Fallback to Another Worker" }),
+    ).toBeHidden();
+    await worker.click();
+    await page.getByRole("option", { name: "worker-b", exact: true }).click();
     await page.getByRole("switch", { name: "Allow Fallback to Another Worker" }).check();
   });
   await page.getByRole("button", { name: "Presets", exact: true }).click();
@@ -661,6 +669,7 @@ test("References, masking, settings and runtime presets remain editable", async 
   expect(state.presets[0].input.inpaint.mask).toMatch(/^data:image\/png/);
   expect(state.presets[0].input.inpaint.feather).toBe(0.4);
   expect(state.presets[0].input.allowFallback).toBe(true);
+  expect(state.presets[0].input.workerId).toBe("worker-b");
   await closePresets(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
   await openPresets(page);
