@@ -51,10 +51,10 @@ test("Studio refuses a folder still on JSON; once migrated, sign-in and gallery 
   ]);
   fs.writeFileSync(path.join(dataDir, "accounts.json"), legacyAccounts);
   fs.writeFileSync(path.join(dataDir, "gallery.json"), legacyGallery);
-  assert.throws(() => run(`import './backend/gallery/store.js';`), /run migrate-runtime/);
+  assert.throws(() => run(`import './backend/storage-check.js';`), /run migrate-runtime/);
 
   assert.equal(migrateRuntime(dataDir, { apply: true }).applied, true);
-  assert.throws(() => run(`import './backend/gallery/store.js';`), /the gallery document/);
+  assert.throws(() => run(`import './backend/storage-check.js';`), /the gallery document/);
   assert.equal(migrateGalleryRows(dataDir, { apply: true }).applied, true);
   closeRuntimeDatabase(dataDir);
   run(`
