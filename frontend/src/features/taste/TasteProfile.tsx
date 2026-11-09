@@ -6,6 +6,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { SettingGroup } from "../../ui/SettingRows";
 import { maxTasteSummary } from "../../../../shared/taste";
+import classes from "./TasteProfile.module.css";
 
 export interface Taste {
   summary: string;
@@ -31,8 +32,11 @@ const learnt = (taste: Taste) =>
     .filter(Boolean)
     .join(" · ");
 
-/** Dream › Taste: the summary Studio keeps of what this account likes, editable by its owner. */
-export function TasteProfile() {
+/**
+ * Dream › Taste: the summary Studio keeps of what this account likes, editable by its owner. `fill`
+ * fits it to the page's height, the text taking the room above its actions.
+ */
+export function TasteProfile({ fill = false }: { fill?: boolean }) {
   const client = useQueryClient();
   const taste = useQuery(tasteQuery);
   const [draft, setDraft] = useState<string | null>(null);
@@ -65,13 +69,16 @@ export function TasteProfile() {
   const changed = !!data && draft !== null && draft.trim() !== data.summary;
   const error = save.error || refresh.error || taste.error;
   return (
-    <SettingGroup title="Taste Profile">
-      <Stack gap="xs" pt="xs">
+    <SettingGroup title="Taste Profile" fill={fill}>
+      <Stack gap="xs" pt="xs" flex={fill ? 1 : undefined} mih={fill ? 0 : undefined}>
         {/* The autosized minimum reserves the field's height while the profile loads. */}
         <TextBox
           aria-label="Taste Profile"
-          autosize
+          autosize={!fill}
           minRows={4}
+          classNames={
+            fill ? { root: classes.fill, wrapper: classes.fill, input: classes.fill } : undefined
+          }
           maxLength={maxTasteSummary}
           disabled={!data || refresh.isPending}
           placeholder="Describe your taste"

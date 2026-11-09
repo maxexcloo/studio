@@ -5,16 +5,19 @@ import classes from "./SettingRows.module.css";
 /**
  * A titled run of setting rows, divided like the rest of Settings. `danger` titles a section's last
  * group, Danger Zone, whose actions always confirm first. A group holding a list puts its
- * `toolbar` (`SectionToolbar`) beside the title, wrapping below it when narrow.
+ * `toolbar` (`SectionToolbar`) beside the title, wrapping below it when narrow. A `fill` group takes
+ * its column's remaining height, its content filling the room under the title.
  */
 export function SettingGroup({
   title,
   danger = false,
+  fill = false,
   toolbar,
   children,
 }: {
   title: string;
   danger?: boolean;
+  fill?: boolean;
   toolbar?: ReactNode;
   children: ReactNode;
 }) {
@@ -24,7 +27,13 @@ export function SettingGroup({
     </Text>
   );
   return (
-    <Stack gap={4} component="section" aria-label={title}>
+    <Stack
+      gap={4}
+      component="section"
+      aria-label={title}
+      flex={fill ? 1 : undefined}
+      mih={fill ? 0 : undefined}
+    >
       {toolbar ? (
         <Group gap="xs" justify="space-between">
           {heading}
@@ -33,7 +42,7 @@ export function SettingGroup({
       ) : (
         heading
       )}
-      <div>{children}</div>
+      <div className={fill ? classes.fill : undefined}>{children}</div>
     </Stack>
   );
 }
