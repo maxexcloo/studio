@@ -7,17 +7,6 @@
   padding-inline-end: max(var(--mantine-spacing-xs), var(--input-padding-inline-end, 0px));
 }
 
-/* Prompt ideas float over the empty prompt's lower lines, clear of its history and assistant actions. */
-.area {
-  position: relative;
-}
-
-.ideas {
-  left: 0;
-  right: 84px;
-  bottom: 4px;
-}
-
 /* The phone sheet's prompt (its text box, tools and suggestions) takes the room left. */
 .area[data-fill] {
   flex: 1;

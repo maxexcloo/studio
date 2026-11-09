@@ -5,6 +5,8 @@ import {
   fixtures,
   image,
   profiles,
+  promptOptions,
+  promptTool,
   serveProfiles,
   stamp,
   viewerAction,
@@ -169,8 +171,13 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     : viewer.getByRole("group", { name: "Generation Actions", exact: true });
   if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  // The editor shows the tools as buttons; elsewhere they are in the prompt's ⋯.
+  const askForChange = () =>
+    phone
+      ? surface.getByRole("button", { name: "Ask for a Change", exact: true }).click()
+      : promptTool(surface, "Prompt", "Ask for a Change");
   await field.fill("make it night");
-  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await askForChange();
   // The proposal replaces the text in place under the chosen action; Undo restores the request.
   await expect(field).toHaveValue("An amber bird at night");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -185,7 +192,7 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await surface.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(field).toHaveValue("make it night");
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
-  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await askForChange();
   await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
   await surface.getByRole("button", { name: "Run", exact: true }).click();
@@ -229,8 +236,8 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
       });
     }),
   );
-  await viewer.getByRole("button", { name: "Suggestions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  const options = await promptOptions(viewer, "Prompt", "Suggestions");
+  await options.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -252,10 +259,12 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's field carries a change typed over the prompt into the Chat; phones show it on the bar.
-  if (desktop)
+  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones show it on the
+  // bar.
+  if (desktop) {
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
-  await viewerAction(page, "Continue in Chat");
+    await promptTool(viewer, "Prompt", "Continue in Chat");
+  } else await viewerAction(page, "Continue in Chat");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/chat$/);
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(
@@ -473,32 +482,38 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
   });
 });
 
-test("Animate runs Fast unless Quality is chosen", async ({ page }) => {
-  const tiers: string[] = [];
-  const { state, viewer } = await seed(page, {}, (page) =>
+test("Animate runs local Fast unless Quality is chosen, and keeps the choice as the account's", async ({
+  page,
+}) => {
+  const asked: unknown[] = [];
+  const { state, viewer } = await seed(page, {}, (page, fixture) =>
     page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
-      const tier = new URL(route.request().url()).searchParams.get("tier") || "";
-      tiers.push(tier);
+      // The account's preference picks the model.
+      const videos = fixture.preferences.preferences.videos;
+      asked.push(videos);
       return route.fulfill({
         json: {
           profileId: "video:test",
-          label: tier === "quality" ? "Motion Quality" : "Motion Fast",
+          label: videos === "quality" ? "Motion Quality" : "Motion Fast",
           cloud: false,
-          tiers: ["fast", "quality"],
+          // Without Cloud Models there is no Cloud.
+          offers: { cloud: false, fast: true, quality: true },
         },
       });
     }),
   );
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  // Fast or Quality is a segmented control at the top of the menu.
-  const choice = page.getByRole("radiogroup", { name: "Fast or Quality", exact: true });
+  // Cloud, Fast or Quality is one segmented control at the top of the menu, Fast until chosen.
+  const choice = page.getByRole("radiogroup", { name: "Cloud, Fast or Quality", exact: true });
   await expect(choice.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
+  await expect(choice.getByRole("radio", { name: "Cloud", exact: true })).toHaveCount(0);
   await choice.getByText("Quality", { exact: true }).click();
   await expect(choice.getByRole("radio", { name: "Quality", exact: true })).toBeChecked();
-  await expect.poll(() => tiers.at(-1)).toBe("quality");
+  expect(state.preferences.preferences.videos).toBe("quality");
+  await expect.poll(() => asked.at(-1)).toBe("quality");
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
-  expect(tiers.at(-1)).toBe("quality");
+  expect(state.jobs[1].input).toMatchObject({ profileId: "video:test" });
 });
 
 test("Review Prompt First writes the motion prompt for editing, and Run queues exactly that prompt", async ({
@@ -620,45 +635,40 @@ async function offline(page: Page) {
         label: grok.label,
         cloud: true,
         size: { width: 960, height: 960 },
-        tiers: [],
-        offers: { local: true, cloud: true },
+        offers: { cloud: true, fast: true, quality: false },
       },
     }),
   );
 }
 
-test("Animate offers Local GPU or Cloud when the account has both, and runs on the pick", async ({
+test("Animate offers Cloud beside the local tiers when the account has both, and runs on the pick", async ({
   page,
 }) => {
   const asked: string[] = [];
-  const { state, viewer } = await seed(page, {}, async (page) => {
+  const { state, viewer } = await seed(page, {}, async (page, fixture) => {
     await serveProfiles(page, [...profiles, grok]);
     await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
-      const where = new URL(route.request().url()).searchParams.get("where") || "";
-      asked.push(where);
-      const cloud = where === "cloud";
+      const cloud = fixture.preferences.preferences.videos === "cloud";
+      asked.push(cloud ? "cloud" : "local");
       return route.fulfill({
         json: {
           profileId: cloud ? grok.id : "video:test",
           label: cloud ? grok.label : "Motion Fast",
           cloud,
-          tiers: cloud ? [] : ["fast", "quality"],
-          offers: { local: true, cloud: true },
+          // One local profile, Fast, so there is no Quality.
+          offers: { cloud: true, fast: true, quality: false },
         },
       });
     });
   });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const where = page.getByRole("radiogroup", { name: "Local GPU or Cloud", exact: true });
-  const tier = page.getByRole("radiogroup", { name: "Fast or Quality", exact: true });
-  // Auto shows the pool it took.
-  await expect(where.getByRole("radio", { name: "Local GPU", exact: true })).toBeChecked();
-  expect(asked[0]).toBe("auto");
-  await expect(tier).toBeVisible();
-  await where.getByText("Cloud", { exact: true }).click();
-  await expect(where.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
-  // Cloud has one tier here, so there is no Fast or Quality.
-  await expect(tier).toBeHidden();
+  const choice = page.getByRole("radiogroup", { name: "Cloud, Fast or Quality", exact: true });
+  // Fast where the account has local video, until another is chosen.
+  await expect(choice.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
+  await expect(choice.getByRole("radio", { name: "Quality", exact: true })).toHaveCount(0);
+  expect(asked[0]).toBe("local");
+  await choice.getByText("Cloud", { exact: true }).click();
+  await expect(choice.getByRole("radio", { name: "Cloud", exact: true })).toBeChecked();
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(asked.at(-1)).toBe("cloud");
@@ -759,7 +769,7 @@ test("With neither local video nor Grok, Animate's options are disabled", async 
   expect(state.jobs).toHaveLength(1);
 });
 
-test("Copy ▾ copies the prompt first and Details copies every input", async ({ page }) => {
+test("Copy ▾ lists Details then Prompt, and each copies its text", async ({ page }) => {
   await page.addInitScript(() => {
     // Copying happens within the tap, as iOS Safari needs: the copy command, not the clipboard API.
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
@@ -782,9 +792,10 @@ test("Copy ▾ copies the prompt first and Details copies every input", async ({
     },
   });
   await viewerAction(page, "Copy");
+  // Its options sort alphabetically.
   await expect(page.getByRole("menuitem", { name: /^(Prompt|Details)$/ })).toHaveText([
-    "Prompt",
     "Details",
+    "Prompt",
   ]);
   await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");

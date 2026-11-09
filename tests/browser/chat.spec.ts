@@ -581,7 +581,9 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
     inputs.getByRole("button", { name: "Choose References", exact: true }),
   ).toBeVisible();
   await expect(inputs.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Copy Message", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "More Message Actions", exact: true }),
+  ).toBeVisible();
   await field.press("Escape");
   await expect(inputs).toHaveCount(0);
   // Without a sidebar, phones list the chats in place of the empty state, as does the header's
