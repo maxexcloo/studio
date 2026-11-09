@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Alert, Badge, CloseButton, Group, Loader, Text, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
+import { useLocation } from "react-router";
 import { icons } from "../../ui/icons";
 import { useIsMutating } from "@tanstack/react-query";
 import type { ChatModel } from "../../../../shared/chat";
@@ -17,6 +18,7 @@ import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useChat, useChatMessages } from "./ChatProvider";
+import { useNewChatOpen } from "./ChatWorkspace";
 import classes from "./ChatComposer.module.css";
 
 /**
@@ -129,7 +131,14 @@ function ChatComposer() {
     admin && !!status.data?.models.some((model) => model.workloads?.length),
   );
   const form = useRef<HTMLFormElement>(null);
+  const message = useRef<HTMLTextAreaElement>(null);
   const [expanded, setExpanded] = useState(false);
+  // New Chat focuses the message, which expands the box, each time it is chosen.
+  const starting = useNewChatOpen();
+  const { key } = useLocation();
+  useEffect(() => {
+    if (starting) message.current?.focus({ preventScroll: true });
+  }, [starting, key]);
   // A layer over the composer, such as a chip's popup or its confirmation, is not outside it.
   const outside = (element: Element) =>
     !form.current?.contains(element) && !element.closest(composerLayers);
@@ -185,6 +194,7 @@ function ChatComposer() {
         onKeyDown={ideas.focusProps.onKeyDown}
       >
         <TextBox
+          ref={message}
           aria-label="Message"
           placeholder="Message Studio"
           variant="unstyled"
