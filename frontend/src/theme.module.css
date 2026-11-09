@@ -25,3 +25,14 @@
   width: 20px;
   height: 20px;
 }
+
+/* A centred dialog fits the area above a phone's keyboard while one of its fields is typed in
+   (ui/useKeyboard.ts), scrolling its content there; Mantine's own limit is the full height. */
+.dialogInner {
+  top: var(--studio-dialog-top, 0px);
+  bottom: var(--studio-dialog-inset, 0px);
+}
+
+.dialogContent:not([data-full-screen]) {
+  max-height: 100% !important;
+}
