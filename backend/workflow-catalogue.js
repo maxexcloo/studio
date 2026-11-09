@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "./gallery/store.js";
 import {
@@ -11,27 +10,26 @@ import {
   workflowOptionIssues,
 } from "./custom-workflows.js";
 import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { repointedPreferences } from "./combined-profiles.js";
 import { workflowRisks } from "./workflow-risk.js";
 
-const preferencesPath = path.join(dataDir, "workflow-preferences.json");
 let preferencesCache = null;
 let preferencesSaveTimer = null;
 
 export function loadWorkflowPreferences() {
   if (preferencesCache) return preferencesCache;
   try {
-    const raw = readJsonFile(preferencesPath);
+    const raw = readRuntimeDocument(dataDir, "workflow-preferences");
     preferencesCache = {
       favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
       lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
     };
-    return preferencesCache;
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     preferencesCache = { favorites: [], lastUsed: {} };
-    return preferencesCache;
   }
+  return preferencesCache;
 }
 
 export function saveWorkflowPreferences(preferences, { immediate = false } = {}) {
@@ -49,8 +47,12 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
     clearTimeout(preferencesSaveTimer);
     preferencesSaveTimer = null;
   }
-  fs.mkdirSync(dataDir, { recursive: true });
-  writeJsonFile(preferencesPath, preferences);
+  writeRuntimeDocument(dataDir, "workflow-preferences", preferences);
+}
+
+/** Saves a change still in its debounce; Studio's exit calls it while the database is open. */
+export function flushWorkflowPreferences() {
+  if (preferencesSaveTimer) saveWorkflowPreferences(preferencesCache, { immediate: true });
 }
 
 /** Moves favourites and last use to the id `canonical` gives each (merged profiles), saved at once. */

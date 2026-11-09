@@ -8,7 +8,12 @@ import { Store } from "./domain/store.ts";
 import { legacyRecords } from "./legacy-records.js";
 import { restoreRuntimeBackup } from "./persistence/migration.ts";
 import { readGalleryRows, writeGalleryRows } from "./persistence/gallery-rows.ts";
-import { closeRuntimeDatabase, runtimeDatabase } from "./persistence/runtime.ts";
+import {
+  closeRuntimeDatabase,
+  readRuntimeDocument,
+  runtimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 
 test("older record shapes become today's once, with a restorable backup", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-legacy-records-"));
@@ -20,11 +25,11 @@ test("older record shapes become today's once, with a restorable backup", (t) =>
     fs.mkdirSync(path.dirname(path.join(dataDir, file)), { recursive: true });
     fs.writeFileSync(path.join(dataDir, file), JSON.stringify(value));
   };
-  const read = (file) => JSON.parse(fs.readFileSync(path.join(dataDir, file), "utf8"));
+  const read = (name) => readRuntimeDocument(dataDir, name);
   write("workflows/krea.json", { studio: { id: "krea", family: "krea2" } });
   const owner = crypto.createHash("sha256").update("account-a").digest("hex");
   const stack = (id) => ({ id, name: id, loras: [] });
-  write(`accounts/${owner}/lora-stacks.json`, {
+  writeRuntimeDocument(dataDir, `lora-stacks:${owner}`, {
     stacks: {},
     library: {
       snapshots: {
@@ -34,7 +39,7 @@ test("older record shapes become today's once, with a restorable backup", (t) =>
       },
     },
   });
-  write("model-types.json", {
+  writeRuntimeDocument(dataDir, "model-types", {
     "unet:a.safetensors": "z-image",
     "unet:b.safetensors": "wan",
     "checkpoint:c.safetensors": "checkpoint",
@@ -79,30 +84,24 @@ test("older record shapes become today's once, with a restorable backup", (t) =>
   const plan = legacyRecords(dataDir);
   assert.deepEqual(plan, {
     loraStacks: {
-      [`accounts/${owner}/lora-stacks.json`]: [
-        { from: "custom:krea", to: "family:krea2", stacks: 2 },
-      ],
+      [`lora-stacks:${owner}`]: [{ from: "custom:krea", to: "family:krea2", stacks: 2 }],
     },
-    unresolved: [{ file: `accounts/${owner}/lora-stacks.json`, key: "custom:gone" }],
+    unresolved: [{ document: `lora-stacks:${owner}`, key: "custom:gone" }],
     modelChoices: { "z-image → zimage": 1, "wan → wan22_5b": 1, "checkpoint → (removed)": 1 },
     galleryReferences: { records: 2, gained: 1 },
     chatRequests: 2,
     applied: false,
     backup: "",
   });
-  assert.equal(
-    read("model-types.json")["unet:a.safetensors"],
-    "z-image",
-    "a dry run writes nothing",
-  );
+  assert.equal(read("model-types")["unet:a.safetensors"], "z-image", "a dry run writes nothing");
 
   const applied = legacyRecords(dataDir, { apply: true });
   assert.equal(applied.applied, true);
-  assert.deepEqual(read(`accounts/${owner}/lora-stacks.json`).library.snapshots, {
+  assert.deepEqual(read(`lora-stacks:${owner}`).library.snapshots, {
     "family:krea2": [stack("current"), stack("old")],
     "custom:gone": [stack("lost")],
   });
-  assert.deepEqual(read("model-types.json"), {
+  assert.deepEqual(read("model-types"), {
     "unet:a.safetensors": "zimage",
     "unet:b.safetensors": "wan22_5b",
     "unet:d.safetensors": "zimage/turbo",

@@ -180,8 +180,8 @@ async function removeInstalled(want) {
   return { removed: true };
 }
 
-/** Each import's own picture (longest edge 1280 px, WebP), beside the records. */
-function importPictures({ dataDir = currentDataDir(), sharp = loadSharp } = {}) {
+/** Each import's own picture (longest edge 1280 px, WebP); `recorded(id)`: its import is kept. */
+function importPictures({ dataDir = currentDataDir(), sharp = loadSharp, recorded }) {
   const dir = path.join(dataDir, "library", "import-pictures");
   const fileFor = (id) =>
     /^imp-[a-z0-9]{6,40}$/.test(String(id)) ? path.join(dir, `${id}.webp`) : "";
@@ -203,14 +203,10 @@ function importPictures({ dataDir = currentDataDir(), sharp = loadSharp } = {}) 
         .toBuffer();
       await writeBytesFileAsync(target, data, { mode: 0o600 });
       // Pictures of pruned imports go too.
-      const records = path.join(dataDir, "library", "imports");
       const names = await fs.promises.readdir(dir).catch(() => []);
       if (names.length > 520)
         for (const name of names)
-          if (
-            name.endsWith(".webp") &&
-            !fs.existsSync(path.join(records, name.replace(/\.webp$/, ".json")))
-          )
+          if (name.endsWith(".webp") && !recorded(name.slice(0, -5)))
             await fs.promises.rm(path.join(dir, name), { force: true });
       return true;
     },
@@ -375,7 +371,7 @@ export function registerLibraryRoutes(
     removeFile = removeInstalled,
     /** Takes a removed LoRA out of every account's stacks, strengths, ratings and recents (lora/stacks.js). */
     forget = forgetLora,
-    pictures = importPictures(),
+    pictures = importPictures({ recorded: (id) => Boolean(store.get(id)) }),
     schedule = true,
   },
 ) {

@@ -3,37 +3,27 @@ import path from "node:path";
 import { comfy } from "./comfy/comfy.js";
 import { currentComfyBackend } from "./comfy/backends.js";
 import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
-import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
+import { writeBytesFileAsync } from "./json-store.js";
+import { runtimeDatabase } from "./persistence/runtime.ts";
 
 /*
- * Runs already moved into Studio media, by job ID. Each stored copy gets a unique
- * name, so a run left in ComfyUI's history (a failed cleanup) can only be told
- * apart from a new one by its job; recovery skips these instead of importing twice.
+ * Runs already moved into Studio media, by job ID (studio_ingested_jobs, the newest 20,000).
+ * Each stored copy gets a unique name, so a run left in ComfyUI's history (a failed cleanup) can
+ * only be told apart from a new one by its job; recovery skips these instead of importing twice.
  */
-const ingestedPath = path.join(dataDir, "media-ingested.json");
 const maxIngested = 20_000;
-let ingested = null;
-function ingestedJobs() {
-  if (ingested) return ingested;
-  try {
-    ingested = new Map(Object.entries(readJsonFile(ingestedPath)?.jobs || {}));
-  } catch {
-    ingested = new Map();
-  }
-  return ingested;
-}
 export function noteIngested(jobIds) {
-  const jobs = ingestedJobs();
-  let changed = false;
-  for (const id of jobIds)
-    if (id && !jobs.has(id)) {
-      jobs.set(String(id), Date.now());
-      changed = true;
-    }
-  if (!changed) return;
-  while (jobs.size > maxIngested) jobs.delete(jobs.keys().next().value);
   try {
-    writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 });
+    const db = runtimeDatabase(dataDir);
+    const insert = db.prepare(
+      "INSERT OR IGNORE INTO studio_ingested_jobs (job_id, at) VALUES (?, ?)",
+    );
+    let added = 0;
+    for (const id of jobIds) if (id) added += insert.run(String(id), Date.now()).changes;
+    if (added)
+      db.prepare(
+        "DELETE FROM studio_ingested_jobs WHERE rowid <= (SELECT rowid FROM studio_ingested_jobs ORDER BY rowid DESC LIMIT 1 OFFSET ?)",
+      ).run(maxIngested);
   } catch (error) {
     console.warn(`[Studio] Could not record ingested runs: ${error.message}`);
   }

@@ -11,13 +11,13 @@
  * Paid and early-access versions are never downloaded: they show with the reason and the newest
  * free version, when there is one, to update to instead.
  *
- * State lives in `<data>/library/updates.json`:
+ * State lives in the `library-updates` document in studio.sqlite:
  *   {checkedAt, byEntry: {key: {state: available|current|error, latest?, freeAlternative?, note, checkedAt}},
  *    applied: {key: {downloadId, from, to, state: downloading|kept|removed|failed, note, startedAt, finishedAt?}}}
  */
 import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { civitaiFileSpec, civitaiModelFiles } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
 import { splitCatalogueKey } from "./catalogue.js";
@@ -168,24 +168,24 @@ export function createUpdateChecker({
   now = Date.now,
   log = console,
 } = {}) {
-  const file = path.join(dataDir, "library", "updates.json");
   let state = null;
   let checking = null;
   const load = () => {
     if (state) return state;
     try {
-      const saved = readJsonFile(file);
+      const saved = readRuntimeDocument(dataDir, "library-updates");
       state =
         saved && typeof saved === "object"
           ? { checkedAt: "", byEntry: {}, applied: {}, ...saved }
           : null;
-    } catch {
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
       state = null;
     }
     state ||= { checkedAt: "", byEntry: {}, applied: {} };
     return state;
   };
-  const save = () => writeJsonFile(file, load());
+  const save = () => writeRuntimeDocument(dataDir, "library-updates", load());
 
   async function latestFor(key, entry) {
     const source = entry.source || {};
@@ -436,7 +436,6 @@ export function createUpdateChecker({
   }
 
   return {
-    file,
     check,
     summary,
     apply,

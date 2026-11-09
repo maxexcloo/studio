@@ -30,6 +30,7 @@ const { buildExport } = await import("./export.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } =
   await import("../workflow-catalogue.js");
 const { McpMedia } = await import("../mcp/media.js");
+const { readRuntimeDocument, writeRuntimeDocument } = await import("../persistence/runtime.ts");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const radianceBlock = {
@@ -106,19 +107,15 @@ saveWorkflowPreferences(
   },
   { immediate: true },
 );
-fs.mkdirSync(path.join(temporary, "accounts", "owner"), { recursive: true });
-fs.writeFileSync(
-  path.join(temporary, "accounts", "owner", "lora-stacks.json"),
-  JSON.stringify({
-    stacks: { [`custom:${comfyId}`]: [{ name: "detail", strength: 0.5 }] },
-    library: {
-      strengths: {
-        [`custom:${radianceId}`]: { detail: 0.4, grain: 0.2 },
-        [`custom:${comfyId}`]: { detail: 0.6 },
-      },
+writeRuntimeDocument(temporary, "lora-stacks:owner", {
+  stacks: { [`custom:${comfyId}`]: [{ name: "detail", strength: 0.5 }] },
+  library: {
+    strengths: {
+      [`custom:${radianceId}`]: { detail: 0.4, grain: 0.2 },
+      [`custom:${comfyId}`]: { detail: 0.6 },
     },
-  }),
-);
+  },
+});
 for (const backend of ["radiance", "comfyui"])
   for (let run = 0; run < 3; run++)
     recordGeneration({
@@ -326,9 +323,7 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
   assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${combinedId}`]);
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${combinedId}`]);
   // LoRA stacks and strengths follow; strengths of both old ids join.
-  const stacks = JSON.parse(
-    fs.readFileSync(path.join(temporary, "accounts", "owner", "lora-stacks.json"), "utf8"),
-  );
+  const stacks = readRuntimeDocument(temporary, "lora-stacks:owner");
   assert.deepEqual(Object.keys(stacks.stacks), [`custom:${combinedId}`]);
   assert.deepEqual(Object.keys(stacks.library.strengths), [`custom:${combinedId}`]);
   assert.equal(stacks.library.strengths[`custom:${combinedId}`].grain, 0.2);

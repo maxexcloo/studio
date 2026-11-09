@@ -50,11 +50,13 @@ test("profileIds renames profiles and guides, keeps old ids resolving, and runs 
     accounts: [],
     profiles: { artists: { id: "artists", generationProfiles: [`custom:${old}`, "custom:other"] } },
   });
-  write("workflow-preferences.json", {
+  writeRuntimeDocument(dataDir, "workflow-preferences", {
     favorites: [`custom:${old}`],
     lastUsed: { [`custom:${old}`]: "2026-11-01" },
   });
-  write("timings.json", { runs: [{ key: `image:custom:${old}@comfyui`, seconds: 9 }] });
+  writeRuntimeDocument(dataDir, "timings", {
+    runs: [{ key: `image:custom:${old}@comfyui`, seconds: 9 }],
+  });
 
   const plan = profileIds(dataDir);
   assert.deepEqual(plan.profiles, [{ from: old, to: renamed }]);
@@ -92,8 +94,13 @@ test("profileIds renames profiles and guides, keeps old ids resolving, and runs 
     `custom:${renamed}`,
     "custom:other",
   ]);
-  assert.deepEqual(read("workflow-preferences.json").favorites, [`custom:${renamed}`]);
-  assert.equal(read("timings.json").runs[0].key, `image:custom:${renamed}@comfyui`);
+  assert.deepEqual(readRuntimeDocument(dataDir, "workflow-preferences").favorites, [
+    `custom:${renamed}`,
+  ]);
+  assert.equal(
+    readRuntimeDocument(dataDir, "timings").runs[0].key,
+    `image:custom:${renamed}@comfyui`,
+  );
 
   const restored = path.join(dataDir, "restored");
   restoreRuntimeBackup(applied.backup, restored);
@@ -105,6 +112,10 @@ test("profileIds renames profiles and guides, keeps old ids resolving, and runs 
   assert.ok(
     JSON.parse(fs.readFileSync(path.join(restored, "accounts.json"))).profiles.artists
       .generationProfiles[0] === `custom:${old}`,
+  );
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(restored, "workflow-preferences.json"))).favorites,
+    [`custom:${old}`],
   );
 
   const again = profileIds(dataDir, { apply: true });

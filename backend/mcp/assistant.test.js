@@ -8,6 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { createChatAssistantMemory } from "./assistant.js";
+import { closeRuntimeDatabase, databaseFile, runtimeDatabase } from "../persistence/runtime.ts";
 import { fakeStudio } from "../fixtures/fake-studio.js";
 
 const gateway = {
@@ -232,14 +233,16 @@ test("the chat memory matches prompts loosely, per owner, and forgets after a wh
 
 test("what the chat wrote is kept on disk, so a Generate after a restart still records it", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-mcp-assistant-memory-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const file = path.join(dataDir, "mcp-assistant.json");
+  t.after(() => {
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
   let clock = 1000;
-  const before = createChatAssistantMemory({ now: () => clock, file });
+  const before = createChatAssistantMemory({ now: () => clock, dataDir });
   before.rewrote("owner-a", "A cabin at dusk.", { preset: "cinematic", model: "cloud/auto" });
   before.suggested("owner-a", ["glow.safetensors"]);
-  assert.equal((fs.statSync(file).mode & 0o777).toString(8), "600");
-  const after = createChatAssistantMemory({ now: () => clock, file });
+  assert.equal((fs.statSync(databaseFile(dataDir)).mode & 0o777).toString(8), "600");
+  const after = createChatAssistantMemory({ now: () => clock, dataDir });
   assert.deepEqual(after.record("owner-a", ["a cabin at dusk."], [{ name: "glow.safetensors" }]), {
     preset: "cinematic",
     model: "cloud/auto",
@@ -248,16 +251,20 @@ test("what the chat wrote is kept on disk, so a Generate after a restart still r
   });
   clock += 7 * 60 * 60 * 1000;
   assert.equal(
-    createChatAssistantMemory({ now: () => clock, file }).record("owner-a", ["a cabin at dusk."]),
-    null,
-    "old records are dropped on load",
-  );
-  fs.writeFileSync(file, "{ broken");
-  assert.equal(
-    createChatAssistantMemory({ now: () => clock, file, log: {} }).record("owner-a", [
+    createChatAssistantMemory({ now: () => clock, dataDir }).record("owner-a", [
       "a cabin at dusk.",
     ]),
     null,
-    "an unreadable file starts afresh",
+    "old records are dropped on load",
+  );
+  runtimeDatabase(dataDir)
+    .prepare("UPDATE studio_documents SET value = '{ broken' WHERE name = 'mcp-assistant'")
+    .run();
+  assert.equal(
+    createChatAssistantMemory({ now: () => clock, dataDir, log: {} }).record("owner-a", [
+      "a cabin at dusk.",
+    ]),
+    null,
+    "an unreadable record starts afresh",
   );
 });

@@ -43,7 +43,6 @@ import {
 } from "./persistence/runtime.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
@@ -116,6 +115,7 @@ import { appVersion } from "./data-dir.js";
 import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
 import { flagEnabled } from "./deployment-settings.js";
 import { hfFetch } from "./hf-access.js";
+import { flushWorkflowPreferences } from "./workflow-catalogue.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -653,20 +653,19 @@ registerMigrationRoutes(app, {
   adminRefusal,
   reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
 });
-const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
   read: () => {
     try {
-      return readJsonFile(comparisonsFile);
+      return readRuntimeDocument(dataDir, "comparisons");
     } catch (error) {
       if (error.code === "ENOENT") return [];
       throw error;
     }
   },
-  write: (records) => writeJsonFile(comparisonsFile, records),
+  write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
   pendingItems: makePendingItems,
   voted: (ownerId, jobId, others) => {
@@ -1097,5 +1096,7 @@ drainServer = async () => {
   });
   await Promise.all([generationQueue.stop(), closed]);
   await flushGalleryStrict();
+  flushWorkflowPreferences();
+  // The runtime database's one connection; nothing may write after this.
   store.close();
 };

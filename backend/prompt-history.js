@@ -1,18 +1,20 @@
-import path from "node:path";
 import { dataDir, gallery } from "./gallery/store.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import crypto from "node:crypto";
+import {
+  ownerDocumentName,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 
 /**
- * Prompts you generated with, newest first, kept on this computer so every
- * device on it sees the same list. A prompt used again moves to the top
- * instead of appearing twice; pinned ones stay no matter how many follow.
+ * Prompts you generated with, newest first, kept per account in studio.sqlite
+ * (`prompt-history:<key>`, `negative-prompt-history:<key>`) so every device sees the same list.
+ * A prompt used again moves to the top instead of appearing twice; pinned ones stay no matter how
+ * many follow.
  *
  * It can be turned off (Settings › Generation): then nothing new is kept and
  * the recent ones are forgotten; starred prompts stay until unstarred.
  */
 
-export const promptHistoryPath = path.join(dataDir, "prompt-history.json");
 export const historyLimit = 500;
 const pinnedLimit = 200;
 const maxPromptLength = 8000;
@@ -77,11 +79,9 @@ export function addPrompt(entries, text, at = new Date()) {
   return capEntries([next, ...entries.filter((entry) => entry !== previous)]);
 }
 
-export const negativePromptHistoryPath = path.join(dataDir, "negative-prompt-history.json");
-
 function createHistory(
   field,
-  historyPath,
+  documentName,
   initiallyEnabled = () => true,
   initialSeedItems = () => gallery,
 ) {
@@ -95,10 +95,11 @@ function createHistory(
   function loadPromptHistory(seedItems) {
     if (cache) return cache;
     try {
-      const saved = readJsonFile(historyPath);
+      const saved = readRuntimeDocument(dataDir, documentName);
       enabled = saved?.enabled !== false;
       cache = cleanEntries(saved);
-    } catch {
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
       enabled = initiallyEnabled();
       let entries = [];
       const seeds = (enabled ? (seedItems ?? initialSeedItems()) : [])
@@ -112,13 +113,8 @@ function createHistory(
     return cache;
   }
 
-  /**
-   * `forget`: the store keeps the previous copy as .bak, and a prompt taken out
-   * (forgotten, or cleared along with its image) must not stay in it.
-   */
-  function save({ forget = false } = {}) {
-    writeJsonFile(historyPath, { version: 1, enabled, entries: cache || [] });
-    if (forget) writeJsonFile(historyPath, { version: 1, enabled, entries: cache || [] });
+  function save() {
+    writeRuntimeDocument(dataDir, documentName, { version: 1, enabled, entries: cache || [] });
   }
 
   function promptHistoryEnabled() {
@@ -131,7 +127,7 @@ function createHistory(
     loadPromptHistory();
     enabled = Boolean(on);
     if (!enabled) cache = cache.filter((entry) => entry.pinned);
-    save({ forget: !enabled });
+    save();
     return cache;
   }
 
@@ -177,17 +173,17 @@ function createHistory(
     const next = entries.filter((entry) => !keys.has(promptKey(entry.text)));
     if (next.length === entries.length) return entries;
     cache = next;
-    save({ forget: true });
+    save();
     return cache;
   }
 
   function clearPromptHistory({ keepPinned = true } = {}) {
     cache = keepPinned ? loadPromptHistory().filter((entry) => entry.pinned) : [];
-    save({ forget: true });
+    save();
     return cache;
   }
 
-  /** For tests: forget what was read, so the next call reads the file again. */
+  /** For tests: forget what was read, so the next call reads the document again. */
   function resetPromptHistoryCache() {
     cache = null;
   }
@@ -208,24 +204,20 @@ const historySets = new Map();
 function historiesFor(ownerId = "") {
   const key = String(ownerId || "");
   if (!historySets.has(key)) {
-    const directory = key
-      ? path.join(dataDir, "accounts", crypto.createHash("sha256").update(key).digest("hex"))
-      : dataDir;
-    const paths = key
-      ? {
-          negative: path.join(directory, "negative-prompt-history.json"),
-          positive: path.join(directory, "prompt-history.json"),
-        }
-      : { negative: negativePromptHistoryPath, positive: promptHistoryPath };
     const histories = {};
     const seeds = key ? () => [] : () => gallery;
     histories.negative = createHistory(
       "negative",
-      paths.negative,
+      ownerDocumentName("negative-prompt-history", key),
       () => histories.positive.promptHistoryEnabled(),
       seeds,
     );
-    histories.positive = createHistory("prompt", paths.positive, () => true, seeds);
+    histories.positive = createHistory(
+      "prompt",
+      ownerDocumentName("prompt-history", key),
+      () => true,
+      seeds,
+    );
     historySets.set(key, histories);
   }
   return historySets.get(key);
