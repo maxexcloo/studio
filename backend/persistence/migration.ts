@@ -5,6 +5,7 @@ import { createGalleryTable, galleryKey, galleryRowsMigration } from "./gallery-
 import {
   databaseFile,
   hasMigration,
+  jsonStoreSource,
   legacyFiles,
   readOfflineRuntime,
   runtimeDatabase,
@@ -245,7 +246,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
  * copy, the account access step's
  * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
  * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists, and the
- * env settings step's (env-settings.js) the env file and the settings document as `settings.json`.
+ * env settings step's (env-settings.js) the env file and the settings document as `settings.json`,
+ * and the JSON stores step's (json-stores.ts) every store file at its path.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -261,23 +263,21 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
       ) ||
       /^history\/(profiles|guides)\/[A-Za-z0-9][A-Za-z0-9._:-]*\/\d+\.json$/.test(mapping.source);
     const catalogue = mapping.source === "library/catalogue.json";
-    const stacks = /^accounts\/[0-9a-f]{64}\/lora-stacks\.json$/.test(mapping.source);
     if (
       !store &&
       !profile &&
       !catalogue &&
-      !stacks &&
+      !jsonStoreSource.test(mapping.source) &&
       !envSettingsFiles.includes(mapping.source) &&
       !downloadSourcesFiles.includes(mapping.source) &&
       !profileIdFiles.includes(mapping.source) &&
       ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
     )
       throw new Error("Unsupported backup mapping");
-    if (profile || catalogue || stacks || profileIdFiles.includes(mapping.source))
-      fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {
-        recursive: true,
-        mode: 0o700,
-      });
+    fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {
+      recursive: true,
+      mode: 0o700,
+    });
     const source = path.join(backup, mapping.source);
     const bytes = fs.readFileSync(source);
     if (digest(bytes) !== mapping.hash)

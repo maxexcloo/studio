@@ -14,7 +14,8 @@ import {
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { presetsEnabled } from "./features.js";
-import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
+import { writeBytesFileAsync } from "./json-store.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import {
   libraryDownload,
   libraryDownloadAccess,
@@ -27,12 +28,12 @@ import { requireLocal } from "./route-access.js";
 import { refreshWorkerModels } from "./worker-models.js";
 import { presetGrade } from "./library/grade.js";
 
-const presetsPath = path.join(dataDir, "presets.json");
 const previewsDir = path.join(dataDir, "preset-previews");
 let presets;
 try {
-  presets = readJsonFile(presetsPath);
-} catch {
+  presets = readRuntimeDocument(dataDir, "presets");
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
   presets = [];
 }
 if (!Array.isArray(presets)) presets = [];
@@ -103,7 +104,7 @@ export function registerPresetRoutes(
   const forgetLegacy = (id) => {
     if (!presets.some((item) => item.id === id)) return;
     presets = presets.filter((item) => item.id !== id);
-    writeJsonFile(presetsPath, presets);
+    writeRuntimeDocument(dataDir, "presets", presets);
     if (/^[1-9]\d*$/.test(id)) fs.rmSync(path.join(previewsDir, `${id}.webp`), { force: true });
   };
   const images = () =>

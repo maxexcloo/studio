@@ -49,6 +49,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const media = await import("./media-store.js");
 const paths = await import("./media-paths.js");
+const { runtimeDatabase } = await import("./persistence/runtime.ts");
 const { localOutputFile } = await import("./comfy/comfy.js");
 const store = await import("./gallery/store.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
@@ -152,6 +153,12 @@ test("recovered history records move into media and keep their titles", async ()
 
 test("ingested runs are remembered across restarts so recovery never imports them twice", async () => {
   media.noteIngested(["job-remembered"]);
-  const saved = JSON.parse(fs.readFileSync(path.join(temporary, "media-ingested.json"), "utf8"));
-  assert.ok(saved.jobs["job-remembered"]);
+  media.noteIngested(["job-remembered"]);
+  assert.deepEqual(
+    runtimeDatabase(paths.dataDir)
+      .prepare("SELECT job_id FROM studio_ingested_jobs")
+      .all()
+      .map((row) => row.job_id),
+    ["job-remembered"],
+  );
 });

@@ -6,13 +6,25 @@ import test from "node:test";
 import { createCatalogueStore } from "./catalogue.js";
 import { createImportEngine, createImportStore, importId, publicImport } from "./imports.js";
 import { detectLink } from "./sources.js";
+import { closeRuntimeDatabase, runtimeDatabase } from "../persistence/runtime.ts";
 
 const quiet = { info: () => {}, warn: () => {} };
 const tempDir = (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-imports-"));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.after(() => {
+    closeRuntimeDatabase(dir);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
   return dir;
 };
+/** The saved import rows: id → record. */
+const savedImports = (dir) =>
+  Object.fromEntries(
+    runtimeDatabase(dir)
+      .prepare("SELECT id, value FROM studio_library_imports")
+      .all()
+      .map((row) => [row.id, JSON.parse(row.value)]),
+  );
 const spec = (id, file) => ({
   id,
   file,
@@ -128,10 +140,7 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
   );
   assert.equal(record.grade.value, "partial");
   assert.deepEqual(record.grade.reasons, ["Watercolour Style isn’t installed"]);
-  assert.ok(
-    fs.existsSync(path.join(h.dir, "library", "imports", `${record.id}.json`)),
-    "library/imports/<id>.json",
-  );
+  assert.ok(savedImports(h.dir)[record.id], "a studio_library_imports row");
   assert.equal(
     publicImport(record).resources[0].spec,
     undefined,
@@ -186,7 +195,7 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
     ["ready", "exact", "installed"],
   );
 
-  // Restart: the record is read back from its file.
+  // Restart: the record is read back from its row.
   const again = createImportStore({ dataDir: h.dir, log: quiet });
   assert.equal(again.get(record.id).state, "ready");
   await assert.rejects(h.engine.downloadMissing(record.id), /Nothing is missing/);
@@ -227,20 +236,13 @@ test("a failed resolve is recorded with its reason; an interrupted one fails on 
     grade: { value: "partial", reasons: [], missingFields: [] },
     results: { catalogueKeys: [] },
   };
-  fs.writeFileSync(
-    path.join(h.dir, "library", "imports", `${interrupted.id}.json`),
-    JSON.stringify(interrupted),
-  );
+  runtimeDatabase(h.dir)
+    .prepare("INSERT INTO studio_library_imports (id, value) VALUES (?, ?)")
+    .run(interrupted.id, JSON.stringify(interrupted));
   const restarted = createImportStore({ dataDir: h.dir, log: quiet });
   assert.equal(restarted.get(interrupted.id).state, "failed");
   assert.match(restarted.get(interrupted.id).error, /restarted/);
-  assert.equal(
-    JSON.parse(
-      fs.readFileSync(path.join(h.dir, "library", "imports", `${interrupted.id}.json`), "utf8"),
-    ).state,
-    "failed",
-    "and the file says so",
-  );
+  assert.equal(savedImports(h.dir)[interrupted.id].state, "failed", "and the row says so");
 });
 
 test("only the newest records are kept", (t) => {
@@ -262,13 +264,7 @@ test("only the newest records are kept", (t) => {
     store.list().map((record) => record.id),
     ids.slice(2).reverse(),
   );
-  assert.deepEqual(
-    fs.readdirSync(path.join(dir, "library", "imports")).sort(),
-    ids
-      .slice(2)
-      .map((id) => `${id}.json`)
-      .sort(),
-  );
+  assert.deepEqual(Object.keys(savedImports(dir)).sort(), ids.slice(2).sort());
   assert.equal(store.get("../escape"), null);
   assert.throws(() => store.put({ id: "bad", state: "ready" }), /valid id/);
 });

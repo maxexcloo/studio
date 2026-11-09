@@ -32,6 +32,7 @@ if (
   result.runtime?.conflicts.length ||
   result.galleryRows?.conflicts.length ||
   result.uploads?.conflicts.length ||
-  result.profileIds?.conflicts.length
+  result.profileIds?.conflicts.length ||
+  result.jsonStores?.conflicts.length
 )
   process.exitCode = 1;

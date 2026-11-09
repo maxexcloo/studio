@@ -3,13 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {
-  readJsonFile,
-  removeJsonFile,
-  writeJsonFile,
-  writeBytesFile,
-  writeBytesFileAsync,
-} from "./json-store.js";
+import { readJsonFile, writeJsonFile, writeBytesFile, writeBytesFileAsync } from "./json-store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -69,12 +63,4 @@ test("a crash between backup and rename still reads the backup", () => {
 
 test("missing with no backup still throws, so callers use their defaults", () => {
   assert.throws(() => readJsonFile(path.join(dir, "never.json")), { code: "ENOENT" });
-});
-
-test("removing on purpose takes the backup too", () => {
-  const file = path.join(dir, "removed.json");
-  writeJsonFile(file, { a: 1 });
-  writeJsonFile(file, { a: 2 });
-  removeJsonFile(file);
-  assert.throws(() => readJsonFile(file));
 });

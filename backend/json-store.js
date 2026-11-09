@@ -123,8 +123,3 @@ export async function writeBytesFileAsync(file, bytes, { mode, validate, durable
 }
 
 export const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
-
-/** Deleting on purpose must take the backup too, or the next read would bring the file back. */
-export function removeJsonFile(file) {
-  for (const target of [file, `${file}.bak`]) fs.rmSync(target, { force: true });
-}

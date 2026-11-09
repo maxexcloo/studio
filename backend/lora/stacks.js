@@ -1,38 +1,34 @@
-import fs from "node:fs";
-import path from "node:path";
 import { dataDir } from "../gallery/store.js";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import {
+  ownerDocumentName,
+  ownerDocuments,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "../persistence/runtime.ts";
 import { cleanTriggers } from "./catalogue.js";
-import crypto from "node:crypto";
 
-const stacksPath = (ownerId = "") =>
-  ownerId
-    ? path.join(
-        dataDir,
-        "accounts",
-        crypto.createHash("sha256").update(String(ownerId)).digest("hex"),
-        "lora-stacks.json",
-      )
-    : path.join(dataDir, "lora-stacks.json");
+/** Each account's `lora-stacks:<key>` document (runtime.ts ownerDocumentName). */
+const stacksDocument = (ownerId = "") => ownerDocumentName("lora-stacks", ownerId);
 
-// Generous caps: enough for anyone, small enough that a bad client cannot bloat the file.
+// Generous caps: enough for anyone, small enough that a bad client cannot bloat the document.
 const maxLorasPerStack = 8;
 const maxStacksPerFamily = 200;
 const maxOpsPerRequest = 500;
 
 function readState(ownerId = "") {
   try {
-    const value = readJsonFile(stacksPath(ownerId));
+    const value = readRuntimeDocument(dataDir, stacksDocument(ownerId));
     if (value?.stacks && typeof value.stacks === "object")
       return { stacks: value.stacks, library: value.library || null };
     return { stacks: value && typeof value === "object" ? value : {}, library: null };
-  } catch {
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
     return { stacks: {}, library: null };
   }
 }
 
 function writeState(state, ownerId = "") {
-  writeJsonFile(stacksPath(ownerId), state);
+  writeRuntimeDocument(dataDir, stacksDocument(ownerId), state);
 }
 
 function cleanStack(value) {
@@ -262,21 +258,14 @@ export function clearLoraState(ownerId = "") {
 
 /**
  * Takes a removed LoRA file out of every account's stacks, saved stacks, strengths, ratings and
- * recents (library/routes.js, Remove). Returns how many files changed.
+ * recents (library/routes.js, Remove). Returns how many accounts' stacks changed.
  */
 export function forgetLora(name, directory = dataDir) {
-  const accounts = path.join(directory, "accounts");
-  const files = [
-    path.join(directory, "lora-stacks.json"),
-    ...(fs.existsSync(accounts)
-      ? fs.readdirSync(accounts).map((owner) => path.join(accounts, owner, "lora-stacks.json"))
-      : []),
-  ].filter((file) => fs.existsSync(file));
   const without = (list) =>
     Array.isArray(list) ? list.filter((item) => item?.name !== name) : list;
   let changed = 0;
-  for (const file of files) {
-    const before = JSON.stringify(readJsonFile(file));
+  for (const document of ownerDocuments(directory, "lora-stacks")) {
+    const before = JSON.stringify(document.value);
     const state = JSON.parse(before);
     const stacks = state?.stacks && typeof state.stacks === "object" ? state.stacks : state;
     for (const key of Object.keys(stacks || {}))
@@ -293,7 +282,7 @@ export function forgetLora(name, directory = dataDir) {
         library.recents = library.recents.filter((item) => item !== name);
     }
     if (JSON.stringify(state) === before) continue;
-    writeJsonFile(file, state);
+    writeRuntimeDocument(directory, document.name, state);
     changed++;
   }
   return changed;

@@ -12,6 +12,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./media.js";
+import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { adminToolNames } from "./admin.js";
 import { pausedReason } from "../../shared/queue.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
@@ -492,7 +493,7 @@ test("a headerless client connects at /mcp/<token>, and a URL carries only a per
     f.requests.find((request) => request.path === "/generate")?.authorization,
     `Bearer ${token}`,
   );
-  const saved = JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8"));
+  const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
   assert.equal(saved.jobs[jobId(result)], "url-token-account");
 });
 
@@ -517,7 +518,7 @@ test("account MCP tokens map requests and jobs to the stable account identity", 
     f.requests.find((request) => request.path === "/generate")?.authorization,
     `Bearer ${token}`,
   );
-  const saved = JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8"));
+  const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
   assert.equal(saved.jobs[id], "stable-account-a");
   Object.assign(f.jobs.get(id), {
     status: "done",
@@ -623,10 +624,7 @@ test("account mode trusts the gateway key only for linked forwarded users and ke
   // MCP calls Studio as the linked account with Studio's own credential, never the gateway key.
   assert.equal(submission.authorization, undefined);
   assert.equal(submission.account, linked.userId);
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8")).jobs[id],
-    linked.userId,
-  );
+  assert.equal(readRuntimeDocument(f.dataDir, "mcp-ownership").jobs[id], linked.userId);
 
   const control = await f.client("administrator", controlKey);
   assert.deepEqual((await control.listTools()).tools.map((tool) => tool.name).sort(), [
@@ -1793,7 +1791,7 @@ test("signed links do not expire, preserve the configured public path and cannot
     clock.mock.restore();
   }
   // Sealed links issued before short links keep opening the same output.
-  const ownership = JSON.parse(fs.readFileSync(path.join(dir, "mcp-ownership.json"), "utf8"));
+  const ownership = readRuntimeDocument(dir, "mcp-ownership");
   const sealed = new McpMedia({
     dataDir: fs.mkdtempSync(path.join(dir, "sealed-")),
     publicUrl: "https://studio.example.test/nested/studio",

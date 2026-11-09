@@ -1,4 +1,5 @@
 import { migrateGalleryRows, migrateRuntime } from "./persistence/migration.ts";
+import { migrateJsonStores } from "./persistence/json-stores.ts";
 import { accountAccess } from "./account-migration.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { reloadAccountStore } from "./account-store.js";
@@ -132,6 +133,11 @@ const steps = [
     name: "envSettings",
     run: envSettings,
     changes: (plan) => size(plan.moved) + size(plan.removed),
+  },
+  {
+    name: "jsonStores",
+    run: migrateJsonStores,
+    changes: (plan) => (plan.alreadyMigrated ? 0 : size(plan.mappings) + size(plan.conflicts)),
   },
 ];
 
