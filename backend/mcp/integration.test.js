@@ -131,6 +131,7 @@ async function fixture(
     noteGatewayIdentity,
     resolveSignedResult,
     gatewayAdminTools,
+    allowedHost,
     control = fixtureRuntime(),
   } = {},
 ) {
@@ -362,6 +363,7 @@ async function fixture(
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
+    ...(allowedHost ? { allowedHost } : {}),
     // Like Studio's queue: failed direct cloud video jobs since a time.
     cloudVideoFailures: (since) =>
       [...jobs.values()]
@@ -431,7 +433,8 @@ async function fixture(
       profiles = value;
       if (chosen) defaults = chosen;
       if (filter) visibleTo = filter;
-      if (videoAvailable !== undefined) backends = { video: { available: videoAvailable } };
+      if (videoAvailable !== undefined)
+        backends = { video: { configured: true, available: videoAvailable } };
       await fetch(`${base}/api/models`);
     },
     client: async (user = "alice", key = mediaKey) => {
@@ -496,6 +499,62 @@ test("a headerless client connects at /mcp/<token>, and a URL carries only a per
   );
   const saved = readRuntimeDocument(f.dataDir, "mcp-ownership");
   assert.equal(saved.jobs[jobId(result)], "url-token-account");
+});
+
+test("the public MCP host takes only personal account tokens, and private hosts keep the shared keys", async (t) => {
+  const token = "account-mcp-token-that-is-long-enough-for-the-fixture";
+  const account = {
+    userId: "public-host-account",
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  };
+  const f = await fixture(t, {
+    accountMode: true,
+    environment: adminEnvironment,
+    authenticateAccountToken: (value) => (value === token ? account : null),
+    authenticateGatewayIdentity: (user) => (user === "librechat-linked" ? account : null),
+    // As deployed, the public host is also an allowed private host; the public rule wins.
+    allowedHost: () => true,
+  });
+  // Fetch normalises Host, so use the native HTTP client.
+  const post = (host, key, url = "/mcp") =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        f.base + url,
+        {
+          method: "POST",
+          headers: {
+            host,
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+            "x-ai-user-id": "librechat-linked",
+            "x-ai-user-email": "linked@example.test",
+            ...(key ? { authorization: `Bearer ${key}` } : {}),
+          },
+        },
+        (response) => {
+          let body = "";
+          response.setEncoding("utf8");
+          response.on("data", (chunk) => (body += chunk));
+          response.once("end", () => resolve({ status: response.statusCode, body }));
+        },
+      );
+      request.once("error", reject);
+      request.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
+    });
+  const refused = await post("studio.example.test", "not-a-real-token");
+  assert.equal(refused.status, 401);
+  // The shared keys are refused exactly like a wrong credential, so a response never confirms one.
+  for (const key of [mediaKey, controlKey])
+    for (const host of ["studio.example.test", "STUDIO.example.test.:443"])
+      assert.deepEqual(await post(host, key), refused, `${host} ${key}`);
+  assert.equal((await post("studio.example.test", token)).status, 200);
+  assert.equal((await post("studio.example.test", "", `/mcp/${token}`)).status, 200);
+  for (const key of [mediaKey, controlKey])
+    assert.equal((await post("studio.studio.svc.cluster.local", key)).status, 200, key);
+  assert.equal(f.requests.length, 0);
 });
 
 test("account MCP tokens map requests and jobs to the stable account identity", async (t) => {
@@ -2435,6 +2494,79 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
 });
 
+test("a client without a conversation header gets its MCP session's own result numbers; the header still wins", async (t) => {
+  const f = await fixture(t);
+  const connect = async (id) => {
+    const client = new Client({ name: "studio-session-fixture", version: "1.0.0" });
+    t.after(() => client.close());
+    const transport = new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), {
+      requestInit: {
+        headers: {
+          Authorization: `Bearer ${mediaKey}`,
+          "x-ai-user-id": "alice",
+          ...(id ? { "x-studio-conversation-id": id } : {}),
+        },
+      },
+    });
+    await client.connect(transport);
+    assert.ok(transport.sessionId, "initialize hands out a session id");
+    return client;
+  };
+  const handover = async (client) =>
+    texts(await call(client, "handover", { summary: "Carry on." }));
+  // Two chats like a Grok connector's: no header, each with its own session, numbering from 1.
+  const [first, second] = [await connect(), await connect()];
+  const queued = await generate(first);
+  const one = jobId(queued);
+  assert.deepEqual(
+    queued.jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(first)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+  const other = await call(second, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A lake"],
+    count: 1,
+  });
+  const two = jobId(data(other));
+  assert.deepEqual(
+    data(other).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.equal(data(await call(first, "status", { job_id: "result 1" })).job_id, one);
+  assert.equal(data(await call(second, "status", { job_id: "result 1" })).job_id, two);
+  await failure(second, "status", { job_id: "result 2" });
+  assert.match(await handover(first), new RegExp(one));
+  assert.doesNotMatch(await handover(first), new RegExp(two));
+  assert.doesNotMatch(await handover(second), new RegExp(one));
+  // Each chat's All Results page lists only that chat's results.
+  const allPage = async (reply) => {
+    const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
+    return [
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(Result \d+)<\/h2>/g),
+    ].map((match) => match[1]);
+  };
+  assert.deepEqual(await allPage(other), ["Result 1"]);
+  assert.deepEqual(
+    await allPage(
+      await call(first, "generate", { profile_id: imageProfile.id, prompts: ["A hill"], count: 1 }),
+    ),
+    ["Result 1", "Result 2", "Result 3"],
+  );
+  // LibreChat's conversation header scopes by itself, whatever session carries it.
+  const [left, right] = [await connect("conversation-x"), await connect("conversation-x")];
+  assert.deepEqual(
+    (await generate(left)).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(right)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+});
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
   const f = await fixture(t);
   const lookups = () => f.requests.filter((request) => request.path.startsWith("/jobs/")).length;
@@ -3681,31 +3813,48 @@ const videoCatalogue = (local = true) => [
   cloudVideo("cloud-video-fast", "Cloud Video · Fast · Cloud"),
 ];
 
-test("while the local video worker is off, video runs on a granted cloud profile and says so", async (t) => {
+test("while local workers are Offline or Stopped, generate queues on them and says the jobs wait", async (t) => {
   const f = await fixture(t);
-  await f.profiles(videoCatalogue(false), {
+  // As the studio's catalogue lists them while their workers restart or are stopped on purpose.
+  const waiting = videoCatalogue().map((profile) =>
+    profile.family === "grok"
+      ? profile
+      : { ...profile, availability: profile.kind === "image" ? "parked" : "offline" },
+  );
+  await f.profiles(waiting, {
     defaults: { image: imageProfile.id, video: "cloud-video" },
     videoAvailable: false,
   });
   const client = await f.client();
-  const fallback = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.match(texts(fallback), /Videos are Offline, so this went to the cloud/);
-  assert.equal(data(fallback).profile.remote, true);
+  const video = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
+  assert.equal(data(video).status, "queued");
+  assert.equal(data(video).profile.remote, undefined, "never moved to the cloud");
+  assert.match(texts(video), /is Offline, so this waits in the queue and starts when its worker/);
+  // Cloud is only offered, for the user to ask for.
+  assert.match(texts(video), /if it stays down, offer Cloud, and run it there only if they ask/);
+  const image = await call(client, "generate", { prompts: ["A heron"], count: 1 });
+  assert.match(texts(image), /is Stopped \(an administrator can start it .*\), so this waits/);
+  assert.doesNotMatch(texts(image), /Cloud/, "no cloud image profile to offer");
+  assert.deepEqual(
+    f.submitted.map((body) => body.profileId),
+    ["fl-fast", imageProfile.id],
+  );
+  assert.match(
+    data(await call(client, "models", { kind: "video" })).services_note,
+    /^Videos are Offline .*; generate still queues on them/,
+  );
 });
 
-test("with no cloud profile granted, video is refused while the local video worker is off, and named cloud profiles run", async (t) => {
+test("with no local or cloud video profile, video is refused, and named cloud profiles run", async (t) => {
   const f = await fixture(t);
-  // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
+  // With no profile to queue on, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
   await f.profiles(
     videoCatalogue(false).filter((profile) => !/^cloud/.test(profile.id)),
     { defaults: { image: imageProfile.id }, videoAvailable: false },
   );
   const client = await f.client();
   const none = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
-  assert.equal(
-    texts(none),
-    "Videos are Offline: the video worker isn't answering. Tell the user to try again later.",
-  );
+  assert.equal(texts(none), "No ready video profile is available to this account.");
   const listing = data(await call(client, "models", { kind: "video" }));
   assert.equal("cloud" in listing || "cloud_note" in listing, false);
   await f.profiles(videoCatalogue(false), {
@@ -3779,7 +3928,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(pending.isError, true);
   assert.match(texts(pending), /^This result is still /);
   finish(f);
-  // Unlike Generate, Animate needs no Video Cloud Fallback: it goes to Grok and says so.
+  // Animate goes to Grok and says so.
   const moved = await call(client, "reuse", {
     job_id: "result 1",
     mode: "animate",
@@ -3932,7 +4081,7 @@ test("video stays local while the worker is up, and a plain request never reache
   const restricted = await f.client("", Object.keys(tokens)[0]);
   const refused = await call(restricted, "generate", { kind: "video", prompts: ["A wave"] });
   assert.equal(refused.isError, true);
-  assert.match(refused.content[0].text, /^Videos are Offline/);
+  assert.match(refused.content[0].text, /^No ready video profile/);
   data(await call(restricted, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
   const nowhere = await call(restricted, "reuse", { job_id: "result 1", mode: "animate" });
@@ -4288,7 +4437,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
     guideOf(await call(first, "generate", { profile_id: "krea-turbo", prompts: ["An egg"] })),
     undefined,
   );
-  // Another conversation of the same account has not seen it; without a conversation, the account and profile decide.
+  // Another conversation of the same account has not seen it; without a conversation header, the MCP session decides.
   assert.ok(
     guideOf(
       await call(await chat(t, f, "alice", "chat-2"), "generate", {
@@ -4300,13 +4449,16 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   const plain = await chat(t, f, "alice");
   assert.ok(guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })));
   assert.equal(
+    guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })),
+    undefined,
+  );
+  assert.ok(
     guideOf(
       await call(await chat(t, f, "alice"), "generate", {
         profile_id: "flux 3",
         prompts: ["A plush"],
       }),
     ),
-    undefined,
   );
   // A refused submission delivered nothing, so the next call still carries the guide.
   const third = await chat(t, f, "alice", "chat-3");
