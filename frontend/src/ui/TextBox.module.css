@@ -1,12 +1,4 @@
-/*
- * The phone editor is an opaque full-screen surface, so nothing shows through while the keyboard
- * opens or drops; its body stops above the keyboard and the text takes all the room left.
- */
-.content {
-  display: flex;
-  flex-direction: column;
-}
-
+/* The phone editor's body stops above the keyboard and the text takes all the room left. */
 .body {
   flex: 1;
   min-height: 0;

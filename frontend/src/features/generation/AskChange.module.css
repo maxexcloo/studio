@@ -6,27 +6,3 @@
   background: var(--proposed-tint);
   box-shadow: 0 0 0 4px var(--proposed-tint);
 }
-
-/* One column of actions beside the text, as the composer's prompt tools stand. */
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* A one-line field, and the phone editor's header, line them up in one row. */
-.actions[data-row],
-:global(.mantine-Modal-header) .actions {
-  flex-direction: row;
-}
-
-/* Four or more desktop actions stand in two columns, so the field stays two rows tall. */
-.actions[data-grid] {
-  display: grid;
-  grid-template-columns: repeat(2, 32px);
-}
-
-/* The text stands as tall as `--change-actions` rows of 32 px bar icons and their gaps. */
-.fit {
-  min-height: calc(var(--change-actions) * 36px - 4px);
-}

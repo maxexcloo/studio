@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useState, type PointerEvent, type ReactNode } from "react";
 import { ActionIcon, Badge, Loader, Menu, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
@@ -75,34 +75,6 @@ export function useAskChange<T>({
     },
   };
 }
-
-/**
- * A field's change actions in one column beside its text, as the composer's prompt tools stand:
- * Ask for a Change, Suggestions, Undo and the field's send last, showing only those that apply. A
- * `row` lines them up in one row instead, for a short phone field such as the viewer's, where the
- * column would stand taller than the text.
- */
-export function ChangeActions({
-  row = false,
-  grid = false,
-  children,
-}: {
-  row?: boolean;
-  grid?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className={classes.actions} data-row={row || undefined} data-grid={grid || undefined}>
-      {children}
-    </div>
-  );
-}
-
-/** Text box props that keep a field's text at least as tall as `count` rows of actions. */
-export const fitActions = (count: number) => ({
-  classNames: { input: classes.fit },
-  style: { "--change-actions": count } as CSSProperties,
-});
 
 function FieldAction({
   label,
