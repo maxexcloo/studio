@@ -227,7 +227,6 @@ interface MediaActionOptions {
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
-  onUpscale?: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
 }
 
@@ -250,7 +249,6 @@ export function useMediaActions(
     onDelete,
     onRetried,
     onTrim,
-    onUpscale,
     onVersionChange,
   }: MediaActionOptions,
 ): ActionGroups {
@@ -292,7 +290,6 @@ export function useMediaActions(
     ready,
     compare,
     onCompare,
-    onUpscale,
     onVersionChange,
   });
   const assistant = useQuery(assistantQuery);

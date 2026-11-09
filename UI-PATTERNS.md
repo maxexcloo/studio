@@ -65,7 +65,8 @@ the primary component reference and verify APIs against the installed version.
   Controls opening a picker or menu show ▾, small beside an action bar's icon;
   icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
-  alone is ambiguous carries a one-line `description` under it.
+  alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
+  menu as segmented choices and checked options above its run, not in a separate dialog.
 
 ## Layers, Focus & Phones
 
