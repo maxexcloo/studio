@@ -8,7 +8,7 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 | ------------------------------------ | ---------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
 | An administrator account             | Yes                                                              | Yes                                     | Yes                                                   |
 | An ordinary account                  | What its group allows, on its own outputs                        | No                                      | No (only its own name, email, password and MCP token) |
-| A personal MCP token                 | What its group allows, on its own outputs, through the MCP tools | An administrator's: the MCP admin tools | An administrator's: the MCP Accounts tool             |
+| A personal MCP token                 | What its group allows, on its own outputs, through the MCP tools | An administrator's: the MCP admin tools | An administrator's: the MCP `accounts` tool           |
 | No account, or a disabled one        | No                                                               | No                                      | No                                                    |
 | Another website open in your browser | No                                                               | No                                      | No                                                    |
 

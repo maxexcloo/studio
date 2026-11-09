@@ -3,7 +3,7 @@
  * writes its prompt as the queue item's first stage, from the request a surface sets as
  * `input.writing`:
  *
- *   animate   the viewer's Animate menu and MCP Reuse's themes (prompt-animate.js)
+ *   animate   the viewer's Animate menu and MCP reuse's themes (prompt-animate.js)
  *   dream     Dream's ideas (domain/dream.ts)
  *
  * Admission keeps only the request (writingRequest) and refuses one the account can't have written

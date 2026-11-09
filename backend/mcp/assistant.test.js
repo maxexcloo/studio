@@ -151,7 +151,7 @@ test("the assistant tools are only offered with a gateway and the Prompt Assista
   const f = await fixture(t);
   const online = await names(await f.client("assistant-token-long-enough-for-the-fixture-0001"));
   const without = await names(await f.client("assistant-token-long-enough-for-the-fixture-0002"));
-  for (const name of ["RewritePrompt", "SuggestNegative", "SuggestLoras"]) {
+  for (const name of ["rewrite_prompt", "suggest_negative", "suggest_loras"]) {
     assert.ok(online.includes(name), name);
     assert.equal(without.includes(name), false, name);
   }
@@ -159,7 +159,7 @@ test("the assistant tools are only offered with a gateway and the Prompt Assista
   assert.equal(
     (
       await names(await offline.client("assistant-token-long-enough-for-the-fixture-0001"))
-    ).includes("RewritePrompt"),
+    ).includes("rewrite_prompt"),
     false,
   );
 });
@@ -168,7 +168,7 @@ test("the tools call the shared engine with the account credential, and Generate
   const f = await fixture(t);
   const client = await f.client("assistant-token-long-enough-for-the-fixture-0001");
   const written = data(
-    await call(client, "RewritePrompt", {
+    await call(client, "rewrite_prompt", {
       prompt: "a cabin",
       profile_id: "Fixture Image",
       preset: "cinematic",
@@ -180,20 +180,21 @@ test("the tools call the shared engine with the account credential, and Generate
   );
   assert.equal(f.asked[0].authorization, "Bearer assistant-token-long-enough-for-the-fixture-0001");
   assert.deepEqual(
-    data(await call(client, "SuggestNegative", { prompt: "a cabin", profile_id: profile.id })),
+    data(await call(client, "suggest_negative", { prompt: "a cabin", profile_id: profile.id })),
     { negative: "blurry" },
   );
   assert.deepEqual(
     data(
-      await call(client, "SuggestLoras", { prompt: "a cabin", profile_id: profile.id }),
+      await call(client, "suggest_loras", { prompt: "a cabin", profile_id: profile.id }),
     ).loras.map((item) => [item.name, item.triggers]),
     [["glow.safetensors", ["glowfx"]]],
   );
   assert.equal(
-    data(await call(client, "RewritePrompt", { prompt: "fail", profile_id: profile.id })).unchanged,
+    data(await call(client, "rewrite_prompt", { prompt: "fail", profile_id: profile.id }))
+      .unchanged,
     true,
   );
-  await call(client, "Generate", {
+  await call(client, "generate", {
     prompts: [written.prompt],
     profile_id: profile.id,
     loras: [{ name: "glow.safetensors" }],
@@ -204,7 +205,7 @@ test("the tools call the shared engine with the account credential, and Generate
     source: "chat",
     lorasSuggested: ["glow.safetensors"],
   });
-  await call(client, "Generate", {
+  await call(client, "generate", {
     prompts: ["Something the chat wrote itself"],
     profile_id: profile.id,
   });

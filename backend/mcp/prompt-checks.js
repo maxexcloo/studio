@@ -1,4 +1,4 @@
-// Checks Generate applies to prompt text: a full-body person gets face detail, and exact prompts must not carry instructions.
+// Checks generate applies to prompt text: a full-body person gets face detail, and exact prompts must not carry instructions.
 import { maxJobsPerCall } from "./controls.js";
 
 const numberWords = {
@@ -61,5 +61,5 @@ export function exactPromptInstructions(prompt) {
   const count = found[1] ? numberOf(found[1]) : 0;
   const quoted = found[0].trim().replace(/\s+/g, " ");
   const counted = count ? `count: ${count}` : "count (the number of images)";
-  return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call Generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or pass the user's words as request so Studio writes the prompts.`;
+  return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or pass the user's words as request so Studio writes the prompts.`;
 }

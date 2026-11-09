@@ -1,11 +1,11 @@
-// Which Generate arguments a profile lets MCP adjust; fixed controls are never advertised.
+// Which generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "../generation-defaults.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
-/** Images one Generate call may queue: every prompt times count. */
+/** Images one generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 10;
 
 const fixedRange = (range) =>
@@ -27,7 +27,7 @@ const rangeOf = (range, fallback, fallbackDefault) => {
 export const cfgIgnoresNegative = (cfg) =>
   Number.isFinite(Number(cfg)) && Math.abs(Number(cfg) - 1) < 1e-6;
 
-/** Adjustable Generate controls in the order agents should consider them, with ranges, options and defaults. */
+/** Adjustable generate controls in the order agents should consider them, with ranges, options and defaults. */
 export function mcpControls(profile) {
   const caps = profile.capabilities || {};
   const constraints = profile.constraints || {};
@@ -83,7 +83,7 @@ export function mcpControls(profile) {
 }
 
 /**
- * The Generate fields for a video `seconds` long: the profile's duration, or frames at its FPS on
+ * The generate fields for a video `seconds` long: the profile's duration, or frames at its FPS on
  * the frame grid the worker accepts (counted from the minimum, as backend/validation.js does, and as
  * the composer's Length chip offers). A length outside the profile's limits is refused with them.
  */
@@ -116,7 +116,7 @@ function fixedValue(profile, field) {
 }
 
 /**
- * The controls Models lists: a guide that says the profile takes no negative (effect "none") keeps
+ * The controls models lists: a guide that says the profile takes no negative (effect "none") keeps
  * negative_prompt out of the listing, so the chat never suggests one; a negative the user gives still runs.
  */
 export function listedControls(profile) {
@@ -257,7 +257,7 @@ function loraCandidates(profile, infos, ratings = {}) {
   );
 }
 
-/** Each LoRA's shortest name that Generate still resolves: its stem when no other file shares it. */
+/** Each LoRA's shortest name that generate still resolves: its stem when no other file shares it. */
 function shortNames(profile) {
   const counts = new Map();
   for (const name of profile.options?.loras || [])
@@ -371,7 +371,7 @@ export const loraQueryWords = (query) =>
       return bare && !generalLoraWords.has(bare);
     });
 
-/** Every compatible LoRA as its file name and Models' index line. */
+/** Every compatible LoRA as its file name and models' index line. */
 export const loraIndex = (profile, infos = {}, ratings = {}) => {
   const short = shortNames(profile);
   return loraCandidates(profile, infos, ratings).map((entry) => ({
@@ -381,7 +381,7 @@ export const loraIndex = (profile, infos = {}, ratings = {}) => {
 };
 
 /**
- * Compatible LoRAs for Models. Without a lookup, a compact index of every compatible LoRA;
+ * Compatible LoRAs for models. Without a lookup, a compact index of every compatible LoRA;
  * with lora_query or lora_names, full details for the first few matches.
  */
 export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings = {} } = {}) {
@@ -447,14 +447,14 @@ export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings 
 }
 
 /**
- * Generate's LoRA stack for a profile: each name resolved to its file, refused with the closest
+ * The generate tool's LoRA stack for a profile: each name resolved to its file, refused with the closest
  * matches when unknown or unusable, and given its recommended strength when none is supplied.
  */
 export function prepareLoras(profile, infos = {}, loras = []) {
   const candidates = loraCandidates(profile, infos);
   const short = shortNames(profile);
   const label = profile.label || profile.id;
-  // Refused, not trimmed: Generate's own check keeps only the first ones, which would drop the caller's picks silently.
+  // Refused, not trimmed: generate's own check keeps only the first ones, which would drop the caller's picks silently.
   const max = Math.max(1, Math.min(8, Number(profile.maxLoras) || 8));
   if (loras.length > max)
     throw new Error(`${label} takes at most ${max} LoRAs; pass ${max} or fewer.`);
@@ -467,13 +467,13 @@ export function prepareLoras(profile, infos = {}, loras = []) {
         throw new Error(`${value} is applied by Studio itself; leave it out of loras.`);
       if (name)
         throw new Error(
-          `${value} is for ${infos[name]?.base || "another model family"}, not ${label}; choose a LoRA from Models for this profile.`,
+          `${value} is for ${infos[name]?.base || "another model family"}, not ${label}; choose a LoRA from models for this profile.`,
         );
       const near = closest(candidates, value, (item) => [stem(item.name), item.info?.title]).map(
         (item) => short(item.name),
       );
       throw new Error(
-        `No LoRA named ${value} for ${label}.${near.length ? ` Closest: ${near.join(", ")}.` : ""} Call Models with lora_query to look one up.`,
+        `No LoRA named ${value} for ${label}.${near.length ? ` Closest: ${near.join(", ")}.` : ""} Call models with lora_query to look one up.`,
       );
     }
     if (stack.some((item) => item.name === name)) continue;
