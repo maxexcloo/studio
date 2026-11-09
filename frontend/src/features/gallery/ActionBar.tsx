@@ -1,4 +1,4 @@
-import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
+import { Fragment, useId, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
@@ -7,6 +7,7 @@ import {
   Menu,
   Paper,
   SegmentedControl,
+  Text,
   Tooltip,
   type FloatingPosition,
   type PaperProps,
@@ -21,6 +22,8 @@ export interface Action {
   id: string;
   /** The menu label, and the bar control's accessible name and tooltip. */
   label: string;
+  /** A short line under its menu label saying what it does. */
+  description?: string;
   icon: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
@@ -82,6 +85,24 @@ const note = (action: Action) =>
   );
 
 /**
+ * A menu item's label with its description, if any, under it; the label stays its accessible name
+ * and the description describes it.
+ */
+const itemLabel = ({ label, description }: Action, describedBy: string) =>
+  description ? (
+    <>
+      {label}
+      <Text id={describedBy} size="xs" c="dimmed">
+        {description}
+      </Text>
+    </>
+  ) : (
+    label
+  );
+const described = ({ label, description }: Action, describedBy: string) =>
+  description ? { "aria-label": label, "aria-describedby": describedBy } : {};
+
+/**
  * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
  * phones and touch screens expand in place under their item, never as a second floating layer.
  */
@@ -90,11 +111,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   const touch = useTouch();
   const inline = phone || touch;
   const [expanded, setExpanded] = useState<string | null>(null);
+  const uid = useId();
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
       {group.map((action) => {
         const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
+        const describedBy = `${uid}-${id}`;
         if (action.choice)
           return (
             <div key={id} className={classes.choice}>
@@ -107,6 +130,11 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 onChange={action.choice.onChange}
                 data={action.choice.options}
               />
+              {action.description && (
+                <Text size="xs" c="dimmed" mt={4} px={4}>
+                  {action.description}
+                </Text>
+              )}
             </div>
           );
         if (action.menu && inline) {
@@ -118,12 +146,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 leftSection={<Icon size={16} />}
                 rightSection={<ChevronDown size={14} className={classes.expand} />}
                 aria-expanded={open}
+                {...described(action, describedBy)}
                 data-expanded={open || undefined}
                 disabled={disabled}
                 closeMenuOnClick={false}
                 onClick={() => setExpanded(open ? null : id)}
               >
-                {label}
+                {itemLabel(action, describedBy)}
               </Menu.Item>
               {/* Unmounted when closed, so arrow keys skip the hidden options. */}
               <Collapse expanded={open} keepMounted={false}>
@@ -139,8 +168,13 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
           return (
             <Menu.Sub key={id} position="right-start">
               <Menu.Sub.Target>
-                <Menu.Sub.Item color={color} leftSection={<Icon size={16} />} disabled={disabled}>
-                  {label}
+                <Menu.Sub.Item
+                  color={color}
+                  leftSection={<Icon size={16} />}
+                  disabled={disabled}
+                  {...described(action, describedBy)}
+                >
+                  {itemLabel(action, describedBy)}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
               <Menu.Sub.Dropdown w={menuWidth}>
@@ -157,11 +191,12 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             rightSection={checked ? <Check size={14} /> : undefined}
             role={checked === undefined ? undefined : "menuitemcheckbox"}
             aria-checked={checked}
+            {...described(action, describedBy)}
             disabled={disabled}
             closeMenuOnClick={!action.keepOpen}
             {...(link && !disabled ? { component: "a" as const, ...link } : { onClick })}
           >
-            {label}
+            {itemLabel(action, describedBy)}
           </Menu.Item>
         );
       })}
