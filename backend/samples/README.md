@@ -40,9 +40,9 @@ order. Review them in **Library › Profiles** before saving. Use Connections to
 edit mappings and Advanced JSON to edit the graph or declarations. AI-drafted
 definitions require approval.
 
-Smart upscale supports imported workflows too. Inpainting is available to image profiles that accept a reference or start image
-and save with `SaveImage`. Set `"inpaint": false` in `capabilities` to hide the
-brush.
+Smart upscale supports imported workflows too. Inpainting is available to image
+profiles that accept a reference or start image and save with `SaveImage`. Set
+`"inpaint": false` in `capabilities` to hide the brush.
 
 ## Image-to-Image Inputs
 
