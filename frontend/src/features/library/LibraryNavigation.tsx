@@ -2,7 +2,6 @@ import { BookOpen, Boxes, Compass, FileCog, HardDriveDownload, Import } from "lu
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
-import { useLibraryAccess } from "./useLibraryAccess";
 
 // What the studio has, then where more comes from, each alphabetical; the Library opens on Models.
 export const librarySections = {
@@ -58,16 +57,7 @@ export const librarySections = {
 };
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  const { presets } = useLibraryAccess();
-  return {
-    admin,
-    imports: admin && presets,
-    options: visibleSections(
-      librarySections,
-      admin,
-      (key) => presets || (key !== "imports" && key !== "presets"),
-    ),
-  };
+  return { admin, options: visibleSections(librarySections, admin) };
 }
 export function LibraryTitle() {
   const { options } = useLibraryNavigation();

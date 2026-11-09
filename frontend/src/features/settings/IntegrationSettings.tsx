@@ -21,10 +21,7 @@ export function IntegrationSettings() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Model Sources">
-        <SettingRow
-          label="Civitai"
-          description={`${civitai.token.set ? "Token set" : "No token"} · Imports ${civitai.presets ? "on" : "off"}`}
-        >
+        <SettingRow label="Civitai" description={civitai.token.set ? "Token set" : "No token"}>
           {status(civitai.token.set, civitai.token.set ? "Connected" : "Public Only")}
         </SettingRow>
         <SettingRow

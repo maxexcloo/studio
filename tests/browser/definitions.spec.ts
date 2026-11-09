@@ -268,7 +268,7 @@ test("Model classification saves and reads back while definition administration 
   );
   administrator = false;
   await signIn(page, { id: "account-a", role: "user" });
-  await serveProfiles(page, profiles, { presets: false });
+  await serveProfiles(page, profiles);
   await page.goto("/library");
   await expect(page).toHaveURL(/\/images$/);
   const options = page.getByRole("button", { name: "More Options", exact: true });

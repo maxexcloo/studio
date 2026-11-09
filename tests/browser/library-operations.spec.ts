@@ -8,7 +8,6 @@ import {
   openNav,
   profiles,
   section,
-  serveProfiles,
 } from "./fixtures";
 
 test("The Library groups what you have and getting more, A–Z, and opens on Models", async ({
@@ -55,7 +54,6 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     return route.fulfill({
       json: {
         profiles: freshModelReads ? [...profiles, downloadedProfile] : profiles,
-        features: { presets: true },
       },
     });
   });
@@ -309,7 +307,6 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
         profiles: drafted
           ? [...profiles, { ...profiles[0], id: "custom:checkpoint", label: "Imported Checkpoint" }]
           : profiles,
-        features: { presets: true },
       },
     });
   });
@@ -407,44 +404,6 @@ test("A Reddit link in Library › Import adds the post's images to Uploads", as
   await expect(page.getByText("3 images added to Uploads.", { exact: true })).toBeVisible();
   await expect(link).toHaveValue("");
   expect(requests).toEqual([{ url: "https://www.reddit.com/r/birds/comments/abc/birds/" }]);
-});
-
-test("Administrators retain model management when deployment imports are disabled", async ({
-  page,
-}) => {
-  await fixtures(page);
-  await serveProfiles(page, profiles, { presets: false });
-  let unavailableReads = 0;
-  for (const pattern of ["**/api/library/imports**", "**/api/presets**"])
-    await page.route(pattern, (route) => {
-      unavailableReads++;
-      return route.fulfill({
-        status: 403,
-        json: { error: "Unavailable for this account or deployment." },
-      });
-    });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Models");
-  await chooseView(page, "Models", "Available");
-  await expect(
-    page
-      .getByRole("table", { name: "Library Models", exact: true })
-      .getByText("Base Model", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Check Updates", exact: true })).toBeVisible();
-  if ((page.viewportSize()?.width || 1440) < 768) {
-    await page.getByRole("combobox", { name: "Library Section", exact: true }).click();
-    for (const name of ["Imports", "Inspiration"])
-      await expect(page.getByRole("option", { name, exact: true })).toBeHidden();
-  } else
-    for (const name of ["Imports", "Inspiration"])
-      await expect(
-        page
-          .getByRole("navigation", { name: "Library Sections", exact: true })
-          .getByRole("link", { name, exact: true }),
-      ).toBeHidden();
-  expect(unavailableReads).toBe(0);
 });
 
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {

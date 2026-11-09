@@ -233,7 +233,7 @@ export async function fixtures(page: Page) {
         },
         catalogue: [],
         integrations: {
-          civitai: { token: { set: false }, presets: false },
+          civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
           assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
         },
@@ -264,8 +264,7 @@ export async function fixtures(page: Page) {
       return respond({ account });
     }
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
-    if (path === "/api/models")
-      return respond({ profiles, features: { presets: true }, familyLabels });
+    if (path === "/api/models") return respond({ profiles, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running and the account has no Cloud: Animate takes the local video profile.
     if (path === "/api/animate/profile")
@@ -842,13 +841,9 @@ export async function fixtures(page: Page) {
   };
 }
 /** Serves `/api/models` with these profiles in place of the fixture catalogue. */
-export async function serveProfiles(
-  page: Page,
-  profiles: Profile[],
-  features?: { presets: boolean },
-) {
+export async function serveProfiles(page: Page, profiles: Profile[]) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles, features, familyLabels } }),
+    route.fulfill({ json: { profiles, familyLabels } }),
   );
 }
 

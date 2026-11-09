@@ -74,7 +74,6 @@ import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import { importStore } from "./library/imports.js";
-import { presetsEnabled } from "./features.js";
 import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { seedSamples } from "./profile/seed.js";
@@ -800,12 +799,12 @@ const dream = createDream({
         ? []
         : [{ ...lora, strength }];
     }),
-  // Library › Imports and Inspiration are administration, shared across Studio and on only where
-  // the deployment enables them (preset-routes.js, library/routes.js), so only an administrator's
-  // Dream, or single-user mode's, draws on them. A saved Civitai image is listed once, by its gallery
-  // copy; files that are not installed drop out where Dream fits the LoRAs to the profile.
+  // Library › Imports and Inspiration are administration, shared across Studio, so only an
+  // administrator's Dream, or single-user mode's, draws on them. A saved Civitai image is listed
+  // once, by its gallery copy; files that are not installed drop out where Dream fits the LoRAs to
+  // the profile.
   inspiration: (account) => {
-    if (!presetsEnabled() || (account && account.role !== accountRoles.administrator)) return [];
+    if (account && account.role !== accountRoles.administrator) return [];
     const saved = filterVisibleGallery(gallery)
       .filter((item) => item.civitai && importedImageFile(item) && item.type !== "video")
       .map((item) => ({

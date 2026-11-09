@@ -19,7 +19,7 @@ import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 
 export function LibraryPage() {
-  const { admin, imports: importsEnabled, options } = useLibraryNavigation();
+  const { admin, options } = useLibraryNavigation();
   const { profiles } = useGenerationActions();
   const [editing, setEditing] = useState<LibraryItem | null>(null);
   const client = useQueryClient();
@@ -40,7 +40,7 @@ export function LibraryPage() {
   const presets = useQuery({
     queryKey: ["presets"],
     queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),
-    enabled: importsEnabled,
+    enabled: admin,
   });
   const update = useMutation({
     mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
@@ -104,11 +104,7 @@ export function LibraryPage() {
         sections={options}
         content={{
           imports: (heading) => (
-            <LibraryImports
-              heading={heading}
-              active={importsEnabled && activeSection === "imports"}
-              admin={admin}
-            />
+            <LibraryImports heading={heading} active={activeSection === "imports"} admin={admin} />
           ),
           presets: presets.isPending ? (
             <LoadingState label="Loading Inspiration" fill />

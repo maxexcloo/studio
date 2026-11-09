@@ -33,13 +33,11 @@ import { uncensoredLoraNames } from "../lora/info.js";
 const none = {};
 const inferredModels = new WeakMap();
 function inferred(info = none, stats = none, { configuredOnly = false } = {}) {
-  const { STUDIO_DEFAULT_IMAGE_PROFILE, STUDIO_DEFAULT_VIDEO_PROFILE, STUDIO_ENABLE_PRESETS } =
-    process.env;
+  const { STUDIO_DEFAULT_IMAGE_PROFILE, STUDIO_DEFAULT_VIDEO_PROFILE } = process.env;
   const revision = [
     customWorkflowsRevision(),
     STUDIO_DEFAULT_IMAGE_PROFILE,
     STUDIO_DEFAULT_VIDEO_PROFILE,
-    STUDIO_ENABLE_PRESETS,
   ].join("|");
   const entries = inferredModels.get(info) || new Map();
   inferredModels.set(info, entries);
@@ -366,18 +364,10 @@ export function modelsForAccount(models, req) {
       };
     },
   );
-  // Saved images stay administration: they are shared across Studio.
-  const features = models.features
-    ? {
-        ...models.features,
-        presets: Boolean(models.features.presets) && req.studioAccount.role === "administrator",
-      }
-    : models.features;
   return {
     ...models,
     loras: lorasOn ? (models.loras || []).filter(allowed) : [],
     profiles,
-    ...(features ? { features } : {}),
   };
 }
 

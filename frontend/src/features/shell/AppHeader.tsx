@@ -5,9 +5,8 @@ import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
-import { useGroupFeature } from "../auth/AccountGate";
+import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
-import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
 import { usePhone } from "../../ui/usePhone";
@@ -72,7 +71,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
 export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
-  const library = useLibraryAccess();
+  const admin = useIsAdmin();
   const location = useLocation();
   return (
     <Group
@@ -100,7 +99,7 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
         <Group gap="xs">
           <AppearanceMenu />
           {navigation
-            .filter((item) => item.to !== "/library" || library.allowed)
+            .filter((item) => item.to !== "/library" || admin)
             .map((item) => {
               const active = location.pathname.startsWith(item.to);
               return (

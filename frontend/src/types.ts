@@ -183,7 +183,6 @@ export interface Account {
   canChangePassword?: boolean;
 }
 export interface Models {
-  features?: { presets?: boolean };
   /** Each family's display name, from the catalogue. */
   familyLabels?: Record<string, string>;
   profiles: Profile[];
