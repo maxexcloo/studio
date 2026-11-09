@@ -78,7 +78,7 @@ import {
   withCanonicalProfile,
 } from "./profile/store.js";
 
-import { requireAdmin } from "./route-access.js";
+import { adminRefusal, requireAdmin } from "./route-access.js";
 import express from "express";
 import {
   configuredBackends,
@@ -155,7 +155,6 @@ import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js"
 import { forgetComfyRun } from "./comfy/traces.js";
 import {
   accountForRequest,
-  internalMcpHeaders,
   multiUserEnabled,
   registerMultiUserAuthRoutes,
 } from "./multi-user-auth.js";
@@ -218,7 +217,6 @@ const mcp = registerMcpRoutes(app, {
   authenticateAccountToken: verifyAccountMcpToken,
   authenticateGatewayIdentity: gatewayAccountAccess,
   noteGatewayIdentity,
-  internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
   domainRequest: (...args) => mcpDomainRequest(...args),
   cloudVideoFailures: (since) =>
@@ -456,14 +454,14 @@ const profileObjectInfo = async (kind) =>
   ).info;
 registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
-  accountName: (req) => req.studioAccount?.userId || "",
+  accountName: (account) => account?.userId || "",
 });
 // Library › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),
   objectInfo: profileObjectInfo,
-  accountName: (req) => req.studioAccount?.userId || "",
+  accountName: (account) => account?.userId || "",
   exportOptions: () => ({
     dataDir,
     workflowsDir: userWorkflowsDir,
@@ -648,10 +646,10 @@ registerRewriteRoutes(app, {
   },
   title: chatTitle,
 });
-registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
+registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
 registerMigrationRoutes(app, {
   dataDir,
-  requireAdmin,
+  adminRefusal,
   reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
@@ -994,13 +992,9 @@ const upscale = registerUpscaleRoutes(app, {
   store,
 });
 
-const { generationJobResponse } = registerJobRoutes(app, { store, queue: generationQueue });
-// MCP's generation and its owned results go straight to the domain (mcp/studio-requests.js).
-const mcpDomainRequest = createMcpDomainRequest({
-  admit: admitGeneration,
-  jobResponse: generationJobResponse,
-  store,
-});
+registerJobRoutes(app, { store, queue: generationQueue });
+// MCP calls Studio's routes in process (mcp/studio-requests.js).
+const mcpDomainRequest = createMcpDomainRequest({ app, admit: admitGeneration, store });
 registerGalleryErrorRoutes(app);
 
 registerGalleryDeleteRoute(app);

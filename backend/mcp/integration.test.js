@@ -15,6 +15,7 @@ import { McpMedia } from "./media.js";
 import { adminToolNames } from "./admin.js";
 import { pausedReason } from "../../shared/queue.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { fakeStudio } from "../fixtures/fake-studio.js";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
 
@@ -126,7 +127,6 @@ async function fixture(
     authenticateAccountToken = () => null,
     authenticateGatewayIdentity,
     noteGatewayIdentity,
-    internalCredential,
     resolveSignedResult,
     gatewayAdminTools,
     control = fixtureRuntime(),
@@ -141,12 +141,11 @@ async function fixture(
   // The gallery's uploads, newest first; `owner` is the account the studio saw send each.
   const uploads = [];
   const uploader = (req) =>
-    String(req.headers["x-studio-mcp-account"] || req.headers.authorization || "");
+    String(req.headers["x-studio-account"] || req.headers.authorization || "");
   const submitted = [];
   const downloads = [];
   let failAfter = Infinity;
   let failResponse = [503, { error: "Fixture backend offline" }];
-  let dropAck = false;
   let completeOnSubmit = false;
   let jobLookupFails = false;
   let deduplicateUploads = false;
@@ -166,8 +165,7 @@ async function fixture(
       method: req.method,
       body: req.body,
       authorization: req.headers.authorization,
-      internal: req.headers["x-studio-mcp-internal"],
-      account: req.headers["x-studio-mcp-account"],
+      account: req.headers["x-studio-account"],
     });
     next();
   });
@@ -349,6 +347,7 @@ async function fixture(
   };
   const mcp = await registerMcpRoutes(app, {
     baseUrl: () => base,
+    domainRequest: fakeStudio(() => base),
     dataDir,
     environment,
     runtime: control.runtime,
@@ -360,7 +359,6 @@ async function fixture(
     generateDedupeMs,
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
-    ...(internalCredential ? { internalCredential } : {}),
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
     // Like Studio's queue: failed direct cloud video jobs since a time.
     cloudVideoFailures: (since) =>
@@ -374,14 +372,6 @@ async function fixture(
         )
         .map((job) => ({ reason: job.error, at: Date.parse(job.updatedAt) })),
     resolveSignedResult,
-    fetchImpl: async (url, init) => {
-      const response = await fetch(url, init);
-      if (dropAck && new URL(url).pathname === "/api/generate") {
-        dropAck = false;
-        throw new Error("Fixture acknowledgement interrupted");
-      }
-      return response;
-    },
   });
   // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
   // The studio limits each account's catalogue to its access profile; the deployment defaults are not limited.
@@ -423,9 +413,6 @@ async function fixture(
     failAfter: (count, status, body) => {
       failAfter = count;
       if (status) failResponse = [status, body];
-    },
-    dropAck: () => {
-      dropAck = true;
     },
     completeOnSubmit: () => {
       completeOnSubmit = true;
@@ -569,10 +556,6 @@ test("account mode trusts the gateway key only for linked forwarded users and ke
       return user === "librechat-linked" ? linked : null;
     },
     noteGatewayIdentity: (user) => noted.push(user),
-    internalCredential: (accountId) => ({
-      "X-Studio-Mcp-Internal": "fixture-internal",
-      "X-Studio-Mcp-Account": accountId,
-    }),
   });
   const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
   const headers = (user) => ({
@@ -637,9 +620,8 @@ test("account mode trusts the gateway key only for linked forwarded users and ke
   const client = await f.client("librechat-linked");
   const id = jobId(await generate(client));
   const submission = f.requests.find((request) => request.path === "/generate");
-  // MCP's loopback call carries the internal credential for the linked account, never the gateway key.
+  // MCP calls Studio as the linked account with Studio's own credential, never the gateway key.
   assert.equal(submission.authorization, undefined);
-  assert.equal(submission.internal, "fixture-internal");
   assert.equal(submission.account, linked.userId);
   assert.equal(
     JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8")).jobs[id],
@@ -1684,21 +1666,6 @@ test("guide packs retain compact discovery, profile modes and reviewed variants"
   assert.equal(detail.reviewed_on, "2026-10-18");
 });
 
-test("an interrupted generation acknowledgement retains its client job ownership and never resubmits", async (t) => {
-  const f = await fixture(t);
-  f.dropAck();
-  const client = await f.client();
-  const result = await generate(client, { prompts: ["A tree", "A flower"] });
-  assert.equal(result.status, "partially_queued");
-  assert.equal(result.jobs.length, 1);
-  assert.equal(result.jobs[0].status, "unknown");
-  const id = jobId(result);
-  assert.equal(id, f.submitted[0].clientJobId);
-  assert.equal(data(await call(client, "Status", { job_id: id })).status, "running");
-  assert.equal(f.submitted.length, 1);
-  await failure(await f.client("bob"), "Status", { job_id: id });
-});
-
 test("Generate without a wait never fetches results, and unavailable retrieval falls back to queued", async (t) => {
   const f = await fixture(t);
   f.completeOnSubmit();
@@ -1829,7 +1796,6 @@ test("signed links do not expire, preserve the configured public path and cannot
   const ownership = JSON.parse(fs.readFileSync(path.join(dir, "mcp-ownership.json"), "utf8"));
   const sealed = new McpMedia({
     dataDir: fs.mkdtempSync(path.join(dir, "sealed-")),
-    baseUrl: f.base,
     publicUrl: "https://studio.example.test/nested/studio",
     signingKey: ownership.signingKey,
   });
@@ -2765,10 +2731,6 @@ test("account watch pages read as the signed owner through the loopback credenti
     enabled: false,
     accountMode: true,
     authenticateAccountToken: (value) => (value === token ? account : null),
-    internalCredential: (accountId) => ({
-      "X-Studio-Mcp-Internal": "fixture-internal",
-      "X-Studio-Mcp-Account": accountId,
-    }),
   });
   const client = await f.client("", token);
   const [queued] = (await generate(client)).jobs;
@@ -2783,10 +2745,7 @@ test("account watch pages read as the signed owner through the loopback credenti
   const lookup = f.requests
     .slice(before)
     .find((request) => request.path === `/jobs/${queued.job_id}`);
-  assert.deepEqual(
-    [lookup.authorization, lookup.internal, lookup.account],
-    [undefined, "fixture-internal", account.userId],
-  );
+  assert.deepEqual([lookup.authorization, lookup.account], [undefined, account.userId]);
 });
 
 const tiered = (id, label, extra = {}) => ({
@@ -3547,10 +3506,6 @@ test("Search with uploads finds only the caller's uploads, an UploadLink adds on
   const f = await fixture(t, {
     accountMode: true,
     authenticateGatewayIdentity: (user) => account(`${user}-account`),
-    internalCredential: (accountId) => ({
-      "X-Studio-Mcp-Internal": "fixture-internal",
-      "X-Studio-Mcp-Account": accountId,
-    }),
   });
   const alice = await f.client("alice");
   const bob = await f.client("bob");
@@ -4799,10 +4754,6 @@ test("admin tools register only for an administrator’s own token, and for a ga
       value === adminToken ? adminAccount : value === userToken ? plainAccount : null,
     authenticateGatewayIdentity: (user) =>
       user === "librechat-admin" ? adminAccount : user === "librechat-user" ? plainAccount : null,
-    internalCredential: (id) => ({
-      "X-Studio-Mcp-Internal": "fixture-internal",
-      "X-Studio-Mcp-Account": id,
-    }),
     gatewayAdminTools: () => gatewayAdmin,
   });
   const has = (names) => adminToolNames.filter((name) => names.includes(name));

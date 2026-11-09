@@ -4,6 +4,7 @@ import {
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { maxTasteSummary } from "../../shared/taste.ts";
+import { directRoute, type RouteAccount } from "./direct-route.ts";
 
 /**
  * What a person did with a result; "keep" and "discard" are their verdicts on Dream results,
@@ -65,21 +66,6 @@ export interface TasteWriter<Content = string> {
     signal?: AbortSignal;
   }): Promise<{ text: string }>;
 }
-interface Request {
-  studioAccount?: { userId: string };
-  body?: Record<string, unknown>;
-}
-interface Response {
-  status(code: number): Response;
-  json(value: unknown): unknown;
-}
-type Handler = (req: Request, res: Response) => unknown;
-interface Router {
-  get(path: string, handler: Handler): unknown;
-  post(path: string, handler: Handler): unknown;
-  put(path: string, handler: Handler): unknown;
-  delete(path: string, handler: Handler): unknown;
-}
 
 const maxSignals = 200;
 /** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
@@ -111,7 +97,7 @@ const describe = (signal: TasteSignal) =>
   ]
     .filter(Boolean)
     .join("; ");
-const owner = (req: Request) => req.studioAccount?.userId || "";
+const owner = (account: RouteAccount) => account?.userId || "";
 const empty = (): TasteRecord => ({
   summary: "",
   source: "studio",
@@ -334,33 +320,37 @@ export function createTaste({
 export type Taste = ReturnType<typeof createTaste>;
 
 /** The caller's own taste profile: read, edit and forget. */
-export function registerTasteRoutes(app: Router, { taste }: { taste: Taste }) {
-  const show = (req: Request, record: TasteRecord) => ({
-    summary: record.summary,
-    source: record.source,
-    updatedAt: record.updatedAt,
-    signals: record.signals.length,
-    writer: taste.writable(owner(req)),
+export function registerTasteRoutes(app: object, { taste }: { taste: Taste }) {
+  const show = (account: RouteAccount, record: TasteRecord) => ({
+    status: 200,
+    payload: {
+      summary: record.summary,
+      source: record.source,
+      updatedAt: record.updatedAt,
+      signals: record.signals.length,
+      writer: taste.writable(owner(account)),
+    },
   });
-  app.get("/api/taste", (req, res) => res.json(show(req, taste.read(owner(req)))));
-  app.put("/api/taste", (req, res) => {
-    const summary = req.body?.summary;
+  directRoute(app, "GET", "/api/taste", (account) => show(account, taste.read(owner(account))));
+  directRoute(app, "PUT", "/api/taste", (account, { body }) => {
+    const summary = body?.summary;
     if (typeof summary !== "string" || summary.trim().length > maxTasteSummary)
-      return res
-        .status(400)
-        .json({ ok: false, error: `Keep the taste profile to ${maxTasteSummary} characters.` });
-    return res.json(show(req, taste.save(owner(req), summary.trim())));
+      return {
+        status: 400,
+        payload: { ok: false, error: `Keep the taste profile to ${maxTasteSummary} characters.` },
+      };
+    return show(account, taste.save(owner(account), summary.trim()));
   });
-  app.post("/api/taste/refresh", async (req, res) => {
+  directRoute(app, "POST", "/api/taste/refresh", async (account) => {
     try {
-      return res.json(show(req, await taste.refresh(owner(req))));
+      return show(account, await taste.refresh(owner(account)));
     } catch (error) {
       const { status = 500, message } = error as Error & { status?: number };
-      return res.status(status).json({ ok: false, error: message });
+      return { status, payload: { ok: false, error: message } };
     }
   });
-  app.delete("/api/taste", (req, res) => {
-    taste.forget(owner(req));
-    return res.json(show(req, taste.read(owner(req))));
+  directRoute(app, "DELETE", "/api/taste", (account) => {
+    taste.forget(owner(account));
+    return show(account, taste.read(owner(account)));
   });
 }

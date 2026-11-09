@@ -211,6 +211,7 @@ export function registerMcpRoutes(
   app,
   {
     dataDir,
+    // This server's own address, which result links use without STUDIO_MCP_PUBLIC_URL.
     baseUrl,
     environment = process.env,
     // Studio's RuntimeController (runtime/controller.ts), which the control key's tools drive.
@@ -218,13 +219,11 @@ export function registerMcpRoutes(
     imageWaitSeconds = generateWaitSeconds,
     etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
-    fetchImpl = fetch,
     allowedHost = (req) => hostAllowed(req.headers.host),
     accountMode = false,
     authenticateAccountToken = () => null,
     authenticateGatewayIdentity = () => null,
     noteGatewayIdentity = () => {},
-    internalCredential = () => ({}),
     resolveSignedResult,
     domainRequest,
     // Failed cloud video jobs updated since a time, as { reason, at }, so a provider refusal pauses cloud video.
@@ -259,12 +258,10 @@ export function registerMcpRoutes(
   const media = new McpMedia({
     dataDir,
     prompting,
-    baseUrl,
     publicUrl: environment.STUDIO_MCP_PUBLIC_URL
       ? publicUrl
       : () => (typeof baseUrl === "function" ? baseUrl() : baseUrl),
     signingKey: environment.STUDIO_MCP_SIGNING_KEY,
-    fetchImpl,
     resolveSignedResult,
     domainRequest,
     cloudVideoFailures,
@@ -353,7 +350,7 @@ export function registerMcpRoutes(
       if (!user) scope = "anonymous";
       else if (account) {
         scope = "media";
-        media.credentials.set(account.userId, internalCredential(account.userId));
+        media.credentials.set(account.userId, { internal: true });
       } else {
         // Listed tools that each explain the missing link read better in a chat than a refused connection.
         noteGatewayIdentity(user);
@@ -363,7 +360,7 @@ export function registerMcpRoutes(
       account = authenticateAccountToken(token);
       if (account) {
         scope = "media";
-        media.credentials.set(account.userId, { Authorization: `Bearer ${token}` });
+        media.credentials.set(account.userId, { token });
       }
     }
     if (!scope)
@@ -1999,7 +1996,7 @@ export function registerMcpRoutes(
       await media.uploadByLink(
         claims,
         { buffer: Buffer.from(await file.arrayBuffer()), name: file.name || "photo" },
-        accountMode ? internalCredential(claims.owner) : undefined,
+        accountMode ? { internal: true } : undefined,
       );
       return send(201, { message: "Uploaded — go back to the chat.", open: false });
     } catch (error) {
@@ -2015,8 +2012,8 @@ export function registerMcpRoutes(
         throw new Error("Invalid host.");
       const claims = media.claims(req.params.token);
       if (claims.page || claims.all) {
-        // Account mode reads as the signed owner through MCP's loopback credential; the studio rechecks that account's access.
-        const credential = accountMode ? internalCredential(claims.owner) : undefined;
+        // Account mode reads as the signed owner with Studio's own credential; the call rechecks that account's access.
+        const credential = accountMode ? { internal: true } : undefined;
         const html = claims.all
           ? await media.allPage(claims, credential)
           : await media.page(claims, credential);
@@ -2060,7 +2057,7 @@ export function registerMcpRoutes(
    * ("result 1") in order and its references become the owner's, so tools can use them.
    */
   async function agent({ owner, account, session, jobs = [], assets = [] }) {
-    if (account) media.credentials.set(owner, internalCredential(owner));
+    if (account) media.credentials.set(owner, { internal: true });
     const conversation = `studio-chat:${session}`;
     const refs = media.referenceScope(owner, conversation);
     media.adopt(owner, refs, { jobs, assets });

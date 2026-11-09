@@ -1,15 +1,16 @@
 import fs from "node:fs";
-import path from "node:path";
+import querystring from "node:querystring";
 import { outputFilenameBelongsToRequest } from "../account-ownership.js";
 import { accountAccessForId } from "../account-store.js";
 import { withComfyBackend } from "../comfy/backends.js";
 import { comfy, inDotFolder, localOutputFile } from "../comfy/comfy.js";
-import { ownerMediaTypes } from "../comfy/media-routes.js";
+import { comfyView, outputMime, ownerMediaTypes } from "../comfy/media-routes.js";
+import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
-import { galleryJobResponse } from "../gallery/routes.js";
 import { gallery } from "../gallery/store.js";
 import { mediaType, outputMediaPattern } from "../media-paths.js";
-import { multiUserEnabled } from "../multi-user-auth.js";
+import { mcpAccount, multiUserEnabled } from "../multi-user-auth.js";
+import { multiUserRefusal, publicAccountPaths } from "../multi-user-gate.js";
 import { defaultWorkerId } from "../workers.js";
 import { mcpOutputPath } from "./media.js";
 
@@ -49,51 +50,52 @@ export async function resolveSignedMcpResult(owner, jobId, index) {
             { timeout: 120000 },
           ),
         );
-    const extension = path.extname(filename).toLowerCase();
-    const mime = {
-      ".jpeg": "image/jpeg",
-      ".jpg": "image/jpeg",
-      ".m4v": "video/mp4",
-      ".mkv": "video/x-matroska",
-      ".mov": "video/quicktime",
-      ".mp4": "video/mp4",
-      ".png": "image/png",
-      ".webm": "video/webm",
-      ".webp": "image/webp",
-    }[extension];
-    return mime ? { content: Buffer.from(bytes), mime } : null;
+    const mime = outputMime(filename);
+    return mime === "application/octet-stream" ? null : { content: Buffer.from(bytes), mime };
   } catch {
     return null;
   }
 }
 
 /**
- * MCP's direct domain calls: only generation and its owned results use them; other MCP tools
- * retain their transport. `admit` is domain/admission.ts's; `jobResponse` job-routes.js's.
+ * MCP's calls into Studio, in process: `(method, route, body, owner, credential, signal)` answers as the
+ * route `app` registered with directRoute (domain/direct-route.ts) does, as `{ status, payload }` or
+ * a file's `{ status, content, mime }`, after the gate a request with that credential meets
+ * (multi-user-auth.js mcpAccount). Generation is admitted with MCP's own queue priority; `admit` is
+ * domain/admission.ts's.
  */
-export function createMcpDomainRequest({ admit, jobResponse, store }) {
-  return async (method, route, input, owner) => {
+export function createMcpDomainRequest({ app, admit, store }) {
+  return async (method, route, input, owner, credential, signal) => {
     const url = new URL(route, "http://localhost");
-    const jobMatch = method === "GET" && url.pathname.match(/^\/api\/jobs\/([^/]+)$/);
-    const galleryMatch = method === "GET" && url.pathname.match(/^\/api\/gallery\/jobs\/([^/]+)$/);
-    if (!(method === "POST" && url.pathname === "/api/generate") && !jobMatch && !galleryMatch)
-      return undefined;
-    const account = multiUserEnabled ? accountAccessForId(owner) : undefined;
-    if (multiUserEnabled && !account?.authenticated)
-      return { status: 401, payload: { ok: false, error: "This account no longer has access." } };
-    if (jobMatch)
-      return {
-        status: 200,
-        payload: jobResponse(account, decodeURIComponent(jobMatch[1])),
-      };
-    if (galleryMatch)
-      return galleryJobResponse(
-        store,
-        account,
-        decodeURIComponent(galleryMatch[1]),
-        url.searchParams.get("settings") === "1",
-      );
-    const { queueSet, studioSession, ...body } = input || {};
+    const routePath = url.pathname;
+    let account;
+    if (multiUserEnabled) {
+      account = mcpAccount(owner, credential, method, routePath);
+      const refusal =
+        !publicAccountPaths.has(routePath) && multiUserRefusal(account, method, routePath);
+      if (refusal) return refusal;
+    }
+    const query = querystring.parse(url.search.slice(1));
+    // A route reads its body as JSON, as it arrived over HTTP; an upload carries its file's bytes.
+    const body =
+      input === undefined || routePath === "/api/reference-assets/upload"
+        ? input
+        : JSON.parse(JSON.stringify(input));
+    try {
+      if (method === "GET" && routePath === "/comfy/view") return await comfyView(account, query);
+      if (method === "POST" && routePath === "/api/generate")
+        return await generate(body, account, owner);
+      const found = findDirectRoute(app, method, routePath);
+      if (!found) throw new Error(`Studio has no route ${method} ${routePath}.`);
+      return await found.run(account, { params: found.params, query, body, stop: signal });
+    } catch (error) {
+      // As Express answers a route that throws.
+      console.error(`[mcp] ${method} ${routePath} failed:`, error);
+      return { status: 500, payload: {} };
+    }
+  };
+
+  function generate({ queueSet, studioSession, ...body }, account, owner) {
     // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
     if (studioSession) {
       const parent = studioSession.parent && store.job(owner, studioSession.parent);
@@ -116,5 +118,5 @@ export function createMcpDomainRequest({ admit, jobResponse, store }) {
     }
     // External chat work queues after manual Studio requests; its set keeps it together once started.
     return admit(body, account, undefined, { priority: queuePriority.mcp, queueSet });
-  };
+  }
 }
