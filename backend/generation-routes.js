@@ -378,10 +378,9 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         `[Studio] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`,
       );
     }
-    // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
-    const inpaintSkipped = Boolean(!isMockJob && input.inpaint?.mask && !body.inpaint);
-    // Kept with the result, so Details says the mask went unused.
-    body.maskSkipped = inpaintSkipped;
+    // A mask was sent but nothing in it was painted, so this runs as a plain edit. Kept with the
+    // result, so Details says the mask went unused.
+    body.maskSkipped = Boolean(!isMockJob && input.inpaint?.mask && !body.inpaint);
     if (!isMockJob && input.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
