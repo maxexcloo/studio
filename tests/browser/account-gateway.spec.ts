@@ -282,11 +282,12 @@ test("Users change their email only behind password-protected controls", async (
   ).toBeDisabled();
 });
 
-test("Administrators change roles, reset passwords and delete accounts and empty groups", async ({
+test("Administrators change roles, reset passwords and delete galleries, accounts and empty groups", async ({
   page,
 }) => {
   const state = await accountFixture(page);
   Object.assign(state.administration.accounts[1], { passwordSignIn: true });
+  Object.assign(state.galleryOwners, { member: 3 });
   state.administration.accessProfiles.push({
     id: "empty",
     name: "Empty",
@@ -326,12 +327,34 @@ test("Administrators change roles, reset passwords and delete accounts and empty
   await reset.getByRole("button", { name: "Reset Password", exact: true }).click();
   await expect(reset).toBeHidden();
 
+  // A generated password resets at once and shows only until Done.
+  await menu("Reset Password");
+  await reset.getByRole("button", { name: "Generate Password", exact: true }).click();
+  const generated = await reset.getByLabel("Generated Password").inputValue();
+  expect(generated).toHaveLength(16);
+  await reset.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(reset).toBeHidden();
+
+  await member
+    .getByRole("button", { name: "Actions for member@example.test", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: /^Delete Gallery/ }).click();
+  const wipe = page.getByRole("dialog", { name: "Delete Gallery", exact: true });
+  await expect(wipe).toContainText("Delete all 3 of member@example.test’s gallery items");
+  await wipe.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(wipe).toBeHidden();
+  expect(state.galleryOwners).toEqual({});
+
   await menu("Delete User");
   const confirm = page.getByRole("dialog", { name: "Delete User", exact: true });
   await expect(confirm).toContainText("stay on disk");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(member).toHaveCount(0);
-  expect(patches).toEqual([{ role: "administrator" }, { password: "a new member password" }]);
+  expect(patches).toEqual([
+    { role: "administrator" },
+    { password: "a new member password" },
+    { password: generated },
+  ]);
 
   // Only a group nobody belongs to that isn't the default can go.
   await section(page, "Settings", "Groups");
