@@ -140,6 +140,19 @@ test(
       body: { spicyPrompts: true },
     });
     assert.equal(refused.status, 400);
+    // Where videos run is one of its choices, not on or off.
+    const videos = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { videos: "quality" },
+    });
+    assert.equal(videos.body.preferences.videos, "quality");
+    const wrong = await call("/api/preferences", {
+      method: "PATCH",
+      cookie,
+      body: { videos: true },
+    });
+    assert.equal(wrong.status, 400);
   },
 );
 
