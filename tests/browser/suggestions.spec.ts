@@ -63,28 +63,31 @@ async function openViewer(page: Page) {
   return state;
 }
 
-test("An idea chip fills the empty, focused composer prompt", async ({ page }, testInfo) => {
+test("Suggestions lists ideas for the empty, focused composer prompt", async ({
+  page,
+}, testInfo) => {
   await fixtures(page);
   const asked = await suggest(page);
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  const group = page.getByRole("group", { name: "Prompt Ideas" });
-  await expect(group).toHaveCount(0);
+  const chip = page.getByRole("combobox", { name: "Suggestions", exact: true });
+  await expect(chip).toHaveCount(0);
   expect(asked).toHaveLength(0);
   await prompt.click();
-  await expect(group.getByRole("button")).toHaveCount(3);
+  await chip.click();
+  await expect(page.getByRole("option")).toHaveText(ideas);
   expect(asked).toEqual([{ surface: "composer", kind: "image" }]);
-  await group.getByRole("button", { name: ideas[1] }).click();
+  await page.getByRole("option", { name: ideas[1] }).click();
   await expect(prompt).toHaveValue(ideas[1]);
   // Phones keep the keyboard down until the text is tapped.
   if (!testInfo.project.use.isMobile) await expect(prompt).toBeFocused();
-  await expect(group).toHaveCount(0);
+  await expect(chip).toHaveCount(0);
   await prompt.fill("");
-  await expect(group).toBeVisible();
+  await expect(chip).toBeVisible();
   expect(asked).toHaveLength(1);
 });
 
-test("An idea chip fills the empty Chat message with a request to create it", async ({ page }) => {
+test("A suggestion fills the empty Chat message with a request to create it", async ({ page }) => {
   const state = await fixtures(page);
   state.sessions.push({
     id: "chat-a",
@@ -97,10 +100,11 @@ test("An idea chip fills the empty Chat message with a request to create it", as
   await page.goto("/chat/chat-a");
   const message = page.getByRole("textbox", { name: "Message", exact: true });
   await message.click();
-  const group = page.getByRole("group", { name: "Prompt Ideas" });
-  await group.getByRole("button", { name: ideas[0] }).click();
+  const chip = page.getByRole("combobox", { name: "Suggestions", exact: true });
+  await chip.click();
+  await page.getByRole("option", { name: ideas[0] }).click();
   await expect(message).toHaveValue(`Create an image: ${ideas[0]}`);
-  await expect(group).toHaveCount(0);
+  await expect(chip).toHaveCount(0);
   expect(state.chatRequests).toHaveLength(0);
 });
 
@@ -166,5 +170,5 @@ test("No ideas or suggestions show when Studio has none", async ({ page }) => {
     page.waitForResponse("**/api/suggestions"),
     page.getByRole("textbox", { name: "Prompt", exact: true }).click(),
   ]);
-  await expect(page.getByRole("group", { name: "Prompt Ideas" })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Suggestions", exact: true })).toHaveCount(0);
 });

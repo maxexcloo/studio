@@ -260,6 +260,7 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(
     desktop ? "make it night" : "",
   );
+  await page.getByRole("textbox", { name: "Message", exact: true }).focus();
   await expect(
     page
       .getByRole("button", { name: "Choose References", exact: true })

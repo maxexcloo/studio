@@ -517,17 +517,26 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   await fixtures(page);
   if (!testInfo.project.use.isMobile) await page.setViewportSize({ width: 1920, height: 1000 });
   await page.goto("/chat");
-  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
-  // With only one model there is no model chip; References sits beside Send as in the gallery.
-  await expect(page.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toBeVisible();
-  // The message is one line, centred with Send on the same row.
-  const message = await page.getByRole("textbox", { name: "Message", exact: true }).boundingBox();
+  const field = page.getByRole("textbox", { name: "Message", exact: true });
+  await expect(field).toBeVisible();
+  // Collapsed, the message is one line, centred with Send on the same row, and nothing else.
+  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toHaveCount(0);
+  const message = await field.boundingBox();
   const send = await page.getByRole("button", { name: "Send Message", exact: true }).boundingBox();
   expect(message!.height).toBeLessThanOrEqual(send!.height + 1);
   expect(
     Math.abs(message!.y + message!.height / 2 - (send!.y + send!.height / 2)),
   ).toBeLessThanOrEqual(2);
+  // Focused, it expands with the text's tools and a chip rail; one model leaves no model chip.
+  await field.focus();
+  const inputs = page.getByRole("group", { name: "Chat Inputs", exact: true });
+  await expect(
+    inputs.getByRole("button", { name: "Choose References", exact: true }),
+  ).toBeVisible();
+  await expect(inputs.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy Message", exact: true })).toBeVisible();
+  await field.press("Escape");
+  await expect(inputs).toHaveCount(0);
   // Without a sidebar, phones list the chats in place of the empty state, as does the header's
   // Chats drawer, each with an open search and New Chat.
   await expectNoChatOpen(page);
@@ -634,6 +643,7 @@ test("An administrator's parked Chat model starts after confirming what it stops
     route.fulfill({ json: { id: "next", status: "completed", progress: "Done." } }),
   );
   await page.goto("/chat");
+  await page.getByRole("textbox", { name: "Message", exact: true }).focus();
   const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
   await expect(model).toHaveText("Studio Assistant");
   await model.click();
@@ -665,9 +675,9 @@ test("Others see a parked Chat model as parked and cannot send to it", async ({ 
     }),
   );
   await page.goto("/chat");
+  await page.getByRole("textbox", { name: "Message", exact: true }).fill("Hello");
   const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
   await expect(model).toHaveAttribute("title", /Stopped/);
-  await page.getByRole("textbox", { name: "Message", exact: true }).fill("Hello");
   await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeDisabled();
   await model.click();
   const parked = page.getByRole("option", { name: /Large Model/ });
