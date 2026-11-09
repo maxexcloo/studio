@@ -124,6 +124,8 @@ export function GenerationForm({
             autosize
             minRows={1}
             maxRows={1}
+            // One line that scrolls sideways: a wrapped second line would show through the padding.
+            wrap="off"
             variant="unstyled"
             className={classes.compactPrompt}
             // A phone tap opens the Generate sheet, so the bar never raises the keyboard.
