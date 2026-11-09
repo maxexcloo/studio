@@ -15,6 +15,7 @@ import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
+import { useDialogKeyboard } from "./ui/useKeyboard";
 import { usePhone } from "./ui/usePhone";
 const ComparePage = lazy(() =>
   import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
@@ -38,6 +39,7 @@ function Workspace() {
   const location = useLocation();
   const navigate = useNavigate();
   const phone = usePhone();
+  useDialogKeyboard();
   const overlay =
     location.pathname === "/library"
       ? "library"

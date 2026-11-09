@@ -1,4 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
+import { usePhone } from "./usePhone";
 
 /**
  * While `active`, follows the visual viewport for a full-screen phone surface being typed into
@@ -30,4 +31,40 @@ export function useKeyboard(active: boolean, surface?: RefObject<HTMLElement | n
     };
   }, [active]);
   return keyboard;
+}
+
+/**
+ * While a phone types in a centred dialog's field, fits every dialog to the visible viewport
+ * (`--studio-dialog-top` and `--studio-dialog-inset`, read by the theme's Modal), so its footer
+ * stays reachable above the keyboard instead of behind it.
+ */
+export function useDialogKeyboard() {
+  const phone = usePhone();
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    if (!phone) return;
+    const check = () => {
+      const field = document.activeElement;
+      setTyping(
+        Boolean(
+          field?.matches("input, textarea") &&
+          field.closest(".mantine-Modal-content:not([data-full-screen])"),
+        ),
+      );
+    };
+    // Moving between fields blurs one before focusing the next; check once focus has settled.
+    const settled = () => requestAnimationFrame(check);
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", settled);
+    return () => {
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", settled);
+    };
+  }, [phone]);
+  const keyboard = useKeyboard(typing);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--studio-dialog-top", `${keyboard.top}px`);
+    root.setProperty("--studio-dialog-inset", `${keyboard.inset}px`);
+  }, [keyboard.top, keyboard.inset]);
 }
