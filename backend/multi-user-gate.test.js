@@ -48,6 +48,8 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["GET", "/api/gallery"],
     ["GET", "/api/gallery/filters"],
     ["POST", "/api/gallery/delete"],
+    ["POST", "/api/gallery/recreate"],
+    ["POST", "/api/gallery/video-edit"],
     ["POST", "/api/sessions/archive"],
     ["POST", "/api/sessions/delete"],
     ["DELETE", "/api/sessions/abc-1"],
