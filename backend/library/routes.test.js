@@ -170,7 +170,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     (await call("GET", "/api/library/imports")).imports.map((item) => item.origin).sort(),
     ["chat", "chat"],
   );
-  assert.equal(fs.existsSync(path.join(store.dir, `${ui.import.id}.json`)), false);
+  assert.equal(createImportStore({ dataDir, log: {} }).get(ui.import.id), null);
   assert.equal((await call("DELETE", `/api/library/imports/${picture.import.id}`)).ok, true);
   assert.equal((await call("GET", "/api/library/imports")).imports.length, 1);
 

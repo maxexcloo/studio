@@ -1,6 +1,6 @@
 /**
- * Library imports as durable job records (design §2.3): one file per import,
- * `<data>/library/imports/<id>.json`, indexed when first read; the 500 newest are kept. A record
+ * Library imports as durable job records (design §2.3): one `studio_library_imports` row per
+ * import in studio.sqlite, indexed when first read; the 500 newest are kept. A record
  * that was still resolving when Studio stopped is marked failed on the next start (the
  * job-recovery pattern), so nothing waits forever.
  *
@@ -18,10 +18,8 @@
  * versions and variants that fit; one is downloaded only when chosen.
  */
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
-import { readJsonFile, removeJsonFile, writeJsonFile } from "../json-store.js";
+import { runtimeDatabase } from "../persistence/runtime.ts";
 import { gradeImport, presetGrade } from "./grade.js";
 import { catalogueKinds } from "./catalogue.js";
 import { imageRecipe, readImageMetadata } from "../image-metadata.js";
@@ -38,40 +36,39 @@ export function importId(at = Date.now()) {
   return `imp-${at.toString(36)}${crypto.randomBytes(4).toString("hex")}`;
 }
 
-/** The record store over one data folder; the only writer of library/imports. */
+/** The record store over one data folder; the only writer of studio_library_imports. */
 export function createImportStore({
   dataDir = currentDataDir(),
   limit = importLimit,
   log = console,
 } = {}) {
-  const dir = path.join(dataDir, "library", "imports");
+  const db = runtimeDatabase(dataDir);
+  const write = (record) =>
+    db
+      .prepare(
+        "INSERT INTO studio_library_imports (id, value) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value",
+      )
+      .run(record.id, JSON.stringify(record));
+  const erase = (id) => db.prepare("DELETE FROM studio_library_imports WHERE id = ?").run(id);
   let index = null;
 
   function load() {
     if (index) return index;
     index = new Map();
-    let names = [];
-    try {
-      names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-    } catch {
-      /* No imports yet. */
-    }
-    for (const name of names) {
-      const id = name.slice(0, -5);
-      if (!idPattern.test(id)) continue;
+    for (const { id, value } of db.prepare("SELECT id, value FROM studio_library_imports").all()) {
       try {
-        const record = readJsonFile(path.join(dir, name));
+        const record = JSON.parse(value);
         if (record?.id !== id || !states.has(record.state)) continue;
         // Interrupted while resolving: say so instead of resolving forever.
         if (record.state === "resolving") {
           record.state = "failed";
           record.error = "Studio restarted before this import finished. Import the link again.";
           record.updatedAt = now();
-          writeJsonFile(path.join(dir, name), record);
+          write(record);
         }
         index.set(id, record);
       } catch (error) {
-        log.warn?.(`[library] Skipped unreadable import ${name}: ${error.message}`);
+        log.warn?.(`[library] Skipped unreadable import ${id}: ${error.message}`);
       }
     }
     prune();
@@ -90,11 +87,7 @@ export function createImportStore({
     );
     for (const record of sorted.slice(limit)) {
       index.delete(record.id);
-      try {
-        removeJsonFile(path.join(dir, `${record.id}.json`));
-      } catch {
-        /* Gone already. */
-      }
+      erase(record.id);
     }
   }
 
@@ -103,8 +96,7 @@ export function createImportStore({
     if (!states.has(record.state)) throw new Error(`Unknown import state ${record.state}.`);
     load();
     record.updatedAt = now();
-    fs.mkdirSync(dir, { recursive: true });
-    writeJsonFile(path.join(dir, `${record.id}.json`), record);
+    write(record);
     index.set(record.id, record);
     prune();
     return record;
@@ -115,11 +107,10 @@ export function createImportStore({
   function remove(id) {
     if (!get(id)) return false;
     index.delete(id);
-    removeJsonFile(path.join(dir, `${id}.json`));
+    erase(id);
     return true;
   }
   return {
-    dir,
     list,
     get,
     put,
