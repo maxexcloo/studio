@@ -7,7 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { hostAllowed } from "../request-guard.js";
+import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { maxJobsPerCall } from "./controls.js";
 import { McpMedia, maxUploadMegabytes, uploadPage } from "./media.js";
 import { livePrompting } from "../profile/store.js";
@@ -117,6 +117,9 @@ export function registerMcpRoutes(
     throw new Error(
       "STUDIO_MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
     );
+  // The internet-facing host, when one is configured: there the shared gateway and control keys are
+  // refused, even if the host is also allowed privately, and only personal account tokens work.
+  const publicHost = environment.STUDIO_MCP_PUBLIC_URL ? hostnameOf(parsedPublic.host) : "";
   // Studio's guide store (guides/prompting.json), reloaded on change.
   const prompting = livePrompting({ dataDir });
   const media = new McpMedia({
@@ -180,19 +183,21 @@ export function registerMcpRoutes(
     }
     // A bearer header carries the credential; a client that sends no headers (a Grok connector takes only a
     // URL) puts its token in the path instead. Only a personal account token is accepted there: the shared
-    // gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
+    // gateway and control keys stay header-only on a private host, so neither a URL nor the internet ever
+    // vouches for a gateway or a GPU.
     const bearer = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ""))?.[1];
     const fromUrl = bearer ? "" : String(req.params.token || "");
     const token = bearer || fromUrl;
+    const sharedKeys = !fromUrl && !(publicHost && hostnameOf(req.headers.host) === publicHost);
     const user = String(req.headers["x-ai-user-id"] || "");
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user))
       return res.status(400).json({ error: "Invalid forwarded user identity." });
     let account = null;
     let scope = "";
-    if (!fromUrl && !accountMode)
+    if (sharedKeys && !accountMode)
       scope = equal(token, mediaKey) ? "media" : equal(token, controlKey) ? "control" : "";
-    else if (!fromUrl && equal(token, controlKey)) scope = "control";
-    else if (!fromUrl && equal(token, mediaKey)) {
+    else if (sharedKeys && equal(token, controlKey)) scope = "control";
+    else if (sharedKeys && equal(token, mediaKey)) {
       // Gateway trust: the shared key vouches for the gateway; only a link (an administrator's, or by matching email) maps its user to an account.
       // The gateway's own health checks and handshakes name no user: they connect and list, and every call is refused.
       const email = String(req.headers["x-ai-user-email"] || "");
