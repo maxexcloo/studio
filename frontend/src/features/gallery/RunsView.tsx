@@ -51,10 +51,11 @@ export function RunsView({
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
   const motionDuration = useMotionDuration();
-  const hold = useHoldToSelect(items, selection);
   const runs = useMemo(() => groupRuns(items), [items]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
+  // As in Grid; a run of several has no menu, so holding it still selects.
+  const hold = useHoldToSelect(items, selection, caption === "none" ? setMenuItem : undefined);
   const fanning = useRef<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);

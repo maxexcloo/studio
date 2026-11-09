@@ -897,6 +897,25 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
+/** Dispatches one touch event at `y` on `target`, as a finger pressing, moving or lifting. */
+export async function touch(target: Locator, type: string, y = 100) {
+  await target.evaluate(
+    (element, { type, y }) => {
+      const contact = { identifier: 1, target: element, clientX: 100, clientY: y };
+      const touches = type === "touchend" ? [] : [contact];
+      const event = document.createEvent("TouchEvent");
+      event.initEvent(type, true, true);
+      Object.defineProperties(event, {
+        touches: { value: touches },
+        targetTouches: { value: touches },
+        changedTouches: { value: [contact] },
+      });
+      element.dispatchEvent(event);
+    },
+    { type, y },
+  );
+}
+
 /** A selection action beyond the bulk ones: on the desktop bar, or an item of the phone's More. */
 export async function selectionMenuItem(page: Page, label: string) {
   if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);
@@ -1001,10 +1020,20 @@ export async function showUploads(page: Page) {
   await closePopup(page, "Filters");
 }
 
-/** Closes the References popup, leaving the composer open; a pick filling the last slot already did. */
+/**
+ * Closes the References popup, leaving the composer open: Apply in the phone sheet's footer,
+ * Escape on desktop. A pick filling the last slot closes it already, so it may be fading out.
+ */
 export async function closeReferences(page: Page) {
-  if (await page.getByRole("dialog", { name: "References", exact: true }).isVisible())
-    await closePopup(page, "References");
+  const references = page.getByRole("dialog", { name: "References", exact: true });
+  if (!(await references.isVisible())) return;
+  const apply = references.getByRole("button", { name: "Apply", exact: true });
+  await (
+    (await apply.isVisible())
+      ? apply.click({ timeout: 2000 })
+      : references.press("Escape", { timeout: 2000 })
+  ).catch(() => {});
+  await expect(references).toBeHidden();
 }
 
 /** Saves the draft as a named stack or preset from its picker's footer. */

@@ -50,9 +50,10 @@ export function useSwipeClose(direction: "down" | "left", close: () => void) {
       const touch = event.touches[0];
       const along = down ? touch.clientY - start.y : start.x - touch.clientX;
       const across = down ? touch.clientX - start.x : touch.clientY - start.y;
-      // The content scrolled under the finger, or the drag went across: it is not a pull.
+      // The drag went across or back (scrolling the content), or the content scrolled under the
+      // finger: it is not a pull, and the sheet is left alone so the content keeps the gesture.
       if (
-        (!start.moved && Math.abs(across) > Math.abs(along)) ||
+        (!start.moved && (along < 0 || Math.abs(across) > Math.abs(along))) ||
         (down && scrolled(start.target, event.currentTarget))
       ) {
         release(event);

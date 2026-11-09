@@ -60,10 +60,11 @@ the primary component reference and verify APIs against the installed version.
 - Empty views use `EmptyState`: one short, subdued line and at most the action
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
-- Search clears only its query. Filters preserve it. Controls opening a picker
-  or menu show ▾ when labelled; icon-only controls use accessible names and
-  tooltips. Menus group related actions, put the usual action first and Delete
-  last, and share their sizing and item style.
+- Search clears only its query. Filters preserve it. Toolbars open search from
+  an icon; the phone Chats list keeps it open, with New Chat at the row's end.
+  Controls opening a picker or menu show ▾ when labelled; icon-only controls
+  use accessible names and tooltips. Menus group related actions, put the usual
+  action first and Delete last, and share their sizing and item style.
 
 ## Layers, Focus & Phones
 
@@ -75,14 +76,19 @@ the primary component reference and verify APIs against the installed version.
   retains `aria-expanded` and toggles its popup. Nested Select/MultiSelect
   dropdowns stay inside their owning Popover with
   `comboboxProps.withinPortal: false` and preserve focus when selected.
-- Shared chip popups anchor on desktop and use phone sheets where the content
-  needs the room; compact choices may use a fitted popover. Keep actions
-  reachable while content scrolls, with one scroll owner per form.
+- Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
+  sheets on phones where the content needs the room; compact choices may use a
+  fitted popover. The sheet's header holds the title, any action and Close;
+  its footer (Clear, then Apply where choices apply as made) stays pinned
+  above the safe area while the content between scrolls, with one scroll owner
+  per form.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor.
+  other phone text boxes open the shared full-screen editor. Its `tools` stand
+  beside the text: Copy, Clear, then the box's own (Improve Prompt, Recent
+  Prompts), in one column where the box is tall enough and 2×2 otherwise.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`. Keep unrelated layout stationary.
@@ -90,8 +96,10 @@ the primary component reference and verify APIs against the installed version.
   visible names where tooltips cannot explain them. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
-  another overlay. Hold-to-select cancels on movement, and its release must
-  not also open the viewer.
+  another overlay. On phones, Chats rows and gallery tiles without Tile Captions
+  hide their menu button and open that menu on hold; other gallery tiles hold
+  to select. Holds cancel on movement and their release opens nothing.
+  Right-click, the Menu key and Shift+F10 open the same menu.
 
 ## Generation & Media
 
@@ -101,10 +109,11 @@ the primary component reference and verify APIs against the installed version.
   changing the original; do not bypass it with a direct queue request.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
-  Reference order, explicit slot IDs and source-result lineage survive edits
-  and reordering; optional End-only inputs and one asset in several roles work.
-  Group compatible linked slots by their declared capacity rather than a
-  global reference limit.
+  Profile options carry short facts (model or family · kind · Cloud or Local
+  GPU), not prose. Reference order, explicit slot IDs and source-result lineage
+  survive edits and reordering; optional End-only inputs and one asset in
+  several roles work. Group compatible linked slots by their declared capacity
+  rather than a global reference limit.
 - Selected LoRAs retain enable, strength and pointer/keyboard ordering controls
   when filters hide them. Saved stacks preserve family keys, order, strengths
   and disabled entries. Trigger words are applied when submitting, without
@@ -144,10 +153,11 @@ the primary component reference and verify APIs against the installed version.
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay
   videos and comparison is an image action.
-- Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying tile videos. Release a closed viewer's player and pause
-  playback when the tab hides. Heavy tools load only when opened. Paging keeps
-  loaded results and offers retry on failure. Failed images show no broken icon.
+- Pinned phone tile captions keep to two lines and leave out the time. Reserve
+  media dimensions, virtualise large galleries, lazy-load images and avoid
+  autoplaying tile videos. Release a closed viewer's player and pause playback
+  when the tab hides. Heavy tools load only when opened. Paging keeps loaded
+  results and offers retry on failure. Failed images show no broken icon.
 
 ## Data & Feedback
 

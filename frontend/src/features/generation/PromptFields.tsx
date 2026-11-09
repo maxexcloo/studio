@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import { Fragment, type Ref } from "react";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -143,7 +143,16 @@ export function PromptFields({
       >
         <TextBox
           ref={textareaRef}
-          tools
+          tools={[
+            assistant.action && <Fragment key="assistant">{assistant.action}</Fragment>,
+            <PromptHistory
+              key="history"
+              kind="positive"
+              value={input.prompt}
+              onPick={(prompt) => onChange({ prompt })}
+            />,
+            proposal && <UndoButton key="undo" onClick={ask.undo} />,
+          ]}
           data-expanded-prompt
           classNames={{ root: classes.root, wrapper: classes.wrapper, input: classes.input }}
           className={proposal ? proposedClass : undefined}
@@ -160,20 +169,6 @@ export function PromptFields({
           minRows={3}
           maxRows={10}
           inline={fill}
-          rightSection={
-            <>
-              <PromptHistory
-                kind="positive"
-                value={input.prompt}
-                onPick={(prompt) => onChange({ prompt })}
-              />
-              {assistant.action}
-              {proposal && <UndoButton onClick={ask.undo} />}
-            </>
-          }
-          rightSectionWidth={40}
-          rightSectionPointerEvents="all"
-          rightSectionProps={{ style: { alignItems: "flex-start" } }}
           value={input.prompt}
           onChange={(prompt) => onChange({ prompt })}
           onKeyDown={(event) => {
@@ -188,32 +183,30 @@ export function PromptFields({
         />
       </div>
       {negative && (
-        <TextBox
-          tools
-          aria-label="Negative Prompt"
-          placeholder="Negative prompt: what to leave out"
-          size="sm"
-          // In the phone sheet it keeps two rows until edited, when it takes the room left.
-          autosize={!fill}
-          rows={fill ? 2 : undefined}
-          rightSectionProps={fill ? { style: { alignItems: "flex-start" } } : undefined}
-          classNames={
-            fill ? { root: classes.negative, wrapper: classes.negativeWrapper } : undefined
-          }
-          minRows={1}
-          maxRows={phone ? 2 : 4}
-          rightSection={
-            <PromptHistory
-              kind="negative"
-              value={input.negative}
-              onPick={(negative) => onChange({ negative })}
-            />
-          }
-          rightSectionPointerEvents="all"
-          inline={fill}
-          value={input.negative}
-          onChange={(negative) => onChange({ negative })}
-        />
+        <div className={classes.negative} data-fill={fill || undefined}>
+          <TextBox
+            tools={[
+              <PromptHistory
+                key="history"
+                kind="negative"
+                value={input.negative}
+                onPick={(negative) => onChange({ negative })}
+              />,
+            ]}
+            classNames={{ input: classes.input }}
+            variant="unstyled"
+            aria-label="Negative Prompt"
+            placeholder="Negative prompt: what to leave out"
+            // In the phone sheet it keeps two rows until edited, when it takes the room left.
+            autosize={!fill}
+            rows={fill ? 2 : undefined}
+            minRows={1}
+            maxRows={phone ? 2 : 4}
+            inline={fill}
+            value={input.negative}
+            onChange={(negative) => onChange({ negative })}
+          />
+        </div>
       )}
     </>
   );

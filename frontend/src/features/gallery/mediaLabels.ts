@@ -20,12 +20,12 @@ const dayAndTime = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-/** When it was made · the profile's name, plus a video's length. */
-export function mediaDetail(item: MediaItem, profiles: Profile[]) {
+/** When it was made (unless `withTime` is false) · the profile's name, plus a video's length. */
+export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: boolean) {
   const settings = item.settings || {};
   const created = item.createdAt ? new Date(item.createdAt) : null;
   const time =
-    created && !Number.isNaN(created.getTime())
+    withTime && created && !Number.isNaN(created.getTime())
       ? (sameDay(created, new Date()) ? timeOnly : dayAndTime).format(created)
       : "";
   const profile = profiles.find((entry) => isProfile(entry, settings.profileId));

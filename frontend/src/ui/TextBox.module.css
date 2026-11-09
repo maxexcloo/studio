@@ -49,12 +49,22 @@
 }
 
 /*
- * A multi-row box's tools stand in a two-column grid beside it, and the text fills its full height
- * (under any description).
+ * A box's tools stand beside its text in pairs: one column of them where the text is tall enough
+ * (the grid fills the row's height with as many pairs as fit), otherwise side by side, so four
+ * make a 2×2. The text is at least as tall as the pairs need two abreast, and fills the row's
+ * height (under any description). `--tool` is the theme's bar icon size.
  */
 .columned {
+  --tool: 32px;
   display: flex;
   gap: var(--mantine-spacing-xs);
+  min-height: calc(var(--tool-pair-rows) * (2 * var(--tool) + 8px) - 4px);
+}
+
+@media (max-width: 48em) {
+  .columned {
+    --tool: 40px;
+  }
 }
 
 .columned > :first-child,
@@ -70,9 +80,24 @@
 }
 
 .tools {
+  position: relative;
   flex-shrink: 0;
+  width: calc(2 * var(--tool) + 4px);
+}
+
+.toolGrid {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  align-content: start;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(auto-fill, calc(2 * var(--tool) + 4px));
+  grid-auto-columns: var(--tool);
+  justify-content: end;
+  gap: 4px;
+}
+
+.pair {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
