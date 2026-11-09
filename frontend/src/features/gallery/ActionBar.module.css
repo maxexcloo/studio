@@ -20,12 +20,17 @@
   scrollbar-width: none;
 }
 
-/* The phone viewer's actions take further centred rows instead of scrolling. */
+/* The phone viewer's actions take further centred rows, a whole group at a time, instead of scrolling. */
 .actions[data-wrap] {
   flex-wrap: wrap;
   justify-content: center;
-  row-gap: 4px;
+  gap: 4px var(--mantine-spacing-sm);
   overflow-x: visible;
+}
+
+.group {
+  display: flex;
+  gap: 2px;
 }
 
 .divider {
