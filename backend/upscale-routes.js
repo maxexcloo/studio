@@ -6,6 +6,7 @@ import {
   withComfyBackend,
 } from "./comfy/backends.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { gallery, galleryRevisionValue, updateGalleryJob } from "./gallery/store.js";
 import { referenceAssetForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./upscale-jobs.js";
@@ -264,10 +265,9 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     };
   }
 
-  app.post("/api/upscale", async (req, res) => {
-    const { status, payload } = await queueUpscale(req.studioAccount, req.body || {});
-    res.status(status).json(payload);
-  });
+  directRoute(app, "POST", "/api/upscale", (account, { body }) =>
+    queueUpscale(account, body || {}),
+  );
 
   app.post("/api/upscale/toggle", (req, res) => {
     try {

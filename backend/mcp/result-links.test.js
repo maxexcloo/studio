@@ -11,7 +11,6 @@ test("result links are sealed, reveal no account or job, and earlier signed link
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const media = new McpMedia({
     dataDir,
-    baseUrl: "http://127.0.0.1:1",
     publicUrl: "https://studio.example.test",
     signingKey: "fixture-signing-key",
   });
@@ -47,7 +46,6 @@ test("result links are sealed, reveal no account or job, and earlier signed link
 
   const other = new McpMedia({
     dataDir: fs.mkdtempSync(path.join(dataDir, "other-")),
-    baseUrl: "http://127.0.0.1:1",
     publicUrl: "https://studio.example.test",
     signingKey: "another-key",
   });
@@ -60,7 +58,6 @@ test("a failed job's result says what went wrong, a Radiance LoRA refusal word f
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const media = new McpMedia({
     dataDir,
-    baseUrl: "http://127.0.0.1:1",
     publicUrl: "https://studio.example.test",
     signingKey: "fixture-signing-key",
   });
@@ -79,33 +76,6 @@ test("a failed job's result says what went wrong, a Radiance LoRA refusal word f
     /failed: loras: none of the adapters' modules is a module of this model \(zimage_style\.safetensors\)/,
   );
   assert.match(words, /Do not resubmit/);
-});
-
-test("a stalled status read answers within its bound and says the job keeps running", async (t) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-status-stall-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  // A studio that takes the request and never answers, as a client sees one that is busy.
-  const fetchImpl = (_url, { signal }) =>
-    new Promise((_resolve, reject) =>
-      signal.addEventListener("abort", () => reject(signal.reason), { once: true }),
-    );
-  const media = new McpMedia({
-    dataDir,
-    baseUrl: "http://127.0.0.1:1",
-    publicUrl: "https://studio.example.test",
-    signingKey: "fixture-signing-key",
-    fetchImpl,
-  });
-  media.state.jobs["job-long-video"] = "account-7";
-  const started = Date.now();
-  await assert.rejects(
-    () => media.job("account-7", "job-long-video", 0, { timeoutMs: 50 }),
-    /keeps running.*without resubmitting/,
-  );
-  assert.ok(
-    Date.now() - started < 2000,
-    "Status never holds the chat for the studio's full minute",
-  );
 });
 
 test("a recovered video with an indexed gallery record keeps its MCP outputs", async (t) => {
@@ -130,16 +100,15 @@ test("a recovered video with an indexed gallery record keeps its MCP outputs", a
       ],
     },
   };
-  const fetchImpl = async (url) =>
-    new Response(JSON.stringify(answers[new URL(url).pathname]), {
-      headers: { "content-type": "application/json" },
-    });
+  const domainRequest = async (_method, route) => ({
+    status: 200,
+    payload: answers[new URL(route, "http://localhost").pathname],
+  });
   const media = new McpMedia({
     dataDir,
-    baseUrl: "http://127.0.0.1:1",
     publicUrl: "https://studio.example.test",
     signingKey: "fixture-signing-key",
-    fetchImpl,
+    domainRequest,
   });
   media.state.jobs["job-fl20"] = "account-7";
   const job = await media.job("account-7", "job-fl20");

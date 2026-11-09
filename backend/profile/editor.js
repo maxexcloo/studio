@@ -11,7 +11,8 @@ import {
 } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
-import { fromChat, requireAdmin } from "../route-access.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { adminRefusal, fromChat } from "../route-access.js";
 import { hashOf, profileStore, validId } from "./store.js";
 
 /**
@@ -334,6 +335,32 @@ export function revertEditableProfile(
   return saveEditableProfile(id, old.text, { baseHash, by, info, origin });
 }
 
+/** A failed profile route's answer: the error's status (400 by default) and any check results. */
+export const failure = (error) => ({
+  status: error.status || 400,
+  payload: {
+    ok: false,
+    error: error.message,
+    ...(error.checked ? { errors: error.checked.errors, warnings: error.checked.warnings } : {}),
+  },
+});
+
+/**
+ * An administrator's Library › Profiles route, shared with MCP's admin tools (domain/direct-route.ts):
+ * it answers `{ ok: true, ...handler(account, input) }`, or a thrown error with its status.
+ */
+export function profileRoute(app, method, path, handler) {
+  directRoute(app, method, path, async (account, input) => {
+    const refused = adminRefusal(account);
+    if (refused) return refused;
+    try {
+      return { status: 200, payload: { ok: true, ...(await handler(account, input)) } };
+    } catch (error) {
+      return failure(error);
+    }
+  });
+}
+
 export function registerProfileEditorRoutes(
   app,
   { objectInfo = async () => null, onSaved = () => {}, accountName = () => "" } = {},
@@ -345,69 +372,48 @@ export function registerProfileEditorRoutes(
       return null;
     }
   };
-  const fail = (res, error) =>
-    res.status(error.status || 400).json({
-      ok: false,
-      error: error.message,
-      ...(error.checked ? { errors: error.checked.errors, warnings: error.checked.warnings } : {}),
-    });
-  app.get("/api/profiles/editable", (req, res) => {
-    if (!requireAdmin(req, res)) return;
+  app.use("/api/profiles/editable", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, profiles: listEditableProfiles() });
+    next();
   });
-  app.get("/api/profiles/editable/:id", (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      res.setHeader("Cache-Control", "no-store");
-      res.json({ ok: true, ...readEditableProfile(req.params.id) });
-    } catch (error) {
-      fail(res, error);
-    }
+  const route = (method, path, handler) => profileRoute(app, method, path, handler);
+  route("GET", "/api/profiles/editable", () => ({ profiles: listEditableProfiles() }));
+  route("GET", "/api/profiles/editable/:id", (_account, { params }) =>
+    readEditableProfile(params.id),
+  );
+  route("POST", "/api/profiles/editable/:id/check", async (_account, { params, body }) => {
+    const current = readEditableProfile(params.id);
+    const kind = metaOf(
+      (() => {
+        try {
+          return JSON.parse(current.text);
+        } catch {
+          return null;
+        }
+      })(),
+    )?.kind;
+    const { raw: _raw, ...checked } = validateProfileText(params.id, body?.text, {
+      info: await info(kind),
+    });
+    return { check: checked };
   });
-  app.post("/api/profiles/editable/:id/check", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
+  route("PUT", "/api/profiles/editable/:id", async (account, { params, body }) => {
+    let kind = "image";
     try {
-      const current = readEditableProfile(req.params.id);
-      const kind = metaOf(
-        (() => {
-          try {
-            return JSON.parse(current.text);
-          } catch {
-            return null;
-          }
-        })(),
-      )?.kind;
-      const { raw: _raw, ...checked } = validateProfileText(req.params.id, req.body?.text, {
-        info: await info(kind),
-      });
-      res.json({ ok: true, check: checked });
-    } catch (error) {
-      fail(res, error);
+      kind = metaOf(JSON.parse(String(body?.text || "")))?.kind || "image";
+    } catch {
+      /* the check reports it */
     }
-  });
-  app.put("/api/profiles/editable/:id", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    try {
-      let kind = "image";
-      try {
-        kind = metaOf(JSON.parse(String(req.body?.text || "")))?.kind || "image";
-      } catch {
-        /* the check reports it */
-      }
-      // From chat (MCP's admin tools) the version's origin is chat; a draft stays AI-Drafted until approved.
-      const chat = fromChat(req);
-      const saved = saveEditableProfile(req.params.id, req.body?.text, {
-        baseHash: String(req.body?.baseHash || ""),
-        by: accountName(req),
-        info: await info(kind),
-        origin: chat ? "chat" : "studio",
-        aiDrafted: chat && req.body?.draft === true,
-      });
-      await onSaved(req.params.id);
-      res.json({ ok: true, ...saved });
-    } catch (error) {
-      fail(res, error);
-    }
+    // From chat (MCP's admin tools) the version's origin is chat; a draft stays AI-Drafted until approved.
+    const chat = fromChat(account);
+    const saved = saveEditableProfile(params.id, body?.text, {
+      baseHash: String(body?.baseHash || ""),
+      by: accountName(account),
+      info: await info(kind),
+      origin: chat ? "chat" : "studio",
+      aiDrafted: chat && body?.draft === true,
+    });
+    await onSaved(params.id);
+    return saved;
   });
 }
