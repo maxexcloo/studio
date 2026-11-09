@@ -2,7 +2,7 @@ import { useState, type Ref, type RefObject } from "react";
 import type { MediaItem } from "../../types";
 import { Box } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
+import { ActionBarGroups, ActionBarSurface, withMore, type ActionGroups } from "./ActionBar";
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
@@ -11,9 +11,10 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Upscale, Copy and Download beside their icons; phones show every
-// action as an icon.
+// Desktop names Animate, Edit, Upscale, Copy and Download beside their icons. Phones show icons on
+// one row: these, then ⋯ More holding the rest.
 const labelled = ["animate", "edit", "upscale", "copy", "download"];
+const phoneBar = ["retry", "stop", "animate", "edit", "upscale", "star"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -26,7 +27,7 @@ export interface ViewerActions {
 
 /**
  * The bar's controls in groups. Every one stays in sight, wrapping onto another row rather than
- * scrolling where they outgrow the bar (phones, touch screens and narrow windows with Details open).
+ * scrolling where they outgrow the bar (touch screens and narrow windows with Details open).
  */
 export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
   return <ActionBarGroups groups={groups} labelled={labelled} wrap />;
@@ -107,13 +108,15 @@ export function MediaViewerActions({
           />
         </Box>
       )}
-      <ViewerActionGroups
-        // Desktop's prompt field carries Continue in Chat.
-        groups={
-          phone ? groups : groups.map((group) => group.filter((action) => action.id !== "chat"))
-        }
-        labelled={phone ? [] : labelled}
-      />
+      {phone ? (
+        <ActionBarGroups groups={withMore(groups, phoneBar)} />
+      ) : (
+        <ViewerActionGroups
+          // Desktop's prompt field carries Continue in Chat.
+          groups={groups.map((group) => group.filter((action) => action.id !== "chat"))}
+          labelled={labelled}
+        />
+      )}
       {animating && (
         <AnimateDialog
           item={item}
