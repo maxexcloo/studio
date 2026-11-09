@@ -280,6 +280,7 @@ export function studioTheme({
           radius: "lg",
           size: "lg",
         },
+        classNames: { inner: classes.dialogInner, content: classes.dialogContent },
         styles: (_theme, props) => ({
           content: props.fullScreen
             ? {}
