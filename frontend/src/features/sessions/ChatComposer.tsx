@@ -12,7 +12,6 @@ import { ReferencePicker } from "../generation/ReferencePicker";
 import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useChat, useChatMessages } from "./ChatProvider";
 import classes from "./ChatComposer.module.css";
@@ -123,7 +122,6 @@ function ChatComposer() {
     parked;
   // The model chip shows only when there is another model to choose.
   const choosable = status.data?.models.some((model) => !model.parked && model.id !== modelId);
-  const phone = usePhone();
   const admin = useIsAdmin();
   const runtime = useWorkloadStart(
     admin && !!status.data?.models.some((model) => model.workloads?.length),
@@ -134,7 +132,6 @@ function ChatComposer() {
     // An idea is an image to make, so Chat asks for it rather than discussing it.
     onPick: (idea) => setText(`Create an image: ${idea}`),
     className: classes.ideas,
-    stacked: phone,
   });
   return (
     <form

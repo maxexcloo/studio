@@ -125,6 +125,8 @@ the primary component reference and verify APIs against the installed version.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
+  Ideas for an empty, focused prompt or Chat message float over it as one
+  Suggestions chip listing them (`usePromptIdeas`), never as a row of ideas.
 - Queue access belongs to the header status action. Report actual endpoint
   health: configuration alone does not prove readiness. A deliberately parked
   worker reads Stopped, not failing; an unexpectedly unavailable one remains
