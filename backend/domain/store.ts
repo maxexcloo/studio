@@ -492,6 +492,12 @@ export class Store {
     return row ? JSON.parse(row.record as string) : undefined;
   }
 
+  /** Whether the owner's job is recorded and not yet completed, failed or cancelled. */
+  unfinished(ownerId: string, id: string): boolean {
+    const job = this.job(ownerId, id);
+    return Boolean(job && !terminalStatuses.has(job.status));
+  }
+
   save(job: OwnedJob): OwnedJob {
     const next = { ...job, updatedAt: now() };
     this.db

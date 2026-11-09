@@ -332,7 +332,7 @@ setInterval(() => recoverRunningJobs(), 5000).unref();
 async function recoverGalleryFromHistory() {
   // Recovery follows only jobs already recorded in this runtime's gallery.
   await recoverRunningJobs();
-  cleanupGalleryState(jobs);
+  cleanupGalleryState(store);
 }
 
 /**
@@ -486,6 +486,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 });
 
 registerGalleryReadRoutes(app, {
+  store,
   near: (text) => imageSearch.near(text),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
