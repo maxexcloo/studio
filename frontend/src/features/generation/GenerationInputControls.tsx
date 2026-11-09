@@ -200,7 +200,7 @@ export function GenerationInputControls({
           onChange={(count) => onChange({ count: Number(count) })}
           data={Array.from({ length: countMax }, (_, index) => ({
             value: String(index + 1),
-            label: `${index + 1} ${index ? "Images" : "Image"}`,
+            label: `${index + 1} ${input.kind === "video" ? "Video" : "Image"}${index ? "s" : ""}`,
           }))}
         />
       )}
