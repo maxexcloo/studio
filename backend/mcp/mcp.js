@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { maxJobsPerCall } from "./controls.js";
 import { McpMedia, maxUploadMegabytes, uploadPage } from "./media.js";
@@ -228,8 +229,14 @@ export function registerMcpRoutes(
     const conversation = String(req.headers["x-studio-conversation-id"] || "");
     if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation))
       return res.status(400).json({ error: "Invalid conversation identity." });
+    // The MCP session id handed out on initialize (see handle), which a client resends for that chat.
+    const session = String(req.headers["mcp-session-id"] || "");
+    if (session.length > 256 || /[^\x21-\x7e]/.test(session))
+      return res.status(400).json({ error: "Invalid MCP session id." });
     const owner = account?.userId || (scope === "media" ? media.owner(user, token) : null);
-    // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
+    // Result numbers ("result 3") are per conversation: the one the client names (LibreChat), else its MCP
+    // session (a client that sends no headers, such as Grok), else the account's.
+    const chat = conversation || (session && `mcp-session:${session}`);
     const assistant = scope === "media" && assistantFor(account);
     // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
     // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
@@ -242,7 +249,7 @@ export function registerMcpRoutes(
       assistant,
       admin,
       conversation,
-      refs: scope === "media" && owner ? media.referenceScope(owner, conversation) : "",
+      refs: scope === "media" && owner ? media.referenceScope(owner, chat) : "",
     };
     next();
   };
@@ -349,8 +356,13 @@ export function registerMcpRoutes(
         inflight.get(inflightKey(req.mcpActor, message.params.requestId))?.abort();
       }
     const server = create(req.mcpActor);
+    // Stateless, but initialize hands out a session id: the client resends it on each call from that
+    // chat, and the guard scopes result numbers by it. Studio keeps no session state, so any replica
+    // serves it, also after a restart.
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: [req.body].flat().some(isInitializeRequest)
+        ? () => crypto.randomUUID()
+        : undefined,
       enableJsonResponse: true,
     });
     res.once("close", () => {
