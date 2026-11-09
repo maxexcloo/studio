@@ -1860,11 +1860,16 @@ export class McpMedia {
       },
     };
   }
-  /** The All Results page: every recent result of a conversation, filling in as jobs finish. */
+  /**
+   * The All Results page: every recent result of a conversation, filling in as jobs finish. A
+   * result opens large in a viewer that flips through them all in place, by its arrows, a swipe or
+   * the arrow keys (a scroll-snapped row, no script).
+   */
   async allPage(claims, credential) {
     const jobs = await this.scopeJobs(claims.owner, claims.scope, { credential });
     if (!jobs.length) return null;
     const pending = jobs.some(({ job }) => !terminal.has(job.status));
+    const slides = [];
     let shownSet = "";
     const sections = jobs
       .map(({ number, jobId, job }) => {
@@ -1888,16 +1893,35 @@ export class McpMedia {
           : [];
         if (!outputs.length)
           return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : "This generation did not produce a result."}</p>${this.promptHtml(jobId, job)}</section>`;
+        const label = set
+          ? `${set.title} › ${this.variationTitle(jobId, job)}`
+          : `Result ${number}`;
         return `<section>${heading}${outputs
-          .map((token) =>
-            job.kind === "video"
-              ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
-              : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`,
-          )
+          .map((token) => {
+            slides.push({ token, label, video: job.kind === "video" });
+            const place = slides.length;
+            return job.kind === "video"
+              ? `<figure id="result-${place}"><video src="${token}" controls playsinline preload="metadata"></video><a href="#view-${place}">Open Large</a> · <a href="${token}">View Original</a></figure>`
+              : `<figure id="result-${place}"><a href="#view-${place}" aria-label="Open ${escapeHtml(label)} Large"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`;
+          })
           .join("")}${this.promptHtml(jobId, job)}</section>`;
       })
       .join("");
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
+    const total = slides.length;
+    const viewer = total
+      ? `<div class="viewer">${slides
+          .map(({ token, label, video }, index) => {
+            const place = index + 1;
+            const name = `${escapeHtml(label)} (${place} of ${total})`;
+            return `<section class="slide" id="view-${place}" tabindex="-1" aria-label="${name}"><p class="bar"><span>${name}</span><a href="#result-${place}">Close</a></p>${
+              video
+                ? `<video src="${token}" controls playsinline preload="none"></video>`
+                : `<img src="${token}" alt="${escapeHtml(label)}" loading="lazy">`
+            }${place > 1 ? `<a class="step previous" href="#view-${place - 1}" aria-label="Previous Result">‹</a>` : ""}${place < total ? `<a class="step next" href="#view-${place + 1}" aria-label="Next Result">›</a>` : ""}</section>`;
+          })
+          .join("")}</div>`
+      : "";
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}.viewer{display:none;position:fixed;inset:0;background:Canvas;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain}.viewer:has(:target){display:flex}.slide{flex:0 0 100%;position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:3rem clamp(2rem,6vw,3.5rem) 1rem;scroll-snap-align:center;outline:none}.slide img,.slide video{max-width:100%;max-height:100%;object-fit:contain;margin:0}.bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:1rem;margin:0;padding:.75rem 1rem}.step{position:absolute;top:50%;transform:translateY(-50%);padding:.5rem 1rem;font-size:2.5rem;line-height:1;text-decoration:none}.previous{left:0}.next{right:0}</style></head><body><h1>All Results</h1>${sections}${viewer}</body></html>`;
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner with Studio's own credential. */
   async page(claims, credential) {

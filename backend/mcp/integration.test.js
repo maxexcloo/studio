@@ -4612,7 +4612,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
   // One call's results sit under its set title, each under its own or its prompt's.
   assert.match(
     html,
-    /<h2>Woodland<\/h2><h3>Result 1 · Bear Hug<\/h3><figure><a href="[A-Za-z0-9]{10}"><img/,
+    /<h2>Woodland<\/h2><h3>Result 1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
   );
   assert.match(html, /<h3>Result 2 · A fox<\/h3>/);
   assert.equal(html.match(/<h2>/g).length, 1);
@@ -4627,6 +4627,21 @@ test('replies label links Result N with one All Results page, and Result "all" s
     status: "done",
     outputs: [{ url: "/comfy/view?filename=fox.png" }],
   });
+  // Each finished result opens large in a viewer that flips through them in place, without script.
+  html = await (await fetch(page)).text();
+  assert.match(
+    html,
+    /<figure id="result-1"><a href="#view-1" aria-label="Open Woodland › Bear Hug Large">/,
+  );
+  assert.match(
+    html,
+    /<section class="slide" id="view-1" tabindex="-1" aria-label="Woodland › Bear Hug \(1 of 2\)">.*?<a href="#result-1">Close<\/a>.*?<a class="step next" href="#view-2" aria-label="Next Result">/,
+  );
+  assert.match(
+    html,
+    /id="view-2"[^>]*aria-label="Woodland › A fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
+  );
+  assert.doesNotMatch(html, /<script/);
   const shown = await call(client, "result", { job_id: "all" });
   const body = texts(shown);
   assert.match(
