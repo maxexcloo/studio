@@ -217,6 +217,27 @@ function queuedJobs(result: ToolResult): string[] {
     .filter((id): id is string => typeof id === "string");
 }
 
+/**
+ * A readable name for a text model the gateway names only by its ID: the ID's group, then the
+ * words of `model` (by default the ID's last part), such as local/auto as "Local · Auto" and
+ * cloud/glm-flash-uncensored as "Cloud · GLM Flash Uncensored". Words without vowels and sizes
+ * such as 27b are capitals.
+ */
+export function chatModelName(id: string, model = id) {
+  const word = (part: string) =>
+    /^[^aeiouy\d]+$/i.test(part) || /^\d+(\.\d+)?[bkm]$/i.test(part)
+      ? part.toUpperCase()
+      : part[0].toUpperCase() + part.slice(1);
+  const words = (text: string) =>
+    text
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map(word)
+      .join(" ");
+  const group = id.includes("/") ? id.split("/")[0] : "";
+  return [group && words(group), words(model.split("/").pop()!)].filter(Boolean).join(" · ");
+}
+
 /** Session-scoped chat: an agent loop over Studio's MCP tools, with card revisions admitted directly. */
 export class ChatService {
   /** Replies in progress by owner and chat; only `stop` cancels one, never a dropped connection. */
@@ -229,15 +250,16 @@ export class ChatService {
     try {
       const settings = this.options.settings();
       const models = (settings ? await this.models(ownerId, settings) : []).map((model) => {
-        // A routing alias (such as local/text) has no name of its own: show the model that answered.
+        // A model the gateway names only by its ID gets a readable name from it; a routing alias
+        // (such as local/text) shows the model that last answered for it.
         const bare =
           model.label === model.id ||
           model.id.toLowerCase().endsWith(`/${model.label.toLowerCase()}`);
-        const actual = bare && this.options.store.actualModel(model.id);
+        if (!bare) return model;
+        const actual = this.options.store.actualModel(model.id);
         // Bifrost reports only the alias's own name (local/text answers as "text"), which says nothing new.
-        return actual && actual !== model.id && actual !== model.id.split("/").pop()
-          ? { ...model, label: actual }
-          : model;
+        const answered = actual && actual !== model.id && actual !== model.id.split("/").pop();
+        return { ...model, label: chatModelName(model.id, answered ? actual : model.id) };
       });
       return settings
         ? {
