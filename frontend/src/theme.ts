@@ -94,6 +94,7 @@ export function studioTheme({
   background,
   motionDuration,
   phone,
+  touch,
   transparency,
 }: {
   primaryColor: string;
@@ -101,13 +102,15 @@ export function studioTheme({
   background: Background;
   motionDuration: number;
   phone: boolean;
+  /** A coarse pointer (phones and tablets): controls are touch targets and tooltips stay off. */
+  touch: boolean;
   transparency: boolean;
 }) {
   // Two control densities: form controls (standard Button and inputs) and bars (icons, and the
-  // stepped-down compact sizes); phones raise both to 44 px touch targets.
-  const form = rem(phone ? 44 : 36);
-  const bar = phone ? 44 : 32;
-  const touch = phone ? { minHeight: bar } : {};
+  // stepped-down compact sizes); touch screens raise both to 44 px touch targets.
+  const form = rem(touch ? 44 : 36);
+  const bar = touch ? 44 : 32;
+  const target = touch ? { minHeight: bar } : {};
   const height = (size: unknown) =>
     size === "md"
       ? form
@@ -194,13 +197,13 @@ export function studioTheme({
       // dozens at once, and each blur layer stalls rendering on slow phones.
       ActionIcon: ActionIcon.extend({
         classNames: (_theme, props) => ({
-          root: `${classes.actionIcon} ${phone && props.size === bar ? classes.phoneIcons : ""}`,
+          root: `${classes.actionIcon} ${touch && props.size === bar ? classes.phoneIcons : ""}`,
         }),
         defaultProps: { size: bar, radius: "xl" },
         vars: (_theme, props) => ({
           root: {
-            // Phones raise the compact icon sizes to the touch target too.
-            ...(phone && (props.size === "xs" || props.size === "sm") && { "--ai-size": rem(bar) }),
+            // Touch screens raise the compact icon sizes to the touch target too.
+            ...(touch && (props.size === "xs" || props.size === "sm") && { "--ai-size": rem(bar) }),
             ...(props.variant === "default" && {
               "--ai-bg": "var(--studio-glass-raised)",
               "--ai-hover": "var(--studio-glass-raised-hover)",
@@ -223,16 +226,16 @@ export function studioTheme({
       Badge: Badge.extend({ defaultProps: { variant: "light", tt: "none" } }),
       Button: Button.extend({
         classNames: (_theme, props) => ({
-          root: `${classes.button} ${phone && height(props.size) ? classes.phoneIcons : ""}`,
+          root: `${classes.button} ${touch && height(props.size) ? classes.phoneIcons : ""}`,
         }),
         defaultProps: { size: "md", fw: 500, autoContrast: true },
-        // A phone button is at least as wide as it is tall (All, Clear).
-        styles: (_theme, props) => ({ root: phone && height(props.size) ? { minWidth: bar } : {} }),
+        // A touch button is at least as wide as it is tall (All, Clear).
+        styles: (_theme, props) => ({ root: touch && height(props.size) ? { minWidth: bar } : {} }),
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
       }),
-      // Close buttons of dialogs, drawers and sheets are touch targets on phones.
+      // Close buttons of dialogs, drawers and sheets are touch targets on touch screens.
       CloseButton: CloseButton.extend({
-        vars: () => ({ root: phone ? { "--cb-size": rem(bar), "--cb-icon-size": rem(20) } : {} }),
+        vars: () => ({ root: touch ? { "--cb-size": rem(bar), "--cb-icon-size": rem(20) } : {} }),
       }),
       // Expanding sections share the motion setting.
       Collapse: Collapse.extend({
@@ -241,10 +244,10 @@ export function studioTheme({
           transitionTimingFunction: easing.enter,
         },
       }),
-      // Option rows are touch targets on phones: Recent Prompts here, the chips' lists
+      // Option rows are touch targets on touch screens: Recent Prompts here, the chips' lists
       // (ComboboxPopover) next, and Select and MultiSelect below.
-      Combobox: Combobox.extend({ styles: { option: touch } }),
-      ComboboxPopover: ComboboxPopover.extend({ styles: { option: touch } }),
+      Combobox: Combobox.extend({ styles: { option: target } }),
+      ComboboxPopover: ComboboxPopover.extend({ styles: { option: target } }),
       Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
@@ -270,7 +273,7 @@ export function studioTheme({
           dropdown: phone
             ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
             : dropdown,
-          item: { minHeight: phone ? bar : 36 },
+          item: { minHeight: touch ? bar : 36 },
         },
       }),
       // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
@@ -297,7 +300,9 @@ export function studioTheme({
       }),
       // Compound modals (phone chip popups) skip the Modal defaults above.
       ModalRoot: { defaultProps: { transitionProps: popupTransition } },
-      NavLink: NavLink.extend({ styles: { root: { borderRadius: "var(--mantine-radius-md)" } } }),
+      NavLink: NavLink.extend({
+        styles: { root: { borderRadius: "var(--mantine-radius-md)", ...target } },
+      }),
       Notification: Notification.extend({ styles: { root: glass } }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
       Paper: Paper.extend({
@@ -306,9 +311,9 @@ export function studioTheme({
       // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
       // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
       // page scrolls, instead of scrolling away and being pulled back a frame later.
-      // The show/hide toggle is a touch target on phones too.
+      // The show/hide toggle is a touch target too.
       PasswordInput: PasswordInput.extend({
-        vars: () => ({ root: phone ? { "--psi-button-size": rem(bar) } : {} }),
+        vars: () => ({ root: touch ? { "--psi-button-size": rem(bar) } : {} }),
       }),
       Popover: Popover.extend({
         defaultProps: {
@@ -346,11 +351,11 @@ export function studioTheme({
       // Every control that opens a picker shows ▾, as the chips do (UI-PATTERNS.md).
       MultiSelect: MultiSelect.extend({
         defaultProps: { rightSection: chevron },
-        styles: { option: touch },
+        styles: { option: target },
       }),
       Select: Select.extend({
         defaultProps: { checkIconPosition: "right", rightSection: chevron },
-        styles: { option: touch },
+        styles: { option: target },
       }),
       Spoiler: Spoiler.extend({ defaultProps: { transitionDuration: motionDuration } }),
       Switch: Switch.extend({
@@ -362,9 +367,9 @@ export function studioTheme({
           track: { borderColor: "var(--mantine-color-default-border)" },
         },
       }),
-      // A tapped tooltip lingers on touch, so phones show none unless a call enables its own.
+      // A tapped tooltip lingers on touch, so touch screens show none unless a call enables its own.
       Tooltip: Tooltip.extend({
-        defaultProps: { transitionProps, disabled: phone },
+        defaultProps: { transitionProps, disabled: touch },
         styles: {
           tooltip: {
             ...glass,

@@ -81,6 +81,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const phone = useMediaQuery(`(max-width: ${DEFAULT_THEME.breakpoints.sm})`, false, {
     getInitialValueInEffect: false,
   });
+  const touch = useMediaQuery("(pointer: coarse)", false, { getInitialValueInEffect: false });
   const configured = useMemo(
     () =>
       studioTheme({
@@ -89,9 +90,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         background: resolved.background,
         motionDuration: duration,
         phone,
+        touch,
         transparency: blurs && !opaque,
       }),
-    [resolved.colour, resolved.rounding, resolved.background, duration, phone, opaque],
+    [resolved.colour, resolved.rounding, resolved.background, duration, phone, touch, opaque],
   );
   return (
     <Context.Provider value={{ appearance: resolved, setAppearance }}>
@@ -273,7 +275,7 @@ export function AppearanceMenu() {
     <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
       <Tooltip label="Appearance">
         <Popover.Target>
-          <ActionIcon aria-label="Appearance" variant="subtle" color="gray" size="lg" radius="xl">
+          <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
             <Palette size={19} />
           </ActionIcon>
         </Popover.Target>
