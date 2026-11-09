@@ -1,7 +1,5 @@
-@media (min-width: 48em) {
-  .dimensions {
-    align-self: flex-start;
-  }
+:where(:root:not([data-phone])) .dimensions {
+  align-self: flex-start;
 }
 
 /* A new variant fades in where it lands. */

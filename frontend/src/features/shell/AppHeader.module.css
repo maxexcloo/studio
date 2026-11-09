@@ -17,13 +17,12 @@
 .mode[aria-current="page"] {
   --button-hover: transparent;
 }
-@media (min-width: 48em) {
-  .modes {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
+:where(:root:not([data-phone])) .modes {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
+
 .home {
   color: inherit;
   text-decoration: none;

@@ -40,26 +40,24 @@
 }
 
 /* Desktop chips stay compact so the rail fits one row where the composer width allows. */
-@media (min-width: 48em) {
-  .rail {
-    gap: 6px;
-  }
+:where(:root:not([data-phone])) .rail {
+  gap: 6px;
+}
 
-  .rail .chip:not(.iconChip) {
-    padding-inline: var(--mantine-spacing-sm);
-  }
+:where(:root:not([data-phone])) .rail .chip:not(.iconChip) {
+  padding-inline: var(--mantine-spacing-sm);
+}
 
-  .chipSection[data-position="left"] {
-    margin-inline-end: 6px;
-  }
+:where(:root:not([data-phone])) .chipSection[data-position="left"] {
+  margin-inline-end: 6px;
+}
 
-  .chipSection[data-position="right"] {
-    margin-inline-start: 4px;
-  }
+:where(:root:not([data-phone])) .chipSection[data-position="right"] {
+  margin-inline-start: 4px;
+}
 
-  .label {
-    max-width: 8rem;
-  }
+:where(:root:not([data-phone])) .label {
+  max-width: 8rem;
 }
 
 /* A chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself

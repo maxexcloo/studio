@@ -74,13 +74,11 @@
   }
 }
 
-@media (max-width: 48em) {
-  .thread {
-    gap: var(--mantine-spacing-lg);
-    --chat-media-height: min(42dvh, 360px);
-  }
+:where(:root[data-phone]) .thread {
+  gap: var(--mantine-spacing-lg);
+  --chat-media-height: min(42dvh, 360px);
+}
 
-  .message {
-    max-width: 94%;
-  }
+:where(:root[data-phone]) .message {
+  max-width: 94%;
 }
