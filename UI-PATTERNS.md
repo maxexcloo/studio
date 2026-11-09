@@ -90,8 +90,10 @@ the primary component reference and verify APIs against the installed version.
   visible names where tooltips cannot explain them. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
-  another overlay. Hold-to-select cancels on movement, and its release must
-  not also open the viewer.
+  another overlay. On phones, gallery tiles without Tile Captions hide their
+  menu button and open that menu on hold; other gallery tiles hold to select.
+  Holds cancel on movement and their release opens nothing. Right-click, the
+  Menu key and Shift+F10 open the same menu.
 
 ## Generation & Media
 
@@ -144,10 +146,11 @@ the primary component reference and verify APIs against the installed version.
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay
   videos and comparison is an image action.
-- Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying tile videos. Release a closed viewer's player and pause
-  playback when the tab hides. Heavy tools load only when opened. Paging keeps
-  loaded results and offers retry on failure. Failed images show no broken icon.
+- Pinned phone tile captions keep to two lines and leave out the time. Reserve
+  media dimensions, virtualise large galleries, lazy-load images and avoid
+  autoplaying tile videos. Release a closed viewer's player and pause playback
+  when the tab hides. Heavy tools load only when opened. Paging keeps loaded
+  results and offers retry on failure. Failed images show no broken icon.
 
 ## Data & Feedback
 
