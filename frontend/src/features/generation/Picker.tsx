@@ -42,11 +42,11 @@ import classes from "./Picker.module.css";
  */
 
 /**
- * A chip's popup, laid out like Recent Prompts: a title row with its few controls (such as Clear),
- * then the content. Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
- * popover never opens a second level there, unless the popup is `floating`: a small form, such as
- * Expert Settings, stays a popover fitted to the screen, as the rail's other dropdowns. Escape
- * closes nested layers first.
+ * A chip's popup: a title row with its few controls, the content, then any `footer` actions.
+ * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
+ * between the header and the footer, pinned above the safe area, so a popover never opens a second
+ * level there, unless the popup is `floating`: a small form, such as Expert Settings, stays a
+ * popover fitted to the screen, as the rail's other dropdowns. Escape closes nested layers first.
  */
 export function ChipPopup({
   title,
@@ -60,6 +60,7 @@ export function ChipPopup({
   trap = true,
   withinPortal = true,
   floating = false,
+  footer,
   children,
 }: {
   title: string;
@@ -77,6 +78,11 @@ export function ChipPopup({
   withinPortal?: boolean;
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
+  /**
+   * Actions under the content: `start` (such as Save Preset), then `end` (such as Clear LoRAs).
+   * `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
+   */
+  footer?: { start?: ReactNode; end?: ReactNode; apply?: boolean };
   children: ReactNode;
 }) {
   const phone = usePhone();
@@ -95,6 +101,17 @@ export function ChipPopup({
   const end = headerEnd && (
     <Group gap="xs" wrap="nowrap">
       {headerEnd}
+    </Group>
+  );
+  const actions = footer && (
+    <Group justify="space-between" gap="xs" wrap="nowrap">
+      <Group gap="xs" wrap="nowrap">
+        {footer.start}
+      </Group>
+      <Group gap="xs" wrap="nowrap">
+        {footer.end}
+        {phone && footer.apply && <Button onClick={close}>Apply</Button>}
+      </Group>
     </Group>
   );
   if (phone && !floating)
@@ -125,6 +142,7 @@ export function ChipPopup({
               </Group>
             </Modal.Header>
             <Modal.Body className={classes.sheetBody}>{children}</Modal.Body>
+            {actions && <div className={classes.sheetFooter}>{actions}</div>}
           </Modal.Content>
         </Modal.Root>
       </>
@@ -160,6 +178,7 @@ export function ChipPopup({
             {end}
           </Group>
           {children}
+          {actions}
         </Stack>
       </Popover.Dropdown>
     </Popover>
@@ -655,10 +674,7 @@ export function SavedList<T extends SavedItem>({
   );
 }
 
-/**
- * The footer's Save action: it asks for a name in place and saves on Enter, like Recent Prompts'
- * Pin Current Prompt sitting at the start of the footer.
- */
+/** Saves the current stack or preset: it asks for a name in place and saves on Enter. */
 export function SaveCurrent({
   noun,
   disabled,
@@ -717,20 +733,6 @@ export function SaveCurrent({
       <Button disabled={!name.trim()} onClick={save}>
         Save
       </Button>
-    </Group>
-  );
-}
-
-/**
- * Secondary actions at the start and end, like Recent Prompts. In a phone sheet whose content
- * fills its height, the footer sits at the bottom.
- */
-export function PickerFooter({ start, end }: { start?: ReactNode; end?: ReactNode }) {
-  if (!start && !end) return null;
-  return (
-    <Group justify="space-between" gap="xs" wrap="nowrap" mt="auto">
-      <Group gap="xs">{start}</Group>
-      <Group gap="xs">{end}</Group>
     </Group>
   );
 }

@@ -75,9 +75,12 @@ the primary component reference and verify APIs against the installed version.
   retains `aria-expanded` and toggles its popup. Nested Select/MultiSelect
   dropdowns stay inside their owning Popover with
   `comboboxProps.withinPortal: false` and preserve focus when selected.
-- Shared chip popups anchor on desktop and use phone sheets where the content
-  needs the room; compact choices may use a fitted popover. Keep actions
-  reachable while content scrolls, with one scroll owner per form.
+- Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
+  sheets on phones where the content needs the room; compact choices may use a
+  fitted popover. The sheet's header holds the title, any action and Close;
+  its footer (Clear, then Apply where choices apply as made) stays pinned
+  above the safe area while the content between scrolls, with one scroll owner
+  per form.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.

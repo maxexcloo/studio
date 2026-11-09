@@ -106,7 +106,7 @@ export function GenerationCard({
         }
         onClear={() => form.reset()}
         onSubmit={() => void submit()}
-        presets={(close) => (
+        presets={
           <PresetPicker
             input={form.values}
             references={references}
@@ -121,10 +121,9 @@ export function GenerationCard({
                 inpaint: null,
                 ...loaded.input,
               });
-              close();
             }}
           />
-        )}
+        }
         operation={draft.operation}
         pending={!!sendingSession}
         blockedReason={chatUnavailable}
