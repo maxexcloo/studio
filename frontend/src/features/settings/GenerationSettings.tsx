@@ -51,7 +51,7 @@ export function GenerationSettings() {
     <SettingRow
       key={flag.key}
       label={flag.label}
-      description={`${flag.description}.${lockedNote(flag)}`}
+      description={`${flag.description}${lockedNote(flag)}`}
     >
       <Switch
         aria-label={flag.label}
