@@ -26,12 +26,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
       ref={ref}
       leftSection={
         onClose ? (
-          <ActionIcon
-            aria-label="Close Search"
-            variant="subtle"
-            color="gray"
-            onClick={onClose}
-          >
+          <ActionIcon aria-label="Close Search" variant="subtle" color="gray" onClick={onClose}>
             <ArrowLeft size={18} />
           </ActionIcon>
         ) : (
