@@ -1,7 +1,13 @@
 import { withResolution } from "../shared/resolution.ts";
 import { terminalStatuses } from "../shared/queue.ts";
 import { accountAccessForId } from "./account-store.js";
-import { profileOnBackendKey, readyWorkers, routeJob, withComfyBackend } from "./comfy/backends.js";
+import {
+  onWorkerOffline,
+  profileOnBackendKey,
+  readyWorkers,
+  routeJob,
+  withComfyBackend,
+} from "./comfy/backends.js";
 import { demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
@@ -29,7 +35,7 @@ import { writingIssue, writingRequest } from "./prompt-stage.js";
 import { providerMediaWriter } from "./providers/media.ts";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { resultSource } from "./version-sources.js";
-import { capabilityForProfile, defaultWorkerId, workerById } from "./workers.js";
+import { capabilityForProfile, defaultWorkerId, listWorkers, workerById } from "./workers.js";
 
 /**
  * Studio's generation queue (domain/queue.ts) and its adapters: local workers, with their GPU
@@ -305,6 +311,12 @@ export function createGenerationQueue({
     },
     promptStage,
   );
+  // A worker that stops, restarts or goes offline no longer has the model it last ran loaded.
+  onWorkerOffline((id) => generationQueue.unload(`worker:${id}`));
+  runtime?.controller.onStop((workload) => {
+    for (const worker of listWorkers())
+      if (workerWorkloads(worker).includes(workload)) generationQueue.unload(`worker:${worker.id}`);
+  });
   async function validateGenerationInput(input, account) {
     if (input.writing === undefined) return validateGeneration(input, account);
     if (typeof input.writing?.prompt === "string") {
