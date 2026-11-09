@@ -53,7 +53,7 @@
   min-height: calc(var(--tool-pair-rows) * (2 * var(--tool) + 8px) - 4px);
 }
 
-@media (max-width: 48em) {
+@media (max-width: 48em), (pointer: coarse) {
   .columned {
     --tool: 44px;
   }
