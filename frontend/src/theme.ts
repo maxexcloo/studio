@@ -27,6 +27,7 @@ import {
   Select,
   Spoiler,
   Switch,
+  Table,
   Tooltip,
   type CSSProperties,
   type CSSVariablesResolver,
@@ -223,7 +224,11 @@ export function studioTheme({
       }),
       // Status pills are light; filled colour is for the one primary action in a view. Labels keep
       // their Title Case instead of Mantine's upper case.
-      Badge: Badge.extend({ defaultProps: { variant: "light", tt: "none" } }),
+      // A linked badge (a caption tag) is a touch target on touch screens.
+      Badge: Badge.extend({
+        classNames: touch ? { root: classes.touchBadge } : {},
+        defaultProps: { variant: "light", tt: "none" },
+      }),
       Button: Button.extend({
         classNames: (_theme, props) => ({
           root: `${classes.button} ${touch && height(props.size) ? classes.phoneIcons : ""}`,
@@ -371,7 +376,13 @@ export function studioTheme({
         defaultProps: { checkIconPosition: "right", rightSection: chevron },
         styles: { option: target },
       }),
-      Spoiler: Spoiler.extend({ defaultProps: { transitionDuration: motionDuration } }),
+      // Expand and Collapse are touch targets on touch screens.
+      Spoiler: Spoiler.extend({
+        classNames: touch
+          ? { root: classes.touchSpoiler, control: classes.touchSpoilerControl }
+          : {},
+        defaultProps: { transitionDuration: motionDuration },
+      }),
       Switch: Switch.extend({
         styles: {
           thumb: {
@@ -381,6 +392,8 @@ export function studioTheme({
           track: { borderColor: "var(--mantine-color-default-border)" },
         },
       }),
+      // A sort header is a touch target on touch screens (ui/DataTable.tsx).
+      Table: Table.extend({ classNames: touch ? { th: classes.touchHeader } : {} }),
       // A tapped tooltip lingers on touch, so touch screens show none unless a call enables its own.
       Tooltip: Tooltip.extend({
         defaultProps: { transitionProps, disabled: touch },
