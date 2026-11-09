@@ -17,6 +17,8 @@ export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqli
 export const jsonStoreSource =
   /^(?:(workflow-preferences|timings|model-types|presets|library\/updates|mcp-assistant|comparisons|mcp-ownership)|(?:accounts\/([0-9a-f]{64})\/)?(prompt-history|negative-prompt-history|lora-stacks)|library\/imports\/(imp-[a-z0-9]{6,40})|media-ingested)\.json(\.bak)?$/;
 
+export const jsonStoresMigration = "json-stores-v1";
+
 /** The json-stores-v1 sources in a data folder, sorted. */
 export function jsonStoreFiles(dataDir: string): string[] {
   const list = (dir: string) => {
@@ -127,23 +129,27 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
 }
 
 /**
- * Studio keeps accounts, deletion markers and the gallery only in SQLite. A data folder still on
- * the older JSON files (`runtime-json-v1` not applied) or the single gallery document
- * (`gallery-rows-v1` not applied) must go through migrate-runtime first, so Studio refuses to
- * start on one rather than ignore what it holds.
+ * Studio keeps accounts, deletion markers, the gallery and the stores json-stores-v1 moved only in
+ * SQLite. A data folder still on the older JSON files (`runtime-json-v1` or `json-stores-v1` not
+ * applied) or the single gallery document (`gallery-rows-v1` not applied) must go through
+ * migrate-runtime first, so Studio refuses to start on one rather than ignore what it holds.
  */
 export function assertCurrentStorage(dataDir: string): void {
   const files = legacyFiles.filter((name) => fs.existsSync(path.join(dataDir, name)));
   const db = runtimeDatabase(dataDir);
+  const stores = hasMigration(db, jsonStoresMigration) ? [] : jsonStoreFiles(dataDir);
+  const imports = stores.filter((source) => source.startsWith("library/imports/")).length;
   const pending = [
     ...(files.length && !hasMigration(db, "runtime-json-v1") ? files : []),
     ...(db.prepare("SELECT 1 FROM studio_documents WHERE name = 'gallery'").get()
       ? ["the gallery document"]
       : []),
+    ...stores.filter((source) => !source.startsWith("library/imports/")),
+    ...(imports ? [`${imports} import records in library/imports`] : []),
   ];
   if (pending.length)
     throw new Error(
-      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it.`,
+      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,
     );
 }
 

@@ -6,6 +6,7 @@ import {
   hasMigration,
   jsonStoreFiles,
   jsonStoreSource,
+  jsonStoresMigration,
   runtimeDatabase,
   withOfflineDatabase,
 } from "./runtime.ts";
@@ -22,8 +23,6 @@ import {
  * with --restore), commits the rows, their round trip and the marker in one transaction, then
  * removes the sources. Run with Studio stopped; a second run finds it done.
  */
-export const jsonStoresMigration = "json-stores-v1";
-
 type Mapping = { source: string; target: string; count: number; hash: string };
 type Table = "studio_documents" | "studio_library_imports" | "studio_ingested_jobs";
 

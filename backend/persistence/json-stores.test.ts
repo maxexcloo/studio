@@ -6,6 +6,7 @@ import test from "node:test";
 import { migrateJsonStores } from "./json-stores.ts";
 import { restoreRuntimeBackup } from "./migration.ts";
 import {
+  assertCurrentStorage,
   closeRuntimeDatabase,
   databaseFile,
   hasMigration,
@@ -69,8 +70,14 @@ test("json-stores-v1 plans, moves every store into SQLite, restores and runs onc
     },
   );
 
+  assert.throws(
+    () => assertCurrentStorage(data),
+    /still holds .*media-ingested\.json.*timings\.json.*, 1 import records in library\/imports\. .*--apply/,
+  );
+
   const result = migrateJsonStores(data, { apply: true });
   assert.equal(result.applied, true);
+  assertCurrentStorage(data);
   for (const name of Object.keys(files)) assert.equal(fs.existsSync(path.join(data, name)), false);
   assert.equal(fs.existsSync(path.join(data, "library/imports/imp-abc123.webp")), true);
   assert.deepEqual(
