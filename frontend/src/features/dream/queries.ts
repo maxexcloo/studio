@@ -31,9 +31,9 @@ export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
-  today: { images: number; videos: number };
   spicyAvailable: boolean;
   status: DreamStatus;
+  /** Why Dream is waiting or can't run, where the backend says. */
   reason?: string;
 }
 

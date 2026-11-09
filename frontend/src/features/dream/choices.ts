@@ -13,21 +13,17 @@ export interface Choice {
   id: string;
   label: string;
   icon: LucideIcon;
-  /** The phone deck's name under the icon, where the label is too long. */
-  short?: string;
   /** Its key on desktop. */
   hint?: string;
   tip?: string;
   primary?: boolean;
-  /** Shown only by its icon on desktop. */
-  iconOnly?: boolean;
-  disabled?: boolean;
 }
 
 /**
- * The top card's choices, in groups: a comparison's Neither, A, B and Both (the picks in the middle); a single card's Skip,
- * Edit and Animate, Star, Variations and More Like This, then Keep. Edit, Animate, Variations and
- * More Like This need a Dream image; a gallery image passes or is liked.
+ * The top card's choices, in groups: a comparison's Neither, A, B and Both (the picks in the
+ * middle); a single card's Pass, then Edit and Animate, Star, Variations and More Like This, then
+ * Like. Edit, Animate, Variations and More Like This need a Dream image; a gallery image is passed,
+ * liked or starred.
  */
 export function dreamChoices(card: DeckCard): Choice[][] {
   if (card.kind === "pair") {
@@ -42,64 +38,42 @@ export function dreamChoices(card: DeckCard): Choice[][] {
       ],
     ];
   }
-  const calibrating = card.kind === "calibration";
-  const dreamImage = !calibrating && card.item.type === "image";
+  const dreamImage = card.kind === "dream" && card.item.type === "image";
+  const star: Choice = { choice: "star", id: "star", label: "Star", icon: icons.star };
   return [
-    [
-      {
-        choice: "discard",
-        id: "discard",
-        label: calibrating ? "Pass" : "Skip",
-        icon: X,
-        hint: "←",
-      },
-    ],
-    [
-      { choice: "refine", id: "edit", label: "Edit", icon: icons.edit, disabled: !dreamImage },
-      {
-        choice: "animate",
-        id: "animate",
-        label: "Animate",
-        icon: icons.animate,
-        disabled: !dreamImage,
-      },
-    ],
-    [
-      { choice: "star", id: "star", label: "Star", icon: icons.star, iconOnly: true },
-      {
-        choice: "variations",
-        id: "variations",
-        label: "Variations",
-        tip: "Keep & Variations",
-        icon: icons.recreate,
-        hint: "↑",
-        disabled: !dreamImage,
-      },
-      {
-        choice: "more",
-        id: "more-like-this",
-        label: "More Like This",
-        short: "Similar",
-        icon: icons.moreLikeThis,
-        disabled: !dreamImage,
-      },
-    ],
-    [
-      {
-        choice: "keep",
-        id: "keep",
-        label: calibrating ? "Like" : "Keep",
-        icon: icons.keep,
-        hint: "→",
-        primary: true,
-      },
-    ],
+    [{ choice: "discard", id: "discard", label: "Pass", icon: X, hint: "←" }],
+    ...(dreamImage
+      ? [
+          [
+            { choice: "refine", id: "edit", label: "Edit", icon: icons.edit },
+            { choice: "animate", id: "animate", label: "Animate", icon: icons.animate },
+          ] satisfies Choice[],
+          [
+            star,
+            {
+              choice: "variations",
+              id: "variations",
+              label: "Variations",
+              tip: "Like & Variations",
+              icon: icons.recreate,
+              hint: "↑",
+            },
+            {
+              choice: "more",
+              id: "more-like-this",
+              label: "More Like This",
+              icon: icons.moreLikeThis,
+            },
+          ] satisfies Choice[],
+        ]
+      : [[star]]),
+    [{ choice: "keep", id: "keep", label: "Like", icon: icons.keep, hint: "→", primary: true }],
   ];
 }
 
 /**
- * The choices as the viewer's action groups, leaving out what this card can't do: desktop names
- * all but Star, and phones name only a comparison's answers and Skip and Keep.
+ * The choices as the viewer's action groups: desktop names all but Star, and phones name only a
+ * comparison's answers and Pass and Like.
  */
 export function viewerChoices(
   card: DeckCard,
@@ -107,14 +81,12 @@ export function viewerChoices(
   phone: boolean,
 ) {
   const groups: ActionGroups = dreamChoices(card).map((group) =>
-    group
-      .filter((choice) => !choice.disabled)
-      .map((choice) => ({
-        id: choice.id,
-        label: choice.label,
-        icon: choice.icon,
-        onClick: () => act(choice.choice),
-      })),
+    group.map((choice) => ({
+      id: choice.id,
+      label: choice.label,
+      icon: choice.icon,
+      onClick: () => act(choice.choice),
+    })),
   );
   const ids = groups.flat().map((action) => action.id);
   return {
