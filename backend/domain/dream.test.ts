@@ -553,10 +553,10 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request(`/${one}/discard`, {})).status, 409);
   assert.equal((await request(`/${two}/discard`, {})).body.item.dream.state, "discarded");
   assert.deepEqual(
-    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId]),
+    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId, signal.arm]),
     [
-      ["discard", state.items.find((item) => item.prompt === "dream 2")?.jobId],
-      ["keep", job.id],
+      ["discard", state.items.find((item) => item.prompt === "dream 2")?.jobId, "exploit"],
+      ["keep", job.id, "exploit"],
     ],
   );
   const discarded = await request("/discarded?limit=1");
@@ -797,13 +797,27 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
         "flux",
         "a fox in snow",
         "0",
-        { id: a.dream!.pair!.id, side: 0, question: "Which Model?", label: "FLUX" },
+        {
+          id: a.dream!.pair!.id,
+          side: 0,
+          question: "Which Model?",
+          axis: "profile",
+          label: "FLUX",
+          value: "flux",
+        },
       ],
       [
         "qwen",
         "a fox in snow",
         "0",
-        { id: a.dream!.pair!.id, side: 1, question: "Which Model?", label: "Qwen" },
+        {
+          id: a.dream!.pair!.id,
+          side: 1,
+          question: "Which Model?",
+          axis: "profile",
+          label: "Qwen",
+          value: "qwen",
+        },
       ],
     ],
   );
@@ -829,6 +843,10 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   assert.deepEqual(
     [signal.kind, signal.question, signal.answer, signal.profileId, signal.over?.profileId],
     ["preferred", "Which Model?", "Qwen over FLUX", "qwen", "flux"],
+  );
+  assert.deepEqual(
+    [signal.axis, signal.value, signal.over?.value, signal.arm],
+    ["profile", "qwen", "flux", "explore:profile"],
   );
   // The same image never starts a second comparison.
   assert.deepEqual(dream.read("alice").compared, ["base"]);
