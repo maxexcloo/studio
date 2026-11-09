@@ -198,7 +198,7 @@ export function GenerationForm({
         draft.presetId,
         draft.operation,
       ])}
-      presets={(close) => (
+      presets={
         <PresetPicker
           input={input}
           references={draft.references}
@@ -219,10 +219,9 @@ export function GenerationForm({
                 ? preset.input.referenceDetails
                 : [],
             }));
-            close();
           }}
         />
-      )}
+      }
       onCompare={() =>
         compare.open({
           input,
