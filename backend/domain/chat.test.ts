@@ -111,7 +111,7 @@ function fakeAgent(fixture: ReturnType<typeof setup>, answers: Record<string, un
     owned.push(value);
     return {
       instructions: "Studio makes images and videos.",
-      tools: ["Models", "Generate", "Reuse"].map((name) => ({
+      tools: ["models", "generate", "reuse"].map((name) => ({
         name,
         description: `${name} tool`,
         inputSchema: { type: "object" },
@@ -119,7 +119,7 @@ function fakeAgent(fixture: ReturnType<typeof setup>, answers: Record<string, un
       refOf: (id) => `result ${value.jobs.indexOf(id) + 1}`,
       call: async (name, args) => {
         calls.push([name, args]);
-        if (name === "Reuse")
+        if (name === "reuse")
           return { isError: true, content: [{ type: "text", text: "No such result." }] };
         return (
           (answers[name] as never) || { content: [{ type: "text", text: `${name} answered.` }] }
@@ -140,7 +140,7 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
           {
             delta: {
               content: "Checking Krea first.",
-              tool_calls: [toolCall(0, "call-models", "Models", { profile_id: "krea" })],
+              tool_calls: [toolCall(0, "call-models", "models", { profile_id: "krea" })],
             },
           },
         ],
@@ -153,9 +153,9 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
           {
             delta: {
               tool_calls: [
-                toolCall(0, "call-generate", "Generate", { prompts: ["a teapot"], count: 3 }),
-                toolCall(1, "call-reuse", "Reuse", { job_id: "result 9" }),
-                toolCall(2, "call-lost", "Upscale", {}),
+                toolCall(0, "call-generate", "generate", { prompts: ["a teapot"], count: 3 }),
+                toolCall(1, "call-reuse", "reuse", { job_id: "result 9" }),
+                toolCall(2, "call-lost", "upscale", {}),
               ],
             },
           },
@@ -166,7 +166,7 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
     [frame({ choices: [{ delta: { content: "Three teapots on Krea." } }] }), "data: [DONE]\n\n"],
   ]);
   const agent = fakeAgent(fixture, {
-    Generate: {
+    generate: {
       content: [{ type: "text", text: "Queued on Krea." }],
       structuredContent: { jobs: [{ job_id: "job-a" }, { job_id: "job-b" }, { job_id: "job-c" }] },
     },
@@ -185,9 +185,9 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
     (event) => events.push(event),
   );
   assert.deepEqual(agent.calls, [
-    ["Models", { profile_id: "krea" }],
-    ["Generate", { prompts: ["a teapot"], count: 3 }],
-    ["Reuse", { job_id: "result 9" }],
+    ["models", { profile_id: "krea" }],
+    ["generate", { prompts: ["a teapot"], count: 3 }],
+    ["reuse", { job_id: "result 9" }],
   ]);
   assert.deepEqual(agent.owned[0].jobs, ["earlier"]);
   const reply = fixture.service.messages("alice", fixture.session.id)[1];
@@ -196,10 +196,10 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
   assert.deepEqual(
     reply.steps?.map(({ tool, status }) => [tool, status]),
     [
-      ["Models", "completed"],
-      ["Generate", "completed"],
-      ["Reuse", "failed"],
-      ["Upscale", "failed"],
+      ["models", "completed"],
+      ["generate", "completed"],
+      ["reuse", "failed"],
+      ["upscale", "failed"],
     ],
   );
   assert.deepEqual(
@@ -214,13 +214,13 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
   assert.match(system, /"job_id":"earlier","ref":"result 1"/);
   assert.deepEqual(
     (streamed[0].tools as { function: { name: string } }[]).map((tool) => tool.function.name),
-    ["Models", "Generate", "Reuse"],
+    ["models", "generate", "reuse"],
   );
   // The last call reads every tool answer, failures included.
   const last = streamed[2].messages as { role: string; content: string; tool_call_id?: string }[];
   assert.deepEqual(
     last.filter((message) => message.role === "tool").map((message) => message.content),
-    ["Models answered.", "Queued on Krea.", "No such result.", "There is no Upscale tool."],
+    ["models answered.", "Queued on Krea.", "No such result.", "There is no upscale tool."],
   );
   // A later turn sees this reply's tool calls and answers before its text.
   rounds(fixture, [[frame({ choices: [{ delta: { content: "Sure." } }] }), "data: [DONE]\n\n"]]);
@@ -240,7 +240,7 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
 test("tool calls a gateway numbers per round keep distinct ids in later turns", async () => {
   const fixture = setup([]);
   const round = () => [
-    frame({ choices: [{ delta: { tool_calls: [toolCall(0, "call_0", "Models", {})] } }] }),
+    frame({ choices: [{ delta: { tool_calls: [toolCall(0, "call_0", "models", {})] } }] }),
     "data: [DONE]\n\n",
   ];
   rounds(fixture, [
@@ -270,7 +270,7 @@ test("a reply's tool rounds are bounded: the last call answers without tools", a
   const fixture = setup([]);
   rounds(fixture, [
     [
-      frame({ choices: [{ delta: { tool_calls: [toolCall(0, "", "Models", {})] } }] }),
+      frame({ choices: [{ delta: { tool_calls: [toolCall(0, "", "models", {})] } }] }),
       "data: [DONE]\n\n",
     ],
   ]);

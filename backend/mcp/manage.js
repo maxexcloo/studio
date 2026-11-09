@@ -2,7 +2,7 @@
  * MCP's tools for an account's own Studio, beside generation (mcp.js): its gallery, queue, Dream
  * and taste. Each action calls the route the UI calls with the account's own credential, so the
  * route's owner scoping and group features (Dream, LoRAs) apply exactly as in the app. Results are
- * named by refs or job ids this MCP owner already holds (from Generate, Search or Queue list).
+ * named by refs or job ids this MCP owner already holds (from generate, search or queue list).
  */
 import { z } from "zod";
 import { terminalStatuses } from "../../shared/queue.ts";
@@ -20,7 +20,7 @@ const short = (value, max = 120) => {
 };
 
 /**
- * Registers Gallery, Queue, Dream and Taste. `tool` is mcp.js's helper, `media` its McpMedia,
+ * Registers gallery, queue, dream and taste. `tool` is mcp.js's helper, `media` its McpMedia,
  * `refs` the conversation's result scope and `resolve(value)` turns a ref into its job id.
  */
 export function registerManageTools({ tool, server, media, owner, refs, resolve }) {
@@ -40,9 +40,9 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
 
   tool(
     server,
-    "Gallery",
-    "Manage Gallery",
-    "Change the user's gallery when asked: star or unstar results, delete them with their files (only on request), or clear_failed. results: refs from Generate or Search; output_index picks one output, else all.",
+    "gallery",
+    "manage gallery",
+    "Change the user's gallery when asked: star or unstar results, delete them with their files (only on request), or clear_failed. results: refs from generate or search; output_index picks one output, else all.",
     {
       action: z.enum(["star", "unstar", "delete", "clear_failed"]),
       results: z.array(result).min(1).max(maxResults).optional(),
@@ -90,8 +90,8 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
 
   tool(
     server,
-    "Queue",
-    "Manage Queue",
+    "queue",
+    "manage queue",
     "The user's queue, when asked. list: unfinished and failed jobs with refs. pause holds new work (running work finishes), resume, cancel_all, clear_failed. retry or clear one failed job_id; move a waiting job_id to position (0 is next).",
     {
       action: z.enum([
@@ -143,7 +143,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
           return mcpJson({
             cancelled: (answer.outcomes || []).filter((outcome) => outcome.cancelRequested).length,
             ...(answer.outcomes?.some((outcome) => outcome.error)
-              ? { note: "Some jobs could not confirm their cancel; check Queue list." }
+              ? { note: "Some jobs could not confirm their cancel; check queue list." }
               : {}),
           });
         return mcpJson({ [action]: true, ...answer });
@@ -182,8 +182,8 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
   };
   tool(
     server,
-    "Dream",
-    "Dream",
+    "dream",
+    "dream",
     "The user's Dream (background images from their taste; needs the Dream feature), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer toward it) or variations (count new seeds) take an item_id; answer takes a pair_id and answer. settings sets any of enabled, paused, videos, spicy, buffer, dailyImages, dailyVideos. discarded lists discards.",
     {
       action: z.enum([
@@ -237,7 +237,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
           kept: items.filter((item) => item.dream?.state === "kept").map((item) => item.id),
         });
       }
-      if (!item_id) throw new Error(`Pass item_id from Dream status to ${action}.`);
+      if (!item_id) throw new Error(`Pass item_id from dream status to ${action}.`);
       const route = `/api/dream/${encodeURIComponent(item_id)}/${action}`;
       const done = await api("POST", route, action === "variations" ? { count } : {}, signal);
       if (action !== "variations")
@@ -255,9 +255,9 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
 
   tool(
     server,
-    "Taste",
-    "Taste & LoRA Ratings",
-    "The user's taste profile, when asked: read, save (summary replaces it), refresh (rewrite from stars, Dream and comparisons) or reset. rate_lora sets a LoRA (name from Models) up, down or none; needs the LoRAs feature.",
+    "taste",
+    "taste & lora ratings",
+    "The user's taste profile, when asked: read, save (summary replaces it), refresh (rewrite from stars, Dream and comparisons) or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
     {
       action: z.enum(["read", "save", "refresh", "reset", "rate_lora"]).default("read"),
       summary: z.string().trim().max(maxTasteSummary).optional(),
@@ -266,7 +266,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     },
     async ({ action, summary, lora, rating }, signal) => {
       if (action === "rate_lora") {
-        if (!lora || !rating) throw new Error("Pass lora (its name from Models) and rating.");
+        if (!lora || !rating) throw new Error("Pass lora (its name from models) and rating.");
         const { library = {} } = await api(
           "POST",
           "/api/loras/library/ops",

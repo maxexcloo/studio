@@ -22,26 +22,26 @@ const titled = (value: unknown) => {
 /** A tool call as the trail names it: what it made or looked at, such as "New images (3)". */
 function stepLabel({ tool, input }: ChatStep) {
   const ref = titled(input.job_id);
-  if (tool === "Generate") {
+  if (tool === "generate") {
     const prompts = Array.isArray(input.prompts) ? input.prompts.length : 1;
     const count = prompts * (Number(input.count) || 1);
     const what = input.kind === "video" ? "video" : "image";
     const model = input.profile_id ? ` on ${input.profile_id}` : "";
     return `New ${count > 1 ? `${what}s (${count})` : what}${model}${input.preview ? " (preview)" : ""}`;
   }
-  if (tool === "Reuse")
+  if (tool === "reuse")
     return input.mode === "animate"
       ? `Animating ${ref}${input.theme ? ` (${titled(input.theme)})` : ""}`
       : input.mode === "reference"
         ? `Using ${ref} as a reference`
         : `Editing ${ref}`;
-  if (tool === "Models")
+  if (tool === "models")
     return input.profile_id ? `Reading ${input.profile_id}` : "Looking up models";
-  if (["Status", "Result"].includes(tool)) return `Checking ${ref}`;
-  if (tool === "Review") return `Reviewing ${ref}`;
-  if (tool === "Search")
+  if (["status", "result"].includes(tool)) return `Checking ${ref}`;
+  if (tool === "review") return `Reviewing ${ref}`;
+  if (tool === "search")
     return input.query ? `Searching for “${input.query}”` : "Searching the gallery";
-  if (tool === "Cancel") return `Cancelling ${ref}`;
+  if (tool === "cancel") return `Cancelling ${ref}`;
   return tool;
 }
 
