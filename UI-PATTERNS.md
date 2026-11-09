@@ -104,10 +104,11 @@ the primary component reference and verify APIs against the installed version.
   changing the original; do not bypass it with a direct queue request.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
-  Reference order, explicit slot IDs and source-result lineage survive edits
-  and reordering; optional End-only inputs and one asset in several roles work.
-  Group compatible linked slots by their declared capacity rather than a
-  global reference limit.
+  Profile options carry short facts (model or family · kind · Cloud or Local
+  GPU), not prose. Reference order, explicit slot IDs and source-result lineage
+  survive edits and reordering; optional End-only inputs and one asset in
+  several roles work. Group compatible linked slots by their declared capacity
+  rather than a global reference limit.
 - Selected LoRAs retain enable, strength and pointer/keyboard ordering controls
   when filters hide them. Saved stacks preserve family keys, order, strengths
   and disabled entries. Trigger words are applied when submitting, without
