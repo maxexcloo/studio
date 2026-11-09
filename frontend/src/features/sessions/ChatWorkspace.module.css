@@ -84,31 +84,29 @@
   }
 }
 
-@media (max-width: 48em) {
-  .workspace {
-    display: flex;
-  }
+:where(:root[data-phone]) .workspace {
+  display: flex;
+}
 
-  .sidebar {
-    display: none;
-  }
+:where(:root[data-phone]) .sidebar {
+  display: none;
+}
 
-  .main {
-    flex: 1;
-    padding: var(--studio-composer-gap);
-  }
+:where(:root[data-phone]) .main {
+  flex: 1;
+  padding: var(--studio-composer-gap);
+}
 
-  /* Phones hold a row for its menu; the hidden button still anchors it. */
-  .link {
-    padding-inline-end: var(--mantine-spacing-sm);
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
+/* Phones hold a row for its menu; the hidden button still anchors it. */
+:where(:root[data-phone]) .link {
+  padding-inline-end: var(--mantine-spacing-sm);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 
-  .menu {
-    visibility: hidden;
-  }
+:where(:root[data-phone]) .menu {
+  visibility: hidden;
 }
 
 /* The list's toolbar fills the row beside the Chats heading, its search field too. */

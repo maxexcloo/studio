@@ -71,9 +71,7 @@
   white-space: nowrap;
 }
 
-@media (max-width: 48em) {
-  .cell {
-    width: 72px;
-    height: 72px;
-  }
+:where(:root[data-phone]) .cell {
+  width: 72px;
+  height: 72px;
 }

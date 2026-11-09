@@ -55,7 +55,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
                   color={active ? undefined : "gray"}
                   className={classes.mode}
                   // Phones size it to the 44 px touch target; wider screens pad its label.
-                  px={{ base: 8, sm: 12 }}
+                  px={phone ? 8 : 12}
                   size="sm"
                   radius="xl"
                 >
@@ -94,32 +94,33 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       </Group>
       <ModeSwitcher mode={mode} />
       {/* Appearance, Library, Settings, User: alphabetical. */}
-      <Group gap="xs" visibleFrom="sm">
-        <AppearanceMenu />
-        {navigation
-          .filter((item) => item.to !== "/library" || library.allowed)
-          .map((item) => {
-            const active = location.pathname.startsWith(item.to);
-            return (
-              <Tooltip key={item.to} label={item.label}>
-                <ActionIcon
-                  component={Link}
-                  to={item.to}
-                  state={{ backgroundLocation: location }}
-                  variant={active ? "light" : "subtle"}
-                  color={active ? undefined : "gray"}
-                  aria-label={item.label}
-                >
-                  <item.icon size={19} />
-                </ActionIcon>
-              </Tooltip>
-            );
-          })}
-        <AccountMenu />
-      </Group>
-      <Group hiddenFrom="sm">
+      {phone ? (
         <HeaderOptions />
-      </Group>
+      ) : (
+        <Group gap="xs">
+          <AppearanceMenu />
+          {navigation
+            .filter((item) => item.to !== "/library" || library.allowed)
+            .map((item) => {
+              const active = location.pathname.startsWith(item.to);
+              return (
+                <Tooltip key={item.to} label={item.label}>
+                  <ActionIcon
+                    component={Link}
+                    to={item.to}
+                    state={{ backgroundLocation: location }}
+                    variant={active ? "light" : "subtle"}
+                    color={active ? undefined : "gray"}
+                    aria-label={item.label}
+                  >
+                    <item.icon size={19} />
+                  </ActionIcon>
+                </Tooltip>
+              );
+            })}
+          <AccountMenu />
+        </Group>
+      )}
     </Group>
   );
 }
