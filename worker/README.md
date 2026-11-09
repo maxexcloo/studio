@@ -10,6 +10,10 @@ The deployment lives in kubelab. The image starts ComfyUI on port 8188 with the
 arguments in `CLI_ARGS` and retains compatible loaded models. Supply model
 directories and the GPU placement in the deployment.
 
+The image sets `HSA_TOOLS_DISABLE_REGISTER=1` to prevent ROCm from consuming a
+CPU core per idle worker. This disables HSA profiler/tool registration; override
+the variable to `0` when profiling with ROCm tools.
+
 Studio starts and stops workers by scaling their Kubernetes deployments between 0
 and 1 replicas; see
 [runtime control](../CONFIGURATION.md#queue-sessions--runtime-control) for
