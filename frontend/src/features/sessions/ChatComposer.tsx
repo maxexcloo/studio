@@ -177,8 +177,8 @@ function ChatComposer() {
     >
       <div
         className={classes.message}
-        onFocus={() => {
-          ideas.focusProps.onFocus();
+        onFocus={(event) => {
+          ideas.focusProps.onFocus(event);
           setExpanded(true);
         }}
         onBlur={ideas.focusProps.onBlur}

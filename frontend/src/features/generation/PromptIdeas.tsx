@@ -1,4 +1,4 @@
-import { useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { Transition } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { MediaKind } from "../../types";
@@ -35,6 +35,7 @@ export function usePromptIdeas({
   const [focused, setFocused] = useState(false);
   const [asked, setAsked] = useState(false);
   const [listed, setListed] = useState(false);
+  const field = useRef<HTMLTextAreaElement | null>(null);
   const motionDuration = useMotionDuration();
   // A group without Prompt Assistant gets no ideas, so they are never asked for.
   const offered = useGroupFeature("promptAssistant");
@@ -42,7 +43,8 @@ export function usePromptIdeas({
   const list = query.data?.suggestions ?? [];
   return {
     focusProps: {
-      onFocus: () => {
+      onFocus: (event: FocusEvent<HTMLElement>) => {
+        if (event.target instanceof HTMLTextAreaElement) field.current = event.target;
         setFocused(true);
         setAsked(true);
       },
@@ -74,7 +76,12 @@ export function usePromptIdeas({
               dropdownOpened={listed}
               onDropdownOpen={() => setListed(true)}
               onDropdownClose={() => setListed(false)}
-              onChange={(idea) => idea && onPick(idea)}
+              onChange={(idea) => {
+                if (!idea) return;
+                onPick(idea);
+                // The list returns focus to the chip, which the filled prompt then hides.
+                requestAnimationFrame(() => field.current?.focus({ preventScroll: true }));
+              }}
             />
           </div>
         )}
