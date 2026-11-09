@@ -1,3 +1,5 @@
+import { accountPreferences } from "../account-preferences.js";
+import { ownerIdForRequest } from "../account-ownership.js";
 import { animateProfile } from "../animate-profile.js";
 import { demoMode } from "../comfy/comfy.js";
 import { directRoute } from "../domain/direct-route.ts";
@@ -34,26 +36,19 @@ export function registerModelRoutes(app, { catalogue }) {
     }
   });
 
-  /** Animate's profile for an account (animate-profile.js), from its catalogue and whether a local video worker answered. */
-  async function animateChoice(account, { tier, where, width, height } = {}) {
-    const models = modelsForAccount(await catalogue.catalogueModels(), { studioAccount: account });
-    return animateProfile(models.profiles || [], {
-      defaultId: models.defaults?.videoModel,
-      localRunning: models.backends?.video?.available !== false,
-      localParked: models.backends?.video?.parked === true,
-      tier,
-      where,
-      width,
-      height,
-    });
-  }
-  // Every Animate surface asks this before queuing or staging, so it shows the model that will run.
+  // Every Animate surface asks this before queuing or staging, so it shows the model that will run:
+  // Animate's profile for the account (animate-profile.js), from its catalogue, whether a local video
+  // worker answered and where it prefers videos to run (Cloud, or the local Fast or Quality tier).
   app.get("/api/animate/profile", async (req, res) => {
     try {
-      const { profile, cloud, size, tiers, offers } = await animateChoice(req.studioAccount, {
-        // Fast or Quality and Local GPU or Cloud, as Animate's menu offers them.
-        tier: req.query.tier === "quality" ? "quality" : "fast",
-        where: ["local", "cloud"].includes(req.query.where) ? req.query.where : "auto",
+      const { videos } = accountPreferences(ownerIdForRequest(req));
+      const models = modelsForAccount(await catalogue.catalogueModels(), req);
+      const { profile, cloud, size, offers, note } = animateProfile(models.profiles || [], {
+        defaultId: models.defaults?.videoModel,
+        localRunning: models.backends?.video?.available !== false,
+        localParked: models.backends?.video?.parked === true,
+        tier: videos === "quality" ? "quality" : "fast",
+        prefer: videos === "cloud" ? "cloud" : "local",
         width: Number(req.query.width),
         height: Number(req.query.height),
       });
@@ -62,8 +57,8 @@ export function registerModelRoutes(app, { catalogue }) {
         label: profile.label || profile.id,
         cloud,
         size,
-        tiers,
         offers,
+        note,
       });
     } catch (error) {
       res.status(409).json({ ok: false, error: error.message, offers: error.offers });

@@ -35,35 +35,30 @@ test("Animate takes a local first-frame profile, Fast unless Quality is asked, w
   const choice = choose({ localRunning: true });
   assert.equal(choice.profile.id, "fl-fast");
   assert.deepEqual([choice.cloud, choice.note, choice.tier], [false, "", "fast"]);
-  assert.deepEqual(choice.tiers, ["fast", "quality"]);
   assert.deepEqual(choice.size, { width: 832, height: 1248 });
   assert.equal(choose({ localRunning: true, tier: "quality" }).profile.id, "fl-quality");
-  // With one first-frame profile there is no choice: every tier takes it.
+  assert.deepEqual(choice.offers, { cloud: true, fast: true, quality: true });
+  // With one first-frame profile there is no choice: every tier takes it, and only its own is offered.
   const one = profiles.filter((profile) => profile.id !== "fl-fast");
   assert.equal(choose({ localRunning: true }, one).profile.id, "fl-quality");
-  assert.deepEqual(choose({ localRunning: true }, one).tiers, []);
-  assert.deepEqual(choice.offers, { local: true, cloud: true });
+  assert.deepEqual(choose({ localRunning: true }, one).offers, {
+    cloud: true,
+    fast: false,
+    quality: true,
+  });
 });
 
 test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather than fall back", () => {
   // Cloud goes to Grok without a note, even while local video runs.
   const cloud = choose({ localRunning: true, where: "cloud" });
-  assert.deepEqual([cloud.profile.id, cloud.note, cloud.tiers], ["grok-video", "", []]);
-  // Cloud offers Fast or Quality only when two Grok profiles differ by tier.
-  const grokFast = { ...grok, id: "grok-fast", label: "Grok · Fast" };
-  const tiered = choose({ localRunning: true, where: "cloud", tier: "quality" }, [
-    ...profiles,
-    { ...grok, label: "Grok · Quality" },
-    grokFast,
-  ]);
-  assert.deepEqual([tiered.profile.id, tiered.tiers], ["grok-video", ["fast", "quality"]]);
+  assert.deepEqual([cloud.profile.id, cloud.note], ["grok-video", ""]);
   assert.equal(choose({ localRunning: true, where: "local" }).profile.id, "fl-fast");
   // A stopped worker refuses with its reason, and the refusal still says what is offered.
   assert.throws(
     () => choose({ localRunning: false, localParked: true, where: "local" }),
     (error) =>
       /^Videos are Stopped .*, so Local GPU can't animate this right now\.$/.test(error.message) &&
-      error.offers.local &&
+      error.offers.fast &&
       error.offers.cloud,
   );
   const offline = profiles.map((p) => (p.family ? p : { ...p, availability: "offline" }));
@@ -73,7 +68,21 @@ test("Picking Cloud or Local GPU takes only that pool, and Local refuses rather 
   );
   assert.throws(
     () => choose({ localRunning: true, where: "local" }, [grok]),
-    (error) => /no local video profile/.test(error.message) && !error.offers.local,
+    (error) =>
+      /no local video profile/.test(error.message) && !error.offers.fast && !error.offers.quality,
+  );
+});
+
+test("A preferred Cloud runs on Grok, and on the local profile when the account has no Grok", () => {
+  const cloud = choose({ localRunning: true, prefer: "cloud" });
+  assert.deepEqual([cloud.profile.id, cloud.cloud, cloud.note], ["grok-video", true, ""]);
+  const local = choose(
+    { localRunning: true, prefer: "cloud" },
+    profiles.filter((profile) => profile !== grok),
+  );
+  assert.deepEqual(
+    [local.profile.id, local.note],
+    ["fl-fast", "Cloud isn't available to this account, so this runs on H3 FL · Fast."],
   );
 });
 

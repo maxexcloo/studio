@@ -183,7 +183,7 @@ export async function fixtures(page: Page) {
       spicyPrompts: false,
       tileCaptions: false,
       uncensoredModels: true,
-    },
+    } as Record<string, unknown>,
     saved: [] as string[],
     grants: { cloudModels: false, loras: false, spicyPrompts: false, uncensoredModels: false },
   };
@@ -291,8 +291,7 @@ export async function fixtures(page: Page) {
         profileId: "video:test",
         label: "Motion Quality",
         cloud: false,
-        tiers: [],
-        offers: { local: true, cloud: false },
+        offers: { cloud: false, fast: false, quality: true },
       });
     if (path === "/api/chat/status")
       return respond({
