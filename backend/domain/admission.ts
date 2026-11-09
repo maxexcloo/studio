@@ -1,7 +1,7 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { referencedResult } from "../../shared/versions.ts";
 import { GenerationQueue } from "./queue.ts";
-import { queuePriority, Store, type OwnedJob, type QueueOrigin } from "./store.ts";
+import { queuePriority, Store, type OwnedJob, type QueuedCopy, type QueueOrigin } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;
@@ -16,6 +16,8 @@ export interface GenerationScope {
   sessionId: string;
   operation: Exclude<GenerationOperation, "upscale">;
   parentJobId?: string;
+  /** The owner's result the run is made from, as the caller checked it. */
+  parentItemId?: string;
 }
 interface AdmissionOptions {
   store: Store;
@@ -79,42 +81,40 @@ export function createGenerationAdmission(options: AdmissionOptions) {
         if (checked.status >= 400) return checked;
         const title = String(input.prompt || "Generation").slice(0, 100);
         // MCP work (its queue tier) joins its conversation's Chat; other unscoped work gets its own.
-        const session =
-          scopedSession ||
-          (origin?.priority === queuePriority.mcp
-            ? options.store.mcpSession(
-                ownerId,
-                title,
-                input,
-                (input.chat as { conversationId?: string } | undefined)?.conversationId,
-              )
-            : options.store.createSession(ownerId, title, input));
+        const session = () =>
+          (
+            scopedSession ||
+            (origin?.priority === queuePriority.mcp
+              ? options.store.mcpSession(
+                  ownerId,
+                  title,
+                  input,
+                  (input.chat as { conversationId?: string } | undefined)?.conversationId,
+                )
+              : options.store.createSession(ownerId, title, input))
+          ).id;
+        // A profile that can't batch makes Count separate runs of one request: seed, seed+1, …
+        // or fresh random seeds, queued together as one set.
+        const copies = splitRuns(input, options.separateRuns?.(input));
+        const queueSet = copies.length > 1 ? origin?.queueSet || crypto.randomUUID() : undefined;
+        const queued: QueuedCopy[] = [];
+        for (const [index, copy] of copies.entries())
+          queued.push({
+            input: copy,
+            operation: scope?.operation || (input.kind === "video" ? "animate" : "image"),
+            parentJobId: scope?.parentJobId,
+            resource: await options.resourceFor(copy, origin?.priority),
+            requestedId: clientId ? (index ? `${clientId}-${index + 1}` : clientId) : undefined,
+            origin: {
+              ...origin,
+              ...(queueSet ? { queueSet } : {}),
+              // Otherwise a Chat run is made from its parent's result only when it uses it as its reference.
+              parentItemId: scope?.parentItemId ?? (parent && referencedResult(input, parent)),
+            },
+          });
+        let jobs: OwnedJob[];
         try {
-          // A profile that can't batch makes Count separate runs of one request: seed, seed+1, …
-          // or fresh random seeds, queued together as one set.
-          const copies = splitRuns(input, options.separateRuns?.(input));
-          const queueSet = copies.length > 1 ? origin?.queueSet || crypto.randomUUID() : undefined;
-          let first: OwnedJob | undefined;
-          for (const [index, copy] of copies.entries()) {
-            const queued = options.store.enqueue(
-              ownerId,
-              session.id,
-              copy,
-              scope?.operation || (input.kind === "video" ? "animate" : "image"),
-              scope?.parentJobId,
-              await options.resourceFor(copy, origin?.priority),
-              clientId ? (index ? `${clientId}-${index + 1}` : clientId) : undefined,
-              {
-                ...origin,
-                ...(queueSet ? { queueSet } : {}),
-                // A Chat run is made from its parent's result only when it uses it as its reference.
-                parentItemId: parent && referencedResult(input, parent),
-              },
-            );
-            first ??= queued;
-            if (index) options.admitted?.(queued);
-          }
-          job = first!;
+          jobs = options.store.enqueueAll(ownerId, session, queued);
         } catch (error) {
           const failure = error as Error & { code?: string };
           if (String(failure.code || "").startsWith("ERR_SQLITE"))
@@ -124,7 +124,8 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             };
           throw error;
         }
-        options.admitted?.(job);
+        for (const each of jobs) options.admitted?.(each);
+        job = jobs[0];
       }
       void options.queue.tick();
       const items = job.items.length

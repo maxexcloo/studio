@@ -14,6 +14,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
+const { openDatabase } = await import("./persistence/runtime.ts");
+const { Store } = await import("./domain/store.ts");
 const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
   import("./gallery/routes.js"),
   import("./gallery/store.js"),
@@ -29,7 +31,11 @@ registerGalleryReadRoutes(
       routes[route] = handler;
     },
   },
-  { jobChats: () => jobChats, near: async (q) => near(q) },
+  {
+    jobChats: () => jobChats,
+    near: async (q) => near(q),
+    store: new Store(openDatabase(":memory:")),
+  },
 );
 
 async function call(handler, req) {

@@ -182,8 +182,8 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     worker.setDown(true);
     dropAcknowledgement();
     await waitFor(
-      async () => (await api(`/api/jobs/${accepted.body.jobId}`)).body,
-      (job) => /Checking the recorded generation/.test(job.error || job.reason || ""),
+      async () => (await api("/api/queue")).body.jobs.find((job) => job.id === accepted.body.jobId),
+      (job) => /Checking the recorded generation/.test(job.reason),
     );
     const exited = once(child, "exit");
     child.kill("SIGTERM");

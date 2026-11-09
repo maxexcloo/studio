@@ -897,6 +897,25 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
+/** Dispatches one touch event at `y` on `target`, as a finger pressing, moving or lifting. */
+export async function touch(target: Locator, type: string, y = 100) {
+  await target.evaluate(
+    (element, { type, y }) => {
+      const contact = { identifier: 1, target: element, clientX: 100, clientY: y };
+      const touches = type === "touchend" ? [] : [contact];
+      const event = document.createEvent("TouchEvent");
+      event.initEvent(type, true, true);
+      Object.defineProperties(event, {
+        touches: { value: touches },
+        targetTouches: { value: touches },
+        changedTouches: { value: [contact] },
+      });
+      element.dispatchEvent(event);
+    },
+    { type, y },
+  );
+}
+
 /** A selection action beyond the bulk ones: on the desktop bar, or an item of the phone's More. */
 export async function selectionMenuItem(page: Page, label: string) {
   if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);

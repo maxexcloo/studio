@@ -60,10 +60,11 @@ the primary component reference and verify APIs against the installed version.
 - Empty views use `EmptyState`: one short, subdued line and at most the action
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
-- Search clears only its query. Filters preserve it. Controls opening a picker
-  or menu show ▾ when labelled; icon-only controls use accessible names and
-  tooltips. Menus group related actions, put the usual action first and Delete
-  last, and share their sizing and item style.
+- Search clears only its query. Filters preserve it. Toolbars open search from
+  an icon; the phone Chats list keeps it open, with New Chat at the row's end.
+  Controls opening a picker or menu show ▾ when labelled; icon-only controls
+  use accessible names and tooltips. Menus group related actions, put the usual
+  action first and Delete last, and share their sizing and item style.
 
 ## Layers, Focus & Phones
 
@@ -95,8 +96,10 @@ the primary component reference and verify APIs against the installed version.
   visible names where tooltips cannot explain them. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
-  another overlay. Hold-to-select cancels on movement, and its release must
-  not also open the viewer.
+  another overlay. On phones, Chats rows and gallery tiles without Tile Captions
+  hide their menu button and open that menu on hold; other gallery tiles hold
+  to select. Holds cancel on movement and their release opens nothing.
+  Right-click, the Menu key and Shift+F10 open the same menu.
 
 ## Generation & Media
 
@@ -106,10 +109,11 @@ the primary component reference and verify APIs against the installed version.
   changing the original; do not bypass it with a direct queue request.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
-  Reference order, explicit slot IDs and source-result lineage survive edits
-  and reordering; optional End-only inputs and one asset in several roles work.
-  Group compatible linked slots by their declared capacity rather than a
-  global reference limit.
+  Profile options carry short facts (model or family · kind · Cloud or Local
+  GPU), not prose. Reference order, explicit slot IDs and source-result lineage
+  survive edits and reordering; optional End-only inputs and one asset in
+  several roles work. Group compatible linked slots by their declared capacity
+  rather than a global reference limit.
 - Selected LoRAs retain enable, strength and pointer/keyboard ordering controls
   when filters hide them. Saved stacks preserve family keys, order, strengths
   and disabled entries. Trigger words are applied when submitting, without
@@ -149,10 +153,11 @@ the primary component reference and verify APIs against the installed version.
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay
   videos and comparison is an image action.
-- Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying tile videos. Release a closed viewer's player and pause
-  playback when the tab hides. Heavy tools load only when opened. Paging keeps
-  loaded results and offers retry on failure. Failed images show no broken icon.
+- Pinned phone tile captions keep to two lines and leave out the time. Reserve
+  media dimensions, virtualise large galleries, lazy-load images and avoid
+  autoplaying tile videos. Release a closed viewer's player and pause playback
+  when the tab hides. Heavy tools load only when opened. Paging keeps loaded
+  results and offers retry on failure. Failed images show no broken icon.
 
 ## Data & Feedback
 

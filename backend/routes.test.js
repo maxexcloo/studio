@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import sharp from "sharp";
 import { fileURLToPath } from "node:url";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
@@ -19,7 +20,14 @@ const snapshot = fs
 const objectInfo = JSON.parse(fs.readFileSync(path.join(here, "fixtures", snapshot), "utf8"));
 objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 
-const fake = await startFakeComfy({ objectInfo });
+// The run's output, which Studio moves into its media before the job completes.
+const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: "white" } })
+  .png()
+  .toBuffer();
+const fake = await startFakeComfy({
+  objectInfo,
+  outputFiles: new Map([["route_00001_.png", png]]),
+});
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-routes-"));
 writeTestWorkflows(dataDir);
 let server;
@@ -143,7 +151,8 @@ test("a ready profile runs a generate request to the gallery", async () => {
   const gallery = await api("/api/gallery?limit=20");
   const item = gallery.body.items.find((entry) => entry.jobId === jobId);
   assert.equal(item.status, "done");
-  assert.equal(item.url, "/comfy/view?filename=route_00001_.png&subfolder=&type=output");
+  // Moved into Studio's media before the job completed.
+  assert.equal(new URL(item.url, base).searchParams.get("type"), "media");
 });
 
 test("a generate request with no prompt is refused plainly", async () => {

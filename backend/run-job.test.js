@@ -18,6 +18,11 @@ process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-
 writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery/store.js");
+const { registerJobRoutes } = await import("./job-routes.js");
+const { openDatabase } = await import("./persistence/runtime.ts");
+const { createGenerationQueueAdapter } = await import("./domain/generation-adapter.ts");
+const { GenerationQueue } = await import("./domain/queue.ts");
+const { Store } = await import("./domain/store.ts");
 test.after(() => fake.close());
 
 const socketsBuiltIn = typeof WebSocket === "function";
@@ -165,3 +170,73 @@ test("a cancel before dispatch finishes without submitting provider work", async
   assert.equal(jobs.get(id).status, "canceled");
   assert.equal(store.gallery.find((entry) => entry.jobId === id).status, "canceled");
 });
+
+test(
+  "cancelling the queue during Smart upscale keeps the picture",
+  { skip: !socketsBuiltIn },
+  async () => {
+    const id = "job-upscale-cancel";
+    const body = sdxlRequest();
+    const records = new Store(openDatabase(":memory:"));
+    records.enqueue("", records.createSession("").id, body, "image", undefined, undefined, id);
+    const queued = fake.nextPrompt();
+    let running;
+    const generations = new GenerationQueue(
+      records,
+      createGenerationQueueAdapter({
+        async submitGeneration() {
+          queue(id, body);
+          // The run's own save feeds the upscale, as planRunUpscale pairs them.
+          const prepare = (graph) => ({
+            graph,
+            pairs: [
+              {
+                base: Object.entries(graph).find(([, node]) => node.class_type === "SaveImage")[0],
+                upscale: "upscale",
+              },
+            ],
+          });
+          running = runJob(id, body, { prepare });
+          return { status: 200, payload: { items: [] } };
+        },
+        jobs,
+        gallery: () => store.gallery,
+        accountForOwner: () => null,
+        flushGallery: async () => undefined,
+        cancelPrompt: async () => {
+          fake.send(id, { type: "execution_interrupted", data: { prompt_id: prompt.id } });
+        },
+      }),
+    );
+    const routes = new Map();
+    registerJobRoutes(
+      { get() {}, post: (route, handler) => routes.set(route, handler) },
+      { store: records, queue: generations },
+    );
+    await generations.tick();
+    const prompt = await queued;
+    await fake.socketFor(id);
+    const save = Object.entries(prompt.prompt).find(
+      ([, node]) => node.class_type === "SaveImage",
+    )[0];
+    fake.send(id, {
+      type: "executed",
+      data: {
+        prompt_id: prompt.id,
+        node: save,
+        output: { images: [{ filename: "kept_00001_.png", subfolder: "studio", type: "output" }] },
+      },
+    });
+    await waitFor(() => jobs.get(id)?.keepsPicture, "the saved picture");
+    await routes.get("/api/queue/cancel")({ params: {} }, { json() {} });
+    await running;
+    const item = store.gallery.find((entry) => entry.jobId === id);
+    assert.equal(item.status, "done");
+    assert.equal(item.url, "/comfy/view?filename=kept_00001_.png&subfolder=studio&type=output");
+    assert.equal(item.upscale.status, "canceled");
+    await generations.tick();
+    assert.equal(records.job("", id).status, "completed");
+    assert.equal(records.job("", id).outputs.length, 1);
+    records.close();
+  },
+);

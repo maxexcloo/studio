@@ -4,7 +4,11 @@ import type { OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
 interface GenerationAdapterOptions {
-  generate(req: RecordValue, res: RecordValue): Promise<unknown>;
+  /** generation-routes.js's: starts the job on its worker. */
+  submitGeneration(
+    job: OwnedJob,
+    account?: RecordValue,
+  ): Promise<{ status: number; payload: RecordValue }>;
   jobs: Map<string, RecordValue>;
   gallery(): RecordValue[];
   accountForOwner(ownerId: string): RecordValue | null;
@@ -16,7 +20,7 @@ interface GenerationAdapterOptions {
   settled?(job: OwnedJob): Promise<void>;
 }
 
-/** The old HTTP contract and the queue call the same generation domain entry point. */
+/** The queue's local generations: generation-routes.js runs them, jobs.js reports their live state. */
 export function createGenerationQueueAdapter(options: GenerationAdapterOptions): QueueAdapter {
   const ownedItems = (job: OwnedJob) =>
     options
@@ -62,32 +66,7 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
       const account = job.ownerId ? options.accountForOwner(job.ownerId) : null;
       if (job.ownerId && (!account || account.authenticated === false))
         return { status: "failed", reason: "This account no longer has access." };
-      let status = 200;
-      let payload: RecordValue | undefined;
-      const res: RecordValue = {
-        headersSent: false,
-        status(code: number) {
-          status = code;
-          return res;
-        },
-        json(value: RecordValue) {
-          payload = value;
-          res.headersSent = true;
-          return res;
-        },
-      };
-      await options.generate(
-        {
-          body: { ...job.input, clientJobId: job.id },
-          studioAccount: account || undefined,
-          studioQueueBackend: job.backend,
-          // Only the queue record marks Dream work; a request body cannot.
-          studioDream: job.dream,
-          headers: {},
-        },
-        res,
-      );
-      if (!payload) throw new Error("Generation did not acknowledge its submission.");
+      const { status, payload } = await options.submitGeneration(job, account || undefined);
       if (status >= 400)
         return {
           status: "failed",
