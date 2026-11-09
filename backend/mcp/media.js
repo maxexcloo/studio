@@ -56,9 +56,11 @@ const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
 const maxReferenceScopes = 5000;
 // Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
-  "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then call search with uploads: true to use it.";
+  "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then pass its reference_asset_id to generate.";
 // An upload link (UploadLink) takes one image within this time.
 export const uploadLinkMinutes = 15;
+// The reference an upload link hands out before its image arrives (uploadUrl), which referenceId resolves.
+const uploadReferencePattern = /^upload-link:[A-Za-z0-9_-]{16}$/;
 const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
 // The largest reference image Upload and the upload link take, and the base64 text it makes.
 export const maxUploadMegabytes = 20;
@@ -231,6 +233,13 @@ export class McpMedia {
       Array.isArray(this.state.prompts)
     )
       this.state.prompts = {};
+    // Each used upload link's reference → the asset its image became.
+    if (
+      !this.state.uploads ||
+      typeof this.state.uploads !== "object" ||
+      Array.isArray(this.state.uploads)
+    )
+      this.state.uploads = {};
     this.cloudUnavailableUntil = 0;
     this.linkIds = new Map(
       Object.entries(this.state.links).map(([id, link]) => [
@@ -1058,8 +1067,9 @@ export class McpMedia {
     }
   }
   /**
-   * A one-time upload page's link (UploadLink) for the owner: sealed like a result link, it takes
-   * one image within uploadLinkMs. Open links are held in memory only, so a restart ends them.
+   * A one-time upload page's link (UploadLink) for the owner and the reference its image becomes:
+   * sealed like a result link, it takes one image within uploadLinkMs. Open links are held in
+   * memory only, so a restart ends them.
    */
   uploadUrl(owner) {
     const now = Date.now();
@@ -1068,8 +1078,9 @@ export class McpMedia {
     const nonce = crypto.randomBytes(16).toString("base64url");
     const expires = now + uploadLinkMs;
     this.uploadLinks.set(nonce, expires);
-    const token = this.seal("u2", { audience: this.publicUrl, owner, nonce, expires });
-    return { url: `${this.publicUrl}/mcp/results/upload/${token}`, expires };
+    const reference = `upload-link:${crypto.randomBytes(12).toString("base64url")}`;
+    const token = this.seal("u2", { audience: this.publicUrl, owner, nonce, expires, reference });
+    return { url: `${this.publicUrl}/mcp/results/upload/${token}`, expires, reference };
   }
   /** An open upload link's claims, or a throw once it is used, expired, altered or for another studio. */
   uploadClaims(token) {
@@ -1088,11 +1099,22 @@ export class McpMedia {
   async uploadByLink(claims, file, credential) {
     if (!this.uploadLinks.delete(claims.nonce)) throw new Error("Invalid upload link.");
     try {
-      return (await this.store(claims.owner, file.buffer, file.name, { credential })).asset;
+      const { asset } = await this.store(claims.owner, file.buffer, file.name, { credential });
+      this.state.uploads[claims.reference] = asset.id;
+      this.save();
+      return asset;
     } catch (error) {
       if (claims.expires > Date.now()) this.uploadLinks.set(claims.nonce, claims.expires);
       throw error;
     }
+  }
+  /** A reference_asset_id, with an upload link's reference resolved to the asset its image became. */
+  referenceId(id) {
+    if (!uploadReferencePattern.test(id)) return id;
+    if (Object.hasOwn(this.state.uploads, id)) return this.state.uploads[id];
+    throw new Error(
+      "The user hasn't uploaded the image through its upload link yet. Ask them to, then call again; if the link has expired, call upload_link for a new one.",
+    );
   }
   linkKey(audience, owner, jobId, index) {
     return JSON.stringify([audience, owner, jobId, index ?? "page"]);

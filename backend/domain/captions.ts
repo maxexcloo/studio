@@ -34,9 +34,9 @@ export const captionVersion = createHash("sha256")
   .slice(0, 12);
 
 /**
- * Captions finished gallery images while Studio is idle (domain/idle-work.ts): a trickle of new
- * images, or an administrator's Caption Gallery pass, which also redoes captions from an older
- * format. Only while the running text model reads images, and never with cloud.
+ * Captions finished gallery images, Dream's pool included, while Studio is idle
+ * (domain/idle-work.ts): a trickle of new images, or an administrator's Caption Gallery pass, which
+ * also redoes captions from an older format. Only while the running text model reads images, and never with cloud.
  */
 export function createCaptioner(options: {
   /** The Settings › Generation switch (STUDIO_GALLERY_CAPTIONS). */
