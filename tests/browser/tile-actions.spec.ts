@@ -343,3 +343,25 @@ for (const surface of ["tile", "viewer"]) {
     expect(state.jobs[1].sessionId).not.toBe("owned-session");
   });
 }
+
+test("On a phone held sideways, the tile menu fits the screen and expands options in place", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+  await page.setViewportSize({ width: 844, height: 390 });
+  await galleryFixture(page);
+  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  const bottom = async () => {
+    const box = (await menu.boundingBox())!;
+    return box.y + box.height;
+  };
+  await expect.poll(bottom).toBeLessThanOrEqual(390);
+  await page.getByRole("menuitem", { name: "Copy", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Copy", exact: true })).toBeVisible();
+  // Delete, last, is reachable by scrolling inside the menu.
+  const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
+  await remove.scrollIntoViewIfNeeded();
+  await expect(remove).toBeInViewport();
+});
