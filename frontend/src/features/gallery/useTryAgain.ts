@@ -24,7 +24,7 @@ export function useTryAgain(items: MediaItem[]) {
         }
       }
       const replaced = items
-        .filter((item) => item.status === "error" && accepted.has(item.jobId || ""))
+        .filter((item) => item.status === "failed" && accepted.has(item.jobId || ""))
         .map((item) => item.id);
       if (replaced.length) await post("/api/gallery/delete", { ids: replaced }).catch(() => {});
       if (accepted.size) await client.invalidateQueries({ queryKey: ["gallery"] });

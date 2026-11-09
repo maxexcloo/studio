@@ -214,7 +214,8 @@ export function registerGalleryErrorRoutes(app) {
     const mine = (item) => recordBelongsToAccount(item, account);
     const owned =
       owner === undefined ? mine : owner === "all" ? () => true : (item) => item.ownerId === owner;
-    const clears = (item) => owned(item) && (item.status === "error" || item.status === "canceled");
+    const clears = (item) =>
+      owned(item) && (item.status === "failed" || item.status === "cancelled");
     const cleared = gallery.filter(clears);
     hideGalleryItems(cleared);
     setGallery(gallery.filter((item) => !clears(item)));

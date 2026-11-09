@@ -138,11 +138,11 @@ test("a run ComfyUI fails is kept as a failure that says why", async () => {
   });
   await running;
   const job = jobs.get(id);
-  assert.equal(job.status, "error");
+  assert.equal(job.status, "failed");
   assert.equal(job.failure.title, "The GPU ran out of memory");
   assert.equal(job.failure.nodeType, "KSampler");
   const item = store.gallery.find((entry) => entry.jobId === id);
-  assert.equal(item.status, "error");
+  assert.equal(item.status, "failed");
   assert.equal(item.filename, "The GPU ran out of memory");
 });
 
@@ -155,7 +155,7 @@ test("a run that ends without an image is a failure, not a vanished tile", async
   const prompt = await queued;
   fake.finish(prompt.id, { outputs: {} });
   await running;
-  assert.equal(jobs.get(id).status, "error");
+  assert.equal(jobs.get(id).status, "failed");
   assert.equal(jobs.get(id).failure.title, "No image was saved");
   assert.equal(store.gallery.filter((entry) => entry.jobId === id).length, 1);
 });
@@ -164,12 +164,12 @@ test("a cancel before dispatch finishes without submitting provider work", async
   const id = "job-cancel";
   const body = sdxlRequest();
   queue(id, body);
-  jobs.set(id, { ...jobs.get(id), status: "canceling" });
+  jobs.set(id, { ...jobs.get(id), status: "cancelling" });
   const submitted = fake.prompts.length;
   await runJob(id, body);
   assert.equal(fake.prompts.length, submitted);
-  assert.equal(jobs.get(id).status, "canceled");
-  assert.equal(store.gallery.find((entry) => entry.jobId === id).status, "canceled");
+  assert.equal(jobs.get(id).status, "cancelled");
+  assert.equal(store.gallery.find((entry) => entry.jobId === id).status, "cancelled");
 });
 
 test(
@@ -234,7 +234,7 @@ test(
     const item = store.gallery.find((entry) => entry.jobId === id);
     assert.equal(item.status, "done");
     assert.equal(item.url, "/comfy/view?filename=kept_00001_.png&subfolder=studio&type=output");
-    assert.equal(item.upscale.status, "canceled");
+    assert.equal(item.upscale.status, "cancelled");
     await generations.tick();
     assert.equal(records.job("", id).status, "completed");
     assert.equal(records.job("", id).outputs.length, 1);

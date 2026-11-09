@@ -38,7 +38,7 @@ test("server pages and client merges put blank imports last, newest first within
     item("generation", "2026-01-02"),
     item("history-import", "2026-01-05", { prompt: " \n ", jobId: "comfy-history" }),
     item("pending", "2026-01-03", { status: "pending", prompt: "" }),
-    item("failed", "2026-01-04", { status: "error", prompt: "" }),
+    item("failed", "2026-01-04", { status: "failed", prompt: "" }),
   ];
   const expected = ["failed", "pending", "generation", "history-import", "import-old"];
   assert.deepEqual(ids(sortGallery(items)), expected);

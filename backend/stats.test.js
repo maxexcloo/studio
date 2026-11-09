@@ -18,7 +18,7 @@ test("counts outputs, render time and megapixels, ignoring unfinished items", ()
     [
       done(at(2026, 9, 1)),
       done(at(2026, 9, 1), { type: "video" }),
-      { status: "error", createdAt: at(2026, 9, 1) },
+      { status: "failed", createdAt: at(2026, 9, 1) },
     ],
     new Date(2026, 8, 1),
   );
@@ -67,10 +67,10 @@ test("profile stats count the last 30 days and flag a profile failing most of it
     [
       run("steady", "done", 1, { favorite: true, timing: { runMs: 9000 } }),
       run("steady", "done", 2, { timing: { runMs: 11000 } }),
-      run("steady", "error", 3),
-      run("steady", "canceled", 1),
+      run("steady", "failed", 3),
+      run("steady", "cancelled", 1),
       run("steady", "done", 40),
-      ...Array.from({ length: 5 }, (_, index) => run("broken", index ? "error" : "done", index)),
+      ...Array.from({ length: 5 }, (_, index) => run("broken", index ? "failed" : "done", index)),
     ],
     now,
   );

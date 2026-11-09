@@ -16,7 +16,7 @@ import { terminalStatuses } from "../../../../shared/queue";
 
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>
-  ["done", "error", "canceled"].includes(String(item.status));
+  ["done", "failed", "cancelled"].includes(String(item.status));
 const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 function useItemJob(item: MediaItem) {
@@ -40,7 +40,7 @@ function TileStatus({
   const motionDuration = useMotionDuration();
   const [retrying, setRetrying] = useState(false);
   const active = !finished(item);
-  const failed = item.status === "error";
+  const failed = item.status === "failed";
   const progress = job?.progress;
   const percent = active && progress?.max ? Math.round(progressPercent(progress)) : undefined;
   const label = active

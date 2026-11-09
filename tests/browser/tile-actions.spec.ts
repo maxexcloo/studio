@@ -250,7 +250,7 @@ test("A reference placed by hand applies the profile's reference-mode settings",
 test("A failed tile retries its owned durable job and refreshes the gallery", async ({ page }) => {
   const state = await galleryFixture(page);
   state.jobs[0].status = "failed";
-  state.gallery[0].status = "error";
+  state.gallery[0].status = "failed";
   state.gallery[0].url = "";
   let attempts = 0;
   let release!: () => void;

@@ -237,7 +237,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
       id: name,
       prompt: `Failed ${name}`,
       jobId: index < 2 ? "batch-a" : "batch-b",
-      status: "error",
+      status: "failed",
       url: "",
     })),
     { ...results(1)[0], id: "ready", prompt: "Ready result" },
@@ -375,7 +375,7 @@ test("Running tiles show progress with Stop and Retry replaces a failed tile", a
       id: "failed",
       jobId: "failed-job",
       prompt: "Failed study",
-      status: "error",
+      status: "failed",
     },
   );
   await page.route("**/api/queue/failed-job/retry", async (route) => {
@@ -424,7 +424,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   });
   state.gallery.push(
     { ...results(1)[0], id: "live", jobId: "live-job", prompt: "Live study", status: "pending" },
-    { ...results(1)[0], id: "failed", prompt: "Failed study", status: "error", url: "" },
+    { ...results(1)[0], id: "failed", prompt: "Failed study", status: "failed", url: "" },
     ...results(4),
   );
   await page.goto("/images");

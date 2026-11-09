@@ -253,7 +253,7 @@ test("a failed download or a checksum mismatch never touches the old file", asyn
     alternative: true,
   });
   h.state.queued = [];
-  h.state.recent = [{ id: applied.downloadId, status: "error", error: "Network lost." }];
+  h.state.recent = [{ id: applied.downloadId, status: "failed", error: "Network lost." }];
   const failed = (await h.checker.settle()).applied["checkpoints/nightfall-v1-fp8.safetensors"];
   assert.deepEqual([failed.state, failed.note], ["failed", "Network lost."]);
   assert.equal(h.removed.length, 0);
