@@ -8,6 +8,7 @@ import {
   CloseButton,
   Collapse,
   Combobox,
+  ComboboxPopover,
   createTheme,
   Drawer,
   FloatingIndicator,
@@ -240,8 +241,10 @@ export function studioTheme({
           transitionTimingFunction: easing.enter,
         },
       }),
-      // Option rows (here the chips' lists; Select and MultiSelect below) are touch targets on phones.
+      // Option rows are touch targets on phones: Recent Prompts here, the chips' lists
+      // (ComboboxPopover) next, and Select and MultiSelect below.
       Combobox: Combobox.extend({ styles: { option: touch } }),
+      ComboboxPopover: ComboboxPopover.extend({ styles: { option: touch } }),
       Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
