@@ -17,19 +17,19 @@ Studio never reads ComfyUI's folders: outputs come into [Studio media storage](#
 Studio runs on zero, one or many ComfyUI workers. Each has a stable id, a name,
 an address and what it can do:
 
-| Capability | Runs                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| `image`    | Image generation                                                                                  |
-| `video`    | Local video generation                                                                            |
-| `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too |
-| `models`   | Holds the model library and receives model and LoRA downloads                                     |
+| Capability | Runs                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| `image`    | Image generation                                                                                              |
+| `video`    | Local video generation                                                                                        |
+| `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the worker running the image too |
+| `models`   | Holds the model library and receives model and LoRA downloads                                                 |
 
 The deployment defines the workers; Studio does not edit them:
 
 ```bash
 STUDIO_WORKERS='[
-  {"id": "primary", "name": "Image Worker", "url": "http://comfyui-image:8188", "capabilities": ["image", "upscale", "models"]},
-  {"id": "video", "name": "Video Worker", "url": "http://comfyui-video:8188", "capabilities": ["video"]}
+  {"id": "primary", "name": "Primary", "url": "http://comfyui-primary:8188", "capabilities": ["image", "video", "upscale", "models"]},
+  {"id": "secondary", "name": "Secondary", "url": "http://comfyui-secondary:8188", "capabilities": ["image", "video", "upscale"]}
 ]'
 ```
 
@@ -470,11 +470,11 @@ Studio switches the GPU workloads itself: each is a Kubernetes deployment it sca
 
 ```bash
 STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
-STUDIO_KUBERNETES_NAMESPACES=comfyui,comfyui-video,text
+STUDIO_KUBERNETES_NAMESPACES=comfyui-image,comfyui-video,text
 STUDIO_LOCAL_TEXT_MODEL=local/auto
 ```
 
-Each deployment states the rest itself. Its name is the workload id; its pool is the value of its pod node selector that names a `STUDIO_KUBERNETES_GPUS` pool; its GPUs are the exact device counts of its pod's resource claim templates; its address is `http://<service>.<namespace>.svc.cluster.local:<port>`, from the one Service selecting its pods and that Service's first port, which several deployments may share. Workloads are listed by namespace, then name, and the first of several at one address is the one to start. Optional annotations under `studio.excloo.dev/` add `label` (its display name, else its id), `vision: "true"` for text workloads that read images, and, for media, `worker` and `capabilities`. Without `STUDIO_WORKERS`, each address of the image and video workloads is one [worker](#workers): `worker` gives its id (else the first workload's id; keep `primary` and `video` so earlier jobs keep their worker) and `capabilities` what it runs, comma-separated (else the workloads' kinds); with `STUDIO_WORKERS`, media workloads match their worker by address. Text workloads all serve `STUDIO_LOCAL_TEXT_MODEL`, the gateway model the [prompt assistant](#prompt-assistant) asks for while one runs, and take `STUDIO_TEXT_KEY` as their health check's bearer key; both are required once a text workload exists. Chat shows administrators that model while its workloads are stopped, and choosing it starts the first that fits beside what runs (or, confirmed, stops what it needs room from, media first); other accounts see it while one of its workloads runs, and marked Stopped, unchoosable, while all are parked. Anything missing or ambiguous, such as no pool or two Services selecting one deployment, stops Studio at start with the deployment's name; restart Studio after adding or changing a workload. Studio uses its pod's service account, which needs a role in each listed namespace to list deployments, Services and `resourceclaimtemplates`, read pods and update `deployments/scale`, and `get` on `pods/log` for each workload's View Log (`GET /api/runtime/workloads/:id/logs?lines=200`, 1–1000; without it Studio answers 503 "Pod logs aren't permitted yet" and the rest of Settings › Workers keeps working); `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+Each deployment states the rest itself. Its name is the workload id; its pool is the value of its pod node selector that names a `STUDIO_KUBERNETES_GPUS` pool; its GPUs are the exact device counts of its pod's resource claim templates; its address is `http://<service>.<namespace>.svc.cluster.local:<port>`, from the one Service selecting its pods and that Service's first port, which several deployments may share. Workloads are listed by namespace, then name, and the first of several at one address is the one to start. Optional annotations under `studio.excloo.dev/` add `label` (its display name, else its id), `vision: "true"` for text workloads that read images, and, for media, `worker` and `capabilities`. Without `STUDIO_WORKERS`, each address of the image and video workloads is one [worker](#workers): `worker` gives its id (else the first workload's id; keep ids stable so earlier jobs keep their worker), the first workload's `label` its name, and `capabilities` what it runs, comma-separated (else the workloads' kinds); with `STUDIO_WORKERS`, media workloads match their worker by address. Text workloads all serve `STUDIO_LOCAL_TEXT_MODEL`, the gateway model the [prompt assistant](#prompt-assistant) asks for while one runs, and take `STUDIO_TEXT_KEY` as their health check's bearer key; both are required once a text workload exists. Chat shows administrators that model while its workloads are stopped, and choosing it starts the first that fits beside what runs (or, confirmed, stops what it needs room from, media first); other accounts see it while one of its workloads runs, and marked Stopped, unchoosable, while all are parked. Anything missing or ambiguous, such as no pool or two Services selecting one deployment, stops Studio at start with the deployment's name; restart Studio after adding or changing a workload. Studio uses its pod's service account, which needs a role in each listed namespace to list deployments, Services and `resourceclaimtemplates`, read pods and update `deployments/scale`, and `get` on `pods/log` for each workload's View Log (`GET /api/runtime/workloads/:id/logs?lines=200`, 1–1000; without it Studio answers 503 "Pod logs aren't permitted yet" and the rest of Settings › Workers keeps working); `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
 **Settings › Workers** shows each workload's state, GPU use and why a pod is not ready (such as a GPU claim that cannot be allocated). An administrator ticks the workloads that should run and reviews a preview before applying it; every workload left out stops. Restart scales a running workload to 0 and back. One change runs at a time: Studio stops accepting new work on the workloads that leave, waits for their accepted work to finish and save, scales them to 0, waits for their pods to go (their GPU claims are released only then), then starts the others and waits for them to be ready. Each change is recorded with its requester, timestamps, steps and the placement before and after, and the history survives restarts; a change cut short by a restart is marked interrupted. A deployment stopped outside Studio, such as by a Flux upgrade that resets replicas, shows as changed outside Studio.
 
