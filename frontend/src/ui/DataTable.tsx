@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Group,
@@ -13,6 +13,7 @@ import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
+import { usePhone } from "./usePhone";
 
 interface DataColumn<T> {
   key: string;
@@ -20,7 +21,10 @@ interface DataColumn<T> {
   cell: (row: T) => ReactNode;
   /** Makes the header sort the rows by this value; missing values sort last. */
   sortValue?: (row: T) => string | number | undefined;
-  /** Hides the column on smaller screens; put what it shows in the main cell there instead. */
+  /**
+   * Hides the column on smaller screens; put what it shows in the main cell there instead. Phones
+   * fold the other secondary columns (those without it) into the main cell themselves.
+   */
   visibleFrom?: MantineBreakpoint;
   width?: number;
   /** The column that takes the free width and lets its text truncate. */
@@ -39,7 +43,9 @@ function compare(a: string | number | undefined, b: string | number | undefined)
  * Every list of records renders through this one Mantine table: sortable headers, the section's
  * text query, one empty line, a loading state and a row actions menu. Rows are named by `rowName`
  * for their accessible label and the actions trigger. Without `initialSort` rows keep the order
- * they arrive in, which matters for queues and histories.
+ * they arrive in, which matters for queues and histories. Phones keep the main column and the
+ * actions, with the other columns' cells under the main cell's content (UI-PATTERNS › Theme &
+ * Layout); editable grids (`minWidth`) keep theirs and scroll.
  */
 export function DataTable<T>({
   label,
@@ -77,6 +83,10 @@ export function DataTable<T>({
   minWidth?: number;
 }) {
   const [sort, setSort] = useState<Sort | undefined>(initialSort);
+  const phone = usePhone();
+  const fold = phone && !minWidth && columns.some((column) => column.main);
+  const folded = fold ? columns.filter((column) => !column.main && !column.visibleFrom) : [];
+  const shown = columns.filter((column) => !folded.includes(column));
   if (loading) return <LoadingState label={loading} />;
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matching =
@@ -102,7 +112,7 @@ export function DataTable<T>({
     <Table aria-label={label} verticalSpacing="xs" highlightOnHover>
       <Table.Thead>
         <Table.Tr>
-          {columns.map((column) => {
+          {shown.map((column) => {
             const active = sort?.key === column.key;
             const Icon = !active ? ChevronsUpDown : sort.descending ? ChevronDown : ChevronUp;
             return (
@@ -154,7 +164,7 @@ export function DataTable<T>({
           const actions = rowActions?.(row);
           return (
             <Table.Tr key={rowKey(row)} aria-label={name}>
-              {columns.map((column) => (
+              {shown.map((column) => (
                 <Table.Td
                   key={column.key}
                   visibleFrom={column.visibleFrom}
@@ -162,6 +172,13 @@ export function DataTable<T>({
                   w={column.main ? "100%" : undefined}
                 >
                   {column.cell(row)}
+                  {column.main && folded.length > 0 && (
+                    <Group gap="xs" mt={4}>
+                      {folded.map((other) => (
+                        <Fragment key={other.key}>{other.cell(row)}</Fragment>
+                      ))}
+                    </Group>
+                  )}
                 </Table.Td>
               ))}
               {rowActions && (
