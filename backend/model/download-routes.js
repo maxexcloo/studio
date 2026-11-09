@@ -1,52 +1,55 @@
 import { refreshWorkerModels } from "../worker-models.js";
 import { catalogueDownload } from "../catalogue-downloads.js";
 import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
-import { requireAdmin } from "../route-access.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { adminRefusal } from "../route-access.js";
 import { libraryDownload } from "../library/downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
-  app.use("/api/models/downloads", async (req, res, next) => {
-    try {
-      await refreshWorkerModels();
-      next();
-    } catch (error) {
-      res.status(503).json({ ok: false, error: error.message });
-    }
-  });
+  // Every downloads answer starts from the worker's current files.
+  const route = (method, path, run) =>
+    directRoute(app, method, path, async (account, input) => {
+      try {
+        await refreshWorkerModels();
+      } catch (error) {
+        return { status: 503, payload: { ok: false, error: error.message } };
+      }
+      return run(account, input);
+    });
 
-  app.get("/api/models/downloads", (_req, res) => {
-    res.json({ ok: true, ...downloadState() });
-  });
+  route("GET", "/api/models/downloads", () => ({
+    status: 200,
+    payload: { ok: true, ...downloadState() },
+  }));
 
   // Catalogue files and provider previews resolved on the server are accepted
   // by ID; this route never accepts a browser-supplied download address.
-  app.post("/api/models/downloads", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const spec = catalogueDownload(req.body?.id) || libraryDownload(String(req.body?.id || ""));
-    if (!spec) {
-      res.status(400).json({ ok: false, error: "Unknown file." });
-      return;
-    }
+  route("POST", "/api/models/downloads", async (account, { body }) => {
+    const refused = adminRefusal(account);
+    if (refused) return refused;
+    const spec = catalogueDownload(body?.id) || libraryDownload(String(body?.id || ""));
+    if (!spec) return { status: 400, payload: { ok: false, error: "Unknown file." } };
     try {
       const download = await startDownload(spec);
       // Already on disk: rescan now so the model page catches up without another click.
       if (download?.already) await loadComfyContext({ force: true }).catch(() => null);
-      res.json({ ok: true, download, ...downloadState() });
+      return { status: 200, payload: { ok: true, download, ...downloadState() } };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
-  app.post("/api/models/downloads/cancel", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const id = String(req.body?.id || "");
-    const spec = req.body?.discard ? catalogueDownload(id) || libraryDownload(id) : null;
+  route("POST", "/api/models/downloads/cancel", async (account, { body }) => {
+    const refused = adminRefusal(account);
+    if (refused) return refused;
+    const id = String(body?.id || "");
+    const spec = body?.discard ? catalogueDownload(id) || libraryDownload(id) : null;
     try {
       if (spec) await discardDownload(spec);
       else cancelDownload(id);
-      res.json({ ok: true, ...downloadState() });
+      return { status: 200, payload: { ok: true, ...downloadState() } };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 }

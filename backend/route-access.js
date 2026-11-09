@@ -31,10 +31,39 @@ export function requireAdmin(req, res) {
 }
 
 /**
- * Whether an administrator's request came from chat: MCP's admin tools (mcp-admin.js) call the same
- * routes as the UI with MCP's administrator credential, so imports, catalogue edits and profile
- * versions record their origin as chat.
+ * requireLocal and requireAdmin for a shared route's account (domain/direct-route.ts): the refusal
+ * to answer, or null. Single-user mode answers only this computer before any route runs, and
+ * a personal MCP token never carries administrator authority.
  */
-export function fromChat(req) {
-  return req?.studioAccount?.credential === "mcp-admin";
+export function localRefusal(account) {
+  if (adminAccount(account)) return null;
+  return {
+    status: 403,
+    payload: { ok: false, error: "This action is restricted to administrators." },
+  };
+}
+export function adminRefusal(account) {
+  if (adminAccount(account)) return null;
+  return {
+    status: 403,
+    payload: {
+      ok: false,
+      reason: "computer-only",
+      error: "Do this on the computer running Studio, or as an administrator.",
+    },
+  };
+}
+function adminAccount(account) {
+  return (
+    !multiUserEnabled || (account?.role === "administrator" && account.credential !== "mcp-token")
+  );
+}
+
+/**
+ * Whether an administrator's call came from chat: MCP's admin tools (mcp/admin.js) call the same
+ * routes as the UI as MCP's administrator, so imports, catalogue edits and profile versions record
+ * their origin as chat.
+ */
+export function fromChat(account) {
+  return account?.credential === "mcp-admin";
 }

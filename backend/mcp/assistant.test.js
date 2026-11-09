@@ -8,6 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { createChatAssistantMemory } from "./assistant.js";
+import { fakeStudio } from "../fixtures/fake-studio.js";
 
 const gateway = {
   STUDIO_ASSISTANT_URL: "http://fixture-writer.invalid:4000",
@@ -107,6 +108,7 @@ async function fixture(t, environment = gateway) {
   let base;
   registerMcpRoutes(app, {
     baseUrl: () => base,
+    domainRequest: fakeStudio(() => base),
     dataDir,
     environment: { STUDIO_MCP_PUBLIC_URL: "https://studio.example.test", ...environment },
     accountMode: true,

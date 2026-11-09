@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import {
   accountAccessForId,
   ownAccount,
@@ -35,6 +34,7 @@ import {
   verifyLocalAccount,
 } from "./account-store.js";
 import { accountCookieName, canAdmin, clientOf, cookieToken } from "./access.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
@@ -104,7 +104,7 @@ function mcpBearerRouteAllowed(method, routePath) {
 /**
  * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
  * guides, Combine Backends, the export, and accounts' groups. Only an administrator's own MCP token reaches them, or
- * MCP's loopback credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
+ * Studio's own credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
  * Nothing here deletes a model file, replaces a download or touches a GPU; Combine Backends backs up
  * the profiles it replaces.
  */
@@ -170,25 +170,20 @@ const asMcpAdmin = (access) =>
     ? { ...access, credential: "mcp-admin" }
     : null;
 
-// MCP's own loopback calls for gateway-linked accounts carry this per-process credential, never a stored token.
-const internalSecret = crypto.randomBytes(32).toString("base64url");
-export function internalMcpHeaders(accountId) {
-  return {
-    "X-Studio-Mcp-Internal": internalSecret,
-    "X-Studio-Mcp-Account": String(accountId || ""),
-  };
-}
-
-function internalMcpAccount(req, method, routePath) {
-  const given = String(req?.headers?.["x-studio-mcp-internal"] || "");
-  if (
-    !given ||
-    Buffer.byteLength(given) !== Buffer.byteLength(internalSecret) ||
-    !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(internalSecret))
-  )
+/**
+ * The account an MCP call acts as on a route, called in process (mcp/studio-requests.js): by the
+ * account's personal token (`{ token }`), as a bearer request is; or by Studio's own word for
+ * `owner` (`{ internal: true }`: a gateway-linked account, Studio Chat, a result or upload link).
+ */
+export function mcpAccount(owner, credential, method, routePath) {
+  if (credential?.token) {
+    if (mcpBearerRouteAllowed(method, routePath)) return verifyAccountMcpToken(credential.token);
+    if (mcpAdminRouteAllowed(method, routePath))
+      return asMcpAdmin(verifyAccountMcpToken(credential.token));
     return null;
-  if (!clientOf(req).thisComputer) return null;
-  const access = accountAccessForId(String(req.headers["x-studio-mcp-account"] || ""));
+  }
+  if (!credential?.internal) return null;
+  const access = accountAccessForId(owner);
   // A gateway-linked administrator reaches the admin routes only while Chat Gateway Admin Tools is on.
   if (mcpAdminRouteAllowed(method, routePath))
     return gatewayAdminTools() ? asMcpAdmin(access) : null;
@@ -206,8 +201,7 @@ export function accountForRequest(req) {
     (bearer && mcpBearerRouteAllowed(method, routePath) ? verifyAccountMcpToken(bearer) : null) ||
     (bearer && mcpAdminRouteAllowed(method, routePath)
       ? asMcpAdmin(verifyAccountMcpToken(bearer))
-      : null) ||
-    internalMcpAccount(req, method, routePath);
+      : null);
   if (req) req.studioAccount = account;
   return account;
 }
@@ -261,13 +255,23 @@ function publicStatus(req) {
 
 function requireAccountAdmin(req, res) {
   if (multiUserEnabled && canAdmin(req)) return true;
-  res.status(multiUserEnabled ? 403 : 404).json({
-    ok: false,
-    error: multiUserEnabled
-      ? "Administrator access is required."
-      : "Account management is disabled.",
-  });
+  const { status, payload } = accountAdminRefusal();
+  res.status(status).json(payload);
   return false;
+}
+/** requireAccountAdmin for a shared route's account (domain/direct-route.ts): the refusal, or null. */
+function accountAdminRefusal(account) {
+  if (multiUserEnabled && account?.role === "administrator" && account.credential !== "mcp-token")
+    return null;
+  return {
+    status: multiUserEnabled ? 403 : 404,
+    payload: {
+      ok: false,
+      error: multiUserEnabled
+        ? "Administrator access is required."
+        : "Account management is disabled.",
+    },
+  };
 }
 
 let oidc = null;
@@ -294,12 +298,25 @@ export function registerMultiUserAuthRoutes(
         : res.status(404).json({ ok: false, error: "Accounts are disabled." }),
     );
   const [get, post, patch, del] = ["get", "post", "patch", "delete"].map(route);
+  /** An administrator's account route that MCP's admin tools also call. */
+  const admin = (method, path, run) =>
+    directRoute(app, method, path, (account, input) => {
+      if (!multiUserEnabled)
+        return { status: 404, payload: { ok: false, error: "Accounts are disabled." } };
+      return accountAdminRefusal(account) || run(account, input);
+    });
   let bootstrapping = null;
 
-  get("/api/accounts/status", (req, res) => {
+  // Whoever asks, so the status finds the caller's account itself (MCP passes the one it found).
+  app.get("/api/accounts/status", (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
-    res.json(publicStatus(req));
+    if (multiUserEnabled) accountForRequest(req);
+    next();
   });
+  directRoute(app, "GET", "/api/accounts/status", (account) => ({
+    status: 200,
+    payload: publicStatus({ studioAccount: account ?? null }),
+  }));
 
   post("/api/accounts/bootstrap", async (req, res) => {
     if (!multiUserEnabled || accountStoreSnapshot().accounts.length) {
@@ -548,30 +565,37 @@ export function registerMultiUserAuthRoutes(
     }
   });
 
-  get("/api/accounts/admin", async (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  app.get("/api/accounts/admin", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  admin("GET", "/api/accounts/admin", async () => {
     const profiles = await availableProfiles();
     ensureBuiltInAccessProfile();
-    res.setHeader("Cache-Control", "no-store");
-    res.json({
-      ok: true,
-      accounts: listAccounts(),
-      accessProfiles: listAccessProfiles(),
-      availableProfiles: profiles,
-      defaultAccessProfileId: defaultAccessProfileId(),
-      gateway: { ...listGatewayIdentities(), adminTools: gatewayAdminTools() },
-    });
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        accounts: listAccounts(),
+        accessProfiles: listAccessProfiles(),
+        availableProfiles: profiles,
+        defaultAccessProfileId: defaultAccessProfileId(),
+        gateway: { ...listGatewayIdentities(), adminTools: gatewayAdminTools() },
+      },
+    };
   });
 
-  post("/api/accounts/default-profile", (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  admin("POST", "/api/accounts/default-profile", (_account, { body }) => {
     try {
-      res.json({
-        ok: true,
-        defaultAccessProfileId: setDefaultAccessProfile(req.body?.accessProfileId),
-      });
+      return {
+        status: 200,
+        payload: {
+          ok: true,
+          defaultAccessProfileId: setDefaultAccessProfile(body?.accessProfileId),
+        },
+      };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
@@ -609,23 +633,24 @@ export function registerMultiUserAuthRoutes(
     }
   });
 
-  post("/api/accounts/profiles", async (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  admin("POST", "/api/accounts/profiles", async (_account, { body }) => {
     try {
       const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
-      res.json({ ok: true, profile: saveAccessProfile(req.body, profiles, cloud) });
+      return {
+        status: 200,
+        payload: { ok: true, profile: saveAccessProfile(body, profiles, cloud) },
+      };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
-  del("/api/accounts/profiles/:id", (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  admin("DELETE", "/api/accounts/profiles/:id", (_account, { params }) => {
     try {
-      deleteAccessProfile(req.params.id);
-      res.json({ ok: true });
+      deleteAccessProfile(params.id);
+      return { status: 200, payload: { ok: true } };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
@@ -639,28 +664,26 @@ export function registerMultiUserAuthRoutes(
     }
   });
 
-  patch("/api/accounts/users/:id", async (req, res) => {
-    if (!requireAccountAdmin(req, res)) return;
+  admin("PATCH", "/api/accounts/users/:id", async (actor, { params, body = {} }) => {
     try {
       // Each change is explicit: a missing or misspelt field must never re-enable an account.
-      const body = req.body || {};
-      const actor = req.studioAccount?.userId;
       let account;
       if (typeof body.accessProfileId === "string")
-        account = assignAccessProfile(req.params.id, body.accessProfileId);
+        account = assignAccessProfile(params.id, body.accessProfileId);
       else if (typeof body.disabled === "boolean")
-        account = setAccountDisabled(req.params.id, body.disabled);
+        account = setAccountDisabled(params.id, body.disabled);
       else if (typeof body.role === "string")
-        account = setAccountRole(req.params.id, body.role, actor);
+        account = setAccountRole(params.id, body.role, actor?.userId);
       else if (typeof body.password === "string")
-        account = await resetAccountPassword(req.params.id, body.password);
+        account = await resetAccountPassword(params.id, body.password);
       else
-        return res
-          .status(400)
-          .json({ ok: false, error: "Choose a group, role, account status or password" });
-      res.json({ ok: true, account });
+        return {
+          status: 400,
+          payload: { ok: false, error: "Choose a group, role, account status or password" },
+        };
+      return { status: 200, payload: { ok: true, account } };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 

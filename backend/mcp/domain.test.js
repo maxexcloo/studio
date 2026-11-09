@@ -46,11 +46,7 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
   const calls = [];
   const media = new McpMedia({
     dataDir: directory,
-    baseUrl: "http://127.0.0.1:1",
     publicUrl: "http://localhost:1",
-    fetchImpl: async () => {
-      throw new Error("Core generation must not use HTTP");
-    },
     async domainRequest(method, route, input, owner) {
       calls.push([method, route, owner]);
       const account = accounts.get(owner);

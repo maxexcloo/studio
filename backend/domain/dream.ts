@@ -9,6 +9,7 @@ import {
 import { replyTitle } from "../../shared/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
+import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts";
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
 import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
 import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
@@ -153,22 +154,6 @@ interface DreamRecord {
   steer?: { prompt: string; profileId?: string; remaining: number };
 }
 type Kind = "image" | "video";
-interface Request {
-  studioAccount?: GenerationAccount;
-  params: Record<string, string>;
-  query?: Record<string, unknown>;
-  body?: Record<string, unknown>;
-}
-interface Response {
-  status(code: number): Response;
-  json(value: unknown): unknown;
-}
-type Handler = (req: Request, res: Response) => unknown;
-interface Router {
-  get(path: string, handler: Handler): unknown;
-  post(path: string, handler: Handler): unknown;
-  put(path: string, handler: Handler): unknown;
-}
 
 /**
  * Dream's explore/exploit balance: the share of fresh ideas, in percent, each draw takes. Draws are
@@ -1445,16 +1430,15 @@ export function createDream(options: {
 export type Dream = ReturnType<typeof createDream>;
 
 /** The caller's own Dream: settings, the unseen pool, verdicts and discards. */
-export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
-  const owner = (req: Request) => req.studioAccount?.userId || "";
-  const allowed = (req: Request, res: Response) => {
-    if (dream.access(owner(req))) return true;
-    res.status(403).json({ ok: false, error: "Dream is unavailable for this account." });
-    return false;
+export function registerDreamRoutes(app: object, { dream }: { dream: Dream }) {
+  const owner = (account: RouteAccount) => account?.userId || "";
+  const refused = {
+    status: 403,
+    payload: { ok: false, error: "Dream is unavailable for this account." },
   };
-  const refuse = (res: Response, error: unknown) => {
+  const refuse = (error: unknown) => {
     const { status = 500, message } = error as Error & { status?: number };
-    return res.status(status).json({ ok: false, error: message });
+    return { status, payload: { ok: false, error: message } };
   };
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
@@ -1466,17 +1450,18 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
       ...dream.status(ownerId),
     };
   };
-  app.get("/api/dream", (req, res) => {
-    if (allowed(req, res)) res.json(show(owner(req)));
-  });
-  app.put("/api/dream/settings", async (req, res) => {
-    if (!allowed(req, res)) return;
-    const body = req.body || {};
+  /** A Dream route, for an account with Dream only. */
+  const route = (method: string, path: string, run: RouteRun) =>
+    directRoute(app, method, path, (account, input) =>
+      dream.access(owner(account)) ? run(account, input) : refused,
+    );
+  route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
+  route("PUT", "/api/dream/settings", async (account, { body = {} }) => {
     const patch: Partial<DreamSettings> = {};
     for (const key of switches) {
       if (body[key] === undefined) continue;
       if (typeof body[key] !== "boolean")
-        return res.status(400).json({ ok: false, error: `Set ${key} to true or false.` });
+        return { status: 400, payload: { ok: false, error: `Set ${key} to true or false.` } };
       patch[key] = body[key];
     }
     for (const [key, [low, high]] of Object.entries(limits) as [
@@ -1489,29 +1474,29 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
         (body[key] as number) < low ||
         (body[key] as number) > high
       )
-        return res
-          .status(400)
-          .json({ ok: false, error: `Set ${key} to a whole number from ${low} to ${high}.` });
+        return {
+          status: 400,
+          payload: { ok: false, error: `Set ${key} to a whole number from ${low} to ${high}.` },
+        };
       patch[key] = body[key] as number;
     }
-    if (patch.spicy && !dream.access(owner(req))?.uncensored)
-      return res
-        .status(403)
-        .json({ ok: false, error: "Spicy needs Uncensored Models for this account." });
-    await dream.save(owner(req), patch);
-    return res.json(show(owner(req)));
+    if (patch.spicy && !dream.access(owner(account))?.uncensored)
+      return {
+        status: 403,
+        payload: { ok: false, error: "Spicy needs Uncensored Models for this account." },
+      };
+    await dream.save(owner(account), patch);
+    return { status: 200, payload: show(owner(account)) };
   });
-  app.get("/api/dream/calibration", (req, res) => {
-    if (!allowed(req, res)) return;
+  route("GET", "/api/dream/calibration", (account, { query }) => {
     const limit = Math.max(
       1,
-      Math.min(24, Number.parseInt(String(req.query?.limit || "12"), 10) || 12),
+      Math.min(24, Number.parseInt(String(query?.limit || "12"), 10) || 12),
     );
-    return res.json({ items: dream.calibration(owner(req), limit) });
+    return { status: 200, payload: { items: dream.calibration(owner(account), limit) } };
   });
-  app.post("/api/dream/calibration", (req, res) => {
-    if (!allowed(req, res)) return;
-    const { liked = [], passed = [] } = req.body || {};
+  route("POST", "/api/dream/calibration", (account, { body }) => {
+    const { liked = [], passed = [] } = body || {};
     const ids = [liked, passed].flat();
     if (
       !Array.isArray(liked) ||
@@ -1521,67 +1506,68 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
       ids.some((id) => typeof id !== "string") ||
       new Set(ids).size < ids.length
     )
-      return res.status(400).json({
-        ok: false,
-        error: "Like or pass one image, or answer a pair.",
-      });
+      return {
+        status: 400,
+        payload: { ok: false, error: "Like or pass one image, or answer a pair." },
+      };
     try {
-      dream.calibrate(owner(req), { liked, passed });
-      return res.json({ ok: true });
+      dream.calibrate(owner(account), { liked, passed });
+      return { status: 200, payload: { ok: true } };
     } catch (error) {
-      return refuse(res, error);
+      return refuse(error);
     }
   });
-  app.get("/api/dream/discarded", (req, res) => {
-    if (!allowed(req, res)) return;
-    const all = dream.discarded(owner(req));
-    const start = Math.max(0, Number.parseInt(String(req.query?.cursor || "0"), 10) || 0);
+  route("GET", "/api/dream/discarded", (account, { query }) => {
+    const all = dream.discarded(owner(account));
+    const start = Math.max(0, Number.parseInt(String(query?.cursor || "0"), 10) || 0);
     const limit = Math.max(
       1,
-      Math.min(100, Number.parseInt(String(req.query?.limit || "40"), 10) || 40),
+      Math.min(100, Number.parseInt(String(query?.limit || "40"), 10) || 40),
     );
     const items = all.slice(start, start + limit);
-    return res.json({ items, nextCursor: start + limit < all.length ? String(start + limit) : "" });
+    return {
+      status: 200,
+      payload: { items, nextCursor: start + limit < all.length ? String(start + limit) : "" },
+    };
   });
-  app.post("/api/dream/pairs/:pairId/answer", (req, res) => {
-    if (!allowed(req, res)) return;
-    const answer = req.body?.answer;
+  route("POST", "/api/dream/pairs/:pairId/answer", (account, { params, body }) => {
+    const answer = body?.answer;
     if (!["a", "b", "both", "neither"].includes(answer as string))
-      return res.status(400).json({ ok: false, error: "Answer A, B, Both or Neither." });
+      return { status: 400, payload: { ok: false, error: "Answer A, B, Both or Neither." } };
     try {
-      return res.json({
-        items: dream.answer(owner(req), req.params.pairId, answer as PairAnswer),
-      });
+      return {
+        status: 200,
+        payload: { items: dream.answer(owner(account), params.pairId, answer as PairAnswer) },
+      };
     } catch (error) {
-      return refuse(res, error);
+      return refuse(error);
     }
   });
   for (const verdict of ["keep", "discard", "more"] as const)
-    app.post(`/api/dream/:itemId/${verdict}`, (req, res) => {
-      if (!allowed(req, res)) return;
+    route("POST", `/api/dream/:itemId/${verdict}`, (account, { params }) => {
       try {
-        return res.json({ item: dream[verdict](owner(req), req.params.itemId) });
+        return { status: 200, payload: { item: dream[verdict](owner(account), params.itemId) } };
       } catch (error) {
-        return refuse(res, error);
+        return refuse(error);
       }
     });
-  app.post("/api/dream/:itemId/variations", async (req, res) => {
-    if (!allowed(req, res)) return;
-    const count = req.body?.count ?? 4;
+  route("POST", "/api/dream/:itemId/variations", async (account, { params, body }) => {
+    const count = body?.count ?? 4;
     if (!Number.isInteger(count) || (count as number) < 1 || (count as number) > 8)
-      return res.status(400).json({ ok: false, error: "Choose 1–8 variations." });
+      return { status: 400, payload: { ok: false, error: "Choose 1–8 variations." } };
     try {
       const { item, result } = await dream.variations(
-        owner(req),
-        req.studioAccount,
-        req.params.itemId,
+        owner(account),
+        account || undefined,
+        params.itemId,
         count as number,
       );
-      return res
-        .status(result.status >= 400 ? result.status : 202)
-        .json({ item, ...result.payload });
+      return {
+        status: result.status >= 400 ? result.status : 202,
+        payload: { item, ...result.payload },
+      };
     } catch (error) {
-      return refuse(res, error);
+      return refuse(error);
     }
   });
 }

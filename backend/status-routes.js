@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { canAdmin } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { profileOnBackendKey, routeJob } from "./comfy/backends.js";
 import { comfyUrl, isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion } from "./data-dir.js";
@@ -75,8 +76,7 @@ export function registerStatusRoutes(app, { observeServices, store }) {
    * `ms` once this model's estimates are trusted, and `queueMs` when Studio's own
    * queue has to finish first. Empty when there is nothing honest to say.
    */
-  app.get("/api/estimate", (req, res) => {
-    const query = req.query || {};
+  directRoute(app, "GET", "/api/estimate", (_account, { query }) => {
     const body = {
       kind: query.kind === "video" ? "video" : "image",
       model: String(query.model || ""),
@@ -128,13 +128,16 @@ export function registerStatusRoutes(app, { observeServices, store }) {
     const clears = backend ? queueClearsAt(now, backend) : null;
     const queueMs = clears === null ? null : Math.max(0, clears - now);
     const upscaleMs = upscale?.totalMs || 0;
-    res.json({
-      ok: true,
-      ...(trusted
-        ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) }
-        : {}),
-      ...(queueMs ? { queueMs } : {}),
-    });
+    return {
+      status: 200,
+      payload: {
+        ok: true,
+        ...(trusted
+          ? { ms: estimate.totalMs + upscaleMs + (runs - 1) * ((rest?.totalMs || 0) + upscaleMs) }
+          : {}),
+        ...(queueMs ? { queueMs } : {}),
+      },
+    };
   });
 
   app.get("/api/stats", (req, res) => {

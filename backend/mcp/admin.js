@@ -213,8 +213,8 @@ const downloadView = (entry) =>
     : null;
 
 /**
- * Registers the admin tools. `tool` is mcp.js's helper; `media` its McpMedia (requests go out with
- * the owner's credential); `resolve(value)` turns a result ref into its job id; `signExport(name)`
+ * Registers the admin tools. `tool` is mcp.js's helper; `media` its McpMedia (which calls Studio as
+ * the owner); `resolve(value)` turns a result ref into its job id; `signExport(name)`
  * signs a download link for an export bundle.
  */
 export function registerAdminTools({ tool, server, media, owner, resolve, signExport }) {
@@ -348,17 +348,14 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         let name;
         if (upload_id) {
           media.own(owner, upload_id, "assets");
-          const response = await media.response(
+          const { content, mime } = await media.call(
             "GET",
             `/api/reference-assets/${encodeURIComponent(upload_id)}/media`,
             undefined,
             owner,
             { signal },
           );
-          image = dataUrl(
-            await response.arrayBuffer(),
-            String(response.headers.get("content-type") || "image/png").split(";")[0],
-          );
+          image = dataUrl(content, mime);
           name = "chat-upload";
         } else {
           const jobId = resolve(job_id);
@@ -889,20 +886,12 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     "Build the export bundle as a backup (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Library › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
     {},
     async (_args, signal) => {
-      const response = await media.response("GET", "/api/profiles/export", undefined, owner, {
+      const { headers = {} } = await media.call("GET", "/api/profiles/export", undefined, owner, {
         signal,
       });
-      await response.arrayBuffer();
-      const name =
-        /filename="([^"]+)"/.exec(String(response.headers.get("content-disposition") || ""))?.[1] ||
-        "";
+      const name = /filename="([^"]+)"/.exec(headers["content-disposition"] || "")?.[1] || "";
       if (!name) throw new Error("Studio didn’t name the export bundle.");
-      let report = {};
-      try {
-        report = JSON.parse(response.headers.get("x-studio-export") || "{}");
-      } catch {
-        /* Counts are optional. */
-      }
+      const report = JSON.parse(headers["x-studio-export"] || "{}");
       const link = signExport(name);
       return mcpJson({ file: name, link: link.url, expires_at: link.expiresAt, ...report });
     },

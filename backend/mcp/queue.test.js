@@ -56,7 +56,6 @@ async function fixture(t, beforeAcknowledgement) {
   const allPrepared = deferred();
   const media = new McpMedia({
     dataDir: dir,
-    baseUrl: "http://127.0.0.1:8790",
     publicUrl: "https://studio.example.test",
     async domainRequest(method, route, body, owner) {
       if (method === "GET" && route === "/api/models?cached=1") {
@@ -219,25 +218,23 @@ for (const failureAt of [1, 2])
     assert.equal(execution.saved.length, expected.length - 1);
   });
 
-test("uncertain MCP acknowledgement retains its owned ID and releases the next complete set without resubmitting", async (t) => {
+test("a failed MCP submission keeps its owned ID and releases the next complete set without resubmitting", async (t) => {
   const entered = deferred();
   const release = deferred();
   const f = await fixture(t, async (index) => {
     if (index === 1) {
       entered.resolve();
       await release.promise;
-      throw new Error("Fixture connection lost");
+      throw new Error("Fixture admission failed");
     }
   });
   const first = f.media.queue("alice", args("A"));
   await entered.promise;
   const next = f.media.queue("bob", args("B"));
   release.resolve();
-  const [uncertain, queued] = await Promise.all([first, next]);
-  assert.equal(uncertain.status, "partially_queued");
-  assert.equal(uncertain.jobs[0].status, "unknown");
-  assert.equal(f.media.state.jobs[uncertain.jobs[0].job_id], "alice");
-  assert.match(uncertain.error, /do not resubmit/);
+  await assert.rejects(first, /Fixture admission failed/);
+  const queued = await next;
+  assert.equal(f.media.state.jobs[f.requests[0].body.clientJobId], "alice");
   assert.equal(queued.jobs.length, 2);
   assert.deepEqual(
     f.requests.map(({ body }) => body.prompt),

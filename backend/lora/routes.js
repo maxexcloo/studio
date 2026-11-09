@@ -1,5 +1,6 @@
 import { ownerIdForRequest } from "../account-ownership.js";
 import { optionsFor } from "../comfy/comfy.js";
+import { directRoute } from "../domain/direct-route.ts";
 import { accountMayUseLoras, loraAllowed } from "../model/catalogue.js";
 import { requireLocal } from "../route-access.js";
 import { loraInfos } from "./info.js";
@@ -23,11 +24,14 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
     res.json({ ok: true });
   });
 
-  app.get("/api/loras/library", (req, res) => {
-    if (!accountMayUseLoras(req))
-      return res.json({ found: false, library: { strengths: {}, snapshots: {} } });
-    const library = loadLoraLibrary(ownerIdForRequest(req));
-    res.json({ found: library !== null, library: library || { strengths: {}, snapshots: {} } });
+  directRoute(app, "GET", "/api/loras/library", (account) => {
+    if (!accountMayUseLoras({ studioAccount: account }))
+      return { status: 200, payload: { found: false, library: { strengths: {}, snapshots: {} } } };
+    const library = loadLoraLibrary(account?.userId || "");
+    return {
+      status: 200,
+      payload: { found: library !== null, library: library || { strengths: {}, snapshots: {} } },
+    };
   });
 
   app.put("/api/loras/library", (req, res) => {
@@ -45,29 +49,35 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
   });
 
   // Clients send edits, not whole copies, so two devices never overwrite each other.
-  app.post("/api/loras/library/ops", (req, res) => {
-    if (!accountMayUseLoras(req))
-      return res
-        .status(403)
-        .json({ ok: false, error: "LoRA access is disabled for this account." });
+  directRoute(app, "POST", "/api/loras/library/ops", (account, { body }) => {
+    if (!accountMayUseLoras({ studioAccount: account }))
+      return {
+        status: 403,
+        payload: { ok: false, error: "LoRA access is disabled for this account." },
+      };
     try {
-      res.json({ ok: true, library: applyLoraOps(req.body?.ops, ownerIdForRequest(req)) });
+      return {
+        status: 200,
+        payload: { ok: true, library: applyLoraOps(body?.ops, account?.userId || "") },
+      };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
   // What each LoRA ComfyUI lists was trained for and its trigger words, from the files themselves.
-  app.get("/api/loras/info", async (req, res) => {
-    if (!accountMayUseLoras(req)) return res.json({ ok: true, loras: {} });
+  directRoute(app, "GET", "/api/loras/info", async (account) => {
+    if (!accountMayUseLoras({ studioAccount: account }))
+      return { status: 200, payload: { ok: true, loras: {} } };
     try {
       const { info } = await loadComfyContext();
-      const names = optionsFor(info, "LoraLoader", "lora_name").filter(
-        loraAllowed(req.studioAccount),
-      );
-      res.json({ ok: true, loras: await loraInfos(names) });
+      const names = optionsFor(info, "LoraLoader", "lora_name").filter(loraAllowed(account));
+      return { status: 200, payload: { ok: true, loras: await loraInfos(names) } };
     } catch (error) {
-      res.status(503).json({ ok: false, loras: {}, error: comfyDownMessage(error?.message) });
+      return {
+        status: 503,
+        payload: { ok: false, loras: {}, error: comfyDownMessage(error?.message) },
+      };
     }
   });
 

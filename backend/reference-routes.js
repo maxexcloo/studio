@@ -1,5 +1,6 @@
 import { ownerIdForRequest } from "./account-ownership.js";
 import { clientOf } from "./access.js";
+import { directRoute } from "./domain/direct-route.ts";
 import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
   bytesForReferenceAccount,
@@ -8,21 +9,28 @@ import {
   referenceAssetMetadataForAccount,
   saveUpload,
 } from "./references.js";
-import { requireLocal } from "./route-access.js";
+import { localRefusal, requireLocal } from "./route-access.js";
 
 /** `uploaded(item)` hears of each new upload's gallery item, for image search. */
 export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
-  app.post("/api/reference-assets/upload", async (req, res) => {
-    if (!req.studioAccount && !requireLocal(req, res)) return;
+  // The form's file becomes the `upload` the shared route takes; MCP passes its own.
+  app.post("/api/reference-assets/upload", async (req, res, next) => {
     try {
-      const { item, asset } = await saveUpload(
-        await readMultipartUpload(req),
-        ownerIdForRequest(req),
-      );
-      uploaded(item);
-      res.status(201).json({ ok: true, asset });
+      req.body = { upload: await readMultipartUpload(req) };
     } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
+      return res.status(400).json({ ok: false, error: error.message });
+    }
+    next();
+  });
+  directRoute(app, "POST", "/api/reference-assets/upload", async (account, { body }) => {
+    const refusal = !account && localRefusal(account);
+    if (refusal) return refusal;
+    try {
+      const { item, asset } = await saveUpload(body.upload, account?.userId || "");
+      uploaded(item);
+      return { status: 201, payload: { ok: true, asset } };
+    } catch (error) {
+      return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
 
@@ -73,23 +81,20 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     }
   });
 
-  app.post("/api/reference-assets/from-gallery", (req, res) => {
-    if (!req.studioAccount && !requireLocal(req, res)) return;
+  directRoute(app, "POST", "/api/reference-assets/from-gallery", (account, { body }) => {
+    const refusal = !account && localRefusal(account);
+    if (refusal) return refusal;
     try {
-      const asset = referenceAssetForAccount(
-        req.studioAccount,
-        String(req.body?.galleryItemId || ""),
-        {
-          // A video's last frame, or the one at a time in milliseconds.
-          frame:
-            req.body?.frame === "last" || (Number.isInteger(req.body?.frame) && req.body.frame >= 0)
-              ? req.body.frame
-              : "",
-        },
-      );
-      res.json({ ok: true, asset });
+      const asset = referenceAssetForAccount(account, String(body?.galleryItemId || ""), {
+        // A video's last frame, or the one at a time in milliseconds.
+        frame:
+          body?.frame === "last" || (Number.isInteger(body?.frame) && body.frame >= 0)
+            ? body.frame
+            : "",
+      });
+      return { status: 200, payload: { ok: true, asset } };
     } catch (error) {
-      res.status(404).json({ ok: false, error: error.message });
+      return { status: 404, payload: { ok: false, error: error.message } };
     }
   });
 
@@ -104,14 +109,18 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   });
 
   // The bytes a run would get for the reference, for the prompt assistant and MCP tools.
-  app.get("/api/reference-assets/:id/media", async (req, res) => {
+  directRoute(app, "GET", "/api/reference-assets/:id/media", async (account, { params }) => {
     try {
-      referenceAssetMetadataForAccount(req.studioAccount, req.params.id);
-      const { buffer, mime } = await bytesForReferenceAccount(req.studioAccount, req.params.id);
-      res.type(mime).setHeader("Cache-Control", "private, max-age=3600");
-      res.send(buffer);
+      referenceAssetMetadataForAccount(account, params.id);
+      const { buffer, mime } = await bytesForReferenceAccount(account, params.id);
+      return {
+        status: 200,
+        content: buffer,
+        mime,
+        headers: { "Cache-Control": "private, max-age=3600" },
+      };
     } catch {
-      gone(res);
+      return { status: 404, payload: { ok: false, error: "That reference image is gone." } };
     }
   });
 

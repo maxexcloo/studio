@@ -115,15 +115,14 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
   /** A reference the account uploaded, as the data URL the assistant reads (a vision model only). */
   const reference = async (id, signal) => {
     media.own(owner, id, "assets");
-    const response = await media.response(
+    const { content, mime } = await media.call(
       "GET",
       `/api/reference-assets/${encodeURIComponent(id)}/media`,
       undefined,
       owner,
       { signal },
     );
-    const type = String(response.headers.get("content-type") || "image/png").split(";")[0];
-    return `data:${type};base64,${Buffer.from(await response.arrayBuffer()).toString("base64")}`;
+    return `data:${mime};base64,${content.toString("base64")}`;
   };
 
   tool(
