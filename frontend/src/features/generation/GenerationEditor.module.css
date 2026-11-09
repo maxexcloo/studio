@@ -5,7 +5,14 @@
   flex-direction: column;
   gap: var(--mantine-spacing-sm);
   min-height: 0;
-  max-height: min(75dvh, 850px);
+  /* While typing, the dock's room above the keyboard (`--dock-room`) bounds it too. */
+  max-height: min(
+    75dvh,
+    850px,
+    calc(
+      var(--dock-room, 100dvh) - 2 * var(--studio-composer-gap, 0px) - 2 * var(--mantine-spacing-md)
+    )
+  );
 }
 
 /* Desktop panels and cards bound their fields above the action row. */

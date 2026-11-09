@@ -1,7 +1,7 @@
 import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
-import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
+import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
 import { useLocation, useSearchParams } from "react-router";
 import type { OpenComposerState } from "./openComposer";
 import { GenerationForm } from "./GenerationForm";
@@ -9,7 +9,7 @@ import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
-import { useKeyboard } from "../../ui/useKeyboard";
+import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
@@ -87,26 +87,15 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const typing = keyboardUp || tappedField;
   const sheetField = (panel: HTMLElement, target: unknown) =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
-  const [keyboardInset, setKeyboardInset] = useState(0);
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    // Phones type in the Generate sheet instead, so the dock stays put there.
-    if (!viewport || phone) return;
-    // Only typing in the dock lifts it above the keyboard; scrolling and the address bar never move it.
-    const resize = () => {
-      const field = document.activeElement;
-      const typing = dock.current?.contains(field) && field?.matches("input, textarea");
-      setKeyboardInset(
-        typing ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0,
-      );
-    };
-    viewport.addEventListener("resize", resize);
-    viewport.addEventListener("scroll", resize);
-    return () => {
-      viewport.removeEventListener("resize", resize);
-      viewport.removeEventListener("scroll", resize);
-    };
-  }, [phone]);
+  // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
+  // (a phone held sideways, a tablet) only typing in the dock lifts it above the keyboard, and the
+  // open panel fits the room left above it (`--dock-room`); a desktop keeps its own scroll.
+  const touch = useMediaQuery("(pointer: coarse)");
+  const typingInDock = useTypingIn(!phone && touch, (field) =>
+    Boolean(dock.current?.contains(field)),
+  );
+  const dockKeyboard = useKeyboard(typingInDock);
+  const keyboardInset = dockKeyboard.inset;
   useEffect(() => {
     if (main && params.get("compose") === "1") open();
   }, [params, open, main]);
@@ -247,12 +236,17 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             collapse();
           }
         }}
-        style={{
-          // The safe area stands in for the gap rather than adding to it, so the bar sits as far
-          // from the bottom as from the sides.
-          bottom: `calc(max(var(--studio-composer-gap), env(safe-area-inset-bottom)) + ${keyboardInset}px)`,
-          marginBottom: chat ? keyboardInset : undefined,
-        }}
+        style={
+          {
+            // The safe area stands in for the gap rather than adding to it, so the bar sits as far
+            // from the bottom as from the sides.
+            bottom: `calc(max(var(--studio-composer-gap), env(safe-area-inset-bottom)) + ${keyboardInset}px)`,
+            marginBottom: chat ? keyboardInset : undefined,
+            ...(typingInDock && {
+              "--dock-room": `${window.innerHeight - dockKeyboard.top - keyboardInset}px`,
+            }),
+          } as CSSProperties
+        }
       >
         {(chat || !opened || !expanded) && (
           <Paper
