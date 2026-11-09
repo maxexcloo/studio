@@ -184,6 +184,29 @@ test("routing: only capable workers, an online one with the model first, then li
   assert.equal(pickWorker("image", { workers: list, online: () => false }).id, "a");
 });
 
+test("routing by load: the profile, then free, then the same model, then fewest queued, then list order", () => {
+  const list = ["a", "b", "c"].map((id) => ({ id, capabilities: ["image"] }));
+  const pick = (loads, options = {}) =>
+    pickWorker("image", { workers: list, load: (id) => loads[id] || null, ...options }).id;
+  const idle = { busy: false, queued: 0, model: "" };
+  // Today's behaviour without load information: the first; background work takes the last.
+  assert.equal(pick({}), "a");
+  assert.equal(pick({}, { last: true }), "c");
+  // A free worker beats a busy one, whatever it has loaded.
+  assert.equal(
+    pick({ a: { ...idle, busy: true, model: "flux" }, b: idle }, { model: "flux" }),
+    "b",
+  );
+  // Among free workers, the one that last ran the model.
+  assert.equal(pick({ a: idle, b: idle, c: { ...idle, model: "flux" } }, { model: "flux" }), "c");
+  // Among busy ones, the shortest queue.
+  const busy = (queued) => ({ busy: true, queued, model: "" });
+  assert.equal(pick({ a: busy(2), b: busy(1), c: busy(1) }), "b");
+  assert.equal(pick({ a: busy(2), b: busy(1), c: busy(1) }, { last: true }), "c");
+  // A worker known to have the profile still comes first.
+  assert.equal(pick({ a: busy(3), b: idle }, { hasModel: (id) => id === "a" }), "a");
+});
+
 test("names, ids and capabilities are tidied", () => {
   const taken = new Set(["image-worker"]);
   const worker = normalizeWorker(

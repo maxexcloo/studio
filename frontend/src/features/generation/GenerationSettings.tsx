@@ -46,7 +46,7 @@ export function GenerationSettings({
   const { models } = useGeneration();
   const workers = models.data?.workers || [];
   const workerIds = profile?.workerIds || [];
-  const worker = workers.find((worker) => worker.id === (input.backendId || workerIds[0]));
+  const worker = workers.find((worker) => worker.id === input.workerId);
   const capabilities = profile?.capabilities || {};
   const video = input.kind === "video";
   const inpaint = input.inpaint as { strength?: number; feather?: number } | undefined;
@@ -231,25 +231,31 @@ export function GenerationSettings({
           <Select
             label="Worker"
             comboboxProps={nested}
-            data={workerIds.map((id) => {
-              const worker = workers.find((worker) => worker.id === id);
-              return {
-                value: id,
-                label: worker
-                  ? `${worker.name} · ${worker.available ? "Available" : worker.parked ? "Stopped" : "Offline"}`
-                  : id,
-              };
-            })}
-            value={String(input.backendId || workerIds[0])}
+            description="Automatic runs on the first worker free for it; a picked worker is waited for."
+            data={[
+              { value: "", label: "Automatic" },
+              ...workerIds.map((id) => {
+                const worker = workers.find((worker) => worker.id === id);
+                return {
+                  value: id,
+                  label: worker
+                    ? `${worker.name} · ${worker.available ? "Available" : worker.parked ? "Stopped" : "Offline"}`
+                    : id,
+                };
+              }),
+            ]}
+            value={input.workerId || ""}
             allowDeselect={false}
-            onChange={(backendId) => onChange({ backendId })}
+            onChange={(workerId) => onChange({ workerId: workerId || undefined })}
           />
-          <Switch
-            label="Allow Fallback to Another Worker"
-            description="Studio waits for the selected backend unless you allow another."
-            checked={Boolean(input.allowFallback)}
-            onChange={(event) => onChange({ allowFallback: event.currentTarget.checked })}
-          />
+          {input.workerId && (
+            <Switch
+              label="Allow Fallback to Another Worker"
+              description="Studio waits for the selected worker unless you allow another."
+              checked={Boolean(input.allowFallback)}
+              onChange={(event) => onChange({ allowFallback: event.currentTarget.checked })}
+            />
+          )}
         </Stack>
       ),
     });

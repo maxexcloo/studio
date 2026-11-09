@@ -35,7 +35,7 @@ export function registerStatusRoutes(app, { observeServices, store }) {
     const waitingWorkers = store
       .jobs(ownerIdForRequest(req))
       .filter((job) => ["waiting", "starting"].includes(job.status))
-      .map((job) => job.backend || job.input.backendId)
+      .map((job) => job.backend)
       .filter(Boolean);
     res.json(
       await observeServices({

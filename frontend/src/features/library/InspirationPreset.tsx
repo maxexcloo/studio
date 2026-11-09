@@ -105,7 +105,6 @@ function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
   }
   // The selected profile owns identity and routing; imported metadata cannot override them.
   for (const field of [
-    "backendId",
     "kind",
     "model",
     "profileId",
@@ -193,7 +192,7 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
                   input: {
                     ...inputForProfile(previous.input, profile),
                     ...fit.settings,
-                    backendId: input.backendId,
+                    workerId: input.workerId,
                     prompt: preset.prompt,
                     negative: profile.capabilities.negativePrompt === false ? "" : preset.negative,
                     referenceAssets: [],
