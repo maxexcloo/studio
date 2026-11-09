@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { terminalStatuses } from "../../shared/queue.ts";
-import { maxTasteSummary } from "../../shared/taste.ts";
+import { maxAvoid, maxAvoids } from "../../shared/taste.ts";
 import { mcpJson } from "./media.js";
 
 const maxResults = 50;
@@ -257,14 +257,14 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     server,
     "taste",
     "taste & lora ratings",
-    "The user's taste profile, when asked: read, save (summary replaces it), refresh (rewrite from stars, Dream and comparisons) or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
+    "The user's taste profile, when asked: read, save (avoid replaces their avoid list), refresh or reset. rate_lora sets a LoRA (name from models) up, down or none; needs the LoRAs feature.",
     {
       action: z.enum(["read", "save", "refresh", "reset", "rate_lora"]).default("read"),
-      summary: z.string().trim().max(maxTasteSummary).optional(),
+      avoid: z.array(z.string().trim().max(maxAvoid)).max(maxAvoids).optional(),
       lora: z.string().trim().min(1).max(400).optional(),
       rating: z.enum(["up", "down", "none"]).optional(),
     },
-    async ({ action, summary, lora, rating }, signal) => {
+    async ({ action, avoid, lora, rating }, signal) => {
       if (action === "rate_lora") {
         if (!lora || !rating) throw new Error("Pass lora (its name from models) and rating.");
         const { library = {} } = await api(
@@ -275,19 +275,22 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
         );
         return mcpJson({ lora, rating: library.ratings?.[lora] || "none" });
       }
-      if (action === "save" && summary === undefined)
-        throw new Error("Pass summary: the whole taste profile to save.");
+      if (action === "save" && avoid === undefined)
+        throw new Error("Pass avoid: everything the user asks Studio to avoid.");
       const answer =
         action === "read"
           ? await api("GET", "/api/taste", undefined, signal)
           : action === "save"
-            ? await api("PUT", "/api/taste", { summary }, signal)
+            ? await api("PUT", "/api/taste", { avoid }, signal)
             : action === "refresh"
               ? await api("POST", "/api/taste/refresh", {}, signal)
               : await api("DELETE", "/api/taste", undefined, signal);
       return mcpJson({
         summary: answer.summary || "",
-        source: answer.source,
+        likes: answer.likes,
+        styles: answer.styles,
+        avoid: answer.avoid,
+        added_avoid: answer.addedAvoid,
         updated_at: answer.updatedAt,
         signals: answer.signals,
       });

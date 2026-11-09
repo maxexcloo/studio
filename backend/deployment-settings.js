@@ -92,7 +92,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_TASTE_UPDATES",
     "Taste Updates",
-    "The assistant model rewrites an account's taste profile after a few stars, compare votes and iterations; its Refresh on the Dream page still works.",
+    "The assistant model summarises an account's likes, styles and avoids after every ten stars, Dream choices, compare votes and iterations; its Refresh on the Dream page still works.",
   ),
   flag(
     "STUDIO_GALLERY_WHILE_BUSY",
