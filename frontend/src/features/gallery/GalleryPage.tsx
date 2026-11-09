@@ -72,6 +72,8 @@ export function GalleryPage() {
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
+  // The run whose results the viewer flips through; unset, it flips through the whole gallery.
+  const [run, setRun] = useState<string>();
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
@@ -196,8 +198,9 @@ export function GalleryPage() {
   const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
-  const openItem = useCallback((item: MediaItem) => {
+  const openItem = useCallback((item: MediaItem, run?: string) => {
     setFocusItem(null);
+    setRun(run);
     setSelected(item);
   }, []);
   // Phones leave out the time, keeping a pinned caption to two lines.
@@ -402,11 +405,13 @@ export function GalleryPage() {
         <MediaViewer
           item={currentMedia(loaded, selected)}
           items={
-            versions
-              ? [...versions.values()].map(
-                  (group) => group.find((version) => version.id === selected.id) || group[0],
-                )
-              : items
+            run
+              ? loaded.filter((candidate) => candidate.jobId === run)
+              : versions
+                ? [...versions.values()].map(
+                    (group) => group.find((version) => version.id === selected.id) || group[0],
+                  )
+                : items
           }
           related={loaded}
           navigate={setSelected}

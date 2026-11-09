@@ -163,7 +163,10 @@ the primary component reference and verify APIs against the installed version.
   clicks close; media, native video controls and actions remain interactive.
   Images open fitted without exceeding their real size. Keep the current image
   visible until the next version loads, then refit before painting. Navigation
-  stops at the first and last item. Closing reveals and focuses the current tile.
+  stops at the first and last item. A result from a Chat iteration or run of
+  several, like their Open All, flips through only those results; other results
+  flip through their Chat or gallery. Closing reveals and focuses the current
+  tile.
 - Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay
