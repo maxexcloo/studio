@@ -20,7 +20,7 @@ import {
 import { writtenJob, type GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
 import { queuePriority, Store } from "./store.ts";
-import { createTaste } from "./taste.ts";
+import { createTaste, tasteSignal } from "./taste.ts";
 
 const profiles: DreamProfile[] = [
   {
@@ -367,9 +367,9 @@ test("Dream stops at the unseen buffer and today's cap per kind, and animates ke
   assert.equal(live().length, 0);
 });
 
-test("Dream picks a ready profile by its stars and keeps Spicy to accounts with Uncensored Models", async (t) => {
-  const { dream, state, dreamOnce, generated } = fixture(t);
-  const starred = (id: string, profileId: string, days = 1) =>
+test("Dream draws a ready profile by its taste, explores one axis at a time and keeps Spicy to accounts with Uncensored Models", async (t) => {
+  const { dream, state, taste, dreamOnce, generated } = fixture(t);
+  const starred = (id: string, profileId: string) => {
     generated({
       id,
       ownerId: "alice",
@@ -377,18 +377,20 @@ test("Dream picks a ready profile by its stars and keeps Spicy to accounts with 
       status: "done",
       favorite: true,
       prompt: `starred ${id}`,
-      createdAt: new Date(state.clock - days * 86_400_000).toISOString(),
       settings: { profileId },
     });
+    taste.record("alice", [tasteSignal("star", id, { profileId, tags: ["fox"] })]);
+  };
   starred("a", "qwen");
   starred("b", "qwen");
-  starred("c", "flux");
-  starred("d", "flux", 40);
-  starred("e", "flux", 40);
+  taste.record("alice", [tasteSignal("discard", "c", { profileId: "flux" })]);
   await dream.save("alice", { enabled: true, spicy: true });
   const job = await dreamOnce();
   assert.equal(job?.input.profileId, "qwen");
-  assert.match(state.calls[0].user, /- starred [abc]/);
+  assert.equal(job?.dream?.arm, "exploit");
+  assert.match(state.calls[0].user, /- starred [ab]/);
+  // An exploited idea features something they like.
+  assert.match(state.calls[0].system, /feature this, which they like: fox\./);
   // No uncensored grant: Spicy never applies, whatever the setting says.
   assert.equal(state.calls[0].model, "writer");
   assert.match(state.calls[0].system, /safe for work/);
@@ -405,15 +407,19 @@ test("Dream picks a ready profile by its stars and keeps Spicy to accounts with 
     onDelta() {},
   });
   assert.match(state.calls[2].system, /safe for work/);
-  // A share of ideas goes to the profile used least, here one never used.
+  // A share of ideas explores one axis; the first tries the profile used least, here one never used.
   state.rolls = [99];
   const explored = await dreamOnce();
   assert.equal(explored?.input.profileId, "flux");
+  assert.equal(explored?.dream?.arm, "explore:profile");
   assert.equal(explored?.dream?.why, "Trying FLUX for the first time · You star foxes.");
-  // Another share starts from a Library import, on its profile with its LoRAs, for Uncensored
-  // Models only, since imports carry no content rating.
+  // The next explores the prompt: half from a Library import, on its profile with its LoRAs, for
+  // Uncensored Models only, since imports carry no content rating.
   state.access.alice!.uncensored = true;
-  state.loras.alice = { ratings: { "ink.safetensors": "down" }, strengths: {} };
+  state.loras.alice = {
+    ratings: { "fox.safetensors": "up", "film.safetensors": "up", "ink.safetensors": "down" },
+    strengths: {},
+  };
   state.inspiration = [
     {
       prompt: "a lighthouse in a storm",
@@ -428,16 +434,23 @@ test("Dream picks a ready profile by its stars and keeps Spicy to accounts with 
   state.rolls = [99];
   const inspired = await dreamOnce();
   assert.equal(inspired?.input.profileId, "flux");
+  assert.equal(inspired?.dream?.arm, "explore:prompt");
   assert.deepEqual(inspired?.input.loras, [
     { name: "fox.safetensors", strength: 0.7, enabled: true },
   ]);
   assert.match(state.calls.at(-1)!.user, /Inspiration prompt: a lighthouse in a storm/);
   assert.match(state.calls.at(-1)!.system, /Start from the inspiration prompt/);
   assert.equal(inspired?.dream?.why, "Inspired by an import · You star foxes.");
+  // Without an import, an explored prompt goes beyond their taste on the profile it drew.
   state.access.alice!.uncensored = false;
+  state.loras = {};
   state.rolls = [99];
   await dreamOnce();
+  state.rolls = [99];
+  const beyond = await dreamOnce();
+  assert.deepEqual([beyond?.input.profileId, beyond?.dream?.arm], ["qwen", "explore:prompt"]);
   assert.doesNotMatch(state.calls.at(-1)!.user, /Inspiration/);
+  assert.match(state.calls.at(-1)!.system, /Explore this time: go beyond their taste profile/);
 });
 
 test("Dream skips unavailable accounts and offline services, logging each reason once", async (t) => {
@@ -690,8 +703,8 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   );
 });
 
-test("Dream loads one of the account's thumbs-up LoRAs the profile can use", async (t) => {
-  const { dream, state, store, dreamOnce } = fixture(t);
+test("Dream loads a LoRA drawn by taste and thumbs up, at its learnt strength, and explores untried ones", async (t) => {
+  const { dream, state, store, taste, dreamOnce } = fixture(t, [profiles[0]]);
   // A LoRA for another family is left out; the run goes ahead without it.
   state.loras.alice = { ratings: { "klein.safetensors": "up" }, strengths: {} };
   await dream.save("alice", { enabled: true });
@@ -706,24 +719,27 @@ test("Dream loads one of the account's thumbs-up LoRAs the profile can use", asy
     },
     strengths: { "family:flux": { "film.safetensors": 0.6 } },
   };
-  await dream.save("alice", { enabled: true });
-  const job = (await dreamOnce())!;
-  const loras = store.job("alice", job.id)!.input.loras as { name: string; strength: number }[];
-  assert.deepEqual(
-    loras.map((lora) => [lora.name, lora.strength]),
-    [["film.safetensors", 0.6]],
-  );
-  state.loras.alice.ratings["ink.safetensors"] = "up";
-  assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 1);
-  assert.match(state.calls.at(-1)!.user, /loads these LoRAs: /);
-  // A share of LoRA ideas tries an unrated one instead, and the why line says so.
+  const loras = (job: { id: string }) =>
+    (store.job("alice", job.id)!.input.loras as { name: string; strength: number }[]).map(
+      (lora) => [lora.name, lora.strength],
+    );
+  // Thumbs up alone: the first of those alike, at its saved strength.
+  assert.deepEqual(loras((await dreamOnce())!), [["fox.safetensors", 1]]);
+  // A liked result with film at 0.8 outweighs it, at the strength it was liked at.
+  taste.record("alice", [
+    tasteSignal("keep", "liked", {
+      profileId: "flux",
+      loras: [{ name: "film.safetensors", strength: 0.8 }],
+    }),
+  ]);
+  assert.deepEqual(loras((await dreamOnce())!), [["film.safetensors", 0.8]]);
+  assert.match(state.calls.at(-1)!.user, /loads these LoRAs: film\.safetensors/);
+  // An explored idea tries an unrated LoRA no result has taught yet, and the why line says so.
   delete state.loras.alice.ratings["ink.safetensors"];
-  state.rolls = [0, 0, 99];
+  state.rolls = [99];
   const tried = (await dreamOnce())!;
-  assert.deepEqual(
-    (tried.input.loras as { name: string }[]).map((lora) => lora.name),
-    ["ink.safetensors"],
-  );
+  assert.deepEqual(loras(tried), [["ink.safetensors", 1]]);
+  assert.equal(tried.dream?.arm, "explore:lora");
   assert.match(String(tried.dream?.why), /^Testing ink · /);
   // Without LoRA access nothing is added.
   state.loras = {};
@@ -731,9 +747,25 @@ test("Dream loads one of the account's thumbs-up LoRAs the profile can use", asy
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
 
-test("Dream compares steps only on a profile with a steps control", async (t) => {
-  const asked = async (capabilities: DreamProfile["capabilities"]) => {
-    const { dream, state, store, live, dreamOnce } = fixture(t, [
+test("an exploited idea draws its steps, guidance and aspect ratio by taste", async (t) => {
+  const { dream, taste, dreamOnce } = fixture(t, [
+    { ...profiles[0], capabilities: { steps: true } },
+  ]);
+  taste.record("alice", [
+    tasteSignal("star", "a", { profileId: "flux", steps: 28, cfg: 3.4, width: 832, height: 1216 }),
+    tasteSignal("discard", "b", { profileId: "flux", steps: 12, cfg: 7, width: 1216, height: 832 }),
+  ]);
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  assert.deepEqual(
+    [job.input.steps, job.input.cfg, job.input.width, job.input.height],
+    [28, 3.5, 832, 1216],
+  );
+});
+
+test("Dream compares steps only on a profile with a steps control, and what taste is least sure of", async (t) => {
+  const asked = async (capabilities: DreamProfile["capabilities"], judged = 0) => {
+    const { dream, state, store, taste, live, dreamOnce } = fixture(t, [
       { id: "flux", kind: "image", label: "FLUX", capabilities },
     ]);
     const session = store.createSession("alice", "Gallery").id;
@@ -754,6 +786,10 @@ test("Dream compares steps only on a profile with a steps control", async (t) =>
       prompt: "a fox in snow",
       settings: { profileId: "flux" },
     });
+    for (let index = 0; index < judged; index++)
+      taste.record("alice", [
+        tasteSignal("star", `judged-${index}`, { profileId: "flux", steps: index % 2 ? 10 : 20 }),
+      ]);
     await dream.save("alice", { enabled: true, dailyImages: 10 });
     for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
     await dream.tick();
@@ -763,6 +799,8 @@ test("Dream compares steps only on a profile with a steps control", async (t) =>
   assert.equal(await asked({ steps: true }), "Which Steps?");
   assert.equal(await asked({ steps: false }), "Which Wording?");
   assert.equal(await asked(undefined), "Which Wording?");
+  // Once results taught 20 and 10 steps, wording is what taste knows least.
+  assert.equal(await asked({ steps: true }, 2), "Which Wording?");
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
