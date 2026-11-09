@@ -13,7 +13,7 @@ import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatHeading, SessionList } from "./ChatWorkspace";
+import { ChatHeading, SessionList, useNewChatOpen } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { sessionQuery } from "./queries";
 import { iterationTiles, SessionIteration } from "./SessionIteration";
@@ -26,6 +26,7 @@ export function ChatPage() {
 export function SessionsPage() {
   const { draft } = useGeneration();
   const phone = usePhone();
+  const starting = useNewChatOpen();
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <>
@@ -42,7 +43,9 @@ export function SessionsPage() {
           <SessionList />
         </Stack>
       ) : (
-        <EmptyState fill>No Chat Selected</EmptyState>
+        <EmptyState fill>
+          {starting ? "Send a message to start this chat." : "No Chat Selected"}
+        </EmptyState>
       )}
       <ChatDock />
     </>
