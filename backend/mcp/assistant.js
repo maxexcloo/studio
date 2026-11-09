@@ -1,8 +1,8 @@
-// The prompt assistant's MCP tools: RewritePrompt, SuggestNegative and SuggestLoras. Each one calls
+// The prompt assistant's MCP tools: rewrite_prompt, suggest_negative and suggest_loras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
 // share one engine and one set of rules (Prompt Assistant, Uncensored Models for Spicy, LoRAs, the
 // account's profiles). What the chat used is remembered for six hours, on disk (mcp-assistant.json
-// beside MCP's ownership file), so a Generate with that prompt records it on the result
+// beside MCP's ownership file), so a generate with that prompt records it on the result
 // (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from "zod";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
@@ -100,7 +100,7 @@ export function createChatAssistantMemory({ now = Date.now, file = "", log = con
 
 /**
  * Registers the three tools. `tool` is mcp.js's registration helper, `profileOf(name)` resolves a
- * profile id or name the way Generate does, and `memory` is createChatAssistantMemory's.
+ * profile id or name the way generate does, and `memory` is createChatAssistantMemory's.
  */
 export function registerAssistantTools({ tool, server, media, owner, profileOf, memory }) {
   // Custom is the UI's free-text instruction; the chat restyles with its own words instead.
@@ -109,7 +109,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
   const profileId = z
     .string()
     .min(1)
-    .describe("The profile the prompt is for: an id or name from Models.");
+    .describe("The profile the prompt is for: an id or name from models.");
   const ask = (route, body, signal) =>
     media.request("POST", `/api/assistant/${route}`, body, owner, { signal });
   /** A reference the account uploaded, as the data URL the assistant reads (a vision model only). */
@@ -127,9 +127,9 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
 
   tool(
     server,
-    "RewritePrompt",
-    "Rewrite Prompt",
-    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; spicy needs Uncensored Models, which Models lists among the account's features), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
+    "rewrite_prompt",
+    "rewrite prompt",
+    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; spicy needs Uncensored Models, which models lists among the account's features), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; generate already writes prompts from requests. A vision model reads reference_asset_ids from upload. Show the result; pass it to generate in prompts.`,
     {
       prompt,
       profile_id: profileId,
@@ -173,8 +173,8 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
 
   tool(
     server,
-    "SuggestNegative",
-    "Suggest Negative",
+    "suggest_negative",
+    "suggest negative",
     "Write a negative prompt for a prompt and profile, only when asked. Returns unused: true when the profile takes none; then pass no negative_prompt.",
     {
       prompt,
@@ -190,9 +190,9 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
 
   tool(
     server,
-    "SuggestLoras",
-    "Suggest LoRAs",
-    "Suggest LoRAs from the profile’s library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to Generate as loras; Studio adds their triggers.",
+    "suggest_loras",
+    "suggest loras",
+    "Suggest LoRAs from the profile’s library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to generate as loras; Studio adds their triggers.",
     {
       prompt,
       profile_id: profileId,

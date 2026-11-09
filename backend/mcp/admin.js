@@ -10,8 +10,8 @@
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
  * Backends backs up the profiles it replaces, only an empty group can be deleted, a model file goes
- * only with its catalogue entry (CatalogueEdit remove, when no profile uses it) and no tool touches
- * a GPU. Maintenance runs Settings' upkeep: migrations and Merge
+ * only with its catalogue entry (catalogue_edit remove, when no profile uses it) and no tool touches
+ * a GPU. The maintenance tool runs Settings' upkeep: migrations and Merge
  * Duplicate Profiles back up what they change, and ending another account's unfinished job is the
  * one step that cannot be undone, so that tool alone is marked destructive.
  */
@@ -23,23 +23,23 @@ import { imageMimes } from "../reference-names.js";
 import { redditPostPath } from "../gallery/reddit.js";
 
 export const adminToolNames = Object.freeze([
-  "Library",
-  "Lookup",
-  "Import",
-  "Imports",
-  "Downloads",
-  "Updates",
-  "CatalogueEdit",
-  "Profiles",
-  "ProfileEdit",
-  "CombineBackends",
-  "Export",
-  "Placement",
-  "Accounts",
-  "Maintenance",
+  "library",
+  "lookup",
+  "import",
+  "imports",
+  "downloads",
+  "updates",
+  "catalogue_edit",
+  "profiles",
+  "profile_edit",
+  "combine_backends",
+  "export",
+  "placement",
+  "accounts",
+  "maintenance",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with Library, Profiles, Accounts or Maintenance before stating or changing it. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, removals (CatalogueEdit remove, ProfileEdit remove, CombineBackends apply) run only when asked and back up or keep versions first, and no tool touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with library, profiles, accounts or maintenance before stating or changing it. Nothing downloads unless asked (downloads start), edits are new versions with base_hash from profiles get, removals (catalogue_edit remove, profile_edit remove, combine_backends apply) run only when asked and back up or keep versions first, and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
@@ -231,8 +231,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Library",
-    "Library",
+    "library",
+    "library",
     "Search or read Studio’s LoRAs and models with provenance (source, origin, version, triggers, strength, links). view installed (default), catalogue (catalogued, installed or not) or updates (available updates). get with key returns one entry in full. Read-only.",
     {
       action: z.enum(["search", "get"]).default("search"),
@@ -283,9 +283,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Lookup",
-    "Look Up a Model",
-    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url Import takes. Read-only.',
+    "lookup",
+    "look up a model",
+    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url import takes. Read-only.',
     {
       url: z.string().trim().url().max(2000).optional(),
       query: z.string().trim().min(2).max(120).optional(),
@@ -308,9 +308,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Import",
-    "Import to Library",
-    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from Upload (upload_id) or a result (job_id). Returns the import’s grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
+    "import",
+    "import to library",
+    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from upload (upload_id) or a result (job_id). Returns the import’s grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
     {
       url: z.string().trim().url().max(2000).optional(),
       upload_id: id.optional(),
@@ -338,7 +338,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           title: saved.title,
           imported: saved.imported,
           ...(saved.failed?.length ? { failed: saved.failed } : {}),
-          note: "Saved as uploads; Search with uploads finds them.",
+          note: "Saved as uploads; call search with uploads to find them.",
         });
       }
       let record;
@@ -389,20 +389,20 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           import: importView(result.import),
           queued: result.queued,
           ...(result.failures?.length ? { failures: result.failures } : {}),
-          note: "Shown in Library › Import. Downloads status with this import_id follows the files.",
+          note: "Shown in Library › Import; downloads status with this import_id follows the files.",
         });
       }
       return mcpJson({
         import: importView(record),
-        note: "Shown in Library › Import. Call Downloads start with this import_id to fetch the missing files when the user asks.",
+        note: "Shown in Library › Import. Call downloads start with this import_id to fetch the missing files when the user asks.",
       });
     },
   );
 
   tool(
     server,
-    "Imports",
-    "Library Imports",
+    "imports",
+    "library imports",
     `Read Library › Import history (newest first, with grade and missing count), or one import by id with its files checked. wait_seconds (at most ${maxWaitSeconds}) waits once for a resolving or downloading import; never poll. clear_failed removes every failed import record and remove one import record (id), when the user asks; downloaded files stay.`,
     {
       action: z.enum(["read", "clear_failed", "remove"]).default("read"),
@@ -451,9 +451,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Downloads",
-    "Model Downloads",
-    "Model downloads through the worker model API, only when asked. start with import_id queues the import’s missing files (indices picks files); start or retry with source queues a download id from Lookup, Imports or status. status lists running, queued and recent downloads (import_id narrows to its files). cancel stops one download; its partial file stays and start resumes it. Paid, early-access and restricted files never download.",
+    "downloads",
+    "model downloads",
+    "Model downloads through the worker model API, only when asked. start with import_id queues the import’s missing files (indices picks files); start or retry with source queues a download id from lookup, imports or status. status lists running, queued and recent downloads (import_id narrows to its files). cancel stops one download; its partial file stays and start resumes it. Paid, early-access and restricted files never download.",
     {
       action: z.enum(["start", "status", "retry", "cancel"]),
       import_id: id.optional(),
@@ -530,8 +530,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Updates",
-    "Library Updates",
+    "updates",
+    "library updates",
     'Updates for catalogued LoRAs and models from Civitai or Hugging Face, only when asked. list shows the last check, check checks now (keys or query narrows it), apply downloads the new file of each key under its own name (alternative picks the free version offered). query names entries as Library search does ("glow lora"). The old file stays until the new one verifies and nothing uses it. Never applies on its own.',
     {
       action: z.enum(["list", "check", "apply"]).default("list"),
@@ -608,8 +608,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     .strict();
   tool(
     server,
-    "CatalogueEdit",
-    "Edit Catalogue Entry",
+    "catalogue_edit",
+    "edit catalogue entry",
     "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile uses it, taking a LoRA out of every account's stacks first, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
     {
       key,
@@ -640,7 +640,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         key: saved.key,
         entry: saved.entry,
         previous: saved.previous,
-        note: "CatalogueEdit with undo: true reverts this change.",
+        note: "Call catalogue_edit with undo: true to revert this change.",
       });
     },
   );
@@ -689,9 +689,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Profiles",
-    "Profiles & Guides",
-    "Read Studio’s model profiles and prompting guides. list lists them with name, version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id. Read-only.",
+    "profiles",
+    "profiles & guides",
+    "Read Studio’s model profiles and prompting guides. list lists them with name, version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to profile_edit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id. Read-only.",
     {
       action: z.enum(["list", "get", "diff"]).default("list"),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -742,7 +742,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
             version,
             text: await versionText(target, name, version, signal),
             current_hash: now.hash,
-            note: "An older version: ProfileEdit revert restores it as a new version.",
+            note: "An older version: profile_edit revert restores it as a new version.",
           });
         return mcpJson({
           target,
@@ -769,9 +769,9 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "ProfileEdit",
-    "Edit Profile or Guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"<family>": {"image": "<pack>"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from Profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
+    "profile_edit",
+    "edit profile or guide",
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"<family>": {"image": "<pack>"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
     {
       action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -801,14 +801,14 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       }
       if (!base_hash)
         throw new Error(
-          "Pass base_hash: the hash from Profiles get, so a change made since is never overwritten.",
+          "Pass base_hash: the hash from profiles get, so a change made since is never overwritten.",
         );
       if (action === "remove") {
         if (target === "bindings") throw new Error("remove takes a profile or a guide.");
         return mcpJson(await api("POST", `${base}/remove`, { baseHash: base_hash }, signal));
       }
       if (action === "revert") {
-        if (!version) throw new Error("Pass version: the version to restore (from Profiles get).");
+        if (!version) throw new Error("Pass version: the version to restore (from profiles get).");
         return reply(await api("POST", `${base}/revert`, { version, baseHash: base_hash }, signal));
       }
       if (Boolean(text) === Boolean(patch))
@@ -820,7 +820,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           const now = await current(target, name, signal);
           if (now.hash !== base_hash)
             throw new Error(
-              `This ${target === "guide" ? "guide" : "binding document"} changed since you read it. Call Profiles get again, then make the change.`,
+              `This ${target === "guide" ? "guide" : "binding document"} changed since you read it. Call profiles get again, then make the change.`,
             );
           value = mergePatch(now.value, patch);
         } else {
@@ -840,7 +840,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         const now = await current("profile", name, signal);
         if (now.hash !== base_hash)
           throw new Error(
-            "This profile changed since you read it. Call Profiles get again, then make the change.",
+            "This profile changed since you read it. Call profiles get again, then make the change.",
           );
         next = `${JSON.stringify(mergePatch(JSON.parse(now.text), patch), null, 2)}\n`;
       }
@@ -850,8 +850,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "CombineBackends",
-    "Combine Backends",
+    "combine_backends",
+    "combine backends",
     "Combine a model’s Radiance and ComfyUI profiles into one, as Library › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
     {
       action: z.enum(["preview", "apply"]).default("preview"),
@@ -872,7 +872,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       if (action === "preview")
         return mcpJson(await api("GET", "/api/profiles/backends", undefined, signal));
       if (!hash || !selections)
-        throw new Error("Pass hash and selections from CombineBackends preview.");
+        throw new Error("Pass hash and selections from combine_backends preview.");
       return mcpJson(
         await api("POST", "/api/profiles/backends/combine", { hash, selections }, signal),
       );
@@ -881,8 +881,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Export",
-    "Export Profiles",
+    "export",
+    "export profiles",
     "Build the export bundle as a backup (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Library › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
     {},
     async (_args, signal) => {
@@ -899,8 +899,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Placement",
-    "Model Placement",
+    "placement",
+    "model placement",
     "Where model files live: the worker’s inventory per folder, free space and whether it is writable (or the local folders); with key, where that one file sits. Read-only.",
     {
       key: key.optional(),
@@ -921,8 +921,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Accounts",
-    "Accounts & Groups",
+    "accounts",
+    "accounts & groups",
     "Manage accounts and groups as Settings › Users and Groups do, only when asked. list returns accounts, groups, the default group and the profiles a group can grant; save_group creates or replaces a group (group: id, name, generationProfiles, allModels and features, each feature set explicitly since an unsaved one is off); set_default makes group_id the group new accounts start in (\"\" for none); delete_group removes an empty group that isn't the default; set_user moves an ordinary account (account_id) to group_id, sets disabled, or sets role (administrator or user; a new user joins the default group); delete_user removes an account (account_id) with its sessions and MCP token, keeping its gallery files. Neither changes the caller's own account or the last enabled administrator.",
     {
       action: z
@@ -958,7 +958,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         const route = `/api/accounts/profiles/${encodeURIComponent(group_id)}`;
         return mcpJson(await api("DELETE", route, undefined, signal));
       }
-      if (!account_id) throw new Error("Pass account_id from Accounts list.");
+      if (!account_id) throw new Error("Pass account_id from accounts list.");
       const route = `/api/accounts/users/${encodeURIComponent(account_id)}`;
       if (action === "delete_user") return mcpJson(await api("DELETE", route, undefined, signal));
       const changes = [
@@ -973,8 +973,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
 
   tool(
     server,
-    "Maintenance",
-    "Studio Maintenance",
+    "maintenance",
+    "studio maintenance",
     "Look after the studio as Settings does, only when asked. migrations previews the runtime data migrations (dry run); with apply: true it applies the steps safe while Studio runs, each writing a backup, and names those that need Studio stopped. unfinished lists every account's unfinished jobs (owner_id, job_id); retry_unfinished ends one and queues it again, delete_unfinished ends it and takes it out of the queue. pause_all holds every account's queue (Dream's too) and resume_all releases it. duplicates previews Merge Duplicate Profiles with a hash; merge_duplicates merges that preview after a backup.",
     {
       action: z.enum([
@@ -1028,7 +1028,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         );
       if (action === "duplicates")
         return mcpJson(await api("GET", "/api/profiles/duplicates", undefined, signal));
-      if (!hash) throw new Error("Pass hash from Maintenance duplicates.");
+      if (!hash) throw new Error("Pass hash from maintenance duplicates.");
       return mcpJson(await api("POST", "/api/profiles/duplicates/merge", { hash }, signal));
     },
     { destructiveHint: true },

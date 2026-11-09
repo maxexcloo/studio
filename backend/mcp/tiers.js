@@ -70,7 +70,7 @@ const nearTiers = {
   standard: ["standard"],
   quality: ["quality"],
 };
-/** Profiles for a tier as Models lists them: the tier itself first, then the neighbouring speed tier, each in catalogue order. */
+/** Profiles for a tier as the models tool lists them: the tier itself first, then the neighbouring speed tier, each in catalogue order. */
 export function profilesNearTier(profiles, tier) {
   const tiers = nearTiers[tier] || [tier];
   const listed = tiers.flatMap((item) => profiles.filter((profile) => tierOf(profile) === item));
@@ -223,7 +223,7 @@ const fits = (profile, references) => {
 };
 
 /**
- * The profiles Studio may use when Generate names a kind and tier instead of a profile_id: without a
+ * The profiles Studio may use when generate names a kind and tier instead of a profile_id: without a
  * tier, the first preferred tier (Fast, Super Fast, Standard, Quality) that fits. `firstFrame`
  * (animating an image) prefers first-frame profiles. `profiles` is already limited to this account's
  * ready profiles of the kind.
@@ -359,7 +359,7 @@ function aliases(profile) {
   );
 }
 /**
- * The profile a request names when Generate has no profile_id ("six baby ducks, fast moss"): a model
+ * The profile a request names when generate has no profile_id ("six baby ducks, fast moss"): a model
  * or family alias of exactly one family, resolved within it by the request's model and speed words,
  * then moved to `tier` within the family. Null when no family, or several, are named.
  */

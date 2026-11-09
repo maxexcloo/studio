@@ -65,11 +65,11 @@ import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
 
-// Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
+// The generate tool waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
-// How long Generate reads the first job for its end time while the queue picks it up.
+// How long generate reads the first job for its end time while the queue picks it up.
 const etaProbeMilliseconds = 2000;
-// An identical Generate from the same conversation within this window is the same request (see Generate).
+// An identical generate from the same conversation within this window is the same request (see generate).
 const generateDedupeWindowMs = 120_000;
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
@@ -96,9 +96,9 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call Models, for work in progress Queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To find earlier work, call Search. For an attached image, call UploadLink. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide (sent once, with models or a model's first generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To find earlier work, call search. For an attached image, call upload_link. To animate or extend, pass reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
 const controlInstructions =
-  "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
+  "GPU placement is manual: use these tools only on explicit request, and present a preview or mode preview and get approval before apply. Call restart only for what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
   "This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -123,7 +123,7 @@ const equal = (left, right) =>
     Buffer.byteLength(left) === Buffer.byteLength(right) &&
     crypto.timingSafeEqual(Buffer.from(left), Buffer.from(right)),
   );
-// Status and Result wait briefly at most: a chat waiting on a tool blocks its turn.
+// The status and result tools wait briefly at most: a chat waiting on a tool blocks its turn.
 const wait = z.number().int().min(0).max(20).default(0);
 const job = {
   job_id: z.string().min(1).max(200).describe('A ref such as "result 3", or a job_id.'),
@@ -138,7 +138,7 @@ const tier = z
     message: `Use one of ${mcpTiers.join(", ")}`,
   })
   .describe(`One of ${mcpTiers.join(", ")}; turbo is Super Fast.`);
-// The animation themes Reuse takes, checked at call time like tier.
+// The animation themes reuse takes, checked at call time like tier.
 const theme = z
   .string()
   .trim()
@@ -158,7 +158,7 @@ const promptListText = z.string().transform((text) => {
     return [text];
   }
 });
-// Models shows a guide's gist; a model's first Generate sends the whole guide for the chat to write to.
+// The models tool shows a guide's gist; a model's first generate sends the whole guide for the chat to write to.
 const maxShownGuideCharacters = 500;
 const maxListedLoras = 30;
 /**
@@ -282,9 +282,9 @@ export function registerMcpRoutes(
     next();
   });
   const reviewedGuides = new Map();
-  // Generate calls of the dedupe window by conversation and arguments (Generate dedupes repeats).
+  // Calls to generate in the dedupe window by conversation and arguments (generate dedupes repeats).
   const recentGenerates = new Map();
-  // Generate previews by conversation and arguments, so the same call without preview queues what was shown.
+  // Previews from generate by conversation and arguments, so the same call without preview queues what was shown.
   const previews = new Map();
   // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
   const inflight = new Map();
@@ -439,9 +439,9 @@ export function registerMcpRoutes(
       note = "",
     ) => {
       const label = profile.label || profile.id;
-      // Iterations that rebuild a whole Generate call drift from the result; Reuse keeps its settings.
-      const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt.`;
-      // A set Studio expects to finish within the wait comes back finished, so the agent needs no Result call;
+      // Iterations that rebuild a whole generate call drift from the result; reuse keeps its settings.
+      const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt.`;
+      // A set Studio expects to finish within the wait comes back finished, so the agent needs no result call;
       // anything longer, or with no trusted estimate, hands back its links at once.
       const [endsAt] = await media.finishTimes(owner, [submission], {
         probeMs: etaProbeMs,
@@ -509,7 +509,7 @@ export function registerMcpRoutes(
       ].join(" · ");
       const message =
         submission.status === "queued"
-          ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. When the user later asks to see results, call Result. Never poll or resubmit. ${followUp}`
+          ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. When the user later asks to see results, call result. Never poll or resubmit. ${followUp}`
           : `${submission.error} ${note}Share the links; never resubmit.`;
       return {
         content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
@@ -568,7 +568,7 @@ export function registerMcpRoutes(
         content: [
           {
             type: "text",
-            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. Never poll or resubmit. To change or animate one later, call Reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
           },
         ],
         structuredContent: {
@@ -630,7 +630,7 @@ export function registerMcpRoutes(
     };
     // A profile whose worker isn't answering, as Settings › Workers names that state.
     const workerState = { parked: "Stopped", offline: "Offline" };
-    /** Profiles as Models lists them: "id — label" grouped by kind, marked when their worker isn't running. */
+    /** Profiles as the models tool lists them: "id — label" grouped by kind, marked when their worker isn't running. */
     const listed = (profiles) => {
       const list = {};
       for (const profile of profiles) {
@@ -656,7 +656,7 @@ export function registerMcpRoutes(
               : `${label} takes no LoRAs.`
             : taking
               ? "No installed LoRA fits this account's ready profiles."
-              : "No ready profile takes LoRAs right now, so none can be listed; this doesn't mean Studio has none. Models without lora_query shows each service's state.";
+              : "No ready profile takes LoRAs right now, so none can be listed; this doesn't mean Studio has none. Call models without lora_query to see each service's state.";
       return { loras: [], loras_note: `${reason}${hiddenLoras(access)}` };
     };
     /** Uncensored LoRAs stay out of an account's lists without Uncensored Models. */
@@ -666,7 +666,7 @@ export function registerMcpRoutes(
         : "";
     /** A lookup that matched none: says so, with how many there are and how to list them. */
     const noMatch = async (query, installed) =>
-      `No LoRA matches ${query ? `"${query}"` : "those names"}, but ${installed} ${installed === 1 ? "is" : "are"} installed for this account. Call Models with lora_query "all" to list them, or try other words.${hiddenLoras(await media.access(owner))}`;
+      `No LoRA matches ${query ? `"${query}"` : "those names"}, but ${installed} ${installed === 1 ? "is" : "are"} installed for this account. Call models with lora_query "all" to list them, or try other words.${hiddenLoras(await media.access(owner))}`;
     /** One page of LoRA index lines. */
     const lorasPage = async (lines, number, installed) => {
       const pages = Math.max(1, Math.ceil(lines.length / maxListedLoras));
@@ -676,7 +676,7 @@ export function registerMcpRoutes(
         loras_installed: installed,
         page: at,
         pages,
-        loras_note: `Each reads name — hint [trigger word].${at < pages ? ` Call Models again with lora_page ${at + 1} for more.` : ""} Pass names to Generate; Studio adds missing trigger words.${hiddenLoras(await media.access(owner))}`,
+        loras_note: `Each reads name — hint [trigger word].${at < pages ? ` Call models again with lora_page ${at + 1} for more.` : ""} Pass names to generate; Studio adds missing trigger words.${hiddenLoras(await media.access(owner))}`,
       };
     };
     /** A ready profile by id or name, the fastest of one family's matches; otherwise the closest few, fastest first, so one call corrects a guess. */
@@ -711,7 +711,7 @@ export function registerMcpRoutes(
         tierOf(profile),
       ]);
       throw new Error(
-        `No ready profile matches ${value}.${near.length ? ` Closest: ${near.map((profile) => `${profile.id} (${profile.label || profile.id})`).join(", ")}.` : " Call Models for the list."}`,
+        `No ready profile matches ${value}.${near.length ? ` Closest: ${near.map((profile) => `${profile.id} (${profile.label || profile.id})`).join(", ")}.` : " Call models for the list."}`,
       );
     };
     /**
@@ -749,8 +749,8 @@ export function registerMcpRoutes(
     if (scope === "media" || scope === "unlinked" || scope === "anonymous") {
       tool(
         server,
-        "Models",
-        "Find Models",
+        "models",
+        "find models",
         "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features. With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
         {
           kind: z.enum(["all", "image", "video"]).default("all"),
@@ -784,7 +784,7 @@ export function registerMcpRoutes(
           const profile_id = canonicalProfileId(named_id);
           let profiles = await media.profiles(kind, owner);
           if (profile_id === undefined) {
-            // Cloud (Grok) profiles list apart: Generate uses one only when the user asks for Grok or the cloud.
+            // Cloud (Grok) profiles list apart: generate uses one only when the user asks for Grok or the cloud.
             const cloud = profiles.filter(isCloudProfile);
             profiles = profiles.filter((profile) => !isCloudProfile(profile));
             if (wanted) profiles = profilesNearTier(profiles, wanted);
@@ -823,7 +823,7 @@ export function registerMcpRoutes(
                 ...(missing.size ? { missing: [...missing] } : {}),
                 loras_installed: installed.size,
                 loras_note: found.size
-                  ? "Pass names to Generate without profile_id and Studio picks a profile that takes them all."
+                  ? "Pass names to generate without profile_id and Studio picks a profile that takes them all."
                   : await noMatch(lora_query, installed.size),
               });
             }
@@ -939,7 +939,7 @@ export function registerMcpRoutes(
             profile.imageModes &&
             Object.fromEntries(
               Object.entries(profile.imageModes).map(([mode, settings]) => {
-                // The same merge Generate validates against when references select this mode.
+                // The same merge generate validates against when references select this mode.
                 const merged = { ...profile, ...settings };
                 return [
                   mode,
@@ -1002,7 +1002,7 @@ export function registerMcpRoutes(
               ? {
                   loras: loras.slice(0, maxListedLoras),
                   loras_total: total,
-                  loras_note: `Each reads name — hint [trigger word]${total > maxListedLoras ? `; the first ${maxListedLoras} shown, lora_query "all" with lora_page or other words finds others` : ""}. Pass names to Generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.`,
+                  loras_note: `Each reads name — hint [trigger word]${total > maxListedLoras ? `; the first ${maxListedLoras} shown, lora_query "all" with lora_page or other words finds others` : ""}. Pass names to generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.`,
                 }
               : {}),
             ...(guide ? { prompting: guide } : {}),
@@ -1013,9 +1013,9 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Generate",
-        "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
+        "generate",
+        "generate",
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
         {
           request: z
             .string()
@@ -1037,7 +1037,7 @@ export function registerMcpRoutes(
             .string()
             .min(1)
             .optional()
-            .describe("A model id, label or words from them; Models lists what is ready."),
+            .describe("A model id, label or words from them; models lists what is ready."),
           profile_ids: z.array(z.string().min(1)).min(1).max(maxJobsPerCall).optional(),
           each_profile: z.boolean().optional(),
           // Unknown keys (a misspelt "strength") are dropped rather than rejected.
@@ -1045,13 +1045,13 @@ export function registerMcpRoutes(
             .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
             .max(8)
             .optional()
-            .describe("Each profile's limit is its controls.loras.max in Models."),
+            .describe("Each profile's limit is its controls.loras.max in models."),
           reference_asset_ids: z
             .array(z.string().min(1))
             .max(16)
             .optional()
             .describe(
-              `From Search uploads, Upload or Reuse mode reference${actor.session ? "" : "; an image attached in chat isn't one until the user uploads it through UploadLink"}. Models gives each profile's references.max.`,
+              `From search uploads, upload or reuse mode reference${actor.session ? "" : "; an image attached in chat isn't one until the user uploads it through upload_link"}. models gives each profile's references.max.`,
             ),
           reference_role: z.enum(["edit", "reference"]).optional(),
           aspect: z
@@ -1077,7 +1077,7 @@ export function registerMcpRoutes(
           face_detail: z.boolean().optional(),
         },
         (input, signal) => {
-          // A chat that sends the same Generate again within two minutes (a retry after a transport error, a doubled tool call) gets the first call's
+          // A chat that sends the same generate again within two minutes (a retry after a transport error, a doubled tool call) gets the first call's
           // jobs and reply, so one request is one set of images; asking again later, or for anything different, queues anew.
           const now = Date.now();
           for (const [key, entry] of recentGenerates)
@@ -1106,11 +1106,11 @@ export function registerMcpRoutes(
         } = structuredClone(input);
         if (!args.prompts)
           throw new Error(
-            "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call Generate again.",
+            "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
           );
         if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
           throw new Error(
-            "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call Generate again.",
+            "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
           );
         const several = Boolean(profile_ids || each_profile);
         if (several && args.loras?.length)
@@ -1150,7 +1150,7 @@ export function registerMcpRoutes(
             .map((profile) => ({ profile, note: "" }));
           if (!targets.length)
             throw new Error(
-              `No ready ${kind || "image"} profile${wanted ? ` in tier ${wanted}` : ""}. Call Models to see what is ready.`,
+              `No ready ${kind || "image"} profile${wanted ? ` in tier ${wanted}` : ""}. Call models to see what is ready.`,
             );
         } else {
           // A model the request names ("fast moss") counts as its profile_id when the chat left it out.
@@ -1220,7 +1220,7 @@ export function registerMcpRoutes(
             content: [
               {
                 type: "text",
-                text: `Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call Generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
+                text: `Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
               },
             ],
           };
@@ -1278,8 +1278,8 @@ export function registerMcpRoutes(
       };
       tool(
         server,
-        "Status",
-        "Check Status",
+        "status",
+        "check status",
         "A job\u2019s status and finished output links, only when the user asks.",
         { ...job, wait_seconds: wait },
         async ({ job_id, wait_seconds }, signal) => {
@@ -1302,8 +1302,8 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Result",
-        "Show Result",
+        "result",
+        "show result",
         'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for all). A running job returns its link: share it and stop; never poll, repeat or background this.',
         {
           job_id: z.string().min(1).max(200),
@@ -1317,9 +1317,9 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Search",
-        "Search Gallery",
-        "Find the user's earlier work by its words or look, with refs for Reuse, Review and Result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
+        "search",
+        "search gallery",
+        "Find the user's earlier work by its words or look, with refs for reuse, review and result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
         {
           query: z.string().trim().max(200).default(""),
           kind: z.enum(["image", "video"]).optional(),
@@ -1358,7 +1358,7 @@ export function registerMcpRoutes(
               content: [
                 {
                   type: "text",
-                  text: `${hits.length === 1 ? "One upload" : `${hits.length} uploads`}, newest first. Pass one to Generate in reference_asset_ids.\n\n${lines.join("\n")}`,
+                  text: `${hits.length === 1 ? "One upload" : `${hits.length} uploads`}, newest first. Pass one to generate in reference_asset_ids.\n\n${lines.join("\n")}`,
                 },
               ],
               structuredContent: { results },
@@ -1398,7 +1398,7 @@ export function registerMcpRoutes(
             content: [
               {
                 type: "text",
-                text: `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to Reuse, Review or Result.\n\n${lines.join("\n")}${picture}`,
+                text: `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to reuse, review or result.\n\n${lines.join("\n")}${picture}`,
               },
             ],
             structuredContent: { results },
@@ -1428,8 +1428,8 @@ export function registerMcpRoutes(
         });
       tool(
         server,
-        "Handover",
-        "Copy Chat Summary",
+        "handover",
+        "copy chat summary",
         "A copy-paste summary for a new chat, when asked or when the host reports about 90% context used. Pass decisions, preferences and unfinished work as summary.",
         {
           summary: z.string().trim().min(1).max(12000),
@@ -1462,8 +1462,8 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Review",
-        "Review Image",
+        "review",
+        "review image",
         "Inspect an image only when asked to judge, compare or improve it: a small preview with prompt and settings; compare_to sets another result beside it.",
         {
           ...output,
@@ -1482,8 +1482,8 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Cancel",
-        "Cancel",
+        "cancel",
+        "cancel",
         "Cancel a job when the user asks.",
         job,
         async ({ job_id }) => {
@@ -1500,11 +1500,11 @@ export function registerMcpRoutes(
       if (!actor.session) {
         tool(
           server,
-          "Upload",
-          "Upload Reference",
-          `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for Generate.`,
+          "upload",
+          "upload reference",
+          `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for generate.`,
           {
-            // Left unbounded below so an empty file gets Upload's own advice, not a schema refusal.
+            // Left unbounded below so an empty file gets upload's own advice, not a schema refusal.
             content_base64: z.string().max(maxUploadBase64),
             filename: z.string().default("reference.png"),
           },
@@ -1513,8 +1513,8 @@ export function registerMcpRoutes(
         );
         tool(
           server,
-          "UploadLink",
-          "Upload Link",
+          "upload_link",
+          "upload link",
           "A one-time page where the user uploads an image attached in chat.",
           {},
           async () => {
@@ -1523,7 +1523,7 @@ export function registerMcpRoutes(
               content: [
                 {
                   type: "text",
-                  text: `Ask the user to open this link and upload the photo they attached, then call Search with uploads to use it as a reference. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
+                  text: `Ask the user to open this link and upload the photo they attached, then call search with uploads to use it as a reference. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
                 },
               ],
               structuredContent: { link: url, expires_at: new Date(expires).toISOString() },
@@ -1533,9 +1533,9 @@ export function registerMcpRoutes(
       }
       tool(
         server,
-        "Reuse",
-        "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
+        "reuse",
+        "reuse result",
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for generate. mode upscale enlarges it in place, only when asked (upscale_quality, balanced by default).`,
         {
           ...output,
           job_id: z
@@ -1575,18 +1575,18 @@ export function registerMcpRoutes(
           const animating = mode === "animate" || mode === "extend";
           if (theme && (!animating || prompt))
             throw new Error(
-              "theme is for mode animate or extend without prompt. Call Reuse again.",
+              "theme is for mode animate or extend without prompt. Call reuse again.",
             );
           if (length && !animating)
-            throw new Error("length is for mode animate or extend. Call Reuse again.");
+            throw new Error("length is for mode animate or extend. Call reuse again.");
           if (theme === "custom" && !request)
-            throw new Error("theme custom needs request: what should happen. Call Reuse again.");
+            throw new Error("theme custom needs request: what should happen. Call reuse again.");
           if (upscale_quality && mode !== "upscale")
-            throw new Error("upscale_quality is for mode upscale. Call Reuse again.");
+            throw new Error("upscale_quality is for mode upscale. Call reuse again.");
           if (mode === "upscale") {
             if (wanted || prompt || request || profile_id || preserve_seed || theme || count > 1)
               throw new Error(
-                "mode upscale takes only job_id, output_index and upscale_quality. Call Reuse again.",
+                "mode upscale takes only job_id, output_index and upscale_quality. Call reuse again.",
               );
             media.own(owner, id);
             const { items = [] } = await media.request(
@@ -1621,7 +1621,7 @@ export function registerMcpRoutes(
           if (mode === "reference") {
             if (wanted || prompt || request || profile_id || preserve_seed || count > 1)
               throw new Error(
-                "mode reference takes only job_id and output_index. To generate from this result, call Reuse with mode again or animate.",
+                "mode reference takes only job_id and output_index. To generate from this result, call reuse with mode again or animate.",
               );
             const result = await media.download(owner, id, output_index);
             if (!imageMimes.includes(result.mime))
@@ -1637,7 +1637,7 @@ export function registerMcpRoutes(
           // Studio never rewrites a prompt: the chat writes the change into it; request is the user's words.
           if (request && !prompt && !theme)
             throw new Error(
-              "Studio runs prompts exactly as given. Write the revised prompt yourself from the result's prompt and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call Reuse again.",
+              "Studio runs prompts exactly as given. Write the revised prompt yourself from the result's prompt and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call reuse again.",
             );
           const item = await media.source(owner, id, output_index);
           if (mode === "extend" && item.type !== "video")
@@ -1648,7 +1648,7 @@ export function registerMcpRoutes(
           const kind = animating ? "video" : own;
           if (preserve_seed && (animating || wanted || profile_id))
             throw new Error(
-              "preserve_seed is for a same-model revision, not animation or a model/tier change. Call Reuse again without preserve_seed.",
+              "preserve_seed is for a same-model revision, not animation or a model/tier change. Call reuse again without preserve_seed.",
             );
           let plan;
           // Animating may name the video model ("grok imagine") in profile_id; naming a cloud profile asks for the cloud.
@@ -1759,8 +1759,8 @@ export function registerMcpRoutes(
       };
       tool(
         server,
-        "GPUStatus",
-        "GPU Status",
+        "gpu_status",
+        "gpu status",
         "Read each GPU workload's state, the GPUs in use and the current or last runtime change.",
         {},
         async () => mcpJson(await runtime.observe()),
@@ -1768,8 +1768,8 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Workloads",
-        "List Workloads",
+        "workloads",
+        "list workloads",
         "List the GPU workloads Studio can run, with their kind, GPU pool and GPU count.",
         {},
         () =>
@@ -1787,8 +1787,8 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Preview",
-        "Preview Placement",
+        "preview",
+        "preview placement",
         "Preview a COMPLETE placement without applying it: the listed workload ids run and every other stops; an empty list stops all. Present the changes for approval; discard to cancel.",
         { workloads: workloadList },
         async ({ workloads }) => mcpJson(await runtime.preview(workloads)),
@@ -1796,9 +1796,9 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Apply",
-        "Apply Placement",
-        "Apply an explicitly requested placement only after its Preview was presented and approved, with its exact signature. Studio waits for accepted work on stopping workloads, then switches; poll Operation. Never use it for media generation.",
+        "apply",
+        "apply placement",
+        "Apply an explicitly requested placement only after its preview was presented and approved, with its exact signature. Studio waits for accepted work on stopping workloads, then switches; poll operation. Never use it for media generation.",
         {
           workloads: workloadList,
           signature: z.string().min(1),
@@ -1815,9 +1815,9 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Mode",
-        "Preview GPU Mode",
-        "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and image), image_video (image and one-GPU video) or video (two-GPU video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then Apply the returned workloads and signature.",
+        "mode",
+        "preview gpu mode",
+        "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and image), image_video (image and one-GPU video) or video (two-GPU video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then apply the returned workloads and signature.",
         {
           mode: z.enum(["image_text", "image_video", "video"]),
           text_profile: z.string().min(1).optional(),
@@ -1828,18 +1828,18 @@ export function registerMcpRoutes(
       );
       tool(
         server,
-        "Restart",
-        "Restart Workload",
-        "Restart a running workload in place, only when the user asks: Studio waits for its accepted work, scales it to 0 and back to 1. workload is an id from GPUStatus. Never starts a stopped workload or changes the placement.",
+        "restart",
+        "restart workload",
+        "Restart a running workload in place, only when the user asks: Studio waits for its accepted work, scales it to 0 and back to 1. workload is an id from gpu_status. Never starts a stopped workload or changes the placement.",
         { workload: z.string().min(1) },
         async ({ workload }) => mcpJson(await runtime.restart(workload, "control-mcp")),
         { destructiveHint: true },
       );
       tool(
         server,
-        "Operation",
-        "Check Operation",
-        "Read the runtime change returned by Apply or Restart, without waiting.",
+        "operation",
+        "check operation",
+        "Read the runtime change returned by apply or restart, without waiting.",
         { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) },
         ({ job_id }) => mcpJson(runtime.operation(job_id)),
         { readOnlyHint: true },
@@ -1911,7 +1911,7 @@ export function registerMcpRoutes(
       );
     }
   }
-  // Export's signed bundle links (mcp-admin.js): the file Library › Profiles › Download All wrote, for an hour.
+  // The export tool's signed bundle links (mcp-admin.js): the file Library › Profiles › Download All wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, "exports") : "";
   function signExport(name, now = Date.now()) {
     const expiresAt = new Date(now + exportLinkMs).toISOString();
@@ -1951,7 +1951,7 @@ export function registerMcpRoutes(
         res.status(404).json({ error: "The export link is invalid, unavailable or expired." });
       }
     });
-  // UploadLink's page, under /mcp/results so the public result route reaches it: the link is the
+  // The upload_link tool's page, under /mcp/results so the public result route reaches it: the link is the
   // credential, so no Studio sign-in; it takes one image for its owner, then closes.
   app.all("/mcp/results/upload/:token", async (req, res) => {
     const send = (status, page) =>

@@ -185,7 +185,7 @@ test("Generate LoRA names resolve without folder, extension or case and take the
   ]);
   assert.throws(
     () => prepareLoras(subject, infos, [{ name: "oil paint" }]),
-    /^Error: No LoRA named oil paint for SDXL\. Call Models with lora_query to look one up\.$/,
+    /^Error: No LoRA named oil paint for SDXL\. Call models with lora_query to look one up\.$/,
   );
 });
 
