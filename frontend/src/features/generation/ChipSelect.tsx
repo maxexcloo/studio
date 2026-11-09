@@ -9,12 +9,14 @@ import {
   type ComboboxPopoverProps,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
+import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 import classes from "./GenerationInputControls.module.css";
 
 /**
  * A rail chip that opens its option list: the composer's Profile and Chat's text model. `swatch`
- * is a readiness colour beside the name; `target` adds attributes to the chip itself.
+ * is a readiness colour beside the name; `target` adds attributes to the chip itself. Phones list
+ * the options without a search, which Mantine would focus on opening and so raise the keyboard.
  */
 export function ChipSelect({
   name,
@@ -22,6 +24,7 @@ export function ChipSelect({
   swatch,
   title,
   target,
+  searchable,
   ...props
 }: Omit<ComboboxPopoverProps, "children"> & {
   name: string;
@@ -30,8 +33,10 @@ export function ChipSelect({
   title?: string;
   target?: Record<string, unknown>;
 }) {
+  const phone = usePhone();
   return (
     <ComboboxPopover
+      searchable={searchable && !phone}
       allowDeselect={false}
       withCheckIcon={false}
       maxDropdownHeight={320}

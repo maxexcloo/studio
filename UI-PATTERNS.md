@@ -81,7 +81,8 @@ the primary component reference and verify APIs against the installed version.
   fitted popover. The sheet's header holds the title, any action and Close;
   its footer (Clear, then Apply where choices apply as made) stays pinned
   above the safe area while the content between scrolls, with one scroll owner
-  per form.
+  per form. Phone sheets and option lists open with the keyboard down: a sheet's
+  search waits for a tap, and chip option lists have none.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
