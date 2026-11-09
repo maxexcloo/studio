@@ -412,7 +412,13 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
           )}
           {!!baseProfile?.capabilities.lora && (
             <Group gap="xs">
-              <LoraPicker value={shared} onChange={setShared} picker={loraPicker} />
+              {/* Under its chip, which sits too high in the dialog for the popup to fit above. */}
+              <LoraPicker
+                value={shared}
+                onChange={setShared}
+                picker={loraPicker}
+                position="bottom-start"
+              />
               {dimension === "loras" && (
                 <Text size="xs" c="dimmed">
                   Other LoRAs in the stack stay the same.

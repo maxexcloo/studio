@@ -45,6 +45,19 @@ test("Compare from the composer queues one seeded variant per chosen local profi
   await expect(dialog.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A copper fox",
   );
+  if (testInfo.project.name === "desktop") {
+    // The LoRAs popup opens under its chip, high in the dialog, without covering it.
+    const chip = dialog.getByRole("button", { name: "Choose LoRAs", exact: true });
+    await chip.click();
+    const loras = page.getByRole("dialog", { name: "LoRAs", exact: true });
+    await expect(loras).toBeVisible();
+    const chipBottom = await chip.evaluate((element) => element.getBoundingClientRect().bottom);
+    await expect
+      .poll(() => loras.evaluate((element) => element.getBoundingClientRect().top))
+      .toBeGreaterThanOrEqual(chipBottom);
+    await closeLoras(page);
+    await expect(dialog).toBeVisible();
+  }
   await dialog.getByRole("textbox", { name: "Negative Prompt", exact: true }).fill("blurry");
   const chosen = dialog.getByRole("combobox", { name: "Profiles", exact: true });
   await chosen.click();

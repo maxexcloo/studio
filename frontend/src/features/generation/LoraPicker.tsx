@@ -11,6 +11,7 @@ import {
   Stack,
   Switch,
   Text,
+  type PopoverProps,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
@@ -154,8 +155,10 @@ interface LoraPickerProps {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
+  /** Where the desktop popup opens: above the composer's rail by default. */
+  position?: PopoverProps["position"];
 }
-export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
+export function LoraPicker({ value, onChange, picker, position = "top-end" }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
   const clear = () =>
@@ -196,7 +199,7 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   return (
     <ChipPopup
       title="LoRAs"
-      position="top-end"
+      position={position}
       width="min(46rem, calc(100vw - 2rem))"
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
