@@ -385,18 +385,21 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
         }}
       >
         <Stack gap="md">
-          <SegmentedControl
-            aria-label="Compare By"
-            fullWidth={phone}
-            className={classes.dimensions}
-            data={available}
-            value={dimension}
-            onChange={(value) => {
-              const next = value as Dimension;
-              setDimension(next);
-              setPatches(patchesFor(next));
-            }}
-          />
+          {/* A cloud or unavailable base compares by profile only, so there is nothing to choose. */}
+          {available.length > 1 && (
+            <SegmentedControl
+              aria-label="Compare By"
+              fullWidth={phone}
+              className={classes.dimensions}
+              data={available}
+              value={dimension}
+              onChange={(value) => {
+                const next = value as Dimension;
+                setDimension(next);
+                setPatches(patchesFor(next));
+              }}
+            />
+          )}
           {dimension !== "prompt" && (
             <PromptFields
               input={shared}
