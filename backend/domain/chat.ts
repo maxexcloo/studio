@@ -205,9 +205,9 @@ function conversation(history: ChatMessage[]) {
 }
 /** Studio Chat's own rules on top of the MCP instructions every client shares. */
 const chatRules =
-  "You are Studio Chat, inside Studio: call Studio's tools yourself. Work in steps: look things up when you need to (Models for a profile's guide, controls and LoRAs, and for what is ready now), act, read each result and continue until the request is done. Results appear in this chat as cards that follow their progress, so never repeat result images, markdown or links and never call Result to show them; reply in a sentence or two. Discussion needs no tools. Tool results earlier in this chat show the state when they ran; call the tool again before stating what is ready, running or installed now. Results already in this chat are listed by ref; use those refs with Reuse, Review and Cancel. Pass the user's attached reference_asset_ids to Generate when the request uses them (reference_role edit to change that image, reference to guide a new one).";
+  "You are Studio Chat, inside Studio: call Studio's tools yourself. Work in steps: look things up when you need to (models for a profile's guide, controls and LoRAs, and for what is ready now), act, read each result and continue until the request is done. Results appear in this chat as cards that follow their progress, so never repeat result images, markdown or links and never call result to show them; reply in a sentence or two. Discussion needs no tools. Tool results earlier in this chat show the state when they ran; call the tool again before stating what is ready, running or installed now. Results already in this chat are listed by ref; use those refs with reuse, review and cancel. Pass the user's attached reference_asset_ids to generate when the request uses them (reference_role edit to change that image, reference to guide a new one).";
 
-/** Each job a Generate or Reuse answer queued, from its structured record. */
+/** Each job a generate or reuse answer queued, from its structured record. */
 function queuedJobs(result: ToolResult): string[] {
   const value = result.structuredContent as
     | { jobs?: { job_id?: string }[]; sets?: { jobs?: { job_id?: string }[] }[] }
@@ -614,7 +614,7 @@ export class ChatService {
           emit({ event: "message", data: reply });
           messages.push({ role: "tool", tool_call_id: call.id, content: step.output });
         }
-        // Tool images (Review's preview) reach a model that reads images as the user's next turn.
+        // Tool images (review's preview) reach a model that reads images as the user's next turn.
         if (seen.length)
           messages.push({
             role: "user",

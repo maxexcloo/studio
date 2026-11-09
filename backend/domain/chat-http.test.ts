@@ -52,7 +52,7 @@ test(
           ? undefined
           : content === "Create a landscape."
             ? {
-                name: "Generate",
+                name: "generate",
                 arguments: {
                   profile_id: "mock-flux-schnell",
                   prompts: ["Neutral mountain landscape"],
@@ -60,14 +60,14 @@ test(
               }
             : content === "Make it painterly."
               ? {
-                  name: "Generate",
+                  name: "generate",
                   arguments: {
                     profile_id: "mock-flux-schnell",
                     prompts: ["Painterly mountain landscape"],
                   },
                 }
               : content === "Animate this."
-                ? { name: "Reuse", arguments: { job_id: "result 1", mode: "animate" } }
+                ? { name: "reuse", arguments: { job_id: "result 1", mode: "animate" } }
                 : undefined;
       if (call && input.tools?.length)
         response.write(
@@ -360,7 +360,7 @@ test(
       const messages = (await api(`/api/sessions/${session.id}/chat`)).messages;
       assert.equal(
         messages.find((message: any) => message.jobId === firstId).steps[0].tool,
-        "Generate",
+        "generate",
       );
       await stop();
       await start();

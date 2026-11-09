@@ -56,7 +56,7 @@ const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
 const maxReferenceScopes = 5000;
 // Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
-  "LibreChat can't pass attached files to tools: call UploadLink, ask the user to upload the image there, then call Search with uploads: true to use it.";
+  "LibreChat can't pass attached files to tools: call upload_link, ask the user to upload the image there, then call search with uploads: true to use it.";
 // An upload link (UploadLink) takes one image within this time.
 export const uploadLinkMinutes = 15;
 const uploadLinkMs = uploadLinkMinutes * 60 * 1000;
@@ -100,7 +100,7 @@ const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(pr
 const maxPromptRecords = 5000;
 const aborted = (signal) => {
   const error = new Error(
-    "The wait ended because the request was cancelled. The generation continues; collect it later with Result.",
+    "The wait ended because the request was cancelled. The generation continues; collect it later with result.",
   );
   error.aborted = true;
   return error;
@@ -390,7 +390,7 @@ export class McpMedia {
       profiles = profiles.filter(usable);
       if (!profiles.length)
         throw new Error(
-          `No ready ${kind} profile can use ${loras.map(({ name }) => name).join(", ")}. Call Models with lora_query to look it up.`,
+          `No ready ${kind} profile can use ${loras.map(({ name }) => name).join(", ")}. Call models with lora_query to look it up.`,
         );
     }
     const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
@@ -520,7 +520,7 @@ export class McpMedia {
       resolution,
     } = args;
     let profile = (await this.profiles("all", owner)).find((item) => item.id === profile_id);
-    if (!profile) throw new Error("Choose a ready profile from Models.");
+    if (!profile) throw new Error("Choose a ready profile from models.");
     const cloud = isCloudVideo(profile);
     if (cloud) await this.checkCloudJobs();
     if (cloud && this.cloudPause())
@@ -947,7 +947,7 @@ export class McpMedia {
     const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[Number(match[1])];
     if (!jobId)
       throw new Error(
-        `There is no result ${Number(match[1])} in this conversation. Use the job_id or a ref returned by Generate.`,
+        `There is no result ${Number(match[1])} in this conversation. Use the job_id or a ref returned by generate.`,
       );
     return jobId;
   }
@@ -1246,7 +1246,7 @@ export class McpMedia {
     );
     if (!item?.settings?.profileId || !item.prompt)
       throw new Error(
-        "This result has no recorded profile or prompt to reuse. Call Generate instead.",
+        "This result has no recorded profile or prompt to reuse. Call generate instead.",
       );
     return item;
   }
@@ -1258,7 +1258,7 @@ export class McpMedia {
     );
     if (!base)
       throw new Error(
-        "The profile behind this result is no longer available to this account. Call Generate instead.",
+        "The profile behind this result is no longer available to this account. Call generate instead.",
       );
     const references = (settings.referenceAssets || [])
       .map((asset) => asset?.assetId)
@@ -1511,7 +1511,7 @@ export class McpMedia {
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))
       throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachedImageHint}`);
     return this.store(owner, Buffer.from(base64, "base64"), filename, {
-      advice: ` For a Studio result, call Reuse with mode reference and its ref. ${attachedImageHint}`,
+      advice: ` For a Studio result, call reuse with mode reference and its ref. ${attachedImageHint}`,
     });
   }
   /**
@@ -1568,10 +1568,10 @@ export class McpMedia {
       const output = this.available(job, index);
       const item = await this.source(owner, jobId, index);
       if (item.type === "video")
-        throw new Error("Review supports still images; review video frames separately.");
+        throw new Error("The review tool supports still images; review video frames separately.");
       const image = await this.readOutput(output, owner);
       if (!imageMimes.includes(image.mime))
-        throw new Error("Review supports PNG, JPEG and WebP images.");
+        throw new Error("The review tool supports PNG, JPEG and WebP images.");
       tiles.push(
         await sharp(image.content, { limitInputPixels: 80000000 })
           .rotate()

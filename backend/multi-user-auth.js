@@ -69,17 +69,17 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
-  // Search: the account's own gallery search.
+  // The search tool: the account's own gallery search.
   ["GET", /^\/api\/gallery$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
-  // Reuse's Extend: a video result's last frame as the next video's first.
+  // The reuse tool's extend: a video result's last frame as the next video's first.
   ["POST", /^\/api\/reference-assets\/from-gallery$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
   ["POST", /^\/api\/comparisons$/],
-  // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
+  // An uploaded reference's own pixels (owner-scoped): rewrite_prompt's vision references and import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],
-  // The account's own gallery, queue, Dream and taste (mcp/manage.js) and Reuse's upscale, as the
+  // The account's own gallery, queue, Dream and taste (mcp/manage.js) and reuse's upscale, as the
   // UI calls them; each route scopes to the account and checks its group's features.
   ["POST", /^\/api\/gallery\/(?:delete|favorite|errors\/clear)$/],
   ["GET", /^\/api\/queue$/],
