@@ -58,7 +58,7 @@ export const reasoningEfforts = {
   profile: "none",
   rewrite: null,
   suggestions: "none",
-  taste: null,
+  taste: "none",
   title: "none",
 };
 const maxCandidates = 20;

@@ -1,7 +1,6 @@
-/* A filling profile's text box, from its root down to the text, takes the height it is given. */
+/* A filling profile's summary takes the room it is given and scrolls within it. */
 .fill {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
 }
