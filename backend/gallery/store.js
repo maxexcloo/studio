@@ -985,7 +985,8 @@ export function dedupeGallery(items) {
   });
 }
 
-export function cleanupGalleryState(jobs) {
+/** `queue` is the queue's records (domain/store.ts): a tile's job runs while its record is unfinished. */
+export function cleanupGalleryState(queue) {
   // Called on every gallery page: most of the time there is nothing pending
   // and no upscale running, and one pass says so without building anything.
   if (!gallery.some((item) => item.status === "pending" || item.upscale?.status === "running"))
@@ -1003,13 +1004,17 @@ export function cleanupGalleryState(jobs) {
   let changed = false;
   for (let item of gallery) {
     // Replaced, never changed in place: other readers compare items by identity.
-    // An upscale whose job this server never ran (it restarted mid-upscale) is not running anymore.
-    if (item.upscale?.status === "running" && !jobs.has(item.upscale.jobId)) {
+    // An upscale whose job is no longer unfinished (or was never recorded) is not running anymore.
+    if (
+      item.upscale?.status === "running" &&
+      !queue.unfinished(item.ownerId || "", item.upscale.jobId)
+    ) {
       item = { ...item, upscale: { ...item.upscale, status: "canceled", progress: null } };
       changed = true;
     }
     if (item.status === "pending") {
-      if (item.jobId && !jobs.has(item.jobId)) {
+      // A job still unfinished after a restart waits for recovery; a tile without one never arrives.
+      if (item.jobId && !queue.unfinished(item.ownerId || "", item.jobId)) {
         item = { ...item, status: "error", filename: "Generation interrupted" };
         changed = true;
       } else if (item.jobId && (doneJobs.has(item.jobId) || doneKeys.has(runKey(item)))) {

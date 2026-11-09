@@ -10,10 +10,15 @@ process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_MEDIA_DIR = dir;
 const { setGallery } = await import("./store.js");
 const { registerGalleryReadRoutes } = await import("./routes.js");
+const { openDatabase } = await import("../persistence/runtime.ts");
+const { Store } = await import("../domain/store.ts");
 
 test("exact job results exclude unrelated and deleted outputs and expose prompts only on request", async (t) => {
   const app = express();
-  registerGalleryReadRoutes(app, { jobChats: () => new Map() });
+  registerGalleryReadRoutes(app, {
+    jobChats: () => new Map(),
+    store: new Store(openDatabase(":memory:")),
+  });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   t.after(async () => {
