@@ -134,6 +134,15 @@ function ReferenceRole({
   );
 }
 
+/** A composer's row of chips, wrapping onto as many lines as they need. */
+export function ChipRail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className={classes.rail} role="group" aria-label={label}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * The chip rail shared by the gallery composer and timeline cards, in one order on
  * every breakpoint: what runs (Profile), what it starts from (References, then their role and
@@ -174,7 +183,7 @@ export function GenerationInputControls({
   const seed = input.seed === "" || input.seed == null ? "" : String(input.seed);
   const length = lengthChoices(input, profile);
   return (
-    <div className={classes.rail} role="group" aria-label="Generation Inputs">
+    <ChipRail label="Generation Inputs">
       <ProfilePicker value={input} onChange={onChange} startParked />
       {references}
       {references && hasReferences && (
@@ -233,6 +242,6 @@ export function GenerationInputControls({
         </Tooltip>
       )}
       {presets}
-    </div>
+    </ChipRail>
   );
 }

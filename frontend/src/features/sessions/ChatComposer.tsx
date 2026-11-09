@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Alert, Badge, CloseButton, Group, Loader, Text, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -6,11 +7,13 @@ import type { ChatModel } from "../../../../shared/chat";
 import type { WorkloadPhase } from "../../../../shared/runtime";
 import { useIsAdmin } from "../auth/AccountGate";
 import { ChipOption, ChipSelect } from "../generation/ChipSelect";
-import { ComposerDock } from "../generation/ComposerDock";
+import { ComposerDock, composerLayers } from "../generation/ComposerDock";
+import { ChipRail } from "../generation/GenerationInputControls";
 import { usePromptIdeas } from "../generation/PromptIdeas";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
+import { closingPopup, layerAbove } from "../../ui/popupClicks";
 import { TextBox } from "../../ui/TextBox";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useChat, useChatMessages } from "./ChatProvider";
@@ -47,62 +50,61 @@ function ChatModelPicker({
   const selected = models.find((model) => model.id === modelId);
   const selectedPhase = phase(selected);
   return (
-    <>
-      <ChipSelect
-        name="Chat Model"
-        target={{ disabled: !models.length || disabled }}
-        searchable={models.length > 8}
-        nothingFoundMessage="No Matches"
-        data={models.map((model) => ({
-          value: model.id,
-          label: model.label,
-          disabled: model.parked,
-        }))}
-        value={modelId || null}
-        renderOption={({ option, checked }) => {
-          const model = models.find((item) => item.id === option.value);
-          const state = phase(model);
-          return (
-            <ChipOption
-              label={option.label}
-              description={model?.provider}
-              checked={checked}
-              badges={
-                state &&
-                state !== "running" && (
-                  <Badge size="xs" color={phaseColour(state)}>
-                    {phaseLabel(state)}
-                  </Badge>
-                )
-              }
-            />
-          );
-        }}
-        onChange={(id) => {
-          const model = models.find((item) => item.id === id);
-          if (!model) return;
-          if (model.workloads?.length && phase(model) !== "running")
-            void runtime.start(model.workloads, model.label, () => selectModel(model.id));
-          else selectModel(model.id);
-        }}
-        swatch={selectedPhase && phaseColour(selectedPhase)}
-        title={[
-          selected?.label,
-          selected?.provider,
-          selectedPhase && selectedPhase !== "running" && phaseLabel(selectedPhase),
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-        label={selected?.label || "Model"}
-      />
-      {runtime.dialog}
-    </>
+    <ChipSelect
+      name="Chat Model"
+      target={{ disabled: !models.length || disabled }}
+      searchable={models.length > 8}
+      nothingFoundMessage="No Matches"
+      data={models.map((model) => ({
+        value: model.id,
+        label: model.label,
+        disabled: model.parked,
+      }))}
+      value={modelId || null}
+      renderOption={({ option, checked }) => {
+        const model = models.find((item) => item.id === option.value);
+        const state = phase(model);
+        return (
+          <ChipOption
+            label={option.label}
+            description={model?.provider}
+            checked={checked}
+            badges={
+              state &&
+              state !== "running" && (
+                <Badge size="xs" color={phaseColour(state)}>
+                  {phaseLabel(state)}
+                </Badge>
+              )
+            }
+          />
+        );
+      }}
+      onChange={(id) => {
+        const model = models.find((item) => item.id === id);
+        if (!model) return;
+        if (model.workloads?.length && phase(model) !== "running")
+          void runtime.start(model.workloads, model.label, () => selectModel(model.id));
+        else selectModel(model.id);
+      }}
+      swatch={selectedPhase && phaseColour(selectedPhase)}
+      title={[
+        selected?.label,
+        selected?.provider,
+        selectedPhase && selectedPhase !== "running" && phaseLabel(selectedPhase),
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      label={selected?.label || "Model"}
+    />
   );
 }
 
 /**
- * The Chat prompt box: one row of the message, one line until it wraps or takes Shift+Enter, then
- * the model chip (when there is a choice), References and Send/Stop as in the gallery's compact bar.
+ * The Chat message box. Collapsed, it is the message and Send; focusing the message expands it as
+ * the gallery composer: the text with its tools, then a chip rail of the text model (when there is
+ * a choice) and References, with Send at its end. Pressing outside, Escape or tabbing away
+ * collapses it.
  */
 function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId } = useChat();
@@ -126,6 +128,20 @@ function ChatComposer() {
   const runtime = useWorkloadStart(
     admin && !!status.data?.models.some((model) => model.workloads?.length),
   );
+  const form = useRef<HTMLFormElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  // A layer over the composer, such as a chip's popup or its confirmation, is not outside it.
+  const outside = (element: Element) =>
+    !form.current?.contains(element) && !element.closest(composerLayers);
+  useEffect(() => {
+    if (!expanded) return;
+    const press = (event: PointerEvent) => {
+      if (outside(event.target as Element) && !closingPopup() && !layerAbove(form.current))
+        setExpanded(false);
+    };
+    document.addEventListener("pointerdown", press);
+    return () => document.removeEventListener("pointerdown", press);
+  }, [expanded]);
   const ideas = usePromptIdeas({
     kind: "image",
     empty: !text.trim(),
@@ -135,65 +151,94 @@ function ChatComposer() {
   });
   return (
     <form
+      ref={form}
       className={classes.form}
+      data-expanded={expanded || undefined}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
       }}
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Element && outside(event.relatedTarget))
+          setExpanded(false);
+      }}
+      onKeyDown={(event) => {
+        if (
+          expanded &&
+          event.key === "Escape" &&
+          !event.defaultPrevented &&
+          !(event.target as HTMLElement).closest('[role="combobox"][aria-expanded="true"]') &&
+          !layerAbove(form.current, event)
+        ) {
+          event.preventDefault();
+          setExpanded(false);
+        }
+      }}
     >
-      <div className={classes.row}>
-        <div className={classes.message} {...ideas.focusProps}>
-          <TextBox
-            aria-label="Message"
-            placeholder="Message Studio"
-            variant="unstyled"
-            autosize
-            minRows={1}
-            maxRows={5}
-            className={classes.writing}
-            value={text}
-            onChange={setText}
-            overlay={ideas.ideas}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                if (!replying && !unavailable) void send();
-              }
-            }}
-          />
-        </div>
-        {/* The model chip, References and Send sit as in the gallery's compact prompt bar. */}
-        <Group wrap="nowrap" gap="xs" className={classes.actions}>
-          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
-          <ReferencePicker compact />
-          {replying ? (
-            <Tooltip label="Stop Response">
-              <ActionIcon
-                aria-label="Stop Response"
-                variant="default"
-                size={44}
-                onClick={() =>
-                  stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
-                }
-              >
-                <icons.stop size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <Tooltip label={parked ? "Model Stopped by an Administrator" : "Send Message"}>
-              <ActionIcon
-                type="submit"
-                aria-label="Send Message"
-                disabled={!text.trim() || unavailable}
-                variant="filled"
-                size={44}
-              >
-                <ArrowUp size={20} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-        </Group>
+      <div
+        className={classes.message}
+        onFocus={() => {
+          ideas.focusProps.onFocus();
+          setExpanded(true);
+        }}
+        onBlur={ideas.focusProps.onBlur}
+        onKeyDown={ideas.focusProps.onKeyDown}
+      >
+        <TextBox
+          aria-label="Message"
+          placeholder="Message Studio"
+          variant="unstyled"
+          autosize
+          minRows={expanded ? 3 : 1}
+          maxRows={expanded ? 10 : 5}
+          className={classes.writing}
+          tools={[]}
+          hideTools={!expanded}
+          value={text}
+          onChange={setText}
+          overlay={ideas.ideas}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (!replying && !unavailable) void send();
+            }
+          }}
+        />
       </div>
+      {expanded && (
+        <ChipRail label="Chat Inputs">
+          {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
+          <ReferencePicker />
+        </ChipRail>
+      )}
+      {replying ? (
+        <Tooltip label="Stop Response">
+          <ActionIcon
+            aria-label="Stop Response"
+            variant="default"
+            size={44}
+            ml="auto"
+            onClick={() =>
+              stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
+            }
+          >
+            <icons.stop size={18} />
+          </ActionIcon>
+        </Tooltip>
+      ) : (
+        <Tooltip label={parked ? "Model Stopped by an Administrator" : "Send Message"}>
+          <ActionIcon
+            type="submit"
+            aria-label="Send Message"
+            disabled={!text.trim() || unavailable}
+            variant="filled"
+            size={44}
+            ml="auto"
+          >
+            <ArrowUp size={20} />
+          </ActionIcon>
+        </Tooltip>
+      )}
       {runtime.starting && (
         <Group gap={6} wrap="nowrap" className={classes.starting} role="status">
           {runtime.starting.error ? (
@@ -213,6 +258,7 @@ function ChatComposer() {
           )}
         </Group>
       )}
+      {runtime.dialog}
     </form>
   );
 }

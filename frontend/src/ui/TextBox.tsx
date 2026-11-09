@@ -46,6 +46,7 @@ export function TextBox({
   value,
   onChange,
   tools,
+  hideTools = false,
   overlay,
   below,
   inline = false,
@@ -59,6 +60,8 @@ export function TextBox({
   onChange: (value: string) => void;
   /** The box's own actions, after Copy and Clear. */
   tools?: ReactNode[];
+  /** Leaves the tools out beside the text (a collapsed composer), keeping the text mounted. */
+  hideTools?: boolean;
   /** Floats over the text, such as prompt ideas; the phone editor shows it under its text. */
   overlay?: ReactNode;
   /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
@@ -173,10 +176,12 @@ export function TextBox({
       {pairs ? (
         <div
           className={classes.columned}
-          style={{ "--tool-pair-rows": Math.ceil(pairs.length / 2) } as CSSProperties}
+          style={
+            { "--tool-pair-rows": hideTools ? 0 : Math.ceil(pairs.length / 2) } as CSSProperties
+          }
         >
           {textarea}
-          {!editing && (
+          {!editing && !hideTools && (
             <div className={classes.tools}>
               <div className={classes.toolGrid}>{pairs}</div>
             </div>

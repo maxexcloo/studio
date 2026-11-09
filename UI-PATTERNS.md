@@ -107,6 +107,10 @@ the primary component reference and verify APIs against the installed version.
   remains independent. Editing an old Chat card sends its source job and full
   normalised input through the assistant and creates a new iteration without
   changing the original; do not bypass it with a direct queue request.
+- The collapsed Chat composer holds only its message and Send. Focusing the
+  message expands it in place, built as the gallery composer: the text with its
+  tools, then a `ChipRail` (the text model where there is a choice, and
+  References) beside Send. Pressing outside, Escape or tabbing away collapses it.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
   Profile options carry short facts (model or family · kind · Cloud or Local
