@@ -19,6 +19,7 @@ import { recommendedNegative } from "../lora/prompts.js";
 import { choicePool, chooseProfile } from "./tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { withResolution } from "../../shared/resolution.ts";
+import { promptWords } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
@@ -504,6 +505,9 @@ export class McpMedia {
       profile_id,
       profile_backend,
       prompts,
+      // One generate call's result set ({ id, title, source }) and each prompt's own title, in order.
+      result_set,
+      titles = [],
       // With `write` ({ animate }), every job writes its motion prompt as its first stage (prompt-animate.js).
       write,
       loras = [],
@@ -654,12 +658,17 @@ export class McpMedia {
       const queued = [];
       const queueSet = crypto.randomUUID();
       let images = 0;
-      for (const prompt of prompts)
+      for (const [position, prompt] of prompts.entries())
         for (let done = 0; done < runs; done += batch) {
           const size = Math.min(batch, runs - done);
           const id = crypto.randomUUID();
           // A prompt written in the queue is not known yet; its outputs carry it.
           const ran = writing ? undefined : prompt;
+          const resultSet = result_set && {
+            ...result_set,
+            index: position,
+            ...(titles[position] ? { variation: titles[position] } : {}),
+          };
           try {
             // Persist the client id before dispatch, so a failed call cannot lose job ownership.
             this.state.jobs[id] = owner;
@@ -671,6 +680,7 @@ export class McpMedia {
                 ...body,
                 clientJobId: id,
                 queueSet,
+                ...(resultSet ? { resultSet } : {}),
                 prompt: ran ?? "",
                 ...(writing ? { writing } : {}),
                 count: size,
@@ -689,6 +699,7 @@ export class McpMedia {
             this.recordPrompt(result.jobId, {
               ...(ran ? { prompt: ran } : {}),
               set: queueSet,
+              ...(resultSet ? { resultSet } : {}),
               ...(record.request ? { request: record.request } : {}),
               ...(record.assistant ? { assistant: record.assistant } : {}),
             });
@@ -1854,9 +1865,16 @@ export class McpMedia {
     const jobs = await this.scopeJobs(claims.owner, claims.scope, { credential });
     if (!jobs.length) return null;
     const pending = jobs.some(({ job }) => !terminal.has(job.status));
+    let shownSet = "";
     const sections = jobs
       .map(({ number, jobId, job }) => {
-        const heading = `<h2>Result ${number}</h2>`;
+        // A generate call's results sit under their set's title, each named by its own.
+        const set = this.promptRecord(jobId)?.resultSet;
+        const setHeading = set && set.id !== shownSet ? `<h2>${escapeHtml(set.title)}</h2>` : "";
+        shownSet = set?.id || "";
+        const heading = set
+          ? `${setHeading}<h3>Result ${number} · ${escapeHtml(this.variationTitle(jobId, job))}</h3>`
+          : `<h2>Result ${number}</h2>`;
         if (!terminal.has(job.status)) {
           const progress = Number.isFinite(job.progress)
             ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
@@ -1896,10 +1914,13 @@ export class McpMedia {
       : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);
+    const set = this.promptRecord(claims.jobId)?.resultSet;
     const title = pending
       ? "Generating…"
       : outputs.length
-        ? "Studio Result"
+        ? set
+          ? `${escapeHtml(set.title)} › ${escapeHtml(this.variationTitle(claims.jobId, job))}`
+          : "Studio Result"
         : `Generation ${escapeHtml(job.status)}`;
     const progress = Number.isFinite(job.progress)
       ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
@@ -1921,6 +1942,11 @@ export class McpMedia {
           ? media
           : ended) + this.promptHtml(claims.jobId, job);
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
+  }
+  /** A set result's own title: the one the chat gave, else its prompt's first words. */
+  variationTitle(jobId, job) {
+    const record = this.promptRecord(jobId);
+    return record?.resultSet?.variation || promptWords(record?.prompt || job?.prompt) || "Untitled";
   }
   /** The full prompt a job ran, for its result pages; one Studio wrote in the queue comes from its results. */
   promptHtml(jobId, job) {
