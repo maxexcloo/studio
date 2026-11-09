@@ -30,7 +30,6 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
             aria-label="Close Search"
             variant="subtle"
             color="gray"
-            size={30}
             onClick={onClose}
           >
             <ArrowLeft size={18} />

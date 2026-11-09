@@ -78,9 +78,3 @@
   flex: 1;
   min-height: 0;
 }
-
-@media (max-width: 48em) {
-  .dock :global(.mantine-Button-root) {
-    min-height: 44px;
-  }
-}

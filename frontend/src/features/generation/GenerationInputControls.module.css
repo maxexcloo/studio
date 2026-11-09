@@ -62,12 +62,6 @@
   }
 }
 
-@media (max-width: 48em) {
-  .chip {
-    min-height: 44px;
-  }
-}
-
 /* A phone chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
    doesn't clip, so a nested Select's list, positioned against it, still shows in full. */
 .fitted {

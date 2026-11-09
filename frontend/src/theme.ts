@@ -5,7 +5,9 @@ import {
   AppShell,
   Badge,
   Button,
+  CloseButton,
   Collapse,
+  Combobox,
   createTheme,
   Drawer,
   FloatingIndicator,
@@ -100,9 +102,10 @@ export function studioTheme({
   transparency: boolean;
 }) {
   // Two control densities: form controls (standard Button and inputs) and bars (icons, and the
-  // stepped-down compact sizes); phones raise both to 40 px touch targets.
-  const form = rem(phone ? 40 : 36);
-  const bar = phone ? 40 : 32;
+  // stepped-down compact sizes); phones raise both to 44 px touch targets.
+  const form = rem(phone ? 44 : 36);
+  const bar = phone ? 44 : 32;
+  const touch = phone ? { minHeight: bar } : {};
   const height = (size: unknown) =>
     size === "md"
       ? form
@@ -193,14 +196,15 @@ export function studioTheme({
         }),
         defaultProps: { size: bar, radius: "xl" },
         vars: (_theme, props) => ({
-          root:
-            props.variant === "default"
-              ? {
-                  "--ai-bg": "var(--studio-glass-raised)",
-                  "--ai-hover": "var(--studio-glass-raised-hover)",
-                  "--ai-bd": "1px solid var(--studio-glass-border)",
-                }
-              : {},
+          root: {
+            // Phones raise the compact icon sizes to the touch target too.
+            ...(phone && (props.size === "xs" || props.size === "sm") && { "--ai-size": rem(bar) }),
+            ...(props.variant === "default" && {
+              "--ai-bg": "var(--studio-glass-raised)",
+              "--ai-hover": "var(--studio-glass-raised-hover)",
+              "--ai-bd": "1px solid var(--studio-glass-border)",
+            }),
+          },
         }),
       }),
       AppShell: AppShell.extend({
@@ -220,7 +224,13 @@ export function studioTheme({
           root: `${classes.button} ${phone && height(props.size) ? classes.phoneIcons : ""}`,
         }),
         defaultProps: { size: "md", fw: 500, autoContrast: true },
+        // A phone button is at least as wide as it is tall (All, Clear).
+        styles: (_theme, props) => ({ root: phone && height(props.size) ? { minWidth: bar } : {} }),
         vars: (_theme, props) => ({ root: { "--button-height": height(props.size) } }),
+      }),
+      // Close buttons of dialogs, drawers and sheets are touch targets on phones.
+      CloseButton: CloseButton.extend({
+        vars: () => ({ root: phone ? { "--cb-size": rem(bar), "--cb-icon-size": rem(20) } : {} }),
       }),
       // Expanding sections share the motion setting.
       Collapse: Collapse.extend({
@@ -229,6 +239,8 @@ export function studioTheme({
           transitionTimingFunction: easing.enter,
         },
       }),
+      // Option rows (here the chips' lists; Select and MultiSelect below) are touch targets on phones.
+      Combobox: Combobox.extend({ styles: { option: touch } }),
       Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
       // On the parts, so a compound Drawer (a header with its own actions) shares them.
       DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
@@ -254,7 +266,7 @@ export function studioTheme({
           dropdown: phone
             ? { ...dropdown, overflowY: "auto", overscrollBehavior: "contain" }
             : dropdown,
-          item: { minHeight: 36 },
+          item: { minHeight: phone ? bar : 36 },
         },
       }),
       // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
@@ -323,9 +335,13 @@ export function studioTheme({
         },
       }),
       // Every control that opens a picker shows ▾, as the chips do (UI-PATTERNS.md).
-      MultiSelect: MultiSelect.extend({ defaultProps: { rightSection: chevron } }),
+      MultiSelect: MultiSelect.extend({
+        defaultProps: { rightSection: chevron },
+        styles: { option: touch },
+      }),
       Select: Select.extend({
         defaultProps: { checkIconPosition: "right", rightSection: chevron },
+        styles: { option: touch },
       }),
       Spoiler: Spoiler.extend({ defaultProps: { transitionDuration: motionDuration } }),
       Switch: Switch.extend({
