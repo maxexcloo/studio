@@ -206,6 +206,47 @@ export function adminScope({ account, gateway = false, gatewayAdminTools = () =>
   if (account?.role !== "administrator" || account.authenticated === false) return false;
   return gateway ? gatewayAdminTools() === true : true;
 }
+/**
+ * The control `mode` tool's preset placement from the configured workloads and their observed
+ * phases, by what each media workload runs (its capabilities, else its kind): a running one first,
+ * then list order. Workloads in other GPU pools keep running as they are.
+ */
+export function presetPlacement(mode, textProfile, configured, observed) {
+  const running = (item) => ["running", "starting"].includes(item.phase);
+  const up = new Set(observed.filter(running).map((item) => item.id));
+  const pick = (capability, gpus, taken = "") => {
+    const fits = configured.filter(
+      (item) =>
+        item.kind !== "text" &&
+        item.gpus === gpus &&
+        item.id !== taken &&
+        (item.capabilities ?? [item.kind]).includes(capability),
+    );
+    const found = fits.find((item) => up.has(item.id)) ?? fits[0];
+    if (!found)
+      throw new Error(
+        `No ${taken ? "other " : ""}${gpus}-GPU workload that runs ${capability === "image" ? "images" : "videos"} is configured.`,
+      );
+    return found;
+  };
+  // Video is picked first, so a workload that runs both isn't taken for images when it alone runs video.
+  const video = mode === "image_video" ? pick("video", 1) : undefined;
+  const anchor = mode === "video" ? pick("video", 2) : pick("image", 1, video?.id);
+  const elsewhere = observed
+    .filter((item) => item.pool !== anchor.pool && running(item))
+    .map((item) => item.id);
+  if (mode === "video") return [anchor.id, ...elsewhere];
+  if (video) return [anchor.id, video.id, ...elsewhere];
+  const fits = configured
+    .filter((item) => item.kind === "text" && item.gpus === 1 && item.pool === anchor.pool)
+    .map((item) => item.id);
+  const current = observed.find((item) => fits.includes(item.id) && running(item))?.id;
+  const text = textProfile || current || "";
+  if (!fits.includes(text))
+    throw new Error(`Name text_profile, a text model that fits one GPU: ${fits.join(", ")}.`);
+  return [text, anchor.id, ...elsewhere];
+}
+
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
 export function registerMcpRoutes(
   app,
@@ -1742,33 +1783,8 @@ export function registerMcpRoutes(
       );
     } else {
       const workloadList = z.array(z.string().min(1)).max(32);
-      /** A preset placement; workloads in other GPU pools keep running as they are. */
-      const modePlacement = async (mode, textProfile) => {
-        const configured = runtime.workloads;
-        const pick = (kind, gpus) => {
-          const found = configured.find((item) => item.kind === kind && item.gpus === gpus);
-          if (!found) throw new Error(`No ${gpus}-GPU ${kind} workload is configured.`);
-          return found;
-        };
-        const status = await runtime.observe();
-        const running = (item) => ["running", "starting"].includes(item.phase);
-        const anchor = mode === "video" ? pick("video", 2) : pick("image", 1);
-        const elsewhere = status.workloads
-          .filter((item) => item.pool !== anchor.pool && running(item))
-          .map((item) => item.id);
-        if (mode === "video") return [anchor.id, ...elsewhere];
-        if (mode === "image_video") return [anchor.id, pick("video", 1).id, ...elsewhere];
-        const fits = configured
-          .filter((item) => item.kind === "text" && item.gpus === 1 && item.pool === anchor.pool)
-          .map((item) => item.id);
-        const current = status.workloads.find(
-          (item) => fits.includes(item.id) && running(item),
-        )?.id;
-        const text = textProfile || current || "";
-        if (!fits.includes(text))
-          throw new Error(`Name text_profile, a text model that fits one GPU: ${fits.join(", ")}.`);
-        return [text, anchor.id, ...elsewhere];
-      };
+      const modePlacement = async (mode, textProfile) =>
+        presetPlacement(mode, textProfile, runtime.workloads, (await runtime.observe()).workloads);
       tool(
         server,
         "gpu_status",
@@ -1829,7 +1845,7 @@ export function registerMcpRoutes(
         server,
         "mode",
         "preview gpu mode",
-        "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and image), image_video (image and one-GPU video) or video (two-GPU video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then apply the returned workloads and signature.",
+        "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and a one-GPU workload that runs images), image_video (two one-GPU workloads, one running images and one video) or video (a two-GPU workload that runs video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then apply the returned workloads and signature.",
         {
           mode: z.enum(["image_text", "image_video", "video"]),
           text_profile: z.string().min(1).optional(),
