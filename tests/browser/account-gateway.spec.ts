@@ -282,11 +282,12 @@ test("Users change their email only behind password-protected controls", async (
   ).toBeDisabled();
 });
 
-test("Administrators change roles, reset passwords and delete accounts and empty groups", async ({
+test("Administrators change roles, reset passwords and delete galleries, accounts and empty groups", async ({
   page,
 }) => {
   const state = await accountFixture(page);
   Object.assign(state.administration.accounts[1], { passwordSignIn: true });
+  Object.assign(state.galleryOwners, { member: 3 });
   state.administration.accessProfiles.push({
     id: "empty",
     name: "Empty",
@@ -325,6 +326,16 @@ test("Administrators change roles, reset passwords and delete accounts and empty
   await reset.getByLabel("New Password").fill("a new member password");
   await reset.getByRole("button", { name: "Reset Password", exact: true }).click();
   await expect(reset).toBeHidden();
+
+  await member
+    .getByRole("button", { name: "Actions for member@example.test", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: /^Delete Gallery/ }).click();
+  const wipe = page.getByRole("dialog", { name: "Delete Gallery", exact: true });
+  await expect(wipe).toContainText("Delete all 3 of member@example.test’s gallery items");
+  await wipe.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(wipe).toBeHidden();
+  expect(state.galleryOwners).toEqual({});
 
   await menu("Delete User");
   const confirm = page.getByRole("dialog", { name: "Delete User", exact: true });

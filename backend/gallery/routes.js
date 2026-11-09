@@ -241,7 +241,33 @@ function deleteRequested(req, ids) {
   return { files, removed: [...wanted].filter((id) => matched.has(id)) };
 }
 
+/** The visible gallery items each account owns, by owner ID. */
+function ownedGalleries() {
+  const owned = new Map();
+  for (const item of filterVisibleGallery(gallery)) {
+    if (!item.ownerId) continue;
+    if (!owned.has(item.ownerId)) owned.set(item.ownerId, []);
+    owned.get(item.ownerId).push(item);
+  }
+  return owned;
+}
+
 export function registerGalleryDeleteRoute(app) {
+  // Administrators only (Settings › Users): each account's gallery size, and deleting all of one
+  // account's items through the owner's own delete path.
+  directRoute(app, "GET", "/api/gallery/owners", (account) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const counts = [...ownedGalleries()].map(([owner, items]) => [owner, items.length]);
+    return { status: 200, payload: { ok: true, owners: Object.fromEntries(counts) } };
+  });
+  directRoute(app, "DELETE", "/api/gallery/owners/:id", (account, { params }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const removed = ownedGalleries().get(params.id) || [];
+    const files = removeGalleryItems(removed);
+    return { status: 200, payload: { ok: true, removed: removed.length, files } };
+  });
   // Many items in one request: one store change and one save, however many there are.
   directRoute(app, "POST", "/api/gallery/delete", (account, { body }) => {
     const ids = Array.isArray(body?.ids) ? body.ids : [];

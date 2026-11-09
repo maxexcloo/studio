@@ -18,7 +18,16 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Plus, ShieldCheck, Unlink, UserCheck, UserRound, UserX } from "lucide-react";
+import {
+  ImageOff,
+  KeyRound,
+  Plus,
+  ShieldCheck,
+  Unlink,
+  UserCheck,
+  UserRound,
+  UserX,
+} from "lucide-react";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -392,7 +401,13 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-type UserAction = "delete" | "disable" | "password" | "role";
+type UserAction = "delete" | "disable" | "gallery" | "password" | "role";
+
+/** Each account's visible gallery size, by account ID (administrators only). */
+export const galleryOwnersQuery = queryOptions({
+  queryKey: ["gallery-owners"],
+  queryFn: () => api<{ owners: Record<string, number> }>("/api/gallery/owners"),
+});
 
 /** Reset Password: an administrator sets a new one, which ends the account's sessions. */
 function ResetPassword({
@@ -480,6 +495,14 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       api(`/api/accounts/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: () => setActing(null),
     onSettled: refresh,
+  });
+  const galleries = useQuery(galleryOwnersQuery);
+  const galleryOf = (account: Account) => galleries.data?.owners[account.id] || 0;
+  const removeGallery = useMutation({
+    mutationFn: (id: string) =>
+      api(`/api/gallery/owners/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: () => setActing(null),
+    onSettled: () => client.invalidateQueries({ queryKey: galleryOwnersQuery.queryKey }),
   });
   const policy = useMutation({
     mutationFn: (accessProfileId: string) =>
@@ -635,6 +658,20 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       Disable User
                     </Menu.Item>
                   )}
+                  {galleryOf(account) > 0 && (
+                    <Menu.Item
+                      color="red"
+                      leftSection={<ImageOff size={16} />}
+                      rightSection={
+                        <Text size="xs" c="dimmed">
+                          {galleryOf(account)}
+                        </Text>
+                      }
+                      onClick={act("gallery")}
+                    >
+                      Delete Gallery
+                    </Menu.Item>
+                  )}
                   <Menu.Item
                     color="red"
                     leftSection={<icons.delete size={16} />}
@@ -723,6 +760,17 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         enable them again.
       </ConfirmDialog>
       <ConfirmDialog
+        opened={acting?.action === "gallery"}
+        title="Delete Gallery"
+        action="Delete"
+        pending={removeGallery.isPending}
+        onConfirm={() => target && removeGallery.mutate(target.id)}
+        onClose={() => setActing(null)}
+      >
+        Delete all {target && galleryOf(target)} of {target?.username}’s gallery items? Their images
+        and videos are deleted for good, as if they deleted them themselves.
+      </ConfirmDialog>
+      <ConfirmDialog
         opened={acting?.action === "delete"}
         title="Delete User"
         action="Delete"
@@ -731,7 +779,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         onClose={() => setActing(null)}
       >
         Delete {target?.username}? Their account, sign-ins and MCP token are removed for good. Their
-        images and videos stay on disk but no longer show in Studio.
+        images and videos stay on disk but no longer show in Studio; use Delete Gallery first to
+        remove them.
       </ConfirmDialog>
     </Stack>
   );

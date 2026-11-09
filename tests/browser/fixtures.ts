@@ -173,6 +173,8 @@ export async function fixtures(page: Page) {
     availableProfiles: ["image:test", "image:fast", "video:test"],
     defaultAccessProfileId: "users",
   };
+  // Each account's gallery size, as Settings › Users counts it.
+  const galleryOwners: Record<string, number> = {};
 
   const preferences = {
     preferences: {
@@ -203,6 +205,11 @@ export async function fixtures(page: Page) {
       return respond({ account: ownAccount });
     }
     if (path === "/api/accounts/admin") return respond(administration);
+    if (path === "/api/gallery/owners") return respond({ ok: true, owners: galleryOwners });
+    if (path.startsWith("/api/gallery/owners/") && method === "DELETE") {
+      delete galleryOwners[decodeURIComponent(path.split("/")[4])];
+      return respond({ ok: true });
+    }
     if (path === "/api/preferences") {
       if (method === "PATCH") {
         Object.assign(preferences.preferences, body);
@@ -818,6 +825,7 @@ export async function fixtures(page: Page) {
     presets,
     gallery,
     administration,
+    galleryOwners,
     ownAccount,
     preferences,
     messages,
