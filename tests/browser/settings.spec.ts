@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, openTheme, section, signIn, stamp, expectNoChatOpen } from "./fixtures";
+import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -385,10 +385,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   );
 });
 
-test("Status summarises service health and opens Workers over the current page", async ({
-  page,
-  isMobile,
-}) => {
+test("Status summarises each kind's workers and state, quietly", async ({ page, isMobile }) => {
   await fixtures(page);
   await page.goto("/chat");
   // Desktop keeps the queue in Chat, beside the Chats sidebar; phones list the Chats.
@@ -402,22 +399,13 @@ test("Status summarises service health and opens Workers over the current page",
     name: isMobile ? "Chats" : "Generations",
     exact: true,
   });
-  await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
-  // A link covering the whole status block opens Workers.
-  const workers = drawer.getByRole("link", { name: "Open Workers", exact: true });
-  const block = (await drawer.getByRole("region", { name: "Service Status" }).boundingBox())!;
-  expect((await workers.boundingBox())!.height).toBeGreaterThan(block.height);
-  await workers.click();
-  await expect(drawer).toBeHidden();
-  const settings = page.getByRole("dialog", { name: /^Settings/ });
-  // Observe-only Workers shows the service line and why nothing can be switched.
-  await expect(settings.getByRole("status", { name: "Services", exact: true })).toContainText(
-    "Videos: Offline",
+  const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
+  await expect(summary).toHaveText(
+    "Images1 worker · IdleVideos1 worker · OfflineText1 local model · Running",
   );
-  await expect(settings.getByText(/runtime control is not configured/)).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page).toHaveURL(/\/chat$/);
-  await expectNoChatOpen(page);
+  // Nothing in it acts.
+  await expect(summary.getByRole("link")).toHaveCount(0);
+  await expect(summary.getByRole("button")).toHaveCount(0);
 });
 
 test("Workers switch GPU workloads only through a reviewed preview", async ({ page }) => {
@@ -579,7 +567,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   expect(previews.at(-1)).toEqual({ start: ["video"] });
 });
 
-test("A parked service reads as parked, and administrators start it from Status", async ({
+test("Status counts running workers, reads a parked service as Stopped and offers no Start", async ({
   page,
 }) => {
   await fixtures(page);
@@ -590,7 +578,9 @@ test("A parked service reads as parked, and administrators start it from Status"
           image: {
             state: "healthy",
             reason: "A direct runtime is healthy.",
-            endpoints: [{ id: "image", label: "Image", state: "healthy", reason: "Ready" }],
+            endpoints: [
+              { id: "image", label: "Image", state: "healthy", reason: "Ready", running: true },
+            ],
           },
           video: {
             state: "parked",
@@ -610,42 +600,14 @@ test("A parked service reads as parked, and administrators start it from Status"
       },
     }),
   );
-  await page.route("**/api/runtime", (route) =>
-    route.fulfill({
-      json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
-        pools: [],
-        history: [],
-        workloads: [],
-      },
-    }),
-  );
-  const previews: unknown[] = [];
-  const applied: unknown[] = [];
-  await page.route("**/api/runtime/preview", (route) => {
-    previews.push(route.request().postDataJSON());
-    return route.fulfill({
-      json: { target: ["video"], stop: [], start: ["video"], keep: [], signature: "fixture" },
-    });
-  });
-  await page.route("**/api/runtime/apply", (route) => {
-    applied.push(route.request().postDataJSON());
-    return route.fulfill({ status: 202, json: { id: "next", status: "running" } });
-  });
-  await page.route("**/api/runtime/operations/next", (route) =>
-    route.fulfill({ json: { id: "next", status: "running", progress: "Starting Video." } }),
-  );
   await page.goto("/images");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Running · Some Stopped");
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
-  await expect(drawer.getByLabel("Videos: Stopped", { exact: true })).toBeVisible();
-  // Nothing stops, so choosing Start is the request itself.
-  await drawer.getByRole("button", { name: "Start Videos", exact: true }).click();
-  await expect(drawer.getByText("Starting Video.", { exact: true })).toBeVisible();
-  expect(previews).toEqual([{ start: ["video"] }]);
-  expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
+  await expect(drawer.getByLabel("Images: 1 worker · 1 running", { exact: true })).toBeVisible();
+  await expect(drawer.getByLabel("Videos: 1 worker · Stopped", { exact: true })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
 test("Settings › Integrations picks the assistant model from the gateway's and text workloads' models", async ({
