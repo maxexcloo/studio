@@ -72,7 +72,7 @@ export function registerCompareRoutes(
   /** The variant's saved image, else a placeholder from its queue record. */
   function variantItem(ownerId: string, items: GalleryItem[], jobId: string) {
     const saved = items.find(
-      (item) => item.jobId === jobId && item.type === "image" && item.status !== "canceled",
+      (item) => item.jobId === jobId && item.type === "image" && item.status !== "cancelled",
     );
     if (saved) return saved;
     const job = store.job(ownerId, jobId);
@@ -84,8 +84,7 @@ export function registerCompareRoutes(
     });
     return {
       ...pending,
-      status:
-        job.status === "failed" ? "error" : job.status === "cancelled" ? "canceled" : "pending",
+      status: job.status === "failed" || job.status === "cancelled" ? job.status : "pending",
       ...(job.status === "failed" ? { error: job.reason } : {}),
     };
   }

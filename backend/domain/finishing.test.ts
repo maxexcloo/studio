@@ -78,7 +78,7 @@ function fixture(t: TestContext) {
       const job = store.job(ownerId, jobId)!;
       store.save({ ...job, status: "cancelled" });
       const item = state.items.find((entry) => entry.id === job.input.galleryItemId)!;
-      item.upscale = { status: "canceled" };
+      item.upscale = { status: "cancelled" };
     },
     log: { info: (message) => state.logs.push(message) },
   });

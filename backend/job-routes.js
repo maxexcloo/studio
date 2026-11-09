@@ -22,8 +22,6 @@ export function registerJobRoutes(app, { store, queue }) {
     const status =
       {
         completed: "done",
-        failed: "error",
-        cancelled: "canceled",
         writing: "queued",
         waiting: "queued",
         starting: "queued",

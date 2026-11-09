@@ -46,7 +46,7 @@ test("a gated file stops at once and points to the browser", async () => {
   });
   startDownload(spec("gated.safetensors"));
   const failed = await settle("gated.safetensors");
-  assert.deepEqual([failed.status, failed.retryable, failed.needsBrowser], ["error", false, true]);
+  assert.deepEqual([failed.status, failed.retryable, failed.needsBrowser], ["failed", false, true]);
   setDownloadTransport(null);
 });
 

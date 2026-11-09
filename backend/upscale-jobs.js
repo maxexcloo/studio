@@ -79,11 +79,11 @@ function watchUpscaleProgress(clientId, target, run) {
         );
       }
       if (message.type === "execution_interrupted") {
-        target.patch({ status: "canceled", progress: null });
+        target.patch({ status: "cancelled", progress: null });
       }
       if (message.type === "execution_error") {
         target.patch({
-          status: "error",
+          status: "failed",
           progress: null,
           error: normalizeComfyError(data.exception_message || "Upscale failed"),
         });
@@ -160,10 +160,10 @@ export async function runUpscaleJob(
       );
     // SQLite records the acknowledged prompt before tracking it or acknowledging any further work.
     recorded.onAccepted?.(queued.prompt_id);
-    const cancelling = ["canceling", "canceled"].includes(jobs.get(jobId)?.status);
+    const cancelling = ["cancelling", "cancelled"].includes(jobs.get(jobId)?.status);
     jobs.set(jobId, {
       ...jobs.get(jobId),
-      status: cancelling ? "canceling" : "running",
+      status: cancelling ? "cancelling" : "running",
       promptId: queued.prompt_id,
     });
     run.promptId = queued.prompt_id;
@@ -171,7 +171,7 @@ export async function runUpscaleJob(
     run.alive = tracker.alive;
     while (true) {
       const state = jobs.get(jobId)?.status;
-      if ((state === "canceling" || state === "canceled") && !cancelSent) {
+      if ((state === "cancelling" || state === "cancelled") && !cancelSent) {
         await cancelPrompt(queued.prompt_id);
         cancelSent = true;
       }
@@ -186,8 +186,8 @@ export async function runUpscaleJob(
         let output = outputs.find((item) => item.type === (body.mediaType || "image"));
         if (!output) {
           if (cancelSent) {
-            target.patch({ status: "canceled", progress: null });
-            setTerminalJob(jobId, { status: "canceled" });
+            target.patch({ status: "cancelled", progress: null });
+            setTerminalJob(jobId, { status: "cancelled" });
             return;
           }
           throw Object.assign(new Error("The upscale ended without a saved result."), {

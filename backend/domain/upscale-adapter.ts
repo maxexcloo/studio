@@ -47,8 +47,8 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
         providerJobId: job.providerJobId,
       };
     }
-    if (live?.status === "error") return { status: "failed", reason: live.error };
-    if (live?.status === "canceled" && !running.has(job.id))
+    if (live?.status === "failed") return { status: "failed", reason: live.error };
+    if (live?.status === "cancelled" && !running.has(job.id))
       return { status: "cancelled", reason: "Upscale cancelled." };
     return live
       ? {
@@ -65,7 +65,7 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
     if (running.has(job.id)) return;
     running.add(job.id);
     options.jobs.set(job.id, {
-      status: job.cancelRequested ? "canceling" : "running",
+      status: job.cancelRequested ? "cancelling" : "running",
       kind: "upscale",
       ownerId: job.ownerId || undefined,
       galleryItemId: job.input.galleryItemId,
@@ -82,7 +82,7 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
           const latest = options.store.job(job.ownerId, job.id)!;
           options.store.save({ ...latest, providerJobId: promptId });
           if (latest.cancelRequested)
-            options.jobs.set(job.id, { ...liveJob(job), status: "canceling", promptId });
+            options.jobs.set(job.id, { ...liveJob(job), status: "cancelling", promptId });
         },
       })
       .catch(
@@ -107,11 +107,11 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
             ...liveJob(job),
             status: uncertain
               ? latest.cancelRequested
-                ? "canceling"
+                ? "cancelling"
                 : "running"
               : latest.cancelRequested && error.droppedRun
-                ? "canceled"
-                : "error",
+                ? "cancelled"
+                : "failed",
             error: error.message,
           });
           if (uncertain)
@@ -147,7 +147,7 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
     async cancel(job) {
       if (job.providerJobId) {
         const live = liveJob(job);
-        if (live) options.jobs.set(job.id, { ...live, status: "canceling" });
+        if (live) options.jobs.set(job.id, { ...live, status: "cancelling" });
         const stopped = await options.cancelPrompt(job.providerJobId, job.backend);
         if (stopped === "unreachable")
           return { status: "cancelled" as const, reason: unreachableCancelReason };

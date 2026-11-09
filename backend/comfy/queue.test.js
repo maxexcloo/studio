@@ -35,7 +35,7 @@ test("queuePlace reads running and pending entries", () => {
 
 test("a current ComfyUI cancels through its atomic jobs route", async () => {
   const { request, calls } = fakeComfy({ "POST /api/jobs/p1/cancel": { cancelled: true } });
-  assert.equal(await cancelPrompt("p1", request), "canceled");
+  assert.equal(await cancelPrompt("p1", request), "cancelled");
   assert.deepEqual(
     calls.map((call) => call.pathname),
     ["/api/jobs/p1/cancel"],

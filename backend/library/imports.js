@@ -372,7 +372,7 @@ export function createImportEngine({
       }
       delete resource.progress;
       const finished = resource.downloadId ? recent.get(resource.downloadId) : null;
-      if (finished?.status === "error")
+      if (finished?.status === "failed")
         resource.downloadError = finished.error || "The download stopped.";
       // Downloads live in memory, so one the running Studio has never heard of was cut off by a restart.
       else if (resource.downloadId && !finished)

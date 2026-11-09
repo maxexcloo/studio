@@ -81,7 +81,7 @@ test("a gated build falls back too, but a full disk does not", async () => {
   assert.equal((await settle("open.safetensors")).status, "done");
   startDownload(spec("full.safetensors", { alternatives: [spec("other.safetensors")] }));
   const full = await settle("full.safetensors");
-  assert.equal(full.status, "error");
+  assert.equal(full.status, "failed");
   assert.equal(full.fellBackTo, undefined);
   setDownloadTransport(null);
 });

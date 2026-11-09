@@ -179,7 +179,7 @@ export function cancelDownload(id) {
   const index = queue.findIndex((entry) => entry.id === id);
   if (index < 0) return null;
   const [entry] = queue.splice(index, 1);
-  entry.status = entry.receivedBytes ? "paused" : "canceled";
+  entry.status = entry.receivedBytes ? "paused" : "cancelled";
   remember(entry);
   return snapshot(entry);
 }
@@ -207,12 +207,12 @@ async function pump() {
     }
     active.status = "done";
   } catch (error) {
-    const canceled = signal.aborted;
-    active.status = canceled ? "paused" : "error";
+    const cancelled = signal.aborted;
+    active.status = cancelled ? "paused" : "failed";
     const percent = active.totalBytes
       ? Math.floor((active.receivedBytes / active.totalBytes) * 100)
       : 0;
-    active.error = canceled
+    active.error = cancelled
       ? ""
       : error?.code === "ENOSPC"
         ? "The disk is full. Free some space and try again. The download resumes where it stopped."
@@ -220,9 +220,9 @@ async function pump() {
           ? `The connection to Hugging Face kept dropping${percent ? ` at ${percent}%` : ""}. Check the internet connection and try again. The download resumes where it stopped.`
           : error.message || "Download failed.";
     // Retrying only helps when the network was the problem.
-    active.retryable = canceled || !error?.final;
+    active.retryable = cancelled || !error?.final;
     active.needsBrowser = Boolean(error?.browser);
-    active.unavailable = !canceled && unavailable(error);
+    active.unavailable = !cancelled && unavailable(error);
   }
   delete active.reconnecting;
   active.finishedAt = Date.now();
@@ -255,7 +255,7 @@ function unavailable(error) {
  * count as done; nothing is tried twice.
  */
 function fallbackFor(failed) {
-  if (failed.status !== "error" || !failed.unavailable) return null;
+  if (failed.status !== "failed" || !failed.unavailable) return null;
   const rest = [...(failed.alternatives || [])];
   while (rest.length) {
     const spec = rest.shift();

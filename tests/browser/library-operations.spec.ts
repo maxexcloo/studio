@@ -85,7 +85,7 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     id: "failed",
     file: "failed.safetensors",
     folder: "loras",
-    status: "error",
+    status: "failed",
     error: "Connection interrupted",
     retryable: true,
   };
