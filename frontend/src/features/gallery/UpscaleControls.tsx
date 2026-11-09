@@ -11,7 +11,12 @@ import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
+import { Eye, ScanFace } from "lucide-react";
+import { icons } from "../../ui/icons";
+import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
+import type { Action } from "./ActionBar";
+import { itemAction } from "./itemActions";
 
 const statusQuery = (quality: UpscaleQuality) => ({
   queryKey: ["upscale-status", quality],
@@ -189,5 +194,135 @@ export function UpscaleDialog({
       <FocusTrap.InitialFocus />
       <UpscaleForm item={item} onClose={onClose} />
     </Modal>
+  );
+}
+
+/**
+ * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, the quick
+ * settings, then the run (MediaActions.tsx places it).
+ */
+export function useUpscaleAction(
+  item: MediaItem,
+  {
+    ready,
+    compare,
+    onCompare,
+    onUpscale,
+    onVersionChange,
+  }: {
+    ready: boolean;
+    compare?: boolean;
+    onCompare?: () => void;
+    onUpscale?: () => void;
+    onVersionChange?: (id: string, active: boolean) => void;
+  },
+): Action | false {
+  const image = ready && item.type === "image";
+  // Phones compare an upscale above its original.
+  const phone = usePhone();
+  const cache = useQueryClient();
+  const version = useMutation({
+    mutationFn: (active: boolean) =>
+      post<{ upscaleActive: boolean }>("/api/upscale/toggle", { galleryItemId: item.id, active }),
+    onSuccess: (result) => {
+      onVersionChange?.(item.id, result.upscaleActive);
+      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: ["session"] });
+    },
+  });
+  const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
+  const quick = useQuickUpscale(item, ready);
+  const upscaleBusy = upscaling(item) || quick.queue.isPending;
+  return (
+    ready &&
+    itemAction("upscale", {
+      // Laid out like Animate: with an upscale, switching between it and the original comes
+      // first; then the remembered settings, then the runs. The usual click is the first run
+      // option: Show Upscale, else Upscale at the chosen settings.
+      label: upscaling(item) ? "Upscaling…" : "Upscale",
+      pressed: upscaled && Boolean(item.upscaleActive),
+      loading: upscaleBusy && !upscaled,
+      disabled: upscaled ? version.isPending : upscaleBusy,
+      menu: [
+        upscaled
+          ? [
+              {
+                id: "show-upscale",
+                label: "Show Upscale",
+                icon: Eye,
+                checked: Boolean(item.upscaleActive),
+                disabled: version.isPending,
+                onClick: () => version.mutate(!item.upscaleActive),
+              },
+              ...(onCompare && image
+                ? [
+                    {
+                      id: "compare-upscale",
+                      label: "Compare Upscale",
+                      icon: phone ? icons.compareStacked : icons.compareSideBySide,
+                      checked: Boolean(compare),
+                      onClick: onCompare,
+                    },
+                  ]
+                : []),
+            ]
+          : [],
+        [
+          {
+            id: "upscale-quality",
+            label: "Upscale Quality",
+            icon: icons.upscale,
+            choice: {
+              value: quick.quality,
+              options: [
+                { value: "fast", label: "Fast" },
+                { value: "balanced", label: "Balanced" },
+                { value: "high", label: "High" },
+              ],
+              onChange: (value: string) => quick.setQuality(value as typeof quick.quality),
+            },
+          },
+          // Face Detail joins every run from here once checked; disabled where the worker can't.
+          ...(image
+            ? [
+                {
+                  id: "upscale-face",
+                  label: "Face Detail",
+                  icon: ScanFace,
+                  checked: quick.faceDetail,
+                  disabled: !quick.faceAvailable,
+                  keepOpen: true,
+                  onClick: () => quick.setFaceDetail(!quick.faceDetail),
+                },
+              ]
+            : []),
+          // The rest of the settings, under the quick ones.
+          {
+            id: "upscale-options",
+            label: "Upscale Options…",
+            icon: icons.settings,
+            disabled: upscaleBusy,
+            onClick: onUpscale,
+          },
+        ],
+        [
+          upscaled
+            ? {
+                id: "upscale-again",
+                label: "Regenerate Upscale",
+                icon: icons.retry,
+                disabled: upscaleBusy,
+                onClick: quick.run,
+              }
+            : {
+                id: "upscale-run",
+                label: image ? "Upscale Image" : "Upscale Video",
+                icon: icons.upscale,
+                disabled: upscaleBusy,
+                onClick: quick.run,
+              },
+        ],
+      ],
+    })
   );
 }
