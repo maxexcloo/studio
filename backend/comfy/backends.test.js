@@ -168,10 +168,10 @@ test("cancel a video without interrupting primary image work", async () => {
   await waitFor(() => jobs.get("video-cancel").promptId);
   const before = primary.requests.length;
   await withComfyBackend(jobs.get("video-cancel").comfyBackend, () => cancelPrompt(prompt.id));
-  jobs.set("video-cancel", { ...jobs.get("video-cancel"), status: "canceling" });
+  jobs.set("video-cancel", { ...jobs.get("video-cancel"), status: "cancelling" });
   video.drop(prompt.id);
   await running;
-  assert.equal(jobs.get("video-cancel").status, "canceled");
+  assert.equal(jobs.get("video-cancel").status, "cancelled");
   assert.equal(
     primary.requests.slice(before).some((item) => item.pathname === "/interrupt"),
     false,
@@ -191,7 +191,7 @@ test("video failure stays a video failure and is never retried on primary", asyn
   const before = primary.prompts.length;
   video.finish(prompt.id, { error: { exception_message: "test GPU error" } });
   await running;
-  assert.equal(jobs.get("video-error").status, "error");
+  assert.equal(jobs.get("video-error").status, "failed");
   assert.equal(primary.prompts.length, before);
 });
 

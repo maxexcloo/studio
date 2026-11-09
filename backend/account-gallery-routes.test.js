@@ -102,7 +102,7 @@ test("Clear Failed takes the account's own failed items; administrators may name
   const { registerGalleryErrorRoutes } = await import("./gallery/routes.js");
   const posts = {};
   registerGalleryErrorRoutes({ post: (route, handler) => (posts[route] = handler) });
-  const failed = (ownerId, jobId) => ({ ...item(ownerId, jobId), status: "error", url: "" });
+  const failed = (ownerId, jobId) => ({ ...item(ownerId, jobId), status: "failed", url: "" });
   const account = (userId, role = "user") => ({
     studioAccount: { userId, role, authenticated: true, features: { gallery: true } },
   });
@@ -144,7 +144,7 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
     made("account-a", "old", "2026-10-18T00:00:00.000Z", [detail]),
     made("account-a", "new", "2026-10-19T00:00:00.000Z", [detail]),
     made("account-a", "off", "2026-10-20T00:00:00.000Z", [{ ...detail, enabled: false }]),
-    made("account-a", "failed", "2026-10-21T00:00:00.000Z", [detail], "error"),
+    made("account-a", "failed", "2026-10-21T00:00:00.000Z", [detail], "failed"),
     made("account-b", "foreign", "2026-10-22T00:00:00.000Z", [
       detail,
       { name: "private.safetensors" },

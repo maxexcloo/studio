@@ -63,7 +63,7 @@ export function isComfyTimeout(error) {
   return error?.name === "AbortError" || error?.name === "TimeoutError";
 }
 /**
- * Call with what a fetch to ComfyUI threw. A canceled request says nothing about ComfyUI, and a timed-out
+ * Call with what a fetch to ComfyUI threw. A cancelled request says nothing about ComfyUI, and a timed-out
  * one reads as busy: a busy ComfyUI takes the connection and answers late while its runs carry on.
  */
 export function noteComfyFetchError(error) {

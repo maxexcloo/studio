@@ -313,7 +313,7 @@ export function createUpdateChecker({
     for (const [key, applied] of Object.entries(current.applied)) {
       if (applied.state !== "downloading" || running.has(applied.downloadId)) continue;
       const finished = recent.get(applied.downloadId);
-      if (finished && ["error", "canceled"].includes(finished.status)) {
+      if (finished && ["failed", "cancelled"].includes(finished.status)) {
         Object.assign(applied, {
           state: "failed",
           note: finished.error || "The download stopped. Update again to retry.",

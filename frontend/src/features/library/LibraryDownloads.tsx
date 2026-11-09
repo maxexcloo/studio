@@ -27,10 +27,10 @@ interface DownloadState {
 }
 const statusLabel = (status: string) =>
   ({
-    canceled: "Cancelled",
+    cancelled: "Cancelled",
     downloading: "Downloading",
     done: "Completed",
-    error: "Failed",
+    failed: "Failed",
     paused: "Paused",
     queued: "Queued",
   })[status] || status;
@@ -159,7 +159,7 @@ export function LibraryDownloads({ active }: { active: boolean }) {
           rowActions={(item) => {
             const running = ["downloading", "queued"].includes(item.status);
             const retry =
-              ["error", "canceled", "paused"].includes(item.status) &&
+              ["failed", "cancelled", "paused"].includes(item.status) &&
               item.retryable !== false &&
               !!item.id;
             if (!running && !retry) return null;

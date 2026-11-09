@@ -22,8 +22,9 @@ export function MediaJobStatus({
   const job = item.jobId ? queue.data?.jobs.find((job) => job.id === item.jobId) : undefined;
   const savedError = "error" in item && typeof item.error === "string" ? item.error : "";
   const loading = Boolean(item.jobId && !job && (queue.isPending || queue.isFetching));
-  const failed = job?.status === "failed" || (!job && item.status === "error");
-  const cancelled = job?.status === "cancelled" || (!job && item.status === "canceled");
+  const status = job ? job.status : item.status;
+  const failed = status === "failed";
+  const cancelled = status === "cancelled";
   const active = job && !terminalStatuses.has(job.status);
   const progress = job?.progress;
   return (

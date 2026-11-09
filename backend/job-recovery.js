@@ -95,8 +95,8 @@ export function createJobRecovery({
         getGallery().filter(
           (item) =>
             !item.url &&
-            (["pending", "error"].includes(item.status) ||
-              (item.status === "canceled" && jobs.get(item.jobId)?.recovered)),
+            (["pending", "failed"].includes(item.status) ||
+              (item.status === "cancelled" && jobs.get(item.jobId)?.recovered)),
         ),
       )
         .map((item) => item.jobId)
@@ -117,7 +117,7 @@ export function createJobRecovery({
   async function recover() {
     if (
       !getGallery().some(
-        (item) => !item.url && ["pending", "error", "canceled"].includes(item.status),
+        (item) => !item.url && ["pending", "failed", "cancelled"].includes(item.status),
       )
     )
       return;
@@ -125,7 +125,7 @@ export function createJobRecovery({
       visible(
         getGallery().filter(
           (item) =>
-            !item.url && ["pending", "error"].includes(item.status) && !jobs.has(item.jobId),
+            !item.url && ["pending", "failed"].includes(item.status) && !jobs.has(item.jobId),
         ),
       )
         .map((item) => item.jobId)
@@ -189,7 +189,7 @@ export function createJobRecovery({
           const place = places.get(id);
           if (
             current?.recovered &&
-            ["canceling", "canceled"].includes(current.status) &&
+            ["cancelling", "cancelled"].includes(current.status) &&
             !completed.has(id)
           ) {
             if (place) {
@@ -199,11 +199,11 @@ export function createJobRecovery({
             } else if (current.promptId) {
               const misses = (missing.get(id) || 0) + 1;
               missing.set(id, misses);
-              if (misses >= 2) finishJob(id, { status: "canceled" });
+              if (misses >= 2) finishJob(id, { status: "cancelled" });
             }
             continue;
           }
-          if (place && !["canceling", "canceled"].includes(current?.status)) {
+          if (place && !["cancelling", "cancelled"].includes(current?.status)) {
             untracked.delete(id);
             missing.delete(id);
             const progress =
@@ -274,12 +274,12 @@ export function createJobRecovery({
               setGallery(
                 getGallery().map((item) =>
                   item.jobId === id && !item.url
-                    ? { ...item, status: "error", error, progress: null }
+                    ? { ...item, status: "failed", error, progress: null }
                     : item,
                 ),
               );
               finishJob(id, {
-                status: "error",
+                status: "failed",
                 error,
                 comfyBackend: backend,
                 promptId: done.promptId,
@@ -289,10 +289,11 @@ export function createJobRecovery({
             const misses = (missing.get(id) || 0) + 1;
             missing.set(id, misses);
             if (misses < 2) continue;
-            const status = ["canceling", "canceled"].includes(current.status)
-              ? "canceled"
-              : "error";
-            const error = status === "error" ? "ComfyUI no longer has this generation." : undefined;
+            const status = ["cancelling", "cancelled"].includes(current.status)
+              ? "cancelled"
+              : "failed";
+            const error =
+              status === "failed" ? "ComfyUI no longer has this generation." : undefined;
             setGallery(
               getGallery().map((item) =>
                 item.jobId === id ? { ...item, status, error, progress: null } : item,
@@ -312,7 +313,7 @@ export function createJobRecovery({
       if (
         jobs.has(id) ||
         !visible(getGallery()).some(
-          (item) => item.jobId === id && !item.url && ["pending", "error"].includes(item.status),
+          (item) => item.jobId === id && !item.url && ["pending", "failed"].includes(item.status),
         )
       ) {
         missing.delete(id);
@@ -328,12 +329,12 @@ export function createJobRecovery({
       const error = "ComfyUI no longer has this generation.";
       setGallery(
         getGallery().map((item) =>
-          item.jobId === id && !item.url && ["pending", "error"].includes(item.status)
-            ? { ...item, status: "error", error, progress: null }
+          item.jobId === id && !item.url && ["pending", "failed"].includes(item.status)
+            ? { ...item, status: "failed", error, progress: null }
             : item,
         ),
       );
-      finishJob(id, { status: "error", error, recovered: true });
+      finishJob(id, { status: "failed", error, recovered: true });
       missing.delete(id);
     }
   }

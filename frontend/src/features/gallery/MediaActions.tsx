@@ -93,7 +93,7 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   const queue = useQueue();
   const retry = useQueueAction(item.jobId);
   const tryAgain = useTryAgain([item]);
-  if (item.status !== "error" || !item.jobId) return null;
+  if (item.status !== "failed" || !item.jobId) return null;
   const job = queue.data?.jobs.find((job) => job.id === item.jobId);
   if (queue.error)
     return itemAction("retry", {

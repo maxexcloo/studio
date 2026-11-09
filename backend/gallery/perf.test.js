@@ -55,7 +55,7 @@ const bigGallery = (count) => {
     id: `local-${index}`,
     jobId: `job-${Math.floor(index / 4)}`,
     index: index % 4,
-    status: index % 97 === 0 ? "error" : "done",
+    status: index % 97 === 0 ? "failed" : "done",
     type: index % 11 === 0 ? "video" : "image",
     prompt: `a quiet harbour at dawn, number ${index}`,
     // Four images per job share a time, like a batch.
@@ -95,18 +95,18 @@ test("paging through 50,000 items reads each page from one sorted list, without 
   );
 
   const videos = pageGallery({ type: "video", limit: 500, includeFailed: false });
-  assert.ok(videos.items.every((item) => item.type === "video" && item.status !== "error"));
+  assert.ok(videos.items.every((item) => item.type === "video" && item.status !== "failed"));
   assert.equal(
     videos.totalApprox,
-    items.filter((item) => item.type === "video" && item.status !== "error").length,
+    items.filter((item) => item.type === "video" && item.status !== "failed").length,
   );
 });
 
 test("a change to the gallery shows on the next page request", () => {
   setGallery(bigGallery(1000), { persist: false });
   assert.equal(pageGallery({ limit: 5 }).totalApprox, 1000);
-  updateGalleryJob("job-249", { status: "canceled" }, { persist: false });
-  assert.equal(pageGallery({ limit: 5 }).totalApprox, 996, "canceled items leave the list");
+  updateGalleryJob("job-249", { status: "cancelled" }, { persist: false });
+  assert.equal(pageGallery({ limit: 5 }).totalApprox, 996, "cancelled items leave the list");
   // A cursor whose item is gone continues after its time instead of starting over.
   const first = pageGallery({ limit: 3 });
   setGallery(

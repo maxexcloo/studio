@@ -462,7 +462,7 @@ export function createDream(options: {
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId).filter((item) => item.dream?.state === state);
   const unseenCount = (ownerId: string) =>
-    pool(ownerId, "unseen").filter((item) => !["error", "canceled"].includes(item.status || ""))
+    pool(ownerId, "unseen").filter((item) => !["failed", "cancelled"].includes(item.status || ""))
       .length;
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
@@ -1464,7 +1464,7 @@ export function createDream(options: {
           (other) =>
             other !== item &&
             other.dream?.pair?.id === item.dream?.pair?.id &&
-            !["done", "error", "canceled"].includes(other.status || ""),
+            !["done", "failed", "cancelled"].includes(other.status || ""),
         );
       return all
         .filter((item) => item.status === "done" && !(item.dream?.pair && pending(item)))

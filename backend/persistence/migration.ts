@@ -22,6 +22,8 @@ const envSettingsFiles = [".env", "settings.json"];
 const downloadSourcesFiles = ["model-download-sources.json", "model-download-sources.json.bak"];
 // What the profile ids step (profile/rename.js) backs up beside profiles, versions and LoRA stacks.
 const profileIdFiles = ["guides/prompting.json", "workflow-preferences.json", "timings.json"];
+// What the status words step (status-words.ts) backs up: the rows it rewrites as JSON lists.
+const statusWordsFiles = ["studio_gallery", "studio_queue"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
 /**
@@ -223,7 +225,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
     const { count } = db.prepare("SELECT count(*) AS count FROM studio_gallery").get() as {
       count: number;
     };
-    if (count !== items.length) throw new Error("Gallery row verification failed");
+    // Without a document there is nothing to move, and rows Studio has written since stay.
+    if (text && count !== items.length) throw new Error("Gallery row verification failed");
     db.prepare("DELETE FROM studio_documents WHERE name = 'gallery'").run();
     db.prepare("INSERT INTO studio_migrations(name, applied_at) VALUES (?, ?)").run(
       galleryRowsMigration,
@@ -247,7 +250,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
  * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
  * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists, and the
  * env settings step's (env-settings.js) the env file and the settings document as `settings.json`,
- * and the JSON stores step's (json-stores.ts) every store file at its path.
+ * the JSON stores step's (json-stores.ts) every store file at its path, and the status words step's
+ * (status-words.ts) the gallery rows and queue records it rewrote as JSON lists.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -271,7 +275,9 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
       !envSettingsFiles.includes(mapping.source) &&
       !downloadSourcesFiles.includes(mapping.source) &&
       !profileIdFiles.includes(mapping.source) &&
-      ![...documents, ...legacyRecordFiles].some((name) => mapping.source === `${name}.json`)
+      ![...documents, ...legacyRecordFiles, ...statusWordsFiles].some(
+        (name) => mapping.source === `${name}.json`,
+      )
     )
       throw new Error("Unsupported backup mapping");
     fs.mkdirSync(path.join(destination, path.dirname(mapping.source)), {

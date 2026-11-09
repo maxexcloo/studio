@@ -235,8 +235,8 @@ function visibleItems({ type = "", includeFailed = true, uploads = false, filter
     const items = sortGallery(filterVisibleGallery(gallery)).filter((item) => {
       if (type && item.type !== type) return false;
       if (Boolean(item.uploaded) !== uploads) return false;
-      if (!includeFailed && item.status === "error") return false;
-      return item.status !== "canceled";
+      if (!includeFailed && item.status === "failed") return false;
+      return item.status !== "cancelled";
     });
     entry = { items, positions: null };
     visibleListBuilds += 1;
@@ -876,13 +876,13 @@ export function cleanupGalleryState(queue) {
       item.upscale?.status === "running" &&
       !queue.unfinished(item.ownerId || "", item.upscale.jobId)
     ) {
-      item = { ...item, upscale: { ...item.upscale, status: "canceled", progress: null } };
+      item = { ...item, upscale: { ...item.upscale, status: "cancelled", progress: null } };
       changed = true;
     }
     if (item.status === "pending") {
       // A job still unfinished after a restart waits for recovery; a tile without one never arrives.
       if (item.jobId && !queue.unfinished(item.ownerId || "", item.jobId)) {
-        item = { ...item, status: "error", filename: "Generation interrupted" };
+        item = { ...item, status: "failed", filename: "Generation interrupted" };
         changed = true;
       } else if (item.jobId && (doneJobs.has(item.jobId) || doneKeys.has(runKey(item)))) {
         changed = true;

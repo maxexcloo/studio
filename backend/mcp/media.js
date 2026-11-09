@@ -33,7 +33,7 @@ function failedReason(job) {
 }
 
 const finished = new Set(["done", "completed", "succeeded"]);
-const terminal = new Set([...finished, "failed", "error", "cancelled", "canceled", "missing"]);
+const terminal = new Set([...finished, "failed", "cancelled", "missing"]);
 const safeId = (id) => encodeURIComponent(id);
 const escapeHtml = (value) =>
   String(value).replace(
@@ -992,7 +992,7 @@ export class McpMedia {
       if (
         job.provider === "cliproxyapi" &&
         job.kind === "video" &&
-        ["failed", "error"].includes(job.status) &&
+        job.status === "failed" &&
         this.noteCloudRefusal(
           `${job.error || ""} ${JSON.stringify(job.failure || "")}`,
           Date.parse(job.updatedAt),

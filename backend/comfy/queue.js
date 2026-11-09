@@ -28,7 +28,7 @@ export function queuePlace(queue, promptId) {
  * running). An older one gets the same by hand: delete it from the pending
  * list, and interrupt only when it is the prompt running right now. Older
  * builds ignore /interrupt's prompt_id and stop whatever runs, which is why the
- * queue is checked first. Returns what it stopped ("canceled" from the atomic
+ * queue is checked first. Returns what it stopped ("cancelled" from the atomic
  * call, else "running" or "pending"), "" when there was nothing to stop, or
  * "unreachable" when the worker refuses the connection or is gone (parked,
  * stopped, no longer configured): nothing of Studio's can be running there.
@@ -44,7 +44,7 @@ export async function cancelPrompt(promptId, request = comfy) {
     });
     // Anything but its JSON answer (an older ComfyUI's 404/405, a front end catching the route) falls through.
     if (answer && typeof answer === "object" && typeof answer.cancelled === "boolean")
-      return answer.cancelled ? "canceled" : "";
+      return answer.cancelled ? "cancelled" : "";
   } catch {
     // Not there on this ComfyUI: do it the older way.
   }

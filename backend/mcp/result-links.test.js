@@ -65,7 +65,7 @@ test("a failed job's result says what went wrong, a Radiance LoRA refusal word f
   const refusal =
     "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors)";
   media.job = async () => ({
-    status: "error",
+    status: "failed",
     error: refusal,
     failure: { title: "A LoRA doesn't fit this model", summary: refusal },
   });

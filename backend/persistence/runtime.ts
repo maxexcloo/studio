@@ -19,6 +19,45 @@ export const jsonStoreSource =
 
 export const jsonStoresMigration = "json-stores-v1";
 
+/**
+ * The words older builds stored for a job's or result's end, and Studio's own, which the
+ * `status-words-v1` step (persistence/status-words.ts) rewrites in gallery rows and in the gallery
+ * items queue records carry: their `status` and `upscale.status`.
+ */
+export const statusWordsMigration = "status-words-v1";
+export const statusWords: Readonly<Record<string, string>> = {
+  error: "failed",
+  canceled: "cancelled",
+  canceling: "cancelling",
+};
+const oldWords = `(${Object.keys(statusWords)
+  .map((word) => `'${word}'`)
+  .join(", ")})`;
+const holdsOldWord = (item: string) =>
+  `json_extract(${item}, '$.status') IN ${oldWords} OR json_extract(${item}, '$.upscale.status') IN ${oldWords}`;
+const holdsOldItem = (list: string) =>
+  `EXISTS (SELECT 1 FROM json_each(record, '${list}') AS item WHERE item.type = 'object' AND (${holdsOldWord("item.value")}))`;
+const hasTable = (db: DatabaseSync, name: string) =>
+  Boolean(db.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?").get(name));
+
+/** The gallery rows and queue records that still hold an old status word. */
+export function oldStatusRows(db: DatabaseSync) {
+  return {
+    gallery: hasTable(db, "studio_gallery")
+      ? (db
+          .prepare(`SELECT key, value FROM studio_gallery WHERE ${holdsOldWord("value")}`)
+          .all() as { key: string; value: string }[])
+      : [],
+    queue: hasTable(db, "studio_queue")
+      ? (db
+          .prepare(
+            `SELECT id, record FROM studio_queue WHERE ${holdsOldItem("$.items")} OR ${holdsOldItem("$.outputs")}`,
+          )
+          .all() as { id: string; record: string }[])
+      : [],
+  };
+}
+
 /** The json-stores-v1 sources in a data folder, sorted. */
 export function jsonStoreFiles(dataDir: string): string[] {
   const list = (dir: string) => {
@@ -131,7 +170,8 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
 /**
  * Studio keeps accounts, deletion markers, the gallery and the stores json-stores-v1 moved only in
  * SQLite. A data folder still on the older JSON files (`runtime-json-v1` or `json-stores-v1` not
- * applied) or the single gallery document (`gallery-rows-v1` not applied) must go through
+ * applied), the single gallery document (`gallery-rows-v1` not applied) or records with old status
+ * words (`status-words-v1` not applied) must go through
  * migrate-runtime first, so Studio refuses to start on one rather than ignore what it holds.
  */
 export function assertCurrentStorage(dataDir: string): void {
@@ -147,6 +187,12 @@ export function assertCurrentStorage(dataDir: string): void {
     ...stores.filter((source) => !source.startsWith("library/imports/")),
     ...(imports ? [`${imports} import records in library/imports`] : []),
   ];
+  if (!hasMigration(db, statusWordsMigration)) {
+    const old = oldStatusRows(db);
+    if (old.gallery.length)
+      pending.push(`${old.gallery.length} gallery rows with old status words`);
+    if (old.queue.length) pending.push(`${old.queue.length} queue records with old status words`);
+  }
   if (pending.length)
     throw new Error(
       `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,

@@ -51,7 +51,7 @@ export function GallerySelectionBar({
   const running = selected.filter((item) => !finished(item));
   const deletable = selected.filter(finished);
   const failedIds = new Set(
-    selected.filter((item) => item.status === "error").map((item) => item.jobId),
+    selected.filter((item) => item.status === "failed").map((item) => item.jobId),
   );
   const failed = (queue.data?.jobs || []).filter(
     (job) => job.status === "failed" && failedIds.has(job.id),
@@ -187,7 +187,7 @@ export function GallerySelectionBar({
       id: "select-failed",
       label: "Select Failed",
       short: "Failed",
-      items: selection.items.filter((item) => item.status === "error"),
+      items: selection.items.filter((item) => item.status === "failed"),
     },
     {
       id: "select-running",
