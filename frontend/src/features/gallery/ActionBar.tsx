@@ -269,7 +269,8 @@ function ActionControl({
 /**
  * The action bar shared by the viewer and gallery selection: icon controls in divided groups; the
  * `labelled` ones show their names. Controls that overflow scroll sideways, or `wrap` onto another
- * row. Menus open above it unless `menuPosition` says otherwise.
+ * row a whole group at a time, spaced apart rather than divided so no divider ends a row. Menus
+ * open above it unless `menuPosition` says otherwise.
  */
 export function ActionBarGroups({
   groups,
@@ -284,19 +285,26 @@ export function ActionBarGroups({
 }) {
   return (
     <div className={classes.actions} data-wrap={wrap || undefined}>
-      {shown(groups).map((group, index) => (
-        <Fragment key={group[0].id}>
-          {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
-          {group.map((action) => (
-            <ActionControl
-              key={action.id}
-              action={action}
-              labelled={labelled.includes(action.id)}
-              menuPosition={menuPosition}
-            />
-          ))}
-        </Fragment>
-      ))}
+      {shown(groups).map((group, index) => {
+        const controls = group.map((action) => (
+          <ActionControl
+            key={action.id}
+            action={action}
+            labelled={labelled.includes(action.id)}
+            menuPosition={menuPosition}
+          />
+        ));
+        return wrap ? (
+          <div key={group[0].id} className={classes.group}>
+            {controls}
+          </div>
+        ) : (
+          <Fragment key={group[0].id}>
+            {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
+            {controls}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
