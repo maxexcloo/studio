@@ -52,15 +52,18 @@ const top = <T extends Weighted>(entries: T[]) =>
 function Chips({ label, values }: { label: string; values: string[] }) {
   if (!values.length) return null;
   return (
-    <Group gap={4} role="list" aria-label={label}>
-      <Text size="xs" c="dimmed" w="4.5rem">
+    // The label keeps its column, so chips that wrap line up under the first.
+    <Group gap={4} wrap="nowrap" align="flex-start">
+      <Text size="xs" c="dimmed" w="4.5rem" style={{ flexShrink: 0 }}>
         {label}
       </Text>
-      {values.map((value) => (
-        <Badge key={value} role="listitem" maw="100%">
-          {value}
-        </Badge>
-      ))}
+      <Group gap={4} miw={0} role="list" aria-label={label}>
+        {values.map((value) => (
+          <Badge key={value} role="listitem" maw="100%">
+            {value}
+          </Badge>
+        ))}
+      </Group>
     </Group>
   );
 }
