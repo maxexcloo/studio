@@ -114,9 +114,7 @@ test("The taste read-out fits the screen and adds what to avoid", async ({ page 
   const profile = page.getByRole("region", { name: "Taste Profile" });
   await expect(profile.getByRole("list", { name: "Likes" })).toContainText("foxes in snow");
   // Only liked models and LoRAs show, by their names.
-  await expect(profile.getByRole("list", { name: "Models" })).toHaveText(
-    /^Models\s*Image Quality$/,
-  );
+  await expect(profile.getByRole("list", { name: "Models" })).toHaveText("Image Quality");
   await expect(profile.getByRole("list", { name: "LoRAs" })).toContainText("Detail Slider 0.8");
   await profile.getByLabel("Always Avoid").fill("clowns");
   await page.keyboard.press("Enter");
