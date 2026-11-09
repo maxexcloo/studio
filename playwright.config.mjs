@@ -15,6 +15,8 @@ export default defineConfig({
   // share the machine with agents and previews, so they run one test at a time.
   workers: process.env.CI ? 2 : 1,
   projects: [
+    // Only the phones are touch screens: a touch-capable context reports a coarse pointer, which
+    // Studio treats as a touch screen (touch targets, no tooltips).
     {
       name: "desktop",
       use: { viewport: { width: 1440, height: 1000 }, launchOptions: chromiumLaunchOptions },
@@ -23,6 +25,7 @@ export default defineConfig({
       name: "phone",
       use: {
         viewport: { width: 390, height: 844 },
+        hasTouch: true,
         isMobile: true,
         launchOptions: chromiumLaunchOptions,
       },
@@ -32,6 +35,7 @@ export default defineConfig({
       use: {
         browserName: "webkit",
         viewport: { width: 390, height: 844 },
+        hasTouch: true,
         isMobile: true,
       },
     },
@@ -39,7 +43,6 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     browserName: "chromium",
-    hasTouch: true,
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
