@@ -1008,7 +1008,6 @@ export function createDream(options: {
         prompt: "",
         writing,
         loras,
-        allowFallback: false,
         referenceAssets: reference
           ? [
               {
@@ -1272,7 +1271,6 @@ export function createDream(options: {
         prompt: side.reword ? "" : base.prompt,
         ...(side.reword ? { writing: { kind: "dream", reword: base.prompt } } : {}),
         loras: side.loras,
-        allowFallback: false,
         referenceAssets: [],
       };
       const pair: DreamPair = {

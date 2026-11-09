@@ -211,8 +211,6 @@ test(
         width: 256,
         height: 256,
         seed: 42,
-        workerId: "",
-        allowFallback: true,
       };
       await chat(session.id, "Explain depth of field.", { operation: "image", input });
       assert.equal((await api("/api/queue")).jobs.length, 0, "discussion does not submit media");

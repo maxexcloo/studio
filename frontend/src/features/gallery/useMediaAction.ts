@@ -173,10 +173,6 @@ export async function mediaDraft(
         workflow: profile.workflow,
         // The profile's current checkpoint runs, not the file the original result loaded.
         modelName: undefined,
-        // A worker the source picked carries over while the profile runs there; otherwise Automatic.
-        workerId: profile.workerIds?.includes(String(source?.input.workerId))
-          ? source?.input.workerId
-          : undefined,
         // Reused drafts draw a new seed; only Repeat Exactly keeps the recorded one.
         seed: "",
         prompt: typedPrompt(item),
