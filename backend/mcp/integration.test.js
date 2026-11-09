@@ -5693,15 +5693,15 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   f.app.get("/api/taste", (_req, res) => res.json({ summary: "Moody light", signals: 3 }));
   f.app.put(
     "/api/taste",
-    record("taste", (req) => ({ summary: req.body.summary, signals: 3 })),
+    record("taste", (req) => ({ summary: "Moody light", addedAvoid: req.body.avoid, signals: 3 })),
   );
   f.app.post(
     "/api/loras/library/ops",
     record("lora-ops", { library: { ratings: { "fixture-effect.safetensors": "up" } } }),
   );
   assert.equal(data(await call(mine, "taste")).summary, "Moody light");
-  await call(mine, "taste", { action: "save", summary: "Soft pastels" });
-  assert.deepEqual(seen.at(-1).body, { summary: "Soft pastels" });
+  await call(mine, "taste", { action: "save", avoid: ["clowns"] });
+  assert.deepEqual(seen.at(-1).body, { avoid: ["clowns"] });
   assert.deepEqual(
     data(
       await call(mine, "taste", {

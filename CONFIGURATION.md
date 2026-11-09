@@ -150,7 +150,7 @@ Every MCP action calls the route its UI action calls, with the caller's own cred
 | Status, Stop                                                                    | `status`, `result`, `cancel`                                               |
 | Queue pause, resume, cancel all, clear failed, retry, clear, reorder            | `queue`                                                                    |
 | Dream keep, discard, more, variations, pair answers, settings, discarded        | `dream` (Dream feature)                                                    |
-| Taste profile edit, refresh, reset; LoRA thumbs up and down                     | `taste` (`rate_lora` needs LoRAs)                                          |
+| Taste profile avoids, refresh, reset; LoRA thumbs up and down                   | `taste` (`rate_lora` needs LoRAs)                                          |
 | Prompt assistant presets, negatives, LoRA suggestions                           | `rewrite_prompt`, `suggest_negative`, `suggest_loras`                      |
 | Library browse and update view; catalogue edits, undo, remove                   | `library`, `catalogue_edit` (administrators, as for every row below)       |
 | Library › Import: Civitai, Hugging Face, Reddit, images; history, clear, remove | `lookup` (search by `type`, `base_model`), `import` (`install`), `imports` |
@@ -207,7 +207,7 @@ Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server env
 
 The prompt assistant uses an OpenAI-compatible Bifrost gateway: `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL`. Credentials remain server-side. Without the gateway, the assistant is off. Bifrost fixture compatibility is separate from live gateway verification.
 
-Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_ASSISTANT_CLOUD_MODEL`, such as `cloud/auto`. For an account with uncensored access an `…/auto` alias becomes `…/uncensored` (Bifrost defines both); any other model is used as it is. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts, the taste summary) sends none and gets the model's default.
+Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_ASSISTANT_CLOUD_MODEL`, such as `cloud/auto`. For an account with uncensored access an `…/auto` alias becomes `…/uncensored` (Bifrost defines both); any other model is used as it is. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, the taste summary, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts) sends none and gets the model's default.
 
 - `STUDIO_ASSISTANT_MODEL`: a model, such as `refuseless/glm-5.3-flash-abliterated`, that replaces the alias for every call and sends no `reasoning_effort`. Unset, Studio picks as above. Administrators choose it under **Settings › Integrations › Prompt Assistant › Model** from the gateway's models and those of Studio's text workloads, or **Automatic** to leave it unset.
 
@@ -223,7 +223,7 @@ Every account whose group has **Prompt Assistant** may use the prompt assistant.
 - `STUDIO_NEXT_STEPS` (**Next Steps**): the Suggestions menu's changes for a finished image (written ahead while idle and when the viewer opens) and for the composer's draft; off, the menu offers none.
 - `STUDIO_PROMPT_IDEAS` (**Prompt Ideas**): ideas over an empty, focused prompt.
 - `STUDIO_SUGGESTED_PROMPTS` (**Suggested Prompts**): prompts for items without one, such as uploads.
-- `STUDIO_TASTE_UPDATES` (**Taste Updates**): the background rewrite of taste profiles.
+- `STUDIO_TASTE_UPDATES` (**Taste Updates**): the background summary of taste profiles.
 
 Dream has no switch here: it is off for each account until turned on, and a group's Dream feature turns it off for its members.
 
@@ -231,9 +231,17 @@ Each account's **Taste Profile** (Dream › Taste) learns from stars, comparison
 votes, iterations and Dream choices. Each of its latest 200 signals keeps the
 result (and the one passed over): its prompt, negative, profile, LoRAs with
 strengths, settings, seed, title and caption tags, a comparison's axis and
-values, and the Dream arm. It can be edited, refreshed or reset. Background
-updates revise manual edits rather than replacing them and wait while the text
-runtime is offline.
+values, and the Dream arm. Studio scores what those results had (profile, LoRA
+at its strength, caption tag, aspect ratio, and steps and guidance per profile)
+on every read, each signal halving in weight every 60 days: a star counts 1.5,
+a like or keep 1, a discard −0.5 and a calibration like or pass ±0.5. A
+comparison's answer moves only what its two sides differ in: the winner's by 1
+and the loser's by −1, or both by 0.5 for Both and −0.5 for Neither. Every ten
+signals the assistant summarises titles, captions and tags into likes, styles,
+things to avoid and a note, without touching the scores; the summary Chat and
+suggestions read is written from both. The profile is not free text: the
+person adds what to avoid, refreshes or resets it. Background summaries wait
+while the text runtime is offline.
 
 **Dream** is off for each account until turned on and also needs its group's
 Dream permission. It makes images and optional videos from taste and recent
