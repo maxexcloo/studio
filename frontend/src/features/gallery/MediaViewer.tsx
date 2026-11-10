@@ -29,7 +29,7 @@ import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
-import { closeWhenTop } from "../../ui/popupClicks";
+import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { FromChat } from "./FromChat";
@@ -117,7 +117,11 @@ const viewerShortcuts: Record<string, string> = {
   u: "upscale",
 };
 
-/** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
+/**
+ * The opened video, its controls hidden until a pointer moves over or taps it, then fading again.
+ * A touch tap while they are hidden also taps the viewer's chrome in or out; taps while they show
+ * work them.
+ */
 function ViewerVideo({
   id,
   src,
@@ -125,6 +129,7 @@ function ViewerVideo({
   width,
   height,
   swipe,
+  onTap,
 }: {
   /** The item's id, so Use Frame as Reference finds the frame showing. */
   id: string;
@@ -134,8 +139,10 @@ function ViewerVideo({
   width?: number;
   height?: number;
   swipe: ReturnType<typeof useTouchSwipe>;
+  onTap: () => void;
 }) {
   const [controls, setControls] = useState(false);
+  const controlsShown = useRef(false);
   const [refused, setRefused] = useState(false);
   const play = useCallback(
     (media: HTMLVideoElement | null) =>
@@ -164,32 +171,41 @@ function ViewerVideo({
       className={classes.video}
       onPointerMove={reveal}
       onPointerDown={(event) => {
+        controlsShown.current = controls || refused;
         reveal();
         swipe.onPointerDown(event);
       }}
-      onPointerUp={swipe.onPointerUp}
+      onPointerUp={(event) => {
+        if (swipe.onPointerUp(event) && !controlsShown.current && !closingPopup()) onTap();
+      }}
       onFocus={reveal}
       onClick={(event) => event.stopPropagation()}
     />
   );
 }
 
-/** Touch swipes over media that has no zoom of its own: running work and videos. */
+/**
+ * Touch swipes over media that has no zoom of its own: running work and videos. Lifting reports
+ * whether the touch was a tap: short, and barely moving.
+ */
 function useTouchSwipe(swipe: (direction: SwipeDirection) => void) {
-  const start = useRef<{ id: number; x: number; y: number } | null>(null);
+  const start = useRef<{ id: number; at: number; x: number; y: number } | null>(null);
   return {
     onPointerDown(event: PointerEvent) {
       start.current =
         event.pointerType === "touch"
-          ? { id: event.pointerId, x: event.clientX, y: event.clientY }
+          ? { id: event.pointerId, at: event.timeStamp, x: event.clientX, y: event.clientY }
           : null;
     },
     onPointerUp(event: PointerEvent) {
       const from = start.current;
       start.current = null;
-      if (from?.id !== event.pointerId) return;
-      const direction = swipeDirection(event.clientX - from.x, event.clientY - from.y);
+      if (from?.id !== event.pointerId) return false;
+      const dx = event.clientX - from.x;
+      const dy = event.clientY - from.y;
+      const direction = swipeDirection(dx, dy);
       if (direction) swipe(direction);
+      return !direction && Math.hypot(dx, dy) < 10 && event.timeStamp - from.at < 500;
     },
   };
 }
@@ -269,6 +285,17 @@ export function MediaViewer({
     getInitialValueInEffect: false,
   });
   const [sheet, setSheet] = useState(false);
+  // A touch tap on the media hides the chrome around it, as Photos does, until the viewer closes.
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const toggleChrome = () => setChromeHidden((hidden) => !hidden);
+  // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
+  const stage = useRef<HTMLDivElement>(null);
+  const shownId = useRef(item.id);
+  useLayoutEffect(() => {
+    if (shownId.current !== item.id && document.activeElement === document.body)
+      stage.current?.focus({ preventScroll: true });
+    shownId.current = item.id;
+  }, [item.id]);
   // The phone details sheet opens above the action bar, which stays in reach without its prompt.
   const bar = useRef<HTMLDivElement>(null);
   const [barOffset, setBarOffset] = useState(0);
@@ -350,7 +377,13 @@ export function MediaViewer({
       <FromChat item={item} />
     </Text>
   );
-  const toggleDetails = () => (phone ? setSheet(true) : setDetails((open) => !open));
+  const toggleDetails = () => {
+    setChromeHidden(false);
+    if (phone) setSheet(true);
+    else setDetails((open) => !open);
+  };
+  // Escape brings hidden chrome back before it closes the viewer.
+  const escape = () => (chromeHidden ? setChromeHidden(false) : close());
   function swipe(direction: SwipeDirection) {
     // A swipe replaces the media before its compatibility click arrives.
     gestureClick.current = true;
@@ -358,8 +391,10 @@ export function MediaViewer({
       gestureClick.current = false;
     });
     if (direction === "down") close();
-    else if (direction === "up") setSheet(phone);
-    else {
+    else if (direction === "up") {
+      setSheet(phone);
+      if (phone) setChromeHidden(false);
+    } else {
       const next = move(direction === "left" ? 1 : -1);
       if (next) setArrival({ id: next.id, from: direction === "left" ? "next" : "previous" });
     }
@@ -390,7 +425,7 @@ export function MediaViewer({
             !target.closest('input:not([type="radio"]),textarea,select,[aria-haspopup]')
           ) {
             event.preventDefault();
-            close();
+            escape();
           }
         }}
         onKeyDown={(event) => {
@@ -403,7 +438,7 @@ export function MediaViewer({
             return;
           if (event.key === "Escape" && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            close();
+            escape();
             return;
           }
           if (
@@ -451,6 +486,8 @@ export function MediaViewer({
             event.preventDefault();
             move(event.key === "ArrowLeft" ? -1 : 1);
           }
+          // A key that ran a viewer action brings hidden chrome back.
+          if (event.defaultPrevented) setChromeHidden(false);
         }}
       >
         <div
@@ -462,12 +499,21 @@ export function MediaViewer({
             gestureClick.current = false;
           }}
           onClick={(event) => {
-            if (!nearControl(event)) close();
+            // With the chrome hidden, a tap beside the media brings it back rather than closing.
+            if (nearControl(event)) return;
+            if (chromeHidden) setChromeHidden(false);
+            else close();
           }}
+          onFocusCapture={(event) => {
+            // Keyboard and screen reader focus reaching hidden chrome reveals it.
+            if ((event.target as Element).closest("[data-chrome]")) setChromeHidden(false);
+          }}
+          data-chrome-hidden={chromeHidden || undefined}
         >
           <div className={classes.main}>
             <Group
               className={classes.topBar}
+              data-chrome
               justify="space-between"
               wrap="nowrap"
               onClick={(event) => event.stopPropagation()}
@@ -546,7 +592,7 @@ export function MediaViewer({
                 </Tooltip>
               </Group>
             </Group>
-            <div className={classes.stage}>
+            <div ref={stage} className={classes.stage} tabIndex={-1}>
               {showTogether ? (
                 // Each side opens alone; the current one, whose details show, is outlined.
                 <div className={classes.together}>
@@ -590,7 +636,12 @@ export function MediaViewer({
                 <>
                   {/* Phones swipe between items instead. */}
                   {canNavigate && !phone && (
-                    <Group className={classes.navigation} justify="space-between" wrap="nowrap">
+                    <Group
+                      className={classes.navigation}
+                      data-chrome
+                      justify="space-between"
+                      wrap="nowrap"
+                    >
                       <Tooltip label="Previous Generation (←)">
                         <ActionIcon
                           aria-label="Previous Generation"
@@ -635,6 +686,7 @@ export function MediaViewer({
                       width={source.width}
                       height={source.height}
                       swipe={touchSwipe}
+                      onTap={toggleChrome}
                     />
                   ) : compare && item.upscale?.url ? (
                     <div className={classes.comparison}>
@@ -658,6 +710,7 @@ export function MediaViewer({
                         height={source.height}
                         swipe={swipe}
                         arrive={arrival?.id === item.id ? arrival.from : undefined}
+                        onTap={toggleChrome}
                       />
                     </Suspense>
                   )}
@@ -711,6 +764,7 @@ export function MediaViewer({
             <div className={classes.asideTrack} data-open={details || undefined}>
               <aside
                 className={classes.aside}
+                data-chrome
                 aria-label="Generation Details"
                 onClick={(event) => event.stopPropagation()}
               >
