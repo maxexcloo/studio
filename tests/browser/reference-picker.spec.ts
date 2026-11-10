@@ -278,3 +278,28 @@ test("An image shared to the installed app opens the composer with it as a refer
   await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
   await expect(page).toHaveURL(/\/images\?compose=1$/);
 });
+
+test("On touch screens, Paste reads a copied photo from the clipboard into the next slot", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Desktop pastes with its keys");
+  await page.addInitScript(() => {
+    const photo = new Blob(["fixture"], { type: "image/png" });
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        read: async () => [new ClipboardItem({ "text/plain": "caption", "image/png": photo })],
+      },
+    });
+  });
+  const state = await setup(page);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  await picker.getByRole("button", { name: "Paste Reference", exact: true }).click();
+  await expect(
+    picker
+      .getByRole("group", { name: "Reference Slots", exact: true })
+      .getByRole("button", { name: "Reference 1 · Start", exact: true }),
+  ).toBeVisible();
+  expect(state.gallery.find((item) => item.id === "upload")?.uploaded).toBe(true);
+});
