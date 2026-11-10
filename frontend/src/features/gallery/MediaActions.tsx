@@ -34,11 +34,10 @@ import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
-import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
+import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { useChatText } from "../sessions/ChatProvider";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
 import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
@@ -48,7 +47,6 @@ import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
-  mediaDraft,
   useAnimateReview,
   useMediaAction,
   useMediaIteration,
@@ -214,36 +212,8 @@ function useCharacterAction(item: MediaItem, onApplied: () => void): Action | nu
   };
 }
 
-/**
- * Continue in Chat: a new Chat about the result, with it attached as the reference and its settings
- * as the generation input, so the conversation can rework its prompt or edit the image. A `message`
- * (the change asked for in the viewer) starts the Chat's unsent message.
- */
-export function useChatAction(item: MediaItem, onApplied: () => void) {
-  const { setDraft, profiles } = useGenerationActions();
-  const client = useQueryClient();
-  const navigate = useNavigate();
-  const [, setText] = useChatText();
-  return useItemMutation(item.id, "chat", {
-    mutationFn: async (message?: string) => {
-      if (message) setText(message);
-      // Without a model that takes the image, the Chat still starts from its settings.
-      const { draft } = await mediaDraft(item, "refine", profiles, client).catch(() =>
-        mediaDraft(item, "image", profiles, client),
-      );
-      setDraft(
-        { ...draft, sessionId: "", parentJobId: undefined, parentItemId: undefined },
-        "chat",
-      );
-      onApplied();
-      navigate("/chat");
-    },
-  });
-}
-
 interface MediaActionOptions {
   transfer: MediaTransferActions;
-  sessionId?: string;
   /** Action and option IDs a surface leaves out. */
   omit?: string[];
   compare?: boolean;
@@ -260,14 +230,13 @@ interface MediaActionOptions {
 }
 
 /**
- * The one media action definition for the viewer bar, tile, context and Chat result menus: labels,
+ * The one media action definition for the viewer bar, tile and context menus: labels,
  * sections, order, options and availability.
  */
 export function useMediaActions(
   item: MediaItem,
   {
     transfer,
-    sessionId,
     omit = [],
     compare,
     iterate,
@@ -280,8 +249,8 @@ export function useMediaActions(
     onVersionChange,
   }: MediaActionOptions,
 ): ActionGroups {
-  const action = useMediaAction(item, sessionId, onApplied);
-  const iteration = useMediaIteration(item, sessionId);
+  const action = useMediaAction(item, onApplied);
+  const iteration = useMediaIteration(item);
   const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
   // Runs from the item, also the viewer's own, share its pending state.
   const running = iteration.variables?.kind;
@@ -312,9 +281,7 @@ export function useMediaActions(
     onClick: () =>
       videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(`${item.id}:${kind}`) }),
   });
-  const chat = useChatAction(item, onApplied);
   const navigate = useNavigate();
-  const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
   const gif = ready ? videoExport(item, "gif") : null;
@@ -455,13 +422,6 @@ export function useMediaActions(
           ],
           [...(reference ? [reference] : []), saveFrame],
         ],
-      }),
-    ready &&
-      chatOn &&
-      itemAction("chat", {
-        loading: chat.isPending,
-        disabled: chat.isPending,
-        onClick: () => chat.mutate(),
       }),
     // Edit changes the item itself first, then reuses its prompt and settings: in the composer, or
     // run again from here. An upload has only its suggested prompt; unfinished work opens its prompt.

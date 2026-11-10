@@ -388,18 +388,9 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   });
   expect(state.jobs[1].input.inpaint).toBeUndefined();
   expect(state.jobs[1].sessionId).toBe(state.jobs[0].sessionId);
-  await page.goto(`/chat/${state.jobs[0].sessionId}`);
-  const original = page.getByRole("article", { name: "Iteration 1", exact: true });
-  await original.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
-  const cardRole = original.getByRole("group", { name: "Reference Role", exact: true });
-  await expect(cardRole.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(cardRole.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
 });
 
-test("LoRA trigger words toggle and published source links work in gallery and timeline editors", async ({
+test("LoRA trigger words toggle and published source links work in the gallery editor", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -456,15 +447,6 @@ test("LoRA trigger words toggle and published source links work in gallery and t
   expect(state.jobs[0].input.loras).toEqual([
     { name: "detail.safetensors", strength: 0.7, enabled: true, triggers: false },
   ]);
-  await page.goto(`/chat/${state.jobs[0].sessionId}`);
-  await page.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(inkbird).not.toBeChecked();
-  await triggers.getByText("inkbird", { exact: true }).click();
-  await expect(inkbird).toBeChecked();
-  await expect(source).toHaveAttribute("href", sourceUrl);
-  expect(state.jobs).toHaveLength(1);
-  expect(state.chatRequests).toHaveLength(0);
 });
 
 test("Generation actions stay in place while the prompt grows and pickers open", async ({

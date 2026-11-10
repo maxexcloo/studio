@@ -18,7 +18,7 @@ import {
 } from "./writing-standard.ts";
 import { maxPromptCharacters } from "../../shared/queue.ts";
 
-type SuggestionSurface = "composer" | "viewer" | "chat" | "change" | "draft";
+type SuggestionSurface = "composer" | "viewer" | "change" | "draft";
 // The viewer's next steps may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
@@ -63,7 +63,7 @@ interface Router {
   post(path: string, handler: (req: Request, res: Response) => unknown): unknown;
 }
 
-const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "chat", "change", "draft"]);
+const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const maxIdea = 160;
@@ -154,7 +154,7 @@ function describeItem(item: SuggestionItem) {
 /**
  * Short, taste-led suggestions from the text model: prompt ideas for an empty composer, next-step
  * chips for a finished image in the viewer (from its prompt, settings, caption and, where the
- * running text model reads images, the image itself), a paragraph of taste context for Chat, and the action
+ * running text model reads images, the image itself), and the action
  * and prompt for a change asked for in plain words to a finished result (`change`) or to the
  * composer's draft (`draft`), never cached or saved; a `draft` without a request gets change ideas
  * for its prompt, as an image gets next steps. Answers are
@@ -262,12 +262,6 @@ export function createSuggestions({
         data,
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>", "prompt": "<the rewritten prompt>"}]}.',
       ],
-      chat: [
-        "You brief a media studio's chat assistant on one person's taste.",
-        "Condense their taste profile and the prompts they liked into one plain paragraph of at most 500 characters: the subjects, styles, lighting, colour and models they favour.",
-        data,
-        "Reply with the paragraph only, without headings, lists or Markdown.",
-      ],
     }[surface]
       .filter(Boolean)
       .join("\n");
@@ -280,7 +274,7 @@ export function createSuggestions({
           { role: "system", content: system },
           { role: "user", content: userContent(context, image ? [image] : [], true) },
         ],
-        temperature: surface === "chat" ? 0.3 : 0.9,
+        temperature: 0.9,
         timeout: 45_000,
         signal,
       }));
@@ -288,12 +282,6 @@ export function createSuggestions({
       return empty(
         `The text model couldn’t suggest anything (${(error as { reason?: string }).reason || "unreachable"}).`,
       );
-    }
-    if (surface === "chat") {
-      const paragraph = fit(clean(text), 600);
-      return paragraph
-        ? { suggestions: [paragraph] }
-        : empty("The text model’s reply was unusable.");
     }
     const reply = json(text);
     if (surface === "composer") {
@@ -479,8 +467,7 @@ export function createSuggestions({
       },
     ): Promise<Suggestions<string | NextStep | Change>> {
       const surface = body.surface as SuggestionSurface;
-      if (!surfaces.has(surface))
-        throw failure("Choose composer, viewer, chat, change or draft.", 400);
+      if (!surfaces.has(surface)) throw failure("Choose composer, viewer, change or draft.", 400);
       if (
         body.prompt !== undefined &&
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
@@ -553,7 +540,7 @@ export function createSuggestions({
       const kind = drafted ? (body.kind as "image" | "video") : "image";
       const prompt = drafted ? clean(body.prompt, maxPromptCharacters) : "";
       if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
-      if ((surface === "composer" || surface === "chat") && !known)
+      if (surface === "composer" && !known)
         return empty("Star a few results so Studio learns your taste.");
       const key = JSON.stringify([ownerId, surface, kind, prompt, body.jobId ?? "", spicy]);
       const cached = cache.get(key);

@@ -11,7 +11,6 @@ import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
-import { FromChat } from "./FromChat";
 import { MediaTile } from "./MediaTile";
 import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 import classes from "./RunsView.module.css";
@@ -47,7 +46,7 @@ function groupRuns(items: MediaItem[]) {
 const runTitle = (run: Run) => run.items[0].resultSet?.title || mediaTitle(run.items[0]);
 const countLabel = (run: Run) =>
   `${run.items.length} ${run.items[0].type === "video" ? "Videos" : "Images"}`;
-/** Where an MCP set came from ("from Chat"), for its stack's caption. */
+/** Where an MCP set came from ("from LibreChat"), for its stack's caption. */
 const fromLabel = (run: Run) =>
   run.items[0].resultSet?.source ? `from ${run.items[0].resultSet.source}` : "";
 
@@ -420,10 +419,9 @@ function RunPanel({
           <Text fw={600} truncate>
             {title}
           </Text>
-          <Group gap="xs" c="dimmed" fz="xs" wrap="wrap" style={{ rowGap: 0 }}>
-            <span>{[countLabel(run), detail(run.items[0])].join(" · ")}</span>
-            <FromChat item={run.items[0]} />
-          </Group>
+          <Text c="dimmed" fz="xs">
+            {[countLabel(run), detail(run.items[0])].join(" · ")}
+          </Text>
         </Stack>
         <Group gap={4} wrap="nowrap">
           <Tooltip label={selectLabel}>

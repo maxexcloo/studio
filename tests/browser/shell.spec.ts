@@ -7,14 +7,24 @@ test("A click outside an open popup only closes it", async ({ page }) => {
   await openTheme(page);
   const theme = page.getByText("Colour Scheme", { exact: true });
   await expect(theme).toBeVisible();
-  const chat = page
+  const videos = page
     .getByRole("navigation", { name: "Creative Modes" })
-    .getByRole("link", { name: "Chat" });
-  await chat.click();
+    .getByRole("link", { name: "Videos" });
+  await videos.click();
   await expect(theme).toHaveCount(0);
   await expect(page).toHaveURL(/\/images$/);
-  await chat.click();
-  await expect(page).toHaveURL(/\/chat$/);
+  await videos.click();
+  await expect(page).toHaveURL(/\/video$/);
+});
+
+test("Chat opens the deployment's chat site in a new tab", async ({ page }) => {
+  await fixtures(page);
+  await page.goto("/images");
+  const chat = page
+    .getByRole("navigation", { name: "Creative Modes" })
+    .getByRole("link", { name: "Chat", exact: true });
+  await expect(chat).toHaveAttribute("href", "https://chat.example.test");
+  await expect(chat).toHaveAttribute("target", "_blank");
 });
 
 test("Popups anchored to the composer stay put while the gallery scrolls", async ({ page }) => {

@@ -175,7 +175,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     if (job) finish(ownerId, job.id);
     return job;
   };
-  /** Gallery records of jobs Studio ran for their owner, as the composer, Chat or MCP make them. */
+  /** Gallery records of jobs Studio ran for their owner, as the composer or MCP make them. */
   const generated = (...items: DreamItem[]) => {
     for (const item of items) {
       const ownerId = String(item.ownerId);
@@ -263,9 +263,8 @@ test("Dream is off until turned on, queues one hidden job per account only while
     prompt: "dream 1",
     why: "You star foxes.",
   });
-  // Its session is Dream's own and never listed as a Chat.
-  assert.equal(store.session("alice", job.sessionId)?.hidden, true);
-  assert.equal(store.sessions("alice").length, 0);
+  // Its session is Dream's own.
+  assert.equal(store.session("alice", job.sessionId)?.title, "Dream");
   assert.equal(dream.status("alice").status, "generating");
   // One Dream job per account: Alice gets no second one, but Bob gets his own.
   await dream.tick();
@@ -315,7 +314,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
     ),
     [[job.id, true]],
   );
-  assert.deepEqual((await (await fetch(`${base}/api/sessions`)).json()).sessions, []);
   for (let index = 0; index < 10; index++)
     assert.equal(
       (await admission({ prompt: `p${index}` }, { userId: "alice", role: "user" })).status,
@@ -590,7 +588,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal(variation.dream, undefined);
   assert.equal(variation.input.count, 3);
   assert.equal(variation.input.prompt, "dream 3");
-  assert.equal(store.session("alice", variation.sessionId)?.hidden, undefined);
+  assert.notEqual(variation.sessionId, store.job("alice", job.id)?.sessionId);
   assert.equal((await request("")).body.unseen.length, 0);
   // A gone or disabled account's Dream is closed.
   state.access.alice = null;

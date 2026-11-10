@@ -1,12 +1,10 @@
-// Studio MCP at /mcp: authentication, a server per request with the actor's tools, the result, upload and export links, and Studio Chat's in-process agent.
+// Studio MCP at /mcp: authentication, a server per request with the actor's tools, and the result, upload and export links.
 import crypto from "node:crypto";
 import path from "node:path";
 import { Readable } from "node:stream";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { maxJobsPerCall } from "./controls.js";
@@ -98,7 +96,7 @@ export function registerMcpRoutes(
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
-  // Without a key or accounts nothing is served at /mcp, but Studio Chat still runs the tools in process.
+  // Without a key or accounts nothing is served at /mcp.
   const served = Boolean(mediaKey || controlKey || accountMode);
   if (controlKey && (!runtime || equal(controlKey, mediaKey)))
     throw new Error(
@@ -157,10 +155,8 @@ export function registerMcpRoutes(
   // The name each MCP session's client gave on initialize (LibreChat, a Grok connector), so its
   // result sets say where they came from; a session another replica began reads as plain MCP.
   const clientNames = new Map();
-  // Studio Chat's in-process client numbers its requests from 0 like any other, so its session
-  // keeps a LibreChat cancel from reaching its calls, and the reverse.
   const inflightKey = (actor, requestId) =>
-    JSON.stringify([actor.scope, actor.owner, actor.session || "", String(requestId)]);
+    JSON.stringify([actor.scope, actor.owner, String(requestId)]);
   const guard = (req, res, next) => {
     res.set("Cache-Control", "private, no-store");
     if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
@@ -570,40 +566,5 @@ export function registerMcpRoutes(
       res.status(404).json({ error: "The result link is invalid, unavailable or expired." });
     }
   });
-  /**
-   * Studio Chat's agent for one chat: the same server, instructions and tools an MCP client gets,
-   * connected in process. Its work joins the chat (`session`), the chat's earlier results get refs
-   * ("result 1") in order and its references become the owner's, so tools can use them.
-   */
-  async function agent({ owner, account, session, jobs = [], assets = [] }) {
-    if (account) media.credentials.set(owner, { internal: true });
-    const conversation = `studio-chat:${session}`;
-    const refs = media.referenceScope(owner, conversation);
-    media.adopt(owner, refs, { jobs, assets });
-    const server = create({
-      scope: "media",
-      owner,
-      conversation,
-      refs,
-      session,
-      assistant: assistantFor(account),
-      // As for a chat gateway's linked account: administrators while Chat Gateway Admin Tools is on.
-      admin: adminScope({ account, gateway: true, gatewayAdminTools }),
-    });
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: "Studio Chat", version: "1.0.0" });
-    await server.connect(serverSide);
-    await client.connect(clientSide);
-    const { tools } = await client.listTools();
-    return {
-      instructions: client.getInstructions() || "",
-      tools,
-      refOf: (jobId) => media.refOf(owner, refs, jobId),
-      // Prompt writing and Studio's estimate run inside a call, so it may take minutes.
-      call: (name, args, signal) =>
-        client.callTool({ name, arguments: args }, undefined, { signal, timeout: 10 * 60_000 }),
-      close: () => client.close(),
-    };
-  }
-  return { agent, endWaits: () => media.endWaits() };
+  return { endWaits: () => media.endWaits() };
 }

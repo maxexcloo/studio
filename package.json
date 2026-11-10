@@ -44,7 +44,6 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-markdown": "latest",
     "react-router": "latest",
     "react-zoom-pan-pinch": "latest",
     "typescript": "^7.0.0",

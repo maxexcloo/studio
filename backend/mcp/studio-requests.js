@@ -64,7 +64,7 @@ export async function resolveSignedMcpResult(owner, jobId, index) {
  * (multi-user-auth.js mcpAccount). Generation is admitted with MCP's own queue priority; `admit` is
  * domain/admission.ts's.
  */
-export function createMcpDomainRequest({ app, admit, store }) {
+export function createMcpDomainRequest({ app, admit }) {
   return async (method, route, input, owner, credential, signal) => {
     const url = new URL(route, "http://localhost");
     const routePath = url.pathname;
@@ -83,8 +83,7 @@ export function createMcpDomainRequest({ app, admit, store }) {
         : JSON.parse(JSON.stringify(input));
     try {
       if (method === "GET" && routePath === "/comfy/view") return await comfyView(account, query);
-      if (method === "POST" && routePath === "/api/generate")
-        return await generate(body, account, owner);
+      if (method === "POST" && routePath === "/api/generate") return await generate(body, account);
       const found = findDirectRoute(app, method, routePath);
       if (!found) throw new Error(`Studio has no route ${method} ${routePath}.`);
       return await found.run(account, { params: found.params, query, body, stop: signal });
@@ -95,27 +94,7 @@ export function createMcpDomainRequest({ app, admit, store }) {
     }
   };
 
-  function generate({ queueSet, studioSession, ...body }, account, owner) {
-    // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
-    if (studioSession) {
-      const parent = studioSession.parent && store.job(owner, studioSession.parent);
-      const parentJobId = parent?.sessionId === studioSession.id ? parent.id : undefined;
-      return admit(
-        body,
-        account,
-        {
-          sessionId: studioSession.id,
-          operation:
-            body.kind === "video"
-              ? "animate"
-              : parentJobId && body.referenceAssets?.length
-                ? "refine"
-                : "image",
-          parentJobId,
-        },
-        { priority: queuePriority.manual, queueSet },
-      );
-    }
+  function generate({ queueSet, ...body }, account) {
     // External chat work queues after manual Studio requests; its set keeps it together once started.
     return admit(body, account, undefined, { priority: queuePriority.mcp, queueSet });
   }

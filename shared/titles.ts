@@ -1,4 +1,4 @@
-/** Short titles the text model writes for chats and gallery items, and the stand-in until it has. */
+/** Short titles the text model writes for gallery items, and the stand-in until it has. */
 
 const capitalised = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : "");
 

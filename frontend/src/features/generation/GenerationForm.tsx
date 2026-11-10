@@ -24,22 +24,17 @@ import classes from "./ComposerDock.module.css";
 
 /**
  * Queues the composer's draft. `prompt` runs a prompt the draft hasn't caught up with yet (a
- * viewer next step); an `embedded` composer stays on its surface rather than opening the Chat.
- * Forms show the error inline; elsewhere (`inlineError` false) it is the default notification.
+ * viewer next step). Forms show the error inline; elsewhere (`inlineError` false) it is the default notification.
  */
 function useDraftSubmit({
   onSubmitted,
-  embedded = false,
   inlineError = true,
 }: {
   onSubmitted?: (jobId: string) => void;
-  embedded?: boolean;
   inlineError?: boolean;
 }) {
   const { draft, setDraft, input, profile, models } = useGeneration();
   const client = useQueryClient();
-  const navigate = useNavigate();
-  const location = useLocation();
   return useMutation({
     meta: { inlineError },
     mutationFn: async (staged?: { prompt: string }) => {
@@ -65,10 +60,10 @@ function useDraftSubmit({
         client.setQueryData(queueQuery.queryKey, (queue) =>
           queue ? { ...queue, jobs: [...queue.jobs, job] } : queue,
         );
-      return { sessionId, jobId };
+      return jobId;
     },
     // The pending tile is the confirmation: refresh the gallery now instead of waiting for its poll.
-    onSuccess: ({ sessionId, jobId }) => {
+    onSuccess: (jobId) => {
       // A default that gave way to the other side from the account's preference says so.
       const note =
         profile &&
@@ -77,11 +72,7 @@ function useDraftSubmit({
       if (note) notifications.show({ message: note });
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
-      void client.invalidateQueries({ queryKey: ["sessions"] });
-      void client.invalidateQueries({ queryKey: ["session", sessionId] });
       onSubmitted?.(jobId);
-      if (!embedded && !["/images", "/video"].includes(location.pathname))
-        navigate(`/chat/${sessionId}`);
     },
   });
 }

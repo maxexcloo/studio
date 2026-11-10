@@ -16,7 +16,6 @@ const { Store } = await import("../domain/store.ts");
 test("exact job results exclude unrelated and deleted outputs and expose prompts only on request", async (t) => {
   const app = express();
   registerGalleryReadRoutes(app, {
-    jobChats: () => new Map(),
     store: new Store(openDatabase(":memory:")),
   });
   const server = app.listen(0, "127.0.0.1");

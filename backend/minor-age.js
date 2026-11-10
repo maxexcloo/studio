@@ -1,5 +1,5 @@
 // Studio makes no image or video of anyone under 18: a prompt that states such an age is refused on
-// every path (composer, Chat, MCP, Dream, written prompts), before it reaches a model.
+// every path (composer, MCP, Dream, written prompts), before it reaches a model.
 const under18 = [
   "one",
   "two",

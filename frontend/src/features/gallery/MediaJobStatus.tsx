@@ -1,6 +1,5 @@
 import { Alert, Button, Group, Loader, Progress, Stack, Text } from "@mantine/core";
 import { useState } from "react";
-import { Link } from "react-router";
 import type { MediaItem } from "../../types";
 import { useTryAgain } from "./useTryAgain";
 import { progressPercent, QueueJobAction, statusLabels, useQueue } from "../generation/Queue";
@@ -112,9 +111,6 @@ export function MediaJobStatus({
           ) : (
             <QueueJobAction job={job} />
           )}
-          <Button component={Link} to={`/chat/${job.sessionId}`} variant="subtle" size="compact-sm">
-            Open Chat
-          </Button>
         </Group>
       )}
     </Stack>

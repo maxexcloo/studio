@@ -3,7 +3,7 @@
  *
  * The file is copied to `<data>/backups/profile-removals/<time>/<id>.json` and recorded as the
  * profile's last version, so its history stays and a seed never brings the id back; then the file
- * and its guide binding and negatives go. Gallery records, presets, jobs and Chats keep the id and
+ * and its guide binding and negatives go. Gallery records, presets and jobs keep the id and
  * report the profile as missing; restoring means saving the backed-up file as a new profile.
  */
 import fs from "node:fs";

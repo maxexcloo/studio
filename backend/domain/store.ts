@@ -21,7 +21,7 @@ export interface QueueOrigin {
   dream?: DreamOrigin;
 }
 /**
- * `cleared` takes a failed job out of the queue panel; its chat card and record stay. `dream` is
+ * `cleared` takes a failed job out of the queue panel; its record stays. `dream` is
  * the Dream origin here; `publicJob` shows only that the job is Dream's.
  */
 export type OwnedJob = Omit<QueueJob, "dream"> &
@@ -84,19 +84,15 @@ export class Store {
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
-      CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS studio_chat_messages (
-        id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES studio_sessions(id), record TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS studio_chat_session ON studio_chat_messages(owner_id, session_id);`);
+      CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);`);
   }
 
-  /** A `hidden` session (Dream's own) holds jobs but is never listed as a Chat. */
+  /** A session holds the jobs of one request or run of requests, such as an MCP conversation's. */
   createSession(
     ownerId: string,
-    title = "New Chat",
+    title = "",
     inputs: GenerationInput = {},
-    marks: Pick<StudioSession, "hidden" | "mcp"> = {},
+    marks: Pick<StudioSession, "mcp"> = {},
   ): StudioSession {
     const stamp = now();
     const session: StudioSession = {
@@ -113,21 +109,21 @@ export class Store {
     return session;
   }
 
-  /** The MCP Chat of a client's conversation, made on its first generation; without one, a new Chat. */
+  /** The session of an MCP client's conversation, made on its first generation; without one, a new session. */
   mcpSession(
     ownerId: string,
     title: string,
     inputs: GenerationInput,
     conversationId = "",
   ): StudioSession {
-    if (!conversationId) return this.createSession(ownerId, title, inputs, { mcp: {} });
+    if (!conversationId) return this.createSession(ownerId, title, inputs);
     const row = this.db
       .prepare(
         "SELECT record FROM studio_sessions WHERE owner_id = ? AND json_extract(record, '$.mcp.conversationId') = ?",
       )
       .get(ownerId, conversationId);
     if (row) return JSON.parse(row.record as string);
-    // Before a conversation kept one Chat, each MCP job had its own; the conversation goes on in its first.
+    // Before a conversation kept one session, each MCP job had its own; the conversation goes on in its first.
     const first = this.db
       .prepare(
         "SELECT session_id FROM studio_queue WHERE owner_id = ? AND json_extract(record, '$.input.chat.conversationId') = ? ORDER BY created_at, rowid LIMIT 1",
@@ -142,103 +138,11 @@ export class Store {
     return session;
   }
 
-  /** The owner's Chats, newest first; a `query` keeps those whose title or a message contains it. */
-  sessions(ownerId: string, query = ""): StudioSession[] {
-    const pattern = query ? `%${query.replace(/[\\%_]/g, "\\$&")}%` : null;
-    return this.db
-      .prepare(
-        `SELECT record FROM studio_sessions AS chat WHERE owner_id = ?1 AND (?2 IS NULL
-          OR json_extract(record, '$.title') LIKE ?2 ESCAPE '\\'
-          OR EXISTS (SELECT 1 FROM studio_chat_messages AS message
-            WHERE message.owner_id = ?1 AND message.session_id = chat.id
-              AND json_extract(message.record, '$.content') LIKE ?2 ESCAPE '\\'))
-        ORDER BY updated_at DESC`,
-      )
-      .all(ownerId, pattern)
-      .map((row) => JSON.parse(row.record as string) as StudioSession)
-      .filter((session) => !session.hidden);
-  }
-
-  /** Archives or unarchives the owner's Chats without reordering them; returns the IDs it found. */
-  archiveSessions(ownerId: string, ids: string[], archived: boolean): string[] {
-    const update = this.db.prepare(
-      `UPDATE studio_sessions SET record = ${archived ? "json_set(record, '$.archived', json('true'))" : "json_remove(record, '$.archived')"}
-        WHERE id = ? AND owner_id = ? AND json_extract(record, '$.hidden') IS NULL`,
-    );
-    return [...new Set(ids)].filter((id) => update.run(id, ownerId).changes > 0);
-  }
-
   session(ownerId: string, id: string): StudioSession | undefined {
     const row = this.db
       .prepare("SELECT record FROM studio_sessions WHERE id = ? AND owner_id = ?")
       .get(id, ownerId);
     return row ? JSON.parse(row.record as string) : undefined;
-  }
-
-  updateSession(
-    ownerId: string,
-    id: string,
-    patch: { title?: string; inputs?: GenerationInput },
-  ): StudioSession | undefined {
-    const session = this.session(ownerId, id);
-    if (!session) return;
-    // A title set here is the user's rename; generated titles never replace it.
-    const next = {
-      ...session,
-      ...patch,
-      ...(patch.title === undefined ? {} : { titleSource: "user" as const }),
-      updatedAt: now(),
-    };
-    this.db
-      .prepare(
-        "UPDATE studio_sessions SET record = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
-      )
-      .run(JSON.stringify(next), next.updatedAt, id, ownerId);
-    return next;
-  }
-
-  /** Work that must finish or be cancelled before the chat can be deleted. */
-  sessionActivity(ownerId: string, id: string): "active-jobs" | "active-chat" | undefined {
-    const row = this.db
-      .prepare(
-        `SELECT (SELECT COUNT(*) FROM studio_queue WHERE owner_id = ?1 AND session_id = ?2 AND status NOT IN ('completed', 'failed', 'cancelled')) AS jobs,
-          (SELECT COUNT(*) FROM studio_chat_messages WHERE owner_id = ?1 AND session_id = ?2 AND json_extract(record, '$.status') = 'streaming') AS chat`,
-      )
-      .get(ownerId, id)!;
-    return Number(row.jobs) ? "active-jobs" : Number(row.chat) ? "active-chat" : undefined;
-  }
-
-  /** Removes a chat with its messages and job records; its results stay in the gallery. */
-  deleteSession(
-    ownerId: string,
-    id: string,
-  ): "deleted" | "missing" | "active-jobs" | "active-chat" {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      let outcome: ReturnType<Store["deleteSession"]> = "deleted";
-      const activity = this.sessionActivity(ownerId, id);
-      if (!this.session(ownerId, id)) outcome = "missing";
-      else if (activity) outcome = activity;
-      else {
-        this.db
-          .prepare(
-            "DELETE FROM studio_provider_jobs WHERE id IN (SELECT id FROM studio_queue WHERE owner_id = ? AND session_id = ?)",
-          )
-          .run(ownerId, id);
-        for (const table of ["studio_queue", "studio_chat_messages"])
-          this.db
-            .prepare(`DELETE FROM ${table} WHERE owner_id = ? AND session_id = ?`)
-            .run(ownerId, id);
-        this.db
-          .prepare("DELETE FROM studio_sessions WHERE id = ? AND owner_id = ?")
-          .run(id, ownerId);
-      }
-      this.db.exec("COMMIT");
-      return outcome;
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
   }
 
   enqueue(
@@ -257,8 +161,8 @@ export class Store {
   }
 
   /**
-   * Queues the copies of one request in one transaction. `session` creates or finds their Chat
-   * inside it, so a failed insert (a requested ID already in use) leaves neither Chat nor copies.
+   * Queues the copies of one request in one transaction. `session` creates or finds their session
+   * inside it, so a failed insert (a requested ID already in use) leaves neither session nor copies.
    */
   enqueueAll(ownerId: string, session: () => string, copies: QueuedCopy[]): OwnedJob[] {
     this.db.exec("BEGIN IMMEDIATE");
@@ -305,8 +209,6 @@ export class Store {
           return job;
         },
       );
-      const [{ input, operation }] = copies;
-      this.updateSession(ownerId, sessionId, operation === "upscale" ? {} : { inputs: input });
       this.db.exec("COMMIT");
       return jobs;
     } catch (error) {

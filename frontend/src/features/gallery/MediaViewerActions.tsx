@@ -36,7 +36,6 @@ export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "la
 /** The viewer's action bar: the prompt field above the shared item actions. */
 export function MediaViewerActions({
   item,
-  sessionId,
   compare,
   iterate,
   pending,
@@ -50,7 +49,6 @@ export function MediaViewerActions({
   promptHidden,
 }: {
   item: MediaItem;
-  sessionId?: string;
   compare: boolean;
   iterate: (iteration: Iteration) => void;
   /** The run being queued from this item. */
@@ -73,7 +71,6 @@ export function MediaViewerActions({
   const [trimming, setTrimming] = useState(false);
   const groups = useMediaActions(item, {
     transfer,
-    sessionId,
     compare,
     iterate,
     onApplied,
@@ -103,23 +100,17 @@ export function MediaViewerActions({
             groups={groups}
             iterate={iterate}
             pending={pending}
-            onApplied={onApplied}
           />
         </Box>
       )}
       {phone ? (
         <ActionBarGroups groups={withMore(groups, phoneBar)} />
       ) : (
-        <ViewerActionGroups
-          // Desktop's prompt field carries Continue in Chat.
-          groups={groups.map((group) => group.filter((action) => action.id !== "chat"))}
-          labelled={labelled}
-        />
+        <ViewerActionGroups groups={groups} labelled={labelled} />
       )}
       {animating && (
         <AnimateDialog
           item={item}
-          sessionId={sessionId}
           iterate={iterate}
           theme={animating}
           onClose={() => setAnimating(null)}

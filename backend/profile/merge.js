@@ -15,7 +15,7 @@
  * `<data>/backups/profile-merges/<time>/`, records each removed id as an alias of the kept one
  * (profile/store.js), then removes the removed files. Version history stays, so a seed never brings
  * a merged id back. Workflow preferences and LoRA stacks move to the kept id and the removed ids'
- * guide bindings go (the kept one has the same); gallery records, presets, jobs, Chats and taste
+ * guide bindings go (the kept one has the same); gallery records, presets, jobs and taste
  * signals keep the ids they hold, and readers resolve them through the aliases.
  */
 import fs from "node:fs";

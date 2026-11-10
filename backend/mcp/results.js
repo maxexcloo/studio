@@ -229,43 +229,40 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     },
     { destructiveHint: true },
   );
-  // Studio Chat attaches its references itself; a model cannot send an image's bytes.
-  if (!actor.session) {
-    tool(
-      server,
-      "upload",
-      "upload reference",
-      `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for generate.`,
-      {
-        // Left unbounded below so an empty file gets upload's own advice, not a schema refusal.
-        content_base64: z.string().max(maxUploadBase64),
-        filename: z.string().default("reference.png"),
-      },
-      async ({ content_base64, filename }) =>
-        mcpJson(await media.upload(owner, content_base64, filename)),
-    );
-    tool(
-      server,
-      "upload_link",
-      "upload link",
-      "A one-time page where the user uploads an image attached in chat, with its reference_asset_id.",
-      {},
-      async () => {
-        const { url, expires, reference } = media.uploadUrl(owner);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Ask the user to open this link and upload the photo they attached. Once they have, pass ${reference} to generate in reference_asset_ids. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
-            },
-          ],
-          structuredContent: {
-            link: url,
-            reference_asset_id: reference,
-            expires_at: new Date(expires).toISOString(),
+  tool(
+    server,
+    "upload",
+    "upload reference",
+    `Upload a PNG, JPEG or WebP reference image (base64, at most ${maxUploadMegabytes} MB) for generate.`,
+    {
+      // Left unbounded below so an empty file gets upload's own advice, not a schema refusal.
+      content_base64: z.string().max(maxUploadBase64),
+      filename: z.string().default("reference.png"),
+    },
+    async ({ content_base64, filename }) =>
+      mcpJson(await media.upload(owner, content_base64, filename)),
+  );
+  tool(
+    server,
+    "upload_link",
+    "upload link",
+    "A one-time page where the user uploads an image attached in chat, with its reference_asset_id.",
+    {},
+    async () => {
+      const { url, expires, reference } = media.uploadUrl(owner);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Ask the user to open this link and upload the photo they attached. Once they have, pass ${reference} to generate in reference_asset_ids. It works once, for ${uploadLinkMinutes} minutes.\n\n[Upload Photo](${url})`,
           },
-        };
-      },
-    );
-  }
+        ],
+        structuredContent: {
+          link: url,
+          reference_asset_id: reference,
+          expires_at: new Date(expires).toISOString(),
+        },
+      };
+    },
+  );
 }

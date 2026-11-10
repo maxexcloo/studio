@@ -32,7 +32,6 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { FromChat } from "./FromChat";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { setMembers, setPosition } from "./resultSets";
@@ -241,7 +240,6 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
 export function MediaViewer({
   item,
   close,
-  sessionId,
   items = [item],
   related = items,
   navigate,
@@ -252,7 +250,6 @@ export function MediaViewer({
 }: {
   item: MediaItem;
   close: () => void;
-  sessionId?: string;
   items?: MediaItem[];
   /** The loaded items the version strip and Details › From and Derived look among; `items` by default. */
   related?: MediaItem[];
@@ -345,7 +342,7 @@ export function MediaViewer({
   const family = useRunFamily(item, queued, related);
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
-  const iteration = useMediaIteration(item, sessionId);
+  const iteration = useMediaIteration(item);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
   const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
@@ -395,12 +392,6 @@ export function MediaViewer({
   ]
     .filter(Boolean)
     .join(" · ");
-  // The Chat that made it, unless the viewer opened from that Chat.
-  const fromChat = item.sessionId !== sessionId && (
-    <Text size="xs" c="dimmed">
-      <FromChat item={item} />
-    </Text>
-  );
   const toggleDetails = () => {
     setChromeHidden(false);
     if (phone) setSheet(true);
@@ -763,7 +754,6 @@ export function MediaViewer({
                 ) : (
                   <MediaViewerActions
                     item={displayed}
-                    sessionId={sessionId}
                     compare={compare}
                     iterate={iterate}
                     pending={pending}
@@ -801,7 +791,6 @@ export function MediaViewer({
                       <Text size="xs" c="dimmed">
                         {subtitle}
                       </Text>
-                      {fromChat}
                     </Stack>
                     <MediaDetails
                       item={displayed}
@@ -843,7 +832,6 @@ export function MediaViewer({
                 <Text size="xs" c="dimmed">
                   {subtitle}
                 </Text>
-                {fromChat}
               </Stack>
               <MediaDetails
                 item={displayed}

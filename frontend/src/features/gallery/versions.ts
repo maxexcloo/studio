@@ -12,7 +12,7 @@ const results = (job?: QueueJob) => (job?.items?.length ? job.items : job?.outpu
 
 /**
  * The source a job's run was made from, and whether the run is one of its versions: compared with
- * the parent run, or for a run made outside its source's Chat with the source itself (`known`).
+ * the parent run, or for a run made outside its source's session with the source itself (`known`).
  */
 export function derivation(
   job: QueueJob | undefined,

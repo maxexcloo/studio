@@ -8,7 +8,7 @@ export function EmptyState({
   fill = false,
 }: {
   children: ReactNode;
-  /** A button beneath the line, such as New Chat. */
+  /** A button beneath the line, such as New Character. */
   action?: ReactNode;
   /** Takes the place its container gives it, with no minimum height of its own. */
   fill?: boolean;
