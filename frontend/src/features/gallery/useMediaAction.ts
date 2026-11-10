@@ -223,11 +223,12 @@ export function useMediaAction(item: MediaItem, prepared?: () => void) {
   });
 }
 
+/** Animate's themes in menu order: alphabetical, with Custom last. */
 export const animateThemes = {
-  cinematic: "Cinematic Camera",
-  living: "Living Photo",
   action: "Action",
+  cinematic: "Cinematic Camera",
   dialogue: "Dialogue",
+  living: "Living Photo",
   spicy: "Spicy",
   custom: "Custom",
 } as const;
