@@ -33,8 +33,14 @@ function fixture(
   {
     automaticLifecycle = false,
     parkIdleAfterMs = 0,
+    idleWorkload,
     store,
-  }: { automaticLifecycle?: boolean; parkIdleAfterMs?: number; store?: RuntimeStore } = {},
+  }: {
+    automaticLifecycle?: boolean;
+    parkIdleAfterMs?: number;
+    idleWorkload?: string;
+    store?: RuntimeStore;
+  } = {},
 ) {
   const kube = fakeKubernetes(
     workloads.map((item) => ({
@@ -62,6 +68,7 @@ function fixture(
     controller.configure({
       automatic: automaticLifecycle,
       parkIdleMinutes: parkIdleAfterMs / 60_000,
+      idleWorkload,
     });
   return { kube, controller, advance: (ms: number) => void (clock += ms) };
 }
@@ -246,7 +253,10 @@ test("automatic control never stops or starts text; an administrator's apply can
     status: 503,
     message: "Waiting for a GPU: Text is running; stop it in Settings › Workers.",
   });
-  await assert.rejects(controller.acquire("gaming"), /automatic control never starts text/);
+  await assert.rejects(
+    controller.acquire("gaming"),
+    /automatic control doesn’t start text for queued work/,
+  );
   assert.deepEqual(kube.log, []);
   assert.deepEqual((await controller.observe()).history, []);
   const preview = await controller.preview(["video-tp2"]);
@@ -355,19 +365,19 @@ test("automatic control parks media idle for its set time, never text or busy wo
     parkIdleAfterMs: 15 * 60_000,
   });
   // First seen running counts as used then.
-  await controller.parkIdle();
+  await controller.settleIdle();
   advance(10 * 60_000);
-  await controller.parkIdle();
+  await controller.settleIdle();
   await controller.settled;
   assert.deepEqual(kube.log, []);
   // Work in progress keeps it running however long it takes.
   const lease = controller.retain("image");
   advance(20 * 60_000);
-  await controller.parkIdle();
+  await controller.settleIdle();
   assert.deepEqual(kube.log, []);
   lease.release();
   advance(15 * 60_000);
-  await controller.parkIdle();
+  await controller.settleIdle();
   await controller.settled;
   assert.deepEqual(kube.log, ["scale comfyui/image 0", "gone comfyui/image"]);
   const status = await controller.observe();
@@ -378,10 +388,102 @@ test("automatic control parks media idle for its set time, never text or busy wo
 test("idle parking stays off without automatic control or a set time", async () => {
   for (const options of [{ parkIdleAfterMs: 60_000 }, { automaticLifecycle: true }]) {
     const { kube, controller, advance } = fixture(["image"], options);
-    await controller.parkIdle();
+    await controller.settleIdle();
     advance(60 * 60_000);
-    await controller.parkIdle();
+    await controller.settleIdle();
     await controller.settled;
     assert.deepEqual(kube.log, []);
   }
+});
+
+test("an idle pool starts the Run When Idle workload, parking its idle media; None starts nothing", async () => {
+  const none = fixture(["image"], { automaticLifecycle: true, parkIdleAfterMs: 15 * 60_000 });
+  await none.controller.settleIdle();
+  none.advance(15 * 60_000);
+  await none.controller.settleIdle();
+  await none.controller.settled;
+  assert.deepEqual(none.kube.log, ["scale comfyui/image 0", "gone comfyui/image"]);
+  const { kube, controller, advance } = fixture(["image"], {
+    automaticLifecycle: true,
+    parkIdleAfterMs: 15 * 60_000,
+    idleWorkload: "video-tp2",
+  });
+  await controller.settleIdle();
+  advance(10 * 60_000);
+  await controller.settleIdle();
+  assert.deepEqual(kube.log, []);
+  advance(5 * 60_000);
+  await controller.settleIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale comfyui/image 0",
+    "gone comfyui/image",
+    "scale comfyui-video/video-tp2 1",
+  ]);
+  assert.equal(
+    (await controller.observe()).history[0].requestedBy,
+    "automatic: parking Image and starting Video-tp2 (Run When Idle) after 15 minutes without work",
+  );
+  // Running already, it is never parked as idle.
+  advance(60 * 60_000);
+  await controller.settleIdle();
+  await controller.settled;
+  assert.equal(kube.log.length, 3);
+});
+
+test("queued work still starts what it needs over the Run When Idle workload", async () => {
+  const { kube, controller, advance } = fixture(["video-tp2"], {
+    automaticLifecycle: true,
+    parkIdleAfterMs: 15 * 60_000,
+    idleWorkload: "video-tp2",
+  });
+  await assert.rejects(controller.acquire("image"), { message: "Waiting for Image to start." });
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale comfyui-video/video-tp2 0",
+    "gone comfyui-video/video-tp2",
+    "scale comfyui/image 1",
+  ]);
+  // Work keeps the pool busy; it is idle only once nothing has run or queued for the set time.
+  controller.retain("image").release();
+  advance(10 * 60_000);
+  await controller.settleIdle();
+  assert.equal(kube.log.length, 3);
+  advance(5 * 60_000);
+  await controller.settleIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log.slice(3), [
+    "scale comfyui/image 0",
+    "gone comfyui/image",
+    "scale comfyui-video/video-tp2 1",
+  ]);
+});
+
+test("a text Run When Idle choice starts when idle and stays while media work waits", async () => {
+  const { kube, controller, advance } = fixture([], {
+    automaticLifecycle: true,
+    parkIdleAfterMs: 15 * 60_000,
+    idleWorkload: "text",
+  });
+  advance(15 * 60_000);
+  await controller.settleIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale text/text 1"]);
+  await assert.rejects(controller.acquire("video-tp2"), {
+    message: "Waiting for a GPU: Text (Run When Idle) is running; stop it in Settings › Workers.",
+  });
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale text/text 1"]);
+  // One-GPU media still fits beside it.
+  await assert.rejects(controller.acquire("image"), { message: "Waiting for Image to start." });
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale text/text 1", "scale comfyui/image 1"]);
+  assert.throws(
+    () => controller.configure({ automatic: true, parkIdleMinutes: 15, idleWorkload: "nope" }),
+    {
+      status: 400,
+    },
+  );
+  controller.configure({ automatic: true, parkIdleMinutes: 15, idleWorkload: "" });
+  assert.deepEqual(controller.settings, { automatic: true, parkIdleMinutes: 15 });
 });
