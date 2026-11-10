@@ -704,6 +704,9 @@ export async function fixtures(page: Page) {
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
           (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
       );
+      // Find Similar ranks the image first.
+      const similar = url.searchParams.get("similar");
+      if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
     // Character cards, their images shown as reference assets.

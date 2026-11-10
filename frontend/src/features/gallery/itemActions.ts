@@ -8,6 +8,7 @@ const definitions = {
   retry: { label: "Retry", icon: icons.retry },
   stop: { label: "Stop", icon: icons.stop },
   compare: { label: "Compare", icon: icons.compare },
+  similar: { label: "Find Similar", icon: icons.similar },
   upscale: { label: "Upscale", icon: icons.upscale },
   copy: { label: "Copy", icon: icons.copy },
   download: { label: "Download", icon: icons.download },
@@ -17,13 +18,13 @@ const definitions = {
 };
 type ItemActionId = keyof typeof definitions;
 /**
- * The sections and order everywhere: Animate, Edit, Upscale | Compare, Continue in Chat |
- * Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only in
- * menus and the selection bar; Share takes Download's place where phones share.
+ * The sections and order everywhere: Animate, Edit, Upscale | Compare, Find Similar, Continue in
+ * Chat | Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only
+ * in menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
   ["retry", "stop", "animate", "edit", "upscale"],
-  ["compare", "chat"],
+  ["compare", "similar", "chat"],
   ["copy", "download", "share"],
   ["star", "delete"],
 ];
