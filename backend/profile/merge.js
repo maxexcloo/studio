@@ -5,7 +5,7 @@
  * Two profile files are duplicates when they share a name and kind and run the same definition:
  * the same graph (node titles aside), the same profile block apart from id, name and description,
  * the same guide binding and negatives, and the same AI-Drafted state. The kept profile is the one
- * whose id follows `<kind>-<model>[-<variant>]-<speed>` (`video-minimax-h3-first-frame-fast`, profile/rename.js)
+ * whose id follows `<kind>-<model>[-<variant>]-<speed>` (`video-minimax-h3-first-frame-fast`)
  * rather than an older shape or a backend ending (`-comfyui`, `-radiance`, `-cloud`); a group where no
  * single id does is listed, not merged. Same-named profiles that differ are listed with what
  * differs.

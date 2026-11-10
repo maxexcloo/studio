@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { migrateRuntime, restoreRuntimeBackup } from "./migration.ts";
+import { writeGalleryRows } from "./gallery-rows.ts";
+import { restoreRuntimeBackup, verifiedBackup } from "./migration.ts";
 import {
   assertCurrentStorage,
   closeRuntimeDatabase,
-  databaseFile,
-  hasMigration,
-  readRuntimeDocument,
   runtimeDatabase,
   writeRuntimeDocument,
 } from "./runtime.ts";
@@ -34,94 +33,64 @@ test("a new data folder starts with every table, the gallery's included", (t) =>
   ]);
 });
 
-test("migration dry run, verified backup, SQLite authority and restoration preserve identities and result links", (t) => {
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-migration-"));
-  t.after(() => {
-    closeRuntimeDatabase(data);
-    fs.rmSync(data, { recursive: true, force: true });
-  });
-  const documents = {
-    accounts: {
-      version: 1,
-      accounts: [{ id: "kept-owner", role: "administrator", username: "example" }],
-      sessions: [],
-    },
-    gallery: [
-      {
-        id: "original",
-        jobId: "kept-job",
-        index: 0,
-        ownerId: "kept-owner",
-        url: "/comfy/view?filename=old.png&subfolder=studio&type=media",
-        settings: { profileId: "custom:original" },
-      },
-    ],
-    "gallery-hidden": { "h:marker": 123 },
+test("Studio refuses a data folder that predates current storage until its migration is marked", (t) => {
+  const folder = (name: string) => {
+    const data = fs.mkdtempSync(path.join(os.tmpdir(), `studio-${name}-`));
+    t.after(() => {
+      closeRuntimeDatabase(data);
+      fs.rmSync(data, { recursive: true, force: true });
+    });
+    return data;
   };
-  for (const [name, value] of Object.entries(documents))
-    fs.writeFileSync(path.join(data, `${name}.json`), JSON.stringify(value));
-  assert.equal(migrateRuntime(data).applied, false);
-  assert.equal(fs.existsSync(path.join(data, "studio.sqlite")), false);
-  const result = migrateRuntime(data, { apply: true });
-  assert.equal(result.applied, true);
-  assert.equal(hasMigration(runtimeDatabase(data), "runtime-json-v1"), true);
-  for (const [name, value] of Object.entries(documents))
-    assert.deepEqual(readRuntimeDocument(data, name), value);
-  writeRuntimeDocument(data, "gallery", [...documents.gallery, { id: "new" }]);
-  closeRuntimeDatabase(data);
-  assert.equal((readRuntimeDocument(data, "gallery") as unknown[]).length, 2);
-  assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8")),
-    documents.gallery,
-    "legacy files remain untouched for rollback",
-  );
-  assert.equal(
-    migrateRuntime(data, { apply: true }).applied,
-    false,
-    "re-running never imports stale JSON",
-  );
-  const restored = path.join(data, "restore-rehearsal");
-  assert.deepEqual(restoreRuntimeBackup(result.backup, restored), { restored: 3 });
-  for (const [name, value] of Object.entries(documents))
-    assert.deepEqual(
-      JSON.parse(fs.readFileSync(path.join(restored, `${name}.json`), "utf8")),
-      value,
+  const mark = (data: string, name: string) =>
+    runtimeDatabase(data)
+      .prepare("INSERT INTO studio_migrations (name, applied_at) VALUES (?, ?)")
+      .run(name, new Date().toISOString());
+  const refused = (data: string, holds: RegExp) =>
+    assert.throws(
+      () => assertCurrentStorage(data),
+      (error: Error) => {
+        assert.match(error.message, holds);
+        assert.match(error.message, /predates current storage/);
+        assert.match(error.message, /migrate-runtime from Studio v2026\.11\.10\.4/);
+        return true;
+      },
     );
-  assert.throws(() => restoreRuntimeBackup(result.backup, restored), /empty/);
+
+  const accounts = folder("accounts");
+  fs.writeFileSync(path.join(accounts, "accounts.json"), JSON.stringify({ accounts: [] }));
+  refused(accounts, /accounts\.json/);
+  mark(accounts, "runtime-json-v1");
+  assertCurrentStorage(accounts);
+
+  const gallery = folder("gallery-document");
+  writeRuntimeDocument(gallery, "gallery", []);
+  refused(gallery, /the gallery document/);
+
+  const stores = folder("json-stores");
+  fs.writeFileSync(path.join(stores, "timings.json"), "{}");
+  refused(stores, /timings\.json/);
+  mark(stores, "json-stores-v1");
+  assertCurrentStorage(stores);
+
+  const words = folder("status-words");
+  writeGalleryRows(runtimeDatabase(words), [{ id: "old", status: "error" } as { id: string }]);
+  refused(words, /1 gallery rows with old status words/);
+  mark(words, "status-words-v1");
+  assertCurrentStorage(words);
 });
 
-test("malformed source fails migration without creating or overwriting a database", (t) => {
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-migration-conflict-"));
+test("a verified backup restores only into a separate empty folder", (t) => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backup-"));
   t.after(() => fs.rmSync(data, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(data, "gallery.json"), "{broken");
-  const result = migrateRuntime(data, { apply: true });
-  assert.equal(result.applied, false);
-  assert.equal(result.conflicts.length, 1);
-  assert.equal(fs.existsSync(path.join(data, "studio.sqlite")), false);
-});
-
-test("a backup manifest write failure leaves legacy state authoritative", (t) => {
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-migration-backup-failure-"));
-  t.after(() => {
-    closeRuntimeDatabase(data);
-    fs.rmSync(data, { recursive: true, force: true });
-  });
-  const original = JSON.stringify([{ id: "kept" }]);
-  fs.writeFileSync(path.join(data, "gallery.json"), original);
-  const write = fs.writeFileSync;
-  t.mock.method(
-    fs,
-    "writeFileSync",
-    (
-      file: Parameters<typeof fs.writeFileSync>[0],
-      value: Parameters<typeof fs.writeFileSync>[1],
-      options?: Parameters<typeof fs.writeFileSync>[2],
-    ) => {
-      if (String(file).endsWith("mapping.json")) throw new Error("Backup disk is full");
-      return write(file, value, options);
-    },
-  );
-  assert.throws(() => migrateRuntime(data, { apply: true }), /Backup disk is full/);
-  assert.equal(fs.existsSync(databaseFile(data)), false);
-  assert.equal(fs.readFileSync(path.join(data, "gallery.json"), "utf8"), original);
+  const bytes = Buffer.from(JSON.stringify([{ id: "kept" }]));
+  const mapping = {
+    source: "gallery.json",
+    hash: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
+  const backup = verifiedBackup(data, "test", [{ ...mapping, bytes }], { mappings: [mapping] });
+  const restored = path.join(data, "restore-rehearsal");
+  assert.deepEqual(restoreRuntimeBackup(backup, restored), { restored: 1 });
+  assert.deepEqual(fs.readFileSync(path.join(restored, "gallery.json")), bytes);
+  assert.throws(() => restoreRuntimeBackup(backup, restored), /empty/);
 });

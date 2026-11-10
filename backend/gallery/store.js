@@ -1119,38 +1119,3 @@ export function updateGalleryJobPreviews(id, previews = []) {
   if (upserts.length) bumpRevision();
   return upserts.length > 0;
 }
-
-/**
- * Takes each result's source fields from its saved row into the loaded items, after a migration
- * step wrote them while Studio runs (version-sources.js `gallerySources`), so the next save keeps
- * them. A run's settlement records them together, so a row without a source may not have saved the
- * item's yet and leaves it as it is.
- */
-export const reloadGallerySources = () =>
-  reloadGalleryFields(["parentItemId", "parentJobId", "derived"], (row) => row.parentItemId);
-
-/** Takes each result's size from its saved row, after gallery-sizes.js `gallerySizes` wrote it. */
-export const reloadGallerySizes = () =>
-  reloadGalleryFields(["width", "height"], (row) => Number(row.width) > 0);
-
-/** Takes `fields` from each saved row that is `settled` into the loaded item, then saves. */
-function reloadGalleryFields(fields, settled) {
-  const saved = new Map(
-    readGalleryRows(runtimeDatabase(dataDir)).map((row) => [galleryKey(row), row]),
-  );
-  let changed = false;
-  gallery = gallery.map((item) => {
-    const row = saved.get(galleryKey(item));
-    if (!row || !settled(row) || fields.every((key) => row[key] === item[key])) return item;
-    changed = true;
-    const next = { ...item };
-    for (const key of fields) {
-      if (key in row) next[key] = row[key];
-      else delete next[key];
-    }
-    return next;
-  });
-  if (!changed) return;
-  bumpRevision();
-  saveGallery();
-}
