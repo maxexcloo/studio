@@ -339,6 +339,9 @@ async function fixture(
     res.json({ asset: assets.get(req.params.id) }),
   );
   app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
+  // The account's character cards (backend/characters.js), set by a test.
+  const characters = [];
+  app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -403,6 +406,7 @@ async function fixture(
   return {
     app,
     assets,
+    characters,
     uploads,
     base,
     mcp,
@@ -985,8 +989,8 @@ test("media and administrator credentials discover only their own friendly tools
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters, and to 15,500 for generate's set title and per-prompt titles.
-    JSON.stringify(tools).length + media.getInstructions().length < 15500,
+    // gallery filters, to 15,500 for generate's set title and per-prompt titles, and to 15,600 for generate's character.
+    JSON.stringify(tools).length + media.getInstructions().length < 15600,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1518,6 +1522,39 @@ test("uploaded references belong to their uploader and map to declared profile s
   assert.deepEqual(f.submitted[0].loras, [
     { name: "fixture-effect.safetensors", strength: -0.5, enabled: true },
   ]);
+});
+
+test("models lists the account's characters, and generate applies one by name: its images fill the slots and its description joins each prompt", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  const uploaded = data(
+    await call(client, "upload", { content_base64: png.toString("base64"), filename: "mara.png" }),
+  );
+  const assetId = uploaded.asset?.id || uploaded.id || uploaded.asset_id;
+  f.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red-haired ranger, green cloak",
+    referenceIds: [assetId, "side-view"],
+    references: [{ id: assetId }, { id: "side-view" }],
+  });
+  assert.deepEqual(data(await call(client, "models")).characters, [
+    { id: "chr-mara", name: "Mara", description: "red-haired ranger, green cloak", images: 2 },
+  ]);
+  const reply = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["Walking through a misty forest"],
+    character: "mara",
+  });
+  assert.notEqual(reply.isError, true);
+  // The fixture profile takes one reference, so the first image goes and the reply says so.
+  assert.deepEqual(f.submitted[0].referenceAssets, [{ slot: "reference", assetId }]);
+  assert.equal(
+    f.submitted[0].prompt,
+    "Walking through a misty forest, red-haired ranger, green cloak",
+  );
+  assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
+  await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
