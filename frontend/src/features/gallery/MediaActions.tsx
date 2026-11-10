@@ -8,6 +8,7 @@ import {
   Flame,
   ImagePlus,
   ListChecks,
+  MessagesSquare,
   Loader,
   PenLine,
   Repeat,
@@ -81,6 +82,7 @@ const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
   living: Wind,
   action: Zap,
+  dialogue: MessagesSquare,
   spicy: Flame,
   custom: PenLine,
 };
