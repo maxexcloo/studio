@@ -55,13 +55,13 @@ export function PopupHeading({
   actions?: ReactNode;
 }) {
   return (
-    <Group justify="space-between" gap="xs" mih={28}>
+    <Group className={classes.heading} justify="space-between" gap="xs" mih={28}>
       <Group gap="xs" wrap="nowrap" miw={0}>
         <Text fw={500}>{title}</Text>
         {detail}
       </Group>
       {actions && (
-        <Group gap="xs" wrap="nowrap">
+        <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
           {actions}
         </Group>
       )}
@@ -164,7 +164,7 @@ export function ChipPopup({
               <div className={classes.sheetHeading}>
                 <Modal.Title>{title}</Modal.Title>
                 {headerEnd && (
-                  <Group gap="xs" wrap="nowrap" ml="auto" miw={0}>
+                  <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
                     {headerEnd}
                   </Group>
                 )}
@@ -240,7 +240,7 @@ export function PickerHeader<Tab extends string>({
   label: string;
   /** What the search and filters cover, such as the current tab's "Gallery". */
   searched?: string;
-  /** The views, in groups shown apart, such as the gallery's and the Library's. */
+  /** The views in one bar, its groups divided, such as the gallery's and the Library's. */
   tabs?: { value: Tab; label: string }[][];
   tab?: Tab;
   onTabChange?: (tab: Tab) => void;
@@ -256,17 +256,19 @@ export function PickerHeader<Tab extends string>({
     <Box className={classes.header}>
       <div className={classes.headerRow}>
         {tabs && (
-          <Group gap="xs" role="group" aria-label={`${label} View`}>
-            {/* The groups choose one view between them; only the group holding it marks it. */}
-            {tabs.map((group) => (
-              <SegmentedControl
-                key={group[0].value}
-                value={group.some((item) => item.value === tab) ? tab : ""}
-                onChange={(value) => onTabChange?.(value as Tab)}
-                data={group}
-              />
-            ))}
-          </Group>
+          <SegmentedControl
+            aria-label={`${label} View`}
+            className={classes.tabs}
+            classNames={{ control: classes.tab }}
+            value={tab}
+            onChange={(value) => onTabChange?.(value as Tab)}
+            data={tabs.flatMap((group, index) =>
+              group.map((item, position) => ({
+                value: item.value,
+                label: index && !position ? <span data-group-start>{item.label}</span> : item.label,
+              })),
+            )}
+          />
         )}
         <div className={classes.searchRow}>
           <SearchInput
@@ -594,7 +596,8 @@ export function SavedList<T extends SavedItem>({
   empty: string;
   /** Whether loading would overwrite the current selection, so it asks first. */
   replaces: boolean;
-  replaceMessage: string;
+  /** The question it asks, or the item's own. */
+  replaceMessage: string | ((item: T) => string);
   onLoad: (item: T) => void;
   onRename?: (item: T, name: string) => void;
   onUpdate?: (item: T) => void;
@@ -698,7 +701,9 @@ export function SavedList<T extends SavedItem>({
           </div>
           {confirming === item.id && (
             <Group className={classes.reveal} justify="space-between" gap="xs" p="xs">
-              <Text size="sm">{replaceMessage}</Text>
+              <Text size="sm">
+                {typeof replaceMessage === "string" ? replaceMessage : replaceMessage(item)}
+              </Text>
               <Group gap="xs">
                 <Button variant="default" onClick={() => setConfirming(null)}>
                   Cancel
@@ -720,18 +725,24 @@ export function SavedList<T extends SavedItem>({
   );
 }
 
-/** Saves the current stack or preset: it asks for a name in place and saves on Enter. */
+/**
+ * A heading's actions with Save for the current stack or preset: Save asks for a name in place,
+ * its field, Save and Cancel taking the actions' row (`children`, such as Clear, step aside), and
+ * saves on Enter.
+ */
 export function SaveCurrent({
   noun,
   disabled,
-  compact = false,
   onSave,
+  options,
+  children,
 }: {
   noun: string;
   disabled: boolean;
-  /** A heading's action, sized and styled as its others. */
-  compact?: boolean;
   onSave: (name: string) => void;
+  /** Beside the name, such as the parts a preset holds. */
+  options?: ReactNode;
+  children?: ReactNode;
 }) {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
@@ -749,24 +760,28 @@ export function SaveCurrent({
   };
   if (!naming)
     return (
-      <Button
-        size={compact ? "compact-sm" : undefined}
-        variant={compact ? "subtle" : "default"}
-        autoFocus={named.current}
-        disabled={disabled}
-        onClick={() => setNaming(true)}
-      >
-        Save {noun}
-      </Button>
+      <>
+        {children}
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          autoFocus={named.current}
+          disabled={disabled}
+          onClick={() => setNaming(true)}
+        >
+          Save {noun}
+        </Button>
+      </>
     );
   return (
-    <Group className={classes.reveal} gap="xs" wrap="nowrap" miw={0}>
+    <Group className={classes.reveal} data-naming gap="xs" wrap="nowrap" flex={1} miw={0}>
       <TextInput
         autoFocus
-        size={compact ? "xs" : undefined}
+        size="xs"
+        flex={1}
         miw={0}
         aria-label={`${noun} Name`}
-        placeholder={`${noun} name`}
+        placeholder="Name"
         value={name}
         data-mantine-stop-propagation
         onChange={(event) => setName(event.currentTarget.value)}
@@ -782,9 +797,15 @@ export function SaveCurrent({
           }
         }}
       />
-      <Button size={compact ? "compact-sm" : undefined} disabled={!name.trim()} onClick={save}>
+      {options}
+      <Button size="compact-sm" disabled={!name.trim()} onClick={save}>
         Save
       </Button>
+      <Tooltip label="Cancel">
+        <ActionIcon variant="subtle" color="gray" aria-label="Cancel" onClick={finish}>
+          <icons.clear size={16} />
+        </ActionIcon>
+      </Tooltip>
     </Group>
   );
 }

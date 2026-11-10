@@ -119,7 +119,8 @@ the primary component reference and verify APIs against the installed version.
   actions at the end (beside Close on phones, wrapping under the title when they
   don't fit): every popup's or sheet's Clear
   and Save, such as Save Stack or Save Preset, sit there, not in its footer, as
-  compact subtle buttons with Clear first. A side column, such as the LoRA
+  compact subtle buttons with Clear first; naming what Save keeps (`SaveCurrent`)
+  turns the whole row into its field, any options, Save and Cancel. A side column, such as the LoRA
   stack, has its own heading with its actions; desktop shows it beside the
   content, divided to the top, and phones under it. The phone sheet's footer
   (other actions, then Apply where choices apply as made) stays pinned

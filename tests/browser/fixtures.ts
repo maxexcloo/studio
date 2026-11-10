@@ -1024,10 +1024,23 @@ export async function closeReferences(page: Page) {
 }
 
 /** Saves the draft as a named stack or preset from its picker. */
-export async function saveCurrent(page: Page, noun: "Preset" | "Stack", name: string) {
+export async function saveCurrent(
+  page: Page,
+  noun: "Preset" | "Stack",
+  name: string,
+  /** A preset's parts to switch from the defaults, such as References. */
+  toggle: string[] = [],
+) {
   await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
   const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });
   await field.fill(name);
+  if (toggle.length) {
+    const parts = page.getByRole("button", { name: "Preset Parts", exact: true });
+    await parts.click();
+    for (const part of toggle)
+      await page.getByRole("menuitem", { name: part, exact: true }).click();
+    await parts.click();
+  }
   await field.press("Enter");
 }
 
@@ -1070,7 +1083,7 @@ export async function savedAction(
 /** Chooses a picker tab, such as LoRAs › Stacks. */
 export async function pickerTab(page: Page, picker: string, tab: string) {
   await page
-    .getByRole("group", { name: `${picker} View`, exact: true })
+    .getByRole("radiogroup", { name: `${picker} View`, exact: true })
     .getByText(tab, { exact: true })
     .click();
 }
