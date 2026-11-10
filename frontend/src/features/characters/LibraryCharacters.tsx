@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Alert, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, Button, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
@@ -10,7 +10,15 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
-import { charactersQuery } from "./queries";
+import { charactersQuery, type CharacterCard } from "./queries";
+
+/** How far Generate References has come: finished results to pick from, or those still running. */
+function generatedNote({ jobIds, results }: NonNullable<CharacterCard["generated"]>) {
+  const done = results.filter((result) => result.status === "done").length;
+  const ended = results.filter((result) => ["done", "failed"].includes(result.status)).length;
+  if (ended < jobIds.length) return `Generating references: ${done} of ${jobIds.length} done`;
+  return `${done} generated ${done === 1 ? "reference" : "references"} to pick from`;
+}
 
 /**
  * Library › Characters: every card the account keeps, to search, edit and delete. Make Character
@@ -85,6 +93,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                     <CharacterMenu
                       card={card}
                       onEdit={() => dialogs.edit(card)}
+                      onGenerate={() => dialogs.generate(card)}
                       onDelete={() => dialogs.remove(card)}
                     />
                   </Group>
@@ -107,6 +116,16 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                       .join(" · ")}
                   </Text>
                 </div>
+                {card.generated && (
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="xs" c="dimmed">
+                      {generatedNote(card.generated)}
+                    </Text>
+                    <Button variant="default" size="compact-sm" onClick={() => dialogs.edit(card)}>
+                      Pick References
+                    </Button>
+                  </Group>
+                )}
               </Stack>
             </Paper>
           ))}

@@ -6,9 +6,21 @@ import { referenceCapacity, referenceGroupAssets, referenceGroups } from "../gen
 import { nextReferenceTarget, placeReference } from "../generation/references";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
-export interface CharacterCard extends Character {
+export interface CharacterCard extends Omit<Character, "generated"> {
   references: ReferenceAsset[];
   missing: number;
+  /** Generate References' results, waiting to be picked in the editor. */
+  generated?: {
+    jobIds: string[];
+    at: string;
+    results: {
+      galleryItemId: string;
+      jobId: string;
+      status: string;
+      thumbnailUrl: string;
+      prompt: string;
+    }[];
+  };
 }
 export interface CharacterFields {
   name: string;
@@ -19,6 +31,13 @@ export interface CharacterFields {
 export const charactersQuery = queryOptions({
   queryKey: ["characters"],
   queryFn: async () => (await api<{ characters: CharacterCard[] }>("/api/characters")).characters,
+  // Follows generated references until each has finished.
+  refetchInterval: (query) =>
+    query.state.data?.some((card) =>
+      card.generated?.results.some((result) => !["done", "failed"].includes(result.status)),
+    )
+      ? 5000
+      : false,
 });
 
 /** Saves a new card, or `id`'s changes, and refreshes the list. */
