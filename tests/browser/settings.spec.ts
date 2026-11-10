@@ -268,30 +268,27 @@ test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for i
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs in Settings › Preferences saves Cloud or Local for each area", async ({
-  page,
-}) => {
+test("Where Work Runs in Settings › Preferences saves where each area runs", async ({ page }) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
   state.preferences.preferences.videos = "quality";
   await page.goto("/settings#preferences");
   const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
-  const choose = (area: string, side: string) =>
-    where
-      .getByRole("radiogroup", { name: area, exact: true })
-      .locator("label")
-      .filter({ hasText: side })
-      .click();
+  const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
+  const choose = (name: string, choice: string) =>
+    area(name).locator("label").filter({ hasText: choice }).click();
   await expect(where.getByRole("radiogroup")).toHaveCount(4);
-  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(4);
+  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(3);
+  // Videos offers Animate's three choices, its saved tier showing.
+  await expect(area("Videos").getByRole("radio")).toHaveCount(3);
+  await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
   await choose("Images", "Cloud");
   await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
   await choose("Prompt Writing", "Cloud");
   await expect.poll(() => state.preferences.preferences.writing).toBe("cloud");
-  // Videos' Cloud replaces its local tier; Local then runs Fast.
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
-  await choose("Videos", "Local");
+  await choose("Videos", "Fast");
   await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
   expect(state.preferences.preferences.chat).toBeUndefined();
 });

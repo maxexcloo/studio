@@ -758,6 +758,7 @@ const suggestions = createSuggestions({
       ownerId ? accountAccessForId(ownerId) : undefined,
       item.settings?.profileId || "",
     ),
+  writingSide: (ownerId) => (accountPreferences(ownerId).writing === "cloud" ? "cloud" : "local"),
 });
 registerSuggestionRoutes(app, {
   suggestions,

@@ -68,7 +68,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
 
-**Where Work Runs** (Settings › Preferences) sets, per account, whether Chat, Prompt Writing, Images and Videos default to Cloud or Local (Local when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins, and `STUDIO_ASSISTANT_MODEL` always runs. Otherwise Studio never switches work to the cloud, and held video work never does.
+**Where Work Runs** (Settings › Preferences) sets, per account, whether Chat, Prompt Writing (including Ask for a Change) and Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins, and `STUDIO_ASSISTANT_MODEL` always runs. Otherwise Studio never switches work to the cloud, and held video work never does.
 
 ### Accounts & Single Sign-On
 
