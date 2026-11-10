@@ -336,6 +336,7 @@ export function createServicesObserver({
       runtime: {
         configured: Boolean(controller),
         automaticLifecycle: controller?.automaticLifecycle === true,
+        swap: Boolean(controller) && (administrator || controller!.settings.everyoneSwaps === true),
         reason: !controller
           ? "Studio runtime control is not configured; GPU workloads are neither observed nor switched."
           : controller.automaticLifecycle

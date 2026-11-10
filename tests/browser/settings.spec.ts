@@ -53,17 +53,13 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
-  // Each worker's status comes first, one line each: what it runs, its state, what waits for it
-  // and its free memory.
-  const workers = page.getByRole("region", { name: "Workers", exact: true });
+  // Each worker's status comes first, under the page's own title, one line each: what it runs, its
+  // state, what waits for it and its free memory.
+  const workers = page.getByRole("list", { name: "Workers", exact: true });
   await expect(workers.getByRole("listitem")).toHaveText([
     "Image Worker · Images, Upscale, Model Library · Busy · 2 Queued · 8.0 GiB Free",
     /^Video Worker · Videos · Offline · 0 Queued/,
   ]);
-  // Service health sits below, with the rarely changed controls.
-  await expect(page.getByRole("status", { name: "Services", exact: true })).toHaveText(
-    "Text: Running · Images: Running · Videos: Offline",
-  );
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);
@@ -420,8 +416,8 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   ).toBeVisible();
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
-  await expect(page.getByRole("status", { name: "Services", exact: true })).toContainText(
-    "Images: Running",
+  await expect(page.getByRole("list", { name: "Workers", exact: true })).toContainText(
+    "Image Worker",
   );
   await section(page, "Settings", "About");
   await expect(page.getByText("Development", { exact: true })).toBeVisible();
@@ -527,7 +523,9 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   });
   await page.goto("/settings");
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("region", { name: "History", exact: true })).toBeVisible();
+  // The change history sits with the rarely changed controls.
+  const control = page.getByRole("region", { name: "Services & Control", exact: true });
+  await expect(control.getByText("History", { exact: true })).toBeVisible();
   // Idle settling applies only under automatic control, which saves 0 as Never.
   const park = page.getByRole("combobox", { name: "Idle After", exact: true });
   const idle = page.getByRole("combobox", { name: "Run When Idle", exact: true });
@@ -543,15 +541,21 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.getByRole("option", { name: "15 Min", exact: true }).click();
   await expect(park).toHaveValue("15 Min");
   expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15 });
-  // Any workload can run when idle; a text choice says media work that needs its GPUs waits.
+  // Any workload can run when idle; a text choice says administrators swap it out from the queue.
   await idle.click();
   await page.getByRole("option", { name: "Text", exact: true }).click();
   await expect(idle).toHaveValue("Text");
   expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text" });
-  await expect(page.getByText(/never stops text, so media work/)).toBeVisible();
+  await expect(page.getByText(/never stops text; administrators can swap it out/)).toBeVisible();
+  await page
+    .getByRole("switch", { name: "Let Everyone Swap Models", exact: true })
+    .click({ force: true });
+  await expect
+    .poll(() => settings)
+    .toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text", everyoneSwaps: true });
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
-  const changes = page.getByRole("table", { name: "Runtime Changes" });
+  const changes = control.getByRole("table", { name: "Runtime Changes" });
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(3);
   await page.getByRole("button", { name: "Show All", exact: true }).click();
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(4);

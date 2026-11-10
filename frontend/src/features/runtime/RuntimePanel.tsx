@@ -10,8 +10,8 @@ import type {
 import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import { AutomaticControl, RuntimeWorkloads } from "./RuntimeWorkloads";
+import { SettingGroup } from "../../ui/SettingRows";
+import { AutomaticControl, RuntimeHistory, RuntimeWorkloads } from "./RuntimeWorkloads";
 
 const services = [
   { kind: "text", label: "Text" },
@@ -45,57 +45,53 @@ const gibFree = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB Free`;
 /**
  * Each media worker on one compact line: its health dot and name, then what it runs, its state,
  * how much waits for it and its free memory. Its reason is the line's tooltip. Read-only: the
- * deployment lists the workers.
+ * deployment lists the workers. It sits under the page's own Workers title, without another.
  */
 function WorkerList({ workers }: { workers: WorkerStatus[] }) {
-  return (
-    <SettingGroup title="Workers">
-      {workers.length ? (
-        <Stack gap={0} component="ul" m={0} p={0} style={{ listStyle: "none" }}>
-          {workers.map((worker) => (
-            <Group
-              key={worker.id}
-              component="li"
-              gap="xs"
-              py={6}
-              wrap="nowrap"
-              align="baseline"
-              title={worker.reason}
-            >
-              <CircleDot
-                size={12}
-                color={`var(--mantine-color-${healthColour(worker.state)}-6)`}
-                style={{ flexShrink: 0, alignSelf: "center" }}
-              />
-              <Text size="sm">
-                <Text span fw={500}>
-                  {worker.label}
-                </Text>
-                <Text span c="dimmed">
-                  {[
-                    "",
-                    worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "),
-                    worker.state !== "healthy"
-                      ? healthLabel(worker.state)
-                      : worker.currentJob
-                        ? "Busy"
-                        : "Idle",
-                    `${worker.queued} Queued`,
-                    worker.memoryFree !== undefined && gibFree(worker.memoryFree),
-                  ]
-                    .filter((part) => part !== false)
-                    .join(" · ")}
-                </Text>
-              </Text>
-            </Group>
-          ))}
-        </Stack>
-      ) : (
-        <Text size="sm" c="dimmed">
-          The deployment lists no workers, so Studio can’t generate.
-        </Text>
-      )}
-    </SettingGroup>
+  return workers.length ? (
+    <Stack gap={0} component="ul" aria-label="Workers" m={0} p={0} style={{ listStyle: "none" }}>
+      {workers.map((worker) => (
+        <Group
+          key={worker.id}
+          component="li"
+          gap="xs"
+          py={6}
+          wrap="nowrap"
+          align="baseline"
+          title={worker.reason}
+        >
+          <CircleDot
+            size={12}
+            color={`var(--mantine-color-${healthColour(worker.state)}-6)`}
+            style={{ flexShrink: 0, alignSelf: "center" }}
+          />
+          <Text size="sm">
+            <Text span fw={500}>
+              {worker.label}
+            </Text>
+            <Text span c="dimmed">
+              {[
+                "",
+                worker.capabilities.map((id) => capabilityLabels[id] || id).join(", "),
+                worker.state !== "healthy"
+                  ? healthLabel(worker.state)
+                  : worker.currentJob
+                    ? "Busy"
+                    : "Idle",
+                `${worker.queued} Queued`,
+                worker.memoryFree !== undefined && gibFree(worker.memoryFree),
+              ]
+                .filter((part) => part !== false)
+                .join(" · ")}
+            </Text>
+          </Text>
+        </Group>
+      ))}
+    </Stack>
+  ) : (
+    <Text size="sm" c="dimmed">
+      The deployment lists no workers, so Studio can’t generate.
+    </Text>
   );
 }
 export const servicesStatusQuery = queryOptions({
@@ -185,7 +181,7 @@ export function ServiceHealthSummary() {
 }
 /**
  * Settings › Workers: each worker's status first, then the GPU workloads Studio controls, then the
- * rarely changed parts: service health in one line, and automatic control.
+ * rarely changed parts: automatic control and the change history.
  */
 export function RuntimePanel() {
   const status = useQuery(servicesStatusQuery);
@@ -199,7 +195,6 @@ export function RuntimePanel() {
       .filter((endpoint) => endpoint.state !== "healthy" && endpoint.state !== "parked")
       .flatMap((endpoint) => (endpoint.workloads ?? []).map((id) => [id, endpoint.reason])),
   );
-  const shown = services.filter(({ kind }) => observed[kind]);
   return (
     <Stack gap="md" aria-label="Runtime">
       {status.data.workers && <WorkerList workers={status.data.workers} />}
@@ -210,27 +205,12 @@ export function RuntimePanel() {
           {runtime.reason}
         </Text>
       )}
-      <SettingGroup title="Services & Control">
-        <SettingRow
-          label="Services"
-          description={
-            // A service's reason is its tooltip; the workloads table carries the detail.
-            <span role="status" aria-label="Services">
-              {shown.length
-                ? shown.map(({ kind, label }, index) => (
-                    <span key={kind}>
-                      {index > 0 && " · "}
-                      <span title={observed[kind]!.reason}>
-                        {`${label}: ${healthLabel(observed[kind]!.state)}`}
-                      </span>
-                    </span>
-                  ))
-                : "No Services"}
-            </span>
-          }
-        />
-        {runtime.configured && <AutomaticControl />}
-      </SettingGroup>
+      {runtime.configured && (
+        <SettingGroup title="Services & Control">
+          <AutomaticControl />
+          <RuntimeHistory />
+        </SettingGroup>
+      )}
     </Stack>
   );
 }
