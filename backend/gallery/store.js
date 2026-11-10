@@ -1003,6 +1003,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         status,
         prompt: body.prompt || "",
         negative: body.negative || "",
+        // The prompt a provider's moderation refused before the assistant rewrote it as `prompt`.
+        ...(body.refusedPrompt ? { refusedPrompt: body.refusedPrompt } : {}),
         filename: title || item.filename,
         createdAt: existing[index]?.createdAt || new Date().toISOString(),
         durationMs,

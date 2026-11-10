@@ -110,6 +110,8 @@ export interface MediaItem {
   status: string;
   prompt?: string;
   negative?: string;
+  /** The prompt a provider's moderation refused; `prompt` is the assistant's softened retry. */
+  refusedPrompt?: string;
   /** How the prompt assistant wrote the prompt in the queue: its text model and thinking. */
   writing?: { kind: string; model?: string; thinking?: string };
   /** A few words the text model summarised from the prompt; show it with mediaTitle. */

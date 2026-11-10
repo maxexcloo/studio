@@ -352,3 +352,157 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     store.close();
   }
 });
+
+/** A video provider whose status answers come from `answers`, one per poll, the last repeating. */
+function videoProvider(answers: (() => Response)[], submits: (() => Response)[] = []) {
+  const calls: { path: string; body?: Record<string, unknown> }[] = [];
+  const fetchImpl: typeof fetch = async (request, init) => {
+    const route = new URL(String(request)).pathname;
+    const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+    calls.push({ path: route, body });
+    if (route === "/v1/models") return Response.json({ data: [{ id: "grok-imagine-video-1.5" }] });
+    if (route === "/v1/videos/generations") {
+      const submitted = calls.filter((call) => call.path === route).length;
+      return (
+        submits[submitted - 1] || (() => Response.json({ request_id: `video-${submitted}` }))
+      )();
+    }
+    if (route.startsWith("/v1/videos/")) {
+      const polled = calls.filter((call) => call.path.startsWith("/v1/videos/video-")).length;
+      return answers[Math.min(polled, answers.length) - 1]();
+    }
+    if (route === "/video.mp4") return new Response(new Uint8Array([1, 2]));
+    throw new Error(`Unexpected fixture endpoint ${route}`);
+  };
+  return { calls, provider: new CliProxyMedia("https://proxy.test", "fixture-value", fetchImpl) };
+}
+
+function videoQueue(
+  remote: ReturnType<typeof videoProvider>,
+  clock: { now: number },
+  soften?: (prompt: string, reason: string) => Promise<string>,
+) {
+  const store = new Store(openDatabase(":memory:"));
+  const session = store.createSession("alice");
+  const job = store.enqueue(
+    "alice",
+    session.id,
+    { prompt: "A storm hits the pier" },
+    "animate",
+    undefined,
+    "provider:cliproxyapi",
+  );
+  const adapter = createCloudQueueAdapter({
+    store,
+    provider: remote.provider,
+    resolve: async (current) => ({
+      ...input,
+      kind: "video",
+      model: "grok-imagine-video-1.5",
+      prompt: String(current.input.prompt),
+    }),
+    ...(soften ? { soften: (_job, prompt, reason) => soften(prompt, reason) } : {}),
+    saveMedia: async () => ({ url: "/fixture-video" }),
+    saveGallery: async () => {},
+    now: () => clock.now,
+  });
+  const queue = new GenerationQueue(store, adapter);
+  return { store, queue, current: () => store.job("alice", job.id)! };
+}
+
+test("a refused video status poll fails the job with the provider's reason", async () => {
+  const clock = { now: 0 };
+  const remote = videoProvider([
+    () => Response.json({ status: "pending" }),
+    () => Response.json({ error: { message: "Request ID not found" } }, { status: 400 }),
+  ]);
+  const { store, queue, current } = videoQueue(remote, clock);
+  try {
+    await queue.tick();
+    await queue.tick();
+    assert.equal(current().status, "running");
+    // The next poll waits for its backoff, not the next queue tick.
+    await queue.tick();
+    assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/video-1").length, 1);
+    clock.now += 2_000;
+    await queue.tick();
+    assert.equal(current().status, "failed");
+    assert.match(current().reason, /no longer has this video.*HTTP 400: Request ID not found/);
+  } finally {
+    store.close();
+  }
+});
+
+test("unanswered video polls back off and give up after half an hour", async () => {
+  const clock = { now: 0 };
+  const remote = videoProvider([() => new Response("upstream down", { status: 503 })]);
+  const { store, queue, current } = videoQueue(remote, clock);
+  try {
+    await queue.tick();
+    await queue.tick();
+    assert.equal(current().status, "running");
+    assert.match(current().reason, /HTTP 503: upstream down/);
+    await queue.tick();
+    assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/video-1").length, 1);
+    while (current().status === "running" && clock.now < 3_600_000) {
+      clock.now += 120_000;
+      await queue.tick();
+    }
+    assert.equal(current().status, "failed");
+    assert.ok(clock.now >= 30 * 60_000 && clock.now < 35 * 60_000);
+    assert.match(current().reason, /did not answer this video's status for 30 minutes/);
+  } finally {
+    store.close();
+  }
+});
+
+test("a moderation refusal is retried once with a softened prompt, keeping both prompts", async () => {
+  const clock = { now: 0 };
+  const moderated = () =>
+    Response.json({ error: { message: "Video rejected by content moderation" } }, { status: 400 });
+  const remote = videoProvider([moderated]);
+  const asked: string[] = [];
+  const { store, queue, current } = videoQueue(remote, clock, async (prompt, reason) => {
+    asked.push(reason);
+    return `${prompt}, gently`;
+  });
+  try {
+    await queue.tick();
+    await queue.tick();
+    assert.equal(asked.length, 1);
+    assert.match(asked[0], /content moderation/);
+    assert.equal(current().status, "running");
+    assert.equal(current().providerJobId, "video-2");
+    assert.equal(current().input.prompt, "A storm hits the pier, gently");
+    assert.equal(current().input.refusedPrompt, "A storm hits the pier");
+    const sent = remote.calls.filter((call) => call.path === "/v1/videos/generations");
+    assert.equal(sent[1].body?.prompt, "A storm hits the pier, gently");
+    // Refused again: no second rewrite, and the job says what was tried.
+    await queue.tick();
+    assert.equal(asked.length, 1);
+    assert.equal(sent.length, 2);
+    assert.equal(current().status, "failed");
+    assert.match(current().reason, /refused this for moderation.*content moderation/);
+    assert.match(current().reason, /retried once.*A storm hits the pier, gently/);
+  } finally {
+    store.close();
+  }
+});
+
+test("a moderation refusal on submit is resubmitted once with the softened prompt", async () => {
+  const clock = { now: 0 };
+  const remote = videoProvider(
+    [() => Response.json({ status: "done", video: { url: "https://media.test/video.mp4" } })],
+    [() => Response.json({ error: "Prompt flagged by safety filter" }, { status: 400 })],
+  );
+  const { store, queue, current } = videoQueue(remote, clock, async () => "A pier at dusk");
+  try {
+    await queue.tick();
+    assert.equal(current().providerJobId, "video-2");
+    await queue.tick();
+    assert.equal(current().status, "completed");
+    assert.equal(current().input.refusedPrompt, "A storm hits the pier");
+  } finally {
+    store.close();
+  }
+});
