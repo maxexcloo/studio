@@ -392,11 +392,15 @@ test("An MCP result set is one titled run whose viewer names each result's place
     "/chat/chat-a",
   );
   // The viewer names the result's place in its set and jumps along the set's strip.
-  await run.getByRole("button", { name: "Open All", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(
-    viewer.getByText("Variety Test › Fox Wizard (1 of 3)", { exact: true }),
-  ).toBeVisible();
+  // WebKit can drop a tap while the run's tiles are still fanning out.
+  await expect(async () => {
+    if (!(await viewer.isVisible()))
+      await run.getByRole("button", { name: "Open All", exact: true }).click();
+    await expect(
+      viewer.getByText("Variety Test › Fox Wizard (1 of 3)", { exact: true }),
+    ).toBeVisible({ timeout: 1000 });
+  }).toPass();
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Bear Hug (3 of 3)", exact: true }).click();
