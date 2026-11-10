@@ -1067,7 +1067,17 @@ export async function promptOptions(scope: Page | Locator, box: string, label: s
 }
 
 // The phone viewer bar's own actions; the rest sit under its ⋯ More.
-const phoneBar = ["Retry", "Stop", "Animate", "Extend", "Edit", "Upscale", "Star", "Unstar"];
+const phoneBar = [
+  "Retry",
+  "Stop",
+  "Stop Upscale",
+  "Animate",
+  "Extend",
+  "Edit",
+  "Upscale",
+  "Star",
+  "Unstar",
+];
 
 /** Runs a viewer bar action: on the bar, or an item of the phone bar's More. */
 export async function viewerAction(page: Page, label: string) {

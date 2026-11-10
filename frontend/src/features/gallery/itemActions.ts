@@ -19,8 +19,9 @@ const definitions = {
 type ItemActionId = keyof typeof definitions;
 /**
  * The sections and order everywhere: Animate, Edit, Upscale | Compare, Find Similar, Continue in
- * Chat | Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only
- * in menus and the selection bar; Share takes Download's place where phones share.
+ * Chat | Copy, Download | Star, Delete. Retry and Stop lead for unfinished work and running
+ * upscales; Compare shows only in menus and the selection bar; Share takes Download's place where
+ * phones share.
  */
 const sections: ItemActionId[][] = [
   ["retry", "stop", "animate", "edit", "upscale"],
