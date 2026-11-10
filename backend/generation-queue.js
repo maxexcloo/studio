@@ -367,5 +367,10 @@ export function createGenerationQueue({
     }
     return generationRoutes.validateInput(input, account);
   }
-  return { generationQueue, queueResourceFor, validateGenerationInput };
+  /** A waiting job's deployments, for a swap; none for running work or another account's. */
+  function waitingWorkloads(ownerId, id) {
+    const job = store.job(ownerId, id);
+    return job?.status === "waiting" ? managedWorkloads(job) : [];
+  }
+  return { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkloads };
 }

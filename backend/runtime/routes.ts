@@ -7,25 +7,26 @@ const workloadIds = (value: unknown) => {
   return value as string[];
 };
 
+const handle =
+  (action: (request: Request) => Promise<unknown> | unknown, status = 200) =>
+  async (request: Request, response: Response) => {
+    response.setHeader("Cache-Control", "no-store");
+    try {
+      response.status(status).json(await action(request));
+    } catch (error) {
+      const known = error as Error & { status?: number };
+      response.status(known.status ?? 500).json({
+        error: known.status ? known.message : "Studio couldn’t complete the runtime request.",
+      });
+    }
+  };
+
 /** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
 export function createRuntimeRouter(
   controller: RuntimeController,
   requestedBy: (request: Request) => string,
 ) {
   const router = Router();
-  const handle =
-    (action: (request: Request) => Promise<unknown> | unknown, status = 200) =>
-    async (request: Request, response: Response) => {
-      response.setHeader("Cache-Control", "no-store");
-      try {
-        response.status(status).json(await action(request));
-      } catch (error) {
-        const known = error as Error & { status?: number };
-        response.status(known.status ?? 500).json({
-          error: known.status ? known.message : "Studio couldn’t complete the runtime request.",
-        });
-      }
-    };
   router.get(
     "/",
     handle(() => controller.observe()),
@@ -65,6 +66,7 @@ export function createRuntimeRouter(
         automatic: request.body?.automatic,
         parkIdleMinutes: request.body?.parkIdleMinutes,
         idleWorkload: request.body?.idleWorkload,
+        everyoneSwaps: request.body?.everyoneSwaps,
       }),
     ),
   );
@@ -82,6 +84,41 @@ export function createRuntimeRouter(
   router.get(
     "/operations/:id",
     handle((request) => controller.operation(String(request.params.id))),
+  );
+  return router;
+}
+
+/**
+ * `POST /api/queue/:id/swap` for the caller's waiting media work that running text holds the GPUs
+ * for: without `signature` it previews the swap, with one it applies it. Administrators may always
+ * swap, ordinary accounts only with Let Everyone Swap Models on. `workloads` gives a waiting job's
+ * deployments, none when the caller has no such job.
+ */
+export function createSwapRouter(
+  controller: RuntimeController,
+  {
+    admin,
+    workloads,
+    requestedBy,
+  }: {
+    admin: (request: Request) => boolean;
+    workloads: (request: Request, id: string) => string[];
+    requestedBy: (request: Request) => string;
+  },
+) {
+  const router = Router();
+  router.post(
+    "/api/queue/:id/swap",
+    handle((request) => {
+      if (!admin(request) && !controller.settings.everyoneSwaps)
+        throw Object.assign(new Error("Only an administrator can swap models."), { status: 403 });
+      const candidates = workloads(request, String(request.params.id));
+      if (!candidates.length)
+        throw Object.assign(new Error("No waiting work of yours has that id."), { status: 404 });
+      return request.body?.signature
+        ? controller.swap(candidates, String(request.body.signature), requestedBy(request))
+        : controller.previewSwap(candidates);
+    }),
   );
   return router;
 }

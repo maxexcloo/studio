@@ -271,6 +271,36 @@ test("automatic control never stops or starts text; an administrator's apply can
   (await controller.acquire("video-tp2")).release();
 });
 
+test("a swap stops the text holding waiting media work's GPUs, records who asked and lets the work run", async () => {
+  const { kube, controller, advance } = fixture([], {
+    automaticLifecycle: true,
+    parkIdleAfterMs: 15 * 60_000,
+    idleWorkload: "text",
+  });
+  advance(15 * 60_000);
+  await controller.settleIdle();
+  await controller.settled;
+  await assert.rejects(controller.acquire("video-tp2"), /Text \(Run When Idle\) is running/);
+  // Media that fits beside the text has nothing to swap.
+  await assert.rejects(controller.previewSwap(["image"]), { status: 409 });
+  const preview = await controller.previewSwap(["video-tp2"]);
+  assert.deepEqual(
+    [preview.stop, preview.start, preview.labels, preview.runWhenIdle],
+    [["text"], ["video-tp2"], { text: "Text", "video-tp2": "Video-tp2" }, "Text"],
+  );
+  await assert.rejects(controller.swap(["video-tp2"], "stale", "account:admin"), { status: 409 });
+  const operation = await controller.swap(["video-tp2"], preview.signature, "account:admin");
+  assert.equal(operation.requestedBy, "account:admin: swap to videos");
+  await controller.settled;
+  assert.deepEqual(kube.log.slice(1), [
+    "scale text/text 0",
+    "gone text/text",
+    "scale comfyui-video/video-tp2 1",
+  ]);
+  assert.equal((await controller.observe()).history[0].status, "completed");
+  (await controller.acquire("video-tp2")).release();
+});
+
 test("an explicit start uses a free GPU, else names what it stops, media before text", async () => {
   const { kube, controller } = fixture(["image", "text"]);
   const preview = await controller.previewStart(["video-tp2"]);

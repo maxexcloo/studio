@@ -31,6 +31,7 @@ import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { Profile, QueueJob, ReferenceAsset } from "../../types";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery, loraTitle } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
@@ -239,11 +240,14 @@ function QueueRow({
   job,
   sortable,
   drag,
+  onSwap,
 }: {
   job: QueueJob;
   /** Shows its drag handle, which works once `drag` arrives with the sortable list. */
   sortable: boolean;
   drag?: QueueRowDrag;
+  /** Offers to swap running text out for this waiting work, when the account may. */
+  onSwap?: () => void;
 }) {
   const [opened, setOpened] = useState(false);
   const detailsId = useId();
@@ -298,6 +302,11 @@ function QueueRow({
             </Stack>
           </Group>
         </UnstyledButton>
+        {onSwap && (
+          <Button variant="default" size="compact-sm" miw="max-content" onClick={onSwap}>
+            Swap to {job.input?.kind === "video" ? "Videos" : "Images"}
+          </Button>
+        )}
         {/* Trailing, so waiting rows' text lines up with the others' and Stop keeps its column. */}
         {sortable && (
           <Tooltip label="Drag to Reorder">
@@ -455,6 +464,7 @@ export function Queue() {
   const action = useQueueAction();
   const everyone = usePausesEveryone();
   const client = useQueryClient();
+  const swap = useJobSwap();
   // Loads dragging ahead of a second waiting item, so the rows aren't replaced when it arrives.
   useEffect(() => void loadSortable(), []);
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
@@ -486,7 +496,13 @@ export function Queue() {
   const movable = jobs.filter(movableJob);
   const sortable = movable.length > 1;
   const row = (job: QueueJob, drag?: QueueRowDrag) => (
-    <QueueRow key={job.id} job={job} sortable={sortable && movableJob(job)} drag={drag} />
+    <QueueRow
+      key={job.id}
+      job={job}
+      sortable={sortable && movableJob(job)}
+      drag={drag}
+      onSwap={swap.swappable(job) ? () => swap.offer(job) : undefined}
+    />
   );
   // The new order shows at once; the refetch after the move settles it, a failed one included.
   function move(job: QueueJob, to: number) {
@@ -518,6 +534,7 @@ export function Queue() {
       ) : (
         jobs.map((job) => row(job))
       )}
+      {swap.dialog}
     </Stack>
   );
 }
