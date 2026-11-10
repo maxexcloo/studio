@@ -339,7 +339,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
           {
             key: "permissions",
             header: "Permissions",
-            visibleFrom: "sm",
+            hideOnPhone: true,
             cell: (group) => (
               <Group gap={4}>
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
