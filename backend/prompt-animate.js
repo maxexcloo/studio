@@ -26,13 +26,13 @@ import { families } from "./family-catalogue.js";
 
 export const animateThemes = Object.freeze({
   cinematic:
-    "Cinematic Camera: a camera move the subject's action motivates carries the shot. The subject does something (turns to look, steps forward, rises, reaches, reacts to someone) and the camera answers it: tracking alongside a walk, arcing around a turn, craning up as they rise, pushing in on a reaction, pulling out to reveal where they are. The move has a speed that matches the action (medium speed while the subject moves, slow only for a held emotional beat) and lands on a different framing than it began. The world moves around them: parallax between foreground and background, passers-by, weather and light.",
+    "Cinematic Camera: a camera move the subject's action motivates carries the shot. The subject does something (turns to look, steps forward, rises, reaches, reacts to someone) and the camera answers it: tracking alongside a walk, arcing around a turn, craning up as they rise, pushing in on a reaction, pulling out to reveal where they are. The move has a speed that matches the action (medium speed while the subject moves, slow only for a held emotional beat) starts with the action and lands on a different framing than it began. The world moves around them: parallax between foreground and background, passers-by, weather and light.",
   living:
-    "Living Photo: the moment keeps rolling as if the photo were a candid video. Each person carries on with what they are doing in real time, with natural, unposed movement that goes somewhere (a laugh that breaks into a glance away, a sip, brushing hair back, turning to someone, a few steps), and the surroundings keep moving: passers-by, traffic, wind, water, steam, flickering light. The camera is handheld with a light natural sway or makes a small reframe as someone moves. No big action or new events.",
+    "Living Photo: the moment keeps rolling as if the photo were a candid video. Each person carries on with what they are doing in real time, with natural, unposed movement that goes somewhere (a laugh that breaks into a glance away, a sip, brushing hair back, turning to someone, a few steps), and the surroundings keep moving: passers-by, traffic, wind, water, steam, flickering light. Something small but clearly visible changes early (a laugh breaking, a turn, a sip) and the moment settles into a new beat by the end. The camera is handheld with a light natural sway or makes a small reframe as someone moves. No big action or new events.",
   action:
-    "Action: the subject does one clear, physical, energetic action that this frame sets up, from their pose, the props and the place (spinning, leaping, running, throwing, striking, dancing), with a wind-up, a peak and a follow-through, the kind of thing this person would do here. Momentum shows in the body and its secondary motion (hair whipping, fabric snapping, splashes, sparks, dust or debris), and the camera moves with it: tracking alongside, whip-panning, a handheld follow or a fast push-in on the impact, at a pace that keeps the motion readable.",
+    "Action: the subject does one clear, physical, energetic action that this frame sets up, from their pose, the props and the place (spinning, leaping, running, throwing, striking, dancing), with a quick wind-up, a peak that lands by the middle of the clip and a follow-through, the kind of thing this person would do here. Momentum shows in the body and its secondary motion (hair whipping, fabric snapping, splashes, sparks, dust or debris), and the camera moves with it: tracking alongside, whip-panning, a handheld follow or a fast push-in on the impact, at a pace that keeps the motion readable.",
   dialogue:
-    "Dialogue: the people in the frame talk. Give one or two short spoken lines, or a quick exchange between two people in the frame, that fit who they are, where they are and what they are doing, each with who says it and how. Speech comes with the body language of talking: lips in sync, a nod, a shrug, a hand lifting to make a point, eyes meeting, and the listener reacting. The camera covers the conversation: a push-in on the speaker, a handheld over-the-shoulder reframe, or a small arc from one speaker to the other. Where no one in the frame can speak, a short voiceover that fits the scene speaks instead.",
+    "Dialogue: the people in the frame talk. Give one or two short spoken lines, or a quick exchange between two people in the frame, that fit who they are, where they are and what they are doing, each with who says it and how. Speech comes with the body language of talking: lips in sync, a nod, a shrug, a hand lifting to make a point, eyes meeting, and the listener reacting. The camera covers the conversation: a push-in on the speaker, a handheld over-the-shoulder reframe, or a small arc from one speaker to the other. The first line starts within the first couple of seconds, and the clip ends on a reaction: the listener's answer, a laugh or a look. Where no one in the frame can speak, a short voiceover that fits the scene speaks instead.",
   spicy:
     "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
   custom:
@@ -56,6 +56,27 @@ export function animateClip(input, profile) {
       ? Math.round((frames / fps) * 10) / 10
       : value("duration");
   return { seconds, fps };
+}
+
+/**
+ * How the shot fills the clip: two beats for a short clip, three for a longer one, the most
+ * interesting change landing early enough to be seen, and nothing that needs more time.
+ */
+function pacing(seconds, fps = 0) {
+  const order =
+    "in the present tense and in order, without timestamps unless the guide asks for them";
+  if (!seconds)
+    return `The clip is short: play it out as two or three beats, ${order}: a start state with movement already under way, a clear change or event, then the payoff or reaction the last frame lands on. Start moving at once, let the most interesting change land by the middle so it is seen, keep something moving to the last frame, and leave out anything that needs more time than a few seconds.`;
+  const beats = seconds <= 6 ? 2 : 3;
+  const each = Math.round((seconds / beats) * 10) / 10;
+  return [
+    `The clip is only ${seconds} seconds long${fps ? ` at ${fps} fps` : ""}: write for exactly that time.`,
+    beats === 2
+      ? `Play it out as two beats of about ${each} seconds each, ${order}: a clear change or event under way from the first second, then the payoff or reaction the last frame lands on.`
+      : `Play it out as three beats of about ${each} seconds each, ${order}: the start state with the first movement already under way, a clear change or event, then the payoff or reaction the last frame lands on.`,
+    `Start moving in the first second and let the most interesting change land by about ${Math.round(seconds * 0.6)} seconds so it is seen; keep something moving to the last frame, with no dead air and no slow fade into stillness. Give each beat one main action; more crowds the clip.`,
+    `Leave out anything that needs more than ${seconds} seconds (crossing a room, changing clothes, a long conversation, several separate actions in a row).`,
+  ].join(" ");
 }
 
 /** Whether the profile makes sound with the picture: an audio family (H3) or Grok. */
@@ -87,11 +108,9 @@ export function animateInstructions({
 }) {
   const { seconds = 0, fps = 0 } = clip;
   const audio = makesSound(profile);
-  const beats = !seconds ? "two to four" : seconds <= 4 ? "two" : seconds <= 8 ? "three" : "four";
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   // About two and a half spoken words a second, leaving room for the action around them.
   const speech = Math.round(2.5 * (seconds || 6));
-  const length = [seconds && `${seconds}-second`, fps && `${fps} fps`].filter(Boolean).join(", ");
   return [
     `You write motion prompts for the image-to-video model ${profile.label || profile.id}. Follow its prompting guide below.`,
     precedence,
@@ -103,7 +122,8 @@ export function animateInstructions({
     `The prompt is guidance on the intent, subjects and mood; where it and the frame disagree, the frame wins.${writing.extend ? "" : " Animate what that prompt was going for, not just what happens to be in view."}`,
     fidelity,
     "Never contradict the frame. Keep each subject's identity, face, body, outfit, setting and style as they are unless the theme or instruction changes them.",
-    `In the present tense, play the shot out as ${beats} beats that fill the ${length ? `${length} clip` : "clip"}: the onset, how it develops, and the result or reaction the last frame lands on, marked by their order rather than timestamps unless the guide asks for them. Pace the beats to the time; don't cram in more action than the clip can show, and don't leave it static: in every beat the main subject visibly changes pose, position, gaze or expression, not only breathing or blinking.`,
+    pacing(seconds, fps),
+    "Don't leave it static: in every beat the main subject visibly changes pose, position, gaze or expression, not only breathing or blinking.",
     fps && fps < 20
       ? `At ${fps} fps fast motion judders: favour fluid, moderate-speed movement and steady camera moves.`
       : "",
