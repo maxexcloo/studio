@@ -272,7 +272,7 @@ taught yet, or new ground for the prompt (half from an import, where allowed).
 Thumbs-down LoRAs are never loaded. Import and Inspiration ideas need
 administrator access, Uncensored Models and enabled imports. Results stay
 outside the gallery, search, exports and MCP until kept; Star also keeps them.
-Discards remain available. Variations keeps a result and queues new seeds as
+Discards are deleted after 30 days, or at once with Delete All. Variations keeps a result and queues new seeds as
 user work; More Like This keeps it and steers upcoming ideas toward it.
 Comparison cards vary one thing and accept A, B, Both or Neither, and ask about
 what taste is least sure of. Calibration cards use older Studio generations

@@ -807,6 +807,7 @@ const dream = createDream({
       throw new Error("That Dream result is unavailable.");
     updateGalleryJob(itemId, { dream: mark });
   },
+  remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (account && !mayUseFeature(account, "loras")) return null;
