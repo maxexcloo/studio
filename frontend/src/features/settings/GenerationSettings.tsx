@@ -61,7 +61,7 @@ export function GenerationSettings() {
       />
     </SettingRow>
   );
-  // The gallery passes' switch sits with them under Gallery.
+  // The gallery passes' switch sits with them under Gallery, whose rows run A–Z by label.
   const whileBusy = catalogue.find((flag) => flag.key === "STUDIO_GALLERY_WHILE_BUSY");
   // The rest are Background AI, A–Z as deployment-settings.js lists them.
   const background = catalogue.filter((flag) => flag !== whileBusy);
@@ -84,18 +84,18 @@ export function GenerationSettings() {
           scopeLabel="Images to Caption"
         />
         <GalleryPass
-          route="/api/gallery/embeddings"
-          label="Index Gallery"
-          description="Index every image for Image Search on the CPU while Studio is idle. The first run downloads the model."
-          remaining="to index"
-          progressLabel="Index Progress"
-        />
-        <GalleryPass
           route="/api/gallery/faces"
           label="Check Faces"
           description="Compare images made with a character with the character's image by face, on the CPU while Studio is idle. The first run downloads the models."
           remaining="to check"
           progressLabel="Face Check Progress"
+        />
+        <GalleryPass
+          route="/api/gallery/embeddings"
+          label="Index Gallery"
+          description="Index every image for Image Search on the CPU while Studio is idle. The first run downloads the model."
+          remaining="to index"
+          progressLabel="Index Progress"
         />
         {whileBusy && flagRow(whileBusy)}
         <UnfinishedItems />

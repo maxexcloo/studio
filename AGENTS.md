@@ -179,9 +179,9 @@ the primary component reference and verify APIs against the installed version.
   Videos' Cloud | Fast | Quality as Animate's menus do. It sets only defaults: a
   model the person picks wins, and a draft keeps following the default until
   then. A default on the other side says so where its work shows: a
-  notification on queuing. Prompt Writing is a text model picker (the
-  Integrations list); its aliases route themselves, so it has no fallback or
-  notice.
+  notification on queuing. Text is the account's text model picker for
+  prompt writing, the only one; its aliases route themselves, so it has no
+  fallback or notice. Studio's own calls keep their automatic route.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.

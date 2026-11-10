@@ -18,11 +18,7 @@ interface AssistantStatus {
   noNegative?: string[];
   /** The account holds Uncensored Models. */
   spicy?: boolean;
-  /**
-   * The model its prompt writing runs on (an administrator's model replaces the account's), the text
-   * models it may pick and the one its writing asks for.
-   */
-  model?: string;
+  /** The text models it may pick and the one its writing asks for. */
   models?: string[];
   writingModel?: string;
 }

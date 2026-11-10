@@ -352,7 +352,7 @@ test("a requested change picks one of the offered actions and rewrites the promp
   assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
 });
 
-test("a requested change is written by the account's Prompt Writing model", async () => {
+test("a requested change is written by the account's Text model", async () => {
   const reply = () =>
     JSON.stringify({ action: "edit", label: "Night", prompt: "A harbour at night" });
   const { models, suggestions } = fixture({ reply, picked: "local/auto" });

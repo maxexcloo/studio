@@ -1,17 +1,17 @@
 // Replays the prompt assistant's eval cases (backend/fixtures/assistant-evals/) against the live
 // Bifrost gateway and scores the replies: `mise run eval:assistant`. On demand only, never in CI.
-// It uses STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL (the cloud model; STUDIO_ASSISTANT_MODEL when set) from the
-// environment. `--record` writes the live replies
-// back as the recorded ones CI replays; review that diff before committing it.
+// It uses STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL (the model it replays on) from the
+// environment. `--record` writes the live replies back as the recorded ones CI replays; review
+// that diff before committing it.
 import fs from "node:fs";
 import path from "node:path";
 import { evalsDir, loadEvals, runEvals } from "../assistant-evals.js";
-import { assistantSettings } from "../assistant.js";
+import { gatewaySettings } from "../assistant.js";
 
 const record = process.argv.includes("--record");
 let settings;
 try {
-  settings = assistantSettings(process.env);
+  settings = gatewaySettings(process.env);
 } catch (error) {
   console.error(error.message);
   process.exit(2);
@@ -26,7 +26,7 @@ if (!settings) {
 const evals = loadEvals();
 const replies = Object.fromEntries(Object.keys(evals).map((kind) => [kind, new Map()]));
 console.log(
-  `Replaying ${Object.values(evals).reduce((sum, set) => sum + set.cases.length, 0)} cases on ${settings.chosen || settings.cloud}…`,
+  `Replaying ${Object.values(evals).reduce((sum, set) => sum + set.cases.length, 0)} cases on ${settings.cloud}…`,
 );
 const { results, passed, total } = await runEvals({
   evals,
