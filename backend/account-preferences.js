@@ -10,10 +10,9 @@ import {
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
  * them. Spicy Prompts starts off and counts only with Uncensored Models (`explicitWording`).
- * `chat`, `writing` and `images` say where Chat, prompt writing and images run by default, Cloud or
- * Local; `videos` where videos and Animate do (Cloud, or the local Fast or Quality tier). Unsaved,
+ * `writing` and `images` say where prompt writing and images run by default, Cloud or Local; `videos` where videos and Animate do (Cloud, or the local Fast or Quality tier). Unsaved,
  * each is Local. The side that can't run gives way to the other, saying so; a model the person
- * picks always wins (chat-settings.js, assistant.js, model/catalogue.js, animate-profile.js).
+ * picks always wins (assistant.js, model/catalogue.js, animate-profile.js).
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -24,7 +23,6 @@ export const preferenceDefaults = Object.freeze({
 });
 /** Preferences that take one of a few values rather than on or off; they have no default. */
 const preferenceChoices = Object.freeze({
-  chat: ["cloud", "local"],
   images: ["cloud", "local"],
   videos: ["cloud", "fast", "quality"],
   writing: ["cloud", "local"],
@@ -68,6 +66,11 @@ export function saveAccountPreferences(ownerId, patch) {
   writeRuntimeDocument(dataDir, documentName(ownerId), next);
   cache.set(ownerId, next);
   return accountPreferences(ownerId);
+}
+
+/** Forgets the cached preferences, so the next read takes the saved documents. */
+export function reloadAccountPreferences() {
+  cache.clear();
 }
 
 /** A deleted account's preferences go with it. */
