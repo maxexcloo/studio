@@ -276,7 +276,7 @@ test("direct and finishing work admitted after a waiting Dream job run first; Dr
   }
 });
 
-test("an idle worker takes waiting work, but background work only while no manual work waits", async () => {
+test("an idle worker takes waiting work, manual work first", async () => {
   const queue = fixture();
   const { store, observations } = queue;
   queue.adapter.alternatives = () => ["worker:primary", "worker:video"];
@@ -384,13 +384,91 @@ test("a waiting job moves to the idle worker with its model loaded, manual work 
     const background = enqueue("worker:a", "flux", mcp("a"));
     const manual = enqueue("worker:a", "flux");
     await queue.queue.tick();
-    // The manual job skips the idle worker b for c, which has flux loaded; background work waits.
+    // The manual job skips the idle worker b for c, which has flux loaded; background work takes b.
     assert.equal(where(manual).resource, "worker:c");
-    assert.equal(where(background).resource, "worker:a");
-    // With no manual work waiting, background work takes the remaining idle worker.
-    await queue.queue.tick();
     assert.equal(where(background).resource, "worker:b");
   } finally {
+    store.close();
+  }
+});
+
+test("an idle worker with another model loaded takes work waiting behind a busy worker", async () => {
+  const queue = fixture();
+  const { store, observations, submitted } = queue;
+  queue.adapter.alternatives = () => ["worker:primary", "worker:secondary"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string, profileId: string, origin = {}) =>
+      store.enqueue(
+        "alice",
+        session.id,
+        { profileId },
+        "image",
+        undefined,
+        resource,
+        undefined,
+        origin,
+      ).id;
+    const where = (id: string) => store.job("alice", id)!;
+    // Primary last ran krea; secondary is busy with kroma.
+    const warm = enqueue("worker:primary", "krea");
+    await queue.queue.tick();
+    observations.set(warm, { status: "completed" });
+    await queue.queue.tick();
+    const busy = enqueue("worker:secondary", "kroma");
+    await queue.queue.tick();
+    const waiting = Array.from({ length: 5 }, (_, index) =>
+      enqueue("worker:secondary", "kroma", mcp(`set-${index}`)),
+    );
+    // A manual job elsewhere does not keep the idle worker from background work.
+    store.enqueue("alice", session.id, {}, "image", undefined, "cloud");
+    queue.adapter.eligible = async (job) =>
+      job.resource === "cloud" ? "Waiting for the provider." : undefined;
+    await queue.queue.tick();
+    assert.equal(where(waiting[0]).resource, "worker:primary");
+    assert.deepEqual(submitted.slice(-1), [waiting[0]]);
+    assert.equal(where(busy).resource, "worker:secondary");
+    for (const id of waiting.slice(1)) assert.equal(where(id).status, "waiting");
+  } finally {
+    store.close();
+  }
+});
+
+test("a job is not observed while its submission is in flight, and a cancel then reaches it", async () => {
+  const { store, queue, adapter, submitted } = fixture();
+  const started = deferred();
+  const release = deferred();
+  const observed: string[] = [];
+  const cancelled: string[] = [];
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image");
+    adapter.submit = async (submittedJob) => {
+      submitted.push(submittedJob.id);
+      started.resolve();
+      await release.promise;
+      return { status: "running", providerJobId: "prompt-1" };
+    };
+    adapter.observe = async (observedJob) => {
+      observed.push(observedJob.id);
+      return { status: "running" };
+    };
+    adapter.cancel = async (cancelledJob) => {
+      cancelled.push(cancelledJob.id);
+    };
+    const first = queue.tick();
+    await started.promise;
+    await queue.cancel("alice", job.id);
+    await queue.tick();
+    assert.deepEqual(observed, []);
+    release.resolve();
+    await first;
+    assert.deepEqual(cancelled, [job.id, job.id]);
+    await queue.tick();
+    assert.deepEqual(observed, [job.id]);
+  } finally {
+    release.resolve();
+    await queue.stop();
     store.close();
   }
 });

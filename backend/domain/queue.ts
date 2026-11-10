@@ -138,6 +138,11 @@ export class GenerationQueue {
   private observing = new Set<string>();
   private scheduling = new Set<string>();
   private checkingEligibility = new Set<string>();
+  /**
+   * Jobs whose submission is in flight. They are not observed until it returns: the provider has
+   * no record of them yet, and recovering one then would stand in for the run it is starting.
+   */
+  private submitting = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private acceptedIds = new Set<string>();
   /**
@@ -327,7 +332,8 @@ export class GenerationQueue {
           (item) =>
             !terminalStatuses.has(item.status) &&
             this.acceptedIds.has(item.id) &&
-            !this.observing.has(item.id),
+            !this.observing.has(item.id) &&
+            !this.submitting.has(item.id),
         )
         .map(async (initial) => {
           this.observing.add(initial.id);
@@ -461,6 +467,7 @@ export class GenerationQueue {
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
             this.acceptedIds.add(job.id);
             this.loaded.set(resource, job);
+            this.submitting.add(job.id);
             try {
               const observation = await this.adapter.submit(job);
               const latest = this.store.job(job.ownerId, job.id)!;
@@ -485,6 +492,8 @@ export class GenerationQueue {
                 ...latest,
                 reason: `Submission outcome is unknown; checking before any retry: ${(error as Error).message}`,
               });
+            } finally {
+              this.submitting.delete(job.id);
             }
             for (const pending of candidates) {
               const latest = this.store.job(pending.ownerId, pending.id)!;
@@ -520,9 +529,9 @@ export class GenerationQueue {
   /**
    * A job waiting behind another job on a busy worker moves to an idle one that can run it, one per
    * idle worker, higher tiers first; an idle worker with the job's model loaded goes first, then the
-   * first idle worker for manual work and the last for background work. A job on an idle worker
-   * without its model moves only to an idle worker that has it. Background work moves only while no
-   * manual work waits, so the worker manual work prefers stays free for it; a job never moves behind
+   * first idle worker for manual work and the last for background work. Model affinity only orders
+   * idle workers: it never keeps work waiting while one that can run it is idle. A job on an idle
+   * worker without its model moves only to an idle worker that has it, and a job never moves behind
    * higher-ranked work. Updates `all` in place.
    */
   private rebalance(
@@ -535,11 +544,6 @@ export class GenerationQueue {
     const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
     const pending = (job: OwnedJob) =>
       ["queued", "waiting"].includes(job.status) && !this.acceptedIds.has(job.id) && !held(job);
-    const manualWaits = all.some(
-      (job) =>
-        (pending(job) || (job.status === "writing" && !held(job))) &&
-        tier(job) === queuePriority.manual,
-    );
     // An unknown model never matches, so without model information nothing moves for affinity.
     const hasModel = (resource: string, job: OwnedJob) => {
       const loaded = this.loaded.get(resource);
@@ -556,8 +560,7 @@ export class GenerationQueue {
         ({ job }) =>
           pending(job) &&
           (occupied.has(job.resource) || (modelOf(job.input) && !hasModel(job.resource, job))) &&
-          !this.scheduling.has(job.resource) &&
-          (tier(job) === queuePriority.manual || !manualWaits),
+          !this.scheduling.has(job.resource),
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
     for (const { job, index } of movable) {
