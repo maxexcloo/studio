@@ -29,7 +29,8 @@
   flex: 1;
 }
 
-/* The chips take the row's free width and scroll sideways, so filters never change its height. */
+/* The chips take the row's free width and scroll sideways, so filters never change its height.
+   Phones, short of room, give them a row of their own. */
 .chips {
   flex: 1;
   min-width: 0;
