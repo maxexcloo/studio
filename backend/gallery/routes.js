@@ -160,6 +160,11 @@ export function registerGalleryReadRoutes(app, { jobChats, near, similar, store 
       cursor,
       includeFailed,
       uploads: query.uploads === "1",
+      // The account and every parameter but the page's own name the filter's list.
+      filterKey: JSON.stringify([
+        account?.userId ?? "",
+        Object.entries(query).filter(([key]) => key !== "cursor" && key !== "limit"),
+      ]),
       filter: (item) =>
         recordBelongsToAccount(item, account) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&

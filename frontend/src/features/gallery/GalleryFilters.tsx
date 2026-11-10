@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, X, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api } from "../../api";
 import { usePhone } from "../../ui/usePhone";
@@ -309,6 +309,43 @@ export function FilterButton({
 }
 
 /**
+ * A filter chip that turns on and off with one tap, pressed while on. With an `icon`, phones show the
+ * icon alone, named by `label` and its tooltip.
+ */
+export function FilterToggle({
+  label,
+  on,
+  onToggle,
+  icon: Icon,
+  title,
+  children = label,
+}: {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+  icon?: LucideIcon;
+  title?: string;
+  children?: ReactNode;
+}) {
+  const iconOnly = usePhone() && Icon !== undefined;
+  return (
+    <Tooltip label={label} disabled={!iconOnly}>
+      <Button
+        {...(iconOnly ? iconChipProps : chipProps)}
+        aria-label={iconOnly ? label : undefined}
+        aria-pressed={on}
+        title={title}
+        variant={on ? "light" : "default"}
+        leftSection={Icon && !iconOnly ? <Icon size={15} /> : undefined}
+        onClick={onToggle}
+      >
+        {Icon && iconOnly ? <Icon size={16} /> : children}
+      </Button>
+    </Tooltip>
+  );
+}
+
+/**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
  * (Grid or Runs) on its own row, then Show (All, Starred or Uploads, one at a time), the view's
  * own `toggles` (such as All Versions), the date and each facet. Choices apply at once.
@@ -355,13 +392,12 @@ export function GalleryFilterPanel({
         {options[key].map((option) => {
           const on = value[key].includes(option.value);
           return (
-            <Button
+            <FilterToggle
               key={option.value}
-              {...chipProps}
-              aria-pressed={on}
+              label={option.label}
               title={option.description}
-              variant={on ? "light" : "default"}
-              onClick={() =>
+              on={on}
+              onToggle={() =>
                 onChange({
                   ...value,
                   [key]: on
@@ -376,7 +412,7 @@ export function GalleryFilterPanel({
                   {option.count}
                 </Text>
               )}
-            </Button>
+            </FilterToggle>
           );
         })}
       </Group>

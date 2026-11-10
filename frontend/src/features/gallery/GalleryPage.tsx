@@ -125,8 +125,8 @@ export function GalleryPage() {
     [search, kind, filters, similar, setId],
   );
   const galleryPage = useCallback(
-    (cursor: string) => {
-      const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
+    (cursor: string, limit = 60) => {
+      const params = new URLSearchParams({ limit: String(limit), cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
       if (similar) params.set("similar", similar);
       if (setId) params.set("set", setId);
@@ -134,10 +134,17 @@ export function GalleryPage() {
     },
     [search, kind, filters, similar, setId],
   );
+  // The gallery key (as JSON) whose every match a quick select is loading: its later pages, refetches
+  // included, then come 500 at a time.
+  const everyMatch = useRef("");
   const gallery = useInfiniteQuery({
     queryKey: galleryKey,
     initialPageParam: "",
-    queryFn: ({ pageParam }) => galleryPage(pageParam),
+    queryFn: ({ pageParam, queryKey }) =>
+      galleryPage(
+        pageParam,
+        pageParam && everyMatch.current === JSON.stringify(queryKey) ? 500 : 60,
+      ),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     // Search and filter changes keep the current results until the new ones arrive; switching
     // between Images and Videos never shows the other mode's results.
@@ -214,7 +221,17 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
-  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters, similar]));
+  const loadEveryMatch = useCallback(async () => {
+    everyMatch.current = JSON.stringify(galleryKey);
+    let result = gallery;
+    while (result.hasNextPage && !result.isFetchNextPageError)
+      result = await result.fetchNextPage({ cancelRefetch: false });
+    return !result.hasNextPage;
+  }, [galleryKey, gallery]);
+  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters, similar]), {
+    complete: !gallery.hasNextPage,
+    load: loadEveryMatch,
+  });
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   const clearFilters = () => {
@@ -277,7 +294,7 @@ export function GalleryPage() {
           !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
         ) {
           event.preventDefault();
-          selection.select(() => true);
+          selection.selectMatching(() => true);
         }
       }}
       // Files or folders dropped on the gallery (not on the composer, which takes references) upload.
@@ -293,80 +310,74 @@ export function GalleryPage() {
       }}
     >
       <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
-      {selection.selecting ? (
-        <GallerySelectionBar
-          selection={{ ...selection, end: doneSelecting }}
-          tryAgain={tryAgain}
-          menu={menu}
-          onMenuClose={() => setMenu(null)}
-        />
-      ) : (
-        <GalleryToolbar
-          query={query}
-          onQueryChange={setQuery}
-          kind={kind}
-          value={filters}
-          onChange={setFilters}
-          count={gallery.data?.pages.at(-1)?.totalApprox}
-          extraChips={[
-            ...(similar
-              ? [
-                  {
-                    key: "similar",
-                    label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
-                    remove: removeSimilar,
-                  },
-                ]
-              : []),
-            ...(setId
-              ? [
-                  {
-                    key: "set",
-                    label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
-                    remove: () =>
-                      setParams(
-                        (next) => {
-                          next.delete("set");
-                          return next;
-                        },
-                        { replace: true },
-                      ),
-                  },
-                ]
-              : []),
-            ...(grouped
-              ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
-              : []),
-          ]}
-          view={
-            <SegmentedControl
-              aria-label="Gallery View"
-              fullWidth
-              radius="xl"
-              mt={4}
-              value={view}
-              onChange={(value) => setView(value as "grid" | "runs")}
-              data={[
+      {/* The search and filters stay in place while selecting; the selection bar follows them. */}
+      <GalleryToolbar
+        query={query}
+        onQueryChange={setQuery}
+        kind={kind}
+        value={filters}
+        onChange={setFilters}
+        count={gallery.data?.pages.at(-1)?.totalApprox}
+        extraChips={[
+          ...(similar
+            ? [
                 {
-                  value: "grid",
-                  label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
+                  key: "similar",
+                  label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
+                  remove: removeSimilar,
                 },
-                { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
-              ]}
+              ]
+            : []),
+          ...(setId
+            ? [
+                {
+                  key: "set",
+                  label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
+                  remove: () =>
+                    setParams(
+                      (next) => {
+                        next.delete("set");
+                        return next;
+                      },
+                      { replace: true },
+                    ),
+                },
+              ]
+            : []),
+          ...(grouped
+            ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
+            : []),
+        ]}
+        view={
+          <SegmentedControl
+            aria-label="Gallery View"
+            fullWidth
+            radius="xl"
+            mt={4}
+            value={view}
+            onChange={(value) => setView(value as "grid" | "runs")}
+            data={[
+              {
+                value: "grid",
+                label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
+              },
+              { value: "runs", label: <ViewLabel icon={<Rows3 size={14} />} text="Runs" /> },
+            ]}
+          />
+        }
+        toggles={
+          view === "grid" && (
+            <Switch
+              label="All Versions"
+              checked={allVersions}
+              onChange={(event) => setAllVersions(event.currentTarget.checked)}
             />
-          }
-          toggles={
-            view === "grid" && (
-              <Switch
-                label="All Versions"
-                checked={allVersions}
-                onChange={(event) => setAllVersions(event.currentTarget.checked)}
-              />
-            )
-          }
-          actions={
-            <>
-              <GalleryUpload upload={upload} />
+          )
+        }
+        actions={
+          <>
+            <GalleryUpload upload={upload} />
+            {!selection.selecting && (
               <Tooltip label="Select Items" disabled={!phone}>
                 <Button
                   {...(phone ? iconChipProps : chipProps)}
@@ -379,8 +390,16 @@ export function GalleryPage() {
                   {phone ? <SquareCheck size={16} /> : "Select"}
                 </Button>
               </Tooltip>
-            </>
-          }
+            )}
+          </>
+        }
+      />
+      {selection.selecting && (
+        <GallerySelectionBar
+          selection={{ ...selection, end: doneSelecting }}
+          tryAgain={tryAgain}
+          menu={menu}
+          onMenuClose={() => setMenu(null)}
         />
       )}
       {gallery.isPending ? (

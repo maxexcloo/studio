@@ -185,7 +185,8 @@ the primary component reference and verify APIs against the installed version.
   Delete last. Elsewhere the viewer bar shows every action, wrapping onto another
   row rather than using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
-  bar and confirms deletion.
+  bar under the search and filters, which stay in place; its quick selects take
+  every match, not only loaded pages, and it confirms deletion.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds under Expand; its tags always show. Prompt and
   Negative Prompt alone have a Copy beside their heading.

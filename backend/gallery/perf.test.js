@@ -102,6 +102,24 @@ test("paging through 50,000 items reads each page from one sorted list, without 
   );
 });
 
+test("paging through a search filters the gallery once, not once per page", () => {
+  setGallery(bigGallery(5000), { persist: false });
+  let tested = 0;
+  const filter = (item) => {
+    tested += 1;
+    return item.type === "video";
+  };
+  const seen = [];
+  let cursor = "";
+  do {
+    const page = pageGallery({ limit: 100, cursor, filter, filterKey: "videos" });
+    seen.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+  assert.equal(seen.length, store.gallery.filter((item) => item.type === "video").length);
+  assert.equal(tested, 5000, "each item is tested once across every page");
+});
+
 test("a change to the gallery shows on the next page request", () => {
   setGallery(bigGallery(1000), { persist: false });
   assert.equal(pageGallery({ limit: 5 }).totalApprox, 1000);
