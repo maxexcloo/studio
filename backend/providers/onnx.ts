@@ -40,7 +40,7 @@ export function createModelFiles({
     if (fs.existsSync(file(name))) return;
     const response = await fetch(files[name]);
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${name}`);
-    fs.mkdirSync(directory, { recursive: true });
+    fs.mkdirSync(path.dirname(file(name)), { recursive: true });
     const partial = `${file(name)}.part`;
     try {
       await pipeline(
