@@ -1,14 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import {
-  closeReferences,
-  create,
-  fixtures,
-  image,
-  pickerTab,
-  showUploads,
-  stamp,
-  expectNoChatOpen,
-} from "./fixtures";
+import { closeReferences, create, fixtures, image, pickerTab, stamp } from "./fixtures";
 
 function referenceItem() {
   return {
@@ -36,55 +27,7 @@ async function referenceSearch(page: Page) {
   return references.getByRole("textbox", { name: "Search Gallery", exact: true });
 }
 
-test("Mode navigation keeps the unsent Chat reference and resumes the selected source lineage", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  state.gallery.push(referenceItem());
-  await page.goto("/chat");
-  const message = page.getByRole("textbox", { name: "Message", exact: true });
-  await message.fill("Create a blue bird");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })
-    .click();
-  await finishReferences(page);
-  await page.getByRole("link", { name: "Images", exact: true }).first().click();
-  const galleryPrompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await galleryPrompt.fill("Independent gallery direction");
-  await page.getByRole("link", { name: "Chat", exact: true }).first().click();
-  await expect(message).toHaveValue("Create a blue bird");
-  await message.focus();
-  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(1);
-  const sessionId = state.jobs[0].sessionId;
-  await expect(page).toHaveURL(new RegExp(`/chat/${sessionId}$`));
-  expect(state.chatRequests[0].references).toEqual(["asset-copper-reference"]);
-  await message.fill("Keep the same source, but discuss softer lighting");
-  await page.getByRole("link", { name: "Images", exact: true }).first().click();
-  await expect(galleryPrompt).toHaveValue("Independent gallery direction");
-  await page.getByRole("link", { name: "Chat", exact: true }).first().click();
-  await expect(page).toHaveURL(new RegExp(`/chat/${sessionId}$`));
-  await expect(message).toHaveValue("Keep the same source, but discuss softer lighting");
-  await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect.poll(() => state.chatRequests.length).toBe(2);
-  expect(state.chatRequests[1].generation.parentJobId).toBe(state.jobs[0].id);
-  expect(state.chatRequests[1].references).toEqual(state.chatRequests[0].references);
-  expect(state.sessions).toHaveLength(1);
-  // Closing the open chat leaves an empty draft, where the next message starts a new chat.
-  await page.getByRole("button", { name: "Close Chat", exact: true }).click();
-  await expect(page).toHaveURL(/\/chat$/);
-  await expectNoChatOpen(page);
-  await message.fill("A new independent discussion");
-  await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect.poll(() => state.sessions.length).toBe(2);
-  await expect.poll(() => state.chatRequests.length).toBe(3);
-  expect(state.chatRequests[2].references).toEqual([]);
-  expect(state.chatRequests[2].generation.parentJobId).toBeUndefined();
-});
-
-test("Reference browsing keeps its scroll, query and filters, Uploads included, in gallery and timeline editors", async ({
+test("Reference browsing keeps its scroll, query and filters in the gallery editor", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -117,27 +60,4 @@ test("Reference browsing keeps its scroll, query and filters, Uploads included, 
   await finishReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  await page.goto(`/chat/${state.jobs[0].sessionId}`);
-  await page.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
-  await page
-    .getByRole("article", { name: "Iteration 1", exact: true })
-    .getByRole("button", { name: "Choose References", exact: true })
-    .click();
-  await showUploads(page);
-  await page.getByRole("textbox", { name: "Search Uploads", exact: true }).fill("Watercolour");
-  await finishReferences(page);
-  await page
-    .getByRole("article", { name: "Iteration 1", exact: true })
-    .getByRole("button", { name: "Choose References", exact: true })
-    .click();
-  await expect(page.getByRole("textbox", { name: "Search Uploads", exact: true })).toHaveValue(
-    "Watercolour",
-  );
-  await finishReferences(page);
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("Keep the picked copper reference");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(2);
-  expect(state.jobs[1].input.referenceAssets).toEqual(state.jobs[0].input.referenceAssets);
 });

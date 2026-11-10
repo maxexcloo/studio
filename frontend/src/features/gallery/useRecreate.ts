@@ -21,27 +21,24 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
         galleryItemId: item.id,
       }),
     onSuccess: ({ sessionId, jobId }) => {
-      changeKind(item.type, "gallery");
-      setDraft(
-        (previous) => ({
-          ...previous,
-          sessionId,
-          operation: item.type === "video" ? "animate" : "image",
-          parentJobId: jobId,
-          parentItemId: item.id,
-          presetId: undefined,
-          presetTitle: undefined,
-          references: [],
-          input: {
-            ...previous.input,
-            prompt: item.suggestedPrompt || "",
-            seed: "",
-            referenceAssets: [],
-            referenceDetails: [],
-          },
-        }),
-        "gallery",
-      );
+      changeKind(item.type);
+      setDraft((previous) => ({
+        ...previous,
+        sessionId,
+        operation: item.type === "video" ? "animate" : "image",
+        parentJobId: jobId,
+        parentItemId: item.id,
+        presetId: undefined,
+        presetTitle: undefined,
+        references: [],
+        input: {
+          ...previous.input,
+          prompt: item.suggestedPrompt || "",
+          seed: "",
+          referenceAssets: [],
+          referenceDetails: [],
+        },
+      }));
       onApplied();
       openComposer(item.type);
     },

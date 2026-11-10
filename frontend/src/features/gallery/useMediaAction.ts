@@ -1,6 +1,5 @@
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { useLocation, useNavigate } from "react-router";
 import { useOpenComposer } from "../generation/openComposer";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
@@ -57,7 +56,6 @@ export async function mediaDraft(
   operation: Operation,
   profiles: Profile[],
   client: QueryClient,
-  sessionId?: string,
   videos?: VideosPreference,
 ) {
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
@@ -92,7 +90,7 @@ export async function mediaDraft(
     );
   const queue = await client.fetchQuery(queueQuery);
   const source = queue.jobs.find((job) => job.id === item.jobId);
-  const sourceSession = sessionId || source?.sessionId || "";
+  const sourceSession = source?.sessionId || "";
   let asset: ReferenceAsset | undefined;
   if (operation !== "image")
     asset = (
@@ -162,7 +160,7 @@ export async function mediaDraft(
       sessionId: sourceSession,
       operation: (operation === "extend" ? "animate" : operation) as "image" | "refine" | "animate",
       parentJobId: sourceSession ? item.jobId : undefined,
-      // Every run from the item records it, also outside its Chat, so its results stay versions.
+      // Every run from the item records it, also outside its session, so its results stay versions.
       parentItemId: item.id,
       references: preparedReferences,
       input: {
@@ -195,11 +193,9 @@ export async function mediaDraft(
   };
 }
 
-/** Prepares the composer (or a Chat card) to refine, animate or recreate a result. */
-export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: () => void) {
-  const { setDraft, profiles, setStaged } = useGenerationActions();
-  const navigate = useNavigate();
-  const location = useLocation();
+/** Prepares the composer to refine, animate or recreate a result. */
+export function useMediaAction(item: MediaItem, prepared?: () => void) {
+  const { setDraft, profiles } = useGenerationActions();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
   const openComposer = useOpenComposer();
@@ -210,7 +206,6 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
         operation,
         profiles,
         client,
-        sessionId,
         videos,
       );
       // The composer's profile chip doesn't say where a video runs, nor why it runs elsewhere.
@@ -220,16 +215,10 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
           : undefined;
       const message = note || choice?.note || cloud;
       if (message) notifications.show({ message });
-      // Chat stages a card with its own input; the gallery loads the composer.
-      if (location.pathname.startsWith("/chat")) setStaged(draft);
-      else setDraft(draft);
+      setDraft(draft);
       prepared?.();
-      // The gallery composer opens on the page for the draft's kind (an Animate draft lands in
-      // Videos); elsewhere a Chat result returns to its Chat.
-      const gallery = ["/images", "/video"].includes(location.pathname);
-      if (gallery || !draft.sessionId) openComposer(draft.input.kind);
-      else if (location.pathname !== `/chat/${draft.sessionId}`)
-        navigate(`/chat/${draft.sessionId}`);
+      // The gallery composer opens on the page for the draft's kind (an Animate draft lands in Videos).
+      openComposer(draft.input.kind);
     },
   });
 }
@@ -262,15 +251,15 @@ type PromptOperation = "image" | "refine" | "animate";
  * Count), an exact repeat, an animation whose motion prompt the assistant writes from a theme
  * as the queue item's first stage, or a given prompt. Resolves to the new job's ID.
  */
-export function useMediaIteration(item: MediaItem, sessionId?: string) {
-  const iterate = useIterate(sessionId);
+export function useMediaIteration(item: MediaItem) {
+  const iterate = useIterate();
   return useItemMutation(item.id, "iterate", {
     mutationFn: (iteration: Iteration) => iterate(item, iteration),
   });
 }
 
 /** `useMediaIteration`'s run for any item, so a selection can iterate each of its items. */
-export function useIterate(sessionId?: string) {
+export function useIterate() {
   const { profiles, input: composer } = useGeneration();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
@@ -283,7 +272,6 @@ export function useIterate(sessionId?: string) {
       given?.operation ?? (animate ? "animate" : "image"),
       profiles,
       client,
-      sessionId,
       videos,
     );
     // An animation that can't run where the account prefers says where it runs instead.
@@ -337,9 +325,7 @@ export function useIterate(sessionId?: string) {
         queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
       );
     void Promise.all(
-      [queueQuery.queryKey, ["gallery"], ["sessions"], ["session", session]].map((queryKey) =>
-        client.invalidateQueries({ queryKey }),
-      ),
+      [queueQuery.queryKey, ["gallery"]].map((queryKey) => client.invalidateQueries({ queryKey })),
     );
     return result.jobId;
   };
@@ -356,7 +342,7 @@ interface AnimateReview extends WrittenPrompt {
  * Writes Animate's motion prompt without queuing it, for Review Prompt First: the same writer as the
  * queue's writing stage (backend/prompt-animate.js), from the same frame and video model.
  */
-export function useAnimateWriter(item: MediaItem, sessionId?: string) {
+export function useAnimateWriter(item: MediaItem) {
   const { profiles } = useGenerationActions();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
@@ -377,7 +363,6 @@ export function useAnimateWriter(item: MediaItem, sessionId?: string) {
         "animate",
         profiles,
         client,
-        sessionId,
         videos,
       );
       // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.

@@ -92,7 +92,7 @@ export function ReferencePicker({
     next: { references: ReferenceAsset[]; prompt: string },
   ) => void;
   browser?: ReferenceBrowser;
-  /** The text a character's description joins: the editor's prompt or Chat's message. */
+  /** The text a character's description joins: the editor's prompt. */
   prompt?: { value: string; onChange: (value: string) => void };
   compact?: boolean;
   value?: ReferenceAsset[];

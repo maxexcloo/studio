@@ -12,7 +12,7 @@ interface StartRequest {
 }
 
 /**
- * An administrator's explicit start of a stopped workload, such as a Chat model: a free GPU starts
+ * An administrator's explicit start of a stopped workload, such as a parked profile's: a free GPU starts
  * it at once, a switch that stops others asks first and names them. Progress follows the runtime
  * change until the workload is ready. `enabled` is the Settings › Workers permission.
  */

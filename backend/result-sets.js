@@ -4,7 +4,7 @@ import { directRoute } from "./domain/direct-route.ts";
 
 const variations = 2;
 
-/** The prompts an MCP result set holds so far, among its Chat's jobs, oldest first. */
+/** The prompts an MCP result set holds so far, among its session's jobs, oldest first. */
 export function setPrompts(store, job) {
   const id = job.input.resultSet?.id;
   return store
@@ -15,7 +15,7 @@ export function setPrompts(store, job) {
 
 /**
  * `POST /api/result-sets/more` with `{ itemId }` queues two variations of the item's set, each with
- * its run's settings, into the set's Chat, after the set's last prompt. `item(ownerId, id)` is
+ * its run's settings, into the set's session, after the set's last prompt. `item(ownerId, id)` is
  * the owner's visible gallery item; `admit` is domain/admission.ts's.
  */
 export function registerResultSetRoutes(app, { store, admit, item }) {

@@ -7,16 +7,6 @@
   width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
 }
 
-/* Chat keeps its composer in the conversation column instead of floating it. */
-.dock[data-chat] {
-  position: static;
-  transform: none;
-  width: 100%;
-  max-width: var(--studio-composer-width);
-  margin-inline: auto;
-  flex-shrink: 0;
-}
-
 .dock textarea {
   font-size: 1rem;
 }
@@ -27,10 +17,6 @@
 
 .surface:focus-within {
   border-color: var(--mantine-color-dimmed);
-}
-
-.dock[data-chat] .surface {
-  box-shadow: var(--mantine-shadow-sm);
 }
 
 .dock[data-reference-drop] > .surface {

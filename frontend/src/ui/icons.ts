@@ -1,6 +1,4 @@
 import {
-  Archive,
-  ArchiveRestore,
   Blend,
   CirclePause,
   CirclePlay,
@@ -10,6 +8,7 @@ import {
   Copy,
   Download,
   Ellipsis,
+  ExternalLink,
   Eye,
   EyeOff,
   GalleryHorizontalEnd,
@@ -21,7 +20,7 @@ import {
   Lightbulb,
   ListFilter,
   MapPinned,
-  MessageSquareShare,
+  MessageCircle,
   Moon,
   Pencil,
   Play,
@@ -55,13 +54,12 @@ export const icons = {
   /** Making a new record, such as New Character. */
   add: Plus,
   animate: Play,
-  /** Archiving a chat keeps it out of the Chats list; Unarchive brings it back. */
-  archive: Archive,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
   /** Character cards: their tab, section and Make Character. */
   character: ContactRound,
-  chat: MessageSquareShare,
+  /** The chat site (LibreChat) the navigation links to. */
+  chat: MessageCircle,
   clear: X,
   /** Comparing variants: Compare runs and the composer's Compare. */
   compare: Blend,
@@ -75,6 +73,8 @@ export const icons = {
   download: Download,
   dream: Moon,
   edit: Pencil,
+  /** A link that opens another site in a new tab. */
+  external: ExternalLink,
   filter: ListFilter,
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
@@ -86,7 +86,7 @@ export const icons = {
   /** An outfit card (Library › Outfits). */
   outfit: Shirt,
   moreLikeThis: Wand,
-  /** Opening every result of a run or Chat iteration in the viewer. */
+  /** Opening every result of a run in the viewer. */
   openAll: GalleryHorizontalEnd,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
@@ -112,7 +112,6 @@ export const icons = {
   stop: Square,
   /** Short changes offered for an image or draft. */
   suggestions: Lightbulb,
-  unarchive: ArchiveRestore,
   undo: Undo2,
   upload: Upload,
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */

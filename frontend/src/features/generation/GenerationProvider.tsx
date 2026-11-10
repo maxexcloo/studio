@@ -109,7 +109,6 @@ const empty: Draft = {
   presetTitle: undefined,
 };
 const emptyProfiles: Profile[] = [];
-type Workspace = "chat" | "gallery";
 const initialDrafts: Record<MediaKind, Draft> = {
   image: empty,
   video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
@@ -126,44 +125,33 @@ function savedDrafts(key: string): Record<MediaKind, Draft> {
   });
   return { image: restore("image"), video: restore("video") };
 }
-function useGenerationState(workspace: Workspace, remember: boolean) {
-  // A Chat card staged by Edit, Animate or Recreate keeps its own input beside the composer's.
-  const [staged, setStaged] = useState<Draft | null>(null);
+function useGenerationState() {
   // The gallery composer's drafts survive a reload, remembered as they change.
-  const rememberedKey = useRememberedKey("composer-draft");
-  const storageKey = remember ? rememberedKey : "";
+  const storageKey = useRememberedKey("composer-draft");
   const [restored] = useState(() => savedDrafts(storageKey));
-  const drafts = useRef({ chat: { ...initialDrafts }, gallery: restored });
-  const chatForm = useForm<Draft>({ mode: "controlled", initialValues: empty });
-  const galleryForm = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
-  const galleryDraft = galleryForm.values;
-  useEffect(() => {
-    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(drafts.current.gallery));
-  }, [galleryDraft, storageKey]);
-  const form = workspace === "chat" ? chatForm : galleryForm;
+  const drafts = useRef(restored);
+  const form = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
   const draft = form.values;
-  const forms = useRef({ chat: chatForm, gallery: galleryForm });
-  forms.current = { chat: chatForm, gallery: galleryForm };
-  const setDraft = useCallback(
-    (value: Draft | ((previous: Draft) => Draft), target: Workspace = workspace) => {
-      const targetForm = forms.current[target];
-      const previous = targetForm.getValues();
-      const next = {
-        ...empty,
-        ...(typeof value === "function" ? value(previous) : value),
-      };
-      drafts.current[target][previous.input.kind] = previous;
-      drafts.current[target][next.input.kind] = next;
-      targetForm.setValues(next);
-    },
-    [workspace],
-  );
+  useEffect(() => {
+    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(drafts.current));
+  }, [draft, storageKey]);
+  const formRef = useRef(form);
+  formRef.current = form;
+  const setDraft = useCallback((value: Draft | ((previous: Draft) => Draft)) => {
+    const previous = formRef.current.getValues();
+    const next = {
+      ...empty,
+      ...(typeof value === "function" ? value(previous) : value),
+    };
+    drafts.current[previous.input.kind] = previous;
+    drafts.current[next.input.kind] = next;
+    formRef.current.setValues(next);
+  }, []);
   const changeKind = useCallback(
-    (kind: MediaKind, target: Workspace = workspace) => {
-      if (forms.current[target].getValues().input.kind !== kind)
-        setDraft(drafts.current[target][kind], target);
+    (kind: MediaKind) => {
+      if (formRef.current.getValues().input.kind !== kind) setDraft(drafts.current[kind]);
     },
-    [setDraft, workspace],
+    [setDraft],
   );
   const models = useQuery({ ...modelsQuery, refetchInterval: 15000 });
   const profiles = models.data?.profiles ?? emptyProfiles;
@@ -198,34 +186,22 @@ function useGenerationState(workspace: Workspace, remember: boolean) {
     profile,
     models,
     selectProfile,
-    staged,
-    setStaged,
   };
 }
 const Context = createContext<ReturnType<typeof useGenerationState> | null>(null);
 const GenerationActionsContext = createContext<Pick<
   ReturnType<typeof useGenerationState>,
-  "profiles" | "setDraft" | "changeKind" | "setStaged"
+  "profiles" | "setDraft" | "changeKind"
 > | null>(null);
-export function GenerationProvider({
-  children,
-  workspace,
-  remember = false,
-}: {
-  children: ReactNode;
-  workspace: Workspace;
-  /** Keeps the gallery draft across reloads: the page's provider, not a surface's own. */
-  remember?: boolean;
-}) {
-  const value = useGenerationState(workspace, remember);
+export function GenerationProvider({ children }: { children: ReactNode }) {
+  const value = useGenerationState();
   const actions = useMemo(
     () => ({
       profiles: value.profiles,
       setDraft: value.setDraft,
       changeKind: value.changeKind,
-      setStaged: value.setStaged,
     }),
-    [value.profiles, value.setDraft, value.changeKind, value.setStaged],
+    [value.profiles, value.setDraft, value.changeKind],
   );
   return (
     <GenerationActionsContext.Provider value={actions}>

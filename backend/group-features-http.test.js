@@ -7,8 +7,8 @@ import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-// A member of a group saved without Chat, Dream or Prompt Assistant settings, as groups were before
-// they existed, and a member of a group that turns all three off.
+// A member of a group saved without Dream or Prompt Assistant settings, as groups were before they
+// existed, and a member of a group that turns both off.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-group-features-"));
 let child;
 let base = "";
@@ -55,7 +55,7 @@ before(async () => {
       id: "limited",
       name: "Limited",
       allModels: true,
-      features: { chat: false, dream: false, promptAssistant: false },
+      features: { dream: false, promptAssistant: false },
     },
   ]) {
     const saved = await call("/api/accounts/profiles", {
@@ -95,15 +95,6 @@ test("Dream is on unless the account's group turns it off", { timeout: 30_000 },
   const refused = await call("/api/dream", { cookie: cookies.limited });
   assert.equal(refused.status, 403);
   assert.equal(refused.body.error, "Dream is unavailable for this account.");
-});
-
-test("Chat is on unless the account's group turns it off", { timeout: 30_000 }, async () => {
-  const off = "Chat is off for this account.";
-  assert.notEqual((await call("/api/chat/status", { cookie: cookies.member })).body.reason, off);
-  assert.equal((await call("/api/chat/status", { cookie: cookies.limited })).body.reason, off);
-  const refused = await call("/api/sessions/any/chat", { cookie: cookies.limited });
-  assert.equal(refused.status, 403);
-  assert.equal(refused.body.error, off);
 });
 
 test(

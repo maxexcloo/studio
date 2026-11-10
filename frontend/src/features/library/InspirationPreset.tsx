@@ -56,14 +56,11 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
             variant="default"
             size="sm"
             onClick={() => {
-              changeKind(kind, "gallery");
-              setDraft(
-                (previous) => ({
-                  ...previous,
-                  input: { ...previous.input, prompt: preset.prompt },
-                }),
-                "gallery",
-              );
+              changeKind(kind);
+              setDraft((previous) => ({
+                ...previous,
+                input: { ...previous.input, prompt: preset.prompt },
+              }));
               openComposer(kind);
             }}
           >
@@ -74,19 +71,16 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
             disabled={!!fit.blockers.length}
             onClick={() => {
               if (!profile) return;
-              setDraft(
-                (previous) => ({
-                  ...previous,
-                  input: inspirationInput(preset, previous.input, profile),
-                  references: [],
-                  operation: kind === "video" ? "animate" : "image",
-                  parentJobId: undefined,
-                  parentItemId: undefined,
-                  presetId: undefined,
-                  presetTitle: undefined,
-                }),
-                "gallery",
-              );
+              setDraft((previous) => ({
+                ...previous,
+                input: inspirationInput(preset, previous.input, profile),
+                references: [],
+                operation: kind === "video" ? "animate" : "image",
+                parentJobId: undefined,
+                parentItemId: undefined,
+                presetId: undefined,
+                presetTitle: undefined,
+              }));
               openComposer(kind);
             }}
           >

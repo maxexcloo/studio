@@ -19,22 +19,20 @@ import {
  */
 export function AnimateDialog({
   item,
-  sessionId,
   iterate,
   theme,
   onClose,
 }: {
   item: MediaItem;
-  sessionId?: string;
   iterate?: (iteration: Iteration) => void;
   theme: AnimateTheme;
   onClose: () => void;
 }) {
   const phone = usePhone();
-  const iteration = useMediaIteration(item, sessionId);
+  const iteration = useMediaIteration(item);
   const run = iterate ?? iteration.mutate;
   const [review] = useAnimateReview();
-  const writer = useAnimateWriter(item, sessionId);
+  const writer = useAnimateWriter(item);
   const [instruction, setInstruction] = useState("");
   const [prompt, setPrompt] = useState("");
   const writing = useRef<AbortController>(null);

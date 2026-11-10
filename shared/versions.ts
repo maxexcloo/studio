@@ -27,7 +27,7 @@ const model = (input: GenerationInput) => String(input.profileId || input.model 
 /**
  * Whether a run made from a result (its recorded `parentItemId`) is one of that result's versions,
  * an iteration of it, rather than a new image derived from it. Every iteration is, whatever model
- * or operation it uses: an edit or animation (Edit, Animate, the viewer's prompt, a Chat edit)
+ * or operation it uses: an edit or animation (Edit, Animate, the viewer's prompt)
  * works on the result itself, and a fresh run from its settings (Edit Prompt, Run Again, Repeat Exactly,
  * on any model) keeps at least `versionPromptOverlap` of its prompt. Only a fresh run that replaces
  * most of the prompt, using the result as a reference or starting point for something new, is
@@ -54,7 +54,7 @@ export const resultInput = (item: {
 
 /**
  * The result of `parent` that a run's first reference is (the image, or a video's last frame), so
- * the run was made from it. Chat records its runs' sources this way.
+ * the run was made from it. A session records its runs' sources this way.
  */
 export function referencedResult(
   input: GenerationInput,

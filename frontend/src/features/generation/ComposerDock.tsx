@@ -1,5 +1,5 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useLocation, useSearchParams } from "react-router";
@@ -13,18 +13,16 @@ import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
-/** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
-export function ComposerDock({ chat }: { chat?: ReactNode }) {
+/** The gallery's generation composer; it answers `?compose=1` and shared images. */
+export function ComposerDock() {
   const [params, setParams] = useSearchParams();
-  // The gallery's composer answers `?compose=1` and shared images.
-  const main = !chat;
-  const [opened, { open, close }] = useDisclosure(main && params.get("compose") === "1");
+  const [opened, { open, close }] = useDisclosure(params.get("compose") === "1");
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
   const [compactFocused, setCompactFocused] = useState(false);
   // Exactly one prompt is exposed: the compact bar until the panel has slid in or taken focus.
-  const handingOver = !chat && opened && !expanded && compactFocused;
+  const handingOver = opened && !expanded && compactFocused;
   const phone = usePhone();
   const motionDuration = useMotionDuration();
   const dock = useRef<HTMLDivElement>(null);
@@ -74,7 +72,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     }
   }
   const controlsId = useId();
-  const keyboard = useKeyboard(!chat && phone && opened);
+  const keyboard = useKeyboard(phone && opened);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation; it ends as the text loses focus or the keyboard drops (Android's
   // Back keeps focus). The bar's lift still follows the viewport.
@@ -97,13 +95,13 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const dockKeyboard = useKeyboard(typingInDock);
   const keyboardInset = dockKeyboard.inset;
   useEffect(() => {
-    if (main && params.get("compose") === "1") open();
-  }, [params, open, main]);
+    if (params.get("compose") === "1") open();
+  }, [params, open]);
   // An action staging a draft (`useOpenComposer`) opens the composer with its prompt focused, even
   // when it is already open; phones bring up the sheet and leave the keyboard down.
   const location = useLocation();
   useEffect(() => {
-    if (!main || !(location.state as OpenComposerState | null)?.openComposer) return;
+    if (!(location.state as OpenComposerState | null)?.openComposer) return;
     focusIntent.current = "[data-expanded-prompt]";
     open();
     if (phone) return;
@@ -113,9 +111,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         ?.focus({ preventScroll: true }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [location.key, main]);
+  }, [location.key]);
   // An image shared to the installed app (POST /share) arrives as a reference to place.
-  const shared = main ? params.get("shared") || "" : "";
+  const shared = params.get("shared") || "";
   useEffect(() => {
     if (!shared) return;
     void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
@@ -131,7 +129,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     setTappedField(false);
     close();
     setExpanded(false);
-    if (main && params.has("compose")) {
+    if (params.has("compose")) {
       const next = new URLSearchParams(params);
       next.delete("compose");
       setParams(next, { replace: true });
@@ -167,7 +165,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     },
     ["mousedown", "touchstart"],
     undefined,
-    !chat && !phone && opened,
+    !phone && opened,
   );
   const dockRef = useMergedRef(dock, outside);
   useEffect(() => {
@@ -187,8 +185,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         ref={dockRef}
         className={classes.dock}
         data-composer-dock
-        data-chat={chat ? true : undefined}
-        hidden={!chat && phone && opened && expanded}
+        hidden={phone && opened && expanded}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
         onDragOver={dragReferences}
@@ -197,7 +194,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         }}
         onDrop={dropReferences}
         onBlurCapture={(event) => {
-          if (chat || phone || !opened) return;
+          if (phone || !opened) return;
           const next = event.relatedTarget;
           const keyboardDeparture = tabbing.current;
           tabbing.current = false;
@@ -211,7 +208,6 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         onKeyDown={(event) => {
           tabbing.current = event.key === "Tab";
           if (
-            !chat &&
             !opened &&
             event.target instanceof HTMLTextAreaElement &&
             event.key === "Enter" &&
@@ -241,14 +237,13 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             // The safe area stands in for the gap rather than adding to it, so the bar sits as far
             // from the bottom as from the sides.
             bottom: `calc(max(var(--studio-composer-gap), env(safe-area-inset-bottom)) + ${keyboardInset}px)`,
-            marginBottom: chat ? keyboardInset : undefined,
             ...(typingInDock && {
               "--dock-room": `${window.innerHeight - dockKeyboard.top - keyboardInset}px`,
             }),
           } as CSSProperties
         }
       >
-        {(chat || !opened || !expanded) && (
+        {(!opened || !expanded) && (
           <Paper
             withBorder
             p={8}
@@ -256,12 +251,11 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             shadow="xl"
             className={classes.surface}
             // While handing over, it leaves the accessibility tree once focus has moved on.
-            aria-hidden={(!chat && opened && !compactFocused) || undefined}
+            aria-hidden={(opened && !compactFocused) || undefined}
             onFocus={() => setCompactFocused(true)}
             onBlur={() => setCompactFocused(false)}
             onClick={(event) => {
               if (
-                chat ||
                 (event.target as HTMLElement).closest('button,a,[role="radio"],input[type="radio"]')
               )
                 return;
@@ -269,10 +263,10 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               open();
             }}
           >
-            {chat || <GenerationForm compact />}
+            <GenerationForm compact />
           </Paper>
         )}
-        {!chat && !phone && (
+        {!phone && (
           <Transition
             mounted={opened}
             transition="slide-up"
@@ -306,7 +300,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           </Transition>
         )}
       </div>
-      {!chat && phone && (
+      {phone && (
         <Drawer
           onPaste={pasteReferences}
           onDragOver={dragReferences}

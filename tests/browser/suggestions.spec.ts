@@ -91,29 +91,6 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("A suggestion fills the empty Chat message with a request to create it", async ({ page }) => {
-  const state = await fixtures(page);
-  state.sessions.push({
-    id: "chat-a",
-    title: "Ideas",
-    inputs: {},
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
-  await suggest(page);
-  await page.goto("/chat/chat-a");
-  const message = page.getByRole("textbox", { name: "Message", exact: true });
-  await message.click();
-  const chip = page
-    .getByRole("group", { name: "Chat Inputs", exact: true })
-    .getByRole("combobox", { name: "Suggestions", exact: true });
-  await chip.click();
-  await page.getByRole("option", { name: ideas[0] }).click();
-  await expect(message).toHaveValue(`Create an image: ${ideas[0]}`);
-  await expect(chip).toHaveCount(0);
-  expect(state.chatRequests).toHaveLength(0);
-});
-
 test("Viewer Suggestions load in the menu, Refresh replaces them and Custom… hands over the field", async ({
   page,
 }) => {

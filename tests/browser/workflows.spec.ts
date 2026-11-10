@@ -1,63 +1,7 @@
 import { expect, test } from "@playwright/test";
-import {
-  create,
-  expandComposer,
-  fixtures,
-  openNav,
-  profiles,
-  stamp,
-  expectNoChatOpen,
-} from "./fixtures";
+import { expandComposer, fixtures, profiles, stamp } from "./fixtures";
 
-test("Image → Edit → Animate retains one session and can reopen saved work", async ({ page }) => {
-  const state = await fixtures(page);
-  await create(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
-  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(1);
-  await page.goto("/chat/session-1");
-  await expect(page.getByRole("button", { name: "Open image: An amber bird" })).toBeVisible();
-  await page
-    .getByRole("article", { name: "Iteration 1", exact: true })
-    .getByRole("button", { name: "Edit", exact: true })
-    .click();
-  // Edit and Animate stage their own card; the Chat composer keeps its references.
-  const edit = page.getByRole("region", { name: "Edit Iteration 1", exact: true });
-  await edit
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("An amber bird with silver wings");
-  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(1);
-  await edit.getByRole("button", { name: "Edit Image", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(2);
-  await expect(edit).toBeHidden();
-  await expect(page.getByText("Edited iteration 1", { exact: true })).toBeVisible();
-  await page
-    .getByRole("article", { name: "Iteration 2", exact: true })
-    .getByRole("button", { name: "Animate", exact: true })
-    .click();
-  // Animate offers the viewer's options; the composer stages a card.
-  await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
-  const animate = page.getByRole("region", { name: "Animate Iteration 2", exact: true });
-  await animate
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("The bird spreads its wings");
-  await animate.getByRole("button", { name: "Generate Video", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(3);
-  expect(state.jobs.map((j) => j.operation)).toEqual(["image", "refine", "animate"]);
-  expect(state.jobs[1].parentJobId).toBe("job-1");
-  expect(state.jobs[2].parentJobId).toBe("job-2");
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Open video: The bird spreads its wings" }),
-  ).toBeVisible();
-  await openNav(page, "Images");
-  // The edited image is a version of the first; Grid shows both until All Versions is off.
-  await expect(page.getByRole("button", { name: /^Open image: / })).toHaveCount(2);
-});
-
-test("Images and Videos tabs keep an expanding bottom composer while Chat keeps sessions beside the media", async ({
-  page,
-}, testInfo) => {
+test("Images and Videos tabs keep an expanding bottom composer", async ({ page }, testInfo) => {
   const state = await fixtures(page);
   await page.goto("/");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
@@ -113,13 +57,9 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await expect(page).toHaveURL(/\/video$/);
   await expect(page.getByRole("heading", { name: "Videos", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Generate Video", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Chat", exact: true }).first().click();
-  await expectNoChatOpen(page);
-  // The Chat stays New Chat until the text model titles it.
-  await expect(page.getByRole("link", { name: /New Chat/ }).first()).toBeVisible();
 });
 
-test("Retry pending state is shared while unrelated jobs remain cancellable", async ({ page }) => {
+test("Retry pending state holds while unrelated jobs remain cancellable", async ({ page }) => {
   const state = await fixtures(page);
   const input = {
     ...profiles[0].defaults,
@@ -128,13 +68,6 @@ test("Retry pending state is shared while unrelated jobs remain cancellable", as
     prompt: "Retry Study",
     referenceAssets: [],
   };
-  state.sessions.push({
-    id: "retry-session",
-    title: "Retry Session",
-    inputs: input,
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
   state.jobs.push(
     ...["failed", "running"].map((status, index) => ({
       id: `retry-${index}`,
@@ -159,24 +92,16 @@ test("Retry pending state is shared while unrelated jobs remain cancellable", as
     await route.fulfill({ json: { job: state.jobs[0] } });
   });
   try {
-    await page.goto("/chat/retry-session");
-    const retry = page
-      .getByRole("article", { name: "Iteration 1", exact: true })
-      .getByRole("button", { name: "Retry", exact: true });
+    await page.goto("/images");
+    await page.getByRole("button", { name: "Open Status", exact: true }).click();
+    const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+    const retry = queue.getByRole("button", { name: "Retry", exact: true });
     await retry.click();
     await expect.poll(() => calls).toBe(1);
     await expect(retry).toBeDisabled();
-    // Gallery modes own the queue slideout; the pending retry stays shared across surfaces.
-    await page.getByRole("link", { name: "Images", exact: true }).first().click();
-    await page.getByRole("button", { name: "Open Status", exact: true }).click();
-    const queue = page.getByRole("dialog", { name: "Generations", exact: true });
-    await expect(queue.getByRole("button", { name: "Retry", exact: true })).toBeDisabled();
     await queue.getByRole("button", { name: "Stop", exact: true }).click();
     await expect.poll(() => state.jobs[1].status).toBe("cancelled");
     expect(calls).toBe(1);
-    await page.keyboard.press("Escape");
-    await expect(queue).toBeHidden();
-    await page.goBack();
     release();
     await expect(retry).toBeEnabled();
   } finally {

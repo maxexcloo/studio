@@ -416,13 +416,6 @@ test("a draft without a request gets change ideas for its prompt, explicit where
   assert.equal(calls.length, 2);
 });
 
-test("chat context is one paragraph from the taste profile", async () => {
-  const { suggestions } = fixture();
-  assert.deepEqual(await suggestions.suggest("bob", { surface: "chat" }), {
-    suggestions: ["They favour misty harbours."],
-  });
-});
-
 test("an account that can't use suggestions, offline text or no taste yet means no suggestions and no model call", async () => {
   const off = fixture({ writer: (owner) => owner !== "alice" });
   assert.deepEqual(await off.suggestions.suggest("alice", { surface: "composer", kind: "image" }), {
@@ -430,14 +423,17 @@ test("an account that can't use suggestions, offline text or no taste yet means 
     reason: "This account can't use suggestions.",
   });
   assert.equal(
-    (await off.suggestions.suggest("carol", { surface: "chat" })).reason,
+    (await off.suggestions.suggest("carol", { surface: "composer", kind: "image" })).reason,
     "Star a few results so Studio learns your taste.",
   );
   const offline = fixture({ online: false });
-  assert.deepEqual(await offline.suggestions.suggest("alice", { surface: "chat" }), {
-    suggestions: [],
-    reason: "The text model is offline.",
-  });
+  assert.deepEqual(
+    await offline.suggestions.suggest("alice", { surface: "composer", kind: "image" }),
+    {
+      suggestions: [],
+      reason: "The text model is offline.",
+    },
+  );
   assert.equal(off.calls.length + offline.calls.length, 0);
   const broken = fixture({ reply: () => "no JSON here" });
   assert.equal(

@@ -66,8 +66,6 @@ export function registerCompareRoutes(
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
     /** Hears the winning job of a vote and the other finished variants, for the taste profile; must not throw. */
     voted?(ownerId: string, jobId: string, others: string[]): void;
-    /** Titles the chat a compare run starts; must not reject. */
-    title?(account: GenerationAccount | undefined, sessionId: string, prompt: string): unknown;
   },
 ) {
   const { store } = options;
@@ -244,14 +242,14 @@ export function registerCompareRoutes(
     const requested = String(variants[0].input.seed ?? "");
     const seed = /^\d+$/.test(requested) ? requested : String(randomInt(2 ** 32));
     const id = randomUUID();
-    const chat = (sessionId as string | undefined) || store.createSession(ownerId).id;
+    const session = (sessionId as string | undefined) || store.createSession(ownerId).id;
     const jobIds: string[] = [];
     for (const variant of variants) {
       const { clientJobId: _clientJobId, ...input } = variant.input as GenerationInput;
       const result = await options.admit(
         { ...input, kind: "image", seed, count: 1 },
         req.studioAccount,
-        { sessionId: chat, operation: "image" },
+        { sessionId: session, operation: "image" },
         { queueSet: id },
       );
       if (result.status >= 400) {
@@ -262,8 +260,6 @@ export function registerCompareRoutes(
       }
       jobIds.push(String(result.payload.jobId));
     }
-    const prompt = String(variants[0].input.prompt || "").trim();
-    if (!sessionId && prompt) void options.title?.(req.studioAccount, chat, prompt);
     const record: ComparisonRecord = {
       id,
       ownerId,
@@ -274,7 +270,7 @@ export function registerCompareRoutes(
       vote: null,
     };
     save(record);
-    return res.status(201).json({ ...show(record, items), sessionId: chat });
+    return res.status(201).json({ ...show(record, items), sessionId: session });
   });
   app.put("/api/comparisons/:id/vote", (req, res) => {
     const items = gallery(req, res);

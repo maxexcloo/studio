@@ -1,5 +1,9 @@
+import { reloadAccountPreferences } from "./account-preferences.js";
+import { reloadAccountStore } from "./account-store.js";
+import { chatRecordChanges, chatRecords } from "./chat-records.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
+import { pruneBackups } from "./prune-backups.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -9,7 +13,24 @@ import { dreamOwnership } from "./dream-ownership.js";
  * Any other step writes state the server holds and cannot reload, so it needs Studio stopped.
  */
 // Applied steps are removed once the live data folder has them; Git history keeps them.
-const steps = [];
+const steps = [
+  {
+    name: "chatRecords",
+    run: chatRecords,
+    changes: chatRecordChanges,
+    online: true,
+    reload: () => {
+      reloadAccountStore();
+      reloadAccountPreferences();
+    },
+  },
+  {
+    name: "pruneBackups",
+    run: pruneBackups,
+    changes: (plan) => plan.folders.length,
+    online: true,
+  },
+];
 
 const stopped =
   "Needs Studio stopped: run migrate-runtime against the data folder (README.md, Data & Migrations).";

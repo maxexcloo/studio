@@ -49,13 +49,7 @@ export type QueueMedia = Record<string, unknown> & { id?: string; url?: string }
 export interface StudioSession {
   id: string;
   title: string;
-  /** Set once the title is generated or the user renames the chat; unset while it is New Chat. */
-  titleSource?: "generated" | "user";
-  /** Dream's own session: it holds Dream jobs and is never listed as a Chat. */
-  hidden?: true;
-  /** Kept out of the Chats list until unarchived; archiving keeps everything. */
-  archived?: true;
-  /** An MCP client's Chat; the conversation the client names (X-Studio-Conversation-Id) has one. */
+  /** An MCP client's session; the conversation the client names (X-Studio-Conversation-Id) has one. */
   mcp?: { conversationId?: string };
   inputs: GenerationInput;
   createdAt: string;
@@ -69,7 +63,7 @@ export interface QueueJob {
   parentJobId?: string;
   /**
    * The result this run was made from (Edit, Recreate, Animate and the like), one of `parentJobId`'s
-   * results when the run joined that job's Chat. Its gallery results keep it (`resultSource`).
+   * results when the run joined that job's session. Its gallery results keep it (`resultSource`).
    */
   parentItemId?: string;
   operation: GenerationOperation;

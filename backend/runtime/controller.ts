@@ -618,7 +618,7 @@ export class RuntimeController {
   }
 
   /**
-   * An explicit start, such as choosing a stopped Chat model: the first candidate that is running,
+   * An explicit start, such as choosing a parked profile: the first candidate that is running,
    * else the first that fits beside what runs, else the first, stopping what it needs room from
    * (text included). Apply the returned placement with its signature.
    */

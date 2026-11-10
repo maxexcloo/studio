@@ -41,7 +41,7 @@ import { terminalStatuses, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
-  // Every in-app submit (composer, viewer, Chat stream) invalidates this query; an idle queue still
+  // Every in-app submit (composer, viewer) invalidates this query; an idle queue still
   // checks now and then, so work started elsewhere (an MCP client, another tab) shows, and the
   // gallery with it, without the window regaining focus.
   refetchInterval: (query) =>
@@ -368,7 +368,7 @@ const bulk = {
     label: "Clear Failed",
     icon: icons.clear,
     title: "Clear Failed Generations",
-    text: "Failed generations leave the queue. Their chat cards stay and can still be retried.",
+    text: "Failed generations leave the queue. Their records stay in the gallery and can still be retried.",
   },
 } as const;
 /** The queue's own actions, as icons like each row's, on its heading's row. */
