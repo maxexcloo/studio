@@ -246,16 +246,25 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   ]);
 });
 
-test("Discarded Dream results stay listed and can be kept after all", async ({ page }) => {
+test("Discarded Dream results can be kept after all, or deleted all at once", async ({ page }) => {
   await fixtures(page);
+  const discarded = (id: string) =>
+    dreamItem(id, { dream: { prompt: "p", why: "", at: "", state: "discarded" } });
   const dream = await serveDream(page, {
-    discarded: [dreamItem("gone", { dream: { prompt: "p", why: "", at: "", state: "discarded" } })],
+    discarded: [discarded("gone"), discarded("other"), discarded("last")],
   });
   await page.goto("/dream");
   await page.getByText("Discarded", { exact: true }).click();
   await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Delete All", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete All Discards", exact: true });
+  await confirm.getByRole("button", { name: "Delete All", exact: true }).click();
+  await expect(confirm).toBeHidden();
   await expect(page.getByText("No Discards", { exact: true })).toBeVisible();
-  expect(verdicts(dream)).toEqual(["POST /api/dream/gone/keep"]);
+  expect(verdicts(dream)).toEqual(["POST /api/dream/gone/keep", "DELETE /api/dream/discarded"]);
 });
 
 test("Full screen switches between a comparison's sides and judges from its bar", async ({
