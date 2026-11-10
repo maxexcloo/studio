@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -17,6 +17,7 @@ import { Link, useParams } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
+import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
@@ -64,6 +65,25 @@ export function ComparePage() {
         ),
       ),
   });
+  // 1–4 star that variant as the winner (again to clear it), unless typing or a layer is above.
+  const pick = useRef<(index: number) => void>(undefined);
+  pick.current = (index) => {
+    const item = comparison.data?.variants[index]?.item;
+    if (item?.status === "done" && !star.isPending) star.mutate(item);
+  };
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (!/^[1-4]$/.test(event.key) || event.defaultPrevented) return;
+      if (event.altKey || event.metaKey || event.ctrlKey) return;
+      const target = event.target as HTMLElement;
+      if (target.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (layerAbove(null, event)) return;
+      event.preventDefault();
+      pick.current?.(Number(event.key) - 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   if (comparison.isPending) return <LoadingState fill label="Loading Comparison" />;
   if (comparison.error)
     return (

@@ -880,3 +880,36 @@ test("The grid heads each day, and the date scrubber names the day while it scro
   // Virtualisation still renders only the tiles near the screen.
   expect(await page.getByRole("button", { name: /^Open image:/ }).count()).toBeLessThan(90);
 });
+
+test("The Tags facet lists the most used caption tags with counts and filters by them", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      caption: { text: "", tags: index ? ["beach", "sunset"] : ["snow"] },
+    })),
+  );
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const tags = page.getByRole("group", { name: "Tags", exact: true });
+  await expect(tags.getByRole("button")).toHaveText(["beach2", "sunset2", "snow1"]);
+  await tags.getByRole("button", { name: "snow 1", exact: true }).click();
+  await expect(tags.getByRole("button", { name: "snow 1", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(state.galleryRequests.at(-1)).toContain("tag=snow");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Remove snow Filter", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeVisible();
+});

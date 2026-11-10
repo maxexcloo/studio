@@ -6,6 +6,13 @@ import { useLibraryAccess } from "./useLibraryAccess";
 
 // What the studio has, then where more comes from, each alphabetical; the Library opens on Models.
 export const librarySections = {
+  characters: {
+    label: "Characters",
+    description:
+      "Your character cards: images and a description that picking one adds to a prompt.",
+    icon: icons.character,
+    group: "What You Have",
+  },
   guides: {
     label: "Guides",
     description: "Prompting guides for profiles and families. Every saved version is kept.",
@@ -56,16 +63,17 @@ export const librarySections = {
     group: "Getting More",
   },
 };
+/** Administrators see the whole Library; other accounts only their Characters. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  const { presets } = useLibraryAccess();
+  const { presets, characters } = useLibraryAccess();
   return {
     admin,
     imports: admin && presets,
-    options: visibleSections(
-      librarySections,
-      admin,
-      (key) => presets || (key !== "imports" && key !== "presets"),
+    options: visibleSections(librarySections, admin, (key) =>
+      key === "characters"
+        ? characters
+        : admin && (presets || (key !== "imports" && key !== "presets")),
     ),
   };
 }

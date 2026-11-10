@@ -29,6 +29,7 @@ import {
   createTaste,
   itemValues,
   preferenceSignal,
+  setPreferenceSignals,
   registerTasteRoutes,
   tasteSignal,
 } from "./domain/taste.ts";
@@ -153,6 +154,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
+import { registerCharacterRoutes } from "./characters.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
@@ -504,6 +506,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 registerGalleryReadRoutes(app, {
   store,
   near: (text) => imageSearch.near(text),
+  similar: (item) => imageSearch.similar(item),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));
@@ -564,10 +567,12 @@ registerGalleryHistoryRoutes(app, {
       items.map((item) => item.id),
       favorite,
     );
-    taste.record(
-      ownerId,
-      items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    );
+    taste.record(ownerId, [
+      ...items.map((item) =>
+        tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item)),
+      ),
+      ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+    ]);
   },
 });
 
@@ -576,6 +581,7 @@ registerPromptHistoryRoutes(app);
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
+registerCharacterRoutes(app);
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
