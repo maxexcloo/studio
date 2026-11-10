@@ -13,7 +13,7 @@ import {
   mcpSize,
 } from "./controls.js";
 import { assertJobCount, mcpJson, replyRule } from "./media.js";
-import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
+import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { canonicalProfileId } from "../profile/store.js";
 import {
   asksForCloud,
@@ -872,7 +872,7 @@ export function registerGenerateTools({
       });
     if (!args.prompts)
       throw new Error(
-        "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
+        `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${Object.keys(input).length ? "" : " (this call had no arguments)"}. Then call generate again.`,
       );
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
@@ -890,6 +890,8 @@ export function registerGenerateTools({
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
     }
+    const listProblem = views ? "" : promptListProblem(args.prompts);
+    if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
       args.count > 1 &&
