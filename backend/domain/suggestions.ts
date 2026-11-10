@@ -7,7 +7,7 @@ import {
 } from "../../shared/suggestions.ts";
 import { createIdleWork, type IdleItem } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
-import type { Taste, TasteWriter } from "./taste.ts";
+import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
 import {
   avoidFiller,
   contentRule,
@@ -174,7 +174,7 @@ export function createSuggestions({
   ideas,
   nextSteps,
   target = async () => null,
-  writingSide = () => undefined,
+  promptWriter = () => undefined,
   now = Date.now,
 }: {
   taste: Pick<Taste, "read">;
@@ -195,8 +195,8 @@ export function createSuggestions({
   nextSteps: () => boolean;
   /** The model a finished result was made with, for the owner, or null where it isn't available. */
   target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
-  /** Where the owner prefers prompts written (Prompt Writing), which Ask for a Change follows. */
-  writingSide?: (ownerId: string) => "cloud" | "local" | undefined;
+  /** The owner's prompt writer (account-policy.js `promptWriter`), which Ask for a Change uses. */
+  promptWriter?: (ownerId: string) => PromptWriter | undefined;
   now?: () => number;
 }) {
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
@@ -398,12 +398,11 @@ export function createSuggestions({
     ]
       .filter(Boolean)
       .join("\n");
-    const prefer = writingSide(ownerId);
     let text: string;
     try {
       ({ text } = await model.chat({
         call: "suggestions",
-        model: await model.model("suggestions", false, prefer),
+        model: await model.model("suggestions", false, promptWriter(ownerId)),
         messages: [
           { role: "system", content: system },
           {
@@ -437,9 +436,7 @@ export function createSuggestions({
     const label = titleCase(clean(reply?.label, 40));
     if (!action || !label || (!prompt && action !== "upscale"))
       return empty("The text model’s reply was unusable.");
-    // Says when the other side wrote it, as Improve Prompt does.
-    const note = prefer ? await model.writerNote?.(prefer) : "";
-    return { suggestions: [{ action, label, request, prompt }], ...(note ? { note } : {}) };
+    return { suggestions: [{ action, label, request, prompt }] };
   }
 
   return {

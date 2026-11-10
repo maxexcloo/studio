@@ -1,8 +1,9 @@
-import { Alert, Badge, Select, Stack } from "@mantine/core";
+import { Alert, Badge, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { deploymentQuery, lockedNote, useDeploymentSetting } from "./deployment";
+import { TextModelSelect } from "./TextModelSelect";
 
 const status = (on: boolean, label: string) => (
   <Badge color={on ? "green" : "gray"} miw="max-content">
@@ -35,28 +36,19 @@ export function IntegrationSettings() {
       </SettingGroup>
       <SettingGroup title="Prompt Assistant">
         {assistant.available && (
-          // Automatic (no saved model) lets Studio pick the local or cloud model for each call.
+          // Automatic (no saved model) lets each account's pick or Studio's route choose the model.
           <SettingRow
             wide
             label="Model"
-            description={`The model that improves prompts and writes captions and titles. Automatic uses the running local model, otherwise the cloud model; uncensored accounts get the uncensored one.${lockedNote(model)}`}
+            description={`The model for every assistant call, replacing each account’s Prompt Writing model. Automatic writes prompts with the account’s pick and everything else with the running local model, otherwise the cloud model; uncensored accounts get the uncensored one.${lockedNote(model)}`}
           >
-            <Select
-              aria-label="Prompt Assistant Model"
-              data={[
-                { value: "", label: "Automatic" },
-                ...[...new Set([...models, model.configured].filter(Boolean))].map((id) => ({
-                  value: id,
-                  label: id,
-                })),
-              ]}
+            <TextModelSelect
+              label="Prompt Assistant Model"
+              automatic="Automatic"
+              models={models}
               value={model.configured}
-              onChange={(value) => save.mutate({ key: model.key, value: value || "" })}
+              onChange={(value) => save.mutate({ key: model.key, value })}
               disabled={model.locked}
-              allowDeselect={false}
-              searchable
-              nothingFoundMessage="No Matches"
-              w={{ base: "100%", sm: 240 }}
             />
           </SettingRow>
         )}

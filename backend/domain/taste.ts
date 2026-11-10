@@ -137,15 +137,19 @@ export interface TasteRecord extends StoredTaste, TasteReadOut {
   scores: Map<string, TasteScore>;
 }
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
+/** What an account's prompt writing asks for (account-policy.js `promptWriter`). */
+export interface PromptWriter {
+  picked?: string;
+  uncensored: boolean;
+}
+
 export interface TasteWriter<Content = string> {
   settings(): unknown;
   /**
-   * The Bifrost model for a call type (assistant.js `modelFor`), on the side an account's Prompt
-   * Writing preference (`prefer`) chooses where it is given.
+   * The Bifrost model for a call type (assistant.js `modelFor`): the model an account's prompt
+   * writing asks for where its `writer` is given.
    */
-  model(call: string, explicit?: boolean, prefer?: "cloud" | "local"): Promise<string>;
-  /** Why writing for that preference ran on the other side, or "" (assistant.js `writerNote`). */
-  writerNote?(prefer: "cloud" | "local"): Promise<string>;
+  model(call: string, explicit?: boolean, writer?: PromptWriter): Promise<string>;
   chat(request: {
     model: string;
     /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */

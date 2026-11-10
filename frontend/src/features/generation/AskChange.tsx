@@ -53,8 +53,6 @@ export function useAskChange<T>({
     mutationFn: ({ text, typed }: { text: string; typed: T }) => ask(text, typed),
     onSuccess: (answer, { typed }) => {
       if (answer.reason) return void notifications.show({ message: answer.reason });
-      // Written on the other side from the account's Prompt Writing preference, it says so.
-      if (answer.note) notifications.show({ message: answer.note });
       const proposal = answer.suggestions[0];
       setChange({ proposal, typed });
       show?.(proposal);

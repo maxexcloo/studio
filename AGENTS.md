@@ -171,12 +171,13 @@ the primary component reference and verify APIs against the installed version.
   the local tiers a profile offers, and the choice only when there are two.
   The preferred side falls back to the other, saying so; Extend keeps its
   video's model unless Cloud is preferred.
-- Settings › Preferences › Where Work Runs sets Cloud or Local for Prompt
-  Writing (Ask for a Change included) and Images, and Videos' Cloud | Fast |
-  Quality as Animate's menus do. It sets only defaults: a model the person picks
-  wins, and a draft keeps following the default until then. A default on the
-  other side says so where its work shows: a notification on queuing or on a
-  proposal, the start of the written prompt's thinking.
+- Settings › Preferences › Where Work Runs sets Cloud or Local for Images and
+  Videos' Cloud | Fast | Quality as Animate's menus do. It sets only defaults: a
+  model the person picks wins, and a draft keeps following the default until
+  then. A default on the other side says so where its work shows: a
+  notification on queuing. Prompt Writing is a text model picker (the
+  Integrations list); its aliases route themselves, so it has no fallback or
+  notice.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.

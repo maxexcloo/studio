@@ -4,8 +4,9 @@
  * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
  *
  * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
- * (`model()`): the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL;
- * for an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
+ * (`model()`): for an account's prompt writing, the text model it picked (`writerModel`); for
+ * anything else the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
+ * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and its effort.
  * Settings are read on every call, so a model chosen in Settings applies at once.
@@ -452,6 +453,9 @@ function uncensoredAlias(model, explicit) {
   return explicit && model.endsWith("/auto") ? model.replace(/\/auto$/, "/uncensored") : model;
 }
 
+/** Whether a gateway text model is uncensored, as its name says (`cloud/uncensored`, `local/uncensored`). */
+export const uncensoredText = (model) => /uncensored/i.test(model);
+
 /**
  * The engine, or null while the gateway is unset. Pass `environment` as a live object (process.env)
  * so model choices saved in Settings apply at once.
@@ -478,35 +482,38 @@ export function createAssistant(
     return resolved;
   };
 
+  /** Local while a local text workload runs (reading images as it says), else the cloud, which does. */
+  async function route() {
+    return (await localText()) || { model: settings().cloud, vision: true };
+  }
+
   /**
-   * Local while a local text workload runs (reading images as it says), otherwise the cloud, which
-   * always does. `prefer` is an account's Prompt Writing preference (account-preferences.js):
-   * "cloud" takes the cloud first; "local" is the usual route, its `note` saying when no local
-   * model ran it. Calls for no account (titles, captions) pass none.
+   * The model an account's prompt writing asks for (Settings › Preferences › Where Work Runs):
+   * `picked`, otherwise the cloud model's uncensored alias where the account may use uncensored
+   * models (`uncensored`), else the cloud model. An uncensored pick the account may not use gives
+   * way to the cloud model.
    */
-  async function route(prefer) {
-    const cloud = { model: settings().cloud, vision: true, note: "" };
-    if (prefer === "cloud") return cloud;
+  function writerModel({ picked, uncensored }) {
+    if (picked && (uncensored || !uncensoredText(picked))) return picked;
+    return uncensoredAlias(settings().cloud, uncensored && !picked);
+  }
+
+  /**
+   * The Bifrost model calls ask for: the administrator's choice, otherwise the account's `writer`
+   * (writerModel's input) for prompt writing, otherwise the route's, uncensored when `explicit`.
+   */
+  async function modelFor(task, explicit = false, writer) {
+    if (settings().chosen) return settings().chosen;
+    if (writer) return writerModel(writer);
+    return uncensoredAlias((await route()).model, explicit);
+  }
+
+  /** Whether the model calls take reads images: a local one as its workload says, any other always. */
+  async function supportsVision(writer) {
+    if (!writer || settings().chosen) return (await route()).vision;
     const local = await localText();
-    if (local) return { ...local, note: "" };
-    return prefer === "local"
-      ? { ...cloud, note: "No local text model is running, so the cloud wrote this." }
-      : cloud;
-  }
-
-  /** The Bifrost model calls ask for: the administrator's choice, otherwise the route's, uncensored when `explicit`. */
-  async function modelFor(task, explicit = false, prefer) {
-    return settings().chosen || uncensoredAlias((await route(prefer)).model, explicit);
-  }
-
-  /** Whether the route the calls take reads images. */
-  async function supportsVision(prefer) {
-    return (await route(prefer)).vision;
-  }
-
-  /** Why writing for an account's `prefer`ence ran on the other side, or ""; the administrator's model always runs. */
-  async function writerNote(prefer) {
-    return settings().chosen ? "" : (await route(prefer)).note;
+    const model = writerModel(writer);
+    return model.startsWith("local/") || model === local?.model ? Boolean(local?.vision) : true;
   }
 
   /** A cached GET against the gateway's root, or `fallback` (cached briefly) when it fails. */
@@ -723,7 +730,7 @@ export function createAssistant(
     stack = [],
     examples = [],
     negative = false,
-    prefer,
+    writer,
     signal,
     onDelta,
   } = {}) {
@@ -738,10 +745,10 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const model = await modelFor("rewrite", explicit, prefer);
+    const model = await modelFor("rewrite", explicit, writer);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
-    const vision = images.length ? await supportsVision(prefer) : false;
+    const vision = images.length ? await supportsVision(writer) : false;
     const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
     let system;
     let user = original;
@@ -763,13 +770,11 @@ export function createAssistant(
         examples: examples.slice(0, maxExamples),
         negative,
       });
-    const sideNote = await writerNote(prefer);
     const base = {
       preset: preset.id,
       model,
       vision,
       referencesRead: vision && images.length > 0,
-      ...(sideNote ? { note: sideNote } : {}),
     };
     try {
       const reply = await chat({
@@ -811,7 +816,7 @@ export function createAssistant(
     cfg,
     stack = [],
     infos = {},
-    prefer,
+    writer,
     signal,
   } = {}) {
     if (negativeUnused(guide) || profile?.capabilities?.negativePrompt === false)
@@ -820,8 +825,7 @@ export function createAssistant(
     const fallback =
       recommendedNegative(guide, { cfg: cfg ?? 2, stack, infos }) ||
       String(guide?.negative?.default || "").trim();
-    const model = await modelFor("negative", false, prefer);
-    const sideNote = await writerNote(prefer);
+    const model = await modelFor("negative", false, writer);
     const system = [
       `You write negative prompts for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || "in use"}.`,
       "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artefacts, defects, styles to avoid), at most 40 words, no preamble.",
@@ -850,7 +854,6 @@ export function createAssistant(
         unused: false,
         source: "assistant",
         model,
-        ...(sideNote ? { note: sideNote } : {}),
         ms: now() - started,
       };
     } catch (error) {
@@ -1205,7 +1208,7 @@ export function createAssistant(
     settings,
     model: modelFor,
     supportsVision,
-    writerNote,
+    writerModel,
     listModels,
     listModelDetails,
     chat,
