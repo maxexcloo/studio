@@ -19,9 +19,10 @@ import {
   assistantModelKey,
   assistantSettings,
   createAssistant,
+  uncensoredText,
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
-import { mayUseFeature } from "./account-policy.js";
+import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { accountPreferences } from "./account-preferences.js";
 import { directRoute } from "./domain/direct-route.ts";
@@ -150,15 +151,16 @@ export async function assistantIntegration({
       model: row(assistantModelKey, ""),
     };
   const [models, vision, model] = await Promise.all([
-    engine.listModels(),
+    textModels(engine, workloadModels),
     engine.supportsVision(),
     engine.model("rewrite"),
   ]);
-  return {
-    available: true,
-    models: [...new Set([...models, ...workloadModels])],
-    model: { ...row(assistantModelKey, model), vision },
-  };
+  return { available: true, models, model: { ...row(assistantModelKey, model), vision } };
+}
+
+/** The text models to choose from: the gateway's and those of Studio's text workloads. */
+async function textModels(engine, workloadModels) {
+  return [...new Set([...(await engine.listModels()), ...workloadModels])];
 }
 
 /** Checks a model name for the two assistant settings; '' clears it. */
@@ -170,8 +172,9 @@ export function assistantSettingValue(key, value) {
 }
 
 /**
- * `profiles(req)`: the generation profiles this account may use (account-scoped). `guide(profile)`:
- * its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
+ * `workloadModels()`: the models of Studio's text workloads, running or not, which prompt writing
+ * may pick too. `profiles(req)`: the generation profiles this account may use (account-scoped).
+ * `guide(profile)`: its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
  * profile)`: { examples, loras } from starred results on the same family. `frame(req, assetId)`: a
  * reference image the account may use, as the text model reads it; `caption(req, assetId)` what it
  * shows in words.
@@ -183,6 +186,7 @@ export function registerAssistantRoutes(
     fetchImpl = fetch,
     localText,
     engine = createAssistant(environment, { fetchImpl, localText }),
+    workloadModels = () => [],
     profiles = async () => [],
     guide = () => null,
     loras = async () => [],
@@ -205,11 +209,9 @@ export function registerAssistantRoutes(
     };
   };
   const refuse = (status, error) => ({ refusal: { status, payload: { ok: false, error } } });
-  /** Where the account prefers its prompts written (Prompt Writing): "cloud" or "local". */
-  const writingSide = (account) =>
-    accountPreferences(ownerIdForRequest({ studioAccount: account })).writing === "cloud"
-      ? "cloud"
-      : "local";
+  /** The account's prompt writer (account-policy.js `promptWriter`). */
+  const writerOf = (account) =>
+    promptWriter(account, accountPreferences(ownerIdForRequest({ studioAccount: account })));
   /** The engine and the account's profile, or `refusal`: the answer explaining why not. */
   const ready = async (account, body) => {
     if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff);
@@ -273,11 +275,19 @@ export function registerAssistantRoutes(
           }
         })
         .map((profile) => profile.id);
+      const writer = writerOf(account);
+      // Settings › Preferences' Prompt Writing picker: the text models, uncensored ones only for
+      // accounts that may use them, and the one its writing asks for.
+      const models = (await textModels(engine, workloadModels())).filter(
+        (model) => writer.uncensored || !uncensoredText(model),
+      );
       res.json({
         ok: true,
         available: true,
-        model: await engine.model("rewrite", false, writingSide(account)),
-        vision: await engine.supportsVision(writingSide(account)),
+        model: await engine.model("rewrite", false, writer),
+        vision: await engine.supportsVision(writer),
+        writingModel: engine.writerModel(writer),
+        models,
         defaultPreset,
         presets: assistantPresets
           .filter((preset) => !preset.spicy || spicy)
@@ -310,7 +320,7 @@ export function registerAssistantRoutes(
       stack,
       examples,
       negative: context.profile.capabilities?.negativePrompt !== false,
-      prefer: writingSide(account),
+      writer: writerOf(account),
       signal,
       onDelta,
     });
@@ -386,7 +396,7 @@ export function registerAssistantRoutes(
           writing,
           clip: animateClip(body, context.profile),
           explicit: allowed(account, "uncensoredModels"),
-          prefer: writingSide(account),
+          writer: writerOf(account),
           frame: () => frame({ studioAccount: account }, assetId),
           caption: () => caption({ studioAccount: account }, assetId),
           signal,
@@ -403,7 +413,7 @@ export function registerAssistantRoutes(
       payload: {
         ok: true,
         ...(await engine.negative({
-          prefer: writingSide(account),
+          writer: writerOf(account),
           signal,
           profile: context.profile,
           guide: context.guide,

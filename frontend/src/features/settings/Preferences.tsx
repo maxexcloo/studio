@@ -6,9 +6,11 @@ import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { accountAdminQuery } from "./AccountAdmin";
 import { FinishStarredImages } from "./FinishStarredImages";
+import { TextModelSelect } from "./TextModelSelect";
 import {
   preferencesQuery,
   useSavePreferences,
@@ -165,14 +167,22 @@ const videoChoices: { value: VideosPreference; label: string }[] = [
   { value: "quality", label: "Quality" },
 ];
 /**
- * Where Prompt Writing, Images and Videos run by default: Cloud or Local, and for Videos
- * Cloud or the local Fast or Quality tier (unsaved, Local and Fast).
+ * Where Images and Videos run by default: Cloud or Local, and for Videos Cloud or the local Fast or
+ * Quality tier (unsaved, Local and Fast). Prompt Writing picks the gateway text model, whose
+ * `cloud/` and `local/` aliases route themselves; an administrator's model replaces it.
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
+  const assistant = useQuery(assistantQuery).data;
   const save = useSavePreferences();
   if (!status) return null;
   const { preferences } = status;
+  const models = assistant?.models || [];
+  // A saved pick shows at once; one the account may no longer use shows what its writing asks for.
+  const writingModel =
+    preferences.writingModel && models.includes(preferences.writingModel)
+      ? preferences.writingModel
+      : assistant?.writingModel;
   const row = <T extends string>(
     label: string,
     description: string,
@@ -198,12 +208,20 @@ function WhereWorkRuns() {
         preferences.images || "local",
         (images) => save.mutate({ images }),
       )}
-      {row(
-        "Prompt Writing",
-        "Where Improve Prompt, Ask for a Change, negative prompts and Animate’s prompts are written.",
-        sides,
-        preferences.writing || "local",
-        (writing) => save.mutate({ writing }),
+      {assistant && writingModel && (
+        <SettingRow
+          wide
+          label="Prompt Writing"
+          description={`The text model that writes Improve Prompt, Ask for a Change, negative prompts and Animate’s prompts.${assistant.model === assistant.writingModel ? "" : ` An administrator set ${assistant.model} for everyone.`}`}
+        >
+          <TextModelSelect
+            label="Prompt Writing"
+            models={models}
+            value={writingModel}
+            onChange={(writingModel) => save.mutate({ writingModel })}
+            disabled={assistant.model !== assistant.writingModel}
+          />
+        </SettingRow>
       )}
       {row(
         "Videos",

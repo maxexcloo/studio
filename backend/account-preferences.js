@@ -10,9 +10,11 @@ import {
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
  * them. Spicy Prompts starts off and counts only with Uncensored Models (`explicitWording`).
- * `writing` and `images` say where prompt writing and images run by default, Cloud or Local; `videos` where videos and Animate do (Cloud, or the local Fast or Quality tier). Unsaved,
- * each is Local. The side that can't run gives way to the other, saying so; a model the person
- * picks always wins (assistant.js, model/catalogue.js, animate-profile.js).
+ * `images` says where images run by default, Cloud or Local, and `videos` where videos and Animate
+ * do (Cloud, or the local Fast or Quality tier); unsaved, each is local. The side that can't run
+ * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
+ * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
+ * `writerModel`). Keys Studio no longer knows are dropped as the document is read.
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -25,8 +27,11 @@ export const preferenceDefaults = Object.freeze({
 const preferenceChoices = Object.freeze({
   images: ["cloud", "local"],
   videos: ["cloud", "fast", "quality"],
-  writing: ["cloud", "local"],
 });
+const known = (key) =>
+  Object.hasOwn(preferenceDefaults, key) ||
+  Object.hasOwn(preferenceChoices, key) ||
+  key === "writingModel";
 const dataDir = currentDataDir();
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;
@@ -40,7 +45,7 @@ function saved(ownerId = "") {
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
-    cache.set(ownerId, value);
+    cache.set(ownerId, Object.fromEntries(Object.entries(value).filter(([key]) => known(key))));
   }
   return cache.get(ownerId);
 }
@@ -59,7 +64,12 @@ export function saveAccountPreferences(ownerId, patch) {
       if (!choices.includes(value)) throw new Error(`Set ${key} to ${choices.join(", ")}.`);
       continue;
     }
-    if (!Object.hasOwn(preferenceDefaults, key)) throw new Error(`Unknown preference ${key}.`);
+    if (key === "writingModel") {
+      if (typeof value !== "string" || !value.trim() || value.length > 200)
+        throw new Error("Choose a text model.");
+      continue;
+    }
+    if (!known(key)) throw new Error(`Unknown preference ${key}.`);
     if (typeof value !== "boolean") throw new Error(`Set ${key} to true or false.`);
   }
   const next = { ...saved(ownerId), ...Object.fromEntries(entries) };

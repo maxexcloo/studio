@@ -18,6 +18,13 @@ interface AssistantStatus {
   noNegative?: string[];
   /** The account holds Uncensored Models. */
   spicy?: boolean;
+  /**
+   * The model its prompt writing runs on (an administrator's model replaces the account's), the text
+   * models it may pick and the one its writing asks for.
+   */
+  model?: string;
+  models?: string[];
+  writingModel?: string;
 }
 interface Suggestion {
   name: string;
@@ -34,8 +41,6 @@ interface Result {
   source?: string;
   reason?: string;
   model?: string;
-  /** Why it was written on the other side from the account's Prompt Writing preference. */
-  note?: string;
 }
 type Action = "rewrite" | "negative" | "loras";
 const workingLabels: Record<Action, string> = {
@@ -244,7 +249,7 @@ export function usePromptAssistant({
           failure("The assistant returned an empty prompt.");
           return;
         }
-        applyChange(result.note ? `Prompt improved. ${result.note}` : "Prompt improved", {
+        applyChange("Prompt improved", {
           prompt: result.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
@@ -263,10 +268,7 @@ export function usePromptAssistant({
           notifications.show({ message: "This model does not use a negative prompt." });
           return;
         }
-        applyChange(
-          result.note ? `Negative prompt written. ${result.note}` : "Negative prompt written",
-          { negative: result.negative },
-        );
+        applyChange("Negative prompt written", { negative: result.negative });
       } else {
         const offered = new Set(current.profile?.options?.loras || []);
         const usable = (result.loras || []).filter((item) => offered.has(item.name));

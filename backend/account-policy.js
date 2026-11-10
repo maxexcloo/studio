@@ -172,6 +172,16 @@ export const explicitWording = (access, preferences) =>
   preferences.spicyPrompts === true &&
   (access === undefined || mayUseFeature(access, "uncensoredModels"));
 
+/**
+ * What an account's prompt writing asks the assistant for (assistant.js `writerModel`): the text
+ * model it picked, and whether it may use uncensored ones (Uncensored Models in its effective
+ * access). `access` is undefined only in single-user mode, which has every feature.
+ */
+export const promptWriter = (access, preferences) => ({
+  picked: preferences.writingModel,
+  uncensored: access === undefined || mayUseFeature(access, "uncensoredModels"),
+});
+
 export function visibleGenerationProfiles(profiles, access) {
   if (!access?.authenticated) return [];
   return profiles.filter((profile) => mayUseGenerationProfile(access, profile));

@@ -5,7 +5,7 @@ import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
 export type VideosPreference = "cloud" | "fast" | "quality";
-/** Where the account prefers an area's work to run; the other side takes over, saying so, when it can't. */
+/** Where the account prefers images to run; the other side takes over, saying so, when it can't. */
 export type SidePreference = "cloud" | "local";
 /** The account's own preferences (backend/account-preferences.js). */
 export interface Preferences {
@@ -14,9 +14,10 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
-  /** Where prompt writing and images run by default; unsaved, Local. */
+  /** Where images run by default; unsaved, Local. */
   images?: SidePreference;
-  writing?: SidePreference;
+  /** The text model prompt writing asks for; unsaved, the assistant's default (`/api/assistant`). */
+  writingModel?: string;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */
   videos?: VideosPreference;
 }
@@ -59,7 +60,7 @@ export function useSavePreferences() {
       if ("images" in patch || "videos" in patch)
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
       if ("videos" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
-      if ("writing" in patch) void client.invalidateQueries({ queryKey: ["assistant"] });
+      if ("writingModel" in patch) void client.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });

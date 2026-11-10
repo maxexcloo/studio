@@ -51,7 +51,9 @@ const encoder = new TextEncoder();
 const calls = [];
 const fetchImpl = async (url, options = {}) => {
   if (url.endsWith("/v1/models"))
-    return Response.json({ data: [{ id: "cloud/auto" }, { id: "local/auto" }] });
+    return Response.json({
+      data: [{ id: "cloud/auto" }, { id: "cloud/uncensored" }, { id: "local/auto" }],
+    });
   const body = JSON.parse(options.body);
   calls.push(body);
   if (body.stream)
@@ -233,6 +235,16 @@ test("Spicy needs Uncensored Models, whatever the profile, and runs on the uncen
     403,
   );
   assert.equal((await get("/api/assistant", "user")).spicy, false);
+  // Prompt Writing offers and defaults to uncensored models only for accounts that may use them.
+  const writing = (status) => [status.writingModel, status.models];
+  assert.deepEqual(writing(await get("/api/assistant", "user")), [
+    "cloud/auto",
+    ["cloud/auto", "local/auto"],
+  ]);
+  assert.deepEqual(writing(await get("/api/assistant", "spicy")), [
+    "cloud/uncensored",
+    ["cloud/auto", "cloud/uncensored", "local/auto"],
+  ]);
   assert.equal(
     (await get("/api/assistant", "spicy")).presets.some((preset) => preset.id === "spicy"),
     true,
@@ -297,7 +309,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
       integration.model.effective,
       integration.model.vision,
     ],
-    [true, ["cloud/auto", "local/auto", "local/stopped"], "cloud/auto", true],
+    [true, ["cloud/auto", "cloud/uncensored", "local/auto", "local/stopped"], "cloud/auto", true],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,
