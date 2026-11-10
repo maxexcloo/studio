@@ -506,3 +506,53 @@ test("a moderation refusal on submit is resubmitted once with the softened promp
     store.close();
   }
 });
+
+test("a video submitted before moderation retries existed just fails when refused", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const remote = videoProvider([
+    () =>
+      Response.json(
+        { error: { message: "Video rejected by content moderation" } },
+        { status: 400 },
+      ),
+  ]);
+  let softened = 0;
+  try {
+    const session = store.createSession("alice");
+    const queued = store.enqueue(
+      "alice",
+      session.id,
+      { prompt: "A storm hits the pier" },
+      "animate",
+      undefined,
+      "provider:cliproxyapi",
+    );
+    // An earlier Studio's record: running, with no retry eligibility.
+    store.save({ ...queued, status: "running", providerJobId: "video-1" });
+    store.saveProviderRecord("alice", queued.id, {
+      state: "running",
+      request: { ...input, kind: "video", prompt: "A storm hits the pier" },
+      providerId: "video-1",
+      outputs: [],
+    });
+    const adapter = createCloudQueueAdapter({
+      store,
+      provider: remote.provider,
+      resolve: async () => ({ ...input, kind: "video" }),
+      soften: async () => {
+        softened += 1;
+        return "A pier at dusk";
+      },
+      saveMedia: async () => ({ url: "/fixture-video" }),
+      saveGallery: async () => {},
+    });
+    await new GenerationQueue(store, adapter).tick();
+    const job = store.job("alice", queued.id)!;
+    assert.equal(job.status, "failed");
+    assert.match(job.reason, /refused this for moderation.*HTTP 400: Video rejected/);
+    assert.equal(softened, 0);
+    assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/generations").length, 0);
+  } finally {
+    store.close();
+  }
+});

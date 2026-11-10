@@ -9,6 +9,11 @@ interface ProviderRecord {
   providerId?: string;
   outputs: QueueMedia[];
   reason?: string;
+  /**
+   * Submitted by a Studio that retries moderation refusals; records from before have none, so
+   * their refusals just fail.
+   */
+  softenable?: boolean;
   /** The one resubmit after a moderation refusal: why the first prompt was refused. */
   retried?: { reason: string };
 }
@@ -106,7 +111,13 @@ export function createCloudQueueAdapter({
   ): Promise<JobObservation> {
     polls.delete(job.id);
     const reason = refusal(message);
-    if (soften && !state.retried && !state.outputs.length && moderation.test(message)) {
+    if (
+      soften &&
+      state.softenable &&
+      !state.retried &&
+      !state.outputs.length &&
+      moderation.test(message)
+    ) {
       const latest = store.job(job.ownerId, job.id)!;
       const original = String(latest.input.refusedPrompt || latest.input.prompt || "");
       let prompt: string;
@@ -304,7 +315,11 @@ export function createCloudQueueAdapter({
         return { status: "failed", reason: (error as Error).message };
       }
       const { reference: _reference, ...request } = input;
-      return send(job, input, save(job, { state: "submitting", request, outputs: [] }));
+      return send(
+        job,
+        input,
+        save(job, { state: "submitting", request, outputs: [], softenable: true }),
+      );
     },
     async observe(job) {
       let state = record(job);
