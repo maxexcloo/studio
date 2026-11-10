@@ -81,6 +81,16 @@ def target(root, folder, filename, subfolders=False):
     return file
 
 
+def make_folder(file):
+    """Creates the file's folder; models stay world-readable so a non-root mirror can copy them."""
+    missing = [
+        parent for parent in [file.parent, *file.parent.parents] if not parent.exists()
+    ]
+    file.parent.mkdir(parents=True, exist_ok=True)
+    for parent in missing:
+        parent.chmod(0o755)
+
+
 def digest(file):
     sha = hashlib.sha256()
     with open(file, "rb") as stream:
@@ -297,15 +307,7 @@ async def receive(root, folder, filename, offset, expected_size, sha256, note, c
             raise ValueError(
                 "A model already uses this filename. Replace it explicitly first."
             )
-        # Models stay world-readable so a non-root mirror can copy them.
-        missing = [
-            parent
-            for parent in [file.parent, *file.parent.parents]
-            if not parent.exists()
-        ]
-        file.parent.mkdir(parents=True, exist_ok=True)
-        for parent in missing:
-            parent.chmod(0o755)
+        make_folder(file)
         partial = Path(str(file) + ".part")
         metadata = Path(str(file) + ".part.json")
         if offset:
@@ -399,12 +401,13 @@ def start_fetch(
         return {"already": True}
     if (FETCHES.get(str(file)) or {}).get("done") is False:
         return {"fetching": True}
+    # A folder no model has used yet (such as `ultralytics_bbox`) is made before its space is read.
+    make_folder(file)
     if shutil.disk_usage(file.parent).free < size + 256 * 1024 * 1024:
         raise ValueError("The worker has insufficient free disk space.")
     acquire(file)
     fetch = {"bytes": 0, "cancel": False, "done": False, "error": ""}
     FETCHES[str(file)] = fetch
-    file.parent.mkdir(parents=True, exist_ok=True)
     allowed_note = {
         key: note[key][:1024]
         for key in ["id", "label", "source"]
