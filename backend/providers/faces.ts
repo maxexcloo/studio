@@ -8,7 +8,7 @@ import { createModelFiles, createOnnxRunner } from "./onnx.ts";
  */
 export const faceSource = {
   // renovate: datasource=git-refs depName=https://github.com/opencv/opencv_zoo
-  detectorRevision: "f12e12798e8314f7c074a6656816c048dcc95b7a",
+  detectorRevision: "48b10fa505aeb51fbd127fc60a5c660040e823b7",
   // renovate: datasource=git-refs depName=https://huggingface.co/fal/AuraFace-v1
   embedderRevision: "af6d057c9b0ec4071d4c49c80e3539258798b609",
 };
