@@ -97,6 +97,9 @@ def install(requirements):
                 "pip",
                 "install",
                 "--no-cache-dir",
+                # Source packages (Impact Pack's git sam2) build against the installed ROCm PyTorch;
+                # an isolated build would download CUDA PyTorch and fill the runner's disk.
+                "--no-build-isolation",
                 "--constraint",
                 constraints.name,
                 *[
