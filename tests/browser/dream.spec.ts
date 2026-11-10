@@ -315,3 +315,18 @@ test("Full screen switches between a comparison's sides and judges from its bar"
   ]);
   expect(dream.requests[0].body).toEqual({ answer: "neither" });
 });
+
+test("The Dream tab counts the results waiting for a verdict", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { unseen: ["one", "two", "three"].map((id) => dreamItem(id)) });
+  await page.goto("/images");
+  const tab = page
+    .getByRole("navigation", { name: "Creative Modes" })
+    .getByRole("link", { name: "Dream", exact: true });
+  await expect(tab).toHaveAccessibleDescription("3 Unseen");
+  await tab.click();
+  await expect(current(page)).toContainText("Dream prompt one");
+  await page.keyboard.press("ArrowRight");
+  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(tab).toHaveAccessibleDescription("2 Unseen");
+});
