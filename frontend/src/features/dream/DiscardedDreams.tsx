@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Center,
+  Group,
   ScrollArea,
   SimpleGrid,
   Text,
@@ -11,7 +12,8 @@ import {
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { icons } from "../../ui/icons";
 import { useState } from "react";
-import { post } from "../../api";
+import { api, post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { mediaSource } from "../gallery/mediaSource";
@@ -32,10 +34,19 @@ function Thumbnail({ item }: { item: DreamItem }) {
   );
 }
 
-/** Discarded Dream results, newest discard first; Keep moves one into the gallery after all. */
+/**
+ * Discarded Dream results, newest discard first; Keep moves one into the gallery after all. Studio
+ * deletes discards after 30 days, and Delete All deletes them now.
+ */
 export function DiscardedDreams() {
   const client = useQueryClient();
   const discarded = useInfiniteQuery(discardedQuery);
+  const [confirming, setConfirming] = useState(false);
+  const deleteAll = useMutation({
+    mutationFn: () => api("/api/dream/discarded", { method: "DELETE" }),
+    onSuccess: () => setConfirming(false),
+    onSettled: () => client.invalidateQueries({ queryKey: discardedQuery.queryKey }),
+  });
   const keep = useMutation({
     mutationFn: (item: DreamItem) => post(dreamItemPath(item, "keep")),
     onSettled: () =>
@@ -56,6 +67,24 @@ export function DiscardedDreams() {
   if (!items.length) return <EmptyState fill>No Discards</EmptyState>;
   return (
     <ScrollArea flex={1} mih={0}>
+      <Group justify="space-between" gap="sm" pb="sm">
+        <Text size="sm" c="dimmed">
+          Discards are deleted after 30 days.
+        </Text>
+        <Button variant="subtle" color="red" size="sm" onClick={() => setConfirming(true)}>
+          Delete All
+        </Button>
+      </Group>
+      <ConfirmDialog
+        opened={confirming}
+        title="Delete All Discards"
+        action="Delete All"
+        pending={deleteAll.isPending}
+        onConfirm={() => deleteAll.mutate()}
+        onClose={() => setConfirming(false)}
+      >
+        Delete every discarded Dream result and its file? This can’t be undone.
+      </ConfirmDialog>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (
           <Card key={item.id} withBorder padding={0} radius="md">

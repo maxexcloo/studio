@@ -65,7 +65,7 @@ const ordinaryRoutes = [
     /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
-  ["DELETE", /^\/api\/taste$/],
+  ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
   // More Like This Set queues into the requester's own set (result-sets.js).
   ["POST", /^\/api\/result-sets\/more$/],
   ["GET", /^\/api\/(finishing|upscale\/status)$/],
