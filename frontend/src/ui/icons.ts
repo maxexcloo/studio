@@ -4,6 +4,7 @@ import {
   Blend,
   CirclePause,
   CirclePlay,
+  ClipboardPaste,
   Columns2,
   Copy,
   Download,
@@ -68,6 +69,7 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
+  paste: ClipboardPaste,
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,

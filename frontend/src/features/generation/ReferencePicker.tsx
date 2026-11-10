@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import { ChevronDown, ImagePlus } from "lucide-react";
 import { icons } from "../../ui/icons";
 import {
@@ -20,7 +21,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { api } from "../../api";
+import { api, failure } from "../../api";
 import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
@@ -46,7 +47,8 @@ import {
 } from "./references";
 import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
-import { usePhone } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
+import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { chipProps, iconChipProps } from "./chip";
 import { ChipPopup, ChipContent, PickerGrid, PickerHeader, PickerTile } from "./Picker";
@@ -231,6 +233,27 @@ export function ReferencePicker({
       )}
     </FileButton>
   );
+  // Touch screens have no paste key, and iOS no paste event outside a text field: Paste reads the
+  // clipboard on a tap instead.
+  const touch = useTouch();
+  const pasteButton = touch && canReadClipboard() && (
+    <Tooltip label="Paste" disabled={!phone}>
+      <Button
+        {...(phone ? iconChipProps : chipProps)}
+        aria-label="Paste Reference"
+        disabled={!target || placement.uploading}
+        leftSection={phone ? undefined : <icons.paste size={15} />}
+        onClick={() =>
+          void readClipboardImages().then((files) => {
+            if (files.length) uploadFiles(files);
+            else notifications.show({ message: "There is no image to paste." });
+          }, failure)
+        }
+      >
+        {phone ? <icons.paste size={16} /> : "Paste"}
+      </Button>
+    </Tooltip>
+  );
   const more = listing.hasNextPage && (
     <Button
       variant="subtle"
@@ -287,7 +310,12 @@ export function ReferencePicker({
         onQueryChange={(query) => browse({ query })}
         filterCount={activeFilters.length}
         onClearFilters={() => browse({ filters: emptyGalleryFilters })}
-        actions={uploadButton}
+        actions={
+          <>
+            {pasteButton}
+            {uploadButton}
+          </>
+        }
         filters={
           <GalleryFilterPanel
             kind="image"
