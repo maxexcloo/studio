@@ -23,8 +23,8 @@ import classes from "./GalleryFilters.module.css";
 
 /**
  * The gallery's one toolbar row: search, Filter ▾, Starred and Uploads, the active filters as removable chips, the result
- * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones open the search from its
- * icon into the full row. Search narrows within the filters; filter changes keep the query.
+ * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones show the chips in a row below
+ * and open the search from its icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
 export function GalleryToolbar({
   kind,
@@ -126,7 +126,8 @@ export function GalleryToolbar({
         {actions}
       </Group>
     );
-  return (
+  const filterChips = <FilterChips chips={chips} onClear={clear} />;
+  const row = (
     <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
       {phone ? (
         <Tooltip label="Search Gallery">
@@ -192,7 +193,8 @@ export function GalleryToolbar({
         on={value.uploads}
         onToggle={() => onChange({ ...value, uploads: !value.uploads, starred: false })}
       />
-      <FilterChips chips={chips} onClear={clear} />
+      {/* Phones have no room here for the chips: a spacer keeps the actions at the end. */}
+      {phone ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (
         <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
           {results}
@@ -201,6 +203,12 @@ export function GalleryToolbar({
       {!phone && <ZoomSlider />}
       {actions}
     </Group>
+  );
+  return (
+    <>
+      {row}
+      {phone && chips.length > 0 && filterChips}
+    </>
   );
 }
 
