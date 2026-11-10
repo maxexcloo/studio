@@ -1019,6 +1019,48 @@ export const families = {
     // 4 MP, which edits want and the shared 32 GB card holds beside H3; text-to-image is best at 8 MP (2912²).
     size: [2048, 2048],
   },
+  // MiniMax's own MiniMax-H3-Image (Nov 2026): H3's 33B transformer without the audio layers,
+  // reading the stock H3 Qwen3-VL 32B encoder, with its own 2D image VAE. One checkpoint
+  // generates and edits (up to 16 references, <Picture n> in the prompt). It is distilled to 6
+  // steps without CFG or a negative: the per-step heads only fit the 6-step grid, which the model's
+  // own sampling lays over KSampler's simple scheduler (MiniMax's API rejects other steps or CFG).
+  // Comfy-Org's templates (ComfyUI 0.45): MiniMaxH3ImageConditioning for the conditioning and
+  // the latent, ConditioningZeroOut, KSampler at 6 steps, CFG 1, euler / simple. Works from 4 to
+  // 20 MP, best around 16 MP; the templates start at 4 MP.
+  minimax_h3_image: {
+    label: "MiniMax H3 Image",
+    kind: "image",
+    native: draws4k,
+    sources: ["unet"],
+    refines: { family: "minimax_h3", name: /minimax[-_ ]?h3[-_ ]?image/i },
+    slots: [{ slot: "encoder", label: "Qwen3-VL 32B", kinds: ["qwen3vl_32b"] }],
+    clipType: "minimax",
+    vae: ["h3_image"],
+    latent: "MiniMaxH3ImageConditioning",
+    sizeStep: 32,
+    negative: "zero",
+    sampling: "ksampler",
+    // The model card's sizes: 1:1, 4:3, 3:2, 16:9 and 21:9 and their portraits.
+    aspects: [
+      ["1:1", 1, 1],
+      ["4:3", 4, 3],
+      ["3:4", 3, 4],
+      ["3:2", 3, 2],
+      ["2:3", 2, 3],
+      ["16:9", 16, 9],
+      ["9:16", 9, 16],
+      ["21:9", 21, 9],
+    ],
+    references: 16,
+    requiredNodes: ["MiniMaxH3ImageConditioning", "ConditioningZeroOut"],
+    variants: [
+      {
+        id: "standard",
+        label: "MiniMax H3 Image",
+      },
+    ],
+    size: [2048, 2048],
+  },
   // Lumina Image 2.0 and its fine-tunes (Neta Lumina, NetaYume). Gemma reads a
   // system prompt before yours, as it did in training; the anime fine-tunes
   // were trained on their own, with a matching one for the negative.
@@ -1316,6 +1358,7 @@ export function familyFromName(name = "", source = "unet") {
     ["ernie", /(^|[^a-z])ernie([^a-z]|$)/i],
     ["lumina2", /lumina|neta[-_ ]?yume|netayume|neta[-_ ]?lumina/i],
     ["p_h3_image", /p[-_ ]?h3[-_ ]?image/i],
+    ["minimax_h3_image", /minimax[-_ ]?h3[-_ ]?image/i],
     ["minimax_h3", /minimax[-_ ]?h3|\bh3[-_]/i],
     ["wan22_14b", /wan[-_ ]?2[._]?2.*(high|low)[-_ ]?noise|(high|low)[-_ ]?noise.*wan/i],
     ["wan22_5b", /wan[-_ ]?2[._]?2.*5b|ti2v/i],
