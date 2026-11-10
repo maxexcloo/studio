@@ -741,7 +741,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
     {
       request: z
         .string()
@@ -773,7 +773,7 @@ export function registerGenerateTools({
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
         .optional()
-        .describe("Each profile's limit is its controls.loras.max in models."),
+        .describe("Each profile's limit is its controls.loras.max in models; [] for none."),
       reference_asset_ids: z
         .array(z.string().min(1))
         .max(16)
