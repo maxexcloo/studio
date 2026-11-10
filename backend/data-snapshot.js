@@ -5,7 +5,7 @@
  * back (sign-in sessions, the gallery file). Before
  * anything else loads, the files a version may rewrite are copied to
  * data/.backups/<from>-to-<to>-<time>/, so going back to the previous version
- * is a matter of stopping Studio and copying them back (TROUBLESHOOTING.md).
+ * is a matter of stopping Studio and copying them back (README.md, Running Studio).
  *
  * Only the small state files are copied. Media, thumbnails, video previews,
  * the image search index, reference images and the backups in data/backups

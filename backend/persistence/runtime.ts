@@ -195,7 +195,7 @@ export function assertCurrentStorage(dataDir: string): void {
   }
   if (pending.length)
     throw new Error(
-      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,
+      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see README.md, Data & Migrations) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,
     );
 }
 

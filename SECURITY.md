@@ -1,6 +1,6 @@
 # Security
 
-Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuration › Multi-User Mode](CONFIGURATION.md#multi-user-mode)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-User Mode](#single-user-mode).
+Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Accounts & Single Sign-On](README.md#accounts--single-sign-on)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-User Mode](#single-user-mode).
 
 ## Who May Do What
 
