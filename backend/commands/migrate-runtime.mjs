@@ -27,12 +27,5 @@ else
     dreamOwner: values["dream-owner"],
   });
 console.log(JSON.stringify(result, null, 2));
-if (
-  result.conflicts?.length ||
-  result.runtime?.conflicts.length ||
-  result.galleryRows?.conflicts.length ||
-  result.uploads?.conflicts.length ||
-  result.profileIds?.conflicts.length ||
-  result.jsonStores?.conflicts.length
-)
-  process.exitCode = 1;
+// A step that finds conflicts applies nothing; the exit code makes that visible to scripts.
+if (Object.values(result).some((step) => step?.conflicts?.length)) process.exitCode = 1;

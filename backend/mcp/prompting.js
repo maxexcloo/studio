@@ -1,24 +1,15 @@
 // Native port of the Studio MCP prompting service.
 import fs from "node:fs";
-import { isDeepStrictEqual } from "node:util";
 import { isObject } from "../values.js";
 
 /**
  * A profile's prompting: its guide from prompting.json with the profile's own `prompting` fields
- * over it, field by field. A profile keeps only what differs from its guide (ownPrompting), so a
- * guide change reaches every profile that doesn't override that field. Null without either.
+ * over it, field by field, so a guide change reaches every profile that doesn't override that
+ * field. Null without either.
  */
 export function mergedPrompting(guide, own) {
   if (!isObject(own) || !Object.keys(own).length) return guide ? structuredClone(guide) : null;
   return structuredClone({ ...guide, ...own });
-}
-
-/** The fields of a profile's own `prompting` that differ from `guide`: what the profile keeps. */
-export function ownPrompting(guide, own) {
-  if (!isObject(own)) return {};
-  return Object.fromEntries(
-    Object.entries(own).filter(([key, value]) => !isDeepStrictEqual(guide?.[key], value)),
-  );
 }
 
 /**
