@@ -61,6 +61,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* It holds focus only for the viewer's keys while navigation replaces the focused media. */
+  outline: none;
 }
 
 /* Desktop media keeps an even margin above and below instead of meeting the top edge. */
@@ -306,4 +308,20 @@
 /* A set's place shortens rather than pushing the top bar's buttons away. */
 .setPosition {
   flex-shrink: 1;
+}
+
+/* A touch tap on the media fades the chrome out and back. Hidden chrome stays in the accessibility
+   tree, and focus reaching it brings it back; work in progress and loading actions stay in sight. */
+.topBar,
+.navigation,
+.dock > * {
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+}
+.layout[data-chrome-hidden]
+  :is(.topBar, .navigation, .aside, .dock > :not([data-running], :has([data-loading]))) {
+  opacity: 0;
+}
+.layout[data-chrome-hidden]
+  :is(.topBar > *, .navigation button, .aside, .dock > :not([data-running], :has([data-loading]))) {
+  pointer-events: none;
 }
