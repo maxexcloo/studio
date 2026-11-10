@@ -1,35 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { Profile, Session } from "../../types";
-import { characterShots } from "../../../../shared/characters";
+import { characterShots, editsReferences } from "../../../../shared/characters";
 import { inputForProfile, initialInput, modelsQuery } from "../generation/GenerationProvider";
 import { generationInput, referencePatch } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 import { charactersQuery, type CharacterCard } from "./queries";
 
-const takesReferences = (profile: Profile) => Boolean(profile.mediaInputs?.length);
+/** A profile that edits with the card's image, keeping its identity in a new pose. */
+const takesReferences = (profile: Profile) =>
+  Boolean(profile.mediaInputs?.length) && editsReferences(profile);
 
 /**
- * The profile Generate References uses: with an image on the card, the preferred image profile
- * that takes references (`preferred`, the composer's, then the default), else the preferred
- * text-to-image one; ready local profiles first.
+ * The profile Generate References uses, the preferred one (`preferred`: the composer's, then the
+ * default) before the others, ready ones only: with an image on the card, one that edits with
+ * references; else, or without one, a text-to-image one, which draws from the description alone.
+ * An img2img start image would carry the card's pose and layout into every view.
  */
 export function referenceProfile(
   card: CharacterCard,
   profiles: Profile[],
   preferred: (string | undefined)[],
 ) {
-  const fits = (profile: Profile) =>
-    profile.kind === "image" &&
-    profile.ready !== false &&
-    (card.references.length
-      ? takesReferences(profile)
-      : !profile.mediaInputs?.some((slot) => slot.required));
-  return (
-    preferred
-      .map((id) => profiles.find((profile) => profile.id === id))
-      .find((profile) => profile && fits(profile)) || profiles.find(fits)
-  );
+  const ordered = [
+    ...preferred.flatMap((id) => profiles.filter((profile) => profile.id === id)),
+    ...profiles,
+  ].filter((profile) => profile.kind === "image" && profile.ready !== false);
+  const editor = card.references.length ? ordered.find(takesReferences) : undefined;
+  return editor || ordered.find((profile) => !profile.mediaInputs?.some((slot) => slot.required));
 }
 
 /**
@@ -74,7 +72,7 @@ export function useGenerateReferences(preferredProfileId?: string) {
           ).jobId,
         );
       await post(`/api/characters/${encodeURIComponent(card.id)}/generated`, { jobIds });
-      return { profile, jobIds };
+      return { profile, jobIds, withImage: references.length > 0 };
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: charactersQuery.queryKey });

@@ -1,3 +1,5 @@
+import { isCloudProfile } from "./profiles.ts";
+
 /**
  * Character cards: a name, 1–4 reference images and a short description that picking the card
  * adds to the prompt (backend/characters.js stores them per account).
@@ -18,6 +20,18 @@ export interface Character {
   /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
   generated?: { jobIds: string[]; at: string };
 }
+
+/**
+ * Whether a profile keeps a character's identity in new scenes: it edits with its references (a
+ * cloud model, or a family such as Qwen-Image, FLUX.2 or MOSS). Elsewhere a reference is an img2img
+ * start image whose pose and layout carry over.
+ */
+export const editsReferences = (profile: {
+  id?: string;
+  family?: string;
+  provider?: string;
+  editReferences?: boolean;
+}) => profile.editReferences === true || isCloudProfile(profile);
 
 /**
  * Generate References: one shot per view, for a consistent set (a character turnaround) the card

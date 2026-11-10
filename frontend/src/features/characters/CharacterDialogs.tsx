@@ -22,10 +22,14 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   const generation = useGenerateReferences(profile?.kind === "image" ? profile.id : undefined);
   const generate = (card: CharacterCard) =>
     generation.mutate(card, {
-      onSuccess: ({ profile, jobIds }) =>
+      onSuccess: ({ profile, jobIds, withImage }) =>
         notifications.show({
           title: `Generating ${jobIds.length} References for ${card.name}`,
-          message: `With ${profileName(profile)}. Once they finish, pick the ones to keep in Edit Character.`,
+          message: `With ${profileName(profile)}${
+            card.references.length && !withImage
+              ? ", from the description alone: no ready model edits with references"
+              : ""
+          }. Once they finish, pick the ones to keep in Edit Character.`,
         }),
       onError: (error) => notifications.show({ color: "red", message: error.message }),
     });

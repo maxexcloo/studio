@@ -113,7 +113,13 @@ function CharacterForm({
   // The card as it stands now, for Generate References' results as they finish.
   const characters = useQuery({ ...charactersQuery, enabled: Boolean(character) });
   const current = characters.data?.find((card) => card.id === character?.id) || character;
-  const generated = current?.generated?.results || [];
+  // Each queued job's results, or a placeholder until its first appears in the gallery.
+  const generated = (current?.generated?.jobIds || []).flatMap((jobId) => {
+    const results = current!.generated!.results.filter((result) => result.jobId === jobId);
+    return results.length
+      ? results
+      : [{ galleryItemId: jobId, jobId, status: "queued", thumbnailUrl: "", prompt: "" }];
+  });
   const fromGallery = useMutation({
     mutationFn: async (item: Pick<MediaItem, "id">) =>
       (
@@ -255,7 +261,7 @@ function CharacterForm({
             <Text size="xs" c="dimmed">
               {generated.length
                 ? "Pick the ones to keep. Saving ends the wait for the rest, which stay in the gallery."
-                : "A front portrait and full-body front, side and back views on a plain background, from the description and the first image."}
+                : "A front portrait and full-body front, side and back views on a plain background, from the description, and from the first image where a model that edits with references is ready."}
             </Text>
             {generated.length > 0 && (
               <PickerGrid label="Generated References">

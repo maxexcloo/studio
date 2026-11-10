@@ -1,6 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 import { characterShots } from "../../shared/characters";
-import { closeReferences, create, fixtures, image, signIn, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  signIn,
+  stamp,
+} from "./fixtures";
 
 const mara = {
   id: "chr-mara",
@@ -39,6 +48,12 @@ test("Picking a character fills the reference slots and adds its description, an
   await expect(
     references.getByText(
       "Image Quality takes 1 reference, so a card with more adds its first image.",
+    ),
+  ).toBeVisible();
+  // The test profile starts from its reference (img2img), which the tab says.
+  await expect(
+    references.getByText(
+      "Image Quality starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.",
     ),
   ).toBeVisible();
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
@@ -187,6 +202,8 @@ test("Generate References queues one view per shot on a shared seed with the car
 }) => {
   const state = await fixtures(page);
   state.characters.push(structuredClone(mara));
+  // The card's image goes only to a model that edits with references, never as an img2img start.
+  await serveProfiles(page, [{ ...profiles[0], editReferences: true }, ...profiles.slice(1)]);
   await page.goto("/library#characters");
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
   await page.getByRole("menuitem", { name: "Generate References", exact: true }).click();
@@ -197,7 +214,8 @@ test("Generate References queues one view per shot on a shared seed with the car
     true,
   );
   await expect.poll(() => state.characters[0].generated?.jobIds.length).toBe(4);
-  const picked = state.characters[0].generated.results[0].galleryItemId;
+  // Tiles follow the queued jobs, the first view first.
+  const picked = `${state.characters[0].generated.jobIds[0]}:0`;
   await page.getByRole("button", { name: "Pick References", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
   const generated = editor.getByRole("list", { name: "Generated References", exact: true });

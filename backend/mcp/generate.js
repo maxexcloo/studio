@@ -17,6 +17,7 @@ import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
 import { canonicalProfileId } from "../profile/store.js";
 import {
   asksForCloud,
+  chooseProfile,
   familyMatches,
   fastestFirst,
   findProfile,
@@ -42,7 +43,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
-import { characterShots, withCharacter } from "../../shared/characters.ts";
+import { characterShots, editsReferences, withCharacter } from "../../shared/characters.ts";
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
@@ -939,6 +940,31 @@ export function registerGenerateTools({
           : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
       ];
     }
+    // A character keeps its identity only on a model that edits with references; an img2img start
+    // image carries its pose and layout over. Without a named model, an editing one is preferred.
+    if (
+      card?.referenceIds.length &&
+      args.profile_id === undefined &&
+      !several &&
+      !editsReferences(targets[0].profile)
+    ) {
+      const editors = localUnlessAsked(await media.profiles("image", owner), { request }).filter(
+        (profile) => profile.mediaInputs?.length && editsReferences(profile),
+      );
+      let editor;
+      try {
+        if ((kind || "image") === "image")
+          editor = chooseProfile(editors, {
+            kind: "image",
+            tier: wanted,
+            references: 1,
+            defaultId: (await media.catalogue(owner)).defaults?.imageModel,
+          });
+      } catch {
+        // None in reach (or in the tier): the usual pick stays, and the reply says it is img2img.
+      }
+      if (editor) targets = [{ profile: editor, note: "" }];
+    }
     targets = targets.filter(
       (target, index) =>
         targets.findIndex((other) => other.profile.id === target.profile.id) === index,
@@ -960,9 +986,10 @@ export function registerGenerateTools({
               const sized = mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
                 throw new Error("Pass aspect or width and height, not both.");
+              // Views take the card's image only on a model that edits with it.
               const room = Math.min(
                 Math.max(0, referenceCount(profile).max - named.length),
-                views ? 1 : Infinity,
+                views ? (editsReferences(profile) ? 1 : 0) : Infinity,
               );
               const plan = {
                 ...args,
@@ -977,7 +1004,20 @@ export function registerGenerateTools({
                 card && !views && room < card.referenceIds.length
                   ? `${card.name}: ${room} of ${card.referenceIds.length} images fit this model. `
                   : "";
-              return { profile, note: `${note || ""}${fewer}`, plan, source: "exact" };
+              const start =
+                card?.referenceIds.length && room && !editsReferences(profile)
+                  ? `${profile.label || profile.id} starts from ${card.name}'s image (img2img), so its pose and layout carry over; a model that edits with references keeps the character in new scenes. `
+                  : "";
+              const alone =
+                views && card.referenceIds.length && !room
+                  ? `The views come from ${card.name}'s description alone: this model doesn't edit with references. `
+                  : "";
+              return {
+                profile,
+                note: `${note || ""}${fewer}${start}${alone}`,
+                plan,
+                source: "exact",
+              };
             }),
           );
     if (preview) {

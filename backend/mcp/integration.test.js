@@ -1529,23 +1529,46 @@ test("models lists the account's characters, and generate applies one by name: i
   );
   assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
-  // Generate References: Studio writes one prompt per view, on one seed, with the card's first image.
-  const before = f.submitted.length;
-  const views = await call(client, "generate", {
-    profile_id: imageProfile.id,
-    character: "Mara",
-    character_views: true,
-  });
-  assert.notEqual(views.isError, true, views.content?.[0]?.text);
-  const queued = f.submitted.slice(before);
+  // The fixture profile starts from a reference (img2img), and the reply says what that means.
+  assert.match(
+    reply.content[0].text,
+    /starts from Mara's image \(img2img\), so its pose and layout carry over/,
+  );
+  // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
+  // views come from the description alone, so the card's pose doesn't carry into every view.
+  const views = async () => {
+    const before = f.submitted.length;
+    const reply = await call(client, "generate", { character: "Mara", character_views: true });
+    assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
+    return { reply, queued: f.submitted.slice(before) };
+  };
+  const alone = await views();
   assert.deepEqual(
-    queued.map((job) => job.prompt),
+    alone.queued.map((job) => job.prompt),
     characterShots("red-haired ranger, green cloak"),
   );
-  assert.equal(new Set(queued.map((job) => job.seed)).size, 1);
-  assert.ok(queued.every((job) => job.referenceAssets[0]?.assetId === assetId));
+  assert.equal(new Set(alone.queued.map((job) => job.seed)).size, 1);
+  assert.ok(alone.queued.every((job) => !job.referenceAssets.length));
+  assert.match(alone.reply.content[0].text, /from Mara's description alone/);
   assert.equal(f.characters[0].generated.jobIds.length, 4);
-  assert.match(views.content[0].text, /once they finish, the user picks which to keep/);
+  assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
+  // With a model that edits with references, both the views and new scenes take the card's image on it.
+  const editor = {
+    ...structuredClone(imageProfile),
+    id: "editor",
+    label: "Editor",
+    editReferences: true,
+  };
+  await f.profiles([structuredClone(imageProfile), editor]);
+  const edited = await views();
+  assert.ok(
+    edited.queued.every(
+      (job) => job.profileId === "editor" && job.referenceAssets[0]?.assetId === assetId,
+    ),
+  );
+  const before = f.submitted.length;
+  await call(client, "generate", { prompts: ["At the harbour"], character: "Mara" });
+  assert.equal(f.submitted[before].profileId, "editor");
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
