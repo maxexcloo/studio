@@ -29,6 +29,7 @@ import {
   createTaste,
   itemValues,
   preferenceSignal,
+  setPreferenceSignals,
   registerTasteRoutes,
   tasteSignal,
 } from "./domain/taste.ts";
@@ -143,6 +144,7 @@ import {
   reloadGallerySources,
 } from "./gallery/store.js";
 import { makePendingItems } from "./gallery/records.js";
+import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
@@ -505,6 +507,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 registerGalleryReadRoutes(app, {
   store,
   near: (text) => imageSearch.near(text),
+  similar: (item) => imageSearch.similar(item),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));
@@ -565,10 +568,12 @@ registerGalleryHistoryRoutes(app, {
       items.map((item) => item.id),
       favorite,
     );
-    taste.record(
-      ownerId,
-      items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    );
+    taste.record(ownerId, [
+      ...items.map((item) =>
+        tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item)),
+      ),
+      ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+    ]);
   },
 });
 
@@ -607,6 +612,7 @@ const promptStage = createPromptStage({
   dream: () => dream,
   frame: assistant.image,
   caption: assistant.caption,
+  setPrompts: (job) => setPrompts(store, job),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
@@ -663,6 +669,14 @@ registerRewriteRoutes(app, {
   title: chatTitle,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
+registerResultSetRoutes(app, {
+  store,
+  admit: admitGeneration,
+  item: (ownerId, id) => {
+    const item = galleryItem(id);
+    return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
+  },
+});
 registerMigrationRoutes(app, {
   dataDir,
   adminRefusal,
