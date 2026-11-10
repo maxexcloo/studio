@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 test(
-  "character cards belong to their account, hold its own images and follow the Characters grant",
+  "character, outfit and scene cards belong to their account, hold its own images and follow the Characters grant",
   { timeout: 30_000 },
   async (t) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-characters-http-"));
@@ -139,6 +139,35 @@ test(
       listed.map((item) => [item.name, item.referenceIds, item.generated]),
       [["Mara the Ranger", [side.id], undefined]],
     );
+    // Outfits and scenes need a description and take at most one image, kept for picking only.
+    const outfit = await call("/api/outfits", {
+      method: "POST",
+      cookie: cookies.artist,
+      body: { name: "Raincoat", description: "a yellow raincoat and black rubber boots" },
+    });
+    assert.equal(outfit.status, 201, outfit.body.error);
+    assert.match(outfit.body.outfit.id, /^out-/);
+    for (const body of [
+      { name: "Bare", description: "" },
+      { name: "Two", description: "a gala gown", referenceIds: [front.id, side.id] },
+    ])
+      assert.equal(
+        (await call("/api/outfits", { method: "POST", cookie: cookies.artist, body })).status,
+        400,
+      );
+    const scene = await call("/api/scenes", {
+      method: "POST",
+      cookie: cookies.artist,
+      body: { name: "Harbour", description: "a foggy harbour at dawn", referenceIds: [front.id] },
+    });
+    assert.equal(scene.status, 201, scene.body.error);
+    assert.deepEqual(
+      (await call("/api/scenes", { cookie: cookies.artist })).body.scenes.map((item) => [
+        item.name,
+        item.references.length,
+      ]),
+      [["Harbour", 1]],
+    );
     // Cards are per account, and a group without Characters is refused.
     assert.deepEqual(
       (await call("/api/characters", { cookie: cookies.other })).body.characters,
@@ -149,11 +178,14 @@ test(
       cookie: cookies.other,
     });
     assert.equal(foreign.status, 404, foreign.body.error);
-    const limited = await call("/api/characters", { cookie: cookies.limited });
-    assert.deepEqual(
-      [limited.status, limited.body.error],
-      [403, "Characters are off for this account."],
-    );
+    assert.deepEqual((await call("/api/outfits", { cookie: cookies.other })).body.outfits, []);
+    for (const route of ["/api/characters", "/api/scenes"]) {
+      const limited = await call(route, { cookie: cookies.limited });
+      assert.deepEqual(
+        [limited.status, limited.body.error],
+        [403, "Characters are off for this account."],
+      );
+    }
     // A deleted gallery image drops out of the card rather than breaking it.
     await call(`/api/gallery/${encodeURIComponent(side.galleryItemId)}`, {
       method: "DELETE",
