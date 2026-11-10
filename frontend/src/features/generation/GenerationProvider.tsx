@@ -14,7 +14,7 @@ import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from
 import { api } from "../../api";
 import { useRememberedKey } from "../auth/useRemembered";
 import { setFamilyLabels } from "../../ui/modelFamily";
-import { isProfile } from "./payload";
+import { isProfile, referencePatch } from "./payload";
 
 export const modelsQuery = queryOptions({
   queryKey: ["models"],
@@ -76,6 +76,22 @@ export interface Draft {
   parentItemId?: string;
   presetId?: string;
   presetTitle?: string;
+}
+/**
+ * The draft moved to `profile` for a picked character (CharacterChoices): the profile's settings,
+ * the prompt led by the character, and its references placed for that profile.
+ */
+export function draftForProfile(
+  previous: Draft,
+  profile: Profile,
+  next: { references: ReferenceAsset[]; prompt: string },
+): Draft {
+  const input = { ...inputForProfile(previous.input, profile), prompt: next.prompt };
+  return {
+    ...previous,
+    references: next.references,
+    input: { ...input, ...referencePatch(input, [], next.references, profile) },
+  };
 }
 const empty: Draft = {
   input: initialInput,
