@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import { Alert, Button, Group, Modal, RangeSlider, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { usePhone } from "../../ui/usePhone";
 import { queueQuery } from "../generation/Queue";
 import { playbackUrl } from "./mediaSource";
+import { useItemMutation } from "./useItemMutation";
 
 /** A video edit backend/gallery/video-edits.js saves as a new version of the clip. */
 export type VideoEdit =
@@ -16,7 +17,7 @@ export type VideoEdit =
 /** Edit › a video edit; the original stays and the edited clip joins its versions. */
 export function useVideoEdit(item: MediaItem, { inlineError = false } = {}) {
   const cache = useQueryClient();
-  return useMutation({
+  return useItemMutation(item.id, "video-edit", {
     meta: { inlineError },
     mutationFn: (edit: VideoEdit) =>
       post<{ id: string }>("/api/gallery/video-edit", { galleryItemId: item.id, ...edit }),

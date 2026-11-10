@@ -53,7 +53,7 @@ export function MediaViewerActions({
   sessionId?: string;
   compare: boolean;
   iterate: (iteration: Iteration) => void;
-  /** The run being queued from here. */
+  /** The run being queued from this item. */
   pending?: Iteration;
   onApplied: () => void;
   onCompare: () => void;
@@ -76,7 +76,6 @@ export function MediaViewerActions({
     sessionId,
     compare,
     iterate,
-    iterating: pending?.kind,
     onApplied,
     onCompare,
     // Compare shows in menus and the selection bar, not under the open item.
