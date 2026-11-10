@@ -66,6 +66,36 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   };
 }
 /**
+ * Upscale for a selection: each image runs with Upscale's remembered settings, as its own menu
+ * would run it, read for the first.
+ */
+export function useUpscaleMany(items: MediaItem[]) {
+  const settings = useQuickUpscale(
+    items[0] ?? ({ id: "", type: "image" } as MediaItem),
+    items.length > 0,
+  );
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      Promise.all(
+        items.map((item) =>
+          post<UpscaleResponse>("/api/upscale", {
+            galleryItemId: item.id,
+            quality: settings.quality,
+            target: settings.target,
+            faceDetail: settings.faceDetail,
+          } satisfies UpscaleRequest),
+        ),
+      ),
+    onSettled: () =>
+      void Promise.all(
+        ["gallery", "queue", "session", "sessions"].map((key) =>
+          cache.invalidateQueries({ queryKey: [key] }),
+        ),
+      ),
+  });
+}
+/**
  * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
  * settings, then the run (MediaActions.tsx places it). Why the worker can't run it shows above them.
  */

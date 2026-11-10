@@ -6,6 +6,7 @@ import {
   gallerySearch,
   image,
   selectionAction,
+  selectionMenuItem,
   showOnly,
   stamp,
   touch,
@@ -322,10 +323,9 @@ test("Runs fan a stacked run out in place, open it to flip through and link its 
   await expect(stack).toHaveAttribute("aria-expanded", "true");
   const run = page.getByRole("region", { name: "Run: Bird study 0", exact: true });
   await expect(run.getByRole("button", { name: /^Open image: Bird study/ })).toHaveCount(3);
-  await expect(run.getByRole("link", { name: "Bird Chat", exact: true })).toHaveAttribute(
-    "href",
-    "/chat/chat-a",
-  );
+  await expect(
+    run.getByRole("link", { name: "From Chat: Bird Chat", exact: true }),
+  ).toHaveAttribute("href", "/chat/chat-a#job-run-job");
   await run.getByRole("button", { name: "Open image: Bird study 2", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // A run's result flips through that run alone, as Open All does from its first.
@@ -341,6 +341,110 @@ test("Runs fan a stacked run out in place, open it to flip through and link its 
   await page.reload();
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
+});
+
+test("An MCP result set is one titled run whose viewer names each result's place and jumps along its strip", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.sessions.push({ id: "chat-a", title: "Bird Chat", inputs: {}, createdAt: stamp });
+  const set = { id: "set-a", title: "Variety Test", source: "Chat" };
+  // Newest first, as the gallery lists them; the second prompt has no title of its own.
+  state.gallery.push(
+    ...[
+      ["Bear Hug", 2],
+      [undefined, 1],
+      ["Fox Wizard", 0],
+    ].map(([variation, index], position) => ({
+      ...results(1)[0],
+      id: `set-${index}`,
+      jobId: `set-job-${index}`,
+      sessionId: "chat-a",
+      prompt: `Set prompt ${index}, detailed`,
+      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
+      resultSet: { ...set, index, ...(variation ? { variation } : {}) },
+    })),
+    ...results(1),
+  );
+  await page.goto("/images");
+  // The grid captions each result by its own title, or its prompt's first words.
+  await expect(
+    page.getByRole("button", { name: "Open image: Fox Wizard", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Set prompt 1", exact: true }),
+  ).toBeVisible();
+  // Runs stacks the set under its title, in prompt order, from the Chat that asked.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByText("Runs", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
+  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
+  const tiles = run.getByRole("button", { name: /^Open image: / });
+  await expect(tiles).toHaveCount(3);
+  expect(await tiles.evaluateAll((all) => all.map((tile) => tile.ariaLabel))).toEqual([
+    "Open image: Fox Wizard",
+    "Open image: Set prompt 1",
+    "Open image: Bear Hug",
+  ]);
+  await expect(
+    run.getByRole("link", { name: "From Chat: Bird Chat", exact: true }),
+  ).toHaveAttribute("href", "/chat/chat-a#job-set-job-0");
+  // The viewer names the result's place in its set and jumps along the set's strip.
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  // WebKit can drop a tap while the run's tiles are still fanning out.
+  await expect(async () => {
+    if (!(await viewer.isVisible()))
+      await run.getByRole("button", { name: "Open All", exact: true }).click();
+    await expect(
+      viewer.getByText("Variety Test › Fox Wizard (1 of 3)", { exact: true }),
+    ).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
+  await expect(strip.getByRole("listitem")).toHaveCount(3);
+  await strip.getByRole("listitem", { name: "Show Bear Hug (3 of 3)", exact: true }).click();
+  await expect(viewer.getByText("Variety Test › Bear Hug (3 of 3)", { exact: true })).toBeVisible();
+  await expect(
+    viewer.getByRole("img", { name: "Set prompt 2, detailed", exact: true }),
+  ).toBeVisible();
+  await strip.getByRole("listitem", { name: "Show Set prompt 1 (2 of 3)", exact: true }).click();
+  await expect(
+    viewer.getByText("Variety Test › Set prompt 1 (2 of 3)", { exact: true }),
+  ).toBeVisible();
+});
+
+test("Select Set picks a set's results to upscale together", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...["Bear Hug", "Owl Librarian", "Fox Wizard"].map((variation, position) => ({
+      ...results(1)[0],
+      id: `set-${2 - position}`,
+      jobId: `set-job-${2 - position}`,
+      prompt: `Set prompt ${2 - position}`,
+      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
+      resultSet: { id: "set-a", title: "Variety Test", index: 2 - position, variation },
+    })),
+    ...results(1),
+  );
+  const upscales: any[] = [];
+  await page.route("**/api/upscale", (route) => {
+    upscales.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByText("Runs", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
+  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
+  await run.getByRole("button", { name: "Select Set", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
+  ).toHaveText("3 Selected");
+  await (await selectionMenuItem(page, "Upscale")).click();
+  await expect
+    .poll(() => upscales.map((body) => body.galleryItemId).sort())
+    .toEqual(["set-0", "set-1", "set-2"]);
 });
 
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
@@ -564,7 +668,8 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("1 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(0);
+  // Animate and Upscale, which run on every selected image, wait under a phone's More.
+  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
   // The selects sit beside the count; phones name them by what they select.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
     phone ? "All" : "Select All",
@@ -572,7 +677,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(0);
+  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
@@ -770,4 +875,37 @@ test("On a phone held sideways, Gallery Filters fits the screen and scrolls", as
   const square = filters.getByRole("button", { name: "Square", exact: true });
   await square.scrollIntoViewIfNeeded();
   await expect(square).toBeInViewport();
+});
+
+test("The Tags facet lists the most used caption tags with counts and filters by them", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      caption: { text: "", tags: index ? ["beach", "sunset"] : ["snow"] },
+    })),
+  );
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const tags = page.getByRole("group", { name: "Tags", exact: true });
+  await expect(tags.getByRole("button")).toHaveText(["beach2", "sunset2", "snow1"]);
+  await tags.getByRole("button", { name: "snow 1", exact: true }).click();
+  await expect(tags.getByRole("button", { name: "snow 1", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(state.galleryRequests.at(-1)).toContain("tag=snow");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Remove snow Filter", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeVisible();
 });

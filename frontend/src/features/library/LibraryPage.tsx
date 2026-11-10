@@ -54,14 +54,15 @@ export function LibraryPage() {
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
     },
   });
-  // The last check or update's outcome, shown under the catalogue toolbar.
+  // The last check or update's outcome, shown under the catalogue toolbar; a check that finds
+  // nothing shows nothing.
   const updateNote =
     update.data &&
     (update.variables
       ? "Update queued. The current file stays until the new one is verified and free."
       : update.data.available
         ? `${update.data.available} updates available.`
-        : "Everything is up to date.");
+        : undefined);
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([

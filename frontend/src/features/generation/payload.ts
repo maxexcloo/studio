@@ -119,7 +119,6 @@ export function generationInput(
     model: profile?.model || input.model,
     workflow: profile?.workflow || input.workflow,
     provider: profile?.provider,
-    workerId: profile?.provider === "cliproxyapi" ? undefined : input.workerId,
     profileName: profile?.displayName || profile?.label,
     referenceAssets: references.length
       ? details.map((asset) => ({ assetId: asset.id, slot: asset.slot! }))

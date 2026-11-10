@@ -73,9 +73,6 @@ export function createGenerationQueue({
       : input.kind === "video"
         ? "video"
         : "image";
-    // Only a worker that can run the job holds it (generation-routes.js ignores any other pin);
-    // background work goes where it is routed, whatever worker its source input names.
-    if (pinned(input, priority, capability)) return `worker:${input.workerId}`;
     const worker = routeJob(capability, {
       profileId: profileOnBackendKey(input.profileId, input.profileBackend),
       loads: generationQueue.loads(),
@@ -84,33 +81,10 @@ export function createGenerationQueue({
     });
     return `worker:${worker?.id || defaultWorkerId() || ""}`;
   }
-  /** Whether manual work names a worker that can run it: an explicit pick, which is strict. */
-  const pinned = (input, priority, capability) =>
-    priority === queuePriority.manual &&
-    typeof input.workerId === "string" &&
-    Boolean(workerById(input.workerId)?.capabilities.includes(capability));
   /** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
   function managedWorkloads(job) {
     if (job.resource.startsWith("provider:cliproxyapi")) return [];
     return workerWorkloads(workerById(job.backend));
-  }
-  async function permitQueueFallback(job) {
-    if (job.input.allowFallback !== true) return false;
-    const models = await mediaModels(false)
-      .then((result) => result.models)
-      .catch(() => null);
-    const profile = models?.profiles.find(
-      (item) => item.id === canonicalProfileId(job.input.profileId),
-    );
-    const backend = profile?.workerIds?.find((id) => id !== job.backend);
-    if (!backend) return false;
-    const latest = store.job(job.ownerId, job.id);
-    store.save({
-      ...latest,
-      backend,
-      resource: `worker:${backend}`,
-    });
-    return true;
   }
   const queueAdapter = createGenerationQueueAdapter({
     submitGeneration: generationRoutes.submitGeneration,
@@ -174,11 +148,8 @@ export function createGenerationQueue({
     },
     eligible: async (job) => {
       if (demoMode) return;
-      if (!job.backend || !workerById(job.backend)) {
-        if (await permitQueueFallback(job))
-          return "Moving to another worker with explicit fallback permission.";
-        return "Waiting for the selected worker to be configured.";
-      }
+      if (!job.backend || !workerById(job.backend))
+        return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
       try {
         if (workloads.length && !mediaLeases.has(job.id))
@@ -187,8 +158,6 @@ export function createGenerationQueue({
       } catch (error) {
         mediaLeases.get(job.id)?.release();
         mediaLeases.delete(job.id);
-        if (await permitQueueFallback(job))
-          return "Moving to another worker with explicit fallback permission.";
         return error.message;
       }
     },
@@ -217,6 +186,20 @@ export function createGenerationQueue({
       store,
       provider: cloudProvider,
       resolve: directCloud.resolve,
+      // A gone or disabled account's prompts never reach the text model.
+      soften: async (job, prompt, reason) => {
+        if (!assistantEngine || (job.ownerId && !accountAccessForId(job.ownerId)?.authenticated))
+          throw new Error("the prompt assistant is unavailable");
+        const written = await assistantEngine.rewrite({
+          prompt,
+          preset: "custom",
+          instruction: `The provider's moderation refused this prompt (${reason.slice(0, 200)}). Keep its subject, scene, action and camera; soften only the wording likely to have tripped moderation.`,
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (written.source !== "assistant")
+          throw new Error(written.reason || "the prompt assistant did not answer");
+        return written.prompt;
+      },
       saveMedia: providerMediaWriter(mediaRoot, mediaSubfolder, writeBytesFileAsync, withPngText),
       saveGallery: async (job, outputs, request) => {
         await replaceGalleryJob(
@@ -283,16 +266,10 @@ export function createGenerationQueue({
     store,
     {
       ...generationAdapter,
-      // A local generation on Automatic may move to another idle worker that runs it until it
-      // starts; an explicitly picked worker is strict.
+      // A local generation may move to another idle worker that runs it until it starts.
       alternatives: (job) => {
         const capability = job.input.kind === "video" ? "video" : "image";
-        return job.resource.startsWith("worker:") &&
-          job.operation !== "upscale" &&
-          !(
-            job.resource === `worker:${job.input.workerId}` &&
-            pinned(job.input, job.priority, capability)
-          )
+        return job.resource.startsWith("worker:") && job.operation !== "upscale"
           ? readyWorkers(
               capability,
               profileOnBackendKey(job.input.profileId, job.input.profileBackend),

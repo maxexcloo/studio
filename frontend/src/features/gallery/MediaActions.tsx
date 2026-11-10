@@ -8,6 +8,7 @@ import {
   Flame,
   ImagePlus,
   ListChecks,
+  MessagesSquare,
   Loader,
   PenLine,
   Repeat,
@@ -35,7 +36,7 @@ import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { useQueue, useQueueAction } from "../generation/Queue";
+import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
 import { useChatText } from "../sessions/ChatProvider";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
@@ -81,6 +82,7 @@ const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
   living: Wind,
   action: Zap,
+  dialogue: MessagesSquare,
   spicy: Flame,
   custom: PenLine,
 };
@@ -307,6 +309,7 @@ export function useMediaActions(
     onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
   });
   const chat = useChatAction(item, onApplied);
+  const navigate = useNavigate();
   const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
@@ -320,6 +323,17 @@ export function useMediaActions(
     onVersionChange,
   });
   const assistant = useQuery(assistantQuery);
+  // The assistant writes new variations into the item's MCP result set, in the queue.
+  const client = useQueryClient();
+  const moreLikeSet = useMutation({
+    mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
+    onSuccess: () =>
+      void Promise.all(
+        [queueQuery.queryKey, ["gallery"], ["session"]].map((queryKey) =>
+          client.invalidateQueries({ queryKey }),
+        ),
+      ),
+  });
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
@@ -502,12 +516,32 @@ export function useMediaActions(
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
+                  ...(item.resultSet && assistant.data?.available
+                    ? [
+                        {
+                          id: "more-like-set",
+                          label: "More Like This Set",
+                          description: `Two new variations for ${item.resultSet.title}`,
+                          icon: icons.suggestions,
+                          disabled: moreLikeSet.isPending,
+                          onClick: () => moreLikeSet.mutate(),
+                        },
+                      ]
+                    : []),
                 ],
           ]
         : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
+    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
+    image &&
+      itemAction("similar", {
+        onClick: () => {
+          onApplied();
+          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+        },
+      }),
     upscale,
     // Its options sort alphabetically.
     itemAction("copy", {

@@ -1,8 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ActionIcon, Anchor, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { MessageCircle, X } from "lucide-react";
-import { Link } from "react-router";
+import { SquareCheck, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { easing } from "../../theme";
@@ -11,6 +10,8 @@ import { layerAbove } from "../../ui/popupClicks";
 import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
+import { inRunOrder, runKey } from "./resultSets";
+import { FromChat } from "./FromChat";
 import { MediaTile } from "./MediaTile";
 import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 import classes from "./RunsView.module.css";
@@ -21,18 +22,34 @@ interface Run {
 }
 type Row = { key: string; runs: Run[] } | { key: string; panel: Run };
 
-/** Consecutive items from one job form a run; items without a job stand alone. */
+/**
+ * Consecutive items from one job form a run, and an MCP call's result set one run at its newest
+ * result's place, in the set's order; items without either stand alone.
+ */
 function groupRuns(items: MediaItem[]) {
   const runs: Run[] = [];
+  const sets = new Map<string, Run>();
   for (const item of items) {
     const last = runs[runs.length - 1];
-    if (item.jobId && last?.items[0].jobId === item.jobId) last.items.push(item);
-    else runs.push({ key: item.jobId ? `${item.jobId}:${item.id}` : item.id, items: [item] });
+    const set = item.resultSet && sets.get(item.resultSet.id);
+    if (set) set.items.push(item);
+    else if (!item.resultSet && item.jobId && last?.items[0].jobId === item.jobId)
+      last.items.push(item);
+    else {
+      const run = { key: `${runKey(item) || ""}:${item.id}`, items: [item] };
+      runs.push(run);
+      if (item.resultSet) sets.set(item.resultSet.id, run);
+    }
   }
-  return runs;
+  return runs.map((run) => ({ ...run, items: inRunOrder(run.items) }));
 }
+/** A run's title: its set's, else its first result's. */
+const runTitle = (run: Run) => run.items[0].resultSet?.title || mediaTitle(run.items[0]);
 const countLabel = (run: Run) =>
   `${run.items.length} ${run.items[0].type === "video" ? "Videos" : "Images"}`;
+/** Where an MCP set came from ("from Chat"), for its stack's caption. */
+const fromLabel = (run: Run) =>
+  run.items[0].resultSet?.source ? `from ${run.items[0].resultSet.source}` : "";
 
 /**
  * Each run is a stacked card; a run of several fans its items out in place, in a panel below the
@@ -45,7 +62,6 @@ export function RunsView({
   focusItem,
   caption,
   detail,
-  chatTitle,
   renderActions,
   onSelectionMenu,
   onTryAgain,
@@ -205,7 +221,6 @@ export function RunsView({
               hold={hold}
               caption={caption}
               detail={detail}
-              chatTitle={chatTitle}
               renderActions={renderActions}
               onSelectionMenu={onSelectionMenu}
               onTryAgain={onTryAgain}
@@ -236,7 +251,6 @@ const RunsRow = memo(function RunsRow({
   hold,
   caption,
   detail,
-  chatTitle,
   renderActions,
   onSelectionMenu,
   onTryAgain,
@@ -257,10 +271,12 @@ const RunsRow = memo(function RunsRow({
       ref={panel}
       run={row.panel}
       columns={columns}
-      chat={row.panel.items[0].sessionId}
-      chatTitle={chatTitle}
       detail={detail}
-      onOpenAll={() => open(row.panel.items[0], row.panel.items[0].jobId)}
+      onOpenAll={() => open(row.panel.items[0], runKey(row.panel.items[0]))}
+      onSelect={() => {
+        const ids = new Set(row.panel.items.map((item) => item.id));
+        selection.select((item) => ids.has(item.id));
+      }}
       onClose={() => collapse(row.panel)}
     >
       {row.panel.items.map((item) => (
@@ -273,7 +289,7 @@ const RunsRow = memo(function RunsRow({
           detail={detail(item)}
           style={{ aspectRatio: `${item.width || 1} / ${item.height || 1}` }}
           className={classes.fanned}
-          onOpen={() => open(item, item.jobId)}
+          onOpen={() => open(item, runKey(item))}
           onMenu={() => setMenuItem(item.id)}
           onSelectionMenu={onSelectionMenu}
           onTryAgain={onTryAgain}
@@ -292,7 +308,7 @@ const RunsRow = memo(function RunsRow({
       {row.runs.map((run) => {
         const cover = run.items.find((item) => item.status === "done") || run.items[0];
         const several = run.items.length > 1;
-        const title = mediaTitle(cover);
+        const title = several ? runTitle(run) : mediaTitle(cover);
         return (
           <div key={run.key} className={classes.run}>
             <MediaTile
@@ -345,7 +361,9 @@ const RunsRow = memo(function RunsRow({
                 {title}
               </Text>
               <Text size="xs" c="dimmed" lineClamp={1}>
-                {[several && countLabel(run), detail(cover)].filter(Boolean).join(" · ")}
+                {[several && countLabel(run), several && fromLabel(run), detail(cover)]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
             </div>
           </div>
@@ -359,24 +377,24 @@ function RunPanel({
   ref,
   run,
   columns,
-  chat,
-  chatTitle,
   detail,
   onOpenAll,
+  onSelect,
   onClose,
   children,
 }: {
   ref: React.Ref<HTMLDivElement>;
   run: Run;
   columns: number;
-  chat?: string;
-  chatTitle: (id: string) => string | undefined;
   detail: (item: MediaItem) => string;
   onOpenAll: () => void;
+  /** Selects the run's results, for the selection bar's actions on them all. */
+  onSelect: () => void;
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  const title = mediaTitle(run.items[0]);
+  const title = runTitle(run);
+  const selectLabel = run.items[0].resultSet ? "Select Set" : "Select Run";
   return (
     <Paper
       ref={ref}
@@ -404,17 +422,15 @@ function RunPanel({
           </Text>
           <Group gap="xs" c="dimmed" fz="xs" wrap="wrap" style={{ rowGap: 0 }}>
             <span>{[countLabel(run), detail(run.items[0])].join(" · ")}</span>
-            {chat && (
-              <Anchor component={Link} to={`/chat/${chat}`} inherit c="dimmed" underline="always">
-                <Group gap={4} wrap="nowrap" component="span">
-                  <MessageCircle size={12} />
-                  {chatTitle(chat) || "Open Chat"}
-                </Group>
-              </Anchor>
-            )}
+            <FromChat item={run.items[0]} />
           </Group>
         </Stack>
         <Group gap={4} wrap="nowrap">
+          <Tooltip label={selectLabel}>
+            <ActionIcon aria-label={selectLabel} variant="subtle" color="gray" onClick={onSelect}>
+              <SquareCheck size={18} />
+            </ActionIcon>
+          </Tooltip>
           <Tooltip label="Open All">
             <ActionIcon aria-label="Open All" variant="subtle" color="gray" onClick={onOpenAll}>
               <icons.openAll size={18} />

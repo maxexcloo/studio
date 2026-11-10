@@ -259,8 +259,8 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones show it on the
-  // bar.
+  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones list it under
+  // the bar's More.
   if (desktop) {
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
     await promptTool(viewer, "Prompt", "Continue in Chat");
@@ -363,6 +363,28 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
+});
+
+test("Edit › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Edit");
+  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+});
+
+test("More Like This Set is offered only for a result in a set", async ({ page }) => {
+  await seed(page);
+  await viewerAction(page, "Edit");
+  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test("Run Again and Edit Prompt draw a new seed; only Repeat Exactly keeps it", async ({
@@ -1227,9 +1249,30 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
-  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  if (phone) {
+    // Phones keep the bar to one row, with the rest under More and Delete last.
+    const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
+    const row = ["Animate", "Edit", "Upscale", "Star", "More"].map((name) =>
+      bar.getByRole("button", { name, exact: true }),
+    );
+    const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
+    expect(new Set(tops).size).toBe(1);
+    await row[4].click();
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Find Similar",
+      "Continue in Chat",
+      "Copy",
+      "Download",
+      "Delete",
+    ]);
+  }
+  const download = (phone ? page : dialog).getByRole(phone ? "menuitem" : "link", {
+    name: "Download",
+    exact: true,
+  });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  if (phone) await page.keyboard.press("Escape");
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);
@@ -1343,7 +1386,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
-  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toBeVisible();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await enabled.check();
@@ -1409,8 +1452,9 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
   }
 });
 
-test("A tablet's viewer bar shows every action without scrolling", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+test("The viewer bar shows every action without scrolling on a tablet or narrow window", async ({
+  page,
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "tablet-study",
@@ -1422,13 +1466,19 @@ test("A tablet's viewer bar shows every action without scrolling", async ({ page
     width: 1024,
     height: 1024,
   });
-  await page.setViewportSize({ width: 1180, height: 820 });
+  // A tablet, or a narrow desktop window with Details open beside the media.
+  const mobile = testInfo.project.use.isMobile;
+  await page.setViewportSize(mobile ? { width: 1180, height: 820 } : { width: 1024, height: 768 });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Tablet Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const remove = viewer.getByRole("button", { name: "Delete", exact: true });
   await expect(remove).toBeVisible();
-  // Touch targets outgrow one row, so the bar wraps rather than scrolling Delete out of sight.
+  if (!mobile)
+    await expect(
+      viewer.getByRole("complementary", { name: "Generation Details", exact: true }),
+    ).toBeVisible();
+  // The actions outgrow one row, so the bar wraps rather than scrolling Delete out of sight.
   const clipped = () =>
     remove.evaluate((button) => {
       const actions = button.closest('[role="group"] > *')!.getBoundingClientRect();

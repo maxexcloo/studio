@@ -32,8 +32,10 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import { FromChat } from "./FromChat";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
+import { setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
@@ -201,7 +203,7 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
       : [1, -1, 2, -2]
           .map((offset) => items[index + offset])
           .filter((item) => item?.type === "image" && item.status === "done")
-          .map((item) => mediaSource(item).url);
+          .map((item) => mediaSource(item).displayUrl);
   const key = urls.join("\n");
   useEffect(() => {
     const keep = new Map<string, HTMLImageElement>();
@@ -290,6 +292,8 @@ export function MediaViewer({
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
   const family = useRunFamily(item, queued, related);
+  // An MCP call's other results, for the set's place in the top bar and its strip.
+  const members = setMembers(related, item);
   const iteration = useMediaIteration(item, sessionId);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
@@ -337,6 +341,12 @@ export function MediaViewer({
   ]
     .filter(Boolean)
     .join(" · ");
+  // The Chat that made it, unless the viewer opened from that Chat.
+  const fromChat = item.sessionId !== sessionId && (
+    <Text size="xs" c="dimmed">
+      <FromChat item={item} />
+    </Text>
+  );
   const toggleDetails = () => (phone ? setSheet(true) : setDetails((open) => !open));
   function swipe(direction: SwipeDirection) {
     // A swipe replaces the media before its compatibility click arrives.
@@ -494,6 +504,18 @@ export function MediaViewer({
                       : []),
                   ]}
                 />
+              ) : item.resultSet ? (
+                <Badge
+                  variant="default"
+                  size="lg"
+                  radius="xl"
+                  style={glass}
+                  fw={500}
+                  miw={0}
+                  className={classes.setPosition}
+                >
+                  {setPosition(item, members)}
+                </Badge>
               ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
                   {currentIndex + 1} / {viewable.length}
@@ -541,7 +563,7 @@ export function MediaViewer({
                         src={
                           candidate.type === "video"
                             ? mediaSource(candidate).thumbnailUrl
-                            : mediaSource(candidate).url
+                            : mediaSource(candidate).displayUrl
                         }
                         alt={candidate.prompt || "Generated Image"}
                         draggable={false}
@@ -626,7 +648,7 @@ export function MediaViewer({
                     <Suspense fallback={<LoadingState label="Loading Image" fill />}>
                       <ZoomImage
                         key={item.id}
-                        src={source.url}
+                        src={source.displayUrl}
                         alt={item.prompt || "Generated Image"}
                         placeholder={source.thumbnailUrl}
                         width={source.width}
@@ -642,6 +664,7 @@ export function MediaViewer({
             <MediaViewerDock
               item={displayed}
               family={family}
+              set={members}
               choose={(next) => {
                 setCompare(false);
                 navigate?.(next);
@@ -697,6 +720,7 @@ export function MediaViewer({
                       <Text size="xs" c="dimmed">
                         {subtitle}
                       </Text>
+                      {fromChat}
                     </Stack>
                     <MediaDetails
                       item={displayed}
@@ -734,9 +758,12 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Text size="xs" c="dimmed" mt={-8}>
-                {subtitle}
-              </Text>
+              <Stack gap={2} mt={-8}>
+                <Text size="xs" c="dimmed">
+                  {subtitle}
+                </Text>
+                {fromChat}
+              </Stack>
               <MediaDetails
                 item={displayed}
                 related={related}

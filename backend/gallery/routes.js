@@ -9,12 +9,13 @@ import {
   cleanupGalleryState,
   pageGallery,
   galleryRevisionValue,
+  galleryItem,
 } from "./store.js";
 import { galleryFilter, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
-import { galleryAspects, gallerySizeBands } from "./filters.js";
+import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal } from "../route-access.js";
@@ -47,12 +48,13 @@ export function galleryJobResponse(store, account, id, settings = false) {
 /**
  * `jobChats(req)` maps the account's job IDs to the Chat that ran them, `{ id, title }`; items
  * carry it as `sessionId`, and `chat` (repeatable) filters by it. `near(q)` resolves to a test for
- * items that look like the search (domain/image-search.ts), or null.
+ * items that look like the search (domain/image-search.ts), or null; `similar(item)` scores items
+ * by how alike they look to it, or is null when it can't.
  */
-export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
+export function registerGalleryReadRoutes(app, { jobChats, near, similar, store }) {
   /**
-   * A gallery search from the query string, or null. `lora`, `model`, `size`
-   * and `aspect` may repeat (any of them matches); `q` and `workflow` are
+   * A gallery search from the query string, or null. `lora`, `model`, `size`,
+   * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
   const many = (value) =>
@@ -69,7 +71,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
       favorites: query.favorites === "1",
       workflow: one(query.workflow),
       ...Object.fromEntries(
-        ["lora", "model", "size", "aspect"].map((key) => [key, many(query[key])]),
+        ["lora", "model", "size", "aspect", "tag"].map((key) => [key, many(query[key])]),
       ),
     });
   }
@@ -106,6 +108,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
         description: band.detail,
       })),
       aspects: galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.label })),
+      tags: topCaptionTags(items),
       chats: [
         ...new Map(
           items
@@ -143,7 +146,13 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
     const search = await searchFilter(query);
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
+    // `similar` (an item id, Find Similar) ranks by likeness to that image; none until it is read.
+    const source = query.similar ? galleryItem(String(query.similar)) : null;
+    const similarTo = query.similar
+      ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
+      : null;
     const page = pageGallery({
+      rank: similarTo,
       type,
       limit: limit || 200,
       cursor,
@@ -152,6 +161,8 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
       filter: (item) =>
         recordBelongsToAccount(item, account) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
+        // `set` keeps one MCP result set's results, which a Chat card links to.
+        (!query.set || item.resultSet?.id === query.set) &&
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });

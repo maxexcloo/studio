@@ -994,8 +994,9 @@ test("media and administrator credentials discover only their own friendly tools
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters, to 15,300 for generate's character and to 15,400 for its character_views.
-    JSON.stringify(tools).length + media.getInstructions().length < 15400,
+    // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
+    // generate's character and to 15,700 for its character_views.
+    JSON.stringify(tools).length + media.getInstructions().length < 15700,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1413,6 +1414,37 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
     f.submitted.map((body) => body.prompt),
     ["A tree", "A flower"],
   );
+});
+
+test("a call of several results is one titled set, each prompt titled by the chat or left to its prompt", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await generate(client, {
+    title: "Variety Test",
+    titles: ["Fox Wizard"],
+    prompts: ["A fox wizard", "An owl at night"],
+    count: 2,
+  });
+  const sets = f.submitted.map((body) => body.resultSet);
+  assert.deepEqual(
+    sets.map(({ id: _id, ...set }) => set),
+    [
+      {
+        title: "Variety Test",
+        source: "studio-integration-fixture",
+        index: 0,
+        variation: "Fox Wizard",
+      },
+      { title: "Variety Test", source: "studio-integration-fixture", index: 1 },
+    ],
+  );
+  assert.equal(sets[0].id, sets[1].id);
+  // Without a title the set is named from the request; one result alone is no set.
+  await generate(client, { request: "owls in the snow please", prompts: ["An owl", "Two owls"] });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Owls in the snow please");
+  assert.notEqual(f.submitted.at(-1).resultSet.id, sets[0].id);
+  await generate(client, { title: "Alone", prompts: ["A lone tree"] });
+  assert.equal(f.submitted.at(-1).resultSet, undefined);
 });
 
 test("partial queue failures retain successful owned jobs without retrying the submission", async (t) => {
@@ -2592,6 +2624,81 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
 });
 
+test("a client without a conversation header gets its MCP session's own result numbers; the header still wins", async (t) => {
+  const f = await fixture(t);
+  const connect = async (id) => {
+    const client = new Client({ name: "studio-session-fixture", version: "1.0.0" });
+    t.after(() => client.close());
+    const transport = new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), {
+      requestInit: {
+        headers: {
+          Authorization: `Bearer ${mediaKey}`,
+          "x-ai-user-id": "alice",
+          ...(id ? { "x-studio-conversation-id": id } : {}),
+        },
+      },
+    });
+    await client.connect(transport);
+    assert.ok(transport.sessionId, "initialize hands out a session id");
+    return client;
+  };
+  const handover = async (client) =>
+    texts(await call(client, "handover", { summary: "Carry on." }));
+  // Two chats like a Grok connector's: no header, each with its own session, numbering from 1.
+  const [first, second] = [await connect(), await connect()];
+  const queued = await generate(first);
+  const one = jobId(queued);
+  assert.deepEqual(
+    queued.jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(first)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+  const other = await call(second, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["A lake"],
+    count: 1,
+  });
+  const two = jobId(data(other));
+  assert.deepEqual(
+    data(other).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.equal(data(await call(first, "status", { job_id: "result 1" })).job_id, one);
+  assert.equal(data(await call(second, "status", { job_id: "result 1" })).job_id, two);
+  await failure(second, "status", { job_id: "result 2" });
+  assert.match(await handover(first), new RegExp(one));
+  assert.doesNotMatch(await handover(first), new RegExp(two));
+  assert.doesNotMatch(await handover(second), new RegExp(one));
+  // Each chat's All Results page lists only that chat's results.
+  const allPage = async (reply) => {
+    const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
+    return [
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(
+        /<h2>(Result \d+) · [^<]+<\/h2>/g,
+      ),
+    ].map((match) => match[1]);
+  };
+  assert.deepEqual(await allPage(other), ["Result 1"]);
+  assert.deepEqual(
+    await allPage(
+      await call(first, "generate", { profile_id: imageProfile.id, prompts: ["A hill"], count: 1 }),
+    ),
+    ["Result 1", "Result 2", "Result 3"],
+  );
+  // LibreChat's conversation header scopes by itself, whatever session carries it.
+  const [left, right] = [await connect("conversation-x"), await connect("conversation-x")];
+  assert.deepEqual(
+    (await generate(left)).jobs.map((job) => job.ref),
+    ["result 1"],
+  );
+  assert.deepEqual(
+    (await generate(right)).jobs.map((job) => job.ref),
+    ["result 2"],
+  );
+});
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
   const f = await fixture(t);
   const lookups = () => f.requests.filter((request) => request.path.startsWith("/jobs/")).length;
@@ -4462,7 +4569,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
     guideOf(await call(first, "generate", { profile_id: "krea-turbo", prompts: ["An egg"] })),
     undefined,
   );
-  // Another conversation of the same account has not seen it; without a conversation, the account and profile decide.
+  // Another conversation of the same account has not seen it; without a conversation header, the MCP session decides.
   assert.ok(
     guideOf(
       await call(await chat(t, f, "alice", "chat-2"), "generate", {
@@ -4474,13 +4581,16 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   const plain = await chat(t, f, "alice");
   assert.ok(guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })));
   assert.equal(
+    guideOf(await call(plain, "generate", { profile_id: "flux 3", prompts: ["A plush"] })),
+    undefined,
+  );
+  assert.ok(
     guideOf(
       await call(await chat(t, f, "alice"), "generate", {
         profile_id: "flux 3",
         prompts: ["A plush"],
       }),
     ),
-    undefined,
   );
   // A refused submission delivered nothing, so the next call still carries the guide.
   const third = await chat(t, f, "alice", "chat-3");
@@ -4578,6 +4688,8 @@ test('replies label links Result N with one All Results page, and Result "all" s
   const queued = await call(client, "generate", {
     kind: "image",
     prompts: ["A bear", "A fox", "An owl"],
+    title: "Woodland",
+    titles: ["Bear Hug"],
   });
   const text = texts(queued);
   assert.equal(/Watch/i.test(text), false, "no Watch wording");
@@ -4598,14 +4710,42 @@ test('replies label links Result N with one All Results page, and Result "all" s
     outputs: [{ url: "/comfy/view?filename=bear.png" }],
   });
   html = await (await fetch(page)).text();
-  assert.match(html, /<h2>Result 1<\/h2><figure><a href="[A-Za-z0-9]{10}"><img/);
+  // One call's results sit under its set title, each under its own or its prompt's.
+  assert.match(
+    html,
+    /<h2>Woodland<\/h2><h3>Result 1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
+  );
+  assert.match(html, /<h3>Result 2 · A fox<\/h3>/);
+  assert.equal(html.match(/<h2>/g).length, 1);
   assert.equal(html.match(/Still generating/g).length, 2);
+  // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
+  assert.match(html, /<title>Woodland<\/title>.*<h1>Woodland<\/h1>/);
+  assert.match(html, /<details class="prompt"><summary>Prompt<\/summary><p>A bear<\/p><\/details>/);
+  assert.match(
+    await (await fetch(localLink(f, first.link))).text(),
+    /<title>Woodland › Bear Hug<\/title>.*<h1>Woodland › Bear Hug<\/h1>/,
+  );
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
   // "show me all": one call returns every finished result under its header, plus links for the rest.
   Object.assign(f.jobs.get(second.job_id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=fox.png" }],
   });
+  // Each finished result opens large in a viewer that flips through them in place, without script.
+  html = await (await fetch(page)).text();
+  assert.match(
+    html,
+    /<figure id="result-1"><a href="#view-1" aria-label="Open Woodland › Bear Hug Large">/,
+  );
+  assert.match(
+    html,
+    /<section class="slide" id="view-1" tabindex="-1" aria-label="Woodland › Bear Hug \(1 of 2\)">.*?<a href="#result-1">Close<\/a>.*?<a class="step next" href="#view-2" aria-label="Next Result">/,
+  );
+  assert.match(
+    html,
+    /id="view-2"[^>]*aria-label="Woodland › A fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
+  );
+  assert.doesNotMatch(html, /<script/);
   const shown = await call(client, "result", { job_id: "all" });
   const body = texts(shown);
   assert.match(

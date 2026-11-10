@@ -9,6 +9,7 @@ import {
   Scroller,
   SegmentedControl,
   Stack,
+  Text,
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
@@ -28,12 +29,14 @@ interface GalleryFilterOption {
   value: string;
   label: string;
   description?: string;
+  /** How many items carry it (caption tags). */
+  count?: number;
   /** Every recorded value the option stands for, when one clean name covers several. */
   keys?: string[];
 }
 const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
-const facets = ["model", "lora", "size", "aspect", "chat"] as const;
+const facets = ["model", "lora", "size", "aspect", "tag", "chat"] as const;
 type Facet = (typeof facets)[number];
 type GalleryDate = "" | "day" | "week" | "month" | "year";
 const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
@@ -56,6 +59,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   lora: [],
   size: [],
   aspect: [],
+  tag: [],
   chat: [],
   date: "",
   starred: false,
@@ -86,6 +90,8 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
         loras: string[];
         sizes: GalleryFilterOption[];
         aspects: GalleryFilterOption[];
+        /** The most used caption tags, with counts. */
+        tags: GalleryFilterOption[];
         chats: GalleryFilterOption[];
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
@@ -168,6 +174,7 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       lora: byName(keys("lora"), (key) => loraTitle(loraInfo.data?.loras[key], key)),
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
+      tag: facets.data?.tags || [],
       chat: facets.data?.chats || [],
     } satisfies Record<Facet, GalleryFilterOption[]>,
   };
@@ -342,9 +349,9 @@ export function GalleryFilterPanel({
       comboboxProps={{ withinPortal: false }}
     />
   );
-  const choices = (key: "size" | "aspect", label: string) => (
+  const choices = (key: "size" | "aspect" | "tag", label: string) => (
     <Input.Wrapper label={label}>
-      <Group gap={6} mt={4}>
+      <Group gap={6} mt={4} role="group" aria-label={label}>
         {options[key].map((option) => {
           const on = value[key].includes(option.value);
           return (
@@ -364,6 +371,11 @@ export function GalleryFilterPanel({
               }
             >
               {option.label}
+              {option.count !== undefined && (
+                <Text span size="xs" c="dimmed" ml={6}>
+                  {option.count}
+                </Text>
+              )}
             </Button>
           );
         })}
@@ -422,6 +434,12 @@ export function GalleryFilterPanel({
       {(options.size.length > 0 || options.aspect.length > 0) && <Divider />}
       {options.size.length > 0 && choices("size", "Size")}
       {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
+      {options.tag.length > 0 && (
+        <>
+          <Divider />
+          {choices("tag", "Tags")}
+        </>
+      )}
     </Stack>
   );
 }

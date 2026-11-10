@@ -20,7 +20,12 @@ import {
   setGallery,
   galleryRevisionValue,
 } from "./gallery/store.js";
-import { makePendingItems, storedChatRecord, storedWritingRecord } from "./gallery/records.js";
+import {
+  makePendingItems,
+  storedChatRecord,
+  storedResultSet,
+  storedWritingRecord,
+} from "./gallery/records.js";
 import { recordPrompt } from "./prompt-history.js";
 import { jobs, runJob, runMockJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -133,7 +138,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
             error: `${backend.label} isn’t ready for ${profile.label}: ${backend.reason}`,
           },
         };
-      // A draft carried over from another kind (an image's worker on an Animate) is not a pin.
+      // A queued job submits to the worker the queue gave it, if that worker can still run it.
       const pinned =
         pinnedBackend && workerHas(pinnedBackend, capabilityForProfile(profile))
           ? pinnedBackend
@@ -300,6 +305,10 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     const chat = storedChatRecord(input.chat);
     if (chat) body.chat = chat;
     else delete body.chat;
+    // The MCP result set it belongs to, so the gallery and viewer show the call's results together.
+    const resultSet = storedResultSet(input.resultSet);
+    if (resultSet) body.resultSet = resultSet;
+    else delete body.resultSet;
     // A Dream job's results stay out of the gallery until kept (domain/dream.ts); only its queue record sets this.
     if (job.dream) body.dream = { state: "unseen", ...job.dream };
     else delete body.dream;
@@ -471,7 +480,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
   return {
     submitGeneration,
     async validateInput(input, account) {
-      const routed = await routeGeneration(input, account, input?.workerId, true);
+      const routed = await routeGeneration(input, account, undefined, true);
       if (routed.payload) return routed;
       if (routed.offline) {
         if (!String(input?.prompt || "").trim())
