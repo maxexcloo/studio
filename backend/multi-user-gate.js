@@ -49,11 +49,12 @@ const ordinaryRoutes = [
   ["POST", /^\/api\/loras\/library\/ops$/],
   ["GET", /^\/api\/reference-assets\/[^/]+(\/(media|thumbnail))?$/],
   ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
-  // Character cards are the requester's own, behind the Characters feature (characters.js).
-  ["GET", /^\/api\/characters$/],
-  ["POST", /^\/api\/characters(\/[\w-]+\/generated)?$/],
-  ["PUT", /^\/api\/characters\/[\w-]+$/],
-  ["DELETE", /^\/api\/characters\/[\w-]+$/],
+  // Character, outfit and scene cards are the requester's own, behind the Characters feature (cards.js).
+  ["GET", /^\/api\/(characters|outfits|scenes)$/],
+  ["POST", /^\/api\/(characters|outfits|scenes)$/],
+  ["POST", /^\/api\/characters\/[\w-]+\/generated$/],
+  ["PUT", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
+  ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],
   ["POST", /^\/api\/assistant\/(animate|character|loras|negative|rewrite)$/],
@@ -64,7 +65,7 @@ const ordinaryRoutes = [
     /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
-  ["DELETE", /^\/api\/taste$/],
+  ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
   // More Like This Set queues into the requester's own set (result-sets.js).
   ["POST", /^\/api\/result-sets\/more$/],
   ["GET", /^\/api\/(finishing|upscale\/status)$/],

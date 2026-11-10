@@ -1,13 +1,21 @@
 import { isCloudProfile } from "./profiles.ts";
 
 /**
- * Character cards: a name, 1–4 reference images and a short description of lasting looks that
- * leads the prompt when the card is picked (backend/characters.js stores them per account).
+ * Cards an account keeps to shoot a series (backend/cards.js stores them per account, one document
+ * per kind): a character (1–4 reference images and its lasting looks), an outfit and a scene (a
+ * description, with at most one image to recognise it by; only a character's image goes to a model).
  */
 export const maxCharacterImages = 4;
-export const maxCharacterName = 60;
-export const maxCharacterDescription = 400;
-export const maxCharacters = 200;
+export const maxCardName = 60;
+// Long enough for a detailed character, such as an owner's ~600-character body and face.
+export const maxCardDescription = 1000;
+export const maxCards = 200;
+export const cardKinds = {
+  characters: { name: "character", prefix: "chr", images: { min: 1, max: maxCharacterImages } },
+  outfits: { name: "outfit", prefix: "out", images: { min: 0, max: 1 } },
+  scenes: { name: "scene", prefix: "scn", images: { min: 0, max: 1 } },
+} as const;
+export type CardKind = keyof typeof cardKinds;
 /**
  * How many of a card's images go to a model: its first. A model that edits with references reads
  * each image as another subject, so three views of one person drew her twice on live, however the
@@ -15,7 +23,7 @@ export const maxCharacters = 200;
  */
 export const characterImages = 1;
 
-export interface Character {
+export interface Card {
   id: string;
   name: string;
   description: string;
@@ -23,6 +31,8 @@ export interface Character {
   referenceIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+export interface Character extends Card {
   /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
   generated?: { jobIds: string[]; at: string };
 }
@@ -102,11 +112,79 @@ export function withCharacter(prompt: string, description: string, fromImage = t
 }
 
 /** The prompt without a card's lead and the space that joined it. */
-export function withoutCharacter(prompt: string, description: string) {
-  const lead = characterLead(description);
-  const at = prompt.indexOf(lead);
+export const withoutCharacter = (prompt: string, description: string) =>
+  withoutPart(prompt, characterLead(description));
+
+const sentence = (text = "") => {
+  const words = text.trim().replace(/[\s.,;:]+$/, "");
+  return words && `${words[0].toUpperCase()}${words.slice(1)}.`;
+};
+/** What the person wears, as written; an outfit names its footwear, or the reference's carries over. */
+export const outfitPart = (outfit = "") =>
+  outfit.trim() ? `The person wears ${outfit.trim().replace(/[\s.,;:]+$/, "")}.` : "";
+/** The place, which with a character's image replaces that image's own background. */
+export function scenePart(scene = "", withImage = false) {
+  const place = sentence(scene);
+  return place && withImage
+    ? `${place.slice(0, -1)}, in place of the reference image's background.`
+    : place;
+}
+/**
+ * A shot composed from its parts, in the order and wording that held a character across ten outfits
+ * and scenes on live (10 Nov): the character's lead (characterLead, with its image unless
+ * `fromImage` is false), what the person wears (outfitPart), the scene (scenePart), then the action
+ * and the camera.
+ */
+export function composePrompt({
+  character,
+  outfit,
+  scene,
+  action,
+  camera,
+  fromImage = true,
+}: {
+  character?: string;
+  outfit?: string;
+  scene?: string;
+  action?: string;
+  camera?: string;
+  fromImage?: boolean;
+}) {
+  return [
+    character === undefined ? "" : characterLead(character, fromImage),
+    outfitPart(outfit),
+    scenePart(scene, character !== undefined && fromImage),
+    sentence(action),
+    sentence(camera),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * The prompt with `part` (an outfit's or scene's sentence) placed after the last of `after` it holds
+ * (the parts that come first: a character's lead, an outfit), else at the start; unchanged when it
+ * already holds it.
+ */
+export function withPart(prompt: string, part: string, after: string[] = []) {
+  if (!part || prompt.includes(part)) return prompt;
+  const at = Math.max(
+    0,
+    ...after.filter(Boolean).map((text) => {
+      const found = prompt.indexOf(text);
+      return found < 0 ? 0 : found + text.length;
+    }),
+  );
+  const before = prompt.slice(0, at).trimEnd();
+  const rest = prompt.slice(at).trimStart();
+  return [before, part, rest].filter(Boolean).join(" ");
+}
+
+/** The prompt without `part` and the space that joined it. */
+export function withoutPart(prompt: string, part: string) {
+  const at = part ? prompt.indexOf(part) : -1;
   if (at < 0) return prompt;
   const before = prompt.slice(0, at).trimEnd();
-  const after = prompt.slice(at + lead.length).trimStart();
+  const after = prompt.slice(at + part.length).trimStart();
   return before && after ? `${before} ${after}` : before || after;
 }

@@ -301,6 +301,28 @@ test(
       });
       assert.equal(cancellation.status, 200);
       await waitFor(base, (job) => job.id === accepted[2] && job.status === "cancelled");
+      // The running upscale stops on the worker; its original stays, marked cancelled.
+      const running = await waitFor(base, (job) => job.id === accepted[1] && job.providerJobId);
+      const stopping = await fetch(base + `/api/queue/${accepted[1]}/cancel`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      assert.equal(stopping.status, 200);
+      fake.finish(running.providerJobId, { outputs: {} });
+      await waitFor(base, (job) => job.id === accepted[1] && job.status === "cancelled");
+      const after = (await (await fetch(base + "/api/gallery")).json()).items;
+      const landscape = after.find((item) => item.id === "landscape");
+      assert.equal(landscape.status, "done");
+      assert.equal(landscape.url, "/comfy/view?filename=landscape.png&type=output");
+      assert.equal(landscape.upscale.status, "cancelled");
+      assert.equal(landscape.upscale.url, undefined);
+      assert.equal(landscape.upscale.error, "");
+      // A cancelled new upscale keeps the item's earlier one.
+      const active = after.find((item) => item.id === "active");
+      assert.equal(active.status, "done");
+      assert.equal(active.upscale.status, "cancelled");
+      assert.equal(active.upscale.url, "/comfy/view?filename=active.png&type=output");
     } finally {
       await stop();
       for (const socket of tunnels) socket.destroy();

@@ -487,7 +487,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             {
               key: "gpus",
               header: "GPUs",
-              visibleFrom: "sm",
+              hideOnPhone: true,
               sortValue: (item) => item.gpus,
               cell: (item) => <Text size="sm">{item.gpus}</Text>,
             },

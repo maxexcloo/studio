@@ -26,6 +26,8 @@ import { useDerivations } from "./versions";
 import { WritingThinking } from "../generation/PromptWriting";
 import { mediaSource } from "./mediaSource";
 import { formatBytes } from "../../ui/bytes";
+import { charactersQuery } from "../characters/queries";
+import { identityNote } from "../characters/identity";
 
 const fileStem = (name: unknown) =>
   String(name || "")
@@ -165,6 +167,8 @@ function generationDetails(
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
       // An upscale's size as the model drew it.
       ["Original Size", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
+      // A stopped upscale leaves the picture at the size it was made.
+      ["Upscale", item.upscale?.status === "cancelled" ? "Cancelled" : ""],
       ["Duration", video && settings.duration ? `${settings.duration}s` : ""],
       ["Frames", video ? settings.frames : ""],
       ["FPS", video ? settings.fps : ""],
@@ -288,6 +292,20 @@ function DetailSection({
 }
 
 /** The gallery caption in the prompt's style, folding until Expand when long, then all its tags. */
+/** Face Check's finding for a result made with a character, naming the character. */
+function FaceCheck({ identity }: { identity: NonNullable<MediaItem["identity"]> }) {
+  const characters = useQuery(charactersQuery);
+  const name =
+    characters.data?.find((card) => card.id === identity.characterId)?.name || "the character";
+  return (
+    <DetailSection title="Face Check">
+      <Text size="sm" c={identity.drifted ? "orange" : undefined}>
+        {identityNote(identity, name)}
+      </Text>
+    </DetailSection>
+  );
+}
+
 function Caption({ item }: { item: MediaItem }) {
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
@@ -453,6 +471,7 @@ export function MediaDetails({
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
+      {item.identity && <FaceCheck identity={item.identity} />}
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
       {item.source && (
