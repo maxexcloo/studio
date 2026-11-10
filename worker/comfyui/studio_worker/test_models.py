@@ -10,6 +10,7 @@ from models import (
     digest,
     discard,
     inventory,
+    make_folder,
     preserve_replaced,
     receive,
     remove,
@@ -210,3 +211,11 @@ class WorkerModelTests(unittest.TestCase):
         self.assertEqual(
             target(roots, "text_encoders", "new.gguf"), first.resolve() / "new.gguf"
         )
+
+    def test_a_folder_no_model_has_used_is_made_readable_before_a_download(self):
+        roots = {"ultralytics_bbox": [str(self.root / "ultralytics" / "bbox")]}
+        file = target(roots, "ultralytics_bbox", "face_yolov8m.pt")
+        make_folder(file)
+        self.assertTrue(file.parent.is_dir())
+        for folder in [file.parent, file.parent.parent]:
+            self.assertEqual(folder.stat().st_mode & 0o777, 0o755)
