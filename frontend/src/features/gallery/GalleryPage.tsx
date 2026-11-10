@@ -351,6 +351,7 @@ export function GalleryPage() {
           <View
             items={items}
             versions={versions}
+            byDay
             focusItem={focusItem}
             open={openItem}
             selection={selection}

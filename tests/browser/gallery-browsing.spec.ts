@@ -838,3 +838,45 @@ test("On a phone held sideways, Gallery Filters fits the screen and scrolls", as
   await square.scrollIntoViewIfNeeded();
   await expect(square).toBeInViewport();
 });
+
+test("The grid heads each day, and the date scrubber names the day while it scrolls the gallery", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const day = 86_400_000;
+  // Today's, yesterday's, then a long run from a week ago, so the gallery spans many screens.
+  state.gallery.push(
+    ...results(90).map((item, index) => ({
+      ...item,
+      createdAt: new Date(Date.now() - (index < 2 ? 0 : index < 4 ? day : 7 * day)).toISOString(),
+    })),
+  );
+  await page.goto("/images");
+  await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Yesterday", exact: true })).toBeVisible();
+  // Each day starts below the one before.
+  const today = (await page.getByRole("heading", { name: "Today" }).boundingBox())!;
+  const first = (await page
+    .getByRole("button", { name: "Open image: Browse Result 0", exact: true })
+    .boundingBox())!;
+  expect(first.y).toBeGreaterThan(today.y);
+  const yesterday = (await page.getByRole("heading", { name: "Yesterday" }).boundingBox())!;
+  expect(yesterday.y).toBeGreaterThan(first.y + first.height);
+
+  const scrubber = page.getByRole("scrollbar", { name: "Gallery Dates" });
+  await page.evaluate(() => window.scrollBy(0, 400));
+  await expect(scrubber).toHaveAttribute("data-active", "true");
+  // Dragging the thumb to the end scrolls to the oldest day, named beside it.
+  const thumb = scrubber.locator("div");
+  const box = (await thumb.boundingBox())!;
+  const track = (await scrubber.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, track.y + track.height, { steps: 5 });
+  await expect(scrubber).not.toHaveAttribute("aria-valuetext", /^(Today|Yesterday)$/);
+  await expect(thumb).toHaveText((await scrubber.getAttribute("aria-valuetext")) ?? "");
+  await page.mouse.up();
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
+  // Virtualisation still renders only the tiles near the screen.
+  expect(await page.getByRole("button", { name: /^Open image:/ }).count()).toBeLessThan(90);
+});
