@@ -44,7 +44,7 @@ import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { itemAction, itemActionGroups } from "./itemActions";
-import { useUpscaleAction } from "./UpscaleControls";
+import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
@@ -322,6 +322,7 @@ export function useMediaActions(
     onCompare,
     onVersionChange,
   });
+  const stopUpscale = useStopUpscale(item);
   const assistant = useQuery(assistantQuery);
   // The assistant writes new variations into the item's MCP result set, in the queue.
   const client = useQueryClient();
@@ -402,6 +403,13 @@ export function useMediaActions(
     : [];
   const actions = [
     retry,
+    stopUpscale &&
+      itemAction("stop", {
+        label: "Stop Upscale",
+        loading: stopUpscale.isPending,
+        disabled: stopUpscale.isPending,
+        onClick: stopUpscale.stop,
+      }),
     image &&
       itemAction("animate", {
         loading: running === "animate" || action.isPending,

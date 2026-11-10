@@ -13,6 +13,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import type { Action } from "./ActionBar";
 import { itemAction } from "./itemActions";
+import { useQueueAction } from "../generation/Queue";
 
 const statusQuery = (quality: UpscaleQuality) => ({
   queryKey: ["upscale-status", quality],
@@ -21,6 +22,17 @@ const statusQuery = (quality: UpscaleQuality) => ({
 
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
+/**
+ * Stop for an upscale queued or running on a finished item: it cancels the upscale's queue job, and
+ * the item keeps its original, marked Upscale Cancelled in Details.
+ */
+export function useStopUpscale(item: MediaItem) {
+  const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
+  const action = useQueueAction(jobId);
+  return jobId
+    ? { isPending: action.isPending, stop: () => action.mutate({ id: jobId, action: "cancel" }) }
+    : null;
+}
 type UpscaleTarget = NonNullable<UpscaleRequest["target"]>;
 /**
  * Upscale's menu runs with its remembered settings: quality (Balanced until chosen), size (Automatic

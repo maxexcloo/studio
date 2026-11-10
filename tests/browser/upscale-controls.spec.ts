@@ -213,3 +213,59 @@ test("Offline workers and unavailable upscale models explain why submission is d
   await expect(page.getByRole("menuitem", { name: "Upscale Image", exact: true })).toBeDisabled();
   expect(submitted).toHaveLength(0);
 });
+
+test("A running upscale stops from its tile and the viewer, keeping the original marked cancelled", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const upscaling = (jobId: string) => ({
+    ...source,
+    id: jobId.replace("job", "item"),
+    jobId: `${jobId}-source`,
+    prompt: `Upscale Study ${jobId.at(-1)}`,
+    upscale: { status: "running", jobId },
+  });
+  for (const jobId of ["upscale-job-1", "upscale-job-2"]) {
+    const item = upscaling(jobId);
+    state.gallery.push(item);
+    state.jobs.push({
+      id: jobId,
+      sessionId: "upscale-session",
+      operation: "upscale",
+      status: "running",
+      progress: { value: 1, max: 4 },
+      input: { prompt: item.prompt, galleryItemId: item.id },
+      items: [],
+      outputs: [],
+      createdAt: stamp,
+    });
+  }
+  const cancelled: string[] = [];
+  await page.route("**/api/queue/*/cancel", (route) => {
+    const jobId = new URL(route.request().url()).pathname.split("/")[3];
+    cancelled.push(jobId);
+    const job = state.jobs.find((entry) => entry.id === jobId);
+    job.status = "cancelled";
+    const item = state.gallery.find((entry) => entry.upscale?.jobId === jobId);
+    item.upscale = { ...item.upscale, status: "cancelled" };
+    return route.fulfill({ json: { job } });
+  });
+  await page.goto("/images");
+  // The tile keeps its picture and offers Stop at its foot.
+  await page.getByRole("button", { name: "Stop Upscale of Upscale Study 1", exact: true }).click();
+  await expect.poll(() => cancelled).toEqual(["upscale-job-1"]);
+  await expect(
+    page.getByRole("button", { name: "Stop Upscale of Upscale Study 1", exact: true }),
+  ).toHaveCount(0);
+  // The viewer stops the other with its shared Stop action.
+  await page.getByRole("button", { name: "Open image: Upscale Study 2", exact: true }).click();
+  await viewerAction(page, "Stop Upscale");
+  await expect.poll(() => cancelled).toEqual(["upscale-job-1", "upscale-job-2"]);
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("button", { name: "Stop Upscale", exact: true })).toHaveCount(0);
+  // Upscale can run again, and Details says the last one was cancelled.
+  await expect(viewer.getByRole("button", { name: "Upscale", exact: true })).toBeEnabled();
+  if ((page.viewportSize()?.width || 1440) < 768)
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
+});
