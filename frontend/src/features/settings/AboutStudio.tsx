@@ -97,7 +97,7 @@ function Help() {
           </Button>
         </SettingRow>
         <SettingRow label="Troubleshooting" description="Common errors and how to fix them.">
-          {link(`${repository}/blob/main/TROUBLESHOOTING.md`, "Troubleshooting")}
+          {link(`${repository}/blob/main/README.md#troubleshooting`, "Troubleshooting")}
         </SettingRow>
       </SettingGroup>
       {phone || (

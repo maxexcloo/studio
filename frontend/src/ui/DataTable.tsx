@@ -36,7 +36,7 @@ function compare(a: string | number | undefined, b: string | number | undefined)
  * text query, one empty line, a loading state and a row actions menu. Rows are named by `rowName`
  * for their accessible label and the actions trigger. Without `initialSort` rows keep the order
  * they arrive in, which matters for queues and histories. Phones keep the main column and the
- * actions, with the other columns' cells under the main cell's content (UI-PATTERNS › Theme &
+ * actions, with the other columns' cells under the main cell's content (AGENTS.md › UI Patterns › Theme &
  * Layout); editable grids (`minWidth`) keep theirs and scroll.
  */
 export function DataTable<T>({
