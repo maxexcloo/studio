@@ -134,6 +134,23 @@ test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3
   assert.equal(classifyEncoder("p-h3-image_text_encoder_w4a8.safetensors").kind, "p_h3_image");
 });
 
+test("MiniMax-H3-Image's files are the MiniMax H3 Image family and its parts, not H3 video", async () => {
+  const { refinedFamily } = await import("../family-catalogue.js");
+  const { classifyEncoder, classifyVae } = await import("./components.js");
+  const found = classifyModel("unet", "minimax_h3_image_pruned_int8_convrot.safetensors");
+  assert.deepEqual([found.family, found.variant.id], ["minimax_h3_image", "standard"]);
+  assert.equal(
+    refinedFamily("minimax_h3", "minimax_h3_image_pruned_bf16.safetensors"),
+    "minimax_h3_image",
+  );
+  assert.equal(classifyVae("minimax_h3_image_vae_fp16.safetensors").kind, "h3_image");
+  assert.equal(classifyVae("p-h3-image_vae_int8_convrot.safetensors").kind, "p_h3_image");
+  assert.equal(
+    classifyEncoder("qwen3vl_32b_minimax_h3_int8_convrot.safetensors").kind,
+    "qwen3vl_32b",
+  );
+});
+
 /* ------------------------------------------------------------ profiles */
 
 test("an imported workflow's missing file gets a download only for that exact catalogue file", async () => {

@@ -41,6 +41,7 @@ const metadataFamilies = [
   [/qwen[-_ ]?image/, ["qwen_image"]],
   // P-H3-Image is H3's transformer: its LoRA (PrunaAI/P-H3-Image-Comfy) goes on H3's FL2VA.
   [/p[-_ ]?h3[-_ ]?image/, ["minimax_h3"]],
+  [/minimax[-_ ]?h3[-_ ]?image/, ["minimax_h3_image"]],
   [/minimax[-_ ]?h3/, ["minimax_h3"]],
   [/wan[-_ ]?2[._]?2.*5b|ti2v/, ["wan22_5b"]],
   [/wan/, ["wan21", "wan22_14b"]],
