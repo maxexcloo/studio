@@ -14,6 +14,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { presetPlacement } from "./gpu.js";
 import { McpMedia } from "./media.js";
+import { withPreferredDefaults } from "../model/catalogue.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { adminToolNames } from "./admin.js";
 import { pausedReason } from "../../shared/queue.ts";
@@ -162,6 +163,8 @@ async function fixture(
   let defaults = { image: imageProfile.id, video: videoProfile.id };
   let visibleTo = null;
   let backends;
+  // The account's Images and Videos preferences, as Settings › Preferences saves them.
+  let preferences = {};
   app.use("/api", (req, _res, next) => {
     requests.push({
       path: req.path,
@@ -388,17 +391,23 @@ async function fixture(
     resolveSignedResult,
   });
   // Registered after MCP, as in the studio, so a rescan reaches MCP's cache invalidation.
-  // The studio limits each account's catalogue to its access profile; the deployment defaults are not limited.
+  // The studio limits each account's catalogue to its access profile and puts its defaults on the
+  // side its preferences choose, Local unless saved otherwise (model/catalogue.js).
   app.get("/api/models", (req, res) =>
-    res.json({
-      profiles: visibleTo
-        ? profiles.filter((profile) =>
-            visibleTo(req.headers["x-ai-user-id"] || req.headers.authorization, profile),
-          )
-        : profiles,
-      defaults: { imageModel: defaults.image, videoModel: defaults.video },
-      ...(backends ? { backends } : {}),
-    }),
+    res.json(
+      withPreferredDefaults(
+        {
+          profiles: visibleTo
+            ? profiles.filter((profile) =>
+                visibleTo(req.headers["x-ai-user-id"] || req.headers.authorization, profile),
+              )
+            : profiles,
+          defaults: { imageModel: defaults.image, videoModel: defaults.video },
+          ...(backends ? { backends } : {}),
+        },
+        preferences,
+      ),
+    ),
   );
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -441,9 +450,13 @@ async function fixture(
     },
     // A model change reaches the studio as a rescan, which refreshes MCP's cached catalogues.
     // `videoAvailable` is the studio's report of whether its local video worker answered.
-    profiles: async (value, { defaults: chosen, visibleTo: filter, videoAvailable } = {}) => {
+    profiles: async (
+      value,
+      { defaults: chosen, visibleTo: filter, videoAvailable, preferences: saved } = {},
+    ) => {
       profiles = value;
       if (chosen) defaults = chosen;
+      if (saved) preferences = saved;
       if (filter) visibleTo = filter;
       if (videoAvailable !== undefined)
         backends = { video: { configured: true, available: videoAvailable } };
@@ -4037,7 +4050,7 @@ const videoCatalogue = (local = true) => [
   cloudVideo("cloud-video-fast", "Cloud Video · Fast · Cloud"),
 ];
 
-test("while local workers are Offline or Stopped, generate queues on them and says the jobs wait", async (t) => {
+test("while local workers are Offline or Stopped, generate runs in the cloud where it can, else queues and says the jobs wait", async (t) => {
   const f = await fixture(t);
   // As the studio's catalogue lists them while their workers restart or are stopped on purpose.
   const waiting = videoCatalogue().map((profile) =>
@@ -4050,18 +4063,30 @@ test("while local workers are Offline or Stopped, generate queues on them and sa
     videoAvailable: false,
   });
   const client = await f.client();
+  // The account's default gives way to the cloud, and the reply says so.
   const video = await call(client, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.equal(data(video).status, "queued");
-  assert.equal(data(video).profile.remote, undefined, "never moved to the cloud");
-  assert.match(texts(video), /is Offline, so this waits in the queue and starts when its worker/);
-  // Cloud is only offered, for the user to ask for.
-  assert.match(texts(video), /if it stays down, offer Cloud, and run it there only if they ask/);
+  assert.equal(data(video).profile.remote, true);
+  assert.match(
+    texts(video),
+    /No local video model is running, so this runs in the cloud\. Tell the user/,
+  );
+  // A local model asked for still waits on its worker; Cloud is only offered, for the user to ask for.
+  const fast = await call(client, "generate", {
+    kind: "video",
+    profile_id: "fl-fast",
+    prompts: ["A wave"],
+    count: 1,
+  });
+  assert.match(texts(fast), /is Offline, so this waits in the queue and starts when its worker/);
+  assert.match(texts(fast), /if it stays down, offer Cloud, and run it there only if they ask/);
+  // With no cloud image profile, images queue on the stopped worker and wait.
   const image = await call(client, "generate", { prompts: ["A heron"], count: 1 });
   assert.match(texts(image), /is Stopped \(an administrator can start it .*\), so this waits/);
   assert.doesNotMatch(texts(image), /Cloud/, "no cloud image profile to offer");
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
-    ["fl-fast", imageProfile.id],
+    ["cloud-video-fast", "fl-fast", imageProfile.id],
   );
   assert.match(
     data(await call(client, "models", { kind: "video" })).services_note,
@@ -4271,6 +4296,13 @@ test("video stays local while the worker is up, and a plain request never reache
     data(await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 })).profile.id,
     "fl-fast",
   );
+  // Videos preferred in the cloud run there by default, with no note.
+  await f.profiles(videoCatalogue(), { preferences: { videos: "cloud" } });
+  const preferred = await call(full, "generate", { kind: "video", prompts: ["A wave"], count: 1 });
+  assert.equal(data(preferred).profile.remote, true);
+  assert.doesNotMatch(texts(preferred), /No local/);
+  f.submitted.pop();
+  await f.profiles(videoCatalogue(), { preferences: {} });
   const localResult = await call(full, "generate", {
     kind: "video",
     tier: "quality",

@@ -92,6 +92,27 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(createAssistant({}), null);
 });
 
+test("prompt writing runs where the account prefers, saying when the other side wrote it", async () => {
+  const environment = gateway();
+  let local = { model: "local/auto", vision: false };
+  const engine = createAssistant(environment, { localText: async () => local });
+  assert.deepEqual(
+    [await engine.model("rewrite", false, "cloud"), await engine.writerNote("cloud")],
+    ["cloud/auto", ""],
+  );
+  assert.deepEqual(
+    [await engine.model("rewrite", false, "local"), await engine.writerNote("local")],
+    ["local/auto", ""],
+  );
+  local = null;
+  assert.equal(await engine.model("rewrite", false, "local"), "cloud/auto");
+  assert.match(await engine.writerNote("local"), /No local text model is running/);
+  // Calls for no account keep the usual route without a note; the administrator's model always runs.
+  assert.equal(await engine.writerNote(), "");
+  environment.STUDIO_ASSISTANT_MODEL = "chosen/model";
+  assert.equal(await engine.writerNote("local"), "");
+});
+
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
   assert.equal(gatewaySettings({}), null);
   assert.throws(

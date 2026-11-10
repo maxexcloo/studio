@@ -22,6 +22,8 @@ import {
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
+import { ownerIdForRequest } from "./account-ownership.js";
+import { accountPreferences } from "./account-preferences.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -203,6 +205,11 @@ export function registerAssistantRoutes(
     };
   };
   const refuse = (status, error) => ({ refusal: { status, payload: { ok: false, error } } });
+  /** Where the account prefers its prompts written (Prompt Writing): "cloud" or "local". */
+  const writingSide = (account) =>
+    accountPreferences(ownerIdForRequest({ studioAccount: account })).writing === "cloud"
+      ? "cloud"
+      : "local";
   /** The engine and the account's profile, or `refusal`: the answer explaining why not. */
   const ready = async (account, body) => {
     if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff);
@@ -269,8 +276,8 @@ export function registerAssistantRoutes(
       res.json({
         ok: true,
         available: true,
-        model: await engine.model("rewrite"),
-        vision: await engine.supportsVision(),
+        model: await engine.model("rewrite", false, writingSide(account)),
+        vision: await engine.supportsVision(writingSide(account)),
         defaultPreset,
         presets: assistantPresets
           .filter((preset) => !preset.spicy || spicy)
@@ -303,6 +310,7 @@ export function registerAssistantRoutes(
       stack,
       examples,
       negative: context.profile.capabilities?.negativePrompt !== false,
+      prefer: writingSide(account),
       signal,
       onDelta,
     });
@@ -378,6 +386,7 @@ export function registerAssistantRoutes(
           writing,
           clip: animateClip(body, context.profile),
           explicit: allowed(account, "uncensoredModels"),
+          prefer: writingSide(account),
           frame: () => frame({ studioAccount: account }, assetId),
           caption: () => caption({ studioAccount: account }, assetId),
           signal,
@@ -394,6 +403,7 @@ export function registerAssistantRoutes(
       payload: {
         ok: true,
         ...(await engine.negative({
+          prefer: writingSide(account),
           signal,
           profile: context.profile,
           guide: context.guide,

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
+import {
+  chatModelAllowed,
+  chatSettings,
+  preferredChatModel,
+  servedChatModels,
+} from "./chat-settings.js";
 
 test("Chat uses the assistant's gateway with an anchored explicit model allowlist", () => {
   assert.equal(chatSettings({}), null);
@@ -62,7 +67,7 @@ test("administrators see every model with its workloads; others models that run 
     { id: "gemma/31b", workloads: ["text-gemma", "text-gemma-tp2"] },
     { id: "qwen/27b", workloads: ["text-qwen"] },
     { id: "mistral/24b", workloads: ["text-mistral"] },
-    { id: "llama/8b", label: "llama/8b", workloads: ["text-llama"] },
+    { id: "llama/8b", label: "llama/8b", local: true, workloads: ["text-llama"] },
   ]);
   const phases = {
     "text-gemma": "parked",
@@ -76,6 +81,23 @@ test("administrators see every model with its workloads; others models that run 
     { id: "cloud/model" },
     { id: "gemma/31b" },
     { id: "qwen/27b", parked: true },
-    { id: "llama/8b", label: "llama/8b", parked: true },
+    { id: "llama/8b", label: "llama/8b", local: true, parked: true },
   ]);
+});
+
+test("Chat's default runs on the preferred side while it can answer, otherwise the other with a note", () => {
+  const models = [{ id: "cloud/auto" }, { id: "local/auto", local: true }];
+  assert.deepEqual(preferredChatModel(models, "cloud"), { id: "cloud/auto", note: "" });
+  assert.deepEqual(preferredChatModel(models, undefined), { id: "local/auto", note: "" });
+  const stopped = (model) => !model.local;
+  assert.deepEqual(preferredChatModel(models, "local", stopped), {
+    id: "cloud/auto",
+    note: "No local text model is running, so a cloud one answered.",
+  });
+  assert.match(preferredChatModel(models.slice(1), "cloud").note, /No cloud text model/);
+  // With nothing that can answer, the first listed stays, without a note.
+  assert.deepEqual(
+    preferredChatModel(models, "local", () => false),
+    { id: "cloud/auto", note: "" },
+  );
 });
