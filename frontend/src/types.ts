@@ -59,6 +59,8 @@ export interface Profile {
   native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
   /** The family edits with its references; otherwise a reference is an img2img start image. */
   editReferences?: boolean;
+  /** The family keeps a character's face across new scenes, so characters go to it first. */
+  keepsCharacters?: boolean;
 }
 export interface ReferenceAsset {
   id: string;

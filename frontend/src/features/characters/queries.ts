@@ -1,8 +1,12 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
-import { withCharacter, withoutCharacter, type Character } from "../../../../shared/characters";
-import { referenceCapacity, referenceGroupAssets, referenceGroups } from "../generation/payload";
+import {
+  characterLead,
+  withCharacter,
+  withoutCharacter,
+  type Character,
+} from "../../../../shared/characters";
 import { nextReferenceTarget, placeReference } from "../generation/references";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
@@ -66,11 +70,7 @@ export function useDeleteCharacter() {
   });
 }
 
-/** How many references `profile` takes in all. */
-export const referenceLimit = (profile?: Profile) =>
-  referenceGroups(profile).reduce((total, group) => total + referenceCapacity(group), 0);
-
-/** Whether the card is in use: some of its images placed and its description in the prompt. */
+/** Whether the card is in use: some of its images placed and its lead in the prompt. */
 export function characterApplied(
   card: CharacterCard,
   references: ReferenceAsset[],
@@ -79,13 +79,13 @@ export function characterApplied(
   const ids = new Set(card.references.map((asset) => asset.id));
   return (
     references.some((asset) => ids.has(asset.id)) &&
-    (!card.description || prompt.includes(card.description.trim()))
+    prompt.includes(characterLead(card.description))
   );
 }
 
 /**
- * Picking a card: its images fill the open reference slots in order, as many as the profile has
- * room for (a profile taking one image swaps its reference), and its description joins the prompt.
+ * Picking a card: its first image (characterImages) fills the next open reference slot (a full
+ * profile taking one image swaps its reference), and its lead starts the prompt.
  */
 export function applyCharacter(
   card: CharacterCard,
@@ -93,23 +93,17 @@ export function applyCharacter(
   prompt: string,
   profile?: Profile,
 ) {
-  const groups = referenceGroups(profile);
-  let room = groups.reduce(
-    (total, group) =>
-      total + referenceCapacity(group) - referenceGroupAssets(references, group).length,
-    0,
-  );
-  if (!room && groups.length === 1 && referenceCapacity(groups[0]) === 1) room = 1;
-  let next = references;
-  for (const asset of card.references.slice(0, room)) {
-    const target = nextReferenceTarget(next, profile, null);
-    if (!target) break;
-    next = placeReference(next, { ...asset, slot: undefined }, profile, target);
-  }
-  return { references: next, prompt: withCharacter(prompt, card.description) };
+  const first = card.references[0];
+  const target = first && nextReferenceTarget(references, profile, null);
+  return {
+    references: target
+      ? placeReference(references, { ...first, slot: undefined }, profile, target)
+      : references,
+    prompt: withCharacter(prompt, card.description),
+  };
 }
 
-/** Removing a card takes out both its images and its description. */
+/** Removing a card takes out both its images and its lead. */
 export function removeCharacter(card: CharacterCard, references: ReferenceAsset[], prompt: string) {
   const ids = new Set(card.references.map((asset) => asset.id));
   return {
