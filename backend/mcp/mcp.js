@@ -327,7 +327,7 @@ export function registerMcpRoutes(
         previews,
         chatAssistant,
       });
-      registerResultTools({ tool, server, media, actor, resolve });
+      registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds });
       registerManageTools({ tool, server, media, owner, refs, resolve });
       if (actor.admin)
         registerAdminTools({
