@@ -3861,7 +3861,7 @@ test("Search finds the account's own finished work through the gallery search, a
   const chat = await f.mcp.agent({ owner: "chat-owner", session: "chat-1" });
   t.after(() => chat.close());
   assert.ok(chat.tools.some((tool) => tool.name === "search"));
-  assert.match(chat.instructions, /To find earlier work, call search\./);
+  assert.match(chat.instructions, /For earlier or starred work, call search\./);
 });
 
 test("Search with uploads finds only the caller's uploads, an UploadLink adds one once, and Generate takes their references", async (t) => {
@@ -4829,8 +4829,11 @@ test('replies label links Result N with one All Results page, and Result "all" s
     texts(await call(client, "result", { job_id: "result 2" })),
     /\*\*Result 2\*\*[^\n]*\n\[!\[Result 2\]\([^)]+\.jpg\)\]/,
   );
-  // Another conversation and another account see only their own results.
-  await failure(await chat(t, f, "alice", "other-chat"), "result", { job_id: "all" });
+  // Another conversation and another account see only their own results, and with none here
+  // are pointed at search for earlier or starred work.
+  const none = await call(await chat(t, f, "alice", "other-chat"), "result", { job_id: "all" });
+  assert.equal(none.isError, true);
+  assert.match(texts(none), /call search \(starred: true/);
   assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"))).status, 404);
   // A result link or its id from a reply names its job, only for its own account.
   const linkId = /\/mcp\/results\/([A-Za-z0-9]{10})/.exec(first.link)[1];

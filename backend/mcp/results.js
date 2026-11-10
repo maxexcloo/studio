@@ -71,7 +71,7 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words or look, with refs for reuse, review and result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words, file name or look, with refs for reuse, review and result; filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
