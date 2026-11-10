@@ -141,7 +141,7 @@
       "expect": {
         "keep": ["fisherman", "net"],
         "sections": [],
-        "camera": ["static", "locked"]
+        "camera": ["handheld", "static", "locked"]
       },
       "recorded": "Static, locked-off shot of the old fisherman on the wooden dock at dawn. His weathered fingers pull a loop of twine through the net and draw it tight with a soft creak of wet cord, and he exhales slowly, a faint cloud of breath drifting from his lips. Mist rolls in thin layers across the water behind him while small waves lap against the pilings with a hollow slap. The net shifts in his lap and a few drops fall from it, ticking on the planks. A gull cries far off and glides through the mist; the sky behind it warms from grey to pale gold as the sun clears the horizon and the first light catches the side of his face. He glances up at the water, then back to his work, and pulls the next knot tight, settling into the same pose he began in."
     },
