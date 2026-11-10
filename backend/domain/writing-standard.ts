@@ -12,6 +12,10 @@ export const precedence =
 export const fidelity =
   "Ground every detail in the input and any image: never add subjects or objects, or invent specific clothing, colours or materials, that the person didn't ask for or clearly imply.";
 
+/** A person's description stays word for word, so a subject looks the same from prompt to prompt. */
+export const keepDescriptions =
+  "Keep the person's own descriptions of people and things (face, body, skin, hair, clothing) word for word; change them only where the instruction asks.";
+
 /** How much to change: expand a short prompt, tidy a detailed one. */
 export const matchEffort =
   "Match the effort to the input: expand a short prompt the way the guide recommends, and only tidy a detailed one (order, grammar, repeated ideas), keeping its wording where it already works.";
