@@ -49,9 +49,13 @@ jobs:
           tools: python ruff shellcheck uv
       - name: Check Bridges & Entrypoint
         run: "mise run check:python ::: check:shell ::: test:python"
-      # The ROCm image fills the runner's disk; drop toolchains this job never uses.
+      # The ROCm image fills the runner's disk; drop toolchains and images this job never uses.
       - name: Free Runner Disk
-        run: sudo rm -rf /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/lib/android /usr/share/dotnet
+        run: |
+          sudo rm -rf /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/local/lib/android \
+            /usr/local/share/boost /usr/local/share/powershell /usr/share/dotnet /usr/share/swift
+          docker image prune --all --force
+          df -h /
       - name: Set Up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Image Metadata
