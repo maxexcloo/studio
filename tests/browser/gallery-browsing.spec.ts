@@ -94,7 +94,10 @@ test("Select All takes every match across pages, and the search and Starred stay
   await expect(starred).toHaveAttribute("aria-pressed", "true");
   await (await gallerySearch(page)).fill("Browse");
   await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
-  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const select = page.getByRole("button", { name: "Select Items", exact: true });
+  await select.click();
+  // Select stays in place, pressed, while selecting.
+  await expect(select).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
     "Browse",
   );
@@ -108,10 +111,15 @@ test("Select All takes every match across pages, and the search and Starred stay
   await selectionAction(page, "Unstar").click();
   expect((await unstar).postDataJSON().ids).toHaveLength(65);
   await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  await expect(select).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
     "Browse",
   );
   expect([requests.at(-1)?.get("q"), requests.at(-1)?.get("favorites")]).toEqual(["Browse", "1"]);
+  // Pressing Select again ends selection too.
+  await select.click();
+  await select.click();
+  await expect(page.getByRole("group", { name: "Gallery Selection" })).toHaveCount(0);
 });
 
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({

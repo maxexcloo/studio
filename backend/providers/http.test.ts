@@ -216,6 +216,25 @@ test(
       assert.equal(updatedPreset.id, ownPreset.id);
       assert.equal(updatedPreset.title, "Blue Birds");
       assert.equal(updatedPreset.input.prompt, "A blue bird");
+      const partPreset = (
+        await api("/api/user-presets", "POST", {
+          title: "Bird Prompt",
+          input: { prompt: "A bird" },
+          parts: ["prompt"],
+        })
+      ).preset;
+      assert.deepEqual(
+        (await api("/api/user-presets")).presets.find(
+          (entry: { id: string }) => entry.id === partPreset.id,
+        ).parts,
+        ["prompt"],
+      );
+      const badParts = await fetch(base + "/api/user-presets", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ title: "Bad", input: { prompt: "A bird" }, parts: "prompt" }),
+      });
+      assert.equal(badParts.status, 400);
       assert.equal(
         (await api("/api/models")).profiles.some(
           (entry: { id: string }) => entry.id === profile.id,

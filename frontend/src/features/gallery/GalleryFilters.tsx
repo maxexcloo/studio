@@ -456,18 +456,13 @@ export function GalleryFilterPanel({
           data={dates.map(({ value, label }) => ({ value, label }))}
         />
       </Input.Wrapper>
+      {lists.tag.length > 0 && many("tag", "Tags")}
       <Divider />
       {many("model", "Models")}
       {many("lora", "LoRAs")}
       {(options.size.length > 0 || options.aspect.length > 0) && <Divider />}
       {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
       {options.size.length > 0 && choices("size", "Size")}
-      {lists.tag.length > 0 && (
-        <>
-          <Divider />
-          {many("tag", "Tags")}
-        </>
-      )}
     </Stack>
   );
 }

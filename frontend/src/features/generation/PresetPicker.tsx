@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { Button, Group, ScrollArea, SegmentedControl, Stack, Text } from "@mantine/core";
+import { Button, Group, Menu, SegmentedControl, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Check, ChevronDown } from "lucide-react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
+import { useRemembered } from "../auth/useRemembered";
 import { inspirationInput, inspirationQuery } from "./inspiration";
 import { iconChipProps } from "./chip";
 import { generationInput } from "./payload";
@@ -21,11 +22,50 @@ import {
   savedItems,
   type SavedSort,
 } from "./Picker";
+import classes from "./Picker.module.css";
 export interface Preset {
   id: string;
   title: string;
   input: GenerationInput;
   savedAt?: string;
+  /** The parts of the draft it holds, when only some; one saved without holds them all. */
+  parts?: PresetPart[];
+}
+/** The parts of a draft a preset may hold, by their input fields; Model & Settings has the rest. */
+const presetParts = [
+  { value: "prompt", label: "Prompt", noun: "prompt", keys: ["prompt"] },
+  { value: "negative", label: "Negative", noun: "negative prompt", keys: ["negative"] },
+  { value: "settings", label: "Model & Settings", noun: "model and settings", keys: [] },
+  {
+    value: "size",
+    label: "Size",
+    noun: "size",
+    keys: ["width", "height", "resolutionTier", "tiledDecode"],
+  },
+  { value: "loras", label: "LoRAs", noun: "LoRAs", keys: ["loras"] },
+  {
+    value: "references",
+    label: "References",
+    noun: "references",
+    keys: ["referenceAssets", "referenceDetails"],
+  },
+] as const;
+type PresetPart = (typeof presetParts)[number]["value"];
+const partOf = (key: string): PresetPart =>
+  presetParts.find((part) => (part.keys as readonly string[]).includes(key))?.value ?? "settings";
+/** The input's fields in `parts`, or all of it. */
+const presetInput = (input: GenerationInput, parts?: PresetPart[]) =>
+  (parts
+    ? Object.fromEntries(Object.entries(input).filter(([key]) => parts.includes(partOf(key))))
+    : input) as GenerationInput;
+/** Asks before a preset replaces the draft's parts it holds. */
+function replaceMessage(preset: Preset) {
+  if (!preset.parts) return "Replace the current prompt and settings with this preset?";
+  const nouns = presetParts
+    .filter((part) => preset.parts?.includes(part.value))
+    .map((part) => part.noun);
+  const list = nouns.length > 1 ? `${nouns.slice(0, -1).join(", ")} and ${nouns.at(-1)}` : nouns[0];
+  return `Replace the current ${list} with this preset? The rest stays as it is.`;
 }
 /** The preset an editor last loaded or saved. */
 export interface PresetSelection {
@@ -38,6 +78,7 @@ const presetsQuery = queryOptions({
   queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
 });
 const json = (method: string, value: unknown) => ({ method, body: JSON.stringify(value) });
+const defaultParts: PresetPart[] = ["prompt", "negative", "settings", "size", "loras"];
 
 /**
  * The Presets chip and its popup for any generation editor, built on the same picker as LoRA
@@ -72,6 +113,9 @@ export function PresetPicker({
   const inspiration = useQuery({ ...inspirationQuery, enabled: opened && inspiring });
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SavedSort>("name-asc");
+  const [parts, setParts] = useRemembered("preset-parts", defaultParts);
+  // A preset of every part holds them all, as one saved before parts.
+  const savedParts = parts.length < presetParts.length ? parts : undefined;
   const refresh = () => void client.invalidateQueries({ queryKey: presetsQuery.queryKey });
   const current = () => generationInput(input, profile, references);
   const change = useMutation({
@@ -105,7 +149,7 @@ export function PresetPicker({
                 onClick={() =>
                   change.mutate({
                     method: "POST",
-                    value: { title: deleted.title, input: deleted.input },
+                    value: { title: deleted.title, input: deleted.input, parts: deleted.parts },
                   })
                 }
               >
@@ -145,7 +189,57 @@ export function PresetPicker({
         </Button>
       }
       headerEnd={
-        <>
+        <SaveCurrent
+          noun="Preset"
+          disabled={!input.prompt.trim()}
+          onSave={(title) =>
+            change.mutate({
+              method: "POST",
+              value: { title, input: presetInput(current(), savedParts), parts: savedParts },
+            })
+          }
+          options={
+            <Menu withinPortal={false} position="bottom-end" closeOnItemClick={false}>
+              <Menu.Target>
+                <Button
+                  size="compact-sm"
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Preset Parts"
+                  rightSection={<ChevronDown size={14} />}
+                >
+                  Parts
+                </Button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Save</Menu.Label>
+                {presetParts.map(({ value, label }) => {
+                  const checked = parts.includes(value);
+                  return (
+                    <Menu.Item
+                      key={value}
+                      aria-checked={checked}
+                      // A preset holds at least one part.
+                      disabled={checked && parts.length === 1}
+                      rightSection={checked && <Check size={14} />}
+                      onClick={() =>
+                        setParts(
+                          checked
+                            ? parts.filter((part) => part !== value)
+                            : presetParts
+                                .map((part) => part.value)
+                                .filter((part) => part === value || parts.includes(part)),
+                        )
+                      }
+                    >
+                      {label}
+                    </Menu.Item>
+                  );
+                })}
+              </Menu.Dropdown>
+            </Menu>
+          }
+        >
           <Button
             size="compact-sm"
             variant="subtle"
@@ -155,18 +249,7 @@ export function PresetPicker({
           >
             Clear
           </Button>
-          <SaveCurrent
-            noun="Preset"
-            compact
-            disabled={!input.prompt.trim()}
-            onSave={(title) =>
-              change.mutate({
-                method: "POST",
-                value: { title, input: current() },
-              })
-            }
-          />
-        </>
+        </SaveCurrent>
       }
     >
       <Stack gap="sm" flex={1} mih={0}>
@@ -194,10 +277,17 @@ export function PresetPicker({
             {error.message}
           </Text>
         )}
-        {/* The phone sheet's body scrolls the list, between its header and footer. */}
-        <ScrollArea.Autosize mah={phone ? undefined : "min(45dvh, 360px)"}>
-          {inspiring && inspiration.isPending ? (
-            <LoadingState label="Loading Inspiration" />
+        {/* Desktop keeps the list at one height, so switching source or loading never resizes the
+            popup; the phone sheet's body scrolls it, between its header and footer. */}
+        <Stack
+          gap={0}
+          h={phone ? undefined : "min(45dvh, 360px)"}
+          flex={phone ? 1 : undefined}
+          mih={0}
+          className={classes.list}
+        >
+          {(inspiring ? inspiration : presets).isPending ? (
+            <LoadingState fill label={inspiring ? "Loading Inspiration" : "Loading Presets"} />
           ) : inspiring ? (
             <SavedList
               label="Inspiration"
@@ -219,9 +309,13 @@ export function PresetPicker({
               current={selection.presetId}
               empty={items.length ? "No Matches" : "No Saved Presets"}
               replaces={!!input.prompt.trim()}
-              replaceMessage="Replace the current prompt and settings with this preset?"
+              replaceMessage={replaceMessage}
               onLoad={(preset) => {
-                onLoad(preset.input, { presetId: preset.id, presetTitle: preset.title });
+                // A preset of some parts leaves the rest of the draft as it is.
+                onLoad(preset.parts ? { ...current(), ...preset.input } : preset.input, {
+                  presetId: preset.id,
+                  presetTitle: preset.title,
+                });
                 setOpened(false);
               }}
               onRename={(preset, title) => {
@@ -233,7 +327,7 @@ export function PresetPicker({
                 change.mutate({
                   id: preset.id,
                   method: "PATCH",
-                  value: { input: current() },
+                  value: { input: presetInput(current(), preset.parts) },
                 })
               }
               onDelete={(preset) =>
@@ -241,7 +335,7 @@ export function PresetPicker({
               }
             />
           )}
-        </ScrollArea.Autosize>
+        </Stack>
       </Stack>
     </ChipPopup>
   );

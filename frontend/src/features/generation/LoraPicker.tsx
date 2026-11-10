@@ -435,7 +435,11 @@ function LoraStack({ value, onChange, picker }: LoraPickerProps) {
           )
         }
         actions={
-          <>
+          <SaveCurrent
+            noun="Stack"
+            disabled={!input.loras.length || !stacks.ready}
+            onSave={(name) => stacks.save(name, input.loras)}
+          >
             <Button
               size="compact-sm"
               variant="subtle"
@@ -445,82 +449,79 @@ function LoraStack({ value, onChange, picker }: LoraPickerProps) {
             >
               Clear
             </Button>
-            <SaveCurrent
-              noun="Stack"
-              compact
-              disabled={!input.loras.length || !stacks.ready}
-              onSave={(name) => stacks.save(name, input.loras)}
-            />
-          </>
+          </SaveCurrent>
         }
       />
-      <ScrollArea className={classes.stack}>
-        <Stack gap="xs">
-          {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
-            <Text size="xs" c="yellow">
-              This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the
-              extras.
-            </Text>
-          )}
-          {input.loras.length ? (
-            <OrderedItems
-              kind="loras"
-              items={input.loras}
-              identity={(lora) => lora.name}
-              label={(lora) => title(lora.name)}
-              onChange={update}
-            >
-              {(lora) => (
-                <StackEntry
-                  lora={lora}
-                  title={title(lora.name)}
-                  info={metadata[lora.name]}
-                  compatible={compatible.includes(lora.name)}
-                  onChange={(patch) =>
-                    update(
-                      input.loras.map((item) =>
-                        item.name === lora.name ? { ...item, ...patch } : item,
-                      ),
-                    )
-                  }
-                  onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
+      {/* With nothing chosen or saved, the empty state centres in the pane. */}
+      {!input.loras.length && !stacks.records.length ? (
+        <EmptyState fill>Choose LoRAs or a saved stack.</EmptyState>
+      ) : (
+        <ScrollArea className={classes.stack}>
+          <Stack gap="xs">
+            {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
+              <Text size="xs" c="yellow">
+                This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the
+                extras.
+              </Text>
+            )}
+            {input.loras.length ? (
+              <OrderedItems
+                kind="loras"
+                items={input.loras}
+                identity={(lora) => lora.name}
+                label={(lora) => title(lora.name)}
+                onChange={update}
+              >
+                {(lora) => (
+                  <StackEntry
+                    lora={lora}
+                    title={title(lora.name)}
+                    info={metadata[lora.name]}
+                    compatible={compatible.includes(lora.name)}
+                    onChange={(patch) =>
+                      update(
+                        input.loras.map((item) =>
+                          item.name === lora.name ? { ...item, ...patch } : item,
+                        ),
+                      )
+                    }
+                    onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
+                  />
+                )}
+              </OrderedItems>
+            ) : (
+              <EmptyState fill>Choose LoRAs or a saved stack.</EmptyState>
+            )}
+            {!!stacks.records.length && (
+              <>
+                <Group justify="space-between" gap="xs" mt="xs">
+                  <Text size="sm" fw={600}>
+                    Saved Stacks
+                  </Text>
+                  <SortMenu
+                    label="Sort Stacks"
+                    labels={savedSortLabels}
+                    value={picker.sort}
+                    onChange={picker.setSort}
+                  />
+                </Group>
+                <SavedList
+                  label="Saved LoRA Stacks"
+                  noun="Stack"
+                  items={savedItems(stacks.records, "", picker.sort)}
+                  empty="No Saved Stacks"
+                  replaces={input.loras.length > 0}
+                  replaceMessage="Replace the current LoRAs with this stack?"
+                  onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
+                  onRename={stacks.rename}
+                  onUpdate={(record) => stacks.update(record, input.loras)}
+                  onDelete={stacks.remove}
                 />
-              )}
-            </OrderedItems>
-          ) : (
-            <Text size="sm" c="dimmed">
-              Choose LoRAs or a saved stack.
-            </Text>
-          )}
-          {!!stacks.records.length && (
-            <>
-              <Group justify="space-between" gap="xs" mt="xs">
-                <Text size="sm" fw={600}>
-                  Saved Stacks
-                </Text>
-                <SortMenu
-                  label="Sort Stacks"
-                  labels={savedSortLabels}
-                  value={picker.sort}
-                  onChange={picker.setSort}
-                />
-              </Group>
-              <SavedList
-                label="Saved LoRA Stacks"
-                noun="Stack"
-                items={savedItems(stacks.records, "", picker.sort)}
-                empty="No Saved Stacks"
-                replaces={input.loras.length > 0}
-                replaceMessage="Replace the current LoRAs with this stack?"
-                onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
-                onRename={stacks.rename}
-                onUpdate={(record) => stacks.update(record, input.loras)}
-                onDelete={stacks.remove}
-              />
-            </>
-          )}
-        </Stack>
-      </ScrollArea>
+              </>
+            )}
+          </Stack>
+        </ScrollArea>
+      )}
     </>
   );
 }

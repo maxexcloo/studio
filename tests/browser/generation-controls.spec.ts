@@ -241,7 +241,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   await page.getByRole("button", { name: "Use reference: Closing frame", exact: true }).click();
   await closeReferences(page);
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await saveCurrent(page, "Preset", "End Frame Only");
+  await saveCurrent(page, "Preset", "End Frame Only", ["References"]);
   await expect.poll(() => state.presets.length).toBe(1);
   await closePresets(page);
   expect(state.presets[0].input.referenceAssets).toEqual([
@@ -652,6 +652,40 @@ test("References, masking, settings and runtime presets remain editable", async 
   await expect.poll(() => state.presets[0].title).toBe("Updated Bird Study");
   expect(state.presets[0].input.prompt).toBe("An updated amber bird");
   expect(state.presets).toHaveLength(1);
+});
+
+test("A preset of some parts holds and loads only those, leaving the rest of the draft", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const seed = page.getByRole("textbox", { name: "Seed", exact: true });
+  await prompt.fill("A copper heron");
+  await withSettings(page, () => seed.fill("42"));
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
+  await saveCurrent(page, "Preset", "Heron Prompt", [
+    "Negative",
+    "Model & Settings",
+    "Size",
+    "LoRAs",
+  ]);
+  await expect.poll(() => state.presets.length).toBe(1);
+  expect(state.presets[0].parts).toEqual(["prompt"]);
+  expect(Object.keys(state.presets[0].input)).toEqual(["prompt"]);
+  await closePresets(page);
+  await prompt.fill("A grey owl");
+  await withSettings(page, () => seed.fill("7"));
+  await openPresets(page);
+  await page.getByRole("button", { name: "Load Preset: Heron Prompt", exact: true }).click();
+  await expect(
+    page.getByText("Replace the current prompt with this preset? The rest stays as it is.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Replace", exact: true }).click();
+  await expect(prompt).toHaveValue("A copper heron");
+  await withSettings(page, () => expect(seed).toHaveValue("7"));
 });
 
 test("Generation controls preserve the draft and return keyboard focus with reduced motion", async ({
