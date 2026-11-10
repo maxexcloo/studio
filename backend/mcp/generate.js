@@ -51,6 +51,7 @@ import {
   characterProfiles,
   characterShots,
   editsReferences,
+  startImageSlot,
   withCharacter,
 } from "../../shared/characters.ts";
 
@@ -793,6 +794,8 @@ export function registerGenerateTools({
           `From search uploads, upload${actor.session ? "" : ", upload_link"} or reuse mode reference. models gives each profile's references.max.`,
         ),
       reference_role: z.enum(["edit", "reference"]).optional(),
+      // In reference_asset_ids order, where models lists the profile's reference_strengths.
+      reference_strengths: z.array(z.number().finite().nullable()).max(16).optional(),
       // A character's name or id (models lists them).
       character: z.string().min(1).optional(),
       // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
@@ -1109,7 +1112,7 @@ export function registerGenerateTools({
                   : "";
               // A reference on an img2img model is its start image, and the reply says what follows.
               const img2img =
-                named.length && profile.mediaInputs?.length && !editsReferences(profile)
+                named.length && startImageSlot(profile)
                   ? `${profile.label || profile.id} starts from the reference image (img2img): its pose and layout carry over and a face drifts in new scenes. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same person in new outfits and scenes. `
                   : "";
               const alone =
