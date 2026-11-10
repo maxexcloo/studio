@@ -61,7 +61,9 @@
 }
 
 /* A chip popup capped to the screen (`fittedPopup`) scrolls its content. The dropdown itself
-   doesn't clip, so a nested Select's list, positioned against it, still shows in full. */
+   doesn't clip, so a nested Select's list, positioned against it, still shows in full. A scroller
+   clips both axes, so it reaches 4px into the dropdown's padding: rings and focus outlines on
+   content at its edges (the reference slots) draw in full. */
 .fitted {
   display: flex;
   flex-direction: column;
@@ -69,6 +71,8 @@
 
 .fitted > * {
   min-height: 0;
+  margin: -4px;
+  padding: 4px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

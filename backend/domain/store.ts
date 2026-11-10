@@ -46,6 +46,8 @@ interface UserPreset {
   input: GenerationInput;
   /** Presets saved before dates were kept have none. */
   savedAt?: string;
+  /** The parts of a draft it holds, when only some; one without holds them all. */
+  parts?: string[];
 }
 const now = () => new Date().toISOString();
 /** The pause key that holds every account's queue. */
@@ -460,8 +462,13 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
-  createPreset(ownerId: string, title: string, input: GenerationInput): UserPreset {
-    const preset = { id: randomUUID(), title, input, savedAt: now() };
+  createPreset(
+    ownerId: string,
+    title: string,
+    input: GenerationInput,
+    parts?: string[],
+  ): UserPreset {
+    const preset = { id: randomUUID(), title, input, savedAt: now(), ...(parts ? { parts } : {}) };
     this.db
       .prepare("INSERT INTO studio_user_presets VALUES (?, ?, ?)")
       .run(preset.id, ownerId, JSON.stringify(preset));

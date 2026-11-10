@@ -80,9 +80,16 @@ export function registerRewriteRoutes(
   app.post("/api/user-presets", (req, res) => {
     if (typeof req.body?.title !== "string" || !req.body.title.trim() || !object(req.body.input))
       return res.status(400).json({ error: "A title and generation input are required." });
-    return res
-      .status(201)
-      .json({ preset: store.createPreset(owner(req), req.body.title.trim(), req.body.input) });
+    // The parts of a draft a preset holds, when it holds only some (the Presets popup's names).
+    const parts = req.body.parts;
+    if (
+      parts !== undefined &&
+      (!Array.isArray(parts) || !parts.every((part) => typeof part === "string"))
+    )
+      return res.status(400).json({ error: "Preset parts must be a list of names." });
+    return res.status(201).json({
+      preset: store.createPreset(owner(req), req.body.title.trim(), req.body.input, parts),
+    });
   });
   app.delete("/api/user-presets/:id", (req, res) =>
     store.deletePreset(owner(req), req.params.id) ? res.json({ ok: true }) : missing(res),
