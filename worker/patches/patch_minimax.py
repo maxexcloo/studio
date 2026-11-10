@@ -36,8 +36,10 @@ REPLACEMENTS = (
     # H3 Image references arrive already sized to their aspect, so they scale exactly instead.
     (
         '    return _resize(image, size[0], size[1], "disabled")',
-        '    samples = comfy.utils.common_upscale(image[..., :3].movedim(-1, 1), size[0], size[1], "lanczos", "disabled")\n'
-        "    return samples.movedim(1, -1)",
+        (
+            '    samples = comfy.utils.common_upscale(image[..., :3].movedim(-1, 1), size[0], size[1], "lanczos", "disabled")\n'
+            "    return samples.movedim(1, -1)"
+        ),
     ),
 )
 
