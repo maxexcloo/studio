@@ -5037,6 +5037,27 @@ test("Review does not poll or download a pending result, and refuses video", asy
   assert.equal(f.downloads.length, 0);
 });
 
+test("Review waits for a result due within the wait, and says plainly when one isn't ready", async (t) => {
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 5 * 60_000 });
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  // Due in five minutes: no wait, and the reply says there is nothing to review yet, with its link.
+  let started = performance.now();
+  const early = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 2000, "doesn't wait for a result minutes away");
+  assert.match(
+    texts(early),
+    /^Result 1 is still running, so there is no image to review yet\..*\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
+  );
+  // Due in a moment, as when the user asks right after a result renders: review waits and sees it.
+  f.jobs.get(id).progress = { endsAt: Date.now() + 300 };
+  setTimeout(() => finish(f), 300);
+  started = performance.now();
+  const later = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 5000, "returns once the result finishes");
+  assert.equal(later.content.filter((item) => item.type === "image").length, 1);
+});
+
 test("Reuse preserves the seed for a requested revision only, and refuses an unknown seed or changed profile", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
