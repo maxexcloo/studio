@@ -31,7 +31,7 @@ const settingSections = {
   groups: {
     label: "Groups",
     description:
-      "Which models, uncensored content, Chat and Dream each group can use; administrators can use everything.",
+      "Which models, uncensored content, Characters, Chat and Dream each group can use; administrators can use everything.",
     icon: Shield,
     admin: true,
     group: "Administration",
