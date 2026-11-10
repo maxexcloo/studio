@@ -943,10 +943,13 @@ test("media and administrator credentials discover only their own friendly tools
     /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
   );
   // A chat keeps the user's own description and their no-LoRAs choice from turn to turn.
-  assert.match(media.getInstructions(), /own descriptive wording .* verbatim in later prompts/);
   assert.match(
     media.getInstructions(),
-    /once the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
+    /own descriptions .* word for word, changing only what they ask/,
+  );
+  assert.match(
+    media.getInstructions(),
+    /if the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
   );
   assert.match(
     media.getInstructions(),
