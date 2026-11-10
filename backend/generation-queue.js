@@ -251,7 +251,8 @@ export function createGenerationQueue({
           upscale: {
             ...item.upscale,
             status: job.status,
-            error: job.reason,
+            // A cancelled upscale leaves the original as it was; only a failure says why.
+            error: job.status === "failed" ? job.reason : "",
             progress: null,
           },
         });
