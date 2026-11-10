@@ -713,7 +713,8 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("chat") ||
             url.searchParams.getAll("chat").includes(i.sessionId)) &&
           (!url.searchParams.has("tag") ||
-            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))),
+            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
       // Find Similar ranks the image first.
       const similar = url.searchParams.get("similar");
@@ -739,6 +740,23 @@ export async function fixtures(page: Page) {
       });
       const id = decodeURIComponent(path.split("/")[3] || "");
       const index = characters.findIndex((item) => item.id === id);
+      // Generate References' jobs, listed with their gallery results.
+      if (path.endsWith("/generated")) {
+        characters[index].generated = {
+          jobIds: body.jobIds,
+          at: stamp,
+          results: gallery
+            .filter((item) => body.jobIds.includes(item.jobId))
+            .map((item) => ({
+              galleryItemId: item.id,
+              jobId: item.jobId,
+              status: item.status,
+              thumbnailUrl: item.thumbnailUrl,
+              prompt: item.prompt,
+            })),
+        };
+        return respond({ ok: true, character: characters[index] });
+      }
       if (method === "POST") {
         characters.push(card(body, `chr-${characters.length + 1}`));
         return respond({ ok: true, character: characters.at(-1) }, 201);

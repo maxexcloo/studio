@@ -51,7 +51,7 @@ const ordinaryRoutes = [
   ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
   // Character cards are the requester's own, behind the Characters feature (characters.js).
   ["GET", /^\/api\/characters$/],
-  ["POST", /^\/api\/characters$/],
+  ["POST", /^\/api\/characters(\/[\w-]+\/generated)?$/],
   ["PUT", /^\/api\/characters\/[\w-]+$/],
   ["DELETE", /^\/api\/characters\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
@@ -65,6 +65,8 @@ const ordinaryRoutes = [
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/taste$/],
+  // More Like This Set queues into the requester's own set (result-sets.js).
+  ["POST", /^\/api\/result-sets\/more$/],
   ["GET", /^\/api\/(finishing|upscale\/status)$/],
   ["PUT", /^\/api\/finishing\/settings$/],
   ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],

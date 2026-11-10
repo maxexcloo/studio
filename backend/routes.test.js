@@ -153,6 +153,12 @@ test("a ready profile runs a generate request to the gallery", async () => {
   assert.equal(item.status, "done");
   // Moved into Studio's media before the job completed.
   assert.equal(new URL(item.url, base).searchParams.get("type"), "media");
+  // `set` keeps one MCP result set's results; this run is in none.
+  const set = await api("/api/gallery?limit=20&set=another-set");
+  assert.equal(
+    set.body.items.some((entry) => entry.jobId === jobId),
+    false,
+  );
 });
 
 test("a generate request with no prompt is refused plainly", async () => {

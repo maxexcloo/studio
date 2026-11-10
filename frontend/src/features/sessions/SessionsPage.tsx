@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Alert, Paper, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 import type { ChatMessage } from "../../../../shared/chat";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
@@ -130,6 +130,14 @@ function SessionPage() {
   useLayoutEffect(() => {
     atBottom.current = true;
   }, [id]);
+  // A result's "From Chat" link (`#job-<id>`) opens at the turn that made it, not the latest.
+  const { hash } = useLocation();
+  useLayoutEffect(() => {
+    const target = !loading && hash.startsWith("#job-") && document.getElementById(hash.slice(1));
+    if (!target) return;
+    atBottom.current = false;
+    target.scrollIntoView({ block: "start" });
+  }, [loading, hash]);
   useEffect(() => {
     if (!session.data || draft.sessionId === id) return;
     const jobs = session.data.jobs,

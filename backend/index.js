@@ -142,8 +142,10 @@ import {
   onGalleryFilesDeleted,
   reloadGallerySizes,
   reloadGallerySources,
+  setGalleryFavorites,
 } from "./gallery/store.js";
 import { makePendingItems } from "./gallery/records.js";
+import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
@@ -160,7 +162,12 @@ import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
 
 import { loadLoraLibrary } from "./lora/stacks.js";
-import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
+import {
+  animatedPhoto,
+  bytesForReferenceAccount,
+  galleryStill,
+  referenceAssetForAccount,
+} from "./references.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
@@ -544,9 +551,29 @@ const taste = {
       ),
     ),
 };
+/** Hears which of an account's items were starred or unstarred, by hand or by animating a photo. */
+const itemsStarred = (ownerId, items, favorite) => {
+  if (favorite)
+    dream.starred(
+      ownerId,
+      items.map((item) => item.id),
+    );
+  finishing.starred(
+    ownerId,
+    items.map((item) => item.id),
+    favorite,
+  );
+  taste.record(ownerId, [
+    ...items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
+    ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+  ]);
+};
 // Every admitted job teaches the taste profile (iterations) and makes a waiting finishing upscale step aside.
+// Animating one of the account's photos, from the app or MCP, stars that photo.
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+  const photo = animatedPhoto(job);
+  if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
   finishing.admitted(job);
   captioner.interrupt();
   imageSearch.interrupt();
@@ -555,25 +582,7 @@ const jobAdmitted = (job) => {
   nextSteps.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
-  starred: (req, items, favorite) => {
-    const ownerId = ownerIdForRequest(req);
-    if (favorite)
-      dream.starred(
-        ownerId,
-        items.map((item) => item.id),
-      );
-    finishing.starred(
-      ownerId,
-      items.map((item) => item.id),
-      favorite,
-    );
-    taste.record(ownerId, [
-      ...items.map((item) =>
-        tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item)),
-      ),
-      ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
-    ]);
-  },
+  starred: (req, items, favorite) => itemsStarred(ownerIdForRequest(req), items, favorite),
 });
 
 registerPreferenceRoutes(app);
@@ -611,6 +620,7 @@ const promptStage = createPromptStage({
   dream: () => dream,
   frame: assistant.image,
   caption: assistant.caption,
+  setPrompts: (job) => setPrompts(store, job),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
@@ -667,6 +677,14 @@ registerRewriteRoutes(app, {
   title: chatTitle,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
+registerResultSetRoutes(app, {
+  store,
+  admit: admitGeneration,
+  item: (ownerId, id) => {
+    const item = galleryItem(id);
+    return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
+  },
+});
 registerMigrationRoutes(app, {
   dataDir,
   adminRefusal,

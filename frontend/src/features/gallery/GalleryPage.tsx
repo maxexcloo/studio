@@ -39,7 +39,7 @@ import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
-import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
+import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
@@ -78,6 +78,8 @@ export function GalleryPage() {
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
+  // A Chat card's set link (?set=<id>) shows that MCP result set alone until its chip is removed.
+  const setId = params.get("set") || "";
   // Find Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
   // within the filters, until its chip is removed.
   const similar = params.get("similar") || "";
@@ -119,17 +121,18 @@ export function GalleryPage() {
     }),
   }).data;
   const galleryKey = useMemo(
-    () => ["gallery", search, kind, filters, similar],
-    [search, kind, filters, similar],
+    () => ["gallery", search, kind, filters, similar, setId],
+    [search, kind, filters, similar, setId],
   );
   const galleryPage = useCallback(
     (cursor: string) => {
       const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
       if (similar) params.set("similar", similar);
+      if (setId) params.set("set", setId);
       return api<Page>(`/api/gallery?${params}`);
     },
-    [search, kind, filters, similar],
+    [search, kind, filters, similar, setId],
   );
   const gallery = useInfiniteQuery({
     queryKey: galleryKey,
@@ -222,7 +225,6 @@ export function GalleryPage() {
   // The image ranks first, being most like itself, unless the filters leave it out.
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
-  const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
   const openItem = useCallback((item: MediaItem, run?: string) => {
     setFocusItem(null);
@@ -246,10 +248,6 @@ export function GalleryPage() {
       />
     ),
     [hideMore],
-  );
-  const chatTitle = useCallback(
-    (id: string) => facets.data?.chats.find((chat) => chat.value === id)?.label,
-    [facets.data],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
@@ -317,6 +315,22 @@ export function GalleryPage() {
                     key: "similar",
                     label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
                     remove: removeSimilar,
+                  },
+                ]
+              : []),
+            ...(setId
+              ? [
+                  {
+                    key: "set",
+                    label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
+                    remove: () =>
+                      setParams(
+                        (next) => {
+                          next.delete("set");
+                          return next;
+                        },
+                        { replace: true },
+                      ),
                   },
                 ]
               : []),
@@ -392,7 +406,6 @@ export function GalleryPage() {
             selection={selection}
             caption={phone ? (captions ? "pinned" : "none") : "hover"}
             detail={detail}
-            chatTitle={chatTitle}
             onSelectionMenu={openSelectionMenu}
             onTryAgain={tryAgainItem}
             renderActions={renderTileActions}

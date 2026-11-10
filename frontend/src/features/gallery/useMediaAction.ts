@@ -232,6 +232,7 @@ export const animateThemes = {
   cinematic: "Cinematic Camera",
   living: "Living Photo",
   action: "Action",
+  dialogue: "Dialogue",
   spicy: "Spicy",
   custom: "Custom",
 } as const;
@@ -256,80 +257,84 @@ type PromptOperation = "image" | "refine" | "animate";
  * as the queue item's first stage, or a given prompt. Resolves to the new job's ID.
  */
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
+  const iterate = useIterate(sessionId);
+  return useMutation({ mutationFn: (iteration: Iteration) => iterate(item, iteration) });
+}
+
+/** `useMediaIteration`'s run for any item, so a selection can iterate each of its items. */
+export function useIterate(sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
-  return useMutation({
-    mutationFn: async (iteration: Iteration) => {
-      const animate = iteration.kind === "animate";
-      const written = animate ? iteration.written : undefined;
-      const given = iteration.kind === "prompt" ? iteration : undefined;
-      const { profile, choice, seed, draft, note } = await mediaDraft(
-        item,
-        given?.operation ?? (animate ? "animate" : "image"),
-        profiles,
-        client,
-        sessionId,
-        videos,
+  return async (item: MediaItem, iteration: Iteration) => {
+    const animate = iteration.kind === "animate";
+    const written = animate ? iteration.written : undefined;
+    const given = iteration.kind === "prompt" ? iteration : undefined;
+    const { profile, choice, seed, draft, note } = await mediaDraft(
+      item,
+      given?.operation ?? (animate ? "animate" : "image"),
+      profiles,
+      client,
+      sessionId,
+      videos,
+    );
+    // An animation that can't run where the account prefers says where it runs instead.
+    if (note || choice?.note) notifications.show({ message: note || choice?.note });
+    const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
+    const repeat = iteration.kind === "repeat";
+    // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.
+    const count = given
+      ? given.operation === "image"
+        ? draft.input.count
+        : 1
+      : repeat || animate
+        ? 1
+        : composer.count;
+    const payload = {
+      ...generationInput(
+        { ...draft.input, prompt, seed: repeat ? (seed ?? "") : "", count },
+        profile,
+        draft.references,
+      ),
+      // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates; a
+      // reviewed prompt was written already and keeps its record.
+      ...(written
+        ? { writing: { kind: "animate", ...written } }
+        : animate
+          ? {
+              writing: {
+                kind: "animate",
+                theme: iteration.theme,
+                instruction: iteration.instruction,
+                source: item.prompt || "",
+                // A video's theme continues it from its last frame, so the writer moves the action on.
+                ...(item.type === "video" ? { extend: true } : {}),
+              },
+            }
+          : {}),
+      operation: draft.input.kind === "video" ? "animate" : draft.operation,
+      parentJobId: draft.parentJobId,
+      parentItemId: draft.parentItemId,
+    };
+    const session =
+      draft.sessionId ||
+      (await post<{ session: Session }>("/api/sessions", { inputs: payload })).session.id;
+    const result = await post<{ jobId: string; job?: QueueJob }>(
+      `/api/sessions/${session}/generations`,
+      payload,
+    );
+    // The strip shows the new run at once; polling then follows its progress.
+    if (result.job)
+      client.setQueryData(queueQuery.queryKey, (queue) =>
+        queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
       );
-      // An animation that can't run where the account prefers says where it runs instead.
-      if (note || choice?.note) notifications.show({ message: note || choice?.note });
-      const prompt = given?.prompt ?? (animate ? (written?.prompt ?? "") : draft.input.prompt);
-      const repeat = iteration.kind === "repeat";
-      // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.
-      const count = given
-        ? given.operation === "image"
-          ? draft.input.count
-          : 1
-        : repeat || animate
-          ? 1
-          : composer.count;
-      const payload = {
-        ...generationInput(
-          { ...draft.input, prompt, seed: repeat ? (seed ?? "") : "", count },
-          profile,
-          draft.references,
-        ),
-        // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates; a
-        // reviewed prompt was written already and keeps its record.
-        ...(written
-          ? { writing: { kind: "animate", ...written } }
-          : animate
-            ? {
-                writing: {
-                  kind: "animate",
-                  theme: iteration.theme,
-                  instruction: iteration.instruction,
-                  source: item.prompt || "",
-                  // A video's theme continues it from its last frame, so the writer moves the action on.
-                  ...(item.type === "video" ? { extend: true } : {}),
-                },
-              }
-            : {}),
-        operation: draft.input.kind === "video" ? "animate" : draft.operation,
-        parentJobId: draft.parentJobId,
-        parentItemId: draft.parentItemId,
-      };
-      const session =
-        draft.sessionId ||
-        (await post<{ session: Session }>("/api/sessions", { inputs: payload })).session.id;
-      const result = await post<{ jobId: string; job?: QueueJob }>(
-        `/api/sessions/${session}/generations`,
-        payload,
-      );
-      // The strip shows the new run at once; polling then follows its progress.
-      if (result.job)
-        client.setQueryData(queueQuery.queryKey, (queue) =>
-          queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
-        );
-      void Promise.all(
-        [queueQuery.queryKey, ["gallery"], ["sessions"], ["session", session]].map((queryKey) =>
-          client.invalidateQueries({ queryKey }),
-        ),
-      );
-      return result.jobId;
-    },
-  });
+    void Promise.all(
+      [queueQuery.queryKey, ["gallery"], ["sessions"], ["session", session]].map((queryKey) =>
+        client.invalidateQueries({ queryKey }),
+      ),
+    );
+    return result.jobId;
+  };
 }
 
 /** The prompt Review Prompt First shows, with the video model (Fast or Quality, Cloud) that will run it. */
