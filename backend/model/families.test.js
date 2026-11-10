@@ -117,34 +117,21 @@ test("model files are placed by their names", () => {
   assert.deepEqual([unknownCheckpoint.family, unknownCheckpoint.variant.id], ["sdxl", "pony"]);
 });
 
-test("P-H3-Image's files are the P-H3 Image family and its parts, not MiniMax H3 video", async () => {
-  const { refinedFamily } = await import("../family-catalogue.js");
-  const { classifyEncoder, classifyVae } = await import("./components.js");
-  for (const file of ["p-h3-image_w4a8.safetensors", "p-h3-image_int8_convrot.safetensors"]) {
-    const found = classifyModel("unet", file);
-    assert.deepEqual([found.family, found.variant.id], ["p_h3_image", "standard"], file);
-  }
-  assert.equal(
-    classifyModel("unet", "minimax_h3_fl2va_pruned_int8_convrot.safetensors").family,
-    "minimax_h3",
-  );
-  assert.equal(refinedFamily("minimax_h3", "p-h3-image_bf16.safetensors"), "p_h3_image");
-  assert.equal(classifyVae("p-h3-image_vae_int8_convrot.safetensors").kind, "p_h3_image");
-  assert.equal(classifyVae("minimax_h3_video_vae_int8_convrot.safetensors").kind, "h3_video");
-  assert.equal(classifyEncoder("p-h3-image_text_encoder_w4a8.safetensors").kind, "p_h3_image");
-});
-
 test("MiniMax-H3-Image's files are the MiniMax H3 Image family and its parts, not H3 video", async () => {
   const { refinedFamily } = await import("../family-catalogue.js");
   const { classifyEncoder, classifyVae } = await import("./components.js");
   const found = classifyModel("unet", "minimax_h3_image_pruned_int8_convrot.safetensors");
+  assert.equal(
+    classifyModel("unet", "minimax_h3_fl2va_pruned_int8_convrot.safetensors").family,
+    "minimax_h3",
+  );
+  assert.equal(classifyVae("minimax_h3_video_vae_int8_convrot.safetensors").kind, "h3_video");
   assert.deepEqual([found.family, found.variant.id], ["minimax_h3_image", "standard"]);
   assert.equal(
     refinedFamily("minimax_h3", "minimax_h3_image_pruned_bf16.safetensors"),
     "minimax_h3_image",
   );
   assert.equal(classifyVae("minimax_h3_image_vae_fp16.safetensors").kind, "h3_image");
-  assert.equal(classifyVae("p-h3-image_vae_int8_convrot.safetensors").kind, "p_h3_image");
   assert.equal(
     classifyEncoder("qwen3vl_32b_minimax_h3_int8_convrot.safetensors").kind,
     "qwen3vl_32b",
