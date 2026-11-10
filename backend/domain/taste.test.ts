@@ -13,6 +13,7 @@ import {
   pairSignal,
   preferenceSignal,
   registerTasteRoutes,
+  setPreferenceSignals,
   tasteSignal,
 } from "./taste.ts";
 
@@ -385,4 +386,38 @@ test("scores weigh each choice, halve every 60 days and move only a comparison's
   // Sixty days on, every score is half what it was.
   clock += 60 * day;
   assert.equal(score("profile:flux-2"), 0.75);
+});
+
+test("starring a set's result prefers it over each other unstarred run of the set", () => {
+  const set = { id: "set-a" };
+  const item = (id: string, jobId: string, extra = {}) => ({
+    id,
+    jobId,
+    ownerId: "alice",
+    status: "done",
+    resultSet: set,
+    ...extra,
+  });
+  const gallery = [
+    item("fox", "fox-job", { favorite: true }),
+    item("fox-2", "fox-job"),
+    item("owl", "owl-job"),
+    item("owl-2", "owl-job"),
+    item("bear", "bear-job", { favorite: true }),
+    item("heron", "heron-job", { status: "failed" }),
+    item("lynx", "lynx-job", { ownerId: "bob" }),
+    { id: "other", jobId: "other-job", ownerId: "alice", status: "done" },
+  ];
+  const signals = setPreferenceSignals([gallery[0]], gallery, (result) => ({
+    prompt: result.id,
+  }));
+  // Once per other run, not its own job's other images, other starred, failed or others' runs.
+  assert.deepEqual(
+    signals.map((signal) => [signal.kind, signal.jobId, signal.over?.jobId]),
+    [["preferred", "fox-job", "owl-job"]],
+  );
+  assert.deepEqual(
+    setPreferenceSignals([gallery[7]], gallery, () => ({})),
+    [],
+  );
 });
