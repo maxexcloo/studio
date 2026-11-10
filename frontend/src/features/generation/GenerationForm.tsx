@@ -215,19 +215,17 @@ export function GenerationForm({
           profile={profile}
           selection={draft}
           onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
-          onLoad={(preset) => {
+          onLoad={(loaded, selection) => {
             setDraft((value) => ({
               ...value,
-              presetId: preset.id,
-              presetTitle: preset.title,
+              presetId: selection.presetId,
+              presetTitle: selection.presetTitle,
               sessionId: "",
               parentJobId: undefined,
               parentItemId: undefined,
-              operation: preset.input.kind === "video" ? "animate" : "image",
-              input: { ...initialInput, ...preset.input },
-              references: Array.isArray(preset.input.referenceDetails)
-                ? preset.input.referenceDetails
-                : [],
+              operation: loaded.kind === "video" ? "animate" : "image",
+              input: { ...initialInput, ...loaded },
+              references: Array.isArray(loaded.referenceDetails) ? loaded.referenceDetails : [],
             }));
           }}
         />

@@ -394,7 +394,7 @@ export function createDream(options: {
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
   /** The LoRAs that can run on the profile (its model family), strengths within published ranges. */
   fitLoras(profile: DreamProfile, loras: DreamLora[]): DreamLora[];
-  /** The images in Library › Imports and Inspiration the account may see, none where it may not. */
+  /** The Library's imports and Inspiration images the account may see, none where it may not. */
   inspiration(account?: GenerationAccount): DreamInspiration[];
   /** A gallery image as a reference asset for a video, or a throw when it can't be one. */
   reference(
