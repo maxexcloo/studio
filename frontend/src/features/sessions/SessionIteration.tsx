@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { Anchor, Button, Group, Image, Menu, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { ChevronDown, FastForward } from "lucide-react";
+import { Link } from "react-router";
 import { icons } from "../../ui/icons";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import { isProfile } from "../generation/payload";
@@ -224,6 +225,8 @@ export function SessionIteration({
     ? (input.referenceDetails as ReferenceAsset[])
     : [];
   const number = index + 1;
+  // An MCP call's results are one set, which the gallery shows on its own.
+  const set = input.resultSet as MediaItem["resultSet"];
   const single = tiles.length === 1;
   const source = parentIndex >= 0 ? `iteration ${parentIndex + 1}` : "";
   // A request says whether it made a new image or edited an earlier one, and which.
@@ -247,6 +250,8 @@ export function SessionIteration({
       radius="lg"
       p={{ base: "sm", sm: "md" }}
       aria-label={`Iteration ${number}`}
+      // A result's "From Chat" link lands here (`#job-<id>`).
+      id={`job-${job.id}`}
     >
       <Stack gap="sm">
         {editing ? (
@@ -331,6 +336,20 @@ export function SessionIteration({
         )}
         <Text size="xs" c="dimmed">
           {label}
+          {set && (
+            <>
+              {" · "}
+              <Anchor
+                component={Link}
+                to={`/${input.kind === "video" ? "video" : "images"}?set=${encodeURIComponent(set.id)}`}
+                inherit
+                c="dimmed"
+                underline="always"
+              >
+                Set: {set.title}
+              </Anchor>
+            </>
+          )}
         </Text>
         {job.status === "writing" && <WritingStream progress={job.progress} />}
         {tiles.length === 0 ? null : single ? (

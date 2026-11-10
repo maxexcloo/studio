@@ -32,6 +32,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import { FromChat } from "./FromChat";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { setMembers, setPosition } from "./resultSets";
@@ -340,6 +341,12 @@ export function MediaViewer({
   ]
     .filter(Boolean)
     .join(" · ");
+  // The Chat that made it, unless the viewer opened from that Chat.
+  const fromChat = item.sessionId !== sessionId && (
+    <Text size="xs" c="dimmed">
+      <FromChat item={item} />
+    </Text>
+  );
   const toggleDetails = () => (phone ? setSheet(true) : setDetails((open) => !open));
   function swipe(direction: SwipeDirection) {
     // A swipe replaces the media before its compatibility click arrives.
@@ -713,6 +720,7 @@ export function MediaViewer({
                       <Text size="xs" c="dimmed">
                         {subtitle}
                       </Text>
+                      {fromChat}
                     </Stack>
                     <MediaDetails
                       item={displayed}
@@ -750,9 +758,12 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Text size="xs" c="dimmed" mt={-8}>
-                {subtitle}
-              </Text>
+              <Stack gap={2} mt={-8}>
+                <Text size="xs" c="dimmed">
+                  {subtitle}
+                </Text>
+                {fromChat}
+              </Stack>
               <MediaDetails
                 item={displayed}
                 related={related}

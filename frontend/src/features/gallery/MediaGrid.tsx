@@ -25,7 +25,6 @@ export interface GalleryViewProps {
   focusItem: string | null;
   caption: "hover" | "pinned" | "none";
   detail: (item: MediaItem) => string;
-  chatTitle: (id: string) => string | undefined;
   renderActions: (
     item: MediaItem,
     opened: boolean,
