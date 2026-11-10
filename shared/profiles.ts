@@ -41,3 +41,14 @@ export const isCloudProfile = (
   profile?.provider === "cliproxyapi" ||
   profile?.family === "grok" ||
   /^grok/i.test(String(profile?.id || ""));
+
+/**
+ * What a reference slot (`studio.mediaInputs[].role`) can guide, by name. A slot with one of these
+ * roles steers the result rather than being where it starts (`start`, `end` or a plain `reference`),
+ * and only these slots may map a `strength` input.
+ */
+export const guidingRoles: Readonly<Record<string, string>> = Object.freeze({
+  identity: "Identity",
+  layout: "Pose/Layout",
+  style: "Style",
+});

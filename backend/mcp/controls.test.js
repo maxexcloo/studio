@@ -210,3 +210,25 @@ test("a distilled profile without CFG offers no cfg and refuses one with a clear
   assert.equal(mcpControls({ ...modes, ...modes.imageModes.reference }).cfg, undefined);
   assert.ok(mcpControls(modes).cfg);
 });
+
+test("reference roles and strengths are listed only where a profile declares them", () => {
+  const plain = { ...profile, mediaInputs: [{ id: "image" }] };
+  assert.equal(mcpControls(plain).reference_asset_ids.roles, undefined);
+  assert.equal(mcpControls(plain).reference_strengths, undefined);
+  assert.throws(
+    () => assertAdjustable(plain, { reference_strengths: [1] }),
+    /reference_strengths cannot be adjusted/,
+  );
+  const strength = { node: "3", input: "strength", min: 0, max: 2, step: 0.05, default: 0.6 };
+  const controls = mcpControls({
+    ...profile,
+    mediaInputs: [
+      { id: "start", role: "start" },
+      { id: "style", role: "style", strength },
+    ],
+  });
+  assert.deepEqual(controls.reference_asset_ids.roles, [null, "Style"]);
+  assert.deepEqual(controls.reference_strengths.slots, {
+    style: { min: 0, max: 2, step: 0.05, default: 0.6 },
+  });
+});

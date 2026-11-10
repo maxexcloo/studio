@@ -122,7 +122,12 @@ function generationContext(input: GenerationInput) {
   if (Array.isArray(input.referenceAssets))
     result.referenceAssets = input.referenceAssets
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({ assetId: item.assetId, source: item.source, slot: item.slot }));
+      .map((item) => ({
+        assetId: item.assetId,
+        source: item.source,
+        slot: item.slot,
+        ...(Number.isFinite(item.strength) ? { strength: item.strength } : {}),
+      }));
   if (Array.isArray(input.loras))
     result.loras = input.loras
       .slice(0, 8)

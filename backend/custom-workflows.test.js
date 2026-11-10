@@ -83,6 +83,68 @@ test("custom filename mappings expose one-image capacity without rewriting the s
   assert.equal(raw.graph[1].inputs.image, "original.png");
 });
 
+test("a guiding reference slot keeps its role and strength input; other slots take none", () => {
+  const workflow = metadataFromJson({
+    studio: {
+      id: "style-guided",
+      mediaInputs: [
+        { id: "start", role: "start", control: { node: "1", input: "image" } },
+        {
+          id: "style",
+          role: "style",
+          control: { node: "2", input: "image" },
+          strength: { node: "3", input: "strength" },
+        },
+        {
+          id: "face",
+          label: "Face",
+          role: "identity",
+          control: { node: "4", input: "image" },
+          strength: { node: "5", input: "weight", min: 0, max: 1.5 },
+        },
+        {
+          id: "extra",
+          role: "reference",
+          control: { node: "6", input: "image" },
+          strength: { node: "3", input: "strength" },
+        },
+      ],
+    },
+    graph: {
+      1: { class_type: "LoadImage", inputs: { image: "a.png" } },
+      2: { class_type: "LoadImage", inputs: { image: "b.png" } },
+      3: { class_type: "StyleModelApply", inputs: { strength: 0.6 } },
+      4: { class_type: "LoadImage", inputs: { image: "c.png" } },
+      5: { class_type: "ApplyPulid", inputs: { weight: 0.9 } },
+      6: { class_type: "LoadImage", inputs: { image: "d.png" } },
+    },
+  });
+  const [start, style, face, extra] = workflow.mediaInputs;
+  assert.equal(start.role, "start");
+  assert.equal(start.strength, undefined);
+  // An unlabelled guiding slot reads as its role; its default is the graph's saved value.
+  assert.equal(style.label, "Style");
+  assert.deepEqual(style.strength, {
+    node: "3",
+    input: "strength",
+    min: 0,
+    max: 2,
+    step: 0.05,
+    default: 0.6,
+  });
+  assert.equal(face.label, "Face");
+  assert.deepEqual(face.strength, {
+    node: "5",
+    input: "weight",
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    default: 0.9,
+  });
+  assert.equal(extra.role, "reference");
+  assert.equal(extra.strength, undefined);
+});
+
 test("prepared recipe metadata preserves conditioning and exact adapter identities", () => {
   const recipe = {
     modelLabel: "MiniMax H3",

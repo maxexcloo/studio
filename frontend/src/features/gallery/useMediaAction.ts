@@ -109,6 +109,7 @@ export async function mediaDraft(
     : recordedDetails.map((asset: ReferenceAsset) => ({
         assetId: asset.id,
         slot: asset.slot || profile.mediaInputs?.[0]?.id || "image",
+        strength: asset.strength,
       }));
   // A job submitted with only `startImageId` (an MCP or API alias) recorded its one reference there.
   const startImageId = String(saved.startImageId || "");
@@ -130,7 +131,11 @@ export async function mediaDraft(
                     `/api/reference-assets/${encodeURIComponent(reference.assetId)}`,
                   )
                 ).asset;
-            return { ...asset, slot: reference.slot };
+            return {
+              ...asset,
+              slot: reference.slot,
+              ...(reference.strength !== undefined ? { strength: reference.strength } : {}),
+            };
           }),
         );
   const preparedReferences = asset
