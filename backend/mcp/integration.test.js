@@ -7,7 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { characterShots } from "../../shared/characters.ts";
+import { characterShots, withCharacter } from "../../shared/characters.ts";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -1536,7 +1536,7 @@ test("uploaded references belong to their uploader and map to declared profile s
   ]);
 });
 
-test("models lists the account's characters, and generate applies one by name: its images fill the slots and its description joins each prompt", async (t) => {
+test("models lists the account's characters, and generate applies one by name: its first image goes in and its lead starts each prompt", async (t) => {
   const f = await fixture(t);
   const client = await f.client("alice");
   const uploaded = data(
@@ -1559,19 +1559,18 @@ test("models lists the account's characters, and generate applies one by name: i
     character: "mara",
   });
   assert.notEqual(reply.isError, true);
-  // The fixture profile takes one reference, so the first image goes and the reply says so.
-  assert.deepEqual(f.submitted[0].referenceAssets, [{ slot: "reference", assetId }]);
+  // The named fixture profile starts from a reference (img2img), so the card's image stays out (its
+  // pose and layout would carry over), its description leads verbatim, and the reply warns.
+  assert.deepEqual(f.submitted[0].referenceAssets, []);
   assert.equal(
     f.submitted[0].prompt,
-    "Walking through a misty forest, red-haired ranger, green cloak",
+    withCharacter("Walking through a misty forest", "red-haired ranger, green cloak", false),
   );
-  assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
-  await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
-  // The fixture profile starts from a reference (img2img), and the reply says what that means.
   assert.match(
     reply.content[0].text,
-    /starts from Mara's image \(img2img\), so its pose and layout carry over/,
+    /can't take Mara's image as a reference, so only the description carries the character/,
   );
+  await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
   // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
   // views come from the description alone, so the card's pose doesn't carry into every view.
   const views = async () => {
@@ -1583,30 +1582,47 @@ test("models lists the account's characters, and generate applies one by name: i
   const alone = await views();
   assert.deepEqual(
     alone.queued.map((job) => job.prompt),
-    characterShots("red-haired ranger, green cloak"),
+    characterShots("red-haired ranger, green cloak", false),
   );
   assert.equal(new Set(alone.queued.map((job) => job.seed)).size, 1);
   assert.ok(alone.queued.every((job) => !job.referenceAssets.length));
   assert.match(alone.reply.content[0].text, /from Mara's description alone/);
   assert.equal(f.characters[0].generated.jobIds.length, 4);
   assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
-  // With a model that edits with references, both the views and new scenes take the card's image on it.
-  const editor = {
+  // Models that edit with references take the card's image for the views and new scenes, a family
+  // that keeps characters before any other.
+  const editor = (id, extra) => ({
     ...structuredClone(imageProfile),
-    id: "editor",
-    label: "Editor",
+    id,
+    label: id,
     editReferences: true,
-  };
-  await f.profiles([structuredClone(imageProfile), editor]);
+    ...extra,
+  });
+  await f.profiles([
+    structuredClone(imageProfile),
+    editor("editor"),
+    editor("keeper", { keepsCharacters: true }),
+  ]);
   const edited = await views();
+  assert.deepEqual(
+    edited.queued.map((job) => job.prompt),
+    characterShots("red-haired ranger, green cloak", true),
+  );
   assert.ok(
     edited.queued.every(
-      (job) => job.profileId === "editor" && job.referenceAssets[0]?.assetId === assetId,
+      (job) => job.profileId === "keeper" && job.referenceAssets[0]?.assetId === assetId,
     ),
   );
+  // Without a named model a scene goes to it with only the card's first image: a second view of
+  // one person is drawn as a second person.
   const before = f.submitted.length;
   await call(client, "generate", { prompts: ["At the harbour"], character: "Mara" });
-  assert.equal(f.submitted[before].profileId, "editor");
+  assert.equal(f.submitted[before].profileId, "keeper");
+  assert.deepEqual(f.submitted[before].referenceAssets, [{ slot: "reference", assetId }]);
+  assert.equal(
+    f.submitted[before].prompt,
+    withCharacter("At the harbour", "red-haired ranger, green cloak"),
+  );
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {

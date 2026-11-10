@@ -59,6 +59,8 @@ export interface Profile {
   native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
   /** The family edits with its references; otherwise a reference is an img2img start image. */
   editReferences?: boolean;
+  /** The family keeps a character's face across new scenes, so characters go to it first. */
+  keepsCharacters?: boolean;
 }
 export interface ReferenceAsset {
   id: string;
@@ -112,6 +114,8 @@ export interface MediaItem {
   status: string;
   prompt?: string;
   negative?: string;
+  /** The prompt a provider's moderation refused; `prompt` is the assistant's softened retry. */
+  refusedPrompt?: string;
   /** How the prompt assistant wrote the prompt in the queue: its text model and thinking. */
   writing?: { kind: string; model?: string; thinking?: string };
   /** A few words the text model summarised from the prompt; show it with mediaTitle. */

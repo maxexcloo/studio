@@ -40,3 +40,33 @@ export function mediaDetail(item: MediaItem, profiles: Profile[], withTime: bool
   const duration = item.type === "video" && seconds ? `${Math.round(seconds * 10) / 10} s` : "";
   return [time, name, duration].filter(Boolean).join(" · ");
 }
+
+/** The local day an item was made, as `YYYY-MM-DD`, or "" when it has no date. */
+export function mediaDay(item: Pick<MediaItem, "createdAt">) {
+  const created = item.createdAt ? new Date(item.createdAt) : null;
+  if (!created || Number.isNaN(created.getTime())) return "";
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${created.getFullYear()}-${pad(created.getMonth() + 1)}-${pad(created.getDate())}`;
+}
+
+const thisYear = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+});
+const otherYear = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/** A day heading for a `mediaDay` key: Today, Yesterday, then the date. */
+export function dayHeading(day: string, now = new Date()) {
+  const [year, month, date] = day.split("-").map(Number);
+  const shown = new Date(year, month - 1, date);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((today.getTime() - shown.getTime()) / 86_400_000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return (year === now.getFullYear() ? thisYear : otherYear).format(shown);
+}

@@ -46,8 +46,9 @@ export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // One rule for every title: a gallery item's from its prompt, a chat's from its first message.
 const titleInstructions =
   "Title what the text below describes: the prompt that made an image or video, or the first message of a chat. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
-// A character card's description (Make Character), which picking the card adds to a prompt.
-const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos) and their outfit. Write one short phrase of comma-separated details under ${maxCharacterDescription} characters, such as "red-haired woman in her thirties, freckles, green cloak, scar over left eye". Leave out the setting, pose, expression, lighting and style, and never guess a name or identity. Reply with only the phrase.`;
+// A character card's description (Make Character), which leads a prompt with the card's images.
+// Clothing stays out: a card's character changes outfits, and a described one fights the prompt's.
+const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCharacterDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity. Reply with only the phrase.`;
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {

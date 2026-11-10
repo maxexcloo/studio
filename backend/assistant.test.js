@@ -625,7 +625,7 @@ test("character describes a card's image as one short phrase of lasting details"
     model: "cloud/auto",
   });
   const [system, user] = seen.calls[0].body.messages;
-  assert.match(system.content, /lasting look.*Leave out the setting, pose/s);
+  assert.match(system.content, /lasting look.*Leave out clothing, the setting, pose/s);
   assert.equal(user.content[1].type, "image_url");
   assert.equal(seen.calls[0].body.reasoning_effort, "none");
 });

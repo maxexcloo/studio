@@ -1,0 +1,62 @@
+/* A day heading spans the grid above its day's tiles (MediaGrid's headingHeight). */
+.day {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* The date scrubber's track: the right edge between the header and the composer. */
+.scrubber {
+  --scrubber-thumb: 44px;
+  position: fixed;
+  z-index: 2;
+  right: 2px;
+  top: calc(var(--app-shell-header-height) + var(--mantine-spacing-md));
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+  width: 28px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.scrubber[data-active] {
+  opacity: 1;
+}
+
+.thumb {
+  position: absolute;
+  right: 0;
+  width: 28px;
+  height: var(--scrubber-thumb);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-color-default);
+  border: 1px solid var(--mantine-color-default-border);
+  box-shadow: var(--mantine-shadow-sm);
+  cursor: grab;
+  touch-action: none;
+}
+
+.scrubber[data-active] .thumb {
+  pointer-events: auto;
+}
+
+/* The day under the top of the screen, beside the thumb while dragging. */
+.date {
+  position: absolute;
+  right: calc(100% + var(--mantine-spacing-xs));
+  top: 50%;
+  translate: 0 -50%;
+  padding: 4px var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-color-default);
+  border: 1px solid var(--mantine-color-default-border);
+  box-shadow: var(--mantine-shadow-sm);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}

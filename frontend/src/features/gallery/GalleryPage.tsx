@@ -399,6 +399,8 @@ export function GalleryPage() {
           <View
             items={items}
             versions={versions}
+            // A similarity ranking isn't in time order.
+            byDay={!similar}
             focusItem={focusItem}
             open={openItem}
             selection={selection}
