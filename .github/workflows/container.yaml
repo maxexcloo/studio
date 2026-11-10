@@ -4,15 +4,21 @@ on:
   pull_request:
   push:
     branches: [main]
+    # Docs a build doesn't read; README.md stays, as a test checks its Troubleshooting headings.
+    paths-ignore:
+      - AGENTS.md
+      - SECURITY.md
+      - backend/samples/README.md
+      - worker/**/*.md
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Only pull requests cancel superseded runs: every main commit must publish and release its image.
+# A newer push supersedes a running one: only the latest main commit is released and deployed.
 concurrency:
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-  group: studio-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: true
+  group: studio-${{ github.ref }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
