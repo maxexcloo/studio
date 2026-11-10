@@ -3564,9 +3564,17 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     "reads the cached catalogue at most once and needs no Models call",
   );
   // mode reference returns a reference asset for Generate, and a rerun keeps a result's references.
-  await failure(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" });
-  const { asset } = data(await call(client, "reuse", { job_id: "result 1", mode: "reference" }));
+  // Arguments a reference doesn't use are named back, not refused.
+  const extras = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" }),
+  );
+  assert.match(extras.asset.id, /^fixture-asset-/);
+  assert.match(extras.note, /^Ignored request: mode reference takes only job_id and output_index/);
+  const { asset, note } = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference" }),
+  );
   assert.match(asset.id, /^fixture-asset-/);
+  assert.equal(note, undefined);
   const edit = data(
     await call(client, "generate", {
       kind: "image",
