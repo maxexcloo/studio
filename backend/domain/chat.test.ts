@@ -86,6 +86,29 @@ test("text discussion streams and persists without submitting media; history sta
   );
   fixture.db.close();
 });
+test("thinking a model writes inline as <think> tags stays out of the reply", async () => {
+  // The tags arrive split across deltas, as a stream cuts them anywhere.
+  const fixture = setup(
+    ["<thi", "nk>The user wants… Hmm", ".</th", "ink>\n\nHere", " you go."]
+      .map((content) => frame({ choices: [{ delta: { content } }] }))
+      .concat("data: [DONE]\n\n"),
+  );
+  const events: ChatEvent[] = [];
+  await fixture.service.stream("alice", fixture.session.id, { content: "Make her" }, (event) =>
+    events.push(event),
+  );
+  const [, reply] = fixture.service.messages("alice", fixture.session.id);
+  assert.equal(reply.content, "Here you go.");
+  assert.equal(reply.thinking, "The user wants… Hmm.");
+  assert.doesNotMatch(
+    events
+      .filter((event) => event.event === "delta")
+      .map((event) => event.data.text)
+      .join(""),
+    /think|Hmm/,
+  );
+  fixture.db.close();
+});
 /** Gateway answers in turn, one per model call; the last repeats. */
 function rounds(fixture: ReturnType<typeof setup>, answers: string[][]) {
   let index = 0;
