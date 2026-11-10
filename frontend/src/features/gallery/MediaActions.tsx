@@ -167,7 +167,6 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
-    description: `Add ${video ? "this frame" : "it"} to the composer's references`,
     icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
@@ -198,7 +197,6 @@ function useCharacterAction(item: MediaItem, onApplied: () => void): Action | nu
   return {
     id: "make-character",
     label: "Make Character",
-    description: "Start a character card from this image",
     icon: icons.character,
     onClick: () => {
       onApplied();
@@ -437,7 +435,6 @@ export function useMediaActions(
                     {
                       id: "edit-image",
                       label: "Edit Image",
-                      description: "Change this image in the composer",
                       icon: icons.edit,
                       disabled: action.isPending,
                       onClick: () => action.mutate("refine"),
@@ -462,8 +459,7 @@ export function useMediaActions(
                 ? recreate
                 : {
                     id: "prompt-composer",
-                    label: "Edit Prompt",
-                    description: "Open its prompt and settings in the composer",
+                    label: "Reuse Prompt",
                     icon: icons.prompt,
                     disabled: action.isPending,
                     onClick: () => action.mutate("image"),
@@ -477,14 +473,12 @@ export function useMediaActions(
                   {
                     id: "new-seed",
                     label: "Run Again",
-                    description: "Same prompt and settings, new seed",
                     icon: Shuffle,
                     onClick: () => run({ kind: "regenerate" }),
                   },
                   {
                     id: "exact-repeat",
-                    label: "Repeat Exactly",
-                    description: "Same prompt, settings and seed",
+                    label: "Run Again, Same Seed",
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
@@ -493,7 +487,6 @@ export function useMediaActions(
                         {
                           id: "more-like-set",
                           label: "More Like This Set",
-                          description: `Two new variations for ${item.resultSet.title}`,
                           icon: icons.suggestions,
                           disabled: moreLikeSet.isPending,
                           onClick: () => moreLikeSet.mutate(),
