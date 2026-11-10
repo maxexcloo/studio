@@ -22,6 +22,12 @@ export interface ImageEncoder {
  */
 export const nearThreshold = 0.08;
 const key = (item: IdleItem) => item.url || item.id || "";
+/** Cosine similarity: SigLIP vectors are unit length. */
+function likeness(a: Float32Array, b: Float32Array) {
+  let similarity = 0;
+  for (let index = 0; index < a.length; index += 1) similarity += a[index] * b[index];
+  return similarity;
+}
 
 /**
  * Image vectors in `studio_image_vectors` (float16, one row per gallery item) and in memory for
@@ -133,11 +139,19 @@ export function createImageSearch(options: {
       const wanted = target;
       return (item: IdleItem) => {
         const vector = vectors.get(item);
-        if (!vector) return false;
-        let similarity = 0;
-        for (let index = 0; index < vector.length; index += 1)
-          similarity += vector[index] * wanted[index];
-        return similarity >= nearThreshold;
+        return vector ? likeness(vector, wanted) >= nearThreshold : false;
+      };
+    },
+    /**
+     * Find Similar: each item's likeness to `source`'s image, undefined for items not read yet, or
+     * null when `source` has no vector (Image Search off or not read yet). Uses stored vectors only.
+     */
+    similar(source: IdleItem) {
+      const wanted = options.enabled() ? vectors.get(source) : undefined;
+      if (!wanted) return null;
+      return (item: IdleItem) => {
+        const vector = vectors.get(item);
+        return vector && likeness(vector, wanted);
       };
     },
   };
