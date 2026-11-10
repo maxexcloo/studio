@@ -365,6 +365,28 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
 });
 
+test("Edit › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Edit");
+  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+});
+
+test("More Like This Set is offered only for a result in a set", async ({ page }) => {
+  await seed(page);
+  await viewerAction(page, "Edit");
+  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
+    0,
+  );
+});
+
 test("Run Again and Edit Prompt draw a new seed; only Repeat Exactly keeps it", async ({
   page,
 }) => {

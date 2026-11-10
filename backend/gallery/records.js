@@ -117,7 +117,7 @@ export function storedResultSet(value) {
  */
 export function storedWritingRecord(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  if (!["animate", "request", "dream"].includes(value.kind)) return null;
+  if (!["animate", "request", "dream", "set"].includes(value.kind)) return null;
   const model = typeof value.model === "string" ? value.model.trim().slice(0, 200) : "";
   const thinking = typeof value.thinking === "string" ? value.thinking.trim().slice(0, 20_000) : "";
   return { kind: value.kind, ...(model ? { model } : {}), ...(thinking ? { thinking } : {}) };
