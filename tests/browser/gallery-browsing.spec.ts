@@ -322,10 +322,9 @@ test("Runs fan a stacked run out in place, open it to flip through and link its 
   await expect(stack).toHaveAttribute("aria-expanded", "true");
   const run = page.getByRole("region", { name: "Run: Bird study 0", exact: true });
   await expect(run.getByRole("button", { name: /^Open image: Bird study/ })).toHaveCount(3);
-  await expect(run.getByRole("link", { name: "Bird Chat", exact: true })).toHaveAttribute(
-    "href",
-    "/chat/chat-a",
-  );
+  await expect(
+    run.getByRole("link", { name: "From Chat: Bird Chat", exact: true }),
+  ).toHaveAttribute("href", "/chat/chat-a#job-run-job");
   await run.getByRole("button", { name: "Open image: Bird study 2", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // A run's result flips through that run alone, as Open All does from its first.
@@ -387,10 +386,9 @@ test("An MCP result set is one titled run whose viewer names each result's place
     "Open image: Set prompt 1",
     "Open image: Bear Hug",
   ]);
-  await expect(run.getByRole("link", { name: "Chat", exact: true })).toHaveAttribute(
-    "href",
-    "/chat/chat-a",
-  );
+  await expect(
+    run.getByRole("link", { name: "From Chat: Bird Chat", exact: true }),
+  ).toHaveAttribute("href", "/chat/chat-a#job-set-job-0");
   // The viewer names the result's place in its set and jumps along the set's strip.
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // WebKit can drop a tap while the run's tiles are still fanning out.

@@ -681,7 +681,9 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
+          (!url.searchParams.has("chat") ||
+            url.searchParams.getAll("chat").includes(i.sessionId)) &&
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }

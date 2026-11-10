@@ -39,7 +39,7 @@ import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
-import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
+import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
@@ -79,6 +79,8 @@ export function GalleryPage() {
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
+  // A Chat card's set link (?set=<id>) shows that MCP result set alone until its chip is removed.
+  const setId = params.get("set") || "";
   useEffect(() => {
     if (linkedQuery === null) return;
     setQuery(linkedQuery);
@@ -102,14 +104,18 @@ export function GalleryPage() {
       active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
     }),
   }).data;
-  const galleryKey = useMemo(() => ["gallery", search, kind, filters], [search, kind, filters]);
+  const galleryKey = useMemo(
+    () => ["gallery", search, kind, filters, setId],
+    [search, kind, filters, setId],
+  );
   const galleryPage = useCallback(
     (cursor: string) => {
       const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
+      if (setId) params.set("set", setId);
       return api<Page>(`/api/gallery?${params}`);
     },
-    [search, kind, filters],
+    [search, kind, filters, setId],
   );
   const gallery = useInfiniteQuery({
     queryKey: galleryKey,
@@ -198,7 +204,6 @@ export function GalleryPage() {
     setAllVersions(true);
   };
   const tryAgain = useTryAgain(loaded);
-  const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
   const openItem = useCallback((item: MediaItem, run?: string) => {
     setFocusItem(null);
@@ -222,10 +227,6 @@ export function GalleryPage() {
       />
     ),
     [hideMore],
-  );
-  const chatTitle = useCallback(
-    (id: string) => facets.data?.chats.find((chat) => chat.value === id)?.label,
-    [facets.data],
   );
   const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
   const tryAgainItem = useCallback(
@@ -285,11 +286,27 @@ export function GalleryPage() {
           value={filters}
           onChange={setFilters}
           count={gallery.data?.pages.at(-1)?.totalApprox}
-          extraChips={
-            grouped
+          extraChips={[
+            ...(setId
+              ? [
+                  {
+                    key: "set",
+                    label: `Set: ${loaded[0]?.resultSet?.title || "Results"}`,
+                    remove: () =>
+                      setParams(
+                        (next) => {
+                          next.delete("set");
+                          return next;
+                        },
+                        { replace: true },
+                      ),
+                  },
+                ]
+              : []),
+            ...(grouped
               ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
-              : []
-          }
+              : []),
+          ]}
           view={
             <SegmentedControl
               aria-label="Gallery View"
@@ -356,7 +373,6 @@ export function GalleryPage() {
             selection={selection}
             caption={phone ? (captions ? "pinned" : "none") : "hover"}
             detail={detail}
-            chatTitle={chatTitle}
             onSelectionMenu={openSelectionMenu}
             onTryAgain={tryAgainItem}
             renderActions={renderTileActions}
