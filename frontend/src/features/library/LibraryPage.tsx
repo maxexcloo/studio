@@ -12,6 +12,7 @@ import {
   libraryItemCategory,
   type LibraryItem,
 } from "./LibraryCatalogueTable";
+import { LibraryUnused } from "./LibraryUnused";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
@@ -123,6 +124,7 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           models: catalogueSection("models"),
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
+          unused: (heading) => <LibraryUnused heading={heading} />,
           downloads: <LibraryDownloads active={activeSection === "downloads"} />,
         }}
       />

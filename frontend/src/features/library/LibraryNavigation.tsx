@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
+import { ArchiveX, BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -50,6 +50,13 @@ export const librarySections = {
     label: "Scenes",
     description: "Places, light and time of day to reuse across a series of shots.",
     icon: icons.scene,
+    group: "What You Have",
+  },
+  unused: {
+    label: "Unused",
+    description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
+    icon: ArchiveX,
+    admin: true,
     group: "What You Have",
   },
   downloads: {
