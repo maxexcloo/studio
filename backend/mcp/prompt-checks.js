@@ -63,3 +63,22 @@ export function exactPromptInstructions(prompt) {
   const counted = count ? `count: ${count}` : "count (the number of images)";
   return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or pass the user's words as request so Studio writes the prompts.`;
 }
+
+const words = (prompt) =>
+  [...new Set(prompt.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [])].sort().join(" ");
+/**
+ * The refusal for a prompt list that isn't several distinct prompts, or '' when it is: a JSON list
+ * that failed to parse would run as one prompt, and prompts with the same words make the same image.
+ */
+export function promptListProblem(prompts) {
+  if (prompts.length === 1 && /^\s*\[\s*"/.test(prompts[0]))
+    return 'prompts reads as a JSON list but isn\'t valid JSON, so it would run as one prompt. Pass prompts as an array of strings, such as ["first prompt", "second prompt"], and call generate again.';
+  const seen = new Map();
+  for (const [index, prompt] of prompts.entries()) {
+    const key = words(prompt);
+    if (seen.has(key))
+      return `prompts ${seen.get(key) + 1} and ${index + 1} have the same words, so they make the same image. For more images of one prompt, raise count; otherwise make each prompt distinct (vary framing, angle, pose, outfit or setting) and call generate again.`;
+    seen.set(key, index);
+  }
+  return "";
+}
