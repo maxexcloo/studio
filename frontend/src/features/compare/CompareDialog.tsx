@@ -26,7 +26,13 @@ import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { mediaDraft } from "../gallery/useMediaAction";
-import { inputForProfile, useGenerationActions } from "../generation/GenerationProvider";
+import {
+  defaultProfile,
+  initialInput,
+  inputForProfile,
+  modelsQuery,
+  useGenerationActions,
+} from "../generation/GenerationProvider";
 import { blockedProps, submitBlockedReason } from "../generation/GenerationEditor";
 import {
   byRating,
@@ -59,6 +65,8 @@ interface CompareBase {
   input: GenerationInput;
   references: ReferenceAsset[];
   sessionId?: string;
+  /** Opens on a strength sweep of this LoRA (Library › Test LoRA) instead of the last choices. */
+  sweep?: string;
 }
 type Dimension = "loras" | "profile" | "prompt" | "settings";
 const dimensions: { value: Dimension; label: string }[] = [
@@ -73,8 +81,10 @@ const loraModes: { value: LoraMode; label: string }[] = [
   { value: "loras", label: "Different LoRAs" },
   { value: "strengths", label: "Strengths" },
 ];
-/** A strength sweep's starting values. */
+/** A strength sweep's starting values; 0 runs without the LoRA. */
 const sweep = ["0.4", "0.7", "1"];
+/** Test LoRA's sweep: without it, then three strengths. */
+const testSweep = ["0", "0.6", "0.8", "1"];
 const most = compareVariants.max;
 const range = `${compareVariants.min}–${most}`;
 const letter = (index: number) => String.fromCharCode(65 + index);
@@ -165,7 +175,8 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   const baseKey = sortedJson(base.input);
   const same = remembered.base === baseKey;
   const [dimension, setDimension] = useState<Dimension>(
-    available.find((option) => option.value === remembered.dimension)?.value ||
+    (base.sweep && "loras") ||
+      available.find((option) => option.value === remembered.dimension)?.value ||
       available[0]?.value ||
       "profile",
   );
@@ -191,8 +202,10 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
       ?.name ||
     baseLoras[0] ||
     "";
-  const [loraMode, setLoraMode] = useState<LoraMode>(remembered.loraMode || "toggle");
-  const [lora, setLora] = useState((same && remembered.lora) || firstLora);
+  const [loraMode, setLoraMode] = useState<LoraMode>(
+    base.sweep ? "strengths" : remembered.loraMode || "toggle",
+  );
+  const [lora, setLora] = useState(base.sweep || (same && remembered.lora) || firstLora);
   const [loraNames, setLoraNames] = useState(() =>
     same && remembered.loraNames
       ? remembered.loraNames
@@ -205,7 +218,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
     same ? (remembered.strength ?? null) : null,
   );
   const [strengths, setStrengths] = useState(() =>
-    same && remembered.strengths ? remembered.strengths : sweep,
+    base.sweep ? testSweep : same && remembered.strengths ? remembered.strengths : sweep,
   );
   useEffect(
     () =>
@@ -253,7 +266,9 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
       ? [null, { name: lora, strength: strength ?? startStrength(lora) }]
       : loraMode === "loras"
         ? loraNames.map((name) => ({ name, strength: startStrength(name) }))
-        : strengths.map((value) => ({ name: lora, strength: Number(value) }));
+        : strengths.map((value) =>
+            Number(value) ? { name: lora, strength: Number(value) } : null,
+          );
   const compared = loraMode === "loras" ? loraNames : [lora];
   /** The shared stack with the compared LoRAs swapped for this variant's. */
   const withLora = (variant: LoraVariant): GenerationInput => {
@@ -693,6 +708,8 @@ function SettingsFields({
 const CompareContext = createContext<{
   open(base: CompareBase): void;
   openItem(item: MediaItem): Promise<void>;
+  /** Library › Test LoRA: a strength sweep of the LoRA on `prompt`, on a ready profile it suits. */
+  testLora(name: string, prompt: string): Promise<void>;
 } | null>(null);
 
 /** Owns the one Compare dialog that the composer, tiles, viewer and compare page open. */
@@ -710,6 +727,29 @@ export function CompareProvider({ children }: { children: ReactNode }) {
           input: { ...draft.input, seed: seed ?? "" },
           references: draft.references,
           sessionId: draft.sessionId || undefined,
+        });
+      },
+      testLora: async (name: string, prompt: string) => {
+        const [models, info] = await Promise.all([
+          client.fetchQuery(modelsQuery),
+          client.fetchQuery(loraInfoQuery),
+        ]);
+        const suits = (profile?: Profile) =>
+          Boolean(
+            profile &&
+            profile.kind === "image" &&
+            profile.ready !== false &&
+            !isCloudProfile(profile) &&
+            profile.capabilities.lora &&
+            compatibleLoras(profile, info.loras).includes(name),
+          );
+        const preferred = defaultProfile(models, "image");
+        const profile = suits(preferred) ? preferred : profiles.find(suits);
+        if (!profile) throw new Error("No ready image profile can run this LoRA.");
+        setBase({
+          input: { ...inputForProfile({ ...initialInput, prompt }, profile), loras: [] },
+          references: [],
+          sweep: name,
         });
       },
     }),

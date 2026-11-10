@@ -12,11 +12,12 @@ import {
   libraryItemCategory,
   type LibraryItem,
 } from "./LibraryCatalogueTable";
+import { useCompare } from "../compare/CompareDialog";
 import { LibraryUnused } from "./LibraryUnused";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
-import { LibraryImports } from "./LibraryImports";
+import { importsQuery, LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 
@@ -46,6 +47,24 @@ export function LibraryPage() {
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
         ? 2000
         : false,
+  });
+  const compare = useCompare();
+  // Test LoRA runs on the sample prompt of an import that brought the LoRA, else its title;
+  // Compare adds its trigger words when it runs.
+  const testLora = useMutation({
+    mutationFn: async (item: LibraryItem) => {
+      const file = item.file || "";
+      const { imports } = await client.fetchQuery(importsQuery);
+      const sample = imports.find(
+        (record) =>
+          record.preset?.prompt &&
+          record.resources?.some(
+            (resource) =>
+              resource.role === "lora" && (resource.localName || resource.want?.file) === file,
+          ),
+      )?.preset?.prompt;
+      await compare.testLora(file, sample || item.title || file);
+    },
   });
   const update = useMutation({
     mutationFn: (choice: { key: string; alternative?: boolean } | { all: true } | undefined) =>
@@ -99,6 +118,7 @@ export function LibraryPage() {
           admin ? (item, alternative) => update.mutate({ key: item.key, alternative }) : undefined
         }
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
+        onTest={section === "loras" ? (item) => testLora.mutate(item) : undefined}
         onUpdateAll={
           admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
         }

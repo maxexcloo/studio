@@ -4,8 +4,10 @@ import {
   create,
   fixtures,
   image,
+  openNav,
   profiles,
   selectionMenuItem,
+  section,
   serveProfiles,
   stamp,
 } from "./fixtures";
@@ -151,6 +153,76 @@ test("Compare runs LoRAs on and off, side by side and as a strength sweep with o
   ]);
   for (const label of ["Detail Slider 0.4", "Detail Slider 0.7", "Detail Slider 1"])
     await expect(page.getByText(label, { exact: true })).toBeVisible();
+});
+
+test("Test LoRA in the Library sweeps a LoRA's strength on its import's sample prompt", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            key: "loras/detail.safetensors",
+            title: "Detail Slider",
+            file: "detail.safetensors",
+            folder: "loras",
+            kind: "lora",
+            installed: true,
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/library/imports", (route) =>
+    route.fulfill({
+      json: {
+        imports: [
+          {
+            id: "import-1",
+            state: "ready",
+            preset: { prompt: "A fox in fine detail", settings: {} },
+            resources: [
+              {
+                name: "Detail",
+                status: "installed",
+                role: "lora",
+                localName: "detail.safetensors",
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "LoRAs");
+  await page.getByRole("button", { name: "Actions for Detail Slider", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Test LoRA", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
+  await expect(
+    dialog.getByRole("list", { name: "Variants", exact: true }).getByRole("listitem"),
+  ).toHaveText([
+    "A · Detail Slider Off",
+    "B · Detail Slider 0.6",
+    "C · Detail Slider 0.8",
+    "D · Detail Slider 1",
+  ]);
+  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\//);
+  expect(
+    state.comparisons[0].requests.map((variant: any) => [
+      variant.input.prompt,
+      variant.input.loras.map((lora: any) => [lora.name, lora.strength]),
+    ]),
+  ).toEqual([
+    ["A fox in fine detail", []],
+    ["A fox in fine detail", [["detail.safetensors", 0.6]]],
+    ["A fox in fine detail", [["detail.safetensors", 0.8]]],
+    ["A fox in fine detail", [["detail.safetensors", 1]]],
+  ]);
 });
 
 test("Compare from the tile menu keeps the result's seed, compares prompts with their negatives and opens variants in the viewer", async ({
