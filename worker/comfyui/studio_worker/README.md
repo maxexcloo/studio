@@ -11,6 +11,10 @@ The [Studio worker image](../../README.md) includes this node at
 copy or mount this directory into its `custom_nodes` directory as `studio_worker`.
 Mount it read-only where possible.
 
+## Nodes
+
+- `StudioTextEncodeQwenImage21`: ComfyUI's `TextEncodeQwenImage21` with a `cfg` input that it passes on to the sampler. At CFG 1, where samplers never read the negative, it skips the negative encode and returns zeroed conditioning, so reference edits run the vision-language encoder once instead of twice.
+
 ## Endpoints
 
 - `GET /studio/worker`: version and whether a token is required.
