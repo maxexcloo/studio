@@ -30,7 +30,7 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
     const system = animateInstructions({ profile, guide, writing, clip: { seconds: 8 } });
     assert.ok(system.includes(guide.mode.rules[0]), profile.id);
     assert.match(system, /makes sound with the picture/, profile.id);
-    assert.match(system, /three beats that fill the 8-second clip/, profile.id);
+    assert.match(system, /only 8 seconds long: write for exactly that time/, profile.id);
     assert.match(system, /awake and able to speak, give them a short spoken line/, profile.id);
     assert.match(system, /speech to about 20 words/, profile.id);
   }
@@ -41,7 +41,7 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
   });
   assert.match(silent, /makes no sound/);
   assert.doesNotMatch(silent, /dialogue with who says it/);
-  assert.match(silent, /three beats that fill the 5-second, 16 fps clip/);
+  assert.match(silent, /only 5 seconds long at 16 fps/);
   assert.match(silent, /At 16 fps fast motion judders/);
   assert.match(silent, /never add subjects or objects/);
   assert.match(silent, /Don't make it any more sexual/);
@@ -49,7 +49,7 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
   assert.match(silent, /Animate what that prompt was going for/);
   const extend = animateInstructions({ ...shapes.grok, writing: { ...writing, extend: true } });
   assert.match(extend, /Don't replay its action: escalate it or turn it/);
-  assert.match(extend, /two to four beats/);
+  assert.match(extend, /two or three beats/);
   assert.doesNotMatch(extend, /judders/);
   assert.equal(writingRequest({ kind: "animate", theme: "action", extend: true }).extend, true);
 });
@@ -63,6 +63,18 @@ test("each theme asks for its own motion and camera", () => {
   assert.match(theme("dialogue"), /the people in the frame talk/);
   assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it is an adult/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
+});
+
+test("the beats and their pacing scale with the clip's length", () => {
+  const pace = (seconds) =>
+    animateInstructions({ ...shapes.grok, writing: { theme: "action" }, clip: { seconds } });
+  assert.match(pace(5), /two beats of about 2\.5 seconds each/);
+  assert.match(pace(5), /land by about 3 seconds/);
+  assert.match(pace(8), /three beats of about 2\.7 seconds each[^:]*: the start state/);
+  assert.match(pace(10), /three beats of about 3\.3 seconds each/);
+  assert.match(pace(10), /land by about 6 seconds/);
+  assert.match(pace(10), /needs more than 10 seconds/);
+  assert.match(pace(10), /one main action/);
 });
 
 test("the clip's length and frame rate come from the control the profile runs on", () => {
@@ -155,7 +167,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     ["prompt", '"The camera slowly pushes in."'],
   ]);
   assert.match(calls[0].messages[0].content, /Cinematic Camera/);
-  assert.match(calls[0].messages[0].content, /5-second, 24 fps clip/);
+  assert.match(calls[0].messages[0].content, /only 5 seconds long at 24 fps/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
   const spicy = await writeAnimatePrompt({
     engine,
