@@ -1592,6 +1592,28 @@ test("models lists the account's characters, and generate applies one by name: i
     /can't take Mara's image as a reference, so only the description carries the character/,
   );
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // A set made with a character carries it, and is named for it unless the chat named the set.
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+    any_model: true,
+  });
+  assert.deepEqual(
+    f.submitted.slice(-2).map(({ resultSet }) => [resultSet.title, resultSet.character]),
+    [
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+    ],
+  );
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+    title: "Ranger Days",
+    any_model: true,
+  });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Ranger Days");
   // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
   // views come from the description alone, so the card's pose doesn't carry into every view.
   const views = async () => {
@@ -4732,12 +4754,14 @@ test("aspect picks the profile’s own preset and resolution its long edge", asy
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
+  // An exact size sent beside an aspect wins, rather than costing the chat a retry.
+  assert.deepEqual(await size({ aspect: "portrait", width: 768, height: 1024 }), [768, 1024]);
   // Not drawn at 4K: drawn at 2K, then upscaled.
   assert.deepEqual(await size({ resolution: "4K" }), [1536, 2048]);
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", target: 4096 });
   for (const [args, message] of [
     [{ aspect: "sideways" }, /Choose aspect from landscape, portrait, square/],
-    [{ aspect: "landscape", width: 1344, height: 768 }, /not both/],
+    [{ aspect: "landscape", width: 1344 }, /Pass aspect, or both width and height/],
   ]) {
     const refused = await call(client, "generate", { kind: "image", prompts: ["An egg"], ...args });
     assert.equal(refused.isError, true);

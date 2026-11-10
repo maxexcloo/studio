@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, Compass, FileCog, HardDriveDownload, Import } from "lucide-react";
+import { BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -67,25 +67,15 @@ export const librarySections = {
     admin: true,
     group: "Getting More",
   },
-  presets: {
-    label: "Inspiration",
-    description: "Saved prompts and settings to start from.",
-    icon: Compass,
-    admin: true,
-    group: "Getting More",
-  },
 };
 /** Administrators see the whole Library; other accounts only their Characters, Outfits and Scenes. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  const { presets, characters } = useLibraryAccess();
+  const { characters } = useLibraryAccess();
   return {
     admin,
-    imports: admin && presets,
     options: visibleSections(librarySections, admin, (key) =>
-      ["characters", "outfits", "scenes"].includes(key)
-        ? characters
-        : admin && (presets || (key !== "imports" && key !== "presets")),
+      ["characters", "outfits", "scenes"].includes(key) ? characters : admin,
     ),
   };
 }

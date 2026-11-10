@@ -6,7 +6,6 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-downloads-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
-process.env.STUDIO_ENABLE_PRESETS = "1";
 fs.mkdirSync(path.join(dir, "data", "library"), { recursive: true });
 fs.writeFileSync(
   path.join(dir, "data", "library", "catalogue.json"),
@@ -24,7 +23,7 @@ fs.writeFileSync(
     },
   }),
 );
-const { libraryDownload, resolveModelLink, startLibraryDownload } = await import("./downloads.js");
+const { resolveModelLink } = await import("./downloads.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("Hugging Face preview pins a revision and requires the published checksum", async () => {
@@ -78,16 +77,4 @@ test("Civitai alternate-domain model pages resolve their latest version with mod
     }),
     /another model/,
   );
-});
-
-test("disabled instances cannot resume previously resolved provider downloads", async () => {
-  const spec = libraryDownload("civitai:17:3");
-  assert.ok(spec);
-  try {
-    delete process.env.STUDIO_ENABLE_PRESETS;
-    assert.equal(libraryDownload("civitai:17:3"), null);
-    await assert.rejects(startLibraryDownload(spec), /off for this deployment/);
-  } finally {
-    process.env.STUDIO_ENABLE_PRESETS = "1";
-  }
 });

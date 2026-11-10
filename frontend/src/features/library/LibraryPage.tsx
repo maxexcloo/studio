@@ -1,14 +1,13 @@
 import { useState, type ReactNode } from "react";
-import { Alert, SimpleGrid } from "@mantine/core";
+import { Alert } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
-import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
 import {
+  freeUpdate,
   LibraryCatalogueTable,
   libraryItemCategory,
   type LibraryItem,
@@ -21,8 +20,15 @@ import { importsQuery, LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 
+/** A check's or an update's answer; Update All also says how many started and which failed. */
+type UpdateResult = {
+  available: number;
+  started?: number;
+  failed?: { key: string; error: string }[];
+};
+
 export function LibraryPage() {
-  const { admin, imports: importsEnabled, options } = useLibraryNavigation();
+  const { admin, options } = useLibraryNavigation();
   const { profiles } = useGenerationActions();
   const [editing, setEditing] = useState<LibraryItem | null>(null);
   const client = useQueryClient();
@@ -40,11 +46,6 @@ export function LibraryPage() {
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
         ? 2000
         : false,
-  });
-  const presets = useQuery({
-    queryKey: ["presets"],
-    queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),
-    enabled: importsEnabled,
   });
   const compare = useCompare();
   // Test LoRA runs on the sample prompt of an import that brought the LoRA, else its title;
@@ -65,10 +66,8 @@ export function LibraryPage() {
     },
   });
   const update = useMutation({
-    mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
-      choice
-        ? post<{ available: number }>("/api/library/updates/apply", choice)
-        : post<{ available: number }>("/api/library/updates/check"),
+    mutationFn: (choice: { key: string; alternative?: boolean } | { all: true } | undefined) =>
+      post<UpdateResult>(`/api/library/updates/${choice ? "apply" : "check"}`, choice),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["library"] });
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
@@ -78,11 +77,16 @@ export function LibraryPage() {
   // nothing shows nothing.
   const updateNote =
     update.data &&
-    (update.variables
-      ? "Update queued. The current file stays until the new one is verified and free."
-      : update.data.available
-        ? `${update.data.available} updates available.`
-        : undefined);
+    (update.variables && "all" in update.variables
+      ? [
+          `${update.data.started} ${update.data.started === 1 ? "update" : "updates"} queued.`,
+          ...(update.data.failed || []).map((failure) => `${failure.key}: ${failure.error}`),
+        ].join(" ")
+      : update.variables
+        ? "Update queued. The current file stays until the new one is verified and free."
+        : update.data.available
+          ? `${update.data.available} updates available.`
+          : undefined);
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([
@@ -114,6 +118,9 @@ export function LibraryPage() {
         }
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
         onTest={section === "loras" ? (item) => testLora.mutate(item) : undefined}
+        onUpdateAll={
+          admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
+        }
         checkingUpdates={update.isPending && !update.variables}
         updateNote={updateNote || undefined}
         onEdit={admin ? setEditing : undefined}
@@ -130,24 +137,7 @@ export function LibraryPage() {
           outfits: (heading) => <LibraryPromptCards kind="outfits" heading={heading} />,
           scenes: (heading) => <LibraryPromptCards kind="scenes" heading={heading} />,
           imports: (heading) => (
-            <LibraryImports
-              heading={heading}
-              active={importsEnabled && activeSection === "imports"}
-              admin={admin}
-            />
-          ),
-          presets: presets.isPending ? (
-            <LoadingState label="Loading Inspiration" fill />
-          ) : presets.error ? (
-            <Alert color="red">{presets.error.message}</Alert>
-          ) : !presets.data.presets.length ? (
-            <EmptyState>No Inspiration</EmptyState>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-              {presets.data.presets.map((preset) => (
-                <InspirationPreset key={preset.id} preset={preset} />
-              ))}
-            </SimpleGrid>
+            <LibraryImports heading={heading} active={activeSection === "imports"} admin={admin} />
           ),
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),

@@ -57,6 +57,22 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], favorite: true });
 });
 
+test("On a phone held sideways, the Dream card's caption stands beside its media", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Only touch screens hold a phone sideways.");
+  await fixtures(page);
+  await serveDream(page, { unseen: [dreamItem("one")] });
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/dream");
+  await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
+  const card = (await current(page).boundingBox())!;
+  const why = (await current(page).getByText("Because you star one.").boundingBox())!;
+  expect(why.x).toBeGreaterThan(card.x + card.width / 2);
+  const like = (await page.getByRole("button", { name: "Like", exact: true }).boundingBox())!;
+  expect(like.y + like.height).toBeLessThanOrEqual(390);
+});
+
 test("Dream explains itself while off and saves its settings on the deck", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, { enabled: false, spicyAvailable: true });

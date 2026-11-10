@@ -9,6 +9,7 @@ function fixture() {
     jobs: new Map(),
     cancellations: [],
     writes: 0,
+    now: 0,
     snapshots: { primary: { queue: {}, history: {} }, video: { queue: {}, history: {} } },
   };
   state.recover = createJobRecovery({
@@ -33,6 +34,7 @@ function fixture() {
       await run();
     },
     cancel: async (promptId) => state.cancellations.push({ promptId, backend: state.backend }),
+    now: () => state.now,
   });
   return state;
 }
@@ -291,6 +293,18 @@ test("cancel recovery without an acknowledgement waits for its exact recorded jo
   assert.equal(s.jobs.get("own").status, "done");
   assert.equal(s.gallery[0].url, "own.mp4");
   assert.equal(s.jobs.size, 1);
+});
+
+test("a cancellation with no prompt and no tiles settles once its worker has long lacked it", async () => {
+  const s = fixture();
+  s.jobs.set("lost", { recovered: true, status: "cancelling", comfyBackend: "primary" });
+  await s.recover();
+  s.now = 2 * 60_000;
+  await s.recover();
+  assert.equal(s.jobs.get("lost").status, "cancelling", "a lost /prompt may still land");
+  s.now = 3 * 60_000;
+  await s.recover();
+  assert.equal(s.jobs.get("lost").status, "cancelled");
 });
 
 test("an untracked job reported lost can still accept a late backend result", async () => {
