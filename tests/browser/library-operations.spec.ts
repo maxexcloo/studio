@@ -25,6 +25,7 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     "Outfits",
     "Profiles",
     "Scenes",
+    "Unused",
     "Downloads",
     "Imports",
   ];
@@ -42,7 +43,7 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     await expect(nav.getByRole("link")).toHaveText(order);
     await expect(
       nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(7));
+    ).toHaveText(order.slice(8));
   }
 });
 
@@ -578,4 +579,44 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   expect(state.jobs[0].input.profileId).toBe("image:test");
   expect(state.jobs[0].input.steps).toBe(24);
   expect(state.jobs[0].input.loras).toEqual([]);
+});
+
+test("Unused lists idle models and LoRAs by size and removes one through the catalogue", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let items = [
+    {
+      key: "loras/idle.safetensors",
+      title: "Idle Style",
+      bytes: 150_000_000,
+      reason: "No run in 90 days",
+    },
+    {
+      key: "checkpoints/spare.safetensors",
+      title: "Spare Model",
+      bytes: 6_500_000_000,
+      reason: "No profile uses it",
+    },
+  ];
+  const removed: unknown[] = [];
+  await page.route("**/api/library/unused", (route) => route.fulfill({ json: { items } }));
+  await page.route("**/api/library/catalogue/remove", (route) => {
+    const body = route.request().postDataJSON();
+    removed.push(body);
+    items = items.filter((item) => item.key !== body.key);
+    return route.fulfill({ json: { ok: true, key: body.key, fileRemoved: true } });
+  });
+  await page.goto("/library");
+  await section(page, "Library", "Unused");
+  const table = page.getByRole("table", { name: "Unused Models", exact: true });
+  await expect(table.getByRole("row").nth(1)).toContainText("Spare Model");
+  await expect(table.getByRole("row").nth(1)).toContainText("6.5 GB");
+  await table.getByRole("button", { name: "Actions for Idle Style", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Remove", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Remove", exact: true });
+  await confirm.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(confirm).toBeHidden();
+  await expect(table.getByRole("row", { name: "Idle Style", exact: true })).toHaveCount(0);
+  expect(removed).toEqual([{ key: "loras/idle.safetensors" }]);
 });
