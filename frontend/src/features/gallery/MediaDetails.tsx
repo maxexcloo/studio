@@ -25,6 +25,7 @@ import { mediaTitle } from "./mediaLabels";
 import { useDerivations } from "./versions";
 import { WritingThinking } from "../generation/PromptWriting";
 import { mediaSource } from "./mediaSource";
+import { formatBytes } from "../../ui/bytes";
 import { charactersQuery } from "../characters/queries";
 import { identityNote } from "../characters/identity";
 
@@ -39,13 +40,6 @@ const elapsed = (ms?: number) => {
   return seconds >= 60
     ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
     : `${seconds}s`;
-};
-const bytes = (value = 0) => {
-  if (!value) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  const unit = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1000)));
-  const scaled = value / 1000 ** unit;
-  return `${scaled >= 10 || !unit ? Math.round(scaled) : scaled.toFixed(1)} ${units[unit]}`;
 };
 const time = (value?: string) => {
   const date = value ? new Date(value) : null;
@@ -179,7 +173,7 @@ function generationDetails(
       ["Frames", video ? settings.frames : ""],
       ["FPS", video ? settings.fps : ""],
       ["File", item.outputName || item.filename],
-      ["File Size", size === null ? pendingValue : bytes(size)],
+      ["File Size", size === null ? pendingValue : formatBytes(size)],
       ["Time", time(item.createdAt)],
     ]),
     // The stages in the order they ran, then their totals.
