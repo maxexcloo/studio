@@ -281,7 +281,7 @@ export function DreamDeck({
   const phone = usePhone();
   const touch = useTouch();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [counts, setCounts] = useState({ judged: 0, calibrated: 0, dreamed: 0 });
+  const [counts, setCounts] = useState({ calibrated: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
   const [viewing, setViewing] = useState<string | null>(null);
   const judge = useJudge((card) =>
@@ -310,7 +310,6 @@ export function DreamDeck({
       return next;
     });
     setCounts((previous) => ({
-      judged: previous.judged + 1,
       calibrated: previous.calibrated + (dreamed(card) ? 0 : 1),
       dreamed: previous.dreamed + dreamed(card),
     }));
