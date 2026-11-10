@@ -425,5 +425,27 @@ export function registerAssistantRoutes(
     };
   });
 
+  // A character card's description from one of its images (Make Character, the card editor).
+  directRoute(app, "POST", "/api/assistant/character", async (account, { body, stop }) => {
+    if (!allowed(account, "promptAssistant")) return refuse(403, promptAssistantOff).refusal;
+    if (!allowed(account, "characters"))
+      return refuse(403, "Characters are off for this account.").refusal;
+    if (!engine) return refuse(503, "The prompt assistant is not configured.").refusal;
+    try {
+      if (!(await engine.supportsVision()))
+        return refuse(409, "The running text model can’t read images.").refusal;
+      const image = await frame({ studioAccount: account }, String(body?.assetId || ""));
+      if (!image) return refuse(404, "That image is gone.").refusal;
+      const result = await engine.character({
+        image,
+        explicit: allowed(account, "uncensoredModels"),
+        signal: stop,
+      });
+      return { status: 200, payload: { ok: true, ...result } };
+    } catch (error) {
+      return failure(error);
+    }
+  });
+
   return engine;
 }

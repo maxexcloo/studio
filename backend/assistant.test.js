@@ -617,6 +617,19 @@ test("caption sends the image and reads the description and tags, or plain text 
   });
 });
 
+test("character describes a card's image as one short phrase of lasting details", async () => {
+  const seen = fakeGateway(() => json('  "Red-haired woman, green cloak,\nscar over left eye."'));
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  assert.deepEqual(await engine.character({ image: { mime: "image/jpeg", data: "AAAA" } }), {
+    description: "Red-haired woman, green cloak, scar over left eye",
+    model: "cloud/auto",
+  });
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /lasting look.*Leave out the setting, pose/s);
+  assert.equal(user.content[1].type, "image_url");
+  assert.equal(seen.calls[0].body.reasoning_effort, "none");
+});
+
 test("title summarises the prompt in a few words, with reasoning off", async () => {
   const seen = fakeGateway(() =>
     json('<think>A barn, so…</think>Title: "Red Barn at Golden Hour Over Wheat Fields".'),
