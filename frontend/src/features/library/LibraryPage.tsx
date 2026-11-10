@@ -7,6 +7,7 @@ import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSectio
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
 import {
+  freeUpdate,
   LibraryCatalogueTable,
   libraryItemCategory,
   type LibraryItem,
@@ -17,6 +18,13 @@ import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
+
+/** A check's or an update's answer; Update All also says how many started and which failed. */
+type UpdateResult = {
+  available: number;
+  started?: number;
+  failed?: { key: string; error: string }[];
+};
 
 export function LibraryPage() {
   const { admin, options } = useLibraryNavigation();
@@ -39,10 +47,8 @@ export function LibraryPage() {
         : false,
   });
   const update = useMutation({
-    mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
-      choice
-        ? post<{ available: number }>("/api/library/updates/apply", choice)
-        : post<{ available: number }>("/api/library/updates/check"),
+    mutationFn: (choice: { key: string; alternative?: boolean } | { all: true } | undefined) =>
+      post<UpdateResult>(`/api/library/updates/${choice ? "apply" : "check"}`, choice),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["library"] });
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
@@ -52,11 +58,16 @@ export function LibraryPage() {
   // nothing shows nothing.
   const updateNote =
     update.data &&
-    (update.variables
-      ? "Update queued. The current file stays until the new one is verified and free."
-      : update.data.available
-        ? `${update.data.available} updates available.`
-        : undefined);
+    (update.variables && "all" in update.variables
+      ? [
+          `${update.data.started} ${update.data.started === 1 ? "update" : "updates"} queued.`,
+          ...(update.data.failed || []).map((failure) => `${failure.key}: ${failure.error}`),
+        ].join(" ")
+      : update.variables
+        ? "Update queued. The current file stays until the new one is verified and free."
+        : update.data.available
+          ? `${update.data.available} updates available.`
+          : undefined);
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([
@@ -87,6 +98,9 @@ export function LibraryPage() {
           admin ? (item, alternative) => update.mutate({ key: item.key, alternative }) : undefined
         }
         onCheckUpdates={admin ? () => update.mutate(undefined) : undefined}
+        onUpdateAll={
+          admin && items.some(freeUpdate) ? () => update.mutate({ all: true }) : undefined
+        }
         checkingUpdates={update.isPending && !update.variables}
         updateNote={updateNote || undefined}
         onEdit={admin ? setEditing : undefined}

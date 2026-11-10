@@ -1262,6 +1262,90 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await expect(viewer).toBeVisible();
 });
 
+test("A tap on the picture hides and shows the chrome; swipes still move and Escape shows it", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Only touch screens hide the chrome.");
+  const state = await fixtures(page);
+  for (const [id, prompt, createdAt] of [
+    ["tap-first", "A quiet harbour", stamp],
+    ["tap-second", "A windy cliff", "2026-01-01T00:00:00.000Z"],
+  ])
+    state.gallery.push({
+      id,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      width: 1024,
+      height: 1024,
+      createdAt,
+    });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const picture = viewer.getByRole("img", { name: "A quiet harbour", exact: true });
+  await expect(picture).toBeVisible();
+  const close = viewer.getByRole("button", { name: "Close Generation", exact: true });
+  const shown = () => close.evaluate((node) => node.checkVisibility({ opacityProperty: true }));
+  const webkit = testInfo.project.use.browserName === "webkit";
+  const touch = webkit ? undefined : await page.context().newCDPSession(page);
+  async function centre() {
+    const box = (await picture.boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  }
+  async function tap() {
+    const { x, y } = await centre();
+    if (!touch) return page.touchscreen.tap(x, y);
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  }
+  await tap();
+  await expect.poll(shown).toBe(false);
+  await tap();
+  await expect.poll(shown).toBe(true);
+  await tap();
+  await expect.poll(shown).toBe(false);
+
+  // A swipe while hidden moves to the next image and keeps the chrome hidden.
+  const { x, y } = await centre();
+  if (touch) {
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - 150, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } else
+    // WebKit takes only taps from Playwright, so the swipe is the pointer events a finger makes.
+    await viewer.locator("[data-zoom-mode]").evaluate(
+      (node, { x, y }) => {
+        const pointer = (type: string, clientX: number) =>
+          node.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              pointerId: 7,
+              pointerType: "touch",
+              isPrimary: true,
+              clientX,
+              clientY: y,
+            }),
+          );
+        pointer("pointerdown", x);
+        pointer("pointermove", x - 150);
+        pointer("pointerup", x - 150);
+      },
+      { x, y },
+    );
+  await expect(viewer.getByRole("img", { name: "A windy cliff", exact: true })).toBeVisible();
+  expect(await shown()).toBe(false);
+
+  await page.keyboard.press("Escape");
+  await expect.poll(shown).toBe(true);
+  await expect(viewer).toBeVisible();
+});
+
 test("Work still generating and videos take the same swipes as a picture", async ({
   page,
 }, testInfo) => {

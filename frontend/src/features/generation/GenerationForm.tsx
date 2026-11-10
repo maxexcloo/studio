@@ -6,7 +6,12 @@ import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import type { QueueJob, ReferenceAsset, Session } from "../../types";
-import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
+import {
+  draftForProfile,
+  initialInput,
+  inputForProfile,
+  useGeneration,
+} from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
 import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
@@ -171,6 +176,9 @@ export function GenerationForm({
       profile={profile}
       onChange={update}
       onReferencesChange={setReferences}
+      onCharacterProfile={(editor, next) =>
+        setDraft((previous) => draftForProfile(previous, editor, next))
+      }
       // The output toggle switches the gallery; the route restores that output's draft.
       onKindChange={(kind) =>
         navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
