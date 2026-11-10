@@ -6,6 +6,7 @@ import {
   CirclePlay,
   ClipboardPaste,
   Columns2,
+  ContactRound,
   Copy,
   Download,
   Ellipsis,
@@ -20,6 +21,7 @@ import {
   Moon,
   Pencil,
   Play,
+  Plus,
   Puzzle,
   RefreshCw,
   RotateCw,
@@ -44,11 +46,15 @@ import {
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
+  /** Making a new record, such as New Character. */
+  add: Plus,
   animate: Play,
   /** Archiving a chat keeps it out of the Chats list; Unarchive brings it back. */
   archive: Archive,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
+  /** Character cards: their tab, section and Make Character. */
+  character: ContactRound,
   chat: MessageSquareShare,
   clear: X,
   /** Comparing variants: Compare runs and the composer's Compare. */
