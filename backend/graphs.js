@@ -123,6 +123,9 @@ async function applyMappedInputs(graph, workflow, body) {
       setMappedInput(graph, mediaInput.control, reference.comfyName);
       mappedReference = true;
     }
+    // A guiding slot's strength; without one the graph keeps its saved value.
+    if (reference && mediaInput.strength && Number.isFinite(reference.strength))
+      setMappedInput(graph, mediaInput.strength, reference.strength);
   }
   const stagedReference = (body.referenceAssets || []).find((item) => item?.comfyName)?.comfyName;
   if (

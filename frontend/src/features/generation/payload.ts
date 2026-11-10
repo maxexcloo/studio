@@ -36,6 +36,13 @@ export function referenceDetails(
 }
 type ReferenceSlot = NonNullable<Profile["mediaInputs"]>[number];
 
+/** A placed reference as a run sends it: its asset, slot and any strength set. */
+const referenceAsset = (asset: ReferenceAsset) => ({
+  assetId: asset.id,
+  slot: asset.slot!,
+  ...(asset.strength !== undefined ? { strength: asset.strength } : {}),
+});
+
 export function referenceGroups(profile?: Profile): ReferenceSlot[][] {
   const groups: ReferenceSlot[][] = [];
   for (const slot of profile?.mediaInputs?.length
@@ -102,9 +109,7 @@ export function generationInput(
   const sized = withResolution(
     {
       ...input,
-      referenceAssets: references.length
-        ? details.map((asset) => ({ assetId: asset.id, slot: asset.slot! }))
-        : input.referenceAssets,
+      referenceAssets: references.length ? details.map(referenceAsset) : input.referenceAssets,
     },
     profile,
   );
@@ -120,9 +125,7 @@ export function generationInput(
     workflow: profile?.workflow || input.workflow,
     provider: profile?.provider,
     profileName: profile?.displayName || profile?.label,
-    referenceAssets: references.length
-      ? details.map((asset) => ({ assetId: asset.id, slot: asset.slot! }))
-      : input.referenceAssets,
+    referenceAssets: references.length ? details.map(referenceAsset) : input.referenceAssets,
     referenceDetails: details,
   };
 }
@@ -156,7 +159,7 @@ export function referencePatch(
   return {
     ...switched,
     referenceDetails: details,
-    referenceAssets: details.map((asset) => ({ assetId: asset.id, slot: asset.slot })),
+    referenceAssets: details.map(referenceAsset),
     ...(primaryReference(before, profile)?.id !== primaryReference(details, profile)?.id
       ? { inpaint: undefined }
       : {}),

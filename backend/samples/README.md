@@ -83,6 +83,29 @@ separate mapped inputs for multiple images. The picker groups slots linked by
 `follows` when their roles match, fills their declared capacity and preserves
 explicit slot IDs when references are reordered.
 
+### Reference Roles
+
+A slot's `role` says where its reference goes (`start`, `end` or a plain
+`reference`) or what it guides: `identity`, `layout` (Pose/Layout) or `style`.
+A guiding slot may map the graph input that sets how strongly it guides, such
+as an IP-Adapter's `weight` or `StyleModelApply`'s `strength`; the composer then
+offers a Strength for it, and MCP `generate` takes `reference_strengths`:
+
+```json
+{
+  "id": "style",
+  "kind": "image",
+  "role": "style",
+  "control": { "node": "12", "input": "image" },
+  "strength": { "node": "15", "input": "strength", "min": 0, "max": 1.5 }
+}
+```
+
+The graph's saved value is the default; `min` and `max` default to 0 and 2.
+Slots without a role or strength run as before. On an image profile that doesn't
+edit with its references, the start slot (else the first) is an img2img start
+image unless it guides, and the References sheet says so.
+
 Visual workflow imports prefer ComfyUI's `widgets_values_named` map when it is
 available. This avoids positional drift from UI-only widget values such as
 `control_after_generate` and upload controls.

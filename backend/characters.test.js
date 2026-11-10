@@ -8,6 +8,7 @@ import {
   withPart,
   withoutPart,
   characterProfiles,
+  startImageSlot,
   withCharacter,
   withoutCharacter,
 } from "../shared/characters.ts";
@@ -88,4 +89,16 @@ test("an outfit and a scene go in after the character's lead in that order, and 
     `${lead} Walking slowly.`,
   );
   assert.equal(withPart("Walking slowly.", outfit), `${outfit} Walking slowly.`);
+});
+
+test("a reference is the img2img start image only where the profile neither edits with it nor guides by it", () => {
+  const slots = [{ id: "image" }, { id: "face", role: "identity" }];
+  assert.equal(startImageSlot({ mediaInputs: slots }), "image");
+  assert.equal(
+    startImageSlot({ mediaInputs: [{ id: "first" }, { id: "go", role: "start" }] }),
+    "go",
+  );
+  assert.equal(startImageSlot({ editReferences: true, mediaInputs: slots }), undefined);
+  assert.equal(startImageSlot({ mediaInputs: [{ id: "style", role: "style" }] }), undefined);
+  assert.equal(startImageSlot({ mediaInputs: [] }), undefined);
 });
