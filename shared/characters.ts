@@ -1,13 +1,21 @@
 import { isCloudProfile } from "./profiles.ts";
 
 /**
- * Character cards: a name, 1–4 reference images and a short description of lasting looks that
- * leads the prompt when the card is picked (backend/characters.js stores them per account).
+ * Cards an account keeps to shoot a series (backend/cards.js stores them per account, one document
+ * per kind): a character (1–4 reference images and its lasting looks), an outfit and a scene (a
+ * description, with at most one image to recognise it by; only a character's image goes to a model).
  */
 export const maxCharacterImages = 4;
-export const maxCharacterName = 60;
-export const maxCharacterDescription = 400;
-export const maxCharacters = 200;
+export const maxCardName = 60;
+// Long enough for a detailed character, such as an owner's ~600-character body and face.
+export const maxCardDescription = 1000;
+export const maxCards = 200;
+export const cardKinds = {
+  characters: { name: "character", prefix: "chr", images: { min: 1, max: maxCharacterImages } },
+  outfits: { name: "outfit", prefix: "out", images: { min: 0, max: 1 } },
+  scenes: { name: "scene", prefix: "scn", images: { min: 0, max: 1 } },
+} as const;
+export type CardKind = keyof typeof cardKinds;
 /**
  * How many of a card's images go to a model: its first. A model that edits with references reads
  * each image as another subject, so three views of one person drew her twice on live, however the
@@ -15,7 +23,7 @@ export const maxCharacters = 200;
  */
 export const characterImages = 1;
 
-export interface Character {
+export interface Card {
   id: string;
   name: string;
   description: string;
@@ -23,6 +31,8 @@ export interface Character {
   referenceIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+export interface Character extends Card {
   /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
   generated?: { jobIds: string[]; at: string };
 }
@@ -109,4 +119,45 @@ export function withoutCharacter(prompt: string, description: string) {
   const before = prompt.slice(0, at).trimEnd();
   const after = prompt.slice(at + lead.length).trimStart();
   return before && after ? `${before} ${after}` : before || after;
+}
+
+const sentence = (text = "") => {
+  const words = text.trim().replace(/[\s.,;:]+$/, "");
+  return words && `${words[0].toUpperCase()}${words.slice(1)}.`;
+};
+/**
+ * A shot composed from its parts, in the order and wording that held a character across ten outfits
+ * and scenes on live (10 Nov): the character's lead (characterLead, with its image unless
+ * `fromImage` is false), what the person wears (an outfit names its footwear, or the reference's
+ * shoes or bare feet carry over), the scene, which replaces the reference image's own background,
+ * then the action and the camera.
+ */
+export function composePrompt({
+  character,
+  outfit,
+  scene,
+  action,
+  camera,
+  fromImage = true,
+}: {
+  character?: string;
+  outfit?: string;
+  scene?: string;
+  action?: string;
+  camera?: string;
+  fromImage?: boolean;
+}) {
+  const withImage = character !== undefined && fromImage;
+  const place = sentence(scene);
+  return [
+    character === undefined ? "" : characterLead(character, fromImage),
+    outfit?.trim() ? `The person wears ${outfit.trim().replace(/[\s.,;:]+$/, "")}.` : "",
+    place && withImage
+      ? `${place.slice(0, -1)}, in place of the reference image's background.`
+      : place,
+    sentence(action),
+    sentence(camera),
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
