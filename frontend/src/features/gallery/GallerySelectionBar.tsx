@@ -162,7 +162,6 @@ export function GallerySelectionBar({
             {
               id: "run-suggested",
               label: "Run Suggested Prompts",
-              description: "Queue each upload's suggested prompt",
               icon: Shuffle,
               disabled: recreate.isPending,
               onClick: () => recreate.mutate(uploads),

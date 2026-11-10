@@ -133,9 +133,13 @@ the primary component reference and verify APIs against the installed version.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
   other phone text boxes open the shared full-screen editor. Only the send
   stands beside the text, with one ⋯ menu of its `tools`: the box's own
-  (Suggestions, Ask for a Change or Improve Prompt, Recent Prompts), then Copy where the page has no other, then Clear, which turns into
-  Undo until the text next changes. The phone editor shows them as buttons, not
-  a menu, and a box without tools has no ⋯.
+  (Suggestions, Ask for a Change… or Improve Prompt, Recent Prompts), then Copy
+  where the page has no other, then Clear, which turns into Undo until the text
+  next changes. The menu is one level deep: a tool's options (suggested changes,
+  Improve Prompt's styles) are listed first under its name, never in a submenu.
+  The phone editor shows the tools as buttons, not a menu, and a box without
+  tools has no ⋯. The viewer's prompt rests on one line ending in an ellipsis
+  and shows the whole prompt while focused.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -200,21 +204,21 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download | Star,
-  Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
-  like), then reuses its prompt: Edit Prompt and Use as Reference stage the
-  composer, Make Character starts a card in Library › Characters, Run Again and
-  Repeat Exactly queue from where they are; menu options expand in place on
-  phones and touch screens. The phone viewer bar keeps to one row: Retry, Stop,
-  Animate, Edit, Upscale and Star, then ⋯ More with the rest in their sections,
-  Delete last. Elsewhere the viewer bar shows every action, wrapping onto another
+  and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
+  Similar | Star, Delete. Edit changes the item itself (Edit Image, or a video's
+  Trim and the like), then reuses its prompt: Reuse Prompt and Use as Reference
+  stage the composer, Make Character starts a card in Library › Characters, Run
+  Again and Run Again, Same Seed queue from where they are; menu options expand
+  in place on phones and touch screens. The phone viewer bar keeps to one row:
+  Retry, Stop, Animate, Edit, Upscale and Star, then ⋯ More with the rest in
+  their sections, Delete last. Elsewhere the viewer bar shows every action, wrapping onto another
   row rather than using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
   bar under the search and filters, which stay in place; its quick selects take
   every match, not only loaded pages, and it confirms deletion.
 - Details sections show their content in full rather than scrolling it in a
-  box. Only a long caption folds under Expand; its tags always show. Prompt and
-  Negative Prompt alone have a Copy beside their heading.
+  box. Only a long caption folds, with Expand on its last line; its tags always
+  show. Prompt and Negative Prompt alone have a Copy beside their heading.
 - Version grouping has one owner in `gallery/versions.ts`; sharing a session or
   prompt alone does not group results. Keep source and derived relationships
   visible, even when a result stands alone.

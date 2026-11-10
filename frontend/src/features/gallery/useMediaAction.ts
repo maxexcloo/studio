@@ -177,7 +177,7 @@ export async function mediaDraft(
         workflow: profile.workflow,
         // The profile's current checkpoint runs, not the file the original result loaded.
         modelName: undefined,
-        // Reused drafts draw a new seed; only Repeat Exactly keeps the recorded one.
+        // Reused drafts draw a new seed; only Run Again, Same Seed keeps the recorded one.
         seed: "",
         prompt: typedPrompt(item),
         negative: item.negative || "",

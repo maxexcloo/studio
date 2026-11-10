@@ -106,7 +106,7 @@ export const icons = {
   share: Share,
   /** Revealing a hidden secret, such as the MCP token. */
   show: Eye,
-  /** Find Similar: the gallery ranked by likeness to an image. */
+  /** Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
   star: Star,
   stop: Square,

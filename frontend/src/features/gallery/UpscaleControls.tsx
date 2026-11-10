@@ -69,6 +69,13 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   const faceAvailable =
     item.type === "image" && Boolean(detector?.nodesInstalled && detector.detectors.length);
   const faceDetail = face && faceAvailable;
+  // What the worker lacks for Face Detail, once its status says.
+  const faceMissing =
+    detector && !faceAvailable
+      ? detector.nodesInstalled
+        ? "Needs the face detector"
+        : "Needs Impact Pack"
+      : undefined;
   return {
     queue,
     status,
@@ -77,6 +84,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
     target,
     setTarget: setSize,
     faceAvailable,
+    faceMissing,
     faceDetail,
     setFaceDetail: setFace,
     run: () => queue.mutate({ quality, target, faceDetail }),
@@ -207,7 +215,6 @@ export function useUpscaleAction(
                 {
                   id: "upscale-size",
                   label: "Upscale Size",
-                  description: "The long edge; keeps the aspect ratio and never shrinks it",
                   icon: icons.upscale,
                   choice: {
                     value: String(quick.target),
@@ -230,9 +237,7 @@ export function useUpscaleAction(
                 {
                   id: "upscale-face",
                   label: "Face Detail",
-                  description: quick.faceAvailable
-                    ? "Refine faces with this image's model"
-                    : "Needs the worker's face detector and Impact Pack nodes",
+                  description: quick.faceMissing,
                   icon: ScanFace,
                   checked: quick.faceDetail,
                   disabled: !quick.faceAvailable,

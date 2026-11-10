@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "Flux.1", sdxl: "SDXL" };
@@ -575,7 +575,7 @@ export async function fixtures(page: Page) {
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
-      // Find Similar ranks the image first.
+      // Similar ranks the image first.
       const similar = url.searchParams.get("similar");
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
@@ -903,22 +903,11 @@ export async function promptTool(scope: Page | Locator, box: string, label: stri
   await page.getByRole("menuitem", { name: label, exact: true }).click();
 }
 
-/**
- * Opens a ⋯ tool's options, such as the Prompt's Suggestions: tapped, they expand in place on touch
- * screens; hovered, they open as a submenu with a mouse. Returns where the options are.
- */
-export async function promptOptions(scope: Page | Locator, box: string, label: string) {
+/** Opens a text box's ⋯ menu, which lists each tool's options under its name, one level deep. */
+export async function promptMenu(scope: Page | Locator, box: string) {
   await scope.getByRole("button", { name: `More ${box} Actions`, exact: true }).click();
   const page = "page" in scope ? scope.page() : scope;
-  // The submenu may open on hover before the item is clicked, adding a same-named option.
-  const item = page.getByRole("menuitem", { name: label, exact: true }).first();
-  if (test.info().project.use.hasTouch) {
-    await item.click();
-    return page.getByRole("group", { name: label, exact: true });
-  }
-  await item.hover();
-  await expect(page.getByRole("menu")).toHaveCount(2);
-  return page.getByRole("menu").last();
+  return page.getByRole("menu");
 }
 
 // The phone viewer bar's own actions; the rest sit under its ⋯ More.

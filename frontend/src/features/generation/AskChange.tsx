@@ -140,10 +140,9 @@ export function SendButton({
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes. They load once `enabled` and stay cached
- * per item or prompt; Refresh asks for different ones (`fresh`) in their place, and Custom…
- * (where `onCustom` is given) leaves the person to type their own change. A failed or empty answer
- * just says there are none.
+ * picked, as an action whose options are the changes, with Refresh Suggestions beside it to ask for
+ * different ones (`fresh`) in their place. They load once `enabled` and stay cached per item or
+ * prompt. While they load, or with none, a dimmed line stands in for them.
  */
 export function useChangeSuggestions<K extends QueryKey>({
   query,
@@ -151,14 +150,12 @@ export function useChangeSuggestions<K extends QueryKey>({
   enabled,
   disabled,
   onPick,
-  onCustom,
 }: {
   query: UseQueryOptions<Suggestions<NextStep>, Error, Suggestions<NextStep>, K>;
   fresh: () => Promise<Suggestions<NextStep>>;
   enabled: boolean;
   disabled?: boolean;
   onPick: (request: string) => void;
-  onCustom?: () => void;
 }) {
   const client = useQueryClient();
   const steps = useQuery({ ...query, enabled });
@@ -183,22 +180,18 @@ export function useChangeSuggestions<K extends QueryKey>({
               onClick: () => onPick(step.request),
             }))
           : [{ id: "none", label: "No Suggestions", disabled: true }],
-      [
-        {
-          id: "refresh",
-          label: "Refresh",
-          icon: icons.refresh,
-          // Never disabled while it works: a disabled item drops focus, which closes a submenu.
-          keepOpen: true,
-          onClick: () => refresh.mutate(),
-        },
-        ...(onCustom
-          ? [{ id: "custom", label: "Custom…", icon: icons.edit, onClick: onCustom }]
-          : []),
-      ],
     ],
   };
-  return { action, loading };
+  const again: Action = {
+    id: "refresh",
+    label: "Refresh Suggestions",
+    icon: icons.refresh,
+    // Never disabled while it works: a disabled item drops focus out of the open menu.
+    disabled,
+    keepOpen: true,
+    onClick: () => refresh.mutate(),
+  };
+  return { action, refresh: again, loading };
 }
 
 /** Suggestions as their own menu button, beside a field outside a text box's tools. */
@@ -207,7 +200,11 @@ export function ChangeSuggestions<K extends QueryKey>({
   ...props
 }: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled">) {
   const [opened, setOpened] = useState(false);
-  const { action, loading } = useChangeSuggestions({ ...props, disabled, enabled: opened });
+  const { action, refresh, loading } = useChangeSuggestions({
+    ...props,
+    disabled,
+    enabled: opened,
+  });
   return (
     <Menu position="top-end" width={240} opened={opened} onChange={setOpened}>
       <Tooltip label="Suggestions">
@@ -225,7 +222,7 @@ export function ChangeSuggestions<K extends QueryKey>({
       </Tooltip>
       <Menu.Dropdown data-composer-layer aria-busy={loading || undefined}>
         <Menu.Label>Suggestions</Menu.Label>
-        <ActionMenuItems groups={action.menu!} />
+        <ActionMenuItems groups={[...action.menu!, [refresh]]} />
       </Menu.Dropdown>
     </Menu>
   );

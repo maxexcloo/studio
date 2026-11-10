@@ -11,9 +11,9 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Upscale, Copy and Download beside their icons. Phones show icons on
-// one row: these, then ⋯ More holding the rest.
-const labelled = ["animate", "edit", "upscale", "copy", "download"];
+// Desktop names Animate, Edit, Upscale, Copy, Download and Similar beside their icons. Phones show
+// icons on one row: these, then ⋯ More holding the rest.
+const labelled = ["animate", "edit", "upscale", "copy", "download", "similar"];
 const phoneBar = ["retry", "stop", "animate", "edit", "upscale", "star"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */

@@ -5,7 +5,7 @@ import {
   fixtures,
   image,
   profiles,
-  promptOptions,
+  promptMenu,
   promptTool,
   serveProfiles,
   stamp,
@@ -174,8 +174,8 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   // The editor shows the tools as buttons; elsewhere they are in the prompt's ⋯.
   const askForChange = () =>
     phone
-      ? surface.getByRole("button", { name: "Ask for a Change", exact: true }).click()
-      : promptTool(surface, "Prompt", "Ask for a Change");
+      ? surface.getByRole("button", { name: "Ask for a Change…", exact: true }).click()
+      : promptTool(surface, "Prompt", "Ask for a Change…");
   await field.fill("make it night");
   await askForChange();
   // The proposal replaces the text in place under the chosen action; Undo restores the request.
@@ -236,8 +236,8 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
       });
     }),
   );
-  const options = await promptOptions(viewer, "Prompt", "Suggestions");
-  await options.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  const menu = await promptMenu(viewer, "Prompt");
+  await menu.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -254,13 +254,43 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
   await expect(field).toHaveValue("add rain");
 });
 
-test("Viewer runs queue into the strip and Edit › Edit Prompt opens the composer", async ({
+test("The viewer's prompt rests on one line and shows the whole prompt while focused", async ({
+  page,
+}, testInfo) => {
+  const prompt =
+    "An amber bird on a mossy branch at dawn, mist over the valley below, soft rim light on its " +
+    "feathers, dew on the leaves, a distant waterfall and pines fading into the haze";
+  const { viewer } = await seed(page);
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await field.fill(prompt);
+  await field.blur();
+  const height = async () => (await field.boundingBox())!.height;
+  const line = await field.evaluate((text) => parseFloat(getComputedStyle(text).lineHeight));
+  // At rest: one whole line, ending in an ellipsis over the text.
+  await expect.poll(height).toBeLessThan(line * 1.5);
+  const summary = viewer.locator("[aria-hidden]", { hasText: prompt });
+  await expect(summary).toBeVisible();
+  expect(await summary.evaluate((line) => line.scrollWidth > line.clientWidth)).toBe(true);
+  // Phones edit in the full-screen editor; elsewhere focus, by click or keyboard, unfolds it.
+  if (testInfo.project.use.isMobile) {
+    await field.click();
+    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
+    return;
+  }
+  await field.focus();
+  await expect.poll(height).toBeGreaterThan(line * 1.5);
+  await expect(summary).toHaveCount(0);
+  await field.blur();
+  await expect.poll(height).toBeLessThan(line * 1.5);
+});
+
+test("Viewer runs queue into the strip and Edit › Reuse Prompt opens the composer", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Repeat Exactly", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     sessionId: "session-hub",
@@ -273,7 +303,7 @@ test("Viewer runs queue into the strip and Edit › Edit Prompt opens the compos
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -363,20 +393,20 @@ test("More Like This Set is offered only for a result in a set", async ({ page }
   );
 });
 
-test("Run Again and Edit Prompt draw a new seed; only Repeat Exactly keeps it", async ({
+test("Run Again and Reuse Prompt draw a new seed; only Run Again, Same Seed keeps it", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Edit queues Run Again and Repeat Exactly at once; Edit Prompt loads the composer.
+  // Edit queues both Run Agains at once; Reuse Prompt loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Repeat Exactly", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -420,14 +450,14 @@ const ranOn = (backend: string) => ({
   settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
 });
 
-test("Repeat Exactly and Edit Prompt keep the backend a combined profile ran on", async ({
+test("Run Again, Same Seed and Reuse Prompt keep the backend a combined profile ran on", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Repeat Exactly", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     profileId: "custom:krea",
@@ -435,7 +465,7 @@ test("Repeat Exactly and Edit Prompt keep the backend a combined profile ran on"
     seed: 1234567,
   });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one. Focus,
   // not a tap: tapping the prompt on a phone switches to the typing layout, which hides the chips.
@@ -452,7 +482,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Repeat Exactly", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect(
     page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
   ).toBeVisible();
@@ -1097,7 +1127,8 @@ test("Details fold only a long caption, keep its tags in sight and copy the prom
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     details = page.getByRole("dialog", { name: "An amber bird", exact: true });
   }
-  // A long caption folds until Expand and folds again on Collapse; its tags stay in sight.
+  // A long caption folds with Expand on its last line and folds again on Collapse; its tags stay
+  // in sight.
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
   await expect(tags).toBeVisible();
@@ -1436,12 +1467,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
     expect(new Set(tops).size).toBe(1);
     await row[4].click();
-    await expect(page.getByRole("menuitem")).toHaveText([
-      "Find Similar",
-      "Copy",
-      "Download",
-      "Delete",
-    ]);
+    await expect(page.getByRole("menuitem")).toHaveText(["Copy", "Download", "Similar", "Delete"]);
   }
   const download = (phone ? page : dialog).getByRole(phone ? "menuitem" : "link", {
     name: "Download",
@@ -1559,7 +1585,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");

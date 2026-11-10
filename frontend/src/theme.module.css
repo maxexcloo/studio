@@ -62,15 +62,6 @@
   inset: -8px -4px;
 }
 
-.touchSpoiler:where([data-has-spoiler]) {
-  margin-bottom: 44px;
-}
-
-.touchSpoilerControl {
-  height: 44px;
-  min-width: 44px;
-}
-
 /* Studio's darker zinc palette leaves Mantine's segmented track (dark-8) black and its indicator
    (dark-5) darker than a raised glass surface, so the choice read as a hole beside its label.
    Tints of white sit a step above whatever surface holds them. */
