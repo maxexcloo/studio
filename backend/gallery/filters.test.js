@@ -77,7 +77,7 @@ test("size bands follow the long edge without overlap, and aspects are orientati
 });
 
 test("a filter with several values matches any of them, and filters still combine", async () => {
-  const { filterValues, hasGalleryFilters } = await import("./filters.js");
+  const { filterValues, galleryFiltersTest } = await import("./filters.js");
   assert.equal(matchesGalleryFilters(item, { model: ["sdxl", "flux"] }), true);
   assert.equal(matchesGalleryFilters(item, { model: ["sdxl", "wan"] }), false);
   assert.equal(
@@ -102,8 +102,8 @@ test("a filter with several values matches any of them, and filters still combin
   assert.equal(matchesGalleryFilters(square, { aspect: ["landscape", "portrait"] }), false);
   assert.deepEqual(filterValues([" a ", "", null, "b"]), ["a", "b"]);
   assert.deepEqual(filterValues("x"), ["x"]);
-  assert.equal(hasGalleryFilters({ model: [], size: "" }), false);
-  assert.equal(hasGalleryFilters({ aspect: ["square"] }), true);
+  assert.equal(galleryFiltersTest({ model: [], size: "" }), null);
+  assert.equal(typeof galleryFiltersTest({ aspect: ["square"] }), "function");
 });
 
 test("caption tags filter whole, any of them, and the facet lists the most used first", () => {
