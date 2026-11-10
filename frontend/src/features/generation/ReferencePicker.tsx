@@ -450,21 +450,21 @@ export function ReferencePicker({
         onOpenedChange={setOpened}
         trap={deleteId === null && !characterLayer}
         target={trigger}
-        footer={{
-          end: (
-            <Button
-              variant="default"
-              disabled={!references.length}
-              onClick={() => {
-                list.set([]);
-                settle();
-              }}
-            >
-              Clear References
-            </Button>
-          ),
-          apply: true,
-        }}
+        headerEnd={
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label="Clear References"
+            disabled={!references.length}
+            onClick={() => {
+              list.set([]);
+              settle();
+            }}
+          >
+            Clear
+          </Button>
+        }
+        footer={{ apply: true }}
       >
         {content}
       </ChipPopup>

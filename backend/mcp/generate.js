@@ -37,6 +37,7 @@ import {
 } from "./tiers.js";
 import { animateThemes } from "../prompt-animate.js";
 import { output, shortPrompt } from "./results.js";
+import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { resolutions } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
@@ -83,6 +84,7 @@ const theme = z
   })
   .describe(`One of ${Object.keys(animateThemes).join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+const setTitle = z.string().trim().min(1).max(80);
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);
 /** A JSON array sent as one string, or a single prompt. */
 const promptListText = z.string().transform((text) => {
@@ -138,7 +140,7 @@ export function registerGenerateTools({
   chatAssistant,
 }) {
   const { owner, refs, conversation } = actor;
-  // A guide goes to each conversation once (each account and profile without a conversation header).
+  // A guide goes to each conversation once (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
   const review = (refs, profileId) => {
@@ -730,6 +732,8 @@ export function registerGenerateTools({
         .union([promptList, promptListText.pipe(promptList)])
         .optional()
         .describe("Run as written; count images each."),
+      title: setTitle.optional(),
+      titles: z.array(setTitle).max(maxJobsPerCall).optional().describe("One per prompt."),
       preview: z.boolean().optional(),
       count: jobCount.optional().describe("Images per prompt; default 1."),
       kind: z.enum(["image", "video"]).optional(),
@@ -803,6 +807,7 @@ export function registerGenerateTools({
       preview,
       profile_ids,
       each_profile,
+      title,
       ...args
     } = structuredClone(input);
     if (args.reference_asset_ids)
@@ -928,6 +933,14 @@ export function registerGenerateTools({
         ],
       };
     }
+    // A call of several results is one titled set; the gallery titles each prompt's results by
+    // titles, or by its prompt where they are missing.
+    const resultSet = jobs > 1 && {
+      id: crypto.randomUUID(),
+      title: title || replyTitle(request) || promptWords(args.prompts[0]),
+      source: actor.session ? "Chat" : actor.client || "MCP",
+    };
+    for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
     // Request and prompts together: the prompts run, and the request stays on the record.
     const recordOf = ({ plan }) => {
       const assistant = actor.assistant
