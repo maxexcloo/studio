@@ -206,6 +206,8 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
     /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Portrait: make the person the clear focus/,
   );
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
+  // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
+  assert.match(body.messages[0].content, /own descriptions of people and things .* word for word/);
   assert.equal(body.messages[1].content, "secret cabin");
   assert.match(lines[0], /^Prompt assistant rewrite for custom:fixture in \d+ ms$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
