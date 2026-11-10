@@ -10,6 +10,8 @@ import {
   Copy,
   Download,
   Ellipsis,
+  Eye,
+  EyeOff,
   GalleryHorizontalEnd,
   Heart,
   ImageUpscale,
@@ -73,6 +75,8 @@ export const icons = {
   dream: Moon,
   edit: Pencil,
   filter: ListFilter,
+  /** Hiding a revealed secret again, such as the MCP token. */
+  hide: EyeOff,
   keep: Heart,
   /** A record's timestamped lines: a runtime change's steps or a workload's log. */
   log: ScrollText,
@@ -99,6 +103,8 @@ export const icons = {
   scene: MapPinned,
   settings: Settings,
   share: Share,
+  /** Revealing a hidden secret, such as the MCP token. */
+  show: Eye,
   /** Find Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
   star: Star,
