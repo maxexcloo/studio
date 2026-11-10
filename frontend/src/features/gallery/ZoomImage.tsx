@@ -3,6 +3,7 @@ import type { PointerEvent } from "react";
 import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
+import { closingPopup } from "../../ui/popupClicks";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import classes from "./ZoomImage.module.css";
 
@@ -14,6 +15,7 @@ export function ZoomImage({
   placeholder,
   swipe,
   arrive,
+  onTap,
 }: {
   src: string;
   alt: string;
@@ -25,6 +27,8 @@ export function ZoomImage({
   swipe?: (direction: SwipeDirection) => void;
   /** A picture reached by swiping slides in from the side it was pulled from. */
   arrive?: "next" | "previous";
+  /** A lone touch tap on the picture, once it is plainly not the first of a double tap. */
+  onTap?: () => void;
 }) {
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
@@ -39,6 +43,8 @@ export function ZoomImage({
   const suppressClick = useRef(false);
   const touched = useRef(false);
   const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
+  const pendingTap = useRef(0);
+  useEffect(() => () => clearTimeout(pendingTap.current), []);
   const gesture = useRef<{
     id: number;
     at: number;
@@ -120,6 +126,7 @@ export function ZoomImage({
   }
   function down(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
+    clearTimeout(pendingTap.current);
     touched.current = event.pointerType === "touch";
     if ((event.target as Element).closest("[data-zoom-controls]") || event.button !== 0) return;
     if (gesture.current) {
@@ -189,7 +196,9 @@ export function ZoomImage({
     ) {
       lastTap.current = null;
       zoom.toggleAt(event.clientX, event.clientY);
-    }
+    } else if (onTap && event.timeStamp - start.at < 500 && !closingPopup())
+      // A long press is not a tap, and a press that closes a popup only closes it.
+      pendingTap.current = window.setTimeout(onTap, 300);
   }
   return (
     <div
