@@ -13,7 +13,7 @@ test.after(() => {
   for (const folder of [outputDir, dataDir]) fs.rmSync(folder, { recursive: true, force: true });
 });
 
-test("search looks through prompts, models and LoRAs; favourites filter by star", () => {
+test("search looks through prompts, set titles, models and LoRAs; favourites filter by star", () => {
   const done = (id, extra) => ({
     id,
     url: id,
@@ -29,6 +29,7 @@ test("search looks through prompts, models and LoRAs; favourites filter by star"
         prompt: "a blue owl",
         model: "sdxl_base.safetensors",
         settings: { loras: [{ name: "Film Grain.safetensors" }] },
+        resultSet: { id: "set-a", title: "Variety Test", index: 0, variation: "Owl Librarian" },
       }),
       {
         id: "s3",
@@ -53,6 +54,8 @@ test("search looks through prompts, models and LoRAs; favourites filter by star"
   );
   assert.deepEqual(ids(store.galleryFilter({ q: "sdxl" })), ["s2", "s3"]);
   assert.deepEqual(ids(store.galleryFilter({ q: "grain" })), ["s2", "s3"]);
+  // An MCP result set's title and the result's own title there find it too.
+  assert.deepEqual(ids(store.galleryFilter({ q: "variety librarian" })), ["s2", "s3"]);
   assert.equal(store.galleryFilter({ q: "  " }), null);
   assert.deepEqual(ids(store.galleryFilter({ model: "sdxl", lora: "grain" })), ["s2", "s3"]);
   assert.deepEqual(ids(store.galleryFilter({ q: "owl", model: "flux" })), ["s3"]);
