@@ -45,12 +45,22 @@ import { isCloudProfile } from "../../../../shared/profiles";
 import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
 
 const featureLabels = {
-  chat: "Chat",
-  cloudModels: "Cloud Models",
-  dream: "Dream",
-  loras: "LoRAs",
-  promptAssistant: "Prompt Assistant",
-  uncensoredModels: "Uncensored Models",
+  characters: {
+    label: "Characters",
+    description: "Character cards that add their images and description to a prompt",
+  },
+  chat: { label: "Chat", description: "Studio Chat and its generation tools" },
+  cloudModels: { label: "Cloud Models", description: "Every cloud-provider profile" },
+  dream: { label: "Dream", description: "The Dream deck of drawn ideas" },
+  loras: { label: "LoRAs", description: "Style and subject adapters on compatible models" },
+  promptAssistant: {
+    label: "Prompt Assistant",
+    description: "Improve, Suggestions, prompt ideas and other written help",
+  },
+  uncensoredModels: {
+    label: "Uncensored Models",
+    description: "Profiles marked uncensored and the Spicy preset",
+  },
 };
 /** A group ID from its name, in the form the server takes (backend/account-policy.js validAccountKey). */
 const groupId = (name: string) =>
@@ -96,7 +106,7 @@ function GroupEditor({
       allModels: false,
       generationProfiles: [],
       // As the server reads a group without them (backend/account-policy.js).
-      features: { chat: true, dream: true, promptAssistant: true },
+      features: { characters: true, chat: true, dream: true, promptAssistant: true },
     },
   });
   const save = useMutation({
@@ -166,10 +176,11 @@ function GroupEditor({
           Permissions
         </Text>
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-          {Object.entries(featureLabels).map(([feature, label]) => (
+          {Object.entries(featureLabels).map(([feature, { label, description }]) => (
             <Checkbox
               key={feature}
               label={label}
+              description={description}
               {...form.getInputProps(`features.${feature}`, { type: "checkbox" })}
             />
           ))}
@@ -333,6 +344,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
               <Group gap={4}>
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
                 {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
+                {!group.features.characters && groupFeature(false, "Characters")}
                 {!group.features.chat && groupFeature(false, "Chat")}
                 {!group.features.dream && groupFeature(false, "Dream")}
                 {!group.features.promptAssistant && groupFeature(false, "Prompt Assistant")}

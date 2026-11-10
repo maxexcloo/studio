@@ -1,7 +1,7 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { AccountGate, useGroupFeature, useIsAdmin } from "./features/auth/AccountGate";
+import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
 import { useRemembered } from "./features/auth/useRemembered";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
@@ -11,6 +11,7 @@ import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
 import { ChatWorkspace, chatShellClass } from "./features/sessions/ChatWorkspace";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
+import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
@@ -32,7 +33,7 @@ const SettingsPage = lazy(() =>
 const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {
   const { appearance } = useAppearance();
-  const admin = useIsAdmin();
+  const library = useLibraryAccess();
   const chat = useGroupFeature("chat");
   const dream = useGroupFeature("dream");
   const location = useLocation();
@@ -72,7 +73,7 @@ function Workspace() {
   const mode = (overlay ? background : location).pathname;
   const chatRoute = mode.startsWith("/chat");
   if (
-    (location.pathname === "/library" && !admin) ||
+    (location.pathname === "/library" && !library.allowed) ||
     (chatRoute && !chat) ||
     (mode === "/dream" && !dream)
   )
@@ -176,7 +177,7 @@ function Workspace() {
                   state={location.state}
                 />
               ) : panel === "library" ? (
-                admin ? (
+                library.allowed ? (
                   <Suspense fallback={<LoadingState label="Loading Library" fill />}>
                     <LibraryPage />
                   </Suspense>

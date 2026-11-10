@@ -5,7 +5,7 @@ import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceControls } from "../../ui/Appearance";
 import { AccountMenuContent } from "../auth/AccountMenu";
-import { useIsAdmin } from "../auth/AccountGate";
+import { useLibraryAccess } from "../library/useLibraryAccess";
 
 // The outer popover and inner menu each retain a ref to the same DOM anchor.
 const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(function OptionsTarget(
@@ -14,7 +14,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
 ) {
   const [opened, setOpened] = useState(false);
   const location = useLocation();
-  const admin = useIsAdmin();
+  const library = useLibraryAccess();
   return (
     <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md">
       <Menu.Target>
@@ -33,7 +33,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
           >
             Appearance
           </Menu.Item>
-          {admin && (
+          {library.allowed && (
             <Menu.Item
               component={Link}
               to="/library"

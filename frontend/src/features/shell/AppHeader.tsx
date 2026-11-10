@@ -1,14 +1,26 @@
-import { useState } from "react";
-import { ActionIcon, Box, Button, FloatingIndicator, Group, Tooltip } from "@mantine/core";
+import { useId, useState } from "react";
+import {
+  ActionIcon,
+  Button,
+  FloatingIndicator,
+  Group,
+  Indicator,
+  Tooltip,
+  VisuallyHidden,
+} from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
 import { Image, Library, MessageCircle, Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
-import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
+import { useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
+import { dreamQuery } from "../dream/queries";
+import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
+import { useFinishedAway } from "./useFinishedAway";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./AppHeader.module.css";
 
@@ -27,6 +39,14 @@ function ModeSwitcher({ mode }: { mode: string }) {
   const [root, setRoot] = useState<HTMLElement | null>(null);
   const [selected, setSelected] = useState<HTMLElement | null>(null);
   const shown = { "/chat": useGroupFeature("chat"), "/dream": useGroupFeature("dream") };
+  // Dream's results waiting for a verdict, counted on its tab.
+  const unseen =
+    useQuery({
+      ...dreamQuery,
+      enabled: shown["/dream"] !== false,
+      select: (dream) => dream.unseen.length,
+    }).data || 0;
+  const unseenId = useId();
   return (
     <Group
       ref={setRoot}
@@ -41,11 +61,24 @@ function ModeSwitcher({ mode }: { mode: string }) {
         .filter((item) => shown[item.to as keyof typeof shown] !== false)
         .map((item) => {
           const active = mode.startsWith(item.to);
+          const count = item.to === "/dream" ? unseen : 0;
           return (
             <Tooltip key={item.to} label={item.label} disabled={!phone}>
-              <Box component="span" style={{ display: "inline-flex" }}>
+              <Indicator
+                // The indicator tracks this wrapper: the Link inside merges refs anew each render,
+                // so a ref there detaches and reattaches on every render and never settles.
+                ref={active ? setSelected : undefined}
+                component="span"
+                display="inline-flex"
+                disabled={!count}
+                label={<span aria-hidden>{count > 99 ? "99+" : count}</span>}
+                size={16}
+                offset={4}
+                zIndex={2}
+              >
+                {count > 0 && <VisuallyHidden id={unseenId}>{count} Unseen</VisuallyHidden>}
                 <Button
-                  ref={active ? setSelected : undefined}
+                  aria-describedby={count ? unseenId : undefined}
                   component={Link}
                   to={item.to}
                   aria-label={item.label}
@@ -60,7 +93,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
                 >
                   {phone ? <item.icon size={20} /> : item.label}
                 </Button>
-              </Box>
+              </Indicator>
             </Tooltip>
           );
         })}
@@ -71,8 +104,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
 export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
-  const admin = useIsAdmin();
+  const library = useLibraryAccess();
   const location = useLocation();
+  useFinishedAway();
   return (
     <Group
       h="100%"
@@ -99,7 +133,7 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
         <Group gap="xs">
           <AppearanceMenu />
           {navigation
-            .filter((item) => item.to !== "/library" || admin)
+            .filter((item) => item.to !== "/library" || library.allowed)
             .map((item) => {
               const active = location.pathname.startsWith(item.to);
               return (

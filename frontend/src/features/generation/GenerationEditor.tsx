@@ -230,6 +230,7 @@ export function GenerationEditor({
       input={input}
       value={references}
       onChange={onReferencesChange}
+      prompt={{ value: String(input.prompt || ""), onChange: (prompt) => onChange({ prompt }) }}
     />
   );
   const settings = { opened: settingsOpen, onOpenedChange: setSettingsOpen };

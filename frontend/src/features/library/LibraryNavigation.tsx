@@ -2,9 +2,17 @@ import { BookOpen, Boxes, Compass, FileCog, HardDriveDownload, Import } from "lu
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
+import { useLibraryAccess } from "./useLibraryAccess";
 
 // What the studio has, then where more comes from, each alphabetical; the Library opens on Models.
 export const librarySections = {
+  characters: {
+    label: "Characters",
+    description:
+      "Your character cards: images and a description that picking one adds to a prompt.",
+    icon: icons.character,
+    group: "What You Have",
+  },
   guides: {
     label: "Guides",
     description: "Prompting guides for profiles and families. Every saved version is kept.",
@@ -55,9 +63,16 @@ export const librarySections = {
     group: "Getting More",
   },
 };
+/** Administrators see the whole Library; other accounts only their Characters. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  return { admin, options: visibleSections(librarySections, admin) };
+  const { characters } = useLibraryAccess();
+  return {
+    admin,
+    options: visibleSections(librarySections, admin, (key) =>
+      key === "characters" ? characters : admin,
+    ),
+  };
 }
 export function LibraryTitle() {
   const { options } = useLibraryNavigation();

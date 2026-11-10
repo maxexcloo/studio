@@ -77,6 +77,7 @@ export async function fixtures(page: Page) {
   const messages: any[] = [];
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
+  const characters: any[] = [];
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -99,7 +100,11 @@ export async function fixtures(page: Page) {
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
-      item: gallery.find((item) => item.jobId === jobId) || null,
+      item:
+        gallery.find(
+          (item) =>
+            item.jobId === jobId && (!comparison.itemIds || item.id === comparison.itemIds[index]),
+        ) || null,
     })),
   });
   function recordGeneration(body: any, sessionId: string) {
@@ -622,6 +627,22 @@ export async function fixtures(page: Page) {
       }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
+    // Compare Selected records chosen gallery images.
+    if (path === "/api/comparisons" && method === "POST") {
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed: "",
+        requests: body.itemIds.map((id: string) => ({
+          input: { prompt: gallery.find((item) => item.id === id)?.prompt },
+        })),
+        jobIds: body.jobIds,
+        itemIds: body.itemIds,
+        labels: body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(showComparison(comparison), 201);
+    }
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
       const sessionId = body.sessionId || "session-compare";
@@ -671,6 +692,14 @@ export async function fixtures(page: Page) {
           { value: "portrait", label: "Portrait" },
           { value: "square", label: "Square" },
         ],
+        // The caption tags in the fixture gallery, most used first.
+        tags: [
+          ...gallery
+            .flatMap((item) => item.caption?.tags || [])
+            .reduce((counts, tag) => counts.set(tag, (counts.get(tag) || 0) + 1), new Map()),
+        ]
+          .sort(([, a], [, b]) => b - a)
+          .map(([tag, count]) => ({ value: tag, label: tag, count })),
         chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
     if (path === "/api/gallery") {
@@ -680,9 +709,66 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
+          (!url.searchParams.has("chat") ||
+            url.searchParams.getAll("chat").includes(i.sessionId)) &&
+          (!url.searchParams.has("tag") ||
+            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
+      // Find Similar ranks the image first.
+      const similar = url.searchParams.get("similar");
+      if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
+    }
+    // Character cards, their images shown as reference assets.
+    if (path.startsWith("/api/characters")) {
+      const card = (fields: any, id: string) => ({
+        id,
+        name: fields.name,
+        description: fields.description,
+        referenceIds: fields.referenceIds,
+        references: fields.referenceIds.map((asset: string) => ({
+          id: asset,
+          name: "Character Image",
+          thumbnailUrl: image,
+          url: image,
+          width: 1024,
+          height: 1024,
+        })),
+        missing: 0,
+      });
+      const id = decodeURIComponent(path.split("/")[3] || "");
+      const index = characters.findIndex((item) => item.id === id);
+      // Generate References' jobs, listed with their gallery results.
+      if (path.endsWith("/generated")) {
+        characters[index].generated = {
+          jobIds: body.jobIds,
+          at: stamp,
+          results: gallery
+            .filter((item) => body.jobIds.includes(item.jobId))
+            .map((item) => ({
+              galleryItemId: item.id,
+              jobId: item.jobId,
+              status: item.status,
+              thumbnailUrl: item.thumbnailUrl,
+              prompt: item.prompt,
+            })),
+        };
+        return respond({ ok: true, character: characters[index] });
+      }
+      if (method === "POST") {
+        characters.push(card(body, `chr-${characters.length + 1}`));
+        return respond({ ok: true, character: characters.at(-1) }, 201);
+      }
+      if (method === "PUT") {
+        characters[index] = card(body, id);
+        return respond({ ok: true, character: characters[index] });
+      }
+      if (method === "DELETE") {
+        characters.splice(index, 1);
+        return respond({ ok: true });
+      }
+      return respond({ characters });
     }
     if (method === "GET" && path.startsWith("/api/reference-assets/")) {
       const id = decodeURIComponent(path.split("/")[3]);
@@ -833,6 +919,7 @@ export async function fixtures(page: Page) {
     messages,
     chatRequests,
     referenceRequests,
+    characters,
     galleryRequests,
     loraLibrary,
     loraOperations,
