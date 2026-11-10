@@ -240,7 +240,8 @@ export function PickerHeader<Tab extends string>({
   label: string;
   /** What the search and filters cover, such as the current tab's "Gallery". */
   searched?: string;
-  tabs?: { value: Tab; label: string }[];
+  /** The views, in groups shown apart, such as the gallery's and the Library's. */
+  tabs?: { value: Tab; label: string }[][];
   tab?: Tab;
   onTabChange?: (tab: Tab) => void;
   query: string;
@@ -255,13 +256,17 @@ export function PickerHeader<Tab extends string>({
     <Box className={classes.header}>
       <div className={classes.headerRow}>
         {tabs && (
-          <SegmentedControl
-            aria-label={`${label} View`}
-            className={classes.tabs}
-            value={tab}
-            onChange={(value) => onTabChange?.(value as Tab)}
-            data={tabs}
-          />
+          <Group gap="xs" role="group" aria-label={`${label} View`}>
+            {/* The groups choose one view between them; only the group holding it marks it. */}
+            {tabs.map((group) => (
+              <SegmentedControl
+                key={group[0].value}
+                value={group.some((item) => item.value === tab) ? tab : ""}
+                onChange={(value) => onTabChange?.(value as Tab)}
+                data={group}
+              />
+            ))}
+          </Group>
         )}
         <div className={classes.searchRow}>
           <SearchInput

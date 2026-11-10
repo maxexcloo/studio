@@ -371,7 +371,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   const header = (
     <PickerHeader
       label="LoRAs"
-      tabs={[...loraTabs]}
+      tabs={[[...loraTabs]]}
       tab={tab}
       onTabChange={picker.setTab}
       query={picker.query}

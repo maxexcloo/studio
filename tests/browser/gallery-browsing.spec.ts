@@ -661,14 +661,12 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   const phone = test.info().project.use.isMobile;
   await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  // The view (Grid or Runs) sits apart from Show, one choice of All, Starred or Uploads.
-  await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+  // Starred and Uploads are toolbar toggles, one at a time.
   await showOnly(page, "Starred");
-  await expect(page.getByRole("radio", { name: "Starred", exact: true })).toBeChecked();
   await showOnly(page, "Uploads");
-  await expect(page.getByRole("radio", { name: "Starred", exact: true })).not.toBeChecked();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  // The view (Grid or Runs) leads the popup.
+  await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
   await expect(page.getByRole("switch", { name: "All Versions", exact: true })).toBeChecked();
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
@@ -761,7 +759,6 @@ test("Uploads stay out of the gallery until its Uploads filter is on", async ({ 
   const tile = (id: string) => page.locator(`[data-media-id="${id}"]`);
   await expect(tile("made")).toBeVisible();
   await expect(tile("uploaded")).toHaveCount(0);
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await showOnly(page, "Uploads");
   await expect(tile("uploaded")).toBeVisible();
   await expect(tile("made")).toHaveCount(0);
@@ -986,14 +983,14 @@ test("The Tags facet lists the most used caption tags with counts and filters by
     page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  const tags = page.getByRole("group", { name: "Tags", exact: true });
-  await expect(tags.getByRole("button")).toHaveText(["beach2", "sunset2", "snow1"]);
-  await tags.getByRole("button", { name: "snow 1", exact: true }).click();
-  await expect(tags.getByRole("button", { name: "snow 1", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  expect(state.galleryRequests.at(-1)).toContain("tag=snow");
+  // A list, most used first, each with its count.
+  await page.getByRole("combobox", { name: "Tags", exact: true }).click();
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect(options).toHaveText(["beach2", "sunset2", "snow1"]);
+  await options.filter({ hasText: "snow" }).click();
+  await expect.poll(() => state.galleryRequests.at(-1)).toContain("tag=snow");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("listbox")).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),

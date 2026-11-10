@@ -67,7 +67,8 @@
   margin-top: var(--mantine-spacing-sm);
 }
 
-/* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
+/* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs,
+   and tab groups under one another. */
 .header {
   display: flex;
   flex-direction: column;
@@ -79,10 +80,6 @@
   flex-wrap: wrap;
   gap: var(--mantine-spacing-xs);
   align-items: center;
-}
-
-.tabs {
-  flex-shrink: 0;
 }
 
 /* Search, Filter and the actions never wrap apart. */

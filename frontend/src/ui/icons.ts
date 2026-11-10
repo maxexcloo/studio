@@ -14,6 +14,7 @@ import {
   EyeOff,
   GalleryHorizontalEnd,
   Heart,
+  ImageUp,
   ImageUpscale,
   Info,
   Layers,
@@ -114,6 +115,8 @@ export const icons = {
   unarchive: ArchiveRestore,
   undo: Undo2,
   upload: Upload,
+  /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
+  uploads: ImageUp,
   upscale: ImageUpscale,
   versions: Layers,
   winner: Trophy,
