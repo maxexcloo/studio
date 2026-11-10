@@ -76,7 +76,8 @@ the primary component reference and verify APIs against the installed version.
   `usePhone()` and `useSideways()`, and CSS the root's `data-phone` attribute
   (`sideways` for a phone held sideways), never width media queries,
   `visibleFrom` or `hiddenFrom`. A phone held sideways shows four gallery
-  columns and puts the viewer's controls beside the media.
+  columns and puts the viewer's controls and Dream's card captions beside the
+  media.
 - Outside click and Escape close only the topmost layer; nothing beneath
   reacts. A closing layer no longer counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
