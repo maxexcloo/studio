@@ -75,3 +75,47 @@ test("A phone held sideways keeps the phone layout and an iPad in landscape does
   await expect(settings).toBeVisible();
   await expect(more).toHaveCount(0);
 });
+
+test("Work that finishes while Studio is hidden counts in the title and app badge until it returns", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await page.addInitScript(() => {
+    const badges: (number | "clear")[] = [];
+    Object.assign(window, { badges });
+    Object.assign(navigator, {
+      setAppBadge: async (count: number) => void badges.push(count),
+      clearAppBadge: async () => void badges.push("clear"),
+    });
+    let hidden = false;
+    Object.defineProperty(document, "hidden", { get: () => hidden, configurable: true });
+    Object.assign(window, {
+      setHidden: (value: boolean) => {
+        hidden = value;
+        document.dispatchEvent(new Event("visibilitychange"));
+      },
+    });
+  });
+  const job = (id: string, extra = {}) => ({
+    id,
+    sessionId: "chat-a",
+    status: "running",
+    operation: "image",
+    input: { kind: "image", prompt: id },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+    ...extra,
+  });
+  state.jobs.push(job("mine"), job("dreamed", { dream: true }));
+  await page.goto("/images");
+  await expect(page).toHaveTitle("Studio");
+  await page.evaluate(() => (window as any).setHidden(true));
+  for (const entry of state.jobs) entry.status = "completed";
+  await expect(page).toHaveTitle("(1) Studio");
+  expect(await page.evaluate(() => (window as any).badges)).toEqual([1]);
+  await page.evaluate(() => (window as any).setHidden(false));
+  await expect(page).toHaveTitle("Studio");
+  expect(await page.evaluate(() => (window as any).badges)).toEqual([1, "clear"]);
+});
