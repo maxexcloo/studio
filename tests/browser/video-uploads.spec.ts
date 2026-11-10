@@ -13,7 +13,7 @@ import {
 const clip = videoClip();
 test.skip(!clip, "Video encoder unavailable");
 
-test("A video uploads as a reference, and Edit Prompt runs an upload's suggested prompt as its version", async ({
+test("A video uploads as a reference, and Reuse Prompt runs an upload's suggested prompt as its version", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -70,9 +70,9 @@ test("A video uploads as a reference, and Edit Prompt runs an upload's suggested
   await page.goto("/video");
   await showOnly(page, "Uploads");
   await page.locator('[data-media-id="clip"]').click();
-  // An upload video's Edit › Edit Prompt opens its suggested prompt.
+  // An upload video's Edit › Reuse Prompt opens its suggested prompt.
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
   await expect.poll(() => recreated).toEqual([{ galleryItemId: "clip" }]);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("A lighthouse at dusk, waves breaking");

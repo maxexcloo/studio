@@ -1,10 +1,10 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Anchor,
   Badge,
   Group,
   Image,
-  Spoiler,
   Stack,
   Table,
   Text,
@@ -28,6 +28,7 @@ import { mediaSource } from "./mediaSource";
 import { formatBytes } from "../../ui/bytes";
 import { charactersQuery } from "../characters/queries";
 import { identityNote } from "../characters/identity";
+import classes from "./MediaDetails.module.css";
 
 const fileStem = (name: unknown) =>
   String(name || "")
@@ -291,7 +292,6 @@ function DetailSection({
   );
 }
 
-/** The gallery caption in the prompt's style, folding until Expand when long, then all its tags. */
 /** Face Check's finding for a result made with a character, naming the character. */
 function FaceCheck({ identity }: { identity: NonNullable<MediaItem["identity"]> }) {
   const characters = useQuery(charactersQuery);
@@ -306,23 +306,58 @@ function FaceCheck({ identity }: { identity: NonNullable<MediaItem["identity"]> 
   );
 }
 
+/**
+ * A caption folds to five lines when longer, ending in an ellipsis and Expand on its last line;
+ * expanded, Collapse follows its last word.
+ */
+function CaptionText({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [long, setLong] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element || expanded) return;
+    const measure = () => setLong(element.scrollHeight > element.clientHeight + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text, expanded]);
+  const toggle = (
+    <Anchor
+      component="button"
+      type="button"
+      fz="inherit"
+      className={classes.fold}
+      aria-label={expanded ? "Collapse Caption" : "Expand Caption"}
+      aria-expanded={expanded}
+      onClick={() => setExpanded(!expanded)}
+    >
+      {expanded ? "Collapse" : "Expand"}
+    </Anchor>
+  );
+  return (
+    <div className={classes.caption}>
+      <Text
+        ref={ref}
+        size="sm"
+        className={expanded ? classes.captionText : `${classes.captionText} ${classes.folded}`}
+      >
+        {long && !expanded && toggle}
+        {text}
+        {expanded && <> {toggle}</>}
+      </Text>
+    </div>
+  );
+}
+
+/** The gallery caption in the prompt's style, folding until Expand when long, then all its tags. */
 function Caption({ item }: { item: MediaItem }) {
   const caption = item.caption;
   if (!caption?.text && !caption?.tags?.length) return null;
   const tags = [...(caption.tags || [])].sort((a, b) => a.localeCompare(b));
   return (
     <DetailSection title="Caption">
-      {caption.text && (
-        <Spoiler
-          maxHeight={120}
-          showLabel="Expand"
-          hideLabel="Collapse"
-          showAriaLabel="Expand Caption"
-          hideAriaLabel="Collapse Caption"
-        >
-          <DetailText>{caption.text}</DetailText>
-        </Spoiler>
-      )}
+      {caption.text && <CaptionText text={caption.text} />}
       {!!tags.length && (
         <Group gap={4} aria-label="Caption Tags">
           {tags.map((tag) => (

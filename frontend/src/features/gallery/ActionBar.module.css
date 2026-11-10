@@ -72,3 +72,8 @@
 [data-expanded] .expand {
   transform: rotate(180deg);
 }
+
+/* A setting's switch sits at the row's end and leaves the press to the row. */
+.switch {
+  pointer-events: none;
+}

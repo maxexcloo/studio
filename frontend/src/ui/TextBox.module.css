@@ -81,3 +81,41 @@
   width: 32px;
   height: 32px;
 }
+
+/* A one-line box at rest: its text, drawn over the hidden textarea, ends in an ellipsis. */
+.line {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.line > :first-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Whole lines only, at the height autosize gives it: the input's usual minimum height, or a zero
+ * flex basis, would cut the text off part-way through a line.
+ */
+.line textarea {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
+.line[data-resting] textarea {
+  color: transparent;
+}
+
+.summary {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 0 solid transparent;
+  color: var(--mantine-color-text);
+  pointer-events: none;
+}

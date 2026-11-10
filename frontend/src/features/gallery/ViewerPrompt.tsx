@@ -22,7 +22,8 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its tools are the text box's: Suggestions, then Ask. The bar has Copy.
+ * Its tools are the text box's: Suggestions, Ask for a Change… and Refresh Suggestions. The bar has
+ * Copy. At rest it is one line; focused, it shows the whole prompt.
  */
 export function ViewerPrompt({
   item,
@@ -86,23 +87,26 @@ export function ViewerPrompt({
       setPrompt(request);
       ask.send(request, request);
     },
-    // Custom… selects the prompt for a change typed over it; phones open the editor.
-    onCustom: () => {
-      if (phone) return field.current?.click();
-      field.current?.focus();
-      field.current?.select();
-    },
   });
+  // Text typed over the prompt is the change to ask for; otherwise Ask for a Change… selects the
+  // prompt for one typed over it, and phones open the editor.
+  const typed = Boolean(prompt.trim()) && prompt !== original;
   const tools = [
     offered && suggestions.action,
     ask.available &&
       !change && {
         id: "ask",
-        label: "Ask for a Change",
+        label: "Ask for a Change…",
         icon: icons.assistant,
-        disabled: !prompt.trim() || ask.pending,
-        onClick: () => ask.send(prompt, prompt.trim()),
+        disabled: ask.pending,
+        onClick: () => {
+          if (typed) return ask.send(prompt, prompt.trim());
+          if (phone) return field.current?.click();
+          field.current?.focus();
+          field.current?.select();
+        },
       },
+    offered && suggestions.refresh,
   ].filter((tool): tool is Action => Boolean(tool));
   // Phones generate from the editor's send arrow; a proposal's Run stays in the field.
   const send = (
@@ -125,8 +129,9 @@ export function ViewerPrompt({
       placeholder={`Describe the ${video ? "video" : "image"}, or ask for a change`}
       variant="unstyled"
       autosize
+      oneLine
       minRows={1}
-      maxRows={phone ? 2 : 4}
+      maxRows={4}
       className={change ? `${classes.prompt} ${proposedClass}` : classes.prompt}
       description={change && <ProposalLabel proposal={change} />}
       value={prompt}
