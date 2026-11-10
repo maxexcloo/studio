@@ -23,16 +23,17 @@ export function withCharacter(prompt: string, description: string) {
   if (!text || prompt.includes(text)) return prompt;
   const before = prompt.trimEnd();
   if (!before) return text;
-  return `${before}${/[.!?,;:]$/.test(before) ? " " : ". "}${text}`;
+  return `${before}${/[.!?,;:]$/.test(before) ? " " : ", "}${text}`;
 }
 
-/** The prompt without a card's description and the separator that joined it. */
+/** The prompt without a card's description and the comma or space that joined it. */
 export function withoutCharacter(prompt: string, description: string) {
   const text = description.trim();
   const at = text ? prompt.indexOf(text) : -1;
   if (at < 0) return prompt;
-  const before = prompt.slice(0, at).trimEnd();
-  const after = prompt.slice(at + text.length).replace(/^[\s,;.]+/, "");
-  if (!after) return before.replace(/[,;:]$/, "");
-  return before ? `${before} ${after}` : after;
+  const before = prompt.slice(0, at).trimEnd().replace(/,$/, "");
+  const rest = prompt.slice(at + text.length);
+  const after = rest.replace(/^[\s,;.]+/, "");
+  if (!before || !after) return before || after;
+  return `${before}${rest.trimStart().startsWith(",") ? ", " : " "}${after}`;
 }
