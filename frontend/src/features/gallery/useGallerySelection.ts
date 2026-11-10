@@ -5,13 +5,22 @@ import type { MediaItem } from "../../types";
  * Selection acts on loaded records, including across virtualised rows. A group (a run in Runs)
  * toggles together; Shift extends from the last toggled item to the group in loaded order. The
  * result stays the same object until the selection or the items change, so tiles skip renders.
+ * `selectMatching` (Select All and the like) covers every match of the search and filters: while
+ * `more.complete` is false it has `more.load` load the rest first. A new search or filter empties
+ * the selection without ending it.
  */
-export function useGallerySelection(items: MediaItem[], resetKey: string) {
+export function useGallerySelection(
+  items: MediaItem[],
+  resetKey: string,
+  more: { complete: boolean; load: () => Promise<boolean> },
+) {
   const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [pending, setPending] = useState<{ match: (item: MediaItem) => boolean } | null>(null);
   const anchor = useRef<string | null>(null);
   const ids = useMemo(() => items.map((item) => item.id).join("\n"), [items]);
   useEffect(() => {
-    setSelected(null);
+    setSelected((current) => current && new Set());
+    setPending(null);
     anchor.current = null;
   }, [resetKey]);
   useEffect(() => {
@@ -22,6 +31,15 @@ export function useGallerySelection(items: MediaItem[], resetKey: string) {
         : current,
     );
   }, [ids]);
+  // Once every match has loaded, the waiting quick select applies to all of them.
+  useEffect(() => {
+    if (!pending || !more.complete) return;
+    setSelected(new Set(items.filter(pending.match).map((item) => item.id)));
+    setPending(null);
+  }, [pending, more.complete, items]);
+  // The latest loader, so a new one doesn't make a new selection object and rerender every tile.
+  const load = useRef(more.load);
+  load.current = more.load;
   return useMemo(() => {
     function toggle(group: MediaItem[]) {
       anchor.current = group[group.length - 1]?.id ?? null;
@@ -40,14 +58,22 @@ export function useGallerySelection(items: MediaItem[], resetKey: string) {
       selected: selected || new Set<string>(),
       selectedItems: selected ? items.filter((item) => selected.has(item.id)) : [],
       items,
+      /** Whether a quick select is waiting for the rest of the matches to load. */
+      loading: pending !== null,
       start: () => setSelected((current) => current || new Set()),
       end: () => {
         setSelected(null);
+        setPending(null);
         anchor.current = null;
       },
       toggle,
       select: (match: (item: MediaItem) => boolean) =>
         setSelected(new Set(items.filter(match).map((item) => item.id))),
+      selectMatching: (match: (item: MediaItem) => boolean) => {
+        setSelected((current) => current || new Set());
+        setPending({ match });
+        void load.current().then((loaded) => loaded || setPending(null));
+      },
       retain: (ids: string[]) => setSelected(new Set(ids)),
       /** Handles a tile click when it selects; returns false when the tile should open instead. */
       click: (group: MediaItem[], event: MouseEvent | KeyboardEvent) => {
@@ -71,6 +97,6 @@ export function useGallerySelection(items: MediaItem[], resetKey: string) {
         return true;
       },
     };
-  }, [selected, items]);
+  }, [selected, items, pending]);
 }
 export type GallerySelection = ReturnType<typeof useGallerySelection>;

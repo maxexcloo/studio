@@ -19,6 +19,7 @@ import { useRecreateMany } from "./useRecreateMany";
 import { useUpscaleMany } from "./UpscaleControls";
 import { animateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
 import type { GallerySelection } from "./useGallerySelection";
+import type { MediaItem } from "../../types";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
@@ -29,7 +30,7 @@ const compareLimit = 4;
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
- * The contextual selection bar in the toolbar's place: the count and the quick selects, then on
+ * The contextual selection bar under the toolbar: the count and the quick selects, then on
  * desktop the selection's actions as icons and Clear Selection; phones keep the actions and More
  * on a bottom toolbar. The same actions show as a context menu at `menu` (right-click or
  * Shift+F10).
@@ -254,29 +255,33 @@ export function GallerySelectionBar({
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
-  // Phones name them by what they select (All, Failed, In Progress).
+  // Phones name them by what they select (All, Failed, In Progress). Each takes every match of the
+  // search and filters, loading the pages not shown yet first.
+  const [quickPicked, setQuickPicked] = useState("");
   const quick = [
-    { id: "select-all", label: "Select All", short: "All", items: selection.items },
+    { id: "select-all", label: "Select All", short: "All", match: () => true },
     {
       id: "select-failed",
       label: "Select Failed",
       short: "Failed",
-      items: selection.items.filter((item) => item.status === "failed"),
+      match: (item: MediaItem) => item.status === "failed",
     },
     {
       id: "select-running",
       label: "Select In Progress",
       short: "In Progress",
-      items: selection.items.filter((item) => !finished(item)),
+      match: (item: MediaItem) => !finished(item),
     },
   ]
-    .filter(({ id, items }) => id === "select-all" || items.length > 0)
-    .map(({ items, ...action }) => ({
+    .map((action) => ({ ...action, shown: selection.items.some(action.match) }))
+    .filter(({ id, shown }) => id === "select-all" || shown)
+    .map(({ match, shown, ...action }) => ({
       ...action,
-      disabled: !items.length || pending,
+      disabled: !shown || pending || selection.loading,
+      loading: selection.loading && quickPicked === action.id,
       onClick: () => {
-        const ids = new Set(items.map((item) => item.id));
-        selection.select((item) => ids.has(item.id));
+        setQuickPicked(action.id);
+        selection.selectMatching(match);
       },
     }));
   const bar = phone ? (
@@ -304,6 +309,7 @@ export function GallerySelectionBar({
               color="gray"
               aria-label={action.label}
               disabled={action.disabled}
+              loading={action.loading}
               onClick={action.onClick}
             >
               {phone ? action.short : action.label}

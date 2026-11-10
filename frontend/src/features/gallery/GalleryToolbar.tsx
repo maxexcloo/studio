@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Button, Group, Slider, Text, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { Search, SquareMinus, SquarePlus } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { SearchInput } from "../../ui/SearchInput";
 import { usePhone } from "../../ui/usePhone";
@@ -11,6 +12,7 @@ import { ChipPopup } from "../generation/Picker";
 import {
   FilterButton,
   FilterChips,
+  FilterToggle,
   GalleryFilterPanel,
   emptyGalleryFilters,
   useActiveFilters,
@@ -20,7 +22,7 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, Filter ▾, the active filters as removable chips, the result
+ * The gallery's one toolbar row: search, Filter ▾, Starred, the active filters as removable chips, the result
  * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones open the search from its
  * icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
@@ -115,10 +117,12 @@ export function GalleryToolbar({
   const results = !count
     ? undefined
     : `${count.toLocaleString()} ${kind === "video" ? "Video" : "Image"}${count === 1 ? "" : "s"}`;
+  // The open phone search keeps the actions at its end, so selecting doesn't close it.
   if (phone && searching)
     return (
-      <Group key="search" ref={toolbar} mih={44} wrap="nowrap" className={classes.mode}>
+      <Group key="search" ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
         {search}
+        {actions}
       </Group>
     );
   return (
@@ -174,7 +178,15 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
-      <FilterChips chips={chips} onClear={clear} />
+      <FilterToggle
+        label="Starred"
+        icon={icons.star}
+        on={value.starred}
+        // Starred and Uploads show one at a time, as in the popup's Show.
+        onToggle={() => onChange({ ...value, starred: !value.starred, uploads: false })}
+      />
+      {/* The pressed Starred toggle stands for its chip. */}
+      <FilterChips chips={chips.filter((chip) => chip.key !== "starred")} onClear={clear} />
       {results && !phone && (
         <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
           {results}

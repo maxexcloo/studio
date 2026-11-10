@@ -5,7 +5,7 @@ import {
 } from "../persistence/runtime.ts";
 import { galleryKey, readGalleryRows, writeGalleryRows } from "../persistence/gallery-rows.ts";
 import { generationRecord } from "../generation-record.js";
-import { hasGalleryFilters, matchesGalleryFilters } from "./filters.js";
+import { galleryFiltersTest } from "./filters.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -213,7 +213,7 @@ export function filterVisibleGallery(items) {
  * anything it depends on changes: the gallery (its revision), hide markers,
  * or a folder listing (a file added or deleted outside).
  */
-let visibleCache = { key: "", lists: new Map() };
+let visibleCache = { key: "", lists: new Map(), searches: new Map() };
 
 let visibleListBuilds = 0;
 /** How often a page list was built from the whole gallery; the paging test counts it. */
@@ -223,11 +223,21 @@ export const visibleListBuildCount = () => visibleListBuilds;
 function visibleLists() {
   refreshFolderListings();
   const key = `${galleryRevision}|${hiddenVersion}|${listingGeneration}`;
-  if (visibleCache.key !== key) visibleCache = { key, lists: new Map() };
+  if (visibleCache.key !== key) visibleCache = { key, lists: new Map(), searches: new Map() };
   return visibleCache.lists;
 }
 
-function visibleItems({ type = "", includeFailed = true, uploads = false, filter = null } = {}) {
+// The last few searches' lists, so paging through one (or Select All loading every match) cuts each
+// page from it instead of filtering the whole gallery again.
+const keptSearches = 20;
+
+function visibleItems({
+  type = "",
+  includeFailed = true,
+  uploads = false,
+  filter = null,
+  filterKey = "",
+} = {}) {
   const lists = visibleLists();
   const listKey = `${type}|${includeFailed}|${uploads}`;
   let entry = lists.get(listKey);
@@ -243,8 +253,18 @@ function visibleItems({ type = "", includeFailed = true, uploads = false, filter
     visibleListBuilds += 1;
     lists.set(listKey, entry);
   }
-  // A search filters the cached list; its positions are its own, so it is not kept.
-  return filter ? { items: entry.items.filter(filter), positions: null } : entry;
+  if (!filter) return entry;
+  // A search filters the cached list; with a `filterKey` naming it, it is kept with the list.
+  if (!filterKey) return { items: entry.items.filter(filter), positions: null };
+  const { searches } = visibleCache;
+  const searchKey = `${listKey}|${filterKey}`;
+  let searched = searches.get(searchKey);
+  if (!searched) {
+    if (searches.size >= keptSearches) searches.delete(searches.keys().next().value);
+    searched = { items: entry.items.filter(filter), positions: null };
+    searches.set(searchKey, searched);
+  }
+  return searched;
 }
 
 // Items by job (in output order) and by id, rebuilt when the gallery is replaced: it changes only
@@ -361,16 +381,12 @@ export function galleryFilter({
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 12);
-  if (
-    !terms.length &&
-    !favorites &&
-    !hasGalleryFilters({ lora, model, workflow, size, aspect, tag })
-  )
-    return null;
+  const filtered = galleryFiltersTest({ lora, model, workflow, size, aspect, tag });
+  if (!terms.length && !favorites && !filtered) return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;
-    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect, tag })) return false;
+    if (filtered && !filtered(item)) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
     return terms.every((term) => text.includes(term)) || Boolean(near?.(item));
@@ -428,7 +444,8 @@ function afterCursor(item, cursor = "") {
 /**
  * A page of the gallery; uploaded images (references.js) are listed only, and alone, with `uploads`.
  * `rank` (Find Similar) orders by its score instead, highest first, leaving out items it can't score;
- * its cursor is then the position.
+ * its cursor is then the position. `filterKey` names everything `filter` depends on, so its list is
+ * kept for the next page while the gallery is unchanged.
  */
 export function pageGallery({
   type = "",
@@ -437,10 +454,11 @@ export function pageGallery({
   includeFailed = true,
   uploads = false,
   filter = null,
+  filterKey = "",
   rank = null,
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
-  const entry = visibleItems({ type, includeFailed, uploads, filter });
+  const entry = visibleItems({ type, includeFailed, uploads, filter, filterKey });
   if (rank) {
     const all = entry.items
       .map((item) => ({ item, score: rank(item) }))
