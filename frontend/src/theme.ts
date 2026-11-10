@@ -349,6 +349,7 @@ export function studioTheme({
       // The sliding indicator alone marks the choice; separators between items flicker and fade
       // unevenly beside it.
       SegmentedControl: SegmentedControl.extend({
+        classNames: { root: classes.segmented },
         defaultProps: {
           size: "sm",
           withItemsBorders: false,
