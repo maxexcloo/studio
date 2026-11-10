@@ -24,6 +24,8 @@ export interface UpscaleStatus {
     missingNodes: string[];
     detectors: string[];
     samModels: string[];
+    /** The catalogue download that installs a face detector, while none is installed. */
+    download?: { id: string; label: string; bytes: number };
   };
 }
 

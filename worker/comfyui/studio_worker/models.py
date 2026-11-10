@@ -13,13 +13,18 @@ from pathlib import Path
 LOCK = threading.Lock()
 MAX_BYTES = 256 * 1024**3
 
+WEIGHTS = {".safetensors", ".gguf"}
+# The file types each ComfyUI folder accepts. Ultralytics detectors (Impact Subpack's
+# `ultralytics_bbox`) exist only as pickled `.pt`, so that type is accepted there alone and, like
+# every transfer, only with a published SHA-256 (the hash Studio's catalogue pins).
 FOLDERS = {
-    "checkpoints",
-    "clip_vision",
-    "diffusion_models",
-    "loras",
-    "text_encoders",
-    "vae",
+    "checkpoints": WEIGHTS,
+    "clip_vision": WEIGHTS,
+    "diffusion_models": WEIGHTS,
+    "loras": WEIGHTS,
+    "text_encoders": WEIGHTS,
+    "ultralytics_bbox": {".pt"},
+    "vae": WEIGHTS,
 }
 BUSY = set()
 # Hugging Face transfers running in this process, keyed by file path: bytes so far, a cancel flag, any error.
@@ -37,9 +42,8 @@ def target(root, folder, filename, subfolders=False):
         not isinstance(folder, str)
         or folder not in FOLDERS
         or not isinstance(filename, str)
-        or not re.fullmatch(
-            r"[^\\\x00-\x1f]+\.(?:safetensors|gguf)", filename, re.IGNORECASE
-        )
+        or not re.fullmatch(r"[^\\\x00-\x1f]+", filename)
+        or Path(filename).suffix.lower() not in FOLDERS[folder]
         or filename.startswith(".")
     ):
         raise ValueError("Choose a supported model folder and filename.")
@@ -151,7 +155,7 @@ def inventory(root):
                     p.is_symlink() for p in file.parents if directory in p.parents
                 ):
                     continue
-                if file.is_file() and file.suffix.lower() in {".safetensors", ".gguf"}:
+                if file.is_file() and file.suffix.lower() in FOLDERS[folder]:
                     stat = file.stat()
                     files.append(
                         {
