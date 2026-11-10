@@ -3,6 +3,7 @@ import { api } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
 import {
   characterLead,
+  identitySlot,
   withCharacter,
   withoutCharacter,
   type Character,
@@ -94,7 +95,10 @@ export function applyCharacter(
   profile?: Profile,
 ) {
   const first = card.references[0];
-  const target = first && nextReferenceTarget(references, profile, null);
+  // A profile's Identity slot takes it first.
+  const identity = profile && identitySlot(profile);
+  const target =
+    first && nextReferenceTarget(references, profile, identity ? { slot: identity } : null);
   return {
     references: target
       ? placeReference(references, { ...first, slot: undefined }, profile, target)

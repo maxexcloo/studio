@@ -220,12 +220,13 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
   expect(state.gallery.some((item) => item.id === "kept")).toBe(true);
 });
 
-test("A guiding reference takes its Strength, and an img2img start image says so", async ({
+test("Each reference takes one Strength: a guiding one its own, an img2img start image the denoise", async ({
   page,
 }) => {
   const state = await fixtures(page);
   const profile: Profile = {
     ...profiles[0],
+    capabilities: { ...profiles[0].capabilities, denoise: true },
     mediaInputs: [
       { id: "image", label: "Image" },
       {
@@ -274,6 +275,9 @@ test("A guiding reference takes its Strength, and an img2img start image says so
     await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
   // The test profile doesn't edit with its references, so the first one is where the result starts.
   await expect(picker.getByText("Reference 1 is the start image", { exact: false })).toBeVisible();
+  await picker
+    .getByRole("textbox", { name: "Reference 1 · Image Strength", exact: true })
+    .fill("0.4");
   const strength = picker.getByRole("textbox", {
     name: "Reference 2 · Style Strength",
     exact: true,
@@ -287,4 +291,5 @@ test("A guiding reference takes its Strength, and an img2img start image says so
     { assetId: "asset-first", slot: "image" },
     { assetId: "asset-second", slot: "style", strength: 1.2 },
   ]);
+  expect(state.jobs[0].input.denoise).toBe(0.4);
 });

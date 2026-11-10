@@ -532,6 +532,8 @@ export class McpMedia {
       reference_asset_ids = [],
       reference_role,
       reference_strengths = [],
+      // Set by generate only, never by a caller: the slot each reference fills, by place.
+      reference_slots = [],
       count = mcpGenerationCount,
       seed,
       // Every job takes `seed` itself rather than counting up from it (Generate References' views).
@@ -575,9 +577,18 @@ export class McpMedia {
       if (filled) controls.negative = filled;
     }
     const slots = profile.mediaInputs || [];
+    // Each reference fills the slot at its place, unless generate placed it (a character's image
+    // goes to an Identity slot).
+    const placed = reference_asset_ids.map((id, index) => ({
+      slot: reference_slots[index] || slots[index]?.id,
+      assetId: id,
+      ...(Number.isFinite(reference_strengths[index])
+        ? { strength: reference_strengths[index] }
+        : {}),
+    }));
     if (
       reference_asset_ids.length > slots.length ||
-      slots.some((slot, index) => slot.required && !reference_asset_ids[index])
+      slots.some((slot) => slot.required && !placed.some((item) => item.slot === slot.id))
     )
       throw new Error("Supply the references required by this profile.");
     for (const id of reference_asset_ids) this.own(owner, id, "assets");
@@ -630,13 +641,7 @@ export class McpMedia {
       model: profile.model,
       workflow: profile.workflow,
       loras: stack.map((adapter) => ({ ...adapter, enabled: true })),
-      referenceAssets: reference_asset_ids.map((id, index) => ({
-        slot: slots[index].id,
-        assetId: id,
-        ...(Number.isFinite(reference_strengths[index])
-          ? { strength: reference_strengths[index] }
-          : {}),
-      })),
+      referenceAssets: placed,
     };
     // A video's length comes only from Reuse's length (videoLength).
     for (const key of ["width", "height", "steps", "duration", "frames"])
@@ -648,11 +653,8 @@ export class McpMedia {
       profile.aspectPolicy === "reference" &&
       reference_role !== "reference"
     ) {
-      const primary = Math.max(
-        0,
-        slots.findIndex((slot) => slot.role === "start"),
-      );
-      const id = reference_asset_ids[primary];
+      const primary = slots.find((slot) => slot.role === "start") || slots[0];
+      const id = placed.find((item) => item.slot === primary?.id)?.assetId;
       if (id) Object.assign(body, await this.referenceFrame(owner, profile, id));
     }
     if (resolution) body.resolutionTier = resolution;

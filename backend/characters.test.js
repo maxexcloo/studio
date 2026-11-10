@@ -8,6 +8,7 @@ import {
   withPart,
   withoutPart,
   characterProfiles,
+  identitySlot,
   startImageSlot,
   withCharacter,
   withoutCharacter,
@@ -55,6 +56,17 @@ test("characters go to a family that keeps them, then to other editing models, n
     characterProfiles(profiles.slice(0, 2), ["kromafine", "klein"]).map((profile) => profile.id),
     ["klein"],
   );
+  // An Identity slot (such as PuLID's) keeps the face too, so it joins the families that keep characters.
+  const pulid = {
+    id: "pulid",
+    family: "sdxl",
+    mediaInputs: [{ id: "start" }, { id: "face", role: "identity" }],
+  };
+  assert.deepEqual(
+    characterProfiles([...profiles, pulid], ["pulid"]).map((profile) => profile.id),
+    ["pulid", "qwen", "klein"],
+  );
+  assert.equal(identitySlot(pulid), "face");
 });
 
 test("a shot composes character, outfit, scene, action and camera in the wording proven on live", () => {

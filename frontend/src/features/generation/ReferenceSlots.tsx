@@ -185,36 +185,82 @@ export function ReferenceSlots({
 }
 
 /**
- * How placed references play their roles: a Strength for each in a slot that maps one, and a note
- * where one is the start image the result is drawn from (img2img) rather than a guide.
+ * How placed references play their roles: one Strength for each that has one, and a note where one
+ * is the start image the result is drawn from (img2img) rather than a guide. A guiding slot's
+ * Strength is its own mapped input; the start image's is the profile's denoise.
  */
 export function ReferenceRoles({
   references,
   profile,
-  startSlot,
+  start,
   onChange,
 }: {
   references: ReferenceAsset[];
   profile?: Profile;
-  /** The img2img start slot (shared/characters.ts startImageSlot). */
-  startSlot?: string;
+  /** The img2img start slot (shared/characters.ts startImageSlot) and the denoise its Strength sets. */
+  start?: {
+    slot: string;
+    denoise?: {
+      value: number;
+      min: number;
+      max: number;
+      step: number;
+      onChange: (value: number) => void;
+    };
+  };
   onChange: (references: ReferenceAsset[]) => void;
 }) {
-  const start = references.findIndex((asset) => asset.slot === startSlot);
-  const strengths = references.flatMap((asset, index) => {
+  const startIndex = references.findIndex((asset) => asset.slot === start?.slot);
+  const strengths = references.flatMap<{
+    asset: ReferenceAsset;
+    index: number;
+    range: { min: number; max: number; step: number };
+    value: number;
+    mark?: number;
+    set: (value: number) => void;
+  }>((asset, index) => {
     const range = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.strength;
-    return range ? [{ asset, index, range }] : [];
+    if (range)
+      return [
+        {
+          asset,
+          index,
+          range,
+          value: asset.strength ?? range.default,
+          mark: range.default,
+          set: (strength: number) =>
+            onChange(
+              references.map((reference) =>
+                reference === asset ? { ...reference, strength } : reference,
+              ),
+            ),
+        },
+      ];
+    const denoise = index === startIndex ? start?.denoise : undefined;
+    return denoise
+      ? [
+          {
+            asset,
+            index,
+            range: denoise,
+            value: denoise.value,
+            mark: undefined,
+            set: denoise.onChange,
+          },
+        ]
+      : [];
   });
-  if (start < 0 && !strengths.length) return null;
+  if (startIndex < 0 && !strengths.length) return null;
   return (
     <Stack gap="xs">
-      {start >= 0 && (
+      {startIndex >= 0 && (
         <Text size="xs" c="dimmed">
-          Reference {start + 1} is the start image: the result is drawn from it (img2img) rather
-          than guided by it.
+          Reference {startIndex + 1} is the start image: the result is drawn from it (img2img)
+          rather than guided by it.
+          {start?.denoise && " Its Strength is the denoise: higher changes more."}
         </Text>
       )}
-      {strengths.map(({ asset, index, range }) => {
+      {strengths.map(({ asset, index, range, value, mark, set }) => {
         const label = `${referenceLabel(asset, index, profile)} Strength`;
         return (
           <Stack key={referenceKey(asset)} gap={4}>
@@ -223,18 +269,12 @@ export function ReferenceRoles({
             </Text>
             <StrengthControl
               label={label}
-              value={asset.strength ?? range.default}
+              value={value}
               min={range.min}
               max={range.max}
               step={range.step}
-              mark={range.default}
-              onChange={(strength) =>
-                onChange(
-                  references.map((reference) =>
-                    reference === asset ? { ...reference, strength } : reference,
-                  ),
-                )
-              }
+              mark={mark}
+              onChange={set}
             />
           </Stack>
         );
