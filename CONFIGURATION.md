@@ -394,75 +394,26 @@ An interrupted apply can resume; repeating a completed apply changes nothing.
 
 ## SQLite Migration & Rollback
 
-Native Node SQLite stores, in `studio.sqlite`, the persistent queue, sessions, Chat messages, user presets, accounts and account sessions (the `accounts` document), deletion markers (`gallery-hidden`) and the gallery (one `studio_gallery` row per item). It also holds what were JSON files beside it: workflow preferences, timings, model types, saved presets, library update checks, comparisons, MCP ownership and the MCP assistant's records as documents; each account's prompt histories and LoRA stacks as `<name>:<key>` documents (the key is the SHA-256 of the account id, empty in single-user mode); import records in `studio_library_imports`; and ingested runs in `studio_ingested_jobs`. Profiles, `history/`, guides, `config/models.json`, `library/catalogue.json`, deployment settings and media stay files. A new data folder starts with these tables. A folder from an older version that still holds `accounts.json`, `gallery.json` or `gallery-hidden.json` without the `runtime-json-v1` migration, the single `gallery` document without `gallery-rows-v1`, any of the moved JSON files without `json-stores-v1`, or gallery rows or queue records with old status words without `status-words-v1`, stops Studio at start with a message naming them, until the explicit offline migration below has run. A local development folder needs one `node backend/commands/migrate-runtime.mjs --data-dir data --apply`.
+Native Node SQLite stores, in `studio.sqlite`, the persistent queue, sessions, Chat messages, user presets, accounts and account sessions (the `accounts` document), deletion markers (`gallery-hidden`) and the gallery (one `studio_gallery` row per item). It also holds what were JSON files beside it: workflow preferences, timings, model types, saved presets, library update checks, comparisons, MCP ownership and the MCP assistant's records as documents; each account's prompt histories and LoRA stacks as `<name>:<key>` documents (the key is the SHA-256 of the account id, empty in single-user mode); import records in `studio_library_imports`; and ingested runs in `studio_ingested_jobs`. Profiles, `history/`, guides, `config/models.json`, `library/catalogue.json`, deployment settings and media stay files. A new data folder starts with these tables.
 
-Stop Studio and run a dry run against a copy of the intended data directory:
+A folder from an older version that still holds `accounts.json`, `gallery.json` or `gallery-hidden.json` without the `runtime-json-v1` migration, the single `gallery` document without `gallery-rows-v1`, any of the moved JSON files without `json-stores-v1`, or gallery rows or queue records with old status words without `status-words-v1`, stops Studio at start with a message naming them. The steps that migrate such a folder have been removed now that the live data folder has applied them; Studio v2026.11.10.4 is the last release with them. Stop Studio, run that release's `migrate-runtime` against the folder (its dry run first, then `--apply`), then start the current Studio.
+
+`migrate-runtime` ([runtime-migrations.js](backend/runtime-migrations.js)) runs each pending step in order, as a dry run unless `--apply` is given, and exits non-zero when a step reports conflicts. A step is removed once the live data folder has applied it; Git history keeps it. With no step pending, it offers only `--dream-owner <account id>`, which removes Dream answers and taste signals about other accounts' results **without a step backup**: supply it only for the one account that used Dream, with Studio stopped and a snapshot of its data taken.
 
 ```sh
 node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data
 node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data --apply
 ```
 
-The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
-
-Rehearse restoration into a separate empty directory:
+Steps that change authority for files or rows write a verified backup beneath `.backups/`, with a restore manifest. A backup restores only that step's metadata, not a complete data directory, and only into a separate empty directory, so a rehearsal cannot overwrite live state. Backups the removed steps wrote still restore:
 
 ```sh
 node backend/commands/migrate-runtime.mjs --restore /copy/of/studio-data/.backups/sqlite-STAMP --destination /empty/restore-rehearsal
 ```
 
-Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, restore the verified pre-migration metadata beside the media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
+Before a version that runs a data migration, take a ZFS snapshot of Studio's data and scale Studio to 0; to roll back, scale Studio to 0, roll the data back to the snapshot and deploy the previous image. Work done since the migration is lost. Do not run old and new writers against the same data directory.
 
-The `jsonStores` step (`json-stores-v1`, [json-stores.ts](backend/persistence/json-stores.ts)) runs last. Apply copies every moved file and its `.bak` to `.backups/json-stores-*`, commits the rows, their round-trip check and the marker in one transaction, then deletes the files. A file that is unreadable or whose row already exists is a conflict: nothing moves and the command exits non-zero. Earlier steps that rewrite preferences, timings, model types or LoRA stacks now read the moved documents, so a folder that skipped them needs a second `--apply`; the dry run after that lists nothing. Deploy a version with this step in this order:
-
-1. Take a ZFS snapshot of Studio's data.
-2. Scale Studio to 0.
-3. Run the new image's migrate-runtime dry run against the data folder and resolve any conflict.
-4. Run it with `--apply`.
-5. Rehearse `--restore` of the new `.backups/json-stores-*` folder into an empty directory.
-6. Scale Studio up.
-
-To roll back, scale Studio to 0, roll the data back to the snapshot and deploy the previous image; work done since the migration is lost.
-
-The `statusWords` step (`status-words-v1`, [status-words.ts](backend/persistence/status-words.ts)) runs after it. Studio says `failed`, `cancelled` and `cancelling` for a job's or result's end; older builds stored `error`, `canceled` and `canceling` in gallery rows and in the gallery items queue records carry, in their `status` and `upscale.status`. The dry run counts each rewrite under `words` and the affected `studio_gallery` rows and `studio_queue` records. Apply copies those rows to `.backups/status-words-*` as `studio_gallery.json` and `studio_queue.json`, then rewrites them and records the marker in one transaction. Deploy it with the steps above.
-
-The command runs all migration steps in [runtime-migrations.js](backend/runtime-migrations.js)
-in order. Its dry run names affected records and conflicts; use that plan and
-the step's source for record mappings. In addition to SQLite, it migrates old
-uploads, profile references, catalogue layers, account access, LoRA ratings,
-gallery lineage and dimensions, prompting overrides and saved environment
-settings. It never adopts unrelated jobs from shared worker history.
-
-Before applying:
-
-- Resolve reported conflicts. Missing upload files stay behind; unresolved
-  profile references need review.
-- Complete catalogue-layer, download-source and legacy-record migrations before
-  deploying a version that no longer reads those formats.
-- Review account-access changes: pending accounts join the default group and
-  retired feature restrictions go. Until migrated, pending accounts cannot
-  sign in. Migrate LoRA favourites before editing that library, or its old
-  favourites list will be lost.
-- Environment settings move into SQLite and replace its saved values because
-  the environment values were in effect. Unrelated environment keys stay.
-- `combinedProfiles` and `uncensoredMarker` write **without a step backup**.
-  `--dream-owner <account id>` also writes without one: it removes Dream answers
-  and taste signals about other accounts' results. Supply it only for the one
-  account that used Dream. Keep the complete pre-migration snapshot.
-
-Other steps write backups beneath `.backups/`, with mappings or restore
-manifests for the affected files or rows. The upload step keeps the retired
-reference store there; profile renaming preserves old-ID resolution and can
-resume after interruption. A backup restores only that step's metadata, not a
-complete data directory. Use `--restore` with each backup and a separate empty
-`--destination` to inspect the recovered files before a stopped-service restore.
-
-An administrator can inspect the same steps online with
-`POST /api/maintenance/migrations` and `{}`, or the `maintenance` MCP tool's
-`migrations` action. `{ "apply": true }` applies only steps marked safe online,
-backs them up and reloads the affected stores. Steps requiring downtime return
-`refused`; run those with the offline command. The online path excludes
-`--dream-owner`. Logs record counts, outcomes and backup folders.
+An administrator can inspect the same steps online with `POST /api/maintenance/migrations` and `{}`, or the `maintenance` MCP tool's `migrations` action. `{ "apply": true }` applies only steps marked safe online, backs them up and reloads the affected stores. Steps requiring downtime return `refused`; run those with the offline command. The online path excludes `--dream-owner`. Logs record counts, outcomes and backup folders.
 
 ## Queue, Sessions & Runtime Control
 

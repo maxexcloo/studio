@@ -1,28 +1,17 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createGalleryTable, galleryKey, galleryRowsMigration } from "./gallery-rows.ts";
-import {
-  databaseFile,
-  hasMigration,
-  jsonStoreSource,
-  legacyFiles,
-  readOfflineRuntime,
-  runtimeDatabase,
-  withOfflineDatabase,
-} from "./runtime.ts";
+import { databaseFile, jsonStoreSource, legacyFiles } from "./runtime.ts";
 
+// What earlier migrate-runtime steps backed up, so --restore still restores their backups: the
+// runtime and gallery rows steps' documents, the legacy records and status words steps' rows as
+// JSON lists, the env settings step's env file and settings document, the download sources step's
+// retired file and the profile ids step's files beside profiles, versions and LoRA stacks.
 const documents = legacyFiles.map((file) => path.basename(file, ".json"));
-// What the legacy records step (legacy-records.js) backs up beside account LoRA stacks: files, and
-// the rows it rewrites as JSON lists.
 const legacyRecordFiles = ["lora-stacks", "model-types", "studio_gallery", "studio_chat_messages"];
-// What the env settings step (env-settings.js) backs up: the env file and the settings document.
 const envSettingsFiles = [".env", "settings.json"];
-// What the download sources step (library/download-sources.js) backs up beside the catalogue.
 const downloadSourcesFiles = ["model-download-sources.json", "model-download-sources.json.bak"];
-// What the profile ids step (profile/rename.js) backs up beside profiles, versions and LoRA stacks.
 const profileIdFiles = ["guides/prompting.json", "workflow-preferences.json", "timings.json"];
-// What the status words step (status-words.ts) backs up: the rows it rewrites as JSON lists.
 const statusWordsFiles = ["studio_gallery", "studio_queue"];
 const digest = (value: string | Buffer) => crypto.createHash("sha256").update(value).digest("hex");
 
@@ -82,176 +71,10 @@ export function verifiedBackup(
   return backup;
 }
 
-/** No media is moved and no source file is rewritten. Run with Studio stopped. */
-export function planRuntimeMigration(dataDir: string) {
-  const mappings: { source: string; target: string; count: number; hash: string }[] = [];
-  const conflicts: string[] = [];
-  for (const name of documents) {
-    const source = path.join(dataDir, `${name}.json`);
-    if (!fs.existsSync(source)) continue;
-    try {
-      const bytes = fs.readFileSync(source);
-      const value = JSON.parse(bytes.toString());
-      if (name === "gallery" && !Array.isArray(value)) throw new Error("Expected an array");
-      if (name === "accounts" && (!value || !Array.isArray(value.accounts)))
-        throw new Error("Expected an accounts record");
-      if (name === "gallery-hidden" && (!value || typeof value !== "object"))
-        throw new Error("Expected deletion markers");
-      mappings.push({
-        source: `${name}.json`,
-        target: `studio_documents/${name}`,
-        count: Array.isArray(value)
-          ? value.length
-          : name === "accounts"
-            ? value.accounts.length
-            : Object.keys(value).length,
-        hash: digest(bytes),
-      });
-    } catch {
-      conflicts.push(`${name}.json is unreadable or has an unsupported shape`);
-    }
-  }
-  return { alreadyMigrated: readOfflineRuntime(dataDir).migrated, mappings, conflicts };
-}
-
-export function migrateRuntime(dataDir: string, { apply = false } = {}) {
-  const plan = planRuntimeMigration(dataDir);
-  if (!apply || plan.alreadyMigrated || plan.conflicts.length)
-    return { ...plan, applied: false, backup: "" };
-  const backup = verifiedBackup(
-    dataDir,
-    "sqlite",
-    plan.mappings.map((mapping) => ({
-      ...mapping,
-      bytes: fs.readFileSync(path.join(dataDir, mapping.source)),
-    })),
-    plan,
-  );
-  const db = runtimeDatabase(dataDir);
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const write = db.prepare("INSERT INTO studio_documents(name, value) VALUES (?, ?)");
-    for (const mapping of plan.mappings) {
-      const name = path.basename(mapping.source, ".json");
-      const text = fs.readFileSync(path.join(backup, mapping.source), "utf8");
-      write.run(name, JSON.stringify(JSON.parse(text)));
-      const saved = db.prepare("SELECT value FROM studio_documents WHERE name = ?").get(name) as {
-        value: string;
-      };
-      if (saved.value !== JSON.stringify(JSON.parse(text)))
-        throw new Error(`Restoration verification failed: ${mapping.source}`);
-    }
-    db.prepare("INSERT INTO studio_migrations(name, applied_at) VALUES (?, ?)").run(
-      "runtime-json-v1",
-      new Date().toISOString(),
-    );
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-  return { ...plan, applied: true, backup };
-}
-
 /**
- * The migrate-runtime step `gallery-rows-v1` (persistence/gallery-rows.ts): moves the `gallery`
- * document into one `studio_gallery` row per item. Plans by default; `apply` backs the document
- * up as `gallery.json` in a `.backups/gallery-rows-<time>` folder (restorable with --restore),
- * then commits the rows, the document's removal and the marker atomically. Runs after
- * runtime-json-v1, with Studio stopped; a second run finds it done.
- */
-function planGalleryRows(dataDir: string) {
-  const plan = {
-    runtimeMigrated: false,
-    alreadyMigrated: false,
-    mappings: [] as { source: string; target: string; count: number; hash: string }[],
-    conflicts: [] as string[],
-  };
-  withOfflineDatabase(dataDir, (db) => {
-    plan.runtimeMigrated = hasMigration(db, "runtime-json-v1");
-    plan.alreadyMigrated = hasMigration(db, galleryRowsMigration);
-    if (!plan.runtimeMigrated || plan.alreadyMigrated) return;
-    const row = db.prepare("SELECT value FROM studio_documents WHERE name = 'gallery'").get() as
-      | { value: string }
-      | undefined;
-    if (!row) return;
-    const items = JSON.parse(row.value);
-    if (!Array.isArray(items)) {
-      plan.conflicts.push("The gallery document is not a list");
-      return;
-    }
-    const keys = new Set<string>();
-    for (const [index, item] of items.entries()) {
-      const key = galleryKey(item);
-      if (!key) plan.conflicts.push(`Gallery item ${index} has no url or id`);
-      else if (keys.has(key)) plan.conflicts.push(`Two gallery items share the key ${key}`);
-      keys.add(key);
-    }
-    plan.mappings.push({
-      source: "gallery.json",
-      target: "studio_gallery",
-      count: items.length,
-      hash: digest(row.value),
-    });
-  });
-  return plan;
-}
-
-export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
-  const plan = planGalleryRows(dataDir);
-  if (!apply || !plan.runtimeMigrated || plan.alreadyMigrated || plan.conflicts.length)
-    return { ...plan, applied: false, backup: "" };
-  const db = runtimeDatabase(dataDir);
-  const document = () =>
-    (
-      db.prepare("SELECT value FROM studio_documents WHERE name = 'gallery'").get() as
-        | { value: string }
-        | undefined
-    )?.value;
-  const text = document();
-  const backup = verifiedBackup(
-    dataDir,
-    "gallery-rows",
-    plan.mappings.map((mapping) => ({ ...mapping, bytes: Buffer.from(text ?? "") })),
-    plan,
-  );
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    if (document() !== text) throw new Error("The gallery changed during the migration");
-    db.exec(createGalleryTable);
-    const items = text ? (JSON.parse(text) as Parameters<typeof galleryKey>[0][]) : [];
-    const insert = db.prepare("INSERT INTO studio_gallery (key, value) VALUES (?, ?)");
-    for (const item of items) insert.run(galleryKey(item), JSON.stringify(item));
-    const { count } = db.prepare("SELECT count(*) AS count FROM studio_gallery").get() as {
-      count: number;
-    };
-    // Without a document there is nothing to move, and rows Studio has written since stay.
-    if (text && count !== items.length) throw new Error("Gallery row verification failed");
-    db.prepare("DELETE FROM studio_documents WHERE name = 'gallery'").run();
-    db.prepare("INSERT INTO studio_migrations(name, applied_at) VALUES (?, ?)").run(
-      galleryRowsMigration,
-      new Date().toISOString(),
-    );
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
-  return { ...plan, applied: true, backup };
-}
-
-/**
- * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
- * uploads step's backup (uploads.js) restores the whole reference store it moved aside, the
- * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote, the
- * LoRA layers step's (library/lora-layers.js) the catalogue, the download sources step's
- * (library/download-sources.js) the catalogue and model-download-sources.json with its `.bak`
- * copy, the account access step's
- * (account-migration.js) the accounts store and the legacy records step's (legacy-records.js) the
- * LoRA stacks and model types files at their paths and the rows it rewrote as JSON lists, and the
- * env settings step's (env-settings.js) the env file and the settings document as `settings.json`,
- * the JSON stores step's (json-stores.ts) every store file at its path, and the status words step's
- * (status-words.ts) the gallery rows and queue records it rewrote as JSON lists.
+ * Restores a backup only into a separate empty directory, so a rehearsal cannot overwrite live
+ * state: each file at its path, and for a reference store (the uploads step's) the whole folder it
+ * moved aside.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -260,7 +83,7 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   for (const mapping of manifest.mappings) {
     const store = mapping.source === "reference-assets/index.json";
-    // A profile and Studio's records beside it, a profile's or guide's version (profile/rename.js).
+    // A profile and Studio's records beside it, a profile's or guide's version.
     const profile =
       /^workflows\/(\.studio-(aliases|edits|meta)|[a-z0-9][a-z0-9._-]*)\.json$/.test(
         mapping.source,
