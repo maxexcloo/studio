@@ -34,6 +34,7 @@ import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
+import { setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
@@ -290,6 +291,8 @@ export function MediaViewer({
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
   const family = useRunFamily(item, queued, related);
+  // An MCP call's other results, for the set's place in the top bar and its strip.
+  const members = setMembers(related, item);
   const iteration = useMediaIteration(item, sessionId);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
@@ -494,6 +497,18 @@ export function MediaViewer({
                       : []),
                   ]}
                 />
+              ) : item.resultSet ? (
+                <Badge
+                  variant="default"
+                  size="lg"
+                  radius="xl"
+                  style={glass}
+                  fw={500}
+                  miw={0}
+                  className={classes.setPosition}
+                >
+                  {setPosition(item, members)}
+                </Badge>
               ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
                   {currentIndex + 1} / {viewable.length}
@@ -642,6 +657,7 @@ export function MediaViewer({
             <MediaViewerDock
               item={displayed}
               family={family}
+              set={members}
               choose={(next) => {
                 setCompare(false);
                 navigate?.(next);
