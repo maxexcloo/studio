@@ -55,10 +55,13 @@ import { chipProps, iconChipProps } from "./chip";
 import { ChipPopup, ChipContent, PickerGrid, PickerHeader, PickerTile } from "./Picker";
 import { useGroupFeature } from "../auth/AccountGate";
 import { CharacterChoices } from "../characters/CharacterChoices";
+import { PromptCardChoices } from "../characters/PromptCardChoices";
 
 const referenceTabs = [
   { value: "gallery" as const, label: "Gallery" },
   { value: "characters" as const, label: "Characters" },
+  { value: "outfits" as const, label: "Outfits" },
+  { value: "scenes" as const, label: "Scenes" },
 ];
 
 export function ReferencePicker({
@@ -97,8 +100,8 @@ export function ReferencePicker({
       setDraft((previous) => ({ ...previous, input: { ...previous.input, prompt } })),
   };
   const charactersOn = useGroupFeature("characters");
-  const [characterQuery, setCharacterQuery] = useState("");
-  const [characterLayer, setCharacterLayer] = useState(false);
+  const [cardQuery, setCardQuery] = useState("");
+  const [cardLayer, setCardLayer] = useState(false);
   const list = useReferenceList({
     value,
     onChange,
@@ -308,7 +311,26 @@ export function ReferencePicker({
           All slots are filled. Choose a reference to replace it, or a selected image to remove it.
         </Text>
       )}
-      {tab === "characters" ? (
+      {tab === "outfits" || tab === "scenes" ? (
+        <>
+          <PickerHeader
+            label="References"
+            searched={tab === "outfits" ? "Outfits" : "Scenes"}
+            tabs={referenceTabs}
+            tab={tab}
+            onTabChange={(tab) => browse({ tab })}
+            query={cardQuery}
+            onQueryChange={setCardQuery}
+          />
+          <PromptCardChoices
+            kind={tab}
+            query={cardQuery}
+            prompt={prompt.value}
+            onChange={prompt.onChange}
+            onLayer={setCardLayer}
+          />
+        </>
+      ) : tab === "characters" ? (
         <>
           <PickerHeader
             label="References"
@@ -316,11 +338,11 @@ export function ReferencePicker({
             tabs={referenceTabs}
             tab={tab}
             onTabChange={(tab) => browse({ tab })}
-            query={characterQuery}
-            onQueryChange={setCharacterQuery}
+            query={cardQuery}
+            onQueryChange={setCardQuery}
           />
           <CharacterChoices
-            query={characterQuery}
+            query={cardQuery}
             references={references}
             prompt={prompt.value}
             profile={profile}
@@ -343,7 +365,7 @@ export function ReferencePicker({
               }
               settle();
             }}
-            onLayer={setCharacterLayer}
+            onLayer={setCardLayer}
           />
         </>
       ) : (
@@ -496,7 +518,7 @@ export function ReferencePicker({
         width={560}
         opened={opened}
         onOpenedChange={setOpened}
-        trap={deleteId === null && !characterLayer}
+        trap={deleteId === null && !cardLayer}
         target={trigger}
         headerEnd={
           <Button

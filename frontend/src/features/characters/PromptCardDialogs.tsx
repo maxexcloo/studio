@@ -1,0 +1,202 @@
+import { useState } from "react";
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  FocusTrap,
+  getDefaultZIndex,
+  Menu,
+  Modal,
+  Stack,
+  TextInput,
+} from "@mantine/core";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
+import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
+import { menuWidth } from "../../theme";
+import { maxCardDescription, maxCardName } from "../../../../shared/characters";
+import {
+  useDeletePromptCard,
+  useSavePromptCard,
+  type PromptCard,
+  type PromptCardKind,
+} from "./queries";
+
+/** Each kind's words: its name in titles, and what its description should hold. */
+export const promptCardText = {
+  outfits: {
+    noun: "Outfit",
+    hint: "What the person wears, footwear included, or the reference image's shoes or bare feet carry over.",
+    placeholder: "A yellow raincoat, dark jeans and black rubber boots",
+  },
+  scenes: {
+    noun: "Scene",
+    hint: "The place, light and time. It replaces a character image's own background.",
+    placeholder: "A rainy city street at night under neon signs",
+  },
+} as const;
+
+/**
+ * New, Edit and Delete for outfit or scene cards: `edit` and `remove` open their dialog, which
+ * `dialogs` renders. `onLayer` hears when one opens or closes over a sheet.
+ */
+export function usePromptCardDialogs(
+  kind: PromptCardKind,
+  onLayer: (open: boolean) => void = () => {},
+) {
+  const { noun } = promptCardText[kind];
+  const [editing, setEditing] = useState<{ card?: PromptCard }>();
+  const [deleting, setDeleting] = useState<PromptCard | null>(null);
+  const deletion = useDeletePromptCard(kind);
+  const phone = usePhone();
+  const closeEditor = () => {
+    setEditing(undefined);
+    onLayer(false);
+  };
+  const closeDelete = () => {
+    setDeleting(null);
+    onLayer(false);
+  };
+  return {
+    edit: (card?: PromptCard) => {
+      setEditing({ card });
+      onLayer(true);
+    },
+    remove: (card: PromptCard) => {
+      deletion.reset();
+      setDeleting(card);
+      onLayer(true);
+    },
+    dialogs: (
+      <>
+        <Modal
+          opened={editing !== undefined}
+          onClose={closeEditor}
+          title={`${editing?.card ? "Edit" : "New"} ${noun}`}
+          fullScreen={phone}
+          // Above the desktop References popover, as Edit Character is.
+          zIndex={phone ? undefined : getDefaultZIndex("overlay")}
+        >
+          <FocusTrap.InitialFocus />
+          {editing && (
+            <PromptCardForm
+              key={editing.card?.id || "new"}
+              kind={kind}
+              card={editing.card}
+              onClose={closeEditor}
+            />
+          )}
+        </Modal>
+        <ConfirmDialog
+          opened={deleting !== null}
+          title={`Delete ${noun}`}
+          action={`Delete ${noun}`}
+          pending={deletion.isPending}
+          error={deletion.error?.message}
+          zIndex={getDefaultZIndex("overlay")}
+          onConfirm={() => deleting && deletion.mutate(deleting.id, { onSuccess: closeDelete })}
+          onClose={closeDelete}
+        >
+          {`Delete ${deleting?.name}?`}
+        </ConfirmDialog>
+      </>
+    ),
+  };
+}
+
+function PromptCardForm({
+  kind,
+  card,
+  onClose,
+}: {
+  kind: PromptCardKind;
+  card?: PromptCard;
+  onClose: () => void;
+}) {
+  const { hint, placeholder } = promptCardText[kind];
+  const [name, setName] = useState(card?.name || "");
+  const [description, setDescription] = useState(card?.description || "");
+  const save = useSavePromptCard(kind, card?.id);
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate(
+          {
+            name: name.trim(),
+            description: description.trim(),
+            referenceIds: card?.references.map((asset) => asset.id) || [],
+          },
+          { onSuccess: onClose },
+        );
+      }}
+    >
+      <Stack>
+        <TextInput
+          label="Name"
+          required
+          maxLength={maxCardName}
+          data-autofocus
+          value={name}
+          onChange={(event) => setName(event.currentTarget.value)}
+        />
+        <TextBox
+          label="Description"
+          description={hint}
+          placeholder={placeholder}
+          autosize
+          minRows={2}
+          maxLength={maxCardDescription}
+          value={description}
+          onChange={setDescription}
+        />
+        {save.error && <Alert color="red">{save.error.message}</Alert>}
+        <DialogFooter pending={save.isPending} onCancel={onClose}>
+          <Button
+            type="submit"
+            loading={save.isPending}
+            disabled={!name.trim() || !description.trim()}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </Stack>
+    </form>
+  );
+}
+
+/** An outfit's or scene's ⋯ menu: Edit, then Delete. */
+export function PromptCardMenu({
+  kind,
+  card,
+  onEdit,
+  onDelete,
+  withinPortal = true,
+}: {
+  kind: PromptCardKind;
+  card: PromptCard;
+  onEdit: () => void;
+  onDelete: () => void;
+  /** Off inside a popover, so choosing an item is not a press outside it. */
+  withinPortal?: boolean;
+}) {
+  const { noun } = promptCardText[kind];
+  return (
+    <Menu position="bottom-end" width={menuWidth} withinPortal={withinPortal}>
+      <Menu.Target>
+        <ActionIcon variant="default" aria-label={`Actions for ${card.name}`}>
+          <icons.more size={14} />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
+          {`Edit ${noun}`}
+        </Menu.Item>
+        <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
+          {`Delete ${noun}`}
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
