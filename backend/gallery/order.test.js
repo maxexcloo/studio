@@ -94,3 +94,18 @@ test("valid dates precede missing and invalid dates, retaining batch indices and
   ];
   assert.deepEqual(ids(sortGallery(items)), expected);
 });
+
+test("a ranked page (Find Similar) orders by score, leaves out the unscored and pages by position", () => {
+  setGallery([
+    item("a", "2026-01-03"),
+    item("b", "2026-01-02"),
+    item("c", "2026-01-01"),
+    item("pending", "2026-01-04", { status: "pending" }),
+  ]);
+  const scores = { a: 0.2, b: 0.9, c: 0.5 };
+  const rank = (entry) => scores[entry.id];
+  const first = pageGallery({ rank, limit: 2 });
+  assert.deepEqual(ids(first.items), ["b", "c"]);
+  assert.equal(first.totalApprox, 3);
+  assert.deepEqual(ids(pageGallery({ rank, limit: 2, cursor: first.nextCursor }).items), ["a"]);
+});

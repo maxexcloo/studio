@@ -9,6 +9,7 @@ import {
   cleanupGalleryState,
   pageGallery,
   galleryRevisionValue,
+  galleryItem,
 } from "./store.js";
 import { galleryFilter, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
@@ -47,9 +48,10 @@ export function galleryJobResponse(store, account, id, settings = false) {
 /**
  * `jobChats(req)` maps the account's job IDs to the Chat that ran them, `{ id, title }`; items
  * carry it as `sessionId`, and `chat` (repeatable) filters by it. `near(q)` resolves to a test for
- * items that look like the search (domain/image-search.ts), or null.
+ * items that look like the search (domain/image-search.ts), or null; `similar(item)` scores items
+ * by how alike they look to it, or is null when it can't.
  */
-export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
+export function registerGalleryReadRoutes(app, { jobChats, near, similar, store }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`
    * and `aspect` may repeat (any of them matches); `q` and `workflow` are
@@ -143,7 +145,13 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
     const search = await searchFilter(query);
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
+    // `similar` (an item id, Find Similar) ranks by likeness to that image; none until it is read.
+    const source = query.similar ? galleryItem(String(query.similar)) : null;
+    const similarTo = query.similar
+      ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
+      : null;
     const page = pageGallery({
+      rank: similarTo,
       type,
       limit: limit || 200,
       cursor,
