@@ -1423,6 +1423,13 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
     f.submitted.map((body) => body.prompt),
     ["A tree", "A flower"],
   );
+  // Broken JSON or repeated prompts are refused rather than run as one image or the same image twice.
+  for (const [prompts, refusal] of [
+    ['["A tree", "A flower"先后]', /isn't valid JSON/],
+    [["A tree", "a tree."], /^prompts 1 and 2 have the same words/],
+  ])
+    assert.match(texts(await call(client, "generate", { kind: "image", prompts })), refusal);
+  assert.equal(f.submitted.length, 2);
 });
 
 test("a call of several results is one titled set, each prompt titled by the chat or left to its prompt", async (t) => {
@@ -5720,6 +5727,11 @@ test("request and prompts together run the prompts and keep the request as conte
   );
   const missing = await call(client, "generate", { kind: "image" });
   assert.match(texts(missing), /^Write the finished prompts yourself/);
+  // An empty call (a host that cancelled its arguments) is told what to send.
+  assert.match(
+    texts(await call(client, "generate", {})),
+    /as prompts, an array of strings.*\(this call had no arguments\)/,
+  );
 });
 
 test("one Generate call fans out over several models with the same prompts and returns at once", async (t) => {
