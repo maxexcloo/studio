@@ -22,6 +22,7 @@ const revisions = {
   "Comfy-Org/Lumina_Image_2.0_Repackaged": "5b072540ef86570fecb8249c505f23d5bdeb88cd",
   "Comfy-Org/Mage-Flow": "6ff68fbf3c667325e961d551691b246791d5eec0",
   "Comfy-Org/MiniMax-H3": "54472221d27c695fca9621b0c3ed52f06c4af707",
+  "Comfy-Org/MiniMax-H3-Image": "892de7cb61df49753bf15145a711154803a355cb",
   "Comfy-Org/MOSS-Image": "2929efe3cdd506c0a430bcfca70a9a8d805cc095",
   "Comfy-Org/Qwen-Image-2.1": "aacf31a6d48e707f352ecba714cee0680da3479b",
   "Comfy-Org/Qwen-Image_ComfyUI": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
@@ -320,6 +321,15 @@ export const encoderDownloads = {
       sha256: "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
     },
     {
+      file: "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      url: hf(
+        "Comfy-Org/MiniMax-H3",
+        "text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      ),
+      bytes: 27_141_342_152,
+      sha256: "bc2ced0fbea64757fa9acddccfc0b3f4819d1dcf1da6c124d690d368be283923",
+    },
+    {
       file: "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
       url: hf("Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"),
       bytes: 15_687_142_551,
@@ -559,6 +569,14 @@ export const vaeDownloads = {
       sha256: "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
     },
   ],
+  h3_image: [
+    {
+      file: "minimax_h3_image_vae_fp16.safetensors",
+      url: hf("Comfy-Org/MiniMax-H3-Image", "vae/minimax_h3_image_vae_fp16.safetensors"),
+      bytes: 1_168_505_312,
+      sha256: "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af",
+    },
+  ],
   mage_flow: [
     {
       file: "mage_flow_vae_bf16.safetensors",
@@ -649,6 +667,20 @@ export const modelDownloads = {
       ),
       bytes: 7_751_105_712,
       sha256: "ec3d4e733a771f61c052fb4856c48b336c55eaf2c65487c2a1faeb9bbda7a343",
+    },
+  ],
+  // Comfy-Org's int8 ConvRot build, as their templates use; bf16 (40 GB) outgrows a 32 GB card,
+  // and w4a8 is left out as MOSS's is.
+  minimax_h3_image_int8: [
+    {
+      file: "minimax_h3_image_pruned_int8_convrot.safetensors",
+      label: "MiniMax H3 Image",
+      url: hf(
+        "Comfy-Org/MiniMax-H3-Image",
+        "diffusion_models/minimax_h3_image_pruned_int8_convrot.safetensors",
+      ),
+      bytes: 20_979_314_802,
+      sha256: "83eb140f1ff95c068f8a6886e6d3f3d0d4ab2e07bb2fe6d2ef992a51146ee622",
     },
   ],
   flux2_dev_fp8: [

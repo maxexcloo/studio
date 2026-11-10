@@ -59,6 +59,7 @@ export const vaeKinds = {
   ltx_video: { label: "LTX video VAE", layout: "ltx" },
   h3_video: { label: "MiniMax H3 video VAE", layout: "h3v" },
   h3_audio: { label: "MiniMax H3 audio VAE", layout: "h3a" },
+  h3_image: { label: "MiniMax H3 Image VAE", layout: "unknown" },
   mage_flow: { label: "MageFlow VAE", layout: "mage" },
   p_h3_image: { label: "P-H3 Image VAE", layout: "unknown" },
 };
@@ -91,6 +92,7 @@ const vaeNameHints = [
   ["hunyuan15", /hunyuan[-_ ]?video[-_ ]?1[._]?5|hunyuanvideo15/i],
   ["hunyuan_video", /hunyuan/i],
   ["p_h3_image", /p[-_ ]?h3[-_ ]?image/i],
+  ["h3_image", /h3[-_ ]?image/i],
   ["h3_audio", /h3.*audio/i],
   ["h3_video", /h3/i],
   ["ltx_video", /ltx/i],
