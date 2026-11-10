@@ -15,7 +15,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import type { MediaItem, ReferenceAsset } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
@@ -32,6 +32,7 @@ import {
 } from "../../../../shared/characters";
 import { emptyGalleryFilters } from "../gallery/GalleryFilters";
 import { PickerGrid, PickerTile } from "../generation/Picker";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { uploadTypes, useGalleryImages } from "../generation/references";
 import { useSaveCharacter, type CharacterCard } from "./queries";
 
@@ -130,7 +131,15 @@ function CharacterForm({
     // An upload is a gallery image, listed under the Uploads filter.
     onSettled: () => client.invalidateQueries({ queryKey: ["gallery"] }),
   });
-  const error = save.error || fromGallery.error || upload.error;
+  // With a prompt assistant that reads images, the first image can be written up as the description.
+  const assistant = useQuery(assistantQuery);
+  const describe = useMutation({
+    mutationFn: (asset: ReferenceAsset) =>
+      post<{ description: string }>("/api/assistant/character", { assetId: asset.id }),
+    onSuccess: ({ description }) => setDescription(description),
+  });
+  const describable = assistant.data?.available && assistant.data.vision && images[0];
+  const error = save.error || fromGallery.error || upload.error || describe.error;
   return (
     <form
       onSubmit={(event) => {
@@ -169,6 +178,21 @@ function CharacterForm({
           maxLength={maxCharacterDescription}
           value={description}
           onChange={setDescription}
+          below={
+            describable && (
+              <Group>
+                <Button
+                  variant="subtle"
+                  size="compact-sm"
+                  leftSection={<icons.assistant size={15} />}
+                  loading={describe.isPending}
+                  onClick={() => describe.mutate(images[0])}
+                >
+                  Describe Image
+                </Button>
+              </Group>
+            )
+          }
         />
         <Stack gap={6}>
           <Text size="sm" fw={500}>

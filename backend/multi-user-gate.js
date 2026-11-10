@@ -56,7 +56,7 @@ const ordinaryRoutes = [
   ["DELETE", /^\/api\/characters\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],
-  ["POST", /^\/api\/assistant\/(animate|loras|negative|rewrite)$/],
+  ["POST", /^\/api\/assistant\/(animate|character|loras|negative|rewrite)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/discarded)?)$/],
   [
