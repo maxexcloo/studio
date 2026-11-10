@@ -10,6 +10,7 @@ import { AccountMenu } from "../auth/AccountMenu";
 import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
+import { useFinishedAway } from "./useFinishedAway";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./AppHeader.module.css";
 
@@ -74,6 +75,7 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
   const phone = usePhone();
   const library = useLibraryAccess();
   const location = useLocation();
+  useFinishedAway();
   return (
     <Group
       h="100%"
