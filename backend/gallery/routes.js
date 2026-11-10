@@ -161,6 +161,8 @@ export function registerGalleryReadRoutes(app, { jobChats, near, similar, store 
       filter: (item) =>
         recordBelongsToAccount(item, account) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
+        // `set` keeps one MCP result set's results, which a Chat card links to.
+        (!query.set || item.resultSet?.id === query.set) &&
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });

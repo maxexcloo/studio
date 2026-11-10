@@ -159,6 +159,31 @@ test("Chat cards show their request, settings and every output beneath the reply
   expect(warnings.filter((text) => /unique "key" prop/.test(text))).toEqual([]);
 });
 
+test("An MCP set's Chat card links to the set in the gallery, and a result links back to its turn", async ({
+  page,
+}) => {
+  const state = await savedChat(page);
+  const set = { id: "set-b", title: "Bird Variety", index: 0, source: "Chat" };
+  const job = state.jobs.find((entry) => entry.id === "job-b");
+  job.input.resultSet = set;
+  for (const item of state.gallery) if (item.jobId === "job-b") item.resultSet = set;
+  await page.goto("/chat/chat-a#job-job-b");
+  const card = page.getByRole("article", { name: "Iteration 2", exact: true });
+  await expect(card).toBeInViewport();
+  await card.getByRole("link", { name: "Set: Bird Variety", exact: true }).click();
+  await expect(page).toHaveURL(/\/images\?set=set-b$/);
+  await expect(page.getByRole("button", { name: /^Open image: / })).toHaveCount(3);
+  await page
+    .getByRole("button", { name: /^Open image: / })
+    .first()
+    .click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  // Details names the Chat and the client that asked, linking to the turn that made it.
+  await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  const back = page.getByRole("link", { name: "From Chat: Blue Bird Studies", exact: true });
+  await expect(back.first()).toHaveAttribute("href", "/chat/chat-a#job-job-b");
+});
+
 test("Open All flips through one iteration's results, as does opening one of them", async ({
   page,
 }, testInfo) => {

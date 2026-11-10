@@ -16,6 +16,8 @@ import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
+import { useUpscaleMany } from "./UpscaleControls";
+import { animateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
@@ -67,6 +69,15 @@ export function GallerySelectionBar({
   const favorites = useFavorites();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
+  // A set or run is animated or upscaled as a whole (Runs' Select Set).
+  const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
+  const upscale = useUpscaleMany(finishedImages);
+  const iterate = useIterate();
+  const animate = useMutation({
+    mutationFn: async (theme: AnimateTheme) => {
+      for (const item of finishedImages) await iterate(item, { kind: "animate", theme });
+    },
+  });
   // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
   // comparison votes per run.
   const navigate = useNavigate();
@@ -157,6 +168,27 @@ export function GallerySelectionBar({
             },
           ],
         ],
+      }),
+    finishedImages.length > 0 &&
+      itemAction("animate", {
+        loading: animate.isPending,
+        menu: [
+          (Object.keys(animateThemes) as AnimateTheme[])
+            .filter((theme) => theme !== "custom")
+            .map((theme) => ({
+              id: `animate-${theme}`,
+              label: animateThemes[theme],
+              icon: icons.animate,
+              disabled: animate.isPending,
+              onClick: () => animate.mutate(theme),
+            })),
+        ],
+      }),
+    finishedImages.length > 0 &&
+      itemAction("upscale", {
+        loading: upscale.isPending,
+        disabled: upscale.isPending,
+        onClick: () => upscale.mutate(),
       }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
