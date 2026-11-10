@@ -44,7 +44,13 @@ import { resolutions } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
-import { characterShots, editsReferences, withCharacter } from "../../shared/characters.ts";
+import {
+  characterImages,
+  characterProfiles,
+  characterShots,
+  editsReferences,
+  withCharacter,
+} from "../../shared/characters.ts";
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
@@ -464,7 +470,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character; character_views queues its reference views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; character_views queues its views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -855,10 +861,11 @@ export function registerGenerateTools({
       throw new Error("character_views needs character: the name or id of the card.");
     const card = args.character ? await characterFor(args.character, signal, views) : null;
     delete args.character;
-    // The views share one seed and, where the profile takes references, the card's first image.
+    // The views share one seed and, where the profile edits with references, the card's first
+    // image, which each plan's prompts then follow (characterShots).
     if (views)
       Object.assign(args, {
-        prompts: characterShots(card.description),
+        prompts: characterShots(card.description, false),
         count: 1,
         seed: args.seed ?? crypto.randomInt(2 ** 31),
         same_seed: true,
@@ -883,9 +890,6 @@ export function registerGenerateTools({
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
     }
-    // A character's description joins each prompt, as picking its card does in the composer.
-    if (card && !views)
-      args.prompts = args.prompts.map((prompt) => withCharacter(prompt, card.description));
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
       args.count > 1 &&
@@ -901,6 +905,8 @@ export function registerGenerateTools({
     const references = named.length + (card?.referenceIds.length ? 1 : 0);
     // Cloud (Grok) profiles only when the user asks for Grok or the cloud.
     const cloud = asksForCloud(request);
+    // A model named by profile_id or in the request is used even for a character.
+    let modelNamed = args.profile_id !== undefined;
     let targets;
     if (profile_ids) {
       const profiles = await media.profiles(kind || "all", owner);
@@ -929,6 +935,7 @@ export function registerGenerateTools({
             )
           : null;
       const fits = fromRequest && (fromRequest.profile.mediaInputs || []).length >= references;
+      if (fits) modelNamed = true;
       targets = [
         args.profile_id === undefined
           ? fits
@@ -945,31 +952,35 @@ export function registerGenerateTools({
           : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
       ];
     }
-    // A character keeps its identity only on a model that edits with references; an img2img start
-    // image carries its pose and layout over. Without a named model, an editing one is preferred.
-    if (
-      card?.referenceIds.length &&
-      args.profile_id === undefined &&
-      !several &&
-      !editsReferences(targets[0].profile)
-    ) {
-      const editors = localUnlessAsked(await media.profiles("image", owner), { request }).filter(
-        (profile) => profile.mediaInputs?.length && editsReferences(profile),
+    // A character keeps its identity only on a model that edits with references (an img2img start
+    // image carries its pose and layout over), best on a family that keeps characters: without a
+    // named model, Studio picks from those first (characterProfiles), in the wanted tier.
+    if (card?.referenceIds.length && !modelNamed && !several && (kind || "image") === "image") {
+      const defaultId = (await media.catalogue(owner)).defaults?.imageModel;
+      const ranked = characterProfiles(
+        localUnlessAsked(await media.profiles("image", owner), { request }),
+        [defaultId],
       );
-      let editor;
-      try {
-        if ((kind || "image") === "image")
-          editor = chooseProfile(editors, {
+      for (const pool of [ranked.filter((profile) => profile.keepsCharacters), ranked]) {
+        try {
+          const editor = chooseProfile(pool, {
             kind: "image",
             tier: wanted,
             references: 1,
-            defaultId: (await media.catalogue(owner)).defaults?.imageModel,
+            defaultId,
           });
-      } catch {
-        // None in reach (or in the tier): the usual pick stays, and the reply says it is img2img.
+          targets = [{ profile: editor, note: "" }];
+          break;
+        } catch {
+          // None in reach (or in the tier): the next pool, else the usual pick, whose reply says img2img.
+        }
       }
-      if (editor) targets = [{ profile: editor, note: "" }];
     }
+    // The model a warning names when the chosen one can't hold a character's (or reference's) face.
+    const keeper =
+      (card?.referenceIds.length || named.length) && !views
+        ? characterProfiles(localUnlessAsked(await media.profiles("image", owner), { request }))[0]
+        : undefined;
     targets = targets.filter(
       (target, index) =>
         targets.findIndex((other) => other.profile.id === target.profile.id) === index,
@@ -991,27 +1002,38 @@ export function registerGenerateTools({
               const sized = mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
                 throw new Error("Pass aspect or width and height, not both.");
-              // Views take the card's image only on a model that edits with it.
-              const room = Math.min(
-                Math.max(0, referenceCount(profile).max - named.length),
-                views ? (editsReferences(profile) ? 1 : 0) : Infinity,
-              );
+              // A character sends its first image (characterImages), only to a model that edits
+              // with it: as an img2img start image its pose and layout (a whole sheet) carry over.
+              const room = editsReferences(profile)
+                ? Math.min(Math.max(0, referenceCount(profile).max - named.length), characterImages)
+                : 0;
               const plan = {
                 ...args,
                 ...sized,
                 ...(card
                   ? { reference_asset_ids: [...named, ...card.referenceIds.slice(0, room)] }
                   : {}),
+                // Its lead starts each prompt verbatim, as in the composer.
+                ...(card
+                  ? {
+                      prompts: views
+                        ? characterShots(card.description, room > 0)
+                        : args.prompts.map((prompt) =>
+                            withCharacter(prompt, card.description, room > 0),
+                          ),
+                    }
+                  : {}),
                 profile_id: profile.id,
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
-              const fewer =
-                card && !views && room < card.referenceIds.length
-                  ? `${card.name}: ${room} of ${card.referenceIds.length} images fit this model. `
-                  : "";
               const start =
-                card?.referenceIds.length && room && !editsReferences(profile)
-                  ? `${profile.label || profile.id} starts from ${card.name}'s image (img2img), so its pose and layout carry over; a model that edits with references keeps the character in new scenes. `
+                card?.referenceIds.length && !views && !room
+                  ? `${profile.label || profile.id} can't take ${card.name}'s image as a reference, so only the description carries the character and the face will change from image to image. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same face in new outfits and scenes. `
+                  : "";
+              // A reference on an img2img model is its start image, and the reply says what follows.
+              const img2img =
+                named.length && profile.mediaInputs?.length && !editsReferences(profile)
+                  ? `${profile.label || profile.id} starts from the reference image (img2img): its pose and layout carry over and a face drifts in new scenes. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same person in new outfits and scenes. `
                   : "";
               const alone =
                 views && card.referenceIds.length && !room
@@ -1019,7 +1041,7 @@ export function registerGenerateTools({
                   : "";
               return {
                 profile,
-                note: `${note || ""}${fewer}${start}${alone}`,
+                note: `${note || ""}${start}${img2img}${alone}`,
                 plan,
                 source: "exact",
               };

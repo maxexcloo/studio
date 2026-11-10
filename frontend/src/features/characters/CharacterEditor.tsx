@@ -184,7 +184,7 @@ function CharacterForm({
         />
         <TextBox
           label="Description"
-          description="Added to the prompt when the character is picked."
+          description="Lasting looks such as age, build, hair and skin, not clothing. Leads the prompt when the character is picked."
           placeholder="Red-haired ranger, green cloak, scar over left eye"
           autosize
           minRows={2}
@@ -212,7 +212,7 @@ function CharacterForm({
             Images
           </Text>
           <Text size="xs" c="dimmed">
-            {`1 to ${maxCharacterImages}, in the order they fill a model's reference slots.`}
+            {`1 to ${maxCharacterImages}. Picking the character gives a model the first, so make it the clearest view: a model draws one person in several images twice.`}
           </Text>
           <SimpleGrid
             cols={maxCharacterImages}
