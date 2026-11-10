@@ -8,7 +8,7 @@ import type { Action } from "./ActionBar";
 import { useItemMutation } from "./useItemMutation";
 
 /**
- * Edit › Reuse Prompt for an item made without a prompt (an upload), once its suggested prompt is
+ * Edit › Recreate for an item made without a prompt (an upload), once its suggested prompt is
  * written: the composer opens on that prompt with the model it has for the item's kind, and the run
  * is one of the item's versions (backend/gallery/recreate.js).
  */
@@ -46,7 +46,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
   });
   return {
     id: "prompt-composer",
-    label: "Reuse Prompt",
+    label: "Recreate",
     description: "Open its suggested prompt in the composer",
     icon: icons.prompt,
     disabled: !item.suggestedPrompt || recreate.isPending,

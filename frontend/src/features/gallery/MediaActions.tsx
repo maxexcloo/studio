@@ -459,7 +459,7 @@ export function useMediaActions(
                 ? recreate
                 : {
                     id: "prompt-composer",
-                    label: "Reuse Prompt",
+                    label: "Recreate",
                     icon: icons.prompt,
                     disabled: action.isPending,
                     onClick: () => action.mutate("image"),
