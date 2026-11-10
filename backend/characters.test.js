@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  cardImageNote,
+  cardImageSlots,
   characterLead,
   composePrompt,
   outfitPart,
@@ -113,4 +115,57 @@ test("a reference is the img2img start image only where the profile neither edit
   assert.equal(startImageSlot({ editReferences: true, mediaInputs: slots }), undefined);
   assert.equal(startImageSlot({ mediaInputs: [{ id: "style", role: "style" }] }), undefined);
   assert.equal(startImageSlot({ mediaInputs: [] }), undefined);
+});
+
+test("outfit and scene images take a Style and a Pose/Layout slot, or spare plain slots on an editing model, else stay words", () => {
+  const both = { outfit: true, scene: true };
+  const plain = (count) =>
+    Array.from({ length: count }, (_, index) => ({ id: `image${index + 1}` }));
+  // An editing model: the character's image first, then the outfit's, then the scene's.
+  assert.deepEqual(
+    cardImageSlots({ editReferences: true, mediaInputs: plain(3) }, ["image1"], both),
+    {
+      outfit: "image2",
+      scene: "image3",
+    },
+  );
+  // One spare slot: the outfit's image goes in, the scene stays words.
+  assert.deepEqual(
+    cardImageSlots({ editReferences: true, mediaInputs: plain(2) }, ["image1"], both),
+    {
+      outfit: "image2",
+    },
+  );
+  assert.deepEqual(
+    cardImageSlots({ editReferences: true, mediaInputs: plain(2) }, ["image1"], { scene: true }),
+    {
+      scene: "image2",
+    },
+  );
+  // Guiding roles (#474): Style takes the outfit, Pose/Layout the scene, never the start or Identity.
+  const roles = [
+    { id: "start", role: "start" },
+    { id: "face", role: "identity" },
+    { id: "look", role: "style" },
+    { id: "pose", role: "layout" },
+  ];
+  assert.deepEqual(cardImageSlots({ mediaInputs: roles }, ["face"], both), {
+    outfit: "look",
+    scene: "pose",
+  });
+  assert.deepEqual(cardImageSlots({ mediaInputs: roles.slice(0, 2) }, ["face"], both), {});
+  // An img2img model's plain slot is what the result is drawn from: no card image goes there.
+  assert.deepEqual(cardImageSlots({ mediaInputs: plain(3) }, ["image1"], both), {});
+  assert.deepEqual(
+    cardImageSlots({ editReferences: true, mediaInputs: plain(3) }, ["image1"], {}),
+    {},
+  );
+  assert.equal(
+    cardImageNote("Outfit", 1),
+    "Outfit described in words; this model takes 1 reference.",
+  );
+  assert.equal(
+    cardImageNote("Scene", 2),
+    "Scene described in words; this model takes 2 references.",
+  );
 });
