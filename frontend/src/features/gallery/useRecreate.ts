@@ -1,4 +1,3 @@
-import { useMutation } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -6,6 +5,7 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { icons } from "../../ui/icons";
 import type { Action } from "./ActionBar";
+import { useItemMutation } from "./useItemMutation";
 
 /**
  * Edit › Edit Prompt for an item made without a prompt (an upload), once its suggested prompt is
@@ -15,7 +15,7 @@ import type { Action } from "./ActionBar";
 export function useRecreateAction(item: MediaItem, onApplied: () => void): Action {
   const { setDraft, changeKind } = useGenerationActions();
   const openComposer = useOpenComposer();
-  const recreate = useMutation({
+  const recreate = useItemMutation(item.id, "recreate", {
     mutationFn: () =>
       post<{ sessionId: string; jobId: string }>("/api/gallery/recreate", {
         galleryItemId: item.id,

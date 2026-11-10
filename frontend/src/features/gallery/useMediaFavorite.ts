@@ -1,10 +1,11 @@
-import { useMutation, useQueryClient, type Query } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQueryClient, type Query } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 
 /** Caches that hold media records: gallery pages (the reference picker's too), Chats and the queue. */
 const mediaCaches = new Set(["gallery", "session", "queue"]);
 const holdsMedia = (query: Query) => mediaCaches.has(String(query.queryKey[0]));
+const favoritesKey = ["favorites"];
 /** Lists filtered to starred items (key position 3), which a change alters. */
 const starredList = (query: Query) =>
   String(query.queryKey[0]) === "gallery" && query.queryKey[3] === true;
@@ -35,6 +36,7 @@ function withFavorite(value: unknown, ids: Set<string>, favorite: boolean): unkn
 export function useFavorites() {
   const cache = useQueryClient();
   return useMutation({
+    mutationKey: favoritesKey,
     mutationFn: async ({ ids, favorite }: { ids: string[]; favorite: boolean }) => {
       for (let offset = 0; offset < ids.length; offset += 500)
         await post("/api/gallery/favorite", { ids: ids.slice(offset, offset + 500), favorite });
@@ -54,11 +56,16 @@ export function useFavorites() {
   });
 }
 
-/** One item's Star toggle. */
+/** One item's Star toggle, pending while a change to that item is. */
 export function useMediaFavorite(item: MediaItem) {
   const favorites = useFavorites();
+  const pending = useIsMutating({
+    mutationKey: favoritesKey,
+    predicate: (mutation) =>
+      (mutation.state.variables as { ids: string[] } | undefined)?.ids.includes(item.id) ?? false,
+  });
   return {
-    isPending: favorites.isPending,
+    isPending: pending > 0,
     mutate: () => favorites.mutate({ ids: [item.id], favorite: !item.favorite }),
   };
 }
