@@ -7,10 +7,8 @@
   min-height: 0;
 }
 
-@media (min-width: 48em) {
-  .choices {
-    height: min(30rem, 60dvh);
-  }
+:where(:root:not([data-phone])) .choices {
+  height: min(30rem, 60dvh);
 }
 
 .stack {
