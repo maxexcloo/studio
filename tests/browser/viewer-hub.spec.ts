@@ -284,7 +284,7 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await expect.poll(height).toBeLessThan(line * 1.5);
 });
 
-test("Viewer runs queue into the strip and Edit › Reuse Prompt opens the composer", async ({
+test("Viewer runs queue into the strip and Edit › Recreate opens the composer", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
@@ -303,7 +303,7 @@ test("Viewer runs queue into the strip and Edit › Reuse Prompt opens the compo
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -393,11 +393,11 @@ test("More Like This Set is offered only for a result in a set", async ({ page }
   );
 });
 
-test("Run Again and Reuse Prompt draw a new seed; only Run Again, Same Seed keeps it", async ({
+test("Run Again and Recreate draw a new seed; only Run Again, Same Seed keeps it", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Edit queues both Run Agains at once; Reuse Prompt loads the composer.
+  // Edit queues both Run Agains at once; Recreate loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
@@ -406,7 +406,7 @@ test("Run Again and Reuse Prompt draw a new seed; only Run Again, Same Seed keep
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -450,7 +450,7 @@ const ranOn = (backend: string) => ({
   settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
 });
 
-test("Run Again, Same Seed and Reuse Prompt keep the backend a combined profile ran on", async ({
+test("Run Again, Same Seed and Recreate keep the backend a combined profile ran on", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
@@ -465,7 +465,7 @@ test("Run Again, Same Seed and Reuse Prompt keep the backend a combined profile 
     seed: 1234567,
   });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one. Focus,
   // not a tap: tapping the prompt on a phone switches to the typing layout, which hides the chips.
@@ -1585,7 +1585,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Reuse Prompt", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");

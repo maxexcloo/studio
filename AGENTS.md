@@ -207,7 +207,7 @@ the primary component reference and verify APIs against the installed version.
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
   Similar | Star, Delete. Edit changes the item itself (Edit Image, or a video's
-  Trim and the like), then reuses its prompt: Reuse Prompt and Use as Reference
+  Trim and the like), then reuses its prompt: Recreate and Use as Reference
   stage the composer, Make Character starts a card in Library › Characters, Run
   Again and Run Again, Same Seed queue from where they are; menu options expand
   in place on phones and touch screens. The phone viewer bar keeps to one row:
