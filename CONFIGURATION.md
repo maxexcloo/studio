@@ -268,7 +268,7 @@ ratio and a liked caption tag are drawn by their scores. The rest explore
 exactly one thing, in turn: a little-used profile, an unrated LoRA no result has
 taught yet, or new ground for the prompt (half from an import, where allowed).
 Thumbs-down LoRAs are never loaded. Import and Inspiration ideas need
-administrator access, Uncensored Models and enabled imports. Results stay
+administrator access and Uncensored Models. Results stay
 outside the gallery, search, exports and MCP until kept; Star also keeps them.
 Discards remain available. Variations keeps a result and queues new seeds as
 user work; More Like This keeps it and steers upcoming ideas toward it.
