@@ -52,6 +52,8 @@ export interface ServicesStatus {
   runtime: {
     configured: boolean;
     automaticLifecycle: boolean;
+    /** This account may swap running text out for its waiting media work (`POST /api/queue/:id/swap`). */
+    swap: boolean;
     reason: string;
   };
 }
