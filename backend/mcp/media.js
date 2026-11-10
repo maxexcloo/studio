@@ -1845,7 +1845,10 @@ export class McpMedia {
    */
   async resultsAll(owner, scope, { signal } = {}) {
     const jobs = await this.scopeJobs(owner, scope, { signal });
-    if (!jobs.length) throw new Error("There are no results in this conversation yet.");
+    if (!jobs.length)
+      throw new Error(
+        "There are no results in this conversation yet. For the user's earlier or starred work, call search (starred: true for starred).",
+      );
     const done = jobs.filter(
       ({ job }) =>
         finished.has(job.status) && job.outputs?.some((item) => mcpOutputPath(item?.url)),
