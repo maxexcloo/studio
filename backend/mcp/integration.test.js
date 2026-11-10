@@ -2577,7 +2577,9 @@ test("a client without a conversation header gets its MCP session's own result n
   const allPage = async (reply) => {
     const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
     return [
-      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(Result \d+)<\/h2>/g),
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(
+        /<h2>(Result \d+) · [^<]+<\/h2>/g,
+      ),
     ].map((match) => match[1]);
   };
   assert.deepEqual(await allPage(other), ["Result 1"]);
@@ -4617,9 +4619,12 @@ test('replies label links Result N with one All Results page, and Result "all" s
   assert.match(html, /<h3>Result 2 · A fox<\/h3>/);
   assert.equal(html.match(/<h2>/g).length, 1);
   assert.equal(html.match(/Still generating/g).length, 2);
+  // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
+  assert.match(html, /<title>Woodland<\/title>.*<h1>Woodland<\/h1>/);
+  assert.match(html, /<details class="prompt"><summary>Prompt<\/summary><p>A bear<\/p><\/details>/);
   assert.match(
     await (await fetch(localLink(f, first.link))).text(),
-    /<h1>Woodland › Bear Hug<\/h1>/,
+    /<title>Woodland › Bear Hug<\/title>.*<h1>Woodland › Bear Hug<\/h1>/,
   );
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
   // "show me all": one call returns every finished result under its header, plus links for the rest.

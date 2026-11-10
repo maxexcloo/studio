@@ -173,6 +173,13 @@ function outputIndex(item) {
   return suffix ? Number(suffix[1]) : 0;
 }
 
+/**
+ * A result page titled `title` (in its tab and heading), refreshing while work is `pending`, with
+ * `css` beside the shared style; the static CSP allows inline style and no script.
+ */
+const resultPage = (title, pending, body, css = "") =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${escapeHtml(title)}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;margin-bottom:1.5rem}.prompt p{opacity:.8;white-space:pre-wrap}${css}</style></head><body><h1>${escapeHtml(title)}</h1>${body}</body></html>`;
+
 export class McpMedia {
   constructor({
     dataDir,
@@ -1878,8 +1885,8 @@ export class McpMedia {
         const setHeading = set && set.id !== shownSet ? `<h2>${escapeHtml(set.title)}</h2>` : "";
         shownSet = set?.id || "";
         const heading = set
-          ? `${setHeading}<h3>Result ${number} · ${escapeHtml(this.variationTitle(jobId, job))}</h3>`
-          : `<h2>Result ${number}</h2>`;
+          ? `${setHeading}<h3>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h3>`
+          : `<h2>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h2>`;
         if (!terminal.has(job.status)) {
           const progress = Number.isFinite(job.progress)
             ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
@@ -1893,9 +1900,7 @@ export class McpMedia {
           : [];
         if (!outputs.length)
           return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : "This generation did not produce a result."}</p>${this.promptHtml(jobId, job)}</section>`;
-        const label = set
-          ? `${set.title} › ${this.variationTitle(jobId, job)}`
-          : `Result ${number}`;
+        const label = this.fullTitle(jobId, job);
         return `<section>${heading}${outputs
           .map((token) => {
             slides.push({ token, label, video: job.kind === "video" });
@@ -1921,7 +1926,15 @@ export class McpMedia {
           })
           .join("")}</div>`
       : "";
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}.viewer{display:none;position:fixed;inset:0;background:Canvas;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain}.viewer:has(:target){display:flex}.slide{flex:0 0 100%;position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:3rem clamp(2rem,6vw,3.5rem) 1rem;scroll-snap-align:center;outline:none}.slide img,.slide video{max-width:100%;max-height:100%;object-fit:contain;margin:0}.bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:1rem;margin:0;padding:.75rem 1rem}.step{position:absolute;top:50%;transform:translateY(-50%);padding:.5rem 1rem;font-size:2.5rem;line-height:1;text-decoration:none}.previous{left:0}.next{right:0}</style></head><body><h1>All Results</h1>${sections}${viewer}</body></html>`;
+    // One set's page is titled by it.
+    const sets = new Set(jobs.map(({ jobId }) => this.promptRecord(jobId)?.resultSet?.title));
+    const [only] = sets;
+    return resultPage(
+      sets.size === 1 && only ? only : "All Results",
+      pending,
+      sections + viewer,
+      `.viewer{display:none;position:fixed;inset:0;background:Canvas;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain}.viewer:has(:target){display:flex}.slide{flex:0 0 100%;position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:3rem clamp(2rem,6vw,3.5rem) 1rem;scroll-snap-align:center;outline:none}.slide img,.slide video{max-width:100%;max-height:100%;object-fit:contain;margin:0}.bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:1rem;margin:0;padding:.75rem 1rem}.step{position:absolute;top:50%;transform:translateY(-50%);padding:.5rem 1rem;font-size:2.5rem;line-height:1;text-decoration:none}.previous{left:0}.next{right:0}`,
+    );
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner with Studio's own credential. */
   async page(claims, credential) {
@@ -1938,14 +1951,6 @@ export class McpMedia {
       : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);
-    const set = this.promptRecord(claims.jobId)?.resultSet;
-    const title = pending
-      ? "Generating…"
-      : outputs.length
-        ? set
-          ? `${escapeHtml(set.title)} › ${escapeHtml(this.variationTitle(claims.jobId, job))}`
-          : "Studio Result"
-        : `Generation ${escapeHtml(job.status)}`;
     const progress = Number.isFinite(job.progress)
       ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
       : "";
@@ -1965,17 +1970,26 @@ export class McpMedia {
         : outputs.length
           ? media
           : ended) + this.promptHtml(claims.jobId, job);
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
+    return resultPage(this.fullTitle(claims.jobId, job), pending, body);
   }
-  /** A set result's own title: the one the chat gave, else its prompt's first words. */
-  variationTitle(jobId, job) {
+  /** A result's own title: the one the chat gave it in its set, else its prompt's first words. */
+  resultTitle(jobId, job) {
     const record = this.promptRecord(jobId);
-    return record?.resultSet?.variation || promptWords(record?.prompt || job?.prompt) || "Untitled";
+    return (
+      record?.resultSet?.variation || promptWords(record?.prompt || job?.prompt) || "Studio Result"
+    );
+  }
+  /** A result's title under its set's, as "Set › Result", for its page and the viewer. */
+  fullTitle(jobId, job) {
+    const set = this.promptRecord(jobId)?.resultSet;
+    return `${set ? `${set.title} › ` : ""}${this.resultTitle(jobId, job)}`;
   }
   /** The full prompt a job ran, for its result pages; one Studio wrote in the queue comes from its results. */
   promptHtml(jobId, job) {
     const prompt = this.promptRecord(jobId)?.prompt || job?.prompt;
-    return prompt ? `<p class="prompt">${escapeHtml(prompt)}</p>` : "";
+    return prompt
+      ? `<details class="prompt"><summary>Prompt</summary><p>${escapeHtml(prompt)}</p></details>`
+      : "";
   }
   summary(job) {
     return Object.fromEntries(
