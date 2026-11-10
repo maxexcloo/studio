@@ -21,7 +21,7 @@ import { copyText } from "../../ui/clipboard";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { useTouch } from "../../ui/usePhone";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import {
   DefinitionEditor,
@@ -234,6 +234,7 @@ function rowMenu(edit: (editing: Editing) => void, kind: DefinitionKind, noun: s
 
 /** Library › Profiles: generation profiles under the section's toolbar; each keeps its saved versions. */
 export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
+  const phone = usePhone();
   const [profileQuery, setProfileQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -380,16 +381,18 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                         .filter(Boolean)
                         .join(" · ") || entry.id}
                     </Text>
-                    <Text size="xs" c="dimmed" hiddenFrom="sm">
-                      {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
-                    </Text>
+                    {phone && (
+                      <Text size="xs" c="dimmed">
+                        {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
+                      </Text>
+                    )}
                   </>
                 ),
               },
               {
                 key: "guide",
                 header: "Guide",
-                visibleFrom: "sm",
+                hideOnPhone: true,
                 sortValue: guideOf,
                 cell: (entry) => (
                   <Text size="sm" c={guideOf(entry) ? undefined : "dimmed"}>
@@ -406,7 +409,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               {
                 key: "use",
                 header: "Last 30 Days",
-                visibleFrom: "md",
+                hideOnPhone: true,
                 sortValue: (entry) => statsOf(entry.id)?.runs,
                 cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
               },

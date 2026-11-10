@@ -101,7 +101,7 @@ export function UnfinishedItems() {
             {
               key: "updated",
               header: "Updated",
-              visibleFrom: "sm",
+              hideOnPhone: true,
               sortValue: (job) => job.updatedAt,
               cell: (job) => (
                 <Text size="xs" style={{ whiteSpace: "nowrap" }}>
