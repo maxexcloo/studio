@@ -16,6 +16,8 @@ export interface ComparisonRecord {
   /** The shared seed; empty when the variants were drawn with different seeds. */
   seed: string;
   jobIds: string[];
+  /** Each variant's own image, where its job made several (Compare Selected); else its first. */
+  itemIds?: string[];
   labels?: string[];
   vote: string | null;
   votedAt?: string;
@@ -69,10 +71,14 @@ export function registerCompareRoutes(
   },
 ) {
   const { store } = options;
-  /** The variant's saved image, else a placeholder from its queue record. */
-  function variantItem(ownerId: string, items: GalleryItem[], jobId: string) {
+  /** The variant's saved image (`itemId` when chosen), else a placeholder from its queue record. */
+  function variantItem(ownerId: string, items: GalleryItem[], jobId: string, itemId?: string) {
     const saved = items.find(
-      (item) => item.jobId === jobId && item.type === "image" && item.status !== "cancelled",
+      (item) =>
+        item.jobId === jobId &&
+        (!itemId || item.id === itemId) &&
+        item.type === "image" &&
+        item.status !== "cancelled",
     );
     if (saved) return saved;
     const job = store.job(ownerId, jobId);
@@ -88,11 +94,13 @@ export function registerCompareRoutes(
       ...(job.status === "failed" ? { error: job.reason } : {}),
     };
   }
+  const recordItem = (record: ComparisonRecord, items: GalleryItem[], jobId: string) =>
+    variantItem(record.ownerId, items, jobId, record.itemIds?.[record.jobIds.indexOf(jobId)]);
   function show(record: ComparisonRecord, items: GalleryItem[]) {
     const variants = record.jobIds.map((jobId, index) => ({
       jobId,
       label: record.labels?.[index] || `Variant ${letter(index)}`,
-      item: variantItem(record.ownerId, items, jobId),
+      item: recordItem(record, items, jobId),
     }));
     const shared = (key: "prompt" | "negative") =>
       new Set(variants.map((variant) => variant.item?.[key] || "")).size === 1
@@ -121,7 +129,7 @@ export function registerCompareRoutes(
     ]);
   }
   /** Records an existing set of the owner's image jobs, such as an MCP fan-out run. */
-  function create(ownerId: string, jobIds: string[], labels?: string[]) {
+  function create(ownerId: string, jobIds: string[], labels?: string[], itemIds?: string[]) {
     const seeds = new Set(
       jobIds.map((id) => String(store.job(ownerId, id)?.input.seed ?? "")).filter(Boolean),
     );
@@ -131,6 +139,7 @@ export function registerCompareRoutes(
       createdAt: new Date().toISOString(),
       seed: seeds.size === 1 ? [...seeds][0] : "",
       jobIds,
+      ...(itemIds ? { itemIds } : {}),
       ...(labels ? { labels } : {}),
       vote: null,
     };
@@ -169,7 +178,8 @@ export function registerCompareRoutes(
       ? res.json(show(record, items))
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
   });
-  // MCP records its multi-model runs through this one.
+  // MCP records its multi-model runs through this one, and Compare Selected the chosen images
+  // (`itemIds`, one per job).
   directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
     const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
     if (!items)
@@ -177,13 +187,17 @@ export function registerCompareRoutes(
         status: 403,
         payload: { ok: false, error: "Gallery access is disabled for this account." },
       };
-    const { jobIds, labels } = body || {};
+    const { jobIds, labels, itemIds } = body || {};
     if (
       !Array.isArray(jobIds) ||
       !sized(jobIds) ||
       jobIds.some((id) => typeof id !== "string") ||
       new Set(jobIds).size !== jobIds.length ||
-      !labelsValid(labels, jobIds.length)
+      !labelsValid(labels, jobIds.length) ||
+      (itemIds !== undefined &&
+        (!Array.isArray(itemIds) ||
+          itemIds.length !== jobIds.length ||
+          itemIds.some((id) => typeof id !== "string")))
     )
       return {
         status: 400,
@@ -196,9 +210,11 @@ export function registerCompareRoutes(
         ? job.input.kind !== "video" && job.operation !== "upscale"
         : items.some((item) => item.jobId === id && item.type === "image");
     };
-    if (!jobIds.every(image))
+    const chosen = (id: string, index: number) =>
+      items.some((item) => item.id === id && item.jobId === jobIds[index] && item.type === "image");
+    if (!jobIds.every(image) || (itemIds && !itemIds.every(chosen)))
       return { status: 404, payload: { ok: false, error: "A comparison image is unavailable." } };
-    const record = create(ownerId, jobIds, labels as string[] | undefined);
+    const record = create(ownerId, jobIds, labels as string[] | undefined, itemIds);
     return { status: 201, payload: show(record, items) };
   });
   // Every variant shares the seed and runs as one queue set; a refused variant cancels the rest.
@@ -272,7 +288,7 @@ export function registerCompareRoutes(
       vote !== null &&
       (typeof vote !== "string" ||
         !record.jobIds.includes(vote) ||
-        variantItem(record.ownerId, items, vote)?.status !== "done")
+        recordItem(record, items, vote)?.status !== "done")
     )
       return res.status(400).json({ ok: false, error: "Choose a finished, available variant." });
     record.vote = vote;
@@ -283,7 +299,7 @@ export function registerCompareRoutes(
         record.ownerId,
         vote,
         record.jobIds.filter(
-          (jobId) => jobId !== vote && variantItem(record.ownerId, items, jobId)?.status === "done",
+          (jobId) => jobId !== vote && recordItem(record, items, jobId)?.status === "done",
         ),
       );
     return res.json(show(record, items));

@@ -3,6 +3,7 @@ import { emptyGalleryFilters, type GalleryFilterValues } from "../gallery/Galler
 import type { ReferenceTarget } from "./references";
 
 interface ReferenceBrowserState {
+  tab: "gallery" | "characters";
   target: ReferenceTarget | null;
   query: string;
   filters: GalleryFilterValues;
@@ -11,6 +12,7 @@ interface ReferenceBrowserState {
 // Owned by the editor so closing or remounting the picker keeps its browsing position.
 export function useReferenceBrowser() {
   const [state, setState] = useState<ReferenceBrowserState>({
+    tab: "gallery",
     target: null,
     query: "",
     filters: emptyGalleryFilters,

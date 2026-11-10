@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesGalleryFilters } from "./filters.js";
+import { matchesGalleryFilters, topCaptionTags } from "./filters.js";
 
 const item = {
   model: "flux.safetensors",
@@ -104,4 +104,18 @@ test("a filter with several values matches any of them, and filters still combin
   assert.deepEqual(filterValues("x"), ["x"]);
   assert.equal(hasGalleryFilters({ model: [], size: "" }), false);
   assert.equal(hasGalleryFilters({ aspect: ["square"] }), true);
+});
+
+test("caption tags filter whole, any of them, and the facet lists the most used first", () => {
+  const tagged = (...tags) => ({ status: "done", caption: { text: "", tags } });
+  assert.equal(matchesGalleryFilters(tagged("beach", "sunset"), { tag: ["sunset", "snow"] }), true);
+  assert.equal(matchesGalleryFilters(tagged("sunsets"), { tag: "sunset" }), false);
+  assert.equal(matchesGalleryFilters({ status: "done" }, { tag: "beach" }), false);
+  assert.deepEqual(
+    topCaptionTags([tagged("beach", "sunset"), tagged("sunset", "sunset"), tagged("anchor")], 2),
+    [
+      { value: "sunset", label: "sunset", count: 2 },
+      { value: "anchor", label: "anchor", count: 1 },
+    ],
+  );
 });

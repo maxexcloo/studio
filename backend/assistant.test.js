@@ -206,6 +206,8 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
     /Fixture Image[\s\S]*Lead with the light\.[\s\S]*Style: Portrait: make the person the clear focus/,
   );
   assert.doesNotMatch(body.messages[0].content, /x\.invalid/, "no guide sources");
+  // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
+  assert.match(body.messages[0].content, /own descriptions of people and things .* word for word/);
   assert.equal(body.messages[1].content, "secret cabin");
   assert.match(lines[0], /^Prompt assistant rewrite for custom:fixture in \d+ ms$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
@@ -615,6 +617,19 @@ test("caption sends the image and reads the description and tags, or plain text 
     tags: [],
     model: "cloud/auto",
   });
+});
+
+test("character describes a card's image as one short phrase of lasting details", async () => {
+  const seen = fakeGateway(() => json('  "Red-haired woman, green cloak,\nscar over left eye."'));
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  assert.deepEqual(await engine.character({ image: { mime: "image/jpeg", data: "AAAA" } }), {
+    description: "Red-haired woman, green cloak, scar over left eye",
+    model: "cloud/auto",
+  });
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /lasting look.*Leave out clothing, the setting, pose/s);
+  assert.equal(user.content[1].type, "image_url");
+  assert.equal(seen.calls[0].body.reasoning_effort, "none");
 });
 
 test("title summarises the prompt in a few words, with reasoning off", async () => {

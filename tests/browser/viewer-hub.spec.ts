@@ -365,6 +365,28 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
 });
 
+test("Edit › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Edit");
+  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+});
+
+test("More Like This Set is offered only for a result in a set", async ({ page }) => {
+  await seed(page);
+  await viewerAction(page, "Edit");
+  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
+    0,
+  );
+});
+
 test("Run Again and Edit Prompt draw a new seed; only Repeat Exactly keeps it", async ({
   page,
 }) => {
@@ -480,6 +502,124 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
       referenceAssets: [{ assetId: "asset-hub", slot: "start" }],
     },
   });
+});
+
+test("An Animate run stays with the image it started on while the viewer moves between images", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  const bird = "An amber bird";
+  const fox = "An ivory fox";
+  for (const [id, prompt, createdAt] of [
+    ["first", bird, stamp],
+    ["second", fox, "2026-01-01T00:00:00.000Z"],
+  ]) {
+    const item = {
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      width: 1024,
+      height: 1024,
+      createdAt,
+      settings: { profileId: "image:test" },
+    };
+    state.sessions.push({
+      id: `session-${id}`,
+      title: prompt,
+      inputs: {},
+      createdAt,
+      updatedAt: createdAt,
+    });
+    state.jobs.push({
+      id: item.jobId,
+      jobId: item.jobId,
+      sessionId: `session-${id}`,
+      status: "completed",
+      operation: "image",
+      input: { kind: "image", prompt, profileId: "image:test" },
+      items: [item],
+      outputs: [item],
+      createdAt,
+      updatedAt: createdAt,
+    });
+    state.gallery.push(item);
+  }
+  // The queue holds the animation's submission until released.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/sessions\/[^/]+\/generations$/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: `Open image: ${bird}`, exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const animate = viewer.getByRole("button", { name: "Animate", exact: true });
+  // Desktop uses the arrows, Chromium phones swipe and WebKit phones take the arrow keys.
+  const { isMobile, browserName } = testInfo.project.use;
+  const touch = isMobile && browserName !== "webkit" && (await page.context().newCDPSession(page));
+  /** Moves from one image to the other: the fox is next. */
+  async function move(from: string, to: string) {
+    const next = from === bird;
+    const shown = viewer.getByRole("img", { name: to, exact: true });
+    if (touch)
+      // A swipe as the last image is still settling slides back, so it swipes again.
+      await expect(async () => {
+        const box = (await viewer.getByRole("img", { name: from, exact: true }).boundingBox())!;
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const points = (dx: number) => [{ x: x + dx, y }];
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: points(0),
+        });
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: points(next ? -150 : 150),
+        });
+        await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await expect(shown).toBeVisible({ timeout: 1000 });
+      }).toPass();
+    else if (isMobile) await page.keyboard.press(next ? "ArrowRight" : "ArrowLeft");
+    else
+      await viewer
+        .getByRole("button", { name: `${next ? "Next" : "Previous"} Generation`, exact: true })
+        .click();
+    await expect(shown).toBeVisible();
+  }
+  await animate.click();
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect(animate).toHaveAttribute("data-loading");
+
+  await move(bird, fox);
+  await expect(animate).not.toHaveAttribute("data-loading");
+  await expect(animate).toBeEnabled();
+
+  await move(fox, bird);
+  await expect(animate).toHaveAttribute("data-loading");
+
+  // Released while the fox shows, the video still joins the bird's versions, not the fox's.
+  await move(bird, fox);
+  release();
+  await expect.poll(() => state.jobs.length).toBe(3);
+  expect(state.jobs[2]).toMatchObject({
+    operation: "animate",
+    parentJobId: "job-first",
+    parentItemId: "first",
+    input: {
+      kind: "video",
+      writing: { kind: "animate", theme: "living", source: bird },
+    },
+  });
+  const versions = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(versions).toHaveCount(0);
+  await move(fox, bird);
+  await expect(animate).not.toHaveAttribute("data-loading");
+  await expect(versions.getByRole("listitem")).toHaveCount(2);
 });
 
 test("Animate runs local Fast unless Quality is chosen, and keeps the choice as the account's", async ({
@@ -1237,6 +1377,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     expect(new Set(tops).size).toBe(1);
     await row[4].click();
     await expect(page.getByRole("menuitem")).toHaveText([
+      "Find Similar",
       "Continue in Chat",
       "Copy",
       "Download",

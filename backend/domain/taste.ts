@@ -430,6 +430,47 @@ export function preferenceSignal(
   };
 }
 
+/** A gallery result as set preferences read it. */
+interface SetResult {
+  id: string;
+  jobId?: string;
+  ownerId?: string;
+  status?: string;
+  favorite?: boolean;
+  resultSet?: { id: string };
+}
+/**
+ * Starring a result of an MCP set picks it from the set, like a compare vote: a preference for it
+ * over each other run of the set the owner left unstarred. `values` reads a result's recorded values.
+ */
+export function setPreferenceSignals(
+  starred: SetResult[],
+  gallery: SetResult[],
+  values: (item: SetResult) => ChoiceValues,
+): Omit<TasteSignal, "at">[] {
+  return starred.flatMap((winner) => {
+    const set = winner.resultSet?.id;
+    if (!set) return [];
+    const others = new Map<string, SetResult>();
+    for (const item of gallery)
+      if (
+        item.resultSet?.id === set &&
+        item.jobId &&
+        item.jobId !== winner.jobId &&
+        item.status === "done" &&
+        !item.favorite &&
+        (item.ownerId || "") === (winner.ownerId || "")
+      )
+        others.set(item.jobId, item);
+    return [...others.values()].map((other) =>
+      preferenceSignal(
+        { jobId: winner.jobId, values: values(winner) },
+        { jobId: other.jobId, values: values(other) },
+      ),
+    );
+  });
+}
+
 /** One side of a Dream comparison: its job, recorded values and the label of what it varies. */
 interface PairSide {
   jobId: unknown;

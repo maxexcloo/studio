@@ -351,6 +351,18 @@ function findGalleryItemForAccount(id, account) {
   );
 }
 
+/**
+ * The account's own photo a video job starts from (its first reference), or null. Extend starts
+ * from a video's frame, so it has none.
+ */
+export function animatedPhoto(job) {
+  if (job.input?.kind !== "video") return null;
+  const item = findGalleryItemForAccount(job.input.referenceAssets?.[0]?.assetId, {
+    userId: job.ownerId,
+  });
+  return item?.type === "image" && item.status === "done" ? item : null;
+}
+
 export async function publicGalleryBuffer(item) {
   const imported = importedImageFile(item);
   if (imported && fs.existsSync(imported))
