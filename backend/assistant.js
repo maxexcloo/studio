@@ -478,19 +478,35 @@ export function createAssistant(
     return resolved;
   };
 
-  /** Local while a local text workload runs (reading images as it says), otherwise the cloud, which always does. */
-  async function route() {
-    return (await localText()) || { model: settings().cloud, vision: true };
+  /**
+   * Local while a local text workload runs (reading images as it says), otherwise the cloud, which
+   * always does. `prefer` is an account's Prompt Writing preference (account-preferences.js):
+   * "cloud" takes the cloud first; "local" is the usual route, its `note` saying when no local
+   * model ran it. Calls for no account (titles, captions) pass none.
+   */
+  async function route(prefer) {
+    const cloud = { model: settings().cloud, vision: true, note: "" };
+    if (prefer === "cloud") return cloud;
+    const local = await localText();
+    if (local) return { ...local, note: "" };
+    return prefer === "local"
+      ? { ...cloud, note: "No local text model is running, so the cloud wrote this." }
+      : cloud;
   }
 
   /** The Bifrost model calls ask for: the administrator's choice, otherwise the route's, uncensored when `explicit`. */
-  async function modelFor(task, explicit = false) {
-    return settings().chosen || uncensoredAlias((await route()).model, explicit);
+  async function modelFor(task, explicit = false, prefer) {
+    return settings().chosen || uncensoredAlias((await route(prefer)).model, explicit);
   }
 
   /** Whether the route the calls take reads images. */
-  async function supportsVision() {
-    return (await route()).vision;
+  async function supportsVision(prefer) {
+    return (await route(prefer)).vision;
+  }
+
+  /** Why writing for an account's `prefer`ence ran on the other side, or ""; the administrator's model always runs. */
+  async function writerNote(prefer) {
+    return settings().chosen ? "" : (await route(prefer)).note;
   }
 
   /** A cached GET against the gateway's root, or `fallback` (cached briefly) when it fails. */
@@ -707,6 +723,7 @@ export function createAssistant(
     stack = [],
     examples = [],
     negative = false,
+    prefer,
     signal,
     onDelta,
   } = {}) {
@@ -721,10 +738,10 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const model = await modelFor("rewrite", explicit);
+    const model = await modelFor("rewrite", explicit, prefer);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
-    const vision = images.length ? await supportsVision() : false;
+    const vision = images.length ? await supportsVision(prefer) : false;
     const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
     let system;
     let user = original;
@@ -746,7 +763,14 @@ export function createAssistant(
         examples: examples.slice(0, maxExamples),
         negative,
       });
-    const base = { preset: preset.id, model, vision, referencesRead: vision && images.length > 0 };
+    const sideNote = await writerNote(prefer);
+    const base = {
+      preset: preset.id,
+      model,
+      vision,
+      referencesRead: vision && images.length > 0,
+      ...(sideNote ? { note: sideNote } : {}),
+    };
     try {
       const reply = await chat({
         call: "rewrite",
@@ -787,6 +811,7 @@ export function createAssistant(
     cfg,
     stack = [],
     infos = {},
+    prefer,
     signal,
   } = {}) {
     if (negativeUnused(guide) || profile?.capabilities?.negativePrompt === false)
@@ -795,7 +820,8 @@ export function createAssistant(
     const fallback =
       recommendedNegative(guide, { cfg: cfg ?? 2, stack, infos }) ||
       String(guide?.negative?.default || "").trim();
-    const model = await modelFor("negative");
+    const model = await modelFor("negative", false, prefer);
+    const sideNote = await writerNote(prefer);
     const system = [
       `You write negative prompts for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || "in use"}.`,
       "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artefacts, defects, styles to avoid), at most 40 words, no preamble.",
@@ -819,7 +845,14 @@ export function createAssistant(
       const written = cleanPrompt(reply.text, 600).replace(/^negative(?: prompt)?\s*:\s*/i, "");
       if (!written) throw new AssistantError("unusable reply");
       note("negative", profile, started);
-      return { negative: written, unused: false, source: "assistant", model, ms: now() - started };
+      return {
+        negative: written,
+        unused: false,
+        source: "assistant",
+        model,
+        ...(sideNote ? { note: sideNote } : {}),
+        ms: now() - started,
+      };
     } catch (error) {
       rethrowCancel(error);
       note("negative", profile, started, failure(error));
@@ -1172,6 +1205,7 @@ export function createAssistant(
     settings,
     model: modelFor,
     supportsVision,
+    writerNote,
     listModels,
     listModelDetails,
     chat,

@@ -482,7 +482,8 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   await expect(first.getByText("A blue bird in soft daylight", { exact: true })).toBeVisible();
   expect(state.jobs[1].parentJobId).toBe(state.jobs[0].id);
   expect(state.chatRequests[2].revision.input.prompt).toBe("A blue bird in watercolour");
-  expect(state.chatRequests[2].modelId).toBe("text:test");
+  // Without a picked model, Studio answers on the account's default and says when it gave way.
+  expect(state.chatRequests[2].modelId).toBeUndefined();
   await page.reload();
   await expect(
     page.getByText("I’ll create a blue bird with your selected settings.", { exact: true }),

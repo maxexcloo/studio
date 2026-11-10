@@ -12,6 +12,7 @@
  * prompt into the item; a failure throws with the reason, which fails the item.
  */
 import { mayUseFeature } from "./account-policy.js";
+import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
@@ -83,6 +84,8 @@ export function createPromptStage({
     if (issue) throw new Error(issue.error);
     const profile = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!profile) throw new Error("The model is no longer available to this account.");
+    // Written where the account's Prompt Writing preference says.
+    const prefer = accountPreferences(job.ownerId || "").writing === "cloud" ? "cloud" : "local";
     if (writing.kind === "set")
       return writeSetPrompt({
         engine,
@@ -90,6 +93,7 @@ export function createPromptStage({
         guide: guide(profile),
         title: job.input.resultSet?.title || "",
         prompts: setPrompts(job),
+        prefer,
         signal,
         onThinking,
         onDelta,
@@ -103,6 +107,7 @@ export function createPromptStage({
       writing,
       clip: animateClip(job.input, profile),
       explicit: !access || mayUseFeature(access, "uncensoredModels"),
+      prefer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),
       signal,

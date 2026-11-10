@@ -22,7 +22,8 @@ test.after(() => {
 });
 
 const { loraCatalogue } = await import("../lora/info.js");
-const { createModelCatalogue, loraAllowed, modelsForAccount } = await import("./catalogue.js");
+const { createModelCatalogue, loraAllowed, modelsForAccount, withPreferredDefaults } =
+  await import("./catalogue.js");
 
 test("the Library lists a worker's last known files without waiting on it", async () => {
   const info = { LoraLoader: { input: { required: { lora_name: [["kept.safetensors"]] } } } };
@@ -64,4 +65,37 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   assert.deepEqual(shown({ ...member(true), role: "administrator" }).loras, names);
   assert.deepEqual(shown({ ...member(false), role: "administrator" }).loras, limited.loras);
   assert.equal(loraAllowed(undefined)("explicit.safetensors"), true);
+});
+
+test("default profiles sit on the preferred side while it can run, otherwise the other with a note", () => {
+  const models = {
+    defaults: { imageModel: "flux", videoModel: "wan" },
+    profiles: [
+      { id: "grok-image", label: "Grok Image", kind: "image" },
+      { id: "flux", label: "Flux", kind: "image" },
+      { id: "krea", label: "Krea", kind: "image" },
+      { id: "grok-video", label: "Grok Video", kind: "video" },
+      { id: "wan", label: "Wan", kind: "video", availability: "parked" },
+    ],
+  };
+  const local = withPreferredDefaults(models, {});
+  assert.deepEqual(local.defaults, { imageModel: "flux", videoModel: "grok-video" });
+  assert.deepEqual(local.defaultNotes, {
+    video: "No local video model is running, so this runs in the cloud.",
+  });
+  const cloud = withPreferredDefaults(models, { images: "cloud", videos: "quality" });
+  assert.deepEqual(cloud.defaults, { imageModel: "grok-image", videoModel: "grok-video" });
+  // Without a cloud profile for the account, Cloud gives way to the deployment's local default.
+  const noCloud = withPreferredDefaults(
+    { ...models, profiles: models.profiles.filter((profile) => !profile.id.startsWith("grok")) },
+    { images: "cloud" },
+  );
+  assert.equal(noCloud.defaults.imageModel, "flux");
+  assert.match(
+    noCloud.defaultNotes.image,
+    /No cloud image model is available, so this runs locally/,
+  );
+  // With nothing that can run, the deployment's default stays and its jobs wait.
+  assert.equal(noCloud.defaults.videoModel, "wan");
+  assert.equal(noCloud.defaultNotes.video, undefined);
 });

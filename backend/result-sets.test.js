@@ -75,6 +75,7 @@ test("a set variation is written from the set's title and its prompts so far", a
   const stage = createPromptStage({
     engine: {
       model: async () => "writer",
+      writerNote: async () => "",
       chat: async (request) => {
         calls.push(request);
         return { text: '{"title": "Heron Monk", "prompt": "A heron monk in a misty temple"}' };

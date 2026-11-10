@@ -43,12 +43,13 @@ export function chatModelAllowed(id, patterns) {
  * Names the text workloads serving each model, adding workload models the gateway leaves out
  * while they are stopped. With `phases` (an account that may not start workloads), a
  * workload-served model is listed while one of its workloads runs, and marked `parked` while all
- * were stopped on purpose, so it reads as parked rather than missing.
+ * were stopped on purpose, so it reads as parked rather than missing. Workload models the gateway
+ * leaves out are `local`.
  */
 export function servedChatModels(models, workloads, phases) {
   const stopped = [...new Set(workloads.map((item) => item.model).filter(Boolean))]
     .filter((id) => !models.some((model) => model.id === id))
-    .map((id) => ({ id, label: id }));
+    .map((id) => ({ id, label: id, local: true }));
   return [...models, ...stopped].flatMap((model) => {
     const served = workloads.filter((item) => item.model === model.id).map(({ id }) => id);
     if (!served.length) return [model];
@@ -56,4 +57,25 @@ export function servedChatModels(models, workloads, phases) {
     if (served.some((id) => phases[id] === "running")) return [model];
     return served.every((id) => phases[id] === "parked") ? [{ ...model, parked: true }] : [];
   });
+}
+
+/**
+ * Chat's model where the person picked none: the first that can answer now (`ready`) on the side
+ * the account's Chat preference chooses (`prefer`, account-preferences.js; Local unless Cloud),
+ * otherwise the first on the other side, with a `note` saying so; with neither, the first listed.
+ * Local models carry `local` (chat-service.js).
+ */
+export function preferredChatModel(models, prefer, ready = (model) => !model.parked) {
+  const cloudFirst = prefer === "cloud";
+  const first = (cloud) => models.find((model) => !model.local === cloud && ready(model));
+  const preferred = first(cloudFirst);
+  if (preferred) return { id: preferred.id, note: "" };
+  const other = first(!cloudFirst);
+  if (!other) return { id: models[0]?.id, note: "" };
+  return {
+    id: other.id,
+    note: cloudFirst
+      ? "No cloud text model is available, so a local one answered."
+      : "No local text model is running, so a cloud one answered.",
+  };
 }

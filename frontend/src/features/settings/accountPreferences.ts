@@ -5,6 +5,8 @@ import { modelsQuery } from "../generation/GenerationProvider";
 
 /** Where the account prefers videos to run: Cloud, or the local Fast or Quality tier. */
 export type VideosPreference = "cloud" | "fast" | "quality";
+/** Where the account prefers an area's work to run; the other side takes over, saying so, when it can't. */
+export type SidePreference = "cloud" | "local";
 /** The account's own preferences (backend/account-preferences.js). */
 export interface Preferences {
   cloudModels: boolean;
@@ -12,6 +14,10 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
+  /** Where Chat, prompt writing and images run by default; unsaved, Local. */
+  chat?: SidePreference;
+  images?: SidePreference;
+  writing?: SidePreference;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */
   videos?: VideosPreference;
 }
@@ -50,8 +56,12 @@ export function useSavePreferences() {
       // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
       if ("spicyPrompts" in patch || "uncensoredModels" in patch)
         void client.invalidateQueries({ queryKey: ["suggestions"] });
-      // Animate's model follows where videos run.
+      // Default models follow where the account prefers each area to run.
+      if ("images" in patch || "videos" in patch)
+        void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
       if ("videos" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
+      if ("chat" in patch) void client.invalidateQueries({ queryKey: ["chat-status"] });
+      if ("writing" in patch) void client.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
   });

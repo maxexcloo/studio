@@ -76,6 +76,11 @@ export interface Draft {
   parentItemId?: string;
   presetId?: string;
   presetTitle?: string;
+  /**
+   * The account's default profile, while the draft still runs on it rather than on one the person
+   * picked: the draft then follows the default as the account's preferences or workers change.
+   */
+  defaultedProfileId?: string;
 }
 /**
  * The draft moved to `profile` for a picked character (CharacterChoices): the profile's settings,
@@ -168,7 +173,8 @@ function useGenerationState(workspace: Workspace, remember: boolean) {
   function update(patch: Partial<GenerationInput>) {
     setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));
   }
-  function selectProfile(profile: Profile) {
+  /** Moves the draft to `profile`: one the person picked, or the account's default (`defaulted`). */
+  function selectProfile(profile: Profile, defaulted = false) {
     // The output toggle restores that mode's whole draft, including its chosen profile.
     if (form.getValues().input.kind !== profile.kind) {
       changeKind(profile.kind);
@@ -178,6 +184,7 @@ function useGenerationState(workspace: Workspace, remember: boolean) {
       ...previous,
       input: inputForProfile(previous.input, profile),
       operation: profile.kind === "video" ? "animate" : previous.operation,
+      defaultedProfileId: defaulted ? profile.id : undefined,
     }));
   }
   return {
