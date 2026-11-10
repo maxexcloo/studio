@@ -69,10 +69,10 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
-  paste: ClipboardPaste,
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,
+  paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */
