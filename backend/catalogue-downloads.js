@@ -6,7 +6,52 @@ import { families } from "./family-catalogue.js";
 import { existingCopy } from "./model/downloads.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
 
-const hf = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${file}`;
+// The commit each repository's files are fetched at, so a download is always the file its
+// `sha256` names. When a file changes upstream, the Library's update check offers it as an Update
+// (library/updates.js); moving a pin here means updating that repository's hashes and sizes too.
+const revisions = {
+  "black-forest-labs/flux-3-image-klein-comfy": "9d36114cf7a2e03a45c28f5cc4987d20ebfdb6c1",
+  "black-forest-labs/FLUX.2-klein-4b-fp8": "5b4408e59397a4a37ccb46afe426d8ed86379441",
+  "circlestone-labs/Anima": "f973fc41ec7545364ac9776c2440285f43ff2a30",
+  "Comfy-Org/ERNIE-Image": "50509a88bc4fb9e89583a98605f4c81dc221eb8c",
+  "Comfy-Org/flux2-dev": "9630c1b4b6e690497ae0c19bb6b1b35d4ebedcb7",
+  "Comfy-Org/HiDream-I1_ComfyUI": "942970a008493fc9bf05b4827374009e69f6a993",
+  "Comfy-Org/HunyuanVideo_1.5_repackaged": "1405a2b738c29b890cf6d03fc038d8d3e92eeed7",
+  "Comfy-Org/Krea-2": "588feaf955b08b9ac4723eeb751752ab045dba71",
+  "Comfy-Org/Lumina_Image_2.0_Repackaged": "5b072540ef86570fecb8249c505f23d5bdeb88cd",
+  "Comfy-Org/Mage-Flow": "6ff68fbf3c667325e961d551691b246791d5eec0",
+  "Comfy-Org/MiniMax-H3": "54472221d27c695fca9621b0c3ed52f06c4af707",
+  "Comfy-Org/MOSS-Image": "2929efe3cdd506c0a430bcfca70a9a8d805cc095",
+  "Comfy-Org/Qwen-Image-2.1": "aacf31a6d48e707f352ecba714cee0680da3479b",
+  "Comfy-Org/Qwen-Image_ComfyUI": "1f12b17be14c89b026c51a91d67c32f84bb047bc",
+  "Comfy-Org/sigclip_vision_384": "5421dab31229df19801c8e3af446b5a8bc71a3bc",
+  "Comfy-Org/stable-diffusion-3.5-fp8": "934251d1e6168bcb45a069abc5bd5cdd5f8fea00",
+  "Comfy-Org/vae-text-encorder-for-flux-klein-4b": "5b3abca5c0dc1ecd4eaf3340868d09063fc1c965",
+  "Comfy-Org/vae-text-encorder-for-flux-klein-9b": "1138ce884c8e977cdacacbe779784fec4426bb3f",
+  "Comfy-Org/Wan_2.1_ComfyUI_repackaged": "123acf1cc74bccbb9bfff8ac1ee72edc08c2341d",
+  "Comfy-Org/Wan_2.2_ComfyUI_Repackaged": "ee6f4a40737a995bf5818954cfce6d59443b0f04",
+  "Comfy-Org/z_image_turbo": "6fc90a3b1b653e935a0d175e260736de25b84df5",
+  "comfyanonymous/flux_text_encoders": "6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5",
+  "DreamFast/qwen3-4b-heretic": "8fbe6e9bcaa3377491a420c4a6eea1ee67e7d101",
+  "DreamFast/qwen3-8b-heretic": "07019d2298fc4802707f8a97e1afe052024cce48",
+  "DreamFast/Qwen3-VL-4b-Heretic-ComfyUI": "c5bd34e940564e4b5b64286694d72f47f429c126",
+  "DreamFast/Qwen3-VL-8B-Heretic-1.3.0": "28dc0129b4c7c16304bc2ed3697c9437ae8ac2f3",
+  "ethanfel/Qwen2.5-VL-7B-Huihui-Abliterated-ComfyUI-ConvRot-INT8":
+    "7b977aaa08da1c8376e86fc3bd5581b56d9d2e10",
+  "ethanfel/Qwen3-VL-32B-Ultra-Heretic-H3-ComfyUI-INT8-ConvRot":
+    "e8967f6a39ea5b4939a1aff81be3e8706490c0e8",
+  "ml-resources/flux-3-image-klein-comfy": "3ba0f7064cbb1666a71e2820d3cc5c2273bb6cd0",
+  "purplesmartai/pony-v7-base": "af688af595b3ed4d482e2997a0804250a06a9e8f",
+  "SG161222/RealVisXL_V5.0": "ac93e0dda1f6d448cae19bbfab8c5e720a5e48bc",
+  "SG161222/RealVisXL_V5.0_Lightning": "f4454158cedaab9f0688c199561d6c92525f3a85",
+  "stabilityai/sd-vae-ft-mse-original": "629b3ad3030ce36e15e70c5db7d91df0d60c627f",
+  "stabilityai/sdxl-vae": "6f5909a7e596173e25d4e97b07fd19cdf9611c76",
+  "stabilityai/stable-diffusion-xl-base-1.0": "462165984030d82259a11f4367a4eed129e94a7b",
+};
+function hf(repo, file) {
+  if (!revisions[repo]) throw new Error(`Pin ${repo} to a commit in revisions.`);
+  return `https://huggingface.co/${repo}/resolve/${revisions[repo]}/${file}`;
+}
 
 /* ------------------------------------------------------------ Downloads */
 
@@ -14,9 +59,8 @@ const hf = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${file}`
 // abliterated builds lead wherever a ComfyUI-ready one exists. `fp8`: the file
 // is quantized fp8 (per-layer scales, read from its header), which ComfyUI
 // keeps in fp8 and a Mac cannot load. A plain fp8 file loads at full precision
-// on a Mac and is not flagged. `sha256` is the file's Hugging Face LFS hash (its paths-info
-// API), checked after every download; an entry without one is checked by
-// length only.
+// on a Mac and is not flagged. `sha256` is the file's Hugging Face LFS hash at its pinned
+// revision, checked after every download; the worker refuses a file without one.
 export const encoderDownloads = {
   clip_l: [
     {
@@ -160,6 +204,7 @@ export const encoderDownloads = {
         "text_encoders/qwen3vl_4b_int8_convrot.safetensors",
       ),
       bytes: 4_858_559_240,
+      sha256: "32de113cbf8282b02cbff0794b637b9d6676da09314a1db5a30bcea9bf4ee01c",
     },
     {
       file: "qwen3vl_4b_int8_convrot.safetensors",
@@ -177,6 +222,7 @@ export const encoderDownloads = {
         "text_encoders/qwen3vl_4b_bf16.safetensors",
       ),
       bytes: 8_875_719_408,
+      sha256: "f0b24fc5c8d7c0ea6ca909da14c20af5cac53f22506be942c6c956f838b9630f",
     },
     {
       file: "qwen3vl_4b_bf16.safetensors",
@@ -195,6 +241,7 @@ export const encoderDownloads = {
         "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
       ),
       bytes: 9_748_113_996,
+      sha256: "cb8cb9b9dcd2569509de755dca54d96fd93a16a7aabfd2f4051f0a144230620f",
     },
     {
       file: "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
@@ -213,6 +260,7 @@ export const encoderDownloads = {
         "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
       ),
       bytes: 6_724_090_780,
+      sha256: "e5d85a7421d197bf5a12474511936ecabce19a833252f16e9310a983194a4458",
     },
     {
       file: "qwen3.5_9b_flux3_prompt_upsampler_w4a8.safetensors",
@@ -231,6 +279,7 @@ export const encoderDownloads = {
         "text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors",
       ),
       bytes: 18_819_722_392,
+      sha256: "f5062a1fba3e63afe5c88349a311903fec06c959b362f1247127e63d5c860ed4",
     },
     {
       file: "qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors",
@@ -673,6 +722,37 @@ const downloadSources = {
   checkpoint: [checkpointDownloads, "checkpoints"],
   vision: [visionDownloads, "clip_vision"],
 };
+
+/**
+ * Catalogue entries (library/catalogue.js) with each installed catalogue download's Hugging Face
+ * source filled in, so the update check covers them. An entry with its own provider source, or
+ * with another file's hash under the same name, keeps what it has; the first build of a name wins.
+ */
+export function withCatalogueSources(entries) {
+  const merged = { ...entries };
+  const seen = new Set();
+  for (const [source, folder] of Object.values(downloadSources))
+    for (const item of Object.values(source).flat()) {
+      const key = `${folder}/${item.file}`;
+      const entry = merged[key];
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (["civitai", "hf"].includes(entry?.source?.provider)) continue;
+      if (entry?.sha256 && entry.sha256 !== item.sha256) continue;
+      const hub = /^https:\/\/huggingface\.co\/([^/]+\/[^/]+)\/resolve\/([a-f0-9]{40})\/(.+)$/.exec(
+        item.url,
+      );
+      merged[key] = {
+        ...entry,
+        folder,
+        file: item.file,
+        sha256: item.sha256,
+        bytes: item.bytes,
+        source: { provider: "hf", repo: hub[1], revision: hub[2], path: hub[3] },
+      };
+    }
+  return merged;
+}
 
 /**
  * One catalogue download by id, with the builds listed after it for the same
