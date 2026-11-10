@@ -181,8 +181,18 @@ export async function fixtures(page: Page) {
     availableProfiles: ["image:test", "image:fast", "video:test"],
     defaultAccessProfileId: "users",
   };
-  // Each account's gallery size, as Settings › Users counts it.
-  const galleryOwners: Record<string, number> = {};
+  // Each account's gallery, storage and last 30 days, as Settings › Users shows them.
+  const galleryOwners: Record<
+    string,
+    {
+      items: number;
+      images: number;
+      videos: number;
+      cloudJobs: number;
+      gpuMs: number;
+      bytes: number;
+    }
+  > = {};
 
   const preferences = {
     preferences: {

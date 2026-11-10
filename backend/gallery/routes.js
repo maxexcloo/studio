@@ -11,7 +11,8 @@ import {
   galleryRevisionValue,
   galleryItem,
 } from "./store.js";
-import { galleryFilter, setGalleryFavorites } from "./store.js";
+import fs from "node:fs";
+import { galleryFilter, outputFileCandidates, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
@@ -20,6 +21,7 @@ import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
+import { galleryStats } from "../stats.js";
 
 export function galleryJobResponse(store, account, id, settings = false) {
   cleanupGalleryState(store);
@@ -264,14 +266,40 @@ function ownedGalleries() {
   return owned;
 }
 
+const usageDays = 30;
+/** The bytes an account's items take on disk: each saved file and its upscale. */
+async function storedBytes(items) {
+  const files = items.flatMap((item) => [
+    ...outputFileCandidates(item),
+    ...(item.upscale?.url ? outputFileCandidates({ url: item.upscale.url }) : []),
+  ]);
+  const sizes = await Promise.all(
+    files.map((file) =>
+      fs.promises.stat(file).then(
+        (stat) => stat.size,
+        () => 0,
+      ),
+    ),
+  );
+  return sizes.reduce((sum, size) => sum + size, 0);
+}
+
 export function registerGalleryDeleteRoute(app) {
-  // Administrators only (Settings › Users): each account's gallery size, and deleting all of one
-  // account's items through the owner's own delete path.
-  directRoute(app, "GET", "/api/gallery/owners", (account) => {
+  // Administrators only (Settings › Users): each account's gallery size, its last 30 days' usage
+  // and storage, and deleting all of one account's items through the owner's own delete path.
+  directRoute(app, "GET", "/api/gallery/owners", async (account) => {
     const refusal = adminRefusal(account);
     if (refusal) return refusal;
-    const counts = [...ownedGalleries()].map(([owner, items]) => [owner, items.length]);
-    return { status: 200, payload: { ok: true, owners: Object.fromEntries(counts) } };
+    const since = Date.now() - usageDays * 86_400_000;
+    const owners = await Promise.all(
+      [...ownedGalleries()].map(async ([owner, items]) => {
+        const recent = items.filter((item) => Date.parse(item.createdAt || "") >= since);
+        const { images, videos, cloudJobs, gpuMs } = galleryStats(recent);
+        const bytes = await storedBytes(items);
+        return [owner, { items: items.length, images, videos, cloudJobs, gpuMs, bytes }];
+      }),
+    );
+    return { status: 200, payload: { ok: true, owners: Object.fromEntries(owners) } };
   });
   directRoute(app, "DELETE", "/api/gallery/owners/:id", (account, { params }) => {
     const refusal = adminRefusal(account);
