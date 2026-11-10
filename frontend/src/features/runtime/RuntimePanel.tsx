@@ -169,7 +169,7 @@ export function ServiceHealthSummary() {
             <Text size="sm" w={56}>
               {label}
             </Text>
-            <Text size="sm" c="dimmed" title={service.reason}>
+            <Text size="sm" c="dimmed" title={service.reason} ml="auto" ta="right">
               {detail}
             </Text>
           </Group>
