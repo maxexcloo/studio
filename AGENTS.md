@@ -252,7 +252,7 @@ the primary component reference and verify APIs against the installed version.
 
 - Switching modes preserves unsent prompts, references and settings. Use
   `useRemembered` for settled UI state per account, including every setting in
-  an action menu (Animate's Review Prompt First, Upscale's quality, size and
+  an action menu (Animate's Review Prompt, Upscale's quality, size and
   Face Detail), shared by every surface showing that menu; a setting Settings
   also shows, such as where videos run, is an account preference instead. Do
   not persist open popups,
@@ -265,7 +265,7 @@ the primary component reference and verify APIs against the installed version.
   approval and conflict handling; read back saved changes.
 - A queued generation whose prompt is written streams its thinking and prompt
   in the Writing Prompt stage without a review pause. Viewer change proposals
-  and Animate's Review Prompt First are explicit review paths: Run queues the
+  and Animate's Review Prompt are explicit review paths: Run queues the
   edited prompt exactly as shown.
 - Failed forms show their mutation error inline. Other failures use the
   `MutationCache` default notification; avoid duplicate error surfaces.

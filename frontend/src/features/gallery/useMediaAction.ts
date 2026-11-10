@@ -29,7 +29,7 @@ interface AnimateChoice {
   note?: string;
 }
 
-/** Animate's Review Prompt First: themes write the prompt for editing before it runs; off until chosen. */
+/** Animate's Review Prompt: themes write the prompt for editing before it runs; off until chosen. */
 export const useAnimateReview = () => useRemembered<boolean>("animate-review", false);
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
@@ -332,7 +332,7 @@ export function useIterate() {
   };
 }
 
-/** The prompt Review Prompt First shows, with the video model (Fast or Quality, Cloud) that will run it. */
+/** The prompt Review Prompt shows, with the video model (Fast or Quality, Cloud) that will run it. */
 interface AnimateReview extends WrittenPrompt {
   profileLabel: string;
   tier?: "fast" | "quality";
@@ -340,7 +340,7 @@ interface AnimateReview extends WrittenPrompt {
 }
 
 /**
- * Writes Animate's motion prompt without queuing it, for Review Prompt First: the same writer as the
+ * Writes Animate's motion prompt without queuing it, for Review Prompt: the same writer as the
  * queue's writing stage (backend/prompt-animate.js), from the same frame and video model.
  */
 export function useAnimateWriter(item: MediaItem) {

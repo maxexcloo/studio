@@ -10,7 +10,7 @@
  *                                       (text/event-stream: delta, done, error) or JSON
  *   POST /api/assistant/animate         { profileId, theme, instruction?, source, extend?, assetId?,
  *                                       duration?, frames?, fps? } → { prompt, model, thinking }:
- *                                       Animate's motion prompt for Review Prompt First
+ *                                       Animate's motion prompt for Review Prompt
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
  */

@@ -219,7 +219,7 @@ interface MediaActionOptions {
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
   onCompare?: () => void;
-  /** Opens Animate's dialog for a theme: Custom Animation, or any theme under Review Prompt First. */
+  /** Opens Animate's dialog for a theme: Custom Animation, or any theme under Review Prompt. */
   onAnimate: (theme: AnimateTheme) => void;
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
@@ -362,7 +362,7 @@ export function useMediaActions(
     ? [
         {
           id: "animate-review",
-          label: "Review Prompt First",
+          label: "Review Prompt",
           icon: ScanText,
           checked: review,
           keepOpen: true,
