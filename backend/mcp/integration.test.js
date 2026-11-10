@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { characterShots } from "../../shared/characters.ts";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -342,6 +343,10 @@ async function fixture(
   // The account's character cards (backend/characters.js), set by a test.
   const characters = [];
   app.get("/api/characters", (_req, res) => res.json({ characters }));
+  app.post("/api/characters/:id/generated", (req, res) => {
+    characters.find((card) => card.id === req.params.id).generated = req.body;
+    res.json({ ok: true });
+  });
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -989,8 +994,9 @@ test("media and administrator credentials discover only their own friendly tools
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters, to 15,500 for generate's set title and per-prompt titles, and to 15,600 for generate's character.
-    JSON.stringify(tools).length + media.getInstructions().length < 15600,
+    // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
+    // generate's character and to 15,700 for its character_views.
+    JSON.stringify(tools).length + media.getInstructions().length < 15700,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1555,6 +1561,46 @@ test("models lists the account's characters, and generate applies one by name: i
   );
   assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // The fixture profile starts from a reference (img2img), and the reply says what that means.
+  assert.match(
+    reply.content[0].text,
+    /starts from Mara's image \(img2img\), so its pose and layout carry over/,
+  );
+  // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
+  // views come from the description alone, so the card's pose doesn't carry into every view.
+  const views = async () => {
+    const before = f.submitted.length;
+    const reply = await call(client, "generate", { character: "Mara", character_views: true });
+    assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
+    return { reply, queued: f.submitted.slice(before) };
+  };
+  const alone = await views();
+  assert.deepEqual(
+    alone.queued.map((job) => job.prompt),
+    characterShots("red-haired ranger, green cloak"),
+  );
+  assert.equal(new Set(alone.queued.map((job) => job.seed)).size, 1);
+  assert.ok(alone.queued.every((job) => !job.referenceAssets.length));
+  assert.match(alone.reply.content[0].text, /from Mara's description alone/);
+  assert.equal(f.characters[0].generated.jobIds.length, 4);
+  assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
+  // With a model that edits with references, both the views and new scenes take the card's image on it.
+  const editor = {
+    ...structuredClone(imageProfile),
+    id: "editor",
+    label: "Editor",
+    editReferences: true,
+  };
+  await f.profiles([structuredClone(imageProfile), editor]);
+  const edited = await views();
+  assert.ok(
+    edited.queued.every(
+      (job) => job.profileId === "editor" && job.referenceAssets[0]?.assetId === assetId,
+    ),
+  );
+  const before = f.submitted.length;
+  await call(client, "generate", { prompts: ["At the harbour"], character: "Mara" });
+  assert.equal(f.submitted[before].profileId, "editor");
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
