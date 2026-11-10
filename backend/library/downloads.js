@@ -1,14 +1,13 @@
 import { workerInventory, workerModelFile, refreshWorkerModels } from "../worker-models.js";
 import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
-import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";
 import { loraCatalogue } from "../lora/info.js";
 import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
 
 // Provider download specs live in the catalogue's provider layer (library/catalogue.js).
 export function libraryDownload(id) {
-  return presetsEnabled() ? loraCatalogue().download(id) : null;
+  return loraCatalogue().download(id);
 }
 
 const directories = new Set([
@@ -110,8 +109,6 @@ export function libraryDownloadAccess() {
 }
 
 export async function startLibraryDownload(spec) {
-  if (!presetsEnabled())
-    throw new Error("Imports and provider downloads are off for this deployment.");
   await refreshWorkerModels({ force: true });
   if (!/^[a-f0-9]{64}$/i.test(spec.sha256 || ""))
     throw new Error("This model has no valid provider SHA-256 checksum. Preview its source again.");

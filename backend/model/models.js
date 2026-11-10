@@ -9,7 +9,6 @@ import {
 import { classifyModel } from "./families.js";
 import { families } from "../family-catalogue.js";
 import { canonicalProfileId } from "../profile/store.js";
-import { presetsEnabled } from "../features.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 
 function modelBasename(name = "") {
@@ -500,8 +499,6 @@ export function inferModels(
     imageModels: imageProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     videoModels: videoProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     profiles,
-    // Release switches the studio needs to know about (features.js).
-    features: { presets: presetsEnabled() },
     textEncoders: clips,
     vaes,
     clipTypes,
@@ -635,7 +632,6 @@ export function mockModelResult() {
 
   return {
     isMock: true,
-    features: { presets: presetsEnabled() },
     imageModels: imageProfiles.map((p) => ({ label: p.label, value: p.id })),
     videoModels: videoProfiles.map((p) => ({ label: p.label, value: p.id })),
     profiles: [...imageProfiles, ...videoProfiles],
@@ -661,7 +657,6 @@ export function mockModelResult() {
 
 function emptyModelResult(extra = {}) {
   return {
-    features: { presets: presetsEnabled() },
     imageModels: [],
     videoModels: [],
     profiles: [],
