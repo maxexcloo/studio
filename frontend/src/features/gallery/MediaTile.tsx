@@ -9,6 +9,7 @@ import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../ge
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
+import { upscaling, useStopUpscale } from "./UpscaleControls";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useHoldToSelect } from "./useGalleryLayout";
 import classes from "./MediaTile.module.css";
@@ -19,11 +20,11 @@ export const finished = (item: { status?: unknown }) =>
   ["done", "failed", "cancelled"].includes(String(item.status));
 const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
 
-function useItemJob(item: MediaItem) {
+function useQueueJob(jobId: string | undefined, enabled: boolean) {
   return useQuery({
     ...queueQuery,
-    select: (data) => data.jobs.find((job) => job.id === item.jobId),
-    enabled: Boolean(item.jobId) && item.status !== "done",
+    select: (data) => data.jobs.find((job) => job.id === jobId),
+    enabled: Boolean(jobId) && enabled,
   }).data;
 }
 
@@ -35,7 +36,7 @@ function TileStatus({
   item: MediaItem;
   onTryAgain?: (item: MediaItem) => void;
 }) {
-  const job = useItemJob(item);
+  const job = useQueueJob(item.jobId, item.status !== "done");
   const action = useQueueAction(job?.id);
   const motionDuration = useMotionDuration();
   const [retrying, setRetrying] = useState(false);
@@ -126,6 +127,44 @@ function TileStatus({
   );
 }
 
+/** A finished item's upscale while it is queued or running: its progress and Stop. */
+function TileUpscale({ item }: { item: MediaItem }) {
+  const stop = useStopUpscale(item);
+  const job = useQueueJob(item.upscale?.jobId, true);
+  const motionDuration = useMotionDuration();
+  if (!stop) return null;
+  const percent = job?.progress?.max ? Math.round(progressPercent(job.progress)) : undefined;
+  return (
+    <>
+      {percent !== undefined && (
+        <div className={classes.progress}>
+          <Progress
+            aria-hidden
+            w="100%"
+            size="xs"
+            radius={0}
+            value={percent}
+            transitionDuration={motionDuration}
+          />
+        </div>
+      )}
+      <div className={classes.statusAction}>
+        <Button
+          size="compact-sm"
+          variant="default"
+          radius="xl"
+          leftSection={<icons.stop size={14} />}
+          aria-label={`Stop Upscale of ${mediaTitle(item)}`}
+          loading={stop.isPending}
+          onClick={stop.stop}
+        >
+          Stop Upscale
+        </Button>
+      </div>
+    </>
+  );
+}
+
 /** The version count, or the shown version's place while flipping through them. */
 function VersionBadge({ count, current }: { count: number; current?: number }) {
   return (
@@ -198,6 +237,8 @@ export function MediaTile({
   onVersion?: (index?: number) => void;
 }) {
   const selecting = Boolean(selection?.selecting);
+  // Its Stop takes the caption's place at the foot of the tile.
+  const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const count = group.filter((entry) => selection?.selected.has(entry.id)).length;
   const selected = selecting && count === group.length;
   const media = mediaSource(item);
@@ -348,7 +389,7 @@ export function MediaTile({
             }}
           />
         ) : null}
-        {item.status === "done"
+        {item.status === "done" && !upscaleShown
           ? caption !== "none" && (
               <div className={classes.caption} data-pinned={caption === "pinned" || undefined}>
                 {/* A pinned (phone) caption keeps to two lines in all. */}
@@ -365,6 +406,7 @@ export function MediaTile({
           : null}
       </UnstyledButton>
       {item.status !== "done" && <TileStatus item={item} onTryAgain={onTryAgain} />}
+      {upscaleShown && <TileUpscale item={item} />}
       {versions && versions.length > 1 && !selecting && (
         <VersionBadge count={versions.length} current={version} />
       )}

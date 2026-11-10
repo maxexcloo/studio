@@ -22,6 +22,22 @@ const statusQuery = (quality: UpscaleQuality) => ({
 
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
+/**
+ * Stop for an upscale queued or running on a finished item: it cancels the upscale's queue job, and
+ * the item keeps its original, marked Upscale Cancelled in Details.
+ */
+export function useStopUpscale(item: MediaItem) {
+  const cache = useQueryClient();
+  const cancel = useItemMutation(item.id, "stop-upscale", {
+    mutationFn: (jobId: string) => post(`/api/queue/${encodeURIComponent(jobId)}/cancel`),
+    onSuccess: () =>
+      void Promise.all(
+        ["queue", "session", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+      ),
+  });
+  const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
+  return jobId ? { isPending: cancel.isPending, stop: () => cancel.mutate(jobId) } : null;
+}
 type UpscaleTarget = NonNullable<UpscaleRequest["target"]>;
 /**
  * Upscale's menu runs with its remembered settings: quality (Balanced until chosen), size (Automatic
