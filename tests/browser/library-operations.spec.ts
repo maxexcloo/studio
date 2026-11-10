@@ -5,10 +5,11 @@ import {
   create,
   expandComposer,
   fixtures,
+  loadSaved,
   openNav,
+  openPresets,
   profiles,
   section,
-  serveProfiles,
 } from "./fixtures";
 
 test("The Library groups what you have and getting more, A–Z, and opens on Models", async ({
@@ -27,7 +28,6 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     "Unused",
     "Downloads",
     "Imports",
-    "Inspiration",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
@@ -67,7 +67,6 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     return route.fulfill({
       json: {
         profiles: freshModelReads ? [...profiles, downloadedProfile] : profiles,
-        features: { presets: true },
       },
     });
   });
@@ -296,6 +295,49 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   expect(applied).toHaveLength(2);
 });
 
+test("Update All applies every free update in one request", async ({ page }) => {
+  await fixtures(page);
+  let all = false;
+  const item = (name: string, update: object) => ({
+    key: `loras/${name}.safetensors`,
+    title: name,
+    file: `${name}.safetensors`,
+    folder: "loras",
+    kind: "lora",
+    installed: true,
+    families: ["test"],
+    update: { state: "available", ...update },
+    ...(all ? { applied: { state: "downloading", note: "Downloading." } } : {}),
+  });
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          item("Style", { latest: { name: "Style 2", downloadable: true } }),
+          item("Detail", {
+            latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
+            freeAlternative: { name: "Detail 2", downloadable: true },
+          }),
+        ],
+      },
+    }),
+  );
+  const requests: unknown[] = [];
+  await page.route("**/api/library/updates/apply", (route) => {
+    requests.push(route.request().postDataJSON());
+    all = true;
+    return route.fulfill({ json: { ok: true, available: 2, started: 2, failed: [] } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "LoRAs");
+  const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
+  await loras.getByRole("button", { name: "Update All", exact: true }).click();
+  await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
+  await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();
+  expect(requests).toEqual([{ all: true }]);
+});
+
 test("A checkpoint profile draft can be retried after failure and refreshed into the model choices", async ({
   page,
 }) => {
@@ -321,7 +363,6 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
         profiles: drafted
           ? [...profiles, { ...profiles[0], id: "custom:checkpoint", label: "Imported Checkpoint" }]
           : profiles,
-        features: { presets: true },
       },
     });
   });
@@ -421,44 +462,6 @@ test("A Reddit link in Library › Import adds the post's images to Uploads", as
   expect(requests).toEqual([{ url: "https://www.reddit.com/r/birds/comments/abc/birds/" }]);
 });
 
-test("Administrators retain model management when deployment imports are disabled", async ({
-  page,
-}) => {
-  await fixtures(page);
-  await serveProfiles(page, profiles, { presets: false });
-  let unavailableReads = 0;
-  for (const pattern of ["**/api/library/imports**", "**/api/presets**"])
-    await page.route(pattern, (route) => {
-      unavailableReads++;
-      return route.fulfill({
-        status: 403,
-        json: { error: "Unavailable for this account or deployment." },
-      });
-    });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Models");
-  await chooseView(page, "Models", "Available");
-  await expect(
-    page
-      .getByRole("table", { name: "Library Models", exact: true })
-      .getByText("Base Model", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Check Updates", exact: true })).toBeVisible();
-  if ((page.viewportSize()?.width || 1440) < 768) {
-    await page.getByRole("combobox", { name: "Library Section", exact: true }).click();
-    for (const name of ["Imports", "Inspiration"])
-      await expect(page.getByRole("option", { name, exact: true })).toBeHidden();
-  } else
-    for (const name of ["Imports", "Inspiration"])
-      await expect(
-        page
-          .getByRole("navigation", { name: "Library Sections", exact: true })
-          .getByRole("link", { name, exact: true }),
-      ).toBeHidden();
-  expect(unavailableReads).toBe(0);
-});
-
 test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
   await fixtures(page);
   const model = (key: string, title: string, families: string[], installed = true) => ({
@@ -520,7 +523,9 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table).toContainText("Later Model");
 });
 
-test("Library shows import grades and reuses compatible inspiration settings", async ({ page }) => {
+test("Library shows import grades, and the Presets chip loads inspiration settings where they fit", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   await page.route("**/api/presets", (route) =>
     route.fulfill({
@@ -546,34 +551,33 @@ test("Library shows import grades and reuses compatible inspiration settings", a
       },
     }),
   );
-  await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
-  await closeLoras(page);
-  const close = page.getByRole("button", { name: "Close Generate", exact: true });
-  if (await close.isVisible()) await close.click();
-  else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
+  await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
-  await section(page, "Library", "Inspiration");
-  const missing = page
-    .locator(".mantine-Card-root")
-    .filter({ has: page.getByText("Missing Style Study", { exact: true }) });
-  await expect(missing.getByRole("button", { name: "Use Settings", exact: true })).toBeDisabled();
-  await expect(missing.getByRole("button", { name: "Use Prompt", exact: true })).toBeEnabled();
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await closeLoras(page);
+  // An inspiration whose LoRA is missing gives only its prompt.
+  await openPresets(page);
   await page
-    .locator(".mantine-Card-root")
-    .filter({ has: page.getByText("Amber Study", { exact: true }) })
-    .getByRole("button", { name: "Use Settings", exact: true })
+    .getByRole("radiogroup", { name: "Preset Source", exact: true })
+    .getByText("Inspiration", { exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "Amber bird study",
-  );
+  await loadSaved(page, "Inspiration", "Missing Style Study");
+  await expect(prompt).toHaveValue("A missing style study");
+  // The picker keeps its source while it is closed.
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
+  await openPresets(page);
+  await loadSaved(page, "Inspiration", "Amber Study");
+  await expect(prompt).toHaveValue("Amber bird study");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.profileId).toBe("image:test");
+  expect(state.jobs[0].input.steps).toBe(24);
   expect(state.jobs[0].input.loras).toEqual([]);
 });
 

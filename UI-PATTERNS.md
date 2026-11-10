@@ -76,7 +76,8 @@ the primary component reference and verify APIs against the installed version.
   `usePhone()` and `useSideways()`, and CSS the root's `data-phone` attribute
   (`sideways` for a phone held sideways), never width media queries,
   `visibleFrom` or `hiddenFrom`. A phone held sideways shows four gallery
-  columns and puts the viewer's controls beside the media.
+  columns and puts the viewer's controls and Dream's card captions beside the
+  media.
 - Outside click and Escape close only the topmost layer; nothing beneath
   reacts. A closing layer no longer counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
@@ -200,6 +201,13 @@ the primary component reference and verify APIs against the installed version.
   several, like their Open All, flips through only those results; other results
   flip through their Chat or gallery. Closing reveals and focuses the current
   tile.
+- On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strips, prompt,
+  actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
+  A picture's tap waits out the double tap, and pinches, drags, long presses and swipes do not
+  count; swipes still navigate and keep it hidden until the viewer closes. A tap on a video whose
+  controls are hidden also shows them; taps while they show work them. Escape, a viewer key,
+  Details, a tap beside the media and focus reaching hidden chrome bring it back. Open menus and
+  sheets, work in progress and loading actions stay in sight.
 - Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay

@@ -14,6 +14,7 @@ import {
 } from "./controls.js";
 import { assertJobCount, mcpJson, replyRule } from "./media.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
+import { minorAgeRefusal } from "../minor-age.js";
 import { canonicalProfileId } from "../profile/store.js";
 import {
   asksForCloud,
@@ -946,6 +947,9 @@ export function registerGenerateTools({
     for (const prompt of args.prompts) {
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
+      // Refused before any prompt queues, so no part of a set runs (admission checks each too).
+      const minor = minorAgeRefusal(prompt);
+      if (minor) throw new Error(minor);
     }
     const listProblem = views ? "" : promptListProblem(args.prompts);
     if (listProblem) throw new Error(listProblem);
@@ -1068,9 +1072,11 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = mcpSize(profile, { aspect });
+              // An exact width and height win over an aspect sent beside them.
+              const exact = args.width !== undefined && args.height !== undefined;
+              const sized = exact ? null : mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
-                throw new Error("Pass aspect or width and height, not both.");
+                throw new Error("Pass aspect, or both width and height.");
               // A character sends its first image (characterImages), only to a model that edits
               // with it: as an img2img start image its pose and layout (a whole sheet) carry over.
               const room = editsReferences(profile)
@@ -1134,12 +1140,14 @@ export function registerGenerateTools({
         ],
       };
     }
-    // A call of several results is one titled set; the gallery titles each prompt's results by
-    // titles, or by its prompt where they are missing.
+    // A call of several results is one titled set, with the character it was made with; the
+    // gallery titles each prompt's results by titles, or by its prompt where they are missing.
     const resultSet = jobs > 1 && {
       id: crypto.randomUUID(),
-      title: title || replyTitle(request) || promptWords(args.prompts[0]),
+      // A character's set is named for it unless the chat named the set.
+      title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
       source: actor.session ? "Chat" : actor.client || "MCP",
+      ...(card ? { character: { id: card.id, name: card.name } } : {}),
     };
     for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
     // Request and prompts together: the prompts run, and the request stays on the record.

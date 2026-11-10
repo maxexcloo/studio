@@ -9,7 +9,7 @@ import {
   Tooltip,
   type ButtonProps,
 } from "@mantine/core";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { Maximize2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOpenComposer } from "../generation/openComposer";
@@ -279,9 +279,10 @@ export function DreamDeck({
   empty: (calibration: boolean) => ReactNode;
 }) {
   const phone = usePhone();
+  const sideways = useSideways();
   const touch = useTouch();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [counts, setCounts] = useState({ judged: 0, calibrated: 0, dreamed: 0 });
+  const [counts, setCounts] = useState({ calibrated: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
   const [viewing, setViewing] = useState<string | null>(null);
   const judge = useJudge((card) =>
@@ -310,7 +311,6 @@ export function DreamDeck({
       return next;
     });
     setCounts((previous) => ({
-      judged: previous.judged + 1,
       calibrated: previous.calibrated + (dreamed(card) ? 0 : 1),
       dreamed: previous.dreamed + dreamed(card),
     }));
@@ -479,14 +479,15 @@ export function DreamDeck({
             ),
         )}
       </div>
-      {/* A comparison's sides stand out from Neither and Both, filling the width on phones. */}
+      {/* A comparison's sides stand out from Neither and Both, filling the width on phones held
+          upright; held sideways, one row leaves the card more height. */}
       {top.kind !== "pair" ? (
         <Group className={classes.actions} justify="center" wrap="nowrap">
           {[choice("discard"), choice("keep")].map((option) =>
             button(option, { size: "lg", miw: "9rem" }),
           )}
         </Group>
-      ) : phone ? (
+      ) : phone && !sideways ? (
         <Stack className={classes.actions} gap="xs">
           <Group grow gap="xs">
             {button(choice("a"))}

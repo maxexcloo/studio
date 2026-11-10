@@ -263,3 +263,14 @@ test("a failed download or a checksum mismatch never touches the old file", asyn
     "the update can be tried again",
   );
 });
+
+test("Update All downloads each free update once, the free version where the newest is paid", async (t) => {
+  const h = harness(t);
+  await h.checker.check();
+  assert.deepEqual(await h.checker.applyAll({ by: "admin" }), { started: 1, failed: [] });
+  assert.deepEqual(
+    h.started.map((spec) => spec.file),
+    ["nightfall-v3-fp8.safetensors"],
+  );
+  assert.deepEqual(await h.checker.applyAll(), { started: 0, failed: [] }, "already under way");
+});

@@ -79,6 +79,7 @@
 .media {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   align-items: center;
@@ -160,6 +161,7 @@
 }
 .pair {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -211,7 +213,20 @@
   top: var(--mantine-spacing-sm);
   right: var(--mantine-spacing-sm);
 }
-:where(:root[data-phone]) .pair {
+:where(:root[data-phone]:not([data-phone="sideways"])) .pair {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 1fr;
+}
+/* A phone held sideways keeps the card's full height for the media: the caption stands beside it,
+   scrolling when it outgrows the card, and a comparison's sides stay side by side. */
+:where(:root[data-phone="sideways"]) .card {
+  flex-direction: row;
+}
+:where(:root[data-phone="sideways"]) .caption {
+  order: 1;
+  width: min(16rem, 40%);
+  overflow-y: auto;
+}
+:where(:root[data-phone="sideways"]) .pair {
+  padding: var(--mantine-spacing-sm) 0 var(--mantine-spacing-sm) var(--mantine-spacing-sm);
 }

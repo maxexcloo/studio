@@ -23,15 +23,14 @@
  *   GET  /api/library/unused                  installed entries no profile names, and LoRAs no run used in 90 days
  *   GET  /api/library/updates                 update states; POST …/check checks now; POST …/apply {key, alternative?}
  *
- * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do. MCP's admin
- * tools (mcp/admin.js) call these same routes; their imports and edits record chat as the origin.
+ * MCP's admin tools (mcp/admin.js) call these same routes; their imports and edits record chat as
+ * the origin.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { writeBytesFileAsync } from "../json-store.js";
 import { civitaiJson } from "../civitai/access.js";
 import { versionResource } from "../civitai/import.js";
-import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { currentDataDir } from "../data-dir.js";
@@ -521,17 +520,10 @@ export function registerLibraryRoutes(
   const by = (account) => String(account?.userId || account?.id || account?.username || "");
   const origin = (account, other) => (fromChat(account) ? "chat" : other);
   const ok = (payload) => ({ status: 200, payload: { ok: true, ...payload } });
-  const refusal = (account, imports) => {
-    const refused = localRefusal(account);
-    if (refused) return refused;
-    if (imports && !presetsEnabled())
-      return { status: 404, payload: { ok: false, error: "Imports are off for this deployment." } };
-    return null;
-  };
-  /** A Library route: administrators only, imports' routes only while imports are on; a failure answers 400. */
-  const route = (method, path, run, { imports = true } = {}) =>
+  /** A Library route: administrators only; a failure answers 400. */
+  const route = (method, path, run) =>
     directRoute(app, method, path, async (account, input) => {
-      const refused = refusal(account, imports);
+      const refused = localRefusal(account);
       if (refused) return refused;
       try {
         return await run(account, input);
@@ -567,7 +559,7 @@ export function registerLibraryRoutes(
     return ok({ import: publicImport(record) });
   });
   app.get("/api/library/imports/:id/picture", (req, res) => {
-    const refused = refusal(req.studioAccount, true);
+    const refused = localRefusal(req.studioAccount);
     if (refused) return res.status(refused.status).json(refused.payload);
     const file = store.get(req.params.id)?.picture ? pictures.file(req.params.id) : "";
     if (!file || !fs.existsSync(file)) return res.sendStatus(404);
@@ -643,168 +635,121 @@ export function registerLibraryRoutes(
     const index = Number.isSafeInteger(body?.index) && body.index >= 0 ? body.index : null;
     return ok({ import: publicImport(await engine.draft(params.id, { by: by(account), index })) });
   });
-  route(
-    "GET",
-    "/api/library/items",
-    async () => {
-      const { files, current } = await latestInstalled().catch(() => ({
-        files: {},
-        current: false,
-      }));
-      const [info, definitions] = await Promise.all([
-        // A worker that isn't answering is not asked for each LoRA's metadata.
-        loraInfo(files.loras || [], { remote: current }).catch(() => ({})),
-        profileDefinitions().catch(() => []),
-      ]);
-      const state = await updates.settle().catch(() => updates.summary());
-      const items = libraryItems({
-        installed: files,
-        entries: catalogue().entries({ throttleMs: 5000 }),
-        loraInfo: info,
-        profiles: definitions,
-      }).map((item) => {
-        const update = item.installed ? state.byEntry[item.key] : null;
-        const applied = state.applied[item.key];
-        return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
-      });
-      return ok({ items, updates: { checkedAt: state.checkedAt, available: state.available } });
-    },
-    { imports: false },
-  );
-  route(
-    "POST",
-    "/api/library/lookup",
-    async (_account, { body }) => {
-      const found = await lookupLibrary(
-        {
-          url: String(body?.url || "").trim(),
-          query: String(body?.query || ""),
-          type: ["lora", "checkpoint"].includes(body?.type) ? body.type : "",
-          baseModel: String(body?.baseModel || ""),
-        },
-        { json, hfRequest, inspect, families, profiles: readyProfiles },
-      );
-      return ok({ lookup: found });
-    },
-    { imports: false },
-  );
-  route(
-    "GET",
-    "/api/library/placement",
-    async (_account, { query }) => {
-      await refreshWorkerModels().catch(() => null);
-      return ok({
-        placement: libraryPlacement(
-          { key: String(query.key || "") },
-          { inventory: workerInventory },
-        ),
-      });
-    },
-    { imports: false },
-  );
+  route("GET", "/api/library/items", async () => {
+    const { files, current } = await latestInstalled().catch(() => ({
+      files: {},
+      current: false,
+    }));
+    const [info, definitions] = await Promise.all([
+      // A worker that isn't answering is not asked for each LoRA's metadata.
+      loraInfo(files.loras || [], { remote: current }).catch(() => ({})),
+      profileDefinitions().catch(() => []),
+    ]);
+    const state = await updates.settle().catch(() => updates.summary());
+    const items = libraryItems({
+      installed: files,
+      entries: catalogue().entries({ throttleMs: 5000 }),
+      loraInfo: info,
+      profiles: definitions,
+    }).map((item) => {
+      const update = item.installed ? state.byEntry[item.key] : null;
+      const applied = state.applied[item.key];
+      return { ...item, ...(update ? { update } : {}), ...(applied ? { applied } : {}) };
+    });
+    return ok({ items, updates: { checkedAt: state.checkedAt, available: state.available } });
+  });
+  route("POST", "/api/library/lookup", async (_account, { body }) => {
+    const found = await lookupLibrary(
+      {
+        url: String(body?.url || "").trim(),
+        query: String(body?.query || ""),
+        type: ["lora", "checkpoint"].includes(body?.type) ? body.type : "",
+        baseModel: String(body?.baseModel || ""),
+      },
+      { json, hfRequest, inspect, families, profiles: readyProfiles },
+    );
+    return ok({ lookup: found });
+  });
+  route("GET", "/api/library/placement", async (_account, { query }) => {
+    await refreshWorkerModels().catch(() => null);
+    return ok({
+      placement: libraryPlacement({ key: String(query.key || "") }, { inventory: workerInventory }),
+    });
+  });
   // One entry's edit, as Studio's catalogue keeps it: the previous values come back, so it can be undone.
-  route(
-    "PATCH",
-    "/api/library/catalogue",
-    async (account, { body }) => {
-      const key = String(body?.key || "");
-      const { entry, previous } = catalogue().edit(key, body?.patch, {
-        by: by(account),
-        origin: origin(account, "admin"),
-      });
-      return ok({ key, entry, previous });
-    },
-    { imports: false },
-  );
-  route(
-    "POST",
-    "/api/library/catalogue/undo",
-    async (account, { body }) => {
-      const key = String(body?.key || "");
-      return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
-    },
-    { imports: false },
-  );
+  route("PATCH", "/api/library/catalogue", async (account, { body }) => {
+    const key = String(body?.key || "");
+    const { entry, previous } = catalogue().edit(key, body?.patch, {
+      by: by(account),
+      origin: origin(account, "admin"),
+    });
+    return ok({ key, entry, previous });
+  });
+  route("POST", "/api/library/catalogue/undo", async (account, { body }) => {
+    const key = String(body?.key || "");
+    return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
+  });
   // Removes an entry and its installed file, unless a profile still uses it; a LoRA leaves every
   // account's stacks, strengths, ratings and recents first.
-  route(
-    "POST",
-    "/api/library/catalogue/remove",
-    async (account, { body }) => {
-      const key = String(body?.key || "");
-      const entry = catalogue().entry(key);
-      if (!entry)
-        return { status: 404, payload: { ok: false, error: "That entry isn’t in the catalogue." } };
-      const { folder, file } = splitCatalogueKey(key);
-      if (folder === "loras") forget(file);
-      const users = await references({ folder, file });
-      if (users.length)
-        return {
-          status: 409,
-          payload: { ok: false, error: `Still used by ${users.join(", ")}.`, users },
-        };
-      const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
-      catalogue().edit(
-        key,
-        { removed: true },
-        { by: by(account), origin: origin(account, "admin") },
-      );
-      return ok({ key, fileRemoved: removed });
-    },
-    { imports: false },
-  );
+  route("POST", "/api/library/catalogue/remove", async (account, { body }) => {
+    const key = String(body?.key || "");
+    const entry = catalogue().entry(key);
+    if (!entry)
+      return { status: 404, payload: { ok: false, error: "That entry isn’t in the catalogue." } };
+    const { folder, file } = splitCatalogueKey(key);
+    if (folder === "loras") forget(file);
+    const users = await references({ folder, file });
+    if (users.length)
+      return {
+        status: 409,
+        payload: { ok: false, error: `Still used by ${users.join(", ")}.`, users },
+      };
+    const { removed } = await removeFile({ folder, file, sha256: entry.sha256 || "" });
+    catalogue().edit(key, { removed: true }, { by: by(account), origin: origin(account, "admin") });
+    return ok({ key, fileRemoved: removed });
+  });
   // Unused: installed catalogue entries to consider removing, with their sizes. A model counts when
   // nothing references it (the removal path's own check); a LoRA when no run used it in 90 days and
   // no profile names it.
-  route(
-    "GET",
-    "/api/library/unused",
-    async () => {
-      const { files } = await latestInstalled().catch(() => ({ files: {} }));
-      const entries = catalogue().entries();
-      const sizes = new Map(workerInventory().files.map((item) => [item.path, item.size]));
-      const definitions = await profileDefinitions().catch(() => []);
-      const ran = recentLoras();
-      const unused = await Promise.all(
-        libraryItems({ installed: files, entries })
-          .filter((item) => item.installed && entries[item.key])
-          .map(async (item) => {
-            const lora = item.folder === "loras";
-            if (lora) {
-              const quoted = JSON.stringify(item.file);
-              if (ran.has(item.file) || definitions.some(({ text }) => text.includes(quoted)))
-                return null;
-            } else if ((await references({ folder: item.folder, file: item.file })).length)
+  route("GET", "/api/library/unused", async () => {
+    const { files } = await latestInstalled().catch(() => ({ files: {} }));
+    const entries = catalogue().entries();
+    const sizes = new Map(workerInventory().files.map((item) => [item.path, item.size]));
+    const definitions = await profileDefinitions().catch(() => []);
+    const ran = recentLoras();
+    const unused = await Promise.all(
+      libraryItems({ installed: files, entries })
+        .filter((item) => item.installed && entries[item.key])
+        .map(async (item) => {
+          const lora = item.folder === "loras";
+          if (lora) {
+            const quoted = JSON.stringify(item.file);
+            if (ran.has(item.file) || definitions.some(({ text }) => text.includes(quoted)))
               return null;
-            return {
-              key: item.key,
-              title: item.title || item.file,
-              kind: item.kind,
-              bytes: Number(sizes.get(item.key) ?? entries[item.key].bytes) || 0,
-              reason: lora ? "No run in 90 days" : "No profile uses it",
-            };
-          }),
-      );
-      return ok({ items: unused.filter(Boolean) });
-    },
-    { imports: false },
+          } else if ((await references({ folder: item.folder, file: item.file })).length)
+            return null;
+          return {
+            key: item.key,
+            title: item.title || item.file,
+            kind: item.kind,
+            bytes: Number(sizes.get(item.key) ?? entries[item.key].bytes) || 0,
+            reason: lora ? "No run in 90 days" : "No profile uses it",
+          };
+        }),
+    );
+    return ok({ items: unused.filter(Boolean) });
+  });
+  route("GET", "/api/library/updates", async () =>
+    ok(await updates.settle().catch(() => updates.summary())),
   );
-  route(
-    "GET",
-    "/api/library/updates",
-    async () => ok(await updates.settle().catch(() => updates.summary())),
-    { imports: false },
-  );
-  route(
-    "POST",
-    "/api/library/updates/check",
-    async (_account, { body }) => {
-      const keys = Array.isArray(body?.keys) ? body.keys.map(String).slice(0, 300) : null;
-      return ok(await updates.check({ keys }));
-    },
-    { imports: false },
-  );
+  route("POST", "/api/library/updates/check", async (_account, { body }) => {
+    const keys = Array.isArray(body?.keys) ? body.keys.map(String).slice(0, 300) : null;
+    return ok(await updates.check({ keys }));
+  });
   route("POST", "/api/library/updates/apply", async (account, { body }) => {
+    // Update All: `{ all: true }` applies every free update at once.
+    if (body?.all === true)
+      return ok({ ...updates.summary(), ...(await updates.applyAll({ by: by(account) })) });
     const applied = await updates.apply(String(body?.key || ""), {
       alternative: body?.alternative === true,
       by: by(account),
