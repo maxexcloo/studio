@@ -83,7 +83,7 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
   };
 }
 
-/** A Hugging Face file changed upstream: the same path with another checksum on main. */
+/** A Hugging Face file changed upstream: its pinned path has another checksum on main. */
 export function hfUpdate(entry, metadata) {
   const filePath = entry.source?.path;
   const sibling = (Array.isArray(metadata?.siblings) ? metadata.siblings : []).find(
@@ -97,10 +97,12 @@ export function hfUpdate(entry, metadata) {
     return { state: "error", note: "Hugging Face publishes no checksum for this file." };
   if (!entry.sha256 || sha256 === entry.sha256) return { state: "current", note: "" };
   const revision = metadata.sha;
-  const base = path.posix.basename(filePath);
+  const base = path.posix.basename(entry.file);
   const extension = path.posix.extname(base);
-  // The new file gets its own name, so the old one stays until the new one verifies.
-  const file = `${base.slice(0, -extension.length)}-${revision.slice(0, 7)}${extension}`;
+  // The new file gets its own name, so the old one stays until the new one verifies: the installed
+  // name (which model detection reads) with the revision in place of an earlier update's.
+  const stem = base.slice(0, -extension.length).replace(/-[a-f0-9]{7}$/, "");
+  const file = `${stem}-${revision.slice(0, 7)}${extension}`;
   const repo = entry.source.repo;
   const url = `https://huggingface.co/${repo}/resolve/${revision}/${filePath.split("/").map(encodeURIComponent).join("/")}`;
   const bytes = Number(sibling.lfs?.size || sibling.size || 0);
