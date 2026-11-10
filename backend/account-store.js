@@ -376,7 +376,9 @@ export function rotateAccountMcpToken(accountId) {
   );
   if (!account) throw new Error("That account is unavailable.");
   const token = crypto.randomBytes(32).toString("base64url");
+  // The hash authenticates; the token itself is kept only so its own account can view it again.
   account.mcpTokenHash = tokenHash(token);
+  account.mcpToken = token;
   account.mcpTokenCreatedAt = new Date().toISOString();
   saveStore();
   return { token, createdAt: account.mcpTokenCreatedAt };
@@ -386,13 +388,25 @@ export function revokeAccountMcpToken(accountId) {
   const account = readStore().accounts.find((item) => item.id === accountId);
   if (!account) throw new Error("That account was not found.");
   delete account.mcpTokenHash;
+  delete account.mcpToken;
   delete account.mcpTokenCreatedAt;
   saveStore();
 }
 
 export function accountMcpTokenStatus(accountId) {
   const account = readStore().accounts.find((item) => item.id === accountId);
-  return { enabled: Boolean(account?.mcpTokenHash), createdAt: account?.mcpTokenCreatedAt || "" };
+  return {
+    enabled: Boolean(account?.mcpTokenHash),
+    // A token issued before tokens were kept has only its hash: rotating it makes it viewable.
+    viewable: Boolean(account?.mcpTokenHash && account.mcpToken),
+    createdAt: account?.mcpTokenCreatedAt || "",
+  };
+}
+
+/** The account's own MCP token, for that account alone to view again; "" when it has none kept. */
+export function accountMcpToken(accountId) {
+  const account = readStore().accounts.find((item) => item.id === accountId);
+  return (account?.mcpTokenHash && account.mcpToken) || "";
 }
 
 export function revokeAccountSession(token) {

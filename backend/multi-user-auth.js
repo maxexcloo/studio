@@ -8,6 +8,7 @@ import {
   listGatewayIdentities,
   setGatewayLink,
   signInWithOidcIdentity,
+  accountMcpToken,
   accountMcpTokenStatus,
   accountSession,
   accountStoreSnapshot,
@@ -479,6 +480,16 @@ export function registerMultiUserAuthRoutes(
       endpoint: `${endpointBase}/mcp`,
       ...accountMcpTokenStatus(account.userId),
     });
+  });
+
+  // The signed-in account's own token, viewable again in Settings › Account: never another
+  // account's, an administrator's view of one, or an MCP credential's.
+  get("/api/accounts/mcp-token/reveal", (req, res) => {
+    const account = accountForRequest(req);
+    if (!account || account.credential)
+      return res.status(401).json({ ok: false, error: "Sign in to view your MCP token." });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, token: accountMcpToken(account.userId) });
   });
 
   post("/api/accounts/mcp-token", (req, res) => {

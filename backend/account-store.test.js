@@ -56,12 +56,15 @@ test("local account passwords and bearer sessions are stored only as verifiers",
 
   const mcp = store.rotateAccountMcpToken(account.id);
   assert.equal(store.verifyAccountMcpToken(mcp.token).userId, account.id);
-  assert.equal(savedText().includes(mcp.token), false);
+  // Kept beside its hash so its own account can view it again (Settings › Account).
+  assert.equal(savedText().includes(mcp.token), true);
   const rotated = store.rotateAccountMcpToken(account.id);
   assert.equal(store.verifyAccountMcpToken(mcp.token), null);
   assert.equal(store.verifyAccountMcpToken(rotated.token).userId, account.id);
+  assert.equal(savedText().includes(mcp.token), false);
   store.revokeAccountMcpToken(account.id);
   assert.equal(store.verifyAccountMcpToken(rotated.token), null);
+  assert.equal(savedText().includes(rotated.token), false);
 });
 
 test("profile assignment, duplicate names and account disabling fail closed", async () => {

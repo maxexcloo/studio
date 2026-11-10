@@ -60,7 +60,7 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Detail Slider", "Soft Style"]);
-  await pickerTab(page, "LoRAs", "Favourites");
+  await pickerTab(page, "LoRAs", "Starred");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
