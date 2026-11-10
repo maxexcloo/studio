@@ -7,6 +7,7 @@ import {
   Menu,
   Paper,
   SegmentedControl,
+  Switch,
   Text,
   Tooltip,
   type FloatingPosition,
@@ -23,13 +24,13 @@ export interface Action {
   id: string;
   /** The menu label, and the bar control's accessible name and tooltip. */
   label: string;
-  /** A short line under its menu label saying what it does. */
+  /** One short line under its menu label, for what the label can't say (why it can't run). */
   description?: string;
   /** Every bar action has one; a menu option may go without (a suggested change). */
   icon?: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
-  /** An on/off option (Show Upscale): a checked menu item. */
+  /** An on/off option: a checked menu item (Show Upscale), or with `keepOpen` a switch row. */
   checked?: boolean;
   color?: "red";
   disabled?: boolean;
@@ -99,14 +100,14 @@ const note = (action: Action) =>
   );
 
 /**
- * A menu item's label with its description, if any, under it; the label stays its accessible name
- * and the description describes it.
+ * A menu item's label with its one-line description, if any, under it; the label stays its
+ * accessible name and the description describes it.
  */
 const itemLabel = ({ label, description }: Action, describedBy: string) =>
   description ? (
     <>
       {label}
-      <Text id={describedBy} size="xs" c="dimmed">
+      <Text id={describedBy} size="xs" c="dimmed" truncate title={description}>
         {description}
       </Text>
     </>
@@ -144,11 +145,6 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                 onChange={action.choice.onChange}
                 data={action.choice.options}
               />
-              {action.description && (
-                <Text size="xs" c="dimmed" mt={4} px={4}>
-                  {action.description}
-                </Text>
-              )}
             </div>
           );
         if (action.menu && inline) {
@@ -202,7 +198,22 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
             key={id}
             color={color}
             leftSection={Icon && <Icon size={16} fill={pressed ? "currentColor" : "none"} />}
-            rightSection={checked ? <Check size={14} /> : undefined}
+            rightSection={
+              isSetting(action) ? (
+                // The row is the control; the switch only shows its state.
+                <Switch
+                  size="xs"
+                  checked={checked}
+                  disabled={disabled}
+                  readOnly
+                  tabIndex={-1}
+                  aria-hidden
+                  className={classes.switch}
+                />
+              ) : checked ? (
+                <Check size={14} />
+              ) : undefined
+            }
             role={checked === undefined ? undefined : "menuitemcheckbox"}
             aria-checked={checked}
             {...described(action, describedBy)}

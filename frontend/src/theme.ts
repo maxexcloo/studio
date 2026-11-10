@@ -25,7 +25,6 @@ import {
   ScrollArea,
   SegmentedControl,
   Select,
-  Spoiler,
   Switch,
   Table,
   Tooltip,
@@ -376,13 +375,6 @@ export function studioTheme({
       Select: Select.extend({
         defaultProps: { checkIconPosition: "right", rightSection: chevron },
         styles: { option: target },
-      }),
-      // Expand and Collapse are touch targets on touch screens.
-      Spoiler: Spoiler.extend({
-        classNames: touch
-          ? { root: classes.touchSpoiler, control: classes.touchSpoilerControl }
-          : {},
-        defaultProps: { transitionDuration: motionDuration },
       }),
       Switch: Switch.extend({
         styles: {

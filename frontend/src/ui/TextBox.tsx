@@ -1,5 +1,7 @@
 import {
+  Fragment,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -22,6 +24,7 @@ import {
   type TextareaProps,
   useProps,
 } from "@mantine/core";
+import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp } from "lucide-react";
 import { ActionBarGroups, ActionMenuItems, type Action } from "../features/gallery/ActionBar";
 import { menuWidth } from "../theme";
@@ -38,11 +41,12 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 /**
  * Every multi-line text box. Beside the text stand only `send` and, with `tools`, a ⋯ menu of the
  * box's own tools, then Copy (unless `copy` is off, where the page offers it) and Clear, which
- * turns into Undo until the text next changes. On phones the box is a summary of its text: tapping it opens it full screen with
- * those tools as buttons, since menus are awkward over the keyboard, then Done, and `below` under
- * the text; Done, Escape or dismissing the keyboard returns to the page. `submit` adds its send
- * arrow there too, so typing and sending take one tap. An `inline` box edits in place on phones
- * too, as on desktop.
+ * turns into Undo until the text next changes. The menu is one level deep: a tool with options
+ * lists them under its name, first, rather than in a submenu. On phones the box is a summary of
+ * its text: tapping it opens it full screen with those tools as buttons, since menus are awkward
+ * over the keyboard, then Done, and `below` under the text; Done, Escape or dismissing the
+ * keyboard returns to the page. `submit` adds its send arrow there too, so typing and sending take
+ * one tap. An `inline` box edits in place on phones too, as on desktop.
  */
 export function TextBox({
   value,
@@ -56,6 +60,7 @@ export function TextBox({
   overlay,
   below,
   inline = false,
+  oneLine = false,
   submit,
   rightSection,
   onClick,
@@ -82,6 +87,8 @@ export function TextBox({
   below?: ReactNode;
   /** Edits in place on phones, for a surface that is itself full screen (the Generate sheet). */
   inline?: boolean;
+  /** Rests on one line, ending in an ellipsis, and shows its whole text while focused. */
+  oneLine?: boolean;
   /** The form's send action, offered in the phone editor beside Done. */
   submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
@@ -132,13 +139,41 @@ export function TextBox({
           },
         },
   ];
+  const [focused, setFocused] = useState(false);
+  const resting = oneLine && !focused;
+  // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
+  // takes the textarea's font, padding and border so the two line up.
+  const field = useRef<HTMLTextAreaElement>(null);
+  const ref = useMergedRef(field, props.ref);
+  const line = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (!resting || !field.current || !line.current) return;
+    const style = getComputedStyle(field.current);
+    for (const key of [
+      "borderLeftWidth",
+      "borderRightWidth",
+      "borderTopWidth",
+      "fontFamily",
+      "fontSize",
+      "fontWeight",
+      "letterSpacing",
+      "lineHeight",
+      "paddingTop",
+      "paddingLeft",
+      "paddingRight",
+    ] as const)
+      line.current.style[key] = style[key];
+  });
+  const listed = actions?.filter((action) => action.menu);
+  const plain = actions?.filter((action) => !action.menu);
   const menu = actions && (
     <Menu
       position="top-end"
       width={menuWidth}
       opened={menuOpened}
       onChange={setMenuOpened}
-      // An item that moves focus itself (Custom… selects the text) keeps it; otherwise it returns.
+      // An item that moves focus itself (Ask for a Change… selects the text) keeps it; otherwise it
+      // returns.
       returnFocus={false}
       onClose={() =>
         setTimeout(() => {
@@ -163,7 +198,18 @@ export function TextBox({
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown>
-        <ActionMenuItems groups={[actions]} />
+        {listed!.map((tool) => (
+          <Fragment key={tool.id}>
+            <Menu.Label>{tool.label}</Menu.Label>
+            <ActionMenuItems
+              groups={tool.menu!.map((group) =>
+                group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
+              )}
+            />
+            <Menu.Divider />
+          </Fragment>
+        ))}
+        <ActionMenuItems groups={[plain!]} />
       </Menu.Dropdown>
     </Menu>
   );
@@ -177,6 +223,7 @@ export function TextBox({
   const textarea = (
     <Textarea
       {...props}
+      ref={ref}
       // While the phone editor is open, it alone is the box.
       aria-hidden={editing || undefined}
       value={value}
@@ -191,6 +238,27 @@ export function TextBox({
       }}
       // While the phone editor is open, it alone carries the actions.
       rightSection={editing ? undefined : rightSection}
+      {...(oneLine && {
+        maxRows: resting ? 1 : props.maxRows,
+        onFocus: (event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        },
+        onBlur: (event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        },
+        inputContainer: (children) => (
+          <div className={classes.line} data-resting={(resting && Boolean(value)) || undefined}>
+            {children}
+            {resting && value && (
+              <span ref={line} aria-hidden className={classes.summary}>
+                {value}
+              </span>
+            )}
+          </div>
+        ),
+      })}
     />
   );
   return (

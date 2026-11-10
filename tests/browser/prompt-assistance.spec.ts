@@ -5,7 +5,7 @@ import {
   create,
   fixtures,
   loadSaved,
-  promptOptions,
+  promptMenu,
   promptTool,
   openPresets,
   savedAction,
@@ -15,8 +15,8 @@ import {
 } from "./fixtures";
 // A single style is named Improve Prompt too.
 async function assist(page: Page, action: string) {
-  const options = await promptOptions(page, "Prompt", "Improve Prompt");
-  await options.getByRole("menuitem", { name: action, exact: true }).click();
+  const menu = await promptMenu(page, "Prompt");
+  await menu.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
 async function undoAssistance(page: Page, message: string) {
@@ -222,7 +222,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles A–Z with Custom… last, which asks what to change", async ({
+test("Improve Prompt lists its styles A–Z in the ⋯ menu with Custom… last, which asks what to change", async ({
   page,
 }) => {
   await fixtures(page);
@@ -242,13 +242,18 @@ test("Improve Prompt lists its styles A–Z with Custom… last, which asks what
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
-  const options = await promptOptions(page, "Prompt", "Improve Prompt");
-  await expect(options.getByRole("menuitem")).toHaveText([
+  // One level deep: the styles are listed under Improve Prompt, then the box's other tools.
+  const menu = await promptMenu(page, "Prompt");
+  await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([
     "Candid",
     "Enhance",
     "Portrait",
     "Custom…",
     "Write Negative",
+    "Recent Prompts",
+    "Copy Prompt",
+    "Clear Prompt",
   ]);
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });

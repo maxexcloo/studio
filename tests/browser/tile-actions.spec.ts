@@ -106,16 +106,16 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Compare, Find Similar
-  // | Copy, Download | Star, Delete.
+  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Copy, Download |
+  // Compare, Similar | Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Animate",
     "Edit",
     "Upscale",
-    "Compare",
-    "Find Similar",
     "Copy",
     /^(Download|Share Image)$/,
+    "Compare",
+    "Similar",
     "Star",
     "Delete",
   ]);
@@ -374,21 +374,21 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
   await expect(remove).toBeInViewport();
 });
 
-test("Find Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
+test("Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
   page,
 }) => {
   const state = await galleryFixture(page);
   state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
   await page.reload();
   await tileMenu(page);
-  await page.getByRole("menuitem", { name: "Find Similar", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   const chip = (title: string) =>
     page.getByRole("button", { name: `Remove Similar to ${title} Filter`, exact: true });
   await expect(chip("A copper bird")).toBeVisible();
   expect(state.galleryRequests.at(-1)).toContain("similar=tile-bird");
 
   await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
-  await viewerAction(page, "Find Similar");
+  await viewerAction(page, "Similar");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(chip("A paper moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(

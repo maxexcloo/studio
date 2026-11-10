@@ -1,0 +1,45 @@
+/* A flex item, so the folded text has a definite height for its spacer. */
+.caption {
+  display: flex;
+}
+
+.captionText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Five lines; a spacer floats Expand to the end of the last one, so the ellipsis stops before it. */
+.folded {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+.folded::before {
+  content: "";
+  float: right;
+  height: 100%;
+  margin-bottom: -1lh;
+}
+
+.folded .fold {
+  float: right;
+  clear: both;
+  margin-inline-start: 0.5ch;
+}
+
+.fold {
+  position: relative;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+/* A touch target taller than the line it sits in. */
+@media (pointer: coarse) {
+  .fold::after {
+    content: "";
+    position: absolute;
+    inset: -12px -8px;
+  }
+}
