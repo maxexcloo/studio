@@ -46,21 +46,21 @@ function dreamCards(dream: DreamItem[]): DeckCard[] {
 }
 
 /**
- * The next `depth` cards. Every fourth card is a gallery image for calibration (all of them once
- * Dream has nothing unseen), and every third calibration card is a this-or-that pair. Counting
- * from what was judged keeps the order steady as cards leave the deck.
+ * The next `depth` cards: Dream's own unseen results always come first; gallery images for
+ * calibration follow only once Dream has nothing unseen, every third one a this-or-that pair.
+ * Counting from what was calibrated keeps the order steady as cards leave the deck.
  */
 export function deckCards(
   dream: DreamItem[],
   calibration: MediaItem[],
-  { judged, calibrated }: { judged: number; calibrated: number },
+  { calibrated }: { calibrated: number },
   depth = 3,
 ) {
   const unseen = dreamCards(dream);
   const gallery = [...calibration];
   const cards: DeckCard[] = [];
-  for (let slot = judged, count = calibrated; cards.length < depth; slot++) {
-    if (gallery.length && (!unseen.length || slot % 4 === 3)) {
+  for (let count = calibrated; cards.length < depth;) {
+    if (gallery.length && !unseen.length) {
       if (count++ % 3 === 2 && gallery.length >= 2) {
         const items = gallery.splice(0, 2) as [MediaItem, MediaItem];
         cards.push({
