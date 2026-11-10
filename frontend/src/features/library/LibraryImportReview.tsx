@@ -20,7 +20,8 @@ import { SectionHeading } from "../../ui/SectionHeading";
 import { icons } from "../../ui/icons";
 import { SettingGroup } from "../../ui/SettingRows";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
+import { InspirationPreset } from "./InspirationPreset";
+import { inspirationQuery, type LibraryPreset } from "../generation/inspiration";
 
 interface Availability {
   note?: string;
@@ -120,7 +121,7 @@ export function LibraryImportReview({
       client.setQueryData(["imports", result.import.id], { import: result.import });
       void client.invalidateQueries({ queryKey: ["imports"] });
       void client.invalidateQueries({ queryKey: ["library"] });
-      void client.invalidateQueries({ queryKey: ["presets"] });
+      void client.invalidateQueries({ queryKey: inspirationQuery.queryKey });
       if (variables.action === "draft-profile") {
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
         void client.invalidateQueries({ queryKey: ["definition-list", "profile"] });

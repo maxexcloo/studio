@@ -113,13 +113,13 @@ export function GenerationCard({
             profile={profile}
             selection={preset}
             onSelectionChange={setPreset}
-            onLoad={(loaded) => {
-              setPreset({ presetId: loaded.id, presetTitle: loaded.title });
+            onLoad={(loaded, selection) => {
+              setPreset(selection);
               form.setValues({
                 ...initialInput,
                 referenceDetails: [],
                 inpaint: null,
-                ...loaded.input,
+                ...loaded,
               });
             }}
           />

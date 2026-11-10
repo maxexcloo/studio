@@ -1,45 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, fixtures, image, openNav, profiles, section, stamp } from "./fixtures";
-
-test("Video inspiration opened from Chat fills its own gallery draft", async ({ page }) => {
-  await fixtures(page);
-  await page.route("**/api/presets", (route) =>
-    route.fulfill({
-      json: {
-        presets: [
-          {
-            id: "video-inspiration",
-            name: "Moving Landscape",
-            type: "video",
-            prompt: "A drifting aerial landscape",
-            negative: "",
-            settings: {},
-          },
-        ],
-      },
-    }),
-  );
-  await create(page);
-  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await prompt.fill("Keep this image composition");
-  await page.keyboard.press("Escape");
-  await openNav(page, "Chat");
-  const message = page.getByRole("textbox", { name: "Message", exact: true });
-  await message.fill("Keep this discussion draft");
-  await openNav(page, "Library");
-  await section(page, "Library", "Inspiration");
-  await page.getByRole("button", { name: "Use Prompt", exact: true }).click();
-  await expect(page).toHaveURL(/\/video\?compose=1$/);
-  await expect(prompt).toHaveValue("A drifting aerial landscape");
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
-    "Motion Quality",
-  );
-  await page.keyboard.press("Escape");
-  await openNav(page, "Images");
-  await expect(prompt).toHaveValue("Keep this image composition");
-  await openNav(page, "Chat");
-  await expect(message).toHaveValue("Keep this discussion draft");
-});
+import { create, fixtures, image, openNav, profiles, stamp } from "./fixtures";
 
 test("Switching creative modes preserves unsent gallery inputs and the Chat message", async ({
   page,

@@ -5,7 +5,9 @@ import {
   create,
   expandComposer,
   fixtures,
+  loadSaved,
   openNav,
+  openPresets,
   profiles,
   section,
 } from "./fixtures";
@@ -20,10 +22,11 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     "Guides",
     "LoRAs",
     "Models",
+    "Outfits",
     "Profiles",
+    "Scenes",
     "Downloads",
     "Imports",
-    "Inspiration",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
@@ -39,7 +42,7 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     await expect(nav.getByRole("link")).toHaveText(order);
     await expect(
       nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(5));
+    ).toHaveText(order.slice(7));
   }
 });
 
@@ -519,7 +522,9 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table).toContainText("Later Model");
 });
 
-test("Library shows import grades and reuses compatible inspiration settings", async ({ page }) => {
+test("Library shows import grades, and the Presets chip loads inspiration settings where they fit", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   await page.route("**/api/presets", (route) =>
     route.fulfill({
@@ -545,33 +550,32 @@ test("Library shows import grades and reuses compatible inspiration settings", a
       },
     }),
   );
-  await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
-  await closeLoras(page);
-  const close = page.getByRole("button", { name: "Close Generate", exact: true });
-  if (await close.isVisible()) await close.click();
-  else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
+  await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
   await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
   await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
-  await section(page, "Library", "Inspiration");
-  const missing = page
-    .locator(".mantine-Card-root")
-    .filter({ has: page.getByText("Missing Style Study", { exact: true }) });
-  await expect(missing.getByRole("button", { name: "Use Settings", exact: true })).toBeDisabled();
-  await expect(missing.getByRole("button", { name: "Use Prompt", exact: true })).toBeEnabled();
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await closeLoras(page);
+  // An inspiration whose LoRA is missing gives only its prompt.
+  await openPresets(page);
   await page
-    .locator(".mantine-Card-root")
-    .filter({ has: page.getByText("Amber Study", { exact: true }) })
-    .getByRole("button", { name: "Use Settings", exact: true })
+    .getByRole("radiogroup", { name: "Preset Source", exact: true })
+    .getByText("Inspiration", { exact: true })
     .click();
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "Amber bird study",
-  );
+  await loadSaved(page, "Inspiration", "Missing Style Study");
+  await expect(prompt).toHaveValue("A missing style study");
+  // The picker keeps its source while it is closed.
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
+  await openPresets(page);
+  await loadSaved(page, "Inspiration", "Amber Study");
+  await expect(prompt).toHaveValue("Amber bird study");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.profileId).toBe("image:test");
+  expect(state.jobs[0].input.steps).toBe(24);
   expect(state.jobs[0].input.loras).toEqual([]);
 });

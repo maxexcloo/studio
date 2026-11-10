@@ -565,7 +565,8 @@ export function SortMenu<Sort extends string>({
 
 /**
  * Saved stacks and presets: choosing one loads it, asking first when it would replace what is
- * there; each row renames, updates from the current settings or deletes from its menu.
+ * there; each row renames, updates from the current settings or deletes from its menu. A list
+ * without those (Inspiration) only loads.
  */
 export function SavedList<T extends SavedItem>({
   label,
@@ -590,9 +591,9 @@ export function SavedList<T extends SavedItem>({
   replaces: boolean;
   replaceMessage: string;
   onLoad: (item: T) => void;
-  onRename: (item: T, name: string) => void;
+  onRename?: (item: T, name: string) => void;
   onUpdate?: (item: T) => void;
-  onDelete: (item: T) => void;
+  onDelete?: (item: T) => void;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -621,7 +622,7 @@ export function SavedList<T extends SavedItem>({
                   } else if (event.key === "Enter") {
                     event.preventDefault();
                     const name = event.currentTarget.value.trim();
-                    if (name && name !== item.name) onRename(item, name);
+                    if (name && name !== item.name) onRename?.(item, name);
                     setRenaming(null);
                   }
                 }}
@@ -644,44 +645,51 @@ export function SavedList<T extends SavedItem>({
               </UnstyledButton>
             )}
             {/* Rename focuses its field, so the closing menu must not take focus back. */}
-            <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
-              <Menu.Target>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={`${noun} Actions for ${item.name}`}
-                >
-                  <icons.more size={18} />
-                </ActionIcon>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item
-                  leftSection={<icons.rename size={16} />}
-                  onClick={() => setRenaming(item.id)}
-                >
-                  Rename {noun}
-                </Menu.Item>
-                {onUpdate && (
-                  <Menu.Item
-                    leftSection={<icons.refresh size={16} />}
-                    onClick={() => {
-                      onUpdate(item);
-                      flashUpdated(item.id);
-                    }}
+            {onRename && onDelete && (
+              <Menu
+                position="bottom-end"
+                width={menuWidth}
+                withinPortal={false}
+                returnFocus={false}
+              >
+                <Menu.Target>
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label={`${noun} Actions for ${item.name}`}
                   >
-                    Update from Current
+                    <icons.more size={18} />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item
+                    leftSection={<icons.rename size={16} />}
+                    onClick={() => setRenaming(item.id)}
+                  >
+                    Rename {noun}
                   </Menu.Item>
-                )}
-                <Menu.Divider />
-                <Menu.Item
-                  color="red"
-                  leftSection={<icons.delete size={16} />}
-                  onClick={() => onDelete(item)}
-                >
-                  Delete {noun}
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
+                  {onUpdate && (
+                    <Menu.Item
+                      leftSection={<icons.refresh size={16} />}
+                      onClick={() => {
+                        onUpdate(item);
+                        flashUpdated(item.id);
+                      }}
+                    >
+                      Update from Current
+                    </Menu.Item>
+                  )}
+                  <Menu.Divider />
+                  <Menu.Item
+                    color="red"
+                    leftSection={<icons.delete size={16} />}
+                    onClick={() => onDelete(item)}
+                  >
+                    Delete {noun}
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )}
           </div>
           {confirming === item.id && (
             <Group className={classes.reveal} justify="space-between" gap="xs" p="xs">

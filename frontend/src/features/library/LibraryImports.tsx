@@ -19,6 +19,7 @@ import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
+import { inspirationQuery } from "../generation/inspiration";
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
 const gradeColours: Record<string, string> = { Exact: "green", Close: "yellow", Partial: "orange" };
@@ -78,7 +79,7 @@ export function LibraryImports({
     refetchInterval: active ? 4000 : false,
   });
   const refresh = () => {
-    for (const queryKey of [["imports"], ["presets"], ["library"]])
+    for (const queryKey of [["imports"], inspirationQuery.queryKey, ["library"]])
       void client.invalidateQueries({ queryKey });
   };
   const opened = (result: { import: ImportRecord }) => {
