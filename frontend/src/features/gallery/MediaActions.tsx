@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { useOpenComposer } from "../generation/openComposer";
 import { post } from "../../api";
@@ -56,6 +56,7 @@ import {
   type AnimateTheme,
   type Iteration,
 } from "./useMediaAction";
+import { useItemMutation } from "./useItemMutation";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
 import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
@@ -125,20 +126,21 @@ function viewerFrame(item: MediaItem) {
 /** Save Frame as Image: the frame a video is showing (else its last) as an image under Uploads. */
 function useSaveFrame(item: MediaItem): Action {
   const cache = useQueryClient();
-  const [saved, flash] = useFlash();
-  const save = useMutation({
+  // Its confirmation, like its progress, shows only on the item saved from.
+  const [saved, flash] = useFlash<string>();
+  const save = useItemMutation(item.id, "save-frame", {
     mutationFn: () =>
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
-      flash(true);
+      flash(item.id);
       void cache.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
     id: "save-frame",
-    label: saved ? "Saved to Uploads" : "Save Frame as Image",
-    icon: saved ? Check : ImageDown,
+    label: saved === item.id ? "Saved to Uploads" : "Save Frame as Image",
+    icon: saved === item.id ? Check : ImageDown,
     disabled: save.isPending,
     loading: save.isPending,
     keepOpen: true,
@@ -222,7 +224,7 @@ export function useChatAction(item: MediaItem, onApplied: () => void) {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [, setText] = useChatText();
-  return useMutation({
+  return useItemMutation(item.id, "chat", {
     mutationFn: async (message?: string) => {
       if (message) setText(message);
       // Without a model that takes the image, the Chat still starts from its settings.
@@ -247,7 +249,6 @@ interface MediaActionOptions {
   compare?: boolean;
   /** Queues a new run; the viewer's joins its strip. Defaults to queueing it directly. */
   iterate?: (iteration: Iteration) => void;
-  iterating?: Iteration["kind"];
   onApplied?: () => void;
   onCompare?: () => void;
   /** Opens Animate's dialog for a theme: Custom Animation, or any theme under Review Prompt First. */
@@ -270,7 +271,6 @@ export function useMediaActions(
     omit = [],
     compare,
     iterate,
-    iterating,
     onApplied = () => {},
     onCompare,
     onAnimate,
@@ -283,9 +283,12 @@ export function useMediaActions(
   const action = useMediaAction(item, sessionId, onApplied);
   const iteration = useMediaIteration(item, sessionId);
   const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
-  const running = iterating ?? (iteration.isPending ? iteration.variables?.kind : undefined);
+  // Runs from the item, also the viewer's own, share its pending state.
+  const running = iteration.variables?.kind;
   const compareVariants = useCompare();
-  const variants = useMutation({ mutationFn: () => compareVariants.openItem(item) });
+  const variants = useItemMutation(item.id, "compare", {
+    mutationFn: () => compareVariants.openItem(item),
+  });
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
@@ -294,7 +297,7 @@ export function useMediaActions(
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
   // A video edit's menu stays open while it saves, then its item says so for a moment.
-  const [edited, flashEdited] = useFlash<VideoEdit["kind"]>();
+  const [edited, flashEdited] = useFlash<string>();
   const editAction = (
     id: string,
     label: string,
@@ -302,11 +305,12 @@ export function useMediaActions(
     kind: Exclude<VideoEdit["kind"], "trim">,
   ): Action => ({
     id,
-    label: edited === kind ? "Saved as New Version" : label,
-    icon: edited === kind ? Check : icon,
+    label: edited === `${item.id}:${kind}` ? "Saved as New Version" : label,
+    icon: edited === `${item.id}:${kind}` ? Check : icon,
     disabled: videoEdit.isPending,
     keepOpen: true,
-    onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
+    onClick: () =>
+      videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(`${item.id}:${kind}`) }),
   });
   const chat = useChatAction(item, onApplied);
   const navigate = useNavigate();
@@ -325,7 +329,7 @@ export function useMediaActions(
   const assistant = useQuery(assistantQuery);
   // The assistant writes new variations into the item's MCP result set, in the queue.
   const client = useQueryClient();
-  const moreLikeSet = useMutation({
+  const moreLikeSet = useItemMutation(item.id, "more-like-set", {
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
       void Promise.all(
