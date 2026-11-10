@@ -31,7 +31,8 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
     assert.ok(system.includes(guide.mode.rules[0]), profile.id);
     assert.match(system, /makes sound with the picture/, profile.id);
     assert.match(system, /three beats that fill the 8-second clip/, profile.id);
-    assert.match(system, /a moment that invites speech/, profile.id);
+    assert.match(system, /awake and able to speak, give them a short spoken line/, profile.id);
+    assert.match(system, /speech to about 20 words/, profile.id);
   }
   const silent = animateInstructions({
     profile: { id: "video:wan", family: "wan22" },
@@ -56,16 +57,12 @@ test("each profile shape gets its guide's format, with sound for H3 and Grok", (
 test("each theme asks for its own motion and camera", () => {
   const theme = (name) =>
     animateInstructions({ ...shapes.grok, writing: { theme: name } }).split("Theme: ")[1];
-  assert.match(theme("cinematic"), /the camera move carries the shot.*composition invites/);
-  assert.match(theme("living"), /camera stays still/);
+  assert.match(theme("cinematic"), /camera move the subject's action motivates/);
+  assert.match(theme("living"), /keeps rolling as if the photo were a candid video/);
   assert.match(theme("action"), /energetic action that this frame sets up/);
+  assert.match(theme("dialogue"), /the people in the frame talk/);
   assert.match(theme("spicy"), /already in the frame[\s\S]*Every person in it is an adult/);
   assert.match(theme("custom"), /instruction decides what happens.*with what is in the frame/);
-  // A Living Photo loops, so its light stays as it is.
-  assert.doesNotMatch(
-    animateInstructions({ ...shapes.grok, writing: { theme: "living" } }),
-    /Let the light or mood shift/,
-  );
 });
 
 test("the clip's length and frame rate come from the control the profile runs on", () => {
@@ -102,6 +99,7 @@ const issue = (features, writing) =>
 
 test("Animate is admitted only for known themes, with Spicy behind Uncensored Models", () => {
   assert.equal(issue({}, { theme: "cinematic" }), undefined);
+  assert.equal(issue({}, { theme: "dialogue" }), undefined);
   assert.equal(issue({}, { theme: "dance" }), 400);
   assert.equal(issue({}, { theme: "custom" }), 400);
   assert.equal(issue({}, { theme: "spicy" }), 403);

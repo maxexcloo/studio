@@ -286,3 +286,44 @@ test("a video upload is an uploaded gallery video, used by its first frame and r
     /can’t be read/,
   );
 });
+
+test("a video started from the account's own photo names that photo; Extend and others' photos don't", async () => {
+  const { gallery } = await import("./gallery/store.js");
+  const items = [
+    {
+      id: "animated-photo",
+      ownerId: "account-a",
+      type: "image",
+      status: "done",
+      url: "/images/animated.png",
+      createdAt: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: "animated-video",
+      ownerId: "account-a",
+      type: "video",
+      status: "done",
+      url: "/images/animated.mp4",
+      outputName: "animated.mp4",
+      createdAt: "2026-01-01T00:00:00Z",
+    },
+  ];
+  gallery.push(...items);
+  const job = (ownerId, assetId, kind = "video") => ({
+    ownerId,
+    input: { kind, referenceAssets: [{ assetId, slot: "image" }] },
+  });
+  try {
+    const owner = { userId: "account-a", role: "user" };
+    const photo = referenceAssets.referenceAssetForAccount(owner, "animated-photo").id;
+    const frame = referenceAssets.referenceAssetForAccount(owner, "animated-video", {
+      frame: "last",
+    }).id;
+    assert.equal(referenceAssets.animatedPhoto(job("account-a", photo))?.id, "animated-photo");
+    assert.equal(referenceAssets.animatedPhoto(job("account-a", frame)), null, "Extend");
+    assert.equal(referenceAssets.animatedPhoto(job("account-b", photo)), null, "another's photo");
+    assert.equal(referenceAssets.animatedPhoto(job("account-a", photo, "image")), null, "an edit");
+  } finally {
+    for (const item of items) gallery.splice(gallery.indexOf(item), 1);
+  }
+});
