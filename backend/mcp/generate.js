@@ -13,7 +13,7 @@ import {
   mcpSize,
 } from "./controls.js";
 import { assertJobCount, mcpJson, replyRule } from "./media.js";
-import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
+import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { canonicalProfileId } from "../profile/store.js";
 import {
   asksForCloud,
@@ -741,7 +741,7 @@ export function registerGenerateTools({
     server,
     "generate",
     "generate",
-    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
+    `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request; at most ${maxJobsPerCall} images per call. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview queues nothing. Put a model the user names in profile_id. Pass other controls only as models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked.`,
     {
       request: z
         .string()
@@ -773,7 +773,7 @@ export function registerGenerateTools({
         .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
         .max(8)
         .optional()
-        .describe("Each profile's limit is its controls.loras.max in models."),
+        .describe("Each profile's limit is its controls.loras.max in models; [] for none."),
       reference_asset_ids: z
         .array(z.string().min(1))
         .max(16)
@@ -872,7 +872,7 @@ export function registerGenerateTools({
       });
     if (!args.prompts)
       throw new Error(
-        "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
+        `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${Object.keys(input).length ? "" : " (this call had no arguments)"}. Then call generate again.`,
       );
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
@@ -890,6 +890,8 @@ export function registerGenerateTools({
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
     }
+    const listProblem = views ? "" : promptListProblem(args.prompts);
+    if (listProblem) throw new Error(listProblem);
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
       args.count > 1 &&
@@ -1176,6 +1178,40 @@ export function registerGenerateTools({
       signal,
     ) => {
       const id = resolve(job_id);
+      // A reference is the result's image as it is, so other arguments change nothing; they are
+      // named back rather than refused, and the chat carries on to generate.
+      if (mode === "reference") {
+        const ignored = Object.entries({
+          tier: wanted,
+          profile_id,
+          request,
+          prompt,
+          preserve_seed,
+          count: count > 1,
+          theme,
+          length,
+          runs_on,
+          upscale_quality,
+        })
+          .filter(([, value]) => value)
+          .map(([name]) => name);
+        const result = await media.download(owner, id, output_index);
+        if (!imageMimes.includes(result.mime))
+          throw new Error("Only images can be reused as references.");
+        const uploaded = await media.upload(
+          owner,
+          result.content.toString("base64"),
+          `reference.${result.mime.split("/")[1]}`,
+        );
+        return mcpJson(
+          ignored.length
+            ? {
+                ...uploaded,
+                note: `Ignored ${ignored.join(", ")}: mode reference takes only job_id and output_index. Pass the asset's id to generate as reference_asset_ids, with your prompts there.`,
+              }
+            : uploaded,
+        );
+      }
       const animating = mode === "animate" || mode === "extend";
       if (theme && (!animating || prompt))
         throw new Error("theme is for mode animate or extend without prompt. Call reuse again.");
@@ -1221,22 +1257,6 @@ export function registerGenerateTools({
           link: media.pageUrl(owner, id),
           note: "Queued. The upscale shows on this result in the gallery when it finishes; share the link and end your turn.",
         });
-      }
-      if (mode === "reference") {
-        if (wanted || prompt || request || profile_id || preserve_seed || count > 1)
-          throw new Error(
-            "mode reference takes only job_id and output_index. To generate from this result, call reuse with mode again or animate.",
-          );
-        const result = await media.download(owner, id, output_index);
-        if (!imageMimes.includes(result.mime))
-          throw new Error("Only images can be reused as references.");
-        return mcpJson(
-          await media.upload(
-            owner,
-            result.content.toString("base64"),
-            `reference.${result.mime.split("/")[1]}`,
-          ),
-        );
       }
       // Studio never rewrites a prompt: the chat writes the change into it; request is the user's words.
       if (request && !prompt && !theme)

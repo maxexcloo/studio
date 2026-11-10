@@ -39,7 +39,7 @@ import { setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
-import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
+import { MediaViewerDock, useRunFamily, type QueuedRun } from "./MediaViewerDock";
 import { mediaSource, playbackUrl } from "./mediaSource";
 import { ActionBarSurface, findAction, usualAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
@@ -289,8 +289,8 @@ export function MediaViewer({
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
-  // Runs this viewer queued outside the item's session still join its strip.
-  const [queued, setQueued] = useState<string[]>([]);
+  // Runs this viewer queued outside the item's session still join their source's strip.
+  const [queued, setQueued] = useState<QueuedRun[]>([]);
   const family = useRunFamily(item, queued, related);
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
@@ -304,11 +304,14 @@ export function MediaViewer({
     setReplacement("");
     navigate?.(next);
   }, [replacement, items, navigate]);
-  const joinStrip = (jobId: string) => setQueued((ids) => [...ids, jobId]);
+  // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
-    iteration.mutate(next, { onSuccess: joinStrip });
+    void iteration.mutateAsync(next).then(
+      (job) => setQueued((runs) => [...runs, { job, from: item.id }]),
+      () => {},
+    );
   }
-  const pending = iteration.isPending ? iteration.variables : undefined;
+  const pending = iteration.variables;
   function move(direction: -1 | 1) {
     // Navigation stops at either end rather than wrapping round.
     const next = canNavigate && viewable[currentIndex + direction];

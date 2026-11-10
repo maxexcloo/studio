@@ -14,6 +14,7 @@ import { backendLabel, generationInput, isProfile, profileName } from "../genera
 import { queueQuery } from "../generation/Queue";
 import { isCloudProfile } from "../../../../shared/profiles";
 import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
+import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";
 /** What Animate's Cloud, Fast and Quality offer the account (backend/animate-profile.js). */
@@ -197,7 +198,7 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
   const client = useQueryClient();
   const [videos] = useVideosPreference();
   const openComposer = useOpenComposer();
-  return useMutation({
+  return useItemMutation(item.id, "prepare", {
     mutationFn: async (operation: Operation) => {
       const { profile, choice, draft, note } = await mediaDraft(
         item,
@@ -258,7 +259,9 @@ type PromptOperation = "image" | "refine" | "animate";
  */
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const iterate = useIterate(sessionId);
-  return useMutation({ mutationFn: (iteration: Iteration) => iterate(item, iteration) });
+  return useItemMutation(item.id, "iterate", {
+    mutationFn: (iteration: Iteration) => iterate(item, iteration),
+  });
 }
 
 /** `useMediaIteration`'s run for any item, so a selection can iterate each of its items. */

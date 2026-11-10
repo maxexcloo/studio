@@ -940,7 +940,16 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(media.getInstructions(), /Studio runs them exactly as written/);
   assert.match(
     media.getInstructions(),
-    /"N sets of K" is N distinct prompts with count K in one call/,
+    /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
+  );
+  // A chat keeps the user's own description and their no-LoRAs choice from turn to turn.
+  assert.match(
+    media.getInstructions(),
+    /own descriptions .* word for word, changing only what they ask/,
+  );
+  assert.match(
+    media.getInstructions(),
+    /if the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
   );
   assert.match(
     media.getInstructions(),
@@ -1414,6 +1423,13 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
     f.submitted.map((body) => body.prompt),
     ["A tree", "A flower"],
   );
+  // Broken JSON or repeated prompts are refused rather than run as one image or the same image twice.
+  for (const [prompts, refusal] of [
+    ['["A tree", "A flower"先后]', /isn't valid JSON/],
+    [["A tree", "a tree."], /^prompts 1 and 2 have the same words/],
+  ])
+    assert.match(texts(await call(client, "generate", { kind: "image", prompts })), refusal);
+  assert.equal(f.submitted.length, 2);
 });
 
 test("a call of several results is one titled set, each prompt titled by the chat or left to its prompt", async (t) => {
@@ -3555,9 +3571,17 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     "reads the cached catalogue at most once and needs no Models call",
   );
   // mode reference returns a reference asset for Generate, and a rerun keeps a result's references.
-  await failure(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" });
-  const { asset } = data(await call(client, "reuse", { job_id: "result 1", mode: "reference" }));
+  // Arguments a reference doesn't use are named back, not refused.
+  const extras = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" }),
+  );
+  assert.match(extras.asset.id, /^fixture-asset-/);
+  assert.match(extras.note, /^Ignored request: mode reference takes only job_id and output_index/);
+  const { asset, note } = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference" }),
+  );
   assert.match(asset.id, /^fixture-asset-/);
+  assert.equal(note, undefined);
   const edit = data(
     await call(client, "generate", {
       kind: "image",
@@ -4473,10 +4497,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
-  assert.match(
-    generate.description,
-    /"4 sets of 2" is 4 distinct prompts with count 2; at most 10 images per call\./,
-  );
+  assert.match(generate.description, /at most 10 images per call\./);
   assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
@@ -5035,6 +5056,27 @@ test("Review does not poll or download a pending result, and refuses video", asy
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /still images/);
   assert.equal(f.downloads.length, 0);
+});
+
+test("Review waits for a result due within the wait, and says plainly when one isn't ready", async (t) => {
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 5 * 60_000 });
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  // Due in five minutes: no wait, and the reply says there is nothing to review yet, with its link.
+  let started = performance.now();
+  const early = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 2000, "doesn't wait for a result minutes away");
+  assert.match(
+    texts(early),
+    /^Result 1 is still running, so there is no image to review yet\..*\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
+  );
+  // Due in a moment, as when the user asks right after a result renders: review waits and sees it.
+  f.jobs.get(id).progress = { endsAt: Date.now() + 300 };
+  setTimeout(() => finish(f), 300);
+  started = performance.now();
+  const later = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 5000, "returns once the result finishes");
+  assert.equal(later.content.filter((item) => item.type === "image").length, 1);
 });
 
 test("Reuse preserves the seed for a requested revision only, and refuses an unknown seed or changed profile", async (t) => {
@@ -5651,7 +5693,6 @@ test("an ordinary request never upscales, even for best quality or a profile def
     generate.description,
     /upscale_quality only when the user asks to upscale or enlarge/,
   );
-  assert.match(client.getInstructions(), /upscale only when the user asks to upscale or enlarge/);
 });
 
 test("request and prompts together run the prompts and keep the request as context", async (t) => {
@@ -5686,6 +5727,11 @@ test("request and prompts together run the prompts and keep the request as conte
   );
   const missing = await call(client, "generate", { kind: "image" });
   assert.match(texts(missing), /^Write the finished prompts yourself/);
+  // An empty call (a host that cancelled its arguments) is told what to send.
+  assert.match(
+    texts(await call(client, "generate", {})),
+    /as prompts, an array of strings.*\(this call had no arguments\)/,
+  );
 });
 
 test("one Generate call fans out over several models with the same prompts and returns at once", async (t) => {
