@@ -1555,6 +1555,26 @@ test("models lists the account's characters, and generate applies one by name: i
   );
   assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // A set made with a character carries it, and is named for it unless the chat named the set.
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+  });
+  assert.deepEqual(
+    f.submitted.slice(-2).map(({ resultSet }) => [resultSet.title, resultSet.character]),
+    [
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+    ],
+  );
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+    title: "Ranger Days",
+  });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Ranger Days");
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {

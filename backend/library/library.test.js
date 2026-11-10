@@ -29,7 +29,13 @@ test("search looks through prompts, set titles, models and LoRAs; favourites fil
         prompt: "a blue owl",
         model: "sdxl_base.safetensors",
         settings: { loras: [{ name: "Film Grain.safetensors" }] },
-        resultSet: { id: "set-a", title: "Variety Test", index: 0, variation: "Owl Librarian" },
+        resultSet: {
+          id: "set-a",
+          title: "Variety Test",
+          index: 0,
+          variation: "Owl Librarian",
+          character: { id: "chr-mara", name: "Mara" },
+        },
       }),
       {
         id: "s3",
@@ -56,6 +62,7 @@ test("search looks through prompts, set titles, models and LoRAs; favourites fil
   assert.deepEqual(ids(store.galleryFilter({ q: "grain" })), ["s2", "s3"]);
   // An MCP result set's title and the result's own title there find it too.
   assert.deepEqual(ids(store.galleryFilter({ q: "variety librarian" })), ["s2", "s3"]);
+  assert.deepEqual(ids(store.galleryFilter({ q: "mara" })), ["s2", "s3"]);
   assert.equal(store.galleryFilter({ q: "  " }), null);
   assert.deepEqual(ids(store.galleryFilter({ model: "sdxl", lora: "grain" })), ["s2", "s3"]);
   assert.deepEqual(ids(store.galleryFilter({ q: "owl", model: "flux" })), ["s3"]);

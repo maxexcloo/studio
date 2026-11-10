@@ -981,12 +981,14 @@ export function registerGenerateTools({
         ],
       };
     }
-    // A call of several results is one titled set; the gallery titles each prompt's results by
-    // titles, or by its prompt where they are missing.
+    // A call of several results is one titled set, with the character it was made with; the
+    // gallery titles each prompt's results by titles, or by its prompt where they are missing.
     const resultSet = jobs > 1 && {
       id: crypto.randomUUID(),
-      title: title || replyTitle(request) || promptWords(args.prompts[0]),
+      // A character's set is named for it unless the chat named the set.
+      title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
       source: actor.session ? "Chat" : actor.client || "MCP",
+      ...(card ? { character: { id: card.id, name: card.name } } : {}),
     };
     for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
     // Request and prompts together: the prompts run, and the request stays on the record.
