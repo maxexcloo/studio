@@ -335,6 +335,49 @@ export class ChatService {
     const calls: { id: string; name: string; arguments: string }[] = [];
     // A later round's text starts its own paragraph.
     let separator = assistant.content ? "\n\n" : "";
+    const think = (piece: string) => {
+      if (!piece) return;
+      assistant.thinking = (assistant.thinking || "") + piece;
+      save();
+      emit({ event: "thinking", data: { id: assistant.id, text: piece } });
+    };
+    // The reply resumes at its next word, not the blank lines a model puts after its thinking.
+    let afterThought = false;
+    const say = (content: string) => {
+      if (afterThought) content = content.trimStart();
+      if (!content) return;
+      afterThought = false;
+      const piece = separator + content;
+      separator = "";
+      text += content;
+      assistant.content += piece;
+      save();
+      emit({ event: "delta", data: { id: assistant.id, text: piece } });
+    };
+    // A model served without a reasoning parser streams its thinking inline as <think>…</think>; it
+    // goes to thinking, never the reply. A tag split across deltas waits in held for the rest.
+    let inThought = false,
+      held = "";
+    const content = (piece: string) => {
+      let rest = held + piece;
+      held = "";
+      while (rest) {
+        const tag = inThought ? "</think>" : "<think>";
+        const at = rest.indexOf(tag);
+        if (at >= 0) {
+          (inThought ? think : say)(rest.slice(0, at));
+          rest = rest.slice(at + tag.length);
+          afterThought = inThought;
+          inThought = !inThought;
+          continue;
+        }
+        let partial = Math.min(tag.length - 1, rest.length);
+        while (partial && !tag.startsWith(rest.slice(-partial))) partial--;
+        (inThought ? think : say)(rest.slice(0, rest.length - partial));
+        held = rest.slice(rest.length - partial);
+        rest = "";
+      }
+    };
     try {
       frames: while (true) {
         const chunk = await reader.read();
@@ -363,19 +406,8 @@ export class ChatService {
           const delta = choice?.delta;
           // Gateways name reasoning `reasoning_content` or `reasoning`; Bifrost sends both with the same text.
           const reasoning = delta?.reasoning_content ?? delta?.reasoning;
-          if (typeof reasoning === "string" && reasoning) {
-            assistant.thinking = (assistant.thinking || "") + reasoning;
-            save();
-            emit({ event: "thinking", data: { id: assistant.id, text: reasoning } });
-          }
-          if (typeof delta?.content === "string" && delta.content) {
-            const piece = separator + delta.content;
-            separator = "";
-            text += delta.content;
-            assistant.content += piece;
-            save();
-            emit({ event: "delta", data: { id: assistant.id, text: piece } });
-          }
+          if (typeof reasoning === "string") think(reasoning);
+          if (typeof delta?.content === "string") content(delta.content);
           for (const call of delta?.tool_calls || []) {
             const index = Number(call.index) || 0;
             calls[index] ||= { id: "", name: "", arguments: "" };
@@ -398,6 +430,7 @@ export class ChatService {
     signal.throwIfAborted();
     if (!completed)
       throw failure("The text gateway disconnected before completing its answer.", 502);
+    (inThought ? think : say)(held);
     return {
       text,
       calls: calls
