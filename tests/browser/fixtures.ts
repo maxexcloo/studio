@@ -181,8 +181,18 @@ export async function fixtures(page: Page) {
     availableProfiles: ["image:test", "image:fast", "video:test"],
     defaultAccessProfileId: "users",
   };
-  // Each account's gallery size, as Settings › Users counts it.
-  const galleryOwners: Record<string, number> = {};
+  // Each account's gallery, storage and last 30 days, as Settings › Users shows them.
+  const galleryOwners: Record<
+    string,
+    {
+      items: number;
+      images: number;
+      videos: number;
+      cloudJobs: number;
+      gpuMs: number;
+      bytes: number;
+    }
+  > = {};
 
   const preferences = {
     preferences: {
@@ -241,7 +251,7 @@ export async function fixtures(page: Page) {
         },
         catalogue: [],
         integrations: {
-          civitai: { token: { set: false }, presets: false },
+          civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
           assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
         },
@@ -272,8 +282,7 @@ export async function fixtures(page: Page) {
       return respond({ account });
     }
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
-    if (path === "/api/models")
-      return respond({ profiles, features: { presets: true }, familyLabels });
+    if (path === "/api/models") return respond({ profiles, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running and the account has no Cloud: Animate takes the local video profile.
     if (path === "/api/animate/profile")
@@ -941,13 +950,9 @@ export async function fixtures(page: Page) {
   };
 }
 /** Serves `/api/models` with these profiles in place of the fixture catalogue. */
-export async function serveProfiles(
-  page: Page,
-  profiles: Profile[],
-  features?: { presets: boolean },
-) {
+export async function serveProfiles(page: Page, profiles: Profile[]) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles, features, familyLabels } }),
+    route.fulfill({ json: { profiles, familyLabels } }),
   );
 }
 
@@ -1211,8 +1216,12 @@ export async function closePresets(page: Page) {
   await closePopup(page, "Presets");
 }
 
-/** Loads a saved stack or preset, confirming when it replaces what the draft has. */
-export async function loadSaved(page: Page, noun: "Preset" | "Stack", name: string) {
+/** Loads a saved stack or preset, or an inspiration, confirming when it replaces what the draft has. */
+export async function loadSaved(
+  page: Page,
+  noun: "Preset" | "Stack" | "Inspiration",
+  name: string,
+) {
   await page.getByRole("button", { name: `Load ${noun}: ${name}`, exact: true }).click();
   const replace = page.getByRole("button", { name: "Replace", exact: true });
   if (await replace.isVisible()) await replace.click();

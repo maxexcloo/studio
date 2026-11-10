@@ -64,12 +64,8 @@ test("installed files join the catalogue, and catalogued files that are not inst
 
 test("an import from chat goes through the same pipeline, records chat as its origin and shows in the history; catalogue edits undo", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-chat-"));
-  const presets = process.env.STUDIO_ENABLE_PRESETS;
-  process.env.STUDIO_ENABLE_PRESETS = "1";
   t.after(() => {
     fs.rmSync(dataDir, { recursive: true, force: true });
-    if (presets === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
-    else process.env.STUDIO_ENABLE_PRESETS = presets;
   });
   const { model, versions } = JSON.parse(
     fs.readFileSync(new URL("../fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
