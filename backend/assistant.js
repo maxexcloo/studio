@@ -35,6 +35,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
+import { maxCharacterDescription } from "../shared/characters.ts";
 
 const gatewayKeys = [
   "STUDIO_ASSISTANT_URL",
@@ -45,11 +46,14 @@ export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // One rule for every title: a gallery item's from its prompt, a chat's from its first message.
 const titleInstructions =
   "Title what the text below describes: the prompt that made an image or video, or the first message of a chat. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
+// A character card's description (Make Character), which picking the card adds to a prompt.
+const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos) and their outfit. Write one short phrase of comma-separated details under ${maxCharacterDescription} characters, such as "red-haired woman in her thirties, freckles, green cloak, scar over left eye". Leave out the setting, pose, expression, lighting and style, and never guess a name or identity. Reply with only the phrase.`;
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {
   animate: null,
   caption: "none",
+  character: "none",
   describe: "none",
   dream: "none",
   guide: "none",
@@ -1030,6 +1034,24 @@ export function createAssistant(
     return { text, tags, model };
   }
 
+  /** A character card's description from its image; the caller checks the model reads images. */
+  async function character({ image, explicit = false, signal } = {}) {
+    const model = await modelFor("character", explicit);
+    const reply = await chat({
+      call: "character",
+      model,
+      messages: [
+        { role: "system", content: `${characterInstructions} ${contentRule(explicit)}` },
+        { role: "user", content: userContent("Describe this character.", [image], true) },
+      ],
+      temperature: 0.3,
+      signal,
+    });
+    const description = one(reply.text, maxCharacterDescription).replace(/^["'“]+|["'”.\s]+$/g, "");
+    if (!description) throw new AssistantError("unusable reply");
+    return { description, model };
+  }
+
   /** A gallery item's title of a few words, summarised from its prompt; throws on an unusable reply. */
   async function title({ prompt, signal } = {}) {
     const model = await modelFor("title");
@@ -1155,6 +1177,7 @@ export function createAssistant(
     matchLoras,
     describe,
     caption,
+    character,
     title,
     draftGuide,
     draftProfile,

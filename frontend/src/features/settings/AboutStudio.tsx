@@ -39,7 +39,7 @@ const credits = [
   },
 ];
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
-// Grouped by where each key works: the gallery, composer, Chat, then the viewer.
+// Grouped by where each key works: the gallery, composer, Chat, the viewer, then Dream and Compare.
 const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["/"], [mod, "F"]], action: "Search the Gallery" },
   { keys: [[mod, "Enter"]], action: "Generate" },
@@ -54,6 +54,10 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["Delete"]], action: "Delete the Viewed Item" },
   { keys: [["+"], ["−"], ["0"]], action: "Zoom In, Out or Fit" },
   { keys: [["Esc"]], action: "Close Search, Panels and the Viewer" },
+  { keys: [["←"], ["→"]], action: "Pass or Like in Dream, or Choose A or B" },
+  { keys: [["↑"]], action: "Variations in Dream, or Both in a Comparison" },
+  { keys: [["↓"]], action: "Neither in a Dream Comparison" },
+  { keys: [["1"], ["2"], ["3"], ["4"]], action: "Star a Compare Winner" },
 ];
 const link = (href: string, label: string) => (
   <Anchor href={href} target="_blank" rel="noopener noreferrer" size="sm">

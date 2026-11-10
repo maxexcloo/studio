@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { Shuffle } from "lucide-react";
 import { icons } from "../../ui/icons";
-import { failure } from "../../api";
+import { failure, post } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
@@ -20,6 +21,8 @@ import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
+// Compare Selected sets out up to four images side by side, one per number key.
+const compareLimit = 4;
 // Phones keep what acts on several items on the bar and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
@@ -64,6 +67,28 @@ export function GallerySelectionBar({
   const favorites = useFavorites();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
+  // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
+  // comparison votes per run.
+  const navigate = useNavigate();
+  const images =
+    selected.length >= 2 &&
+    selected.length <= compareLimit &&
+    selected.every((item) => item.type === "image" && item.status === "done");
+  const comparable =
+    images &&
+    selected.every((item) => item.jobId) &&
+    new Set(selected.map((item) => item.jobId)).size === selected.length;
+  const compare = useMutation({
+    mutationFn: () =>
+      post<{ id: string }>("/api/comparisons", {
+        jobIds: selected.map((item) => item.jobId),
+        itemIds: selected.map((item) => item.id),
+      }),
+    onSuccess: (comparison) => {
+      selection.end();
+      navigate(`/compare/${comparison.id}`);
+    },
+  });
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
   const shareKey = ready.map((item) => item.id).join("\n");
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
@@ -144,6 +169,12 @@ export function GallerySelectionBar({
         disabled: pending || !runningJobs.length,
         loading: busy === "stop",
         onClick: () => void stopSelected(),
+      }),
+    images &&
+      itemAction("compare", {
+        disabled: !comparable || compare.isPending || pending,
+        loading: compare.isPending,
+        onClick: () => compare.mutate(),
       }),
     // Phones that share natively share instead of downloading.
     phone && typeof navigator.share === "function"
