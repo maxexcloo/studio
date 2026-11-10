@@ -8,18 +8,26 @@ import { writerGuide } from "./domain/writing-standard.ts";
 // The newest prompts are enough to steer away from; older ones only lengthen the request.
 const shownPrompts = 12;
 
-/** Resolves to `{ prompt, title, thinking, model }` for one new variation of the set; throws AssistantError. */
+/**
+ * Resolves to `{ prompt, title, thinking, model }` for one new variation of the set, written where
+ * the account's Prompt Writing preference (`prefer`) chooses, the thinking led by the note where the
+ * other side wrote it; throws AssistantError.
+ */
 export async function writeSetPrompt({
   engine,
   profile,
   guide,
   title,
   prompts,
+  prefer,
   signal,
   onThinking,
   onDelta,
 }) {
-  const model = await engine.model("rewrite");
+  const model = await engine.model("rewrite", false, prefer);
+  // The thinking starts with why the other side wrote it, where it did.
+  const note = await engine.writerNote(prefer);
+  if (note) onThinking?.(`${note}\n\n`);
   const reply = await engine.chat({
     call: "rewrite",
     model,
@@ -58,5 +66,10 @@ export async function writeSetPrompt({
   const prompt = cleanPrompt(String(written.prompt || "")).slice(0, maxPromptCharacters);
   if (!prompt) throw new AssistantError("unusable reply");
   const named = replyTitle(written.title);
-  return { prompt, thinking: reply.thinking, model, ...(named ? { title: named } : {}) };
+  return {
+    prompt,
+    thinking: note ? `${note}\n\n${reply.thinking || ""}` : reply.thinking,
+    model,
+    ...(named ? { title: named } : {}),
+  };
 }

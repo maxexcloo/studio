@@ -210,7 +210,10 @@ export interface Models {
   /** Each family's display name, from the catalogue. */
   familyLabels?: Record<string, string>;
   profiles: Profile[];
+  /** The account's defaults, on the side its Images and Videos preferences choose. */
   defaults?: { imageModel?: string; videoModel?: string };
+  /** Why a default runs on the other side from the account's preference. */
+  defaultNotes?: Partial<Record<MediaKind, string>>;
   workers?: {
     id: string;
     name: string;

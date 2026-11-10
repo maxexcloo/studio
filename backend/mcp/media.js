@@ -22,6 +22,7 @@ import { withResolution } from "../../shared/resolution.ts";
 import { promptWords } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { accessFeatures } from "../account-policy.js";
+import { accountPreferences } from "../account-preferences.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
@@ -365,19 +366,26 @@ export class McpMedia {
   }
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
-   * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). A local profile whose worker is
-   * Offline or Stopped is still chosen: its jobs wait in the queue until a worker is back, never moved to the cloud.
+   * Cloud (Grok) profiles join when the user asked for the cloud (`cloud`) or the account's default is one: its
+   * Images or Videos preference is Cloud, or no local profile can run (model/catalogue.js withPreferredDefaults,
+   * whose note the pick carries). Otherwise a local profile whose worker is Offline or Stopped is still chosen:
+   * its jobs wait in the queue until a worker is back.
    */
   async choose(owner, options = {}) {
-    const { profile } = await this.choices(owner, options);
-    return { profile, note: "" };
+    const { profile, note } = await this.choices(owner, options);
+    return { profile, note };
   }
-  /** The profiles choose() picks from (`pool`) and its usual pick (`profile`), so Generate can pick by the request. */
+  /**
+   * The profiles choose() picks from (`pool`), its usual pick (`profile`), so Generate can pick by the request,
+   * and `note`, to pass on, where that pick is a default that gave way to the other side.
+   */
   async choices(owner, { kind = "image", tier, references = 0, loras = [], cloud = false } = {}) {
     const models = await this.catalogue(owner);
     const ready = await this.profiles(kind, owner);
+    const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
+    const cloudDefault = isCloudProfile(ready.find((profile) => profile.id === defaultId));
     let profiles = ready;
-    if (!cloud) {
+    if (!cloud && !cloudDefault) {
       profiles = ready.filter((profile) => !isCloudProfile(profile));
       if (!profiles.length && ready.length)
         throw new Error(
@@ -403,11 +411,14 @@ export class McpMedia {
           `No ready ${kind} profile can use ${loras.map(({ name }) => name).join(", ")}. Call models with lora_query to look it up.`,
         );
     }
-    const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
     const options = { kind, tier, references };
+    const profile = chooseProfile(profiles, { ...options, defaultId });
+    // The default's note holds for any pick on its side.
+    const note = isCloudProfile(profile) === cloudDefault ? models.defaultNotes?.[kind] : "";
     return {
       pool: choicePool(profiles, options),
-      profile: chooseProfile(profiles, { ...options, defaultId }),
+      profile,
+      note: note ? `${note} Tell the user. ` : "",
     };
   }
   async catalogue(owner = "") {
@@ -1429,10 +1440,13 @@ export class McpMedia {
     // on its video's own model while that runs and is in the pool asked (`where`: auto, local or
     // cloud, which always takes Animate's pick), and anything else takes Animate's own pick.
     const videos = await this.profiles("video", owner);
+    // The account's Videos preference, as in the app (model/routes.js): Cloud first, else local.
+    const cloudPreferred = where === "auto" && accountPreferences(owner).videos === "cloud";
     const own =
       item.type === "video" &&
       !tier &&
       where !== "cloud" &&
+      !cloudPreferred &&
       videos.find(
         (profile) =>
           profile.id === canonicalProfileId(item.settings.profileId) &&
@@ -1450,6 +1464,7 @@ export class McpMedia {
         localParked: models.backends?.video?.parked === true,
         tier,
         where,
+        prefer: cloudPreferred ? "cloud" : "local",
       });
       base = choice.profile;
       note = choice.note ? `${choice.note} Tell the user. ` : "";

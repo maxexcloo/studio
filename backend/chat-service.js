@@ -1,6 +1,12 @@
+import { accountPreferences } from "./account-preferences.js";
 import { accountAccessForId } from "./account-store.js";
 import { createAssistant } from "./assistant.js";
-import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
+import {
+  chatModelAllowed,
+  chatSettings,
+  preferredChatModel,
+  servedChatModels,
+} from "./chat-settings.js";
 import { flagEnabled } from "./deployment-settings.js";
 import { ChatService } from "./domain/chat.ts";
 import { ChatStore } from "./domain/chat-store.ts";
@@ -54,6 +60,16 @@ export function createSessionChat({
       reject("Choose a model that supports image references for this action.");
     return profile;
   }
+  /** The Studio text workloads serving a model; one without a provider prefix serves only itself. */
+  const serving = (modelId) =>
+    (runtime?.controller.workloads || []).filter(
+      (item) =>
+        item.kind === "text" &&
+        item.model &&
+        (item.model.includes("/")
+          ? modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1))
+          : modelId === item.model),
+    );
   let chatGateway;
   return new ChatService({
     store: new ChatStore(store.db),
@@ -83,16 +99,19 @@ export function createSessionChat({
       })),
     // A text workload's model reads images as its workloads say; Bifrost's cloud models all do.
     vision: async (modelId) => {
-      const served = (runtime?.controller.workloads || []).filter(
-        (item) =>
-          item.kind === "text" &&
-          item.model &&
-          // A workload model without a provider prefix matches only itself, not every model.
-          (item.model.includes("/")
-            ? modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1))
-            : modelId === item.model),
-      );
+      const served = serving(modelId);
       return served.length ? served.every((item) => item.vision === true) : true;
+    },
+    // Where the person picked no model: the account's Chat preference, a local model only while
+    // one of its workloads runs.
+    defaultModel: async (ownerId, models) => {
+      const running = new Set(
+        (await runtime?.controller.running("text").catch(() => []))?.map(({ id }) => id),
+      );
+      return preferredChatModel(models, accountPreferences(ownerId).chat, (model) => {
+        const served = serving(model.id);
+        return !model.parked && (!served.length || served.some(({ id }) => running.has(id)));
+      });
     },
     models: async (ownerId) => {
       const settings = chatSettings();
@@ -100,9 +119,14 @@ export function createSessionChat({
       const account = ownerId ? accountAccessForId(ownerId) : undefined;
       if (ownerId && !account?.authenticated) return [];
       chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
-      const models = ((await chatGateway?.listModelDetails()) || []).filter((model) =>
-        chatModelAllowed(model.id, settings.patterns),
-      );
+      // Local models: a Studio text workload serves them, or the gateway's local/ router.
+      const models = ((await chatGateway?.listModelDetails()) || [])
+        .filter((model) => chatModelAllowed(model.id, settings.patterns))
+        .map((model) =>
+          serving(model.id).length || model.id.startsWith("local/")
+            ? { ...model, local: true }
+            : model,
+        );
       const workloads = (runtime?.controller.workloads || []).filter(
         (item) =>
           item.kind === "text" && item.model && chatModelAllowed(item.model, settings.patterns),

@@ -3,19 +3,31 @@ import { ownerIdForRequest } from "../account-ownership.js";
 import { animateProfile } from "../animate-profile.js";
 import { demoMode } from "../comfy/comfy.js";
 import { directRoute } from "../domain/direct-route.ts";
-import { familyLabels, modelsForAccount, withFailing, withProfileAliases } from "./catalogue.js";
+import {
+  familyLabels,
+  modelsForAccount,
+  withFailing,
+  withPreferredDefaults,
+  withProfileAliases,
+} from "./catalogue.js";
 
 /** The catalogue for the browser (/api/models) and Animate's model choice. `catalogue` is model/catalogue.js. */
 export function registerModelRoutes(app, { catalogue }) {
   directRoute(app, "GET", "/api/models", async (account, { query }) => {
     const req = { studioAccount: account };
+    // The account's catalogue, its defaults on the side its Images and Videos preferences choose.
+    const forAccount = (models) =>
+      withPreferredDefaults(
+        modelsForAccount(models, req),
+        accountPreferences(ownerIdForRequest(req)),
+      );
     try {
       // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
       const { models } = await catalogue.mediaModels(query.cached !== "1");
       return {
         status: 200,
         payload: {
-          ...withFailing(withProfileAliases(modelsForAccount(models, req))),
+          ...withFailing(withProfileAliases(forAccount(models))),
           familyLabels,
         },
       };
@@ -29,7 +41,7 @@ export function registerModelRoutes(app, { catalogue }) {
       return {
         status: 200,
         payload: {
-          ...withFailing(withProfileAliases(modelsForAccount(catalogue.unavailableModels(), req))),
+          ...withFailing(withProfileAliases(forAccount(catalogue.unavailableModels()))),
           familyLabels,
         },
       };

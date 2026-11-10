@@ -34,6 +34,8 @@ interface Result {
   source?: string;
   reason?: string;
   model?: string;
+  /** Why it was written on the other side from the account's Prompt Writing preference. */
+  note?: string;
 }
 type Action = "rewrite" | "negative" | "loras";
 const workingLabels: Record<Action, string> = {
@@ -242,7 +244,7 @@ export function usePromptAssistant({
           failure("The assistant returned an empty prompt.");
           return;
         }
-        applyChange("Prompt improved", {
+        applyChange(result.note ? `Prompt improved. ${result.note}` : "Prompt improved", {
           prompt: result.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
@@ -261,7 +263,10 @@ export function usePromptAssistant({
           notifications.show({ message: "This model does not use a negative prompt." });
           return;
         }
-        applyChange("Negative prompt written", { negative: result.negative });
+        applyChange(
+          result.note ? `Negative prompt written. ${result.note}` : "Negative prompt written",
+          { negative: result.negative },
+        );
       } else {
         const offered = new Set(current.profile?.options?.loras || []);
         const usable = (result.loras || []).filter((item) => offered.has(item.name));
