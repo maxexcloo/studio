@@ -1,4 +1,4 @@
-import { BookOpen, Boxes, Compass, FileCog, HardDriveDownload, Import } from "lucide-react";
+import { BookOpen, Boxes, FileCog, HardDriveDownload, Import } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -64,13 +64,6 @@ export const librarySections = {
     description:
       "Import a Civitai or Hugging Face link, or an image, and review its compatibility.",
     icon: Import,
-    admin: true,
-    group: "Getting More",
-  },
-  presets: {
-    label: "Inspiration",
-    description: "Saved prompts and settings to start from.",
-    icon: Compass,
     admin: true,
     group: "Getting More",
   },
