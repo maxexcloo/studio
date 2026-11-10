@@ -22,7 +22,7 @@
   touch-action: pan-y;
 }
 /* The desktop dropdown sizes the list to its rows, bounded above the service summary, with even
-   gaps around the divider; an empty queue keeps a small minimum height with Empty Queue centred. */
+   gaps around the divider; an empty or short queue keeps a steady minimum height, with Empty Queue centred. */
 .dropdown {
   display: flex;
   flex-direction: column;
@@ -32,6 +32,6 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  min-height: 6rem;
+  min-height: 12rem;
   max-height: min(60dvh, 32rem);
 }
