@@ -120,6 +120,7 @@ export function LibraryCatalogueTable({
   label,
   onUpdate,
   onCheckUpdates,
+  onTest,
   onUpdateAll,
   checkingUpdates = false,
   updateNote,
@@ -131,6 +132,8 @@ export function LibraryCatalogueTable({
   label: "Models" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
   onCheckUpdates?: () => void;
+  /** Test LoRA: a strength sweep in Compare. */
+  onTest?: (item: LibraryItem) => void;
   /** Applies every free update, models and LoRAs alike; absent when there are none. */
   onUpdateAll?: () => void;
   checkingUpdates?: boolean;
@@ -377,6 +380,11 @@ export function LibraryCatalogueTable({
           const free = item.update?.freeAlternative;
           return (
             <>
+              {onTest && item.installed && item.folder === "loras" && (
+                <Menu.Item leftSection={<icons.compare size={16} />} onClick={() => onTest(item)}>
+                  Test LoRA
+                </Menu.Item>
+              )}
               {onEdit && (
                 <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => onEdit(item)}>
                   Edit Catalogue Entry
