@@ -1592,6 +1592,28 @@ test("models lists the account's characters, and generate applies one by name: i
     /can't take Mara's image as a reference, so only the description carries the character/,
   );
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // A set made with a character carries it, and is named for it unless the chat named the set.
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+    any_model: true,
+  });
+  assert.deepEqual(
+    f.submitted.slice(-2).map(({ resultSet }) => [resultSet.title, resultSet.character]),
+    [
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+      ["Mara", { id: "chr-mara", name: "Mara" }],
+    ],
+  );
+  await call(client, "generate", {
+    profile_id: imageProfile.id,
+    prompts: ["At a campfire", "On a cliff"],
+    character: "Mara",
+    title: "Ranger Days",
+    any_model: true,
+  });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Ranger Days");
   // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
   // views come from the description alone, so the card's pose doesn't carry into every view.
   const views = async () => {
