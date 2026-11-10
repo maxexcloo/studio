@@ -4,7 +4,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-UPSTREAM_SHA256 = "75514fe9093c589da231938287ef0ceeb2dcf31179143a1de9a269fb2f7bb626"
+UPSTREAM_SHA256 = "217f3b50ede649831c34be347196926211606904610bcb267c8725c18eb62498"
 BEFORE = """def _resize(image, width, height, crop):
     # image [B, H, W, C] -> [B, height, width, 3]
     samples = image[..., :3].movedim(-1, 1)
@@ -32,6 +32,12 @@ REPLACEMENTS = (
     (
         "# follower: aspect-preserving cover-crop",
         "# Fit the final frame with the same geometry policy.",
+    ),
+    # H3 Image references arrive already sized to their aspect, so they scale exactly instead.
+    (
+        '    return _resize(image, size[0], size[1], "disabled")',
+        '    samples = comfy.utils.common_upscale(image[..., :3].movedim(-1, 1), size[0], size[1], "lanczos", "disabled")\n'
+        "    return samples.movedim(1, -1)",
     ),
 )
 
