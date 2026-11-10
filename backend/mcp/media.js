@@ -522,6 +522,8 @@ export class McpMedia {
       reference_role,
       count = mcpGenerationCount,
       seed,
+      // Every job takes `seed` itself rather than counting up from it (Generate References' views).
+      same_seed = false,
       negative_prompt,
       cfg,
       denoise,
@@ -691,7 +693,7 @@ export class McpMedia {
                 prompt: ran ?? "",
                 ...(writing ? { writing } : {}),
                 count: size,
-                seed: seed === undefined ? "" : String(seed + images),
+                seed: seed === undefined ? "" : String(same_seed ? seed : seed + images),
               },
               owner,
             );
@@ -1591,13 +1593,33 @@ export class McpMedia {
   }
   /**
    * Pixels and the recorded brief for a requested visual review; never generates or judges. A
-   * comparison arrives side by side in one image, so the model reads one small preview.
+   * comparison arrives side by side in one image, so the model reads one small preview. A result
+   * Studio expects within `waitSeconds` is waited for, as generate waits for a quick set.
    */
-  async review(owner, targets, { scope = "", signal } = {}) {
+  async review(owner, targets, { scope = "", signal, waitSeconds = 0 } = {}) {
     const records = [];
     const tiles = [];
     for (const { jobId, index } of targets) {
-      const job = await this.job(owner, jobId, 0, { signal });
+      let job = await this.job(owner, jobId, 0, { signal });
+      const due = job.progress?.endsAt - Date.now();
+      if (!terminal.has(job.status) && due <= waitSeconds * 1000)
+        job = await this.job(owner, jobId, waitSeconds, { signal });
+      if (!terminal.has(job.status)) {
+        const ref = this.refOf(owner, scope, jobId);
+        const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "This result";
+        return {
+          content: [
+            text(
+              `${label} is still ${job.status || "running"}, so there is no image to review yet. Reply now with its link and offer to review it once it is done; do not poll. [${ref ? label : "Result"}](${this.pageUrl(owner, jobId)})`,
+            ),
+          ],
+          structuredContent: {
+            job_id: jobId,
+            ...(ref ? { ref } : {}),
+            status: job.status || "running",
+          },
+        };
+      }
       if (!finished.has(job.status)) return this.result(owner, jobId, 0, { scope, signal });
       const output = this.available(job, index);
       const item = await this.source(owner, jobId, index);

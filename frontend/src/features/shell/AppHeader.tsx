@@ -65,6 +65,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
           return (
             <Tooltip key={item.to} label={item.label} disabled={!phone}>
               <Indicator
+                // The indicator tracks this wrapper: the Link inside merges refs anew each render,
+                // so a ref there detaches and reattaches on every render and never settles.
+                ref={active ? setSelected : undefined}
                 component="span"
                 display="inline-flex"
                 disabled={!count}
@@ -76,7 +79,6 @@ function ModeSwitcher({ mode }: { mode: string }) {
                 {count > 0 && <VisuallyHidden id={unseenId}>{count} Unseen</VisuallyHidden>}
                 <Button
                   aria-describedby={count ? unseenId : undefined}
-                  ref={active ? setSelected : undefined}
                   component={Link}
                   to={item.to}
                   aria-label={item.label}

@@ -95,6 +95,8 @@ export function buildProfile({
   maxLoras = 8,
   imageModes: modes = {},
   native = {},
+  editReferences = false,
+  keepsCharacters = false,
   recipe,
   prompting,
   uncensored = false,
@@ -165,6 +167,10 @@ export function buildProfile({
             ),
           )
         : {},
+    // The family edits with its references; elsewhere a reference is an img2img start image.
+    ...(editReferences === true ? { editReferences: true } : {}),
+    // Characters go to it first: it keeps a face across new scenes (family catalogue).
+    ...(editReferences === true && keepsCharacters === true ? { keepsCharacters: true } : {}),
     // How many LoRAs the workflow's loader accepts (rgthree stacks take 4).
     maxLoras: Math.max(1, Math.min(8, Number(maxLoras) || 8)),
     capabilities: {
@@ -425,6 +431,9 @@ export function inferModels(
           families[String(workflow.family || "").replaceAll("-", "_")]?.aspectDefault || "",
         // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
         native: workflowFamilyValue(workflow, "native"),
+        // Whether the family edits with its references, rather than starting from one (img2img).
+        editReferences: Boolean(workflowFamilyValue(workflow, "references")),
+        keepsCharacters: Boolean(workflowFamilyValue(workflow, "keepsCharacters")),
         options: {
           textEncoders: clips,
           vaes,

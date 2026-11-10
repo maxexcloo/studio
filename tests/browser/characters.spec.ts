@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeReferences, create, fixtures, image, signIn, stamp } from "./fixtures";
+import { characterShots, outfitPart, scenePart, withCharacter } from "../../shared/characters";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  signIn,
+  stamp,
+} from "./fixtures";
 
 const mara = {
   id: "chr-mara",
@@ -24,7 +34,7 @@ async function openCharacters(page: Page) {
   return references;
 }
 
-test("Picking a character fills the reference slots and adds its description, and picking it again takes both out", async ({
+test("Picking a character places its first image and leads the prompt with it, and picking it again takes both out", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -33,11 +43,12 @@ test("Picking a character fills the reference slots and adds its description, an
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A misty forest path at dawn");
   const references = await openCharacters(page);
-  // The test profile takes one reference, so the card says it uses the first of its two.
-  await expect(references.getByText("Uses 1 of 2 images", { exact: true })).toBeVisible();
+  await expect(references.getByText("2 images", { exact: true })).toBeVisible();
+  // The test profile starts from its reference (img2img) and no model edits with them, which the
+  // tab says.
   await expect(
     references.getByText(
-      "Image Quality takes 1 reference, so a card with more adds its first image.",
+      "Image Quality starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.",
     ),
   ).toBeVisible();
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
@@ -45,15 +56,37 @@ test("Picking a character fills the reference slots and adds its description, an
     references.getByRole("button", { name: "Remove character: Mara", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await closeReferences(page);
-  await expect(prompt).toHaveValue(
-    "A misty forest path at dawn, red-haired ranger, green cloak, scar over left eye",
-  );
+  await expect(prompt).toHaveValue(withCharacter("A misty forest path at dawn", mara.description));
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await openCharacters(page);
   await page.getByRole("button", { name: "Remove character: Mara", exact: true }).click();
   await closeReferences(page);
   await expect(prompt).toHaveValue("A misty forest path at dawn");
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(0);
+});
+
+test("Picking a character on an img2img model moves the composer to a model that keeps characters", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara);
+  const keeper = {
+    ...profiles[0],
+    id: "image:keeper",
+    recipe: { modelLabel: "Keeper", label: "Fast" },
+    editReferences: true,
+    keepsCharacters: true,
+  };
+  await serveProfiles(page, [...profiles, keeper]);
+  await create(page);
+  const references = await openCharacters(page);
+  await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
+  await expect(references.getByText(/^Switched to .*Keeper/)).toBeVisible();
+  await closeReferences(page);
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    withCharacter("", mara.description),
+  );
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
 });
 
 test("New Character saves a name, description and gallery images from the References sheet", async ({
@@ -156,7 +189,7 @@ test("Make Character starts a card from a gallery image in Library › Character
   expect(state.characters).toEqual([]);
 });
 
-test("A member sees only Characters in the Library, and a group without Characters has neither tab nor Library", async ({
+test("A member sees only Characters, Outfits and Scenes in the Library, and a group without Characters has neither tab nor Library", async ({
   page,
 }) => {
   await fixtures(page);
@@ -167,7 +200,8 @@ test("A member sees only Characters in the Library, and a group without Characte
   const select = page.getByRole("combobox", { name: "Library Section", exact: true });
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
-  if (await nav.isVisible()) await expect(nav.getByRole("link")).toHaveText(["Characters"]);
+  if (await nav.isVisible())
+    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes"]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library");
@@ -179,4 +213,78 @@ test("A member sees only Characters in the Library, and a group without Characte
       exact: true,
     }),
   ).toHaveCount(0);
+});
+
+test("Generate References queues one view per shot on a shared seed with the card's image, then the editor picks which to keep", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(structuredClone(mara));
+  // The card's image goes only to a model that edits with references, never as an img2img start.
+  await serveProfiles(page, [{ ...profiles[0], editReferences: true }, ...profiles.slice(1)]);
+  await page.goto("/library#characters");
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Generate References", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs.map((job) => job.input.prompt)).toEqual(characterShots(mara.description, true));
+  expect(new Set(state.jobs.map((job) => job.input.seed)).size).toBe(1);
+  expect(state.jobs.every((job) => job.input.referenceAssets[0].assetId === "asset-front")).toBe(
+    true,
+  );
+  await expect.poll(() => state.characters[0].generated?.jobIds.length).toBe(4);
+  // Tiles follow the queued jobs, the first view first.
+  const picked = `${state.characters[0].generated.jobIds[0]}:0`;
+  await page.getByRole("button", { name: "Pick References", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
+  const generated = editor.getByRole("list", { name: "Generated References", exact: true });
+  await generated.getByRole("button", { name: "Add generated reference 1", exact: true }).click();
+  await expect(editor.getByRole("img", { name: "Image 3", exact: true })).toBeVisible();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.characters[0].referenceIds).toEqual([
+    "asset-front",
+    "asset-side",
+    `asset-${picked}`,
+  ]);
+});
+
+test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const raincoat = "a yellow raincoat and black rubber boots";
+  const harbour = "a foggy harbour at dawn";
+  state.outfits.push({ id: "outfit-1", name: "Raincoat", description: raincoat, references: [] });
+  state.scenes.push({ id: "scene-1", name: "Harbour", description: harbour, references: [] });
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("Walking slowly.");
+  const pick = async (tab: string, name: string) => {
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+    const references = page.getByRole("region", { name: "References", exact: true });
+    await references.getByText(tab, { exact: true }).click();
+    await references.getByRole("button", { name, exact: true }).click();
+    await closeReferences(page);
+  };
+  // Picked scene first, the outfit still goes before it.
+  await pick("Scenes", "Use scene: Harbour");
+  await pick("Outfits", "Use outfit: Raincoat");
+  await expect(prompt).toHaveValue(`${outfitPart(raincoat)} ${scenePart(harbour)} Walking slowly.`);
+  await pick("Outfits", "Remove outfit: Raincoat");
+  await expect(prompt).toHaveValue(`${scenePart(harbour)} Walking slowly.`);
+  // Library › Outfits saves a new card.
+  await page.goto("/library#outfits");
+  await page.getByRole("button", { name: "New Outfit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New Outfit", exact: true });
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Gala");
+  await editor
+    .getByRole("textbox", { name: "Description", exact: true })
+    .last()
+    .fill("an emerald gown and gold heels");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.outfits.map((card) => [card.name, card.description])).toEqual([
+    ["Raincoat", raincoat],
+    ["Gala", "an emerald gown and gold heels"],
+  ]);
 });

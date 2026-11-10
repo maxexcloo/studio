@@ -119,3 +119,20 @@ test("Work that finishes while Studio is hidden counts in the title and app badg
   await expect(page).toHaveTitle("Studio");
   expect(await page.evaluate(() => (window as any).badges)).toEqual([1, "clear"]);
 });
+
+test("The mode switcher settles on each mode without a render loop", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await fixtures(page);
+  await page.goto("/images");
+  const modes = page.getByRole("navigation", { name: "Creative Modes" });
+  for (const mode of ["Videos", "Images"]) {
+    await modes.getByRole("link", { name: mode, exact: true }).click();
+    await expect(modes.getByRole("link", { name: mode, exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  }
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});

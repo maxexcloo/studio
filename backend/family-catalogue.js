@@ -549,6 +549,9 @@ export const families = {
     // Edits: its text encoder reads reference images (up to 16; the composer offers three).
     references: 3,
     referenceVia: "encoder",
+    // Characters go here first: it kept one face, hair and build across new outfits and scenes on
+    // live, where FLUX.2 [klein] drifted more and MOSS changed the face (shared/characters.ts).
+    keepsCharacters: true,
     variants: [
       {
         id: "turbo",

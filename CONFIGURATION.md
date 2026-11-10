@@ -149,6 +149,7 @@ Every MCP action calls the route its UI action calls, with the caller's own cred
 | UI action                                                                       | MCP tool and action                                                        |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Composer generation, variations, sizes, LoRAs, references                       | `generate` (`models` to look up), `upload`, `upload_link`                  |
+| References › Characters, Generate References (Characters feature)               | `models` lists them, `generate` `character` (`character_views`)            |
 | Edit › Run Again and Repeat Exactly, Animate, Extend, Use as Reference          | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
 | Upscale                                                                         | `reuse` `upscale`                                                          |
 | Compare models side by side                                                     | `generate` with several profiles (a comparison page)                       |
@@ -225,6 +226,7 @@ Every account whose group has **Prompt Assistant** may use the prompt assistant.
 **Background AI** (**Settings › Generation**, administrators) has a switch for each model call Studio makes on its own. Each is on by default and `0` turns it off, and an off switch means the call is never made, with nothing shown in its place. What a person asks for (Improve, Ask for a Change, Animate, Chat replies, taste Refresh) has no switch.
 
 - `STUDIO_CHAT_TITLES` (**Chat Titles**): names a new chat from its first request; off, it stays New Chat until renamed.
+- `STUDIO_FACE_CHECK` (**Face Check**, YuNet and AuraFace on the CPU rather than the assistant model): compares each image made with a character (a job whose references include a card's first image) with that image by face, while Studio is idle and as results finish. A result is marked drifted below a cosine similarity of 0.40, or with a second face. The models (about 260 MB, MIT and Apache-2.0) download into `face-check/` in the data folder the first time; Settings › Generation's Check Faces covers earlier images.
 - `STUDIO_GALLERY_CAPTIONS` (**Gallery Captions**) and `STUDIO_IMAGE_SEARCH` (**Image Search**, SigLIP 2 rather than the assistant model): the gallery search aids described below.
 - `STUDIO_GALLERY_TITLES` (**Gallery Titles**): titles finished images and videos.
 - `STUDIO_NEXT_STEPS` (**Next Steps**): the Suggestions menu's changes for a finished image (written ahead while idle and when the viewer opens) and for the composer's draft; off, the menu offers none.
@@ -271,7 +273,7 @@ taught yet, or new ground for the prompt (half from an import, where allowed).
 Thumbs-down LoRAs are never loaded. Import and Inspiration ideas need
 administrator access, Uncensored Models and enabled imports. Results stay
 outside the gallery, search, exports and MCP until kept; Star also keeps them.
-Discards remain available. Variations keeps a result and queues new seeds as
+Discards are deleted after 30 days, or at once with Delete All. Variations keeps a result and queues new seeds as
 user work; More Like This keeps it and steers upcoming ideas toward it.
 Comparison cards vary one thing and accept A, B, Both or Neither, and ask about
 what taste is least sure of. Calibration cards use older Studio generations

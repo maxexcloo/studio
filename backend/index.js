@@ -47,6 +47,8 @@ import {
 } from "./persistence/runtime.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
+import { createFaces } from "./providers/faces.ts";
+import { createFaceCheck } from "./domain/face-check.ts";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { workerLoads } from "./queue-eta.js";
@@ -156,7 +158,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
-import { registerCharacterRoutes } from "./characters.js";
+import { listCards, registerCardRoutes } from "./cards.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
@@ -590,7 +592,7 @@ registerPromptHistoryRoutes(app);
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
-registerCharacterRoutes(app);
+registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
@@ -630,6 +632,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   completed: (items) => {
     void titler.completed(items);
     void imageSearch.completed(items);
+    void faceCheck.completed(items);
   },
   directCloud,
   generationRoutes,
@@ -807,6 +810,7 @@ const dream = createDream({
       throw new Error("That Dream result is unavailable.");
     updateGalleryJob(itemId, { dream: mark });
   },
+  remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (account && !mayUseFeature(account, "loras")) return null;
@@ -959,6 +963,28 @@ const imageSearch = createImageSearch({
   persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
+// Face check (domain/face-check.ts): results made with a character, compared by face with its image.
+const faceCheck = createFaceCheck({
+  // Demo images are placeholders, and demo test runs must not download the models.
+  enabled: () => !demoMode && flagEnabled("STUDIO_FACE_CHECK"),
+  // Studio's Hugging Face fetch (mirror, token and proxy) only for Hugging Face; GitHub plainly.
+  faces: createFaces({
+    dataDir,
+    fetch: (url, init) =>
+      url.startsWith("https://huggingface.co/") ? hfFetch(url, init) : fetch(url, init),
+  }),
+  idle: galleryIdle,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  characters: (ownerId) => listCards("characters", ownerId),
+  image: galleryStill,
+  reference: (ownerId, assetId) =>
+    bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId),
+  save: (item, identity) => updateGalleryJob(galleryKey(item), { identity }),
+  load: runtimeLoad("face-check"),
+  persist: (document) => writeRuntimeDocument(dataDir, "face-check", document),
+});
+registerIdlePassRoutes(app, "/api/gallery/faces", { work: faceCheck, requireAdmin });
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
@@ -1021,6 +1047,7 @@ dream.start();
 finishing.start();
 captioner.start();
 imageSearch.start();
+faceCheck.start();
 titler.start();
 suggester.start();
 nextSteps.start();

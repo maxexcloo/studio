@@ -14,12 +14,19 @@ interface Entry {
   item?: MediaItem;
 }
 
+/** A run the viewer queued, and the item it was started on. */
+export interface QueuedRun {
+  job: string;
+  from: string;
+}
+
 /**
  * The item's versions, oldest first: its version group (`versionGroups`, as the grid groups them)
  * among the owner's jobs' results and the `related` items loaded with it, and the runs this viewer
- * queued without a parent. Work still queued from one of them shows as placeholders.
+ * queued from one of them or that made one of them. Work still queued from one of them shows as
+ * placeholders.
  */
-export function useRunFamily(item: MediaItem, extra: string[], related: MediaItem[]): Entry[] {
+export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaItem[]): Entry[] {
   const jobs = useQuery(queueQuery).data?.jobs;
   return useMemo(() => {
     const all = [...(jobs ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -32,6 +39,16 @@ export function useRunFamily(item: MediaItem, extra: string[], related: MediaIte
     const group = versionGroups(loaded, all).find((versions) =>
       versions.some((version) => version.id === item.id),
     )!;
+    const members = new Set(group.map(({ id }) => id));
+    // A run started on another item joins only that item's strip, or the strip of what it made.
+    const extra = runs
+      .filter(({ job, from }) => {
+        const made = all.find(({ id }) => id === job);
+        return (
+          members.has(from) || Boolean(made && results(made).some(({ id }) => members.has(id)))
+        );
+      })
+      .map(({ job }) => job);
     const queued = all.filter((job) => extra.includes(job.id)).reverse();
     const versions = [
       ...group,
@@ -57,7 +74,7 @@ export function useRunFamily(item: MediaItem, extra: string[], related: MediaIte
         })),
       );
     return [...versions.map((version) => ({ key: version.id, item: version })), ...waiting];
-  }, [jobs, item, extra, related]);
+  }, [jobs, item, runs, related]);
 }
 
 /** The set strip, the version strip and the actions under the viewer image. */
