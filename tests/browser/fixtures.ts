@@ -100,7 +100,11 @@ export async function fixtures(page: Page) {
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
-      item: gallery.find((item) => item.jobId === jobId) || null,
+      item:
+        gallery.find(
+          (item) =>
+            item.jobId === jobId && (!comparison.itemIds || item.id === comparison.itemIds[index]),
+        ) || null,
     })),
   });
   function recordGeneration(body: any, sessionId: string) {
@@ -623,6 +627,22 @@ export async function fixtures(page: Page) {
         return respond({ ok: true, media: { removed: ids, failed: [] } });
       }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
+    }
+    // Compare Selected records chosen gallery images.
+    if (path === "/api/comparisons" && method === "POST") {
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed: "",
+        requests: body.itemIds.map((id: string) => ({
+          input: { prompt: gallery.find((item) => item.id === id)?.prompt },
+        })),
+        jobIds: body.jobIds,
+        itemIds: body.itemIds,
+        labels: body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(showComparison(comparison), 201);
     }
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
