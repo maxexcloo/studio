@@ -104,6 +104,11 @@ test("Multiple owned references preserve order, role identity and capacity throu
   await page
     .getByRole("textbox", { name: "Message", exact: true })
     .fill("Explain how the selected references fit together");
+  // Focusing the message slides the chip rail in. Its chips sit still at their start, below the
+  // box, before they move, so a click then can land before they arrive: wait until they are in.
+  await expect(
+    page.getByRole("group", { name: "Chat Inputs", exact: true }).locator(".."),
+  ).toHaveCSS("opacity", "1");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   for (const name of ["second", "first"])
     await page.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
