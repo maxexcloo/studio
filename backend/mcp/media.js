@@ -19,6 +19,7 @@ import { recommendedNegative } from "../lora/prompts.js";
 import { choicePool, chooseProfile } from "./tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 import { withResolution } from "../../shared/resolution.ts";
+import { promptWords } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
@@ -171,6 +172,13 @@ function outputIndex(item) {
   const suffix = /-(\d+)$/.exec(String(item.id || "").slice(String(item.jobId || "").length));
   return suffix ? Number(suffix[1]) : 0;
 }
+
+/**
+ * A result page titled `title` (in its tab and heading), refreshing while work is `pending`, with
+ * `css` beside the shared style; the static CSP allows inline style and no script.
+ */
+const resultPage = (title, pending, body, css = "") =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${escapeHtml(title)}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;margin-bottom:1.5rem}.prompt p{opacity:.8;white-space:pre-wrap}${css}</style></head><body><h1>${escapeHtml(title)}</h1>${body}</body></html>`;
 
 export class McpMedia {
   constructor({
@@ -504,6 +512,9 @@ export class McpMedia {
       profile_id,
       profile_backend,
       prompts,
+      // One generate call's result set ({ id, title, source }) and each prompt's own title, in order.
+      result_set,
+      titles = [],
       // With `write` ({ animate }), every job writes its motion prompt as its first stage (prompt-animate.js).
       write,
       loras = [],
@@ -654,12 +665,17 @@ export class McpMedia {
       const queued = [];
       const queueSet = crypto.randomUUID();
       let images = 0;
-      for (const prompt of prompts)
+      for (const [position, prompt] of prompts.entries())
         for (let done = 0; done < runs; done += batch) {
           const size = Math.min(batch, runs - done);
           const id = crypto.randomUUID();
           // A prompt written in the queue is not known yet; its outputs carry it.
           const ran = writing ? undefined : prompt;
+          const resultSet = result_set && {
+            ...result_set,
+            index: position,
+            ...(titles[position] ? { variation: titles[position] } : {}),
+          };
           try {
             // Persist the client id before dispatch, so a failed call cannot lose job ownership.
             this.state.jobs[id] = owner;
@@ -671,6 +687,7 @@ export class McpMedia {
                 ...body,
                 clientJobId: id,
                 queueSet,
+                ...(resultSet ? { resultSet } : {}),
                 prompt: ran ?? "",
                 ...(writing ? { writing } : {}),
                 count: size,
@@ -689,6 +706,7 @@ export class McpMedia {
             this.recordPrompt(result.jobId, {
               ...(ran ? { prompt: ran } : {}),
               set: queueSet,
+              ...(resultSet ? { resultSet } : {}),
               ...(record.request ? { request: record.request } : {}),
               ...(record.assistant ? { assistant: record.assistant } : {}),
             });
@@ -1849,14 +1867,26 @@ export class McpMedia {
       },
     };
   }
-  /** The All Results page: every recent result of a conversation, filling in as jobs finish. */
+  /**
+   * The All Results page: every recent result of a conversation, filling in as jobs finish. A
+   * result opens large in a viewer that flips through them all in place, by its arrows, a swipe or
+   * the arrow keys (a scroll-snapped row, no script).
+   */
   async allPage(claims, credential) {
     const jobs = await this.scopeJobs(claims.owner, claims.scope, { credential });
     if (!jobs.length) return null;
     const pending = jobs.some(({ job }) => !terminal.has(job.status));
+    const slides = [];
+    let shownSet = "";
     const sections = jobs
       .map(({ number, jobId, job }) => {
-        const heading = `<h2>Result ${number}</h2>`;
+        // A generate call's results sit under their set's title, each named by its own.
+        const set = this.promptRecord(jobId)?.resultSet;
+        const setHeading = set && set.id !== shownSet ? `<h2>${escapeHtml(set.title)}</h2>` : "";
+        shownSet = set?.id || "";
+        const heading = set
+          ? `${setHeading}<h3>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h3>`
+          : `<h2>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h2>`;
         if (!terminal.has(job.status)) {
           const progress = Number.isFinite(job.progress)
             ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
@@ -1870,16 +1900,41 @@ export class McpMedia {
           : [];
         if (!outputs.length)
           return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : "This generation did not produce a result."}</p>${this.promptHtml(jobId, job)}</section>`;
+        const label = this.fullTitle(jobId, job);
         return `<section>${heading}${outputs
-          .map((token) =>
-            job.kind === "video"
-              ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
-              : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`,
-          )
+          .map((token) => {
+            slides.push({ token, label, video: job.kind === "video" });
+            const place = slides.length;
+            return job.kind === "video"
+              ? `<figure id="result-${place}"><video src="${token}" controls playsinline preload="metadata"></video><a href="#view-${place}">Open Large</a> · <a href="${token}">View Original</a></figure>`
+              : `<figure id="result-${place}"><a href="#view-${place}" aria-label="Open ${escapeHtml(label)} Large"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`;
+          })
           .join("")}${this.promptHtml(jobId, job)}</section>`;
       })
       .join("");
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
+    const total = slides.length;
+    const viewer = total
+      ? `<div class="viewer">${slides
+          .map(({ token, label, video }, index) => {
+            const place = index + 1;
+            const name = `${escapeHtml(label)} (${place} of ${total})`;
+            return `<section class="slide" id="view-${place}" tabindex="-1" aria-label="${name}"><p class="bar"><span>${name}</span><a href="#result-${place}">Close</a></p>${
+              video
+                ? `<video src="${token}" controls playsinline preload="none"></video>`
+                : `<img src="${token}" alt="${escapeHtml(label)}" loading="lazy">`
+            }${place > 1 ? `<a class="step previous" href="#view-${place - 1}" aria-label="Previous Result">‹</a>` : ""}${place < total ? `<a class="step next" href="#view-${place + 1}" aria-label="Next Result">›</a>` : ""}</section>`;
+          })
+          .join("")}</div>`
+      : "";
+    // One set's page is titled by it.
+    const sets = new Set(jobs.map(({ jobId }) => this.promptRecord(jobId)?.resultSet?.title));
+    const [only] = sets;
+    return resultPage(
+      sets.size === 1 && only ? only : "All Results",
+      pending,
+      sections + viewer,
+      `.viewer{display:none;position:fixed;inset:0;background:Canvas;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior:contain}.viewer:has(:target){display:flex}.slide{flex:0 0 100%;position:relative;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:3rem clamp(2rem,6vw,3.5rem) 1rem;scroll-snap-align:center;outline:none}.slide img,.slide video{max-width:100%;max-height:100%;object-fit:contain;margin:0}.bar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;gap:1rem;margin:0;padding:.75rem 1rem}.step{position:absolute;top:50%;transform:translateY(-50%);padding:.5rem 1rem;font-size:2.5rem;line-height:1;text-decoration:none}.previous{left:0}.next{right:0}`,
+    );
   }
   /** The watch page behind a p2 link; account mode reads as the signed owner with Studio's own credential. */
   async page(claims, credential) {
@@ -1896,11 +1951,6 @@ export class McpMedia {
       : [];
     if (finished.has(job.status) && !outputs.length) return null;
     const pending = !terminal.has(job.status);
-    const title = pending
-      ? "Generating…"
-      : outputs.length
-        ? "Studio Result"
-        : `Generation ${escapeHtml(job.status)}`;
     const progress = Number.isFinite(job.progress)
       ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
       : "";
@@ -1920,12 +1970,26 @@ export class McpMedia {
         : outputs.length
           ? media
           : ended) + this.promptHtml(claims.jobId, job);
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
+    return resultPage(this.fullTitle(claims.jobId, job), pending, body);
+  }
+  /** A result's own title: the one the chat gave it in its set, else its prompt's first words. */
+  resultTitle(jobId, job) {
+    const record = this.promptRecord(jobId);
+    return (
+      record?.resultSet?.variation || promptWords(record?.prompt || job?.prompt) || "Studio Result"
+    );
+  }
+  /** A result's title under its set's, as "Set › Result", for its page and the viewer. */
+  fullTitle(jobId, job) {
+    const set = this.promptRecord(jobId)?.resultSet;
+    return `${set ? `${set.title} › ` : ""}${this.resultTitle(jobId, job)}`;
   }
   /** The full prompt a job ran, for its result pages; one Studio wrote in the queue comes from its results. */
   promptHtml(jobId, job) {
     const prompt = this.promptRecord(jobId)?.prompt || job?.prompt;
-    return prompt ? `<p class="prompt">${escapeHtml(prompt)}</p>` : "";
+    return prompt
+      ? `<details class="prompt"><summary>Prompt</summary><p>${escapeHtml(prompt)}</p></details>`
+      : "";
   }
   summary(job) {
     return Object.fromEntries(

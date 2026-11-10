@@ -73,8 +73,11 @@ const waitFor = async (check, what, ms = 5000) => {
 
 test("a run goes from queued through progress to a finished gallery image", async () => {
   const id = "job-success";
-  const body = sdxlRequest();
+  // An MCP call's set travels from the pending tile to the finished one, kept to its known fields.
+  const resultSet = { id: "set-1", title: "Variety Test", index: 2, variation: "Fox Wizard" };
+  const body = sdxlRequest({ resultSet: { ...resultSet, extra: "dropped" } });
   queue(id, body);
+  assert.deepEqual(store.gallery.find((item) => item.jobId === id).resultSet, resultSet);
   const queued = fake.nextPrompt();
   const running = runJob(id, body);
   const prompt = await queued;
@@ -118,6 +121,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
     "/comfy/thumb?filename=image_00001_.png&subfolder=studio&type=output",
   );
   assert.equal(item.settings.steps, 4);
+  assert.deepEqual(item.resultSet, resultSet);
 });
 
 test("a run ComfyUI fails is kept as a failure that says why", async () => {
