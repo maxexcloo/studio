@@ -14,6 +14,7 @@ import {
 } from "./controls.js";
 import { assertJobCount, mcpJson, replyRule } from "./media.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
+import { minorAgeRefusal } from "../minor-age.js";
 import { canonicalProfileId } from "../profile/store.js";
 import {
   asksForCloud,
@@ -946,6 +947,9 @@ export function registerGenerateTools({
     for (const prompt of args.prompts) {
       const instructed = exactPromptInstructions(prompt);
       if (instructed) throw new Error(instructed);
+      // Refused before any prompt queues, so no part of a set runs (admission checks each too).
+      const minor = minorAgeRefusal(prompt);
+      if (minor) throw new Error(minor);
     }
     const listProblem = views ? "" : promptListProblem(args.prompts);
     if (listProblem) throw new Error(listProblem);

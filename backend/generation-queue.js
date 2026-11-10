@@ -27,6 +27,7 @@ import { storedWritingRecord } from "./gallery/records.js";
 import { jobs } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";
+import { minorAgeRefusal } from "./minor-age.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { mockModelResult } from "./model/models.js";
 import { withPngText } from "./png-text.js";
@@ -297,7 +298,14 @@ export function createGenerationQueue({
         completed(items);
       },
     },
-    promptStage,
+    // A written prompt passes the same age check as one the person wrote.
+    promptStage &&
+      (async (job, stream) => {
+        const written = await promptStage(job, stream);
+        const refusal = minorAgeRefusal(written?.prompt);
+        if (refusal) throw new Error(refusal);
+        return written;
+      }),
   );
   // A worker that stops, restarts or goes offline no longer has the model it last ran loaded.
   onWorkerOffline((id) => generationQueue.unload(`worker:${id}`));
@@ -306,6 +314,8 @@ export function createGenerationQueue({
       if (workerWorkloads(worker).includes(workload)) generationQueue.unload(`worker:${worker.id}`);
   });
   async function validateGenerationInput(input, account) {
+    const refusal = minorAgeRefusal(input.prompt);
+    if (refusal) return { status: 400, payload: { ok: false, error: refusal } };
     if (input.writing === undefined) return validateGeneration(input, account);
     if (typeof input.writing?.prompt === "string") {
       // Already written (a Dream variation): the record goes with the prompt it explains.
