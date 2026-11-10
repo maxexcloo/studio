@@ -1354,6 +1354,11 @@ export async function serveDream(
       return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
+      if (method === "DELETE") {
+        const deleted = state.discarded.length;
+        state.discarded = [];
+        return route.fulfill({ json: { deleted } });
+      }
       const start = Number(url.searchParams.get("cursor") || 0);
       const limit = Number(url.searchParams.get("limit") || 40);
       return route.fulfill({
