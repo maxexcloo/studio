@@ -10,7 +10,6 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { accountAdminQuery } from "./AccountAdmin";
 import { FinishStarredImages } from "./FinishStarredImages";
-import { TextModelSelect } from "./TextModelSelect";
 import {
   preferencesQuery,
   useSavePreferences,
@@ -168,8 +167,8 @@ const videoChoices: { value: VideosPreference; label: string }[] = [
 ];
 /**
  * Where Images and Videos run by default: Cloud or Local, and for Videos Cloud or the local Fast or
- * Quality tier (unsaved, Local and Fast). Prompt Writing picks the gateway text model, whose
- * `cloud/` and `local/` aliases route themselves; an administrator's model replaces it.
+ * Quality tier (unsaved, Local and Fast). Text picks the gateway text model for prompt writing,
+ * whose `cloud/` and `local/` aliases route themselves.
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
@@ -185,12 +184,11 @@ function WhereWorkRuns() {
       : assistant?.writingModel;
   const row = <T extends string>(
     label: string,
-    description: string,
     data: { value: T; label: string }[],
     value: T,
     change: (choice: T) => void,
   ) => (
-    <SettingRow label={label} description={description}>
+    <SettingRow label={label}>
       <SegmentedControl
         aria-label={label}
         data={data}
@@ -201,34 +199,24 @@ function WhereWorkRuns() {
   );
   return (
     <SettingGroup title="Where Work Runs">
-      {row(
-        "Images",
-        "The model new images start on. A model you pick wins.",
-        sides,
-        preferences.images || "local",
-        (images) => save.mutate({ images }),
-      )}
+      {row("Images", sides, preferences.images || "local", (images) => save.mutate({ images }))}
       {assistant && writingModel && (
-        <SettingRow
-          wide
-          label="Prompt Writing"
-          description={`The text model that writes Improve Prompt, Ask for a Change, negative prompts and Animate’s prompts.${assistant.model === assistant.writingModel ? "" : ` An administrator set ${assistant.model} for everyone.`}`}
-        >
-          <TextModelSelect
-            label="Prompt Writing"
-            models={models}
+        <SettingRow wide label="Text">
+          {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
+          <Select
+            aria-label="Text"
+            data={[...new Set([...models, writingModel])]}
             value={writingModel}
-            onChange={(writingModel) => save.mutate({ writingModel })}
-            disabled={assistant.model !== assistant.writingModel}
+            onChange={(choice) => choice && save.mutate({ writingModel: choice })}
+            allowDeselect={false}
+            searchable
+            nothingFoundMessage="No Matches"
+            w={{ base: "100%", sm: 240 }}
           />
         </SettingRow>
       )}
-      {row(
-        "Videos",
-        "Where new videos and Animate run, as Animate’s menu sets it too.",
-        videoChoices,
-        preferences.videos || "fast",
-        (videos) => save.mutate({ videos }),
+      {row("Videos", videoChoices, preferences.videos || "fast", (videos) =>
+        save.mutate({ videos }),
       )}
     </SettingGroup>
   );

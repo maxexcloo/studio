@@ -268,7 +268,7 @@ test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for i
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs in Settings › Preferences saves where each area runs and the writing model", async ({
+test("Where Work Runs in Settings › Preferences saves where each area runs and the Text model", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -279,7 +279,6 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
       json: {
         available: true,
         presets: [],
-        model: "cloud/uncensored",
         writingModel: "cloud/uncensored",
         models: ["cloud/auto", "cloud/uncensored", "local/auto"],
       },
@@ -297,8 +296,8 @@ test("Where Work Runs in Settings › Preferences saves where each area runs and
   await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
   await choose("Images", "Cloud");
   await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
-  // Prompt Writing picks the gateway text model, unsaved the account's default.
-  const writing = where.getByRole("combobox", { name: "Prompt Writing", exact: true });
+  // Text picks the gateway text model, unsaved the account's default.
+  const writing = where.getByRole("combobox", { name: "Text", exact: true });
   await expect(writing).toHaveValue("cloud/uncensored");
   await writing.click();
   await expect(page.getByRole("option")).toHaveText([
@@ -659,63 +658,6 @@ test("Status counts running workers, reads a parked service as Stopped and offer
   await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
-test("Settings › Integrations picks the assistant model from the gateway's and text workloads' models", async ({
-  page,
-}) => {
-  await fixtures(page);
-  await signIn(page, { id: "admin", role: "administrator" });
-  const saved: unknown[] = [];
-  const setting = (key: string, configured = "", effective = "") => ({
-    key,
-    configured,
-    effective,
-    source: configured ? "studio" : "default",
-    locked: false,
-  });
-  let model = "";
-  await page.route("**/api/settings/deployment", (route) => {
-    if (route.request().method() === "POST") {
-      const body = route.request().postDataJSON();
-      saved.push(body);
-      model = body.value;
-      return route.fulfill({ json: { ok: true, setting: body } });
-    }
-    return route.fulfill({
-      json: {
-        defaults: {
-          image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
-          video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
-          profiles: [],
-        },
-        catalogue: [],
-        integrations: {
-          civitai: { token: { set: false } },
-          huggingFace: { token: { set: false } },
-          assistant: {
-            available: true,
-            models: ["cloud/auto", "local/auto", "local/stopped"],
-            model: setting("STUDIO_ASSISTANT_MODEL", model, model || "cloud/auto"),
-          },
-        },
-      },
-    });
-  });
-  await page.goto("/settings");
-  await section(page, "Settings", "Integrations");
-  const select = page.getByRole("combobox", { name: "Prompt Assistant Model", exact: true });
-  await expect(select).toHaveValue("Automatic");
-  await select.click();
-  await expect(page.getByRole("option")).toHaveText([
-    "Automatic",
-    "cloud/auto",
-    "local/auto",
-    "local/stopped",
-  ]);
-  await page.getByRole("option", { name: "local/stopped", exact: true }).click();
-  await expect(select).toHaveValue("local/stopped");
-  expect(saved).toEqual([{ key: "STUDIO_ASSISTANT_MODEL", value: "local/stopped" }]);
-});
-
 test("Settings › Generation switches follow at once and settle back after a failed save", async ({
   page,
 }) => {
@@ -758,7 +700,7 @@ test("Settings › Generation switches follow at once and settle back after a fa
         integrations: {
           civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
-          assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
+          assistant: { available: false },
         },
       },
     });

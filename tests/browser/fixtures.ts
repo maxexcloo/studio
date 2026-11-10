@@ -251,7 +251,7 @@ export async function fixtures(page: Page) {
         integrations: {
           civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
-          assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
+          assistant: { available: false },
         },
       });
     }

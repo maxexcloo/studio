@@ -11,14 +11,17 @@ process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "deployment-profile";
 delete process.env.STUDIO_GALLERY_CAPTIONS;
 delete process.env.STUDIO_IMAGE_SEARCH;
 delete process.env.STUDIO_GALLERY_WHILE_BUSY;
+delete process.env.STUDIO_RETIRED_SETTING;
 writeRuntimeDocument(temporary, "settings", {
   STUDIO_GALLERY_CAPTIONS: "0",
   STUDIO_DEFAULT_IMAGE_PROFILE: "saved-profile",
+  STUDIO_RETIRED_SETTING: "old",
 });
 const settings = await import("./deployment-settings.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
-test("values report their source and only deployment values are locked", () => {
+test("values report their source, only deployment values are locked and retired keys drop", () => {
+  assert.equal(process.env.STUDIO_RETIRED_SETTING, undefined);
   assert.deepEqual(settings.settingSource("STUDIO_DEFAULT_IMAGE_PROFILE"), {
     source: "deployment",
     locked: true,
