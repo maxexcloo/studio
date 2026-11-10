@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
+import { editsReferences } from "../../../../shared/characters";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
@@ -54,6 +55,11 @@ export function CharacterChoices({
   if (characters.error) return <Alert color="red">{characters.error.message}</Alert>;
   return (
     <Stack gap="xs" flex={1} mih={0}>
+      {profile && !editsReferences(profile) && cards.length > 0 && (
+        <Text size="xs" c="dimmed">
+          {`${profileName(profile)} starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.`}
+        </Text>
+      )}
       {cards.some((card) => card.references.length > limit) && (
         <Text size="xs" c="dimmed">
           {`${profile ? profileName(profile) : "This model"} takes ${limit} ${limit === 1 ? "reference" : "references"}, so a card with more adds its first ${limit === 1 ? "image" : limit}.`}
@@ -92,6 +98,7 @@ export function CharacterChoices({
                     card={card}
                     withinPortal={false}
                     onEdit={() => dialogs.edit(card)}
+                    onGenerate={() => dialogs.generate(card)}
                     onDelete={() => dialogs.remove(card)}
                   />
                 }

@@ -740,6 +740,23 @@ export async function fixtures(page: Page) {
       });
       const id = decodeURIComponent(path.split("/")[3] || "");
       const index = characters.findIndex((item) => item.id === id);
+      // Generate References' jobs, listed with their gallery results.
+      if (path.endsWith("/generated")) {
+        characters[index].generated = {
+          jobIds: body.jobIds,
+          at: stamp,
+          results: gallery
+            .filter((item) => body.jobIds.includes(item.jobId))
+            .map((item) => ({
+              galleryItemId: item.id,
+              jobId: item.jobId,
+              status: item.status,
+              thumbnailUrl: item.thumbnailUrl,
+              prompt: item.prompt,
+            })),
+        };
+        return respond({ ok: true, character: characters[index] });
+      }
       if (method === "POST") {
         characters.push(card(body, `chr-${characters.length + 1}`));
         return respond({ ok: true, character: characters.at(-1) }, 201);

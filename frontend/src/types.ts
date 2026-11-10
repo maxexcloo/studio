@@ -57,6 +57,8 @@ export interface Profile {
   aspectPresets?: { label: string; w: number; h: number }[];
   /** Output sizes the model draws itself: "yes" or "maybe" per 2K/4K. */
   native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
+  /** The family edits with its references; otherwise a reference is an img2img start image. */
+  editReferences?: boolean;
 }
 export interface ReferenceAsset {
   id: string;
