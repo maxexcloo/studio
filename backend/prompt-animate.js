@@ -177,7 +177,8 @@ export function animateIssue(writing, { allowed }) {
  * Writes the motion prompt for `profile` and a `clip` ({ seconds, fps }), streaming through
  * `onThinking` and `onDelta`. `frame()` loads the frame the clip starts from ({ mime, data },
  * downscaled) and is asked only when the text model reads images; otherwise `caption()` says what
- * it shows in words. `explicit`: the account holds Uncensored Models.
+ * it shows in words. `explicit`: the account holds Uncensored Models. `prefer`: its Prompt Writing
+ * preference (assistant.js `route`); the thinking starts with the note where the other side wrote it.
  */
 export async function writeAnimatePrompt({
   engine,
@@ -186,14 +187,18 @@ export async function writeAnimatePrompt({
   writing,
   clip = {},
   explicit = false,
+  prefer,
   frame = async () => null,
   caption = () => "",
   signal,
   onThinking,
   onDelta,
 }) {
-  const model = await engine.model("animate");
-  const image = (await engine.supportsVision()) ? await frame() : null;
+  const model = await engine.model("animate", false, prefer);
+  // The thinking starts with why the other side wrote it, where it did.
+  const note = await engine.writerNote(prefer);
+  if (note) onThinking?.(`${note}\n\n`);
+  const image = (await engine.supportsVision(prefer)) ? await frame() : null;
   const description = image ? "" : String((await caption()) || "").trim();
   const known = image ? "seen" : description ? "described" : "unknown";
   const reply = await engine.chat({
@@ -228,5 +233,5 @@ export async function writeAnimatePrompt({
   });
   const prompt = cleanPrompt(reply.text);
   if (!prompt) throw new AssistantError("unusable reply");
-  return { prompt, thinking: reply.thinking, model };
+  return { prompt, thinking: note ? `${note}\n\n${reply.thinking || ""}` : reply.thinking, model };
 }

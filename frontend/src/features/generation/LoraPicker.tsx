@@ -5,9 +5,7 @@ import {
   Button,
   Chip,
   Group,
-  NumberInput,
   ScrollArea,
-  Slider,
   Stack,
   Switch,
   Text,
@@ -27,6 +25,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Profile } from "../../types";
 import { isProfile } from "./payload";
+import { StrengthControl } from "./StrengthControl";
 import { loraFamilyId } from "../../../../shared/profiles";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
@@ -540,14 +539,11 @@ function StackEntry({
   onChange: (patch: Partial<Lora>) => void;
   onRemove: () => void;
 }) {
-  // Dragging previews locally and commits once, so the draft doesn't rerender every frame.
-  const [dragging, setDragging] = useState<number | null>(null);
   const range = info?.strengthRange;
   const step = range?.step ?? 0.05;
   // The catalogue's published range bounds the control; without one, 0 to 2.
   const min = range?.min ?? 0;
   const max = range?.max ?? 2;
-  const strength = dragging ?? lora.strength;
   const enabled = lora.enabled !== false;
   // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
   const triggers = info?.triggers || [];
@@ -576,38 +572,15 @@ function StackEntry({
         </ActionIcon>
       </Group>
       <Stack gap={6} className={classes.details}>
-        <Group gap="sm" wrap="nowrap">
-          <Slider
-            flex={1}
-            size="sm"
-            min={min}
-            max={max}
-            step={step}
-            value={strength}
-            thumbLabel={`${title} Strength`}
-            marks={range?.default !== undefined ? [{ value: range.default }] : undefined}
-            onChange={setDragging}
-            onChangeEnd={(value) => {
-              setDragging(null);
-              onChange({ strength: value });
-            }}
-          />
-          <NumberInput
-            size="xs"
-            w={76}
-            aria-label={`${title} Strength`}
-            value={strength}
-            min={min}
-            max={max}
-            clampBehavior="blur"
-            hideControls
-            step={step}
-            onChange={(value) => {
-              if (value !== "" && Number.isFinite(Number(value)))
-                onChange({ strength: Number(value) });
-            }}
-          />
-        </Group>
+        <StrengthControl
+          label={`${title} Strength`}
+          value={lora.strength}
+          min={min}
+          max={max}
+          step={step}
+          mark={range?.default}
+          onChange={(strength) => onChange({ strength })}
+        />
         {range && (
           <Text size="xs" c="dimmed">
             Suggested {range.min} to {range.max}

@@ -145,6 +145,11 @@ export function ChatTurn({
           <Text size="xs">{requestLine(message.draft.operation, source)}</Text>
         </Group>
       )}
+      {message.note && (
+        <Text size="xs" c="dimmed">
+          {message.note}
+        </Text>
+      )}
       {message.status === "cancelled" && (
         <Text size="xs" c="dimmed">
           Response stopped.

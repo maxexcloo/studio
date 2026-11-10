@@ -32,8 +32,9 @@ export const loraFamilyId = (family: unknown) => {
 
 /**
  * A provider-backed cloud profile (Grok): it runs at the provider, not on a worker. Access
- * profiles grant these through their Cloud Models feature rather than one by one, and nothing
- * ever picks one by itself.
+ * profiles grant these through their Cloud Models feature rather than one by one. Studio picks one
+ * by itself only as an account's default: its Images or Videos preference is Cloud, or no local
+ * profile can run (model/catalogue.js withPreferredDefaults).
  */
 export const isCloudProfile = (
   profile?: { id?: unknown; family?: string; provider?: string } | null,
@@ -41,3 +42,14 @@ export const isCloudProfile = (
   profile?.provider === "cliproxyapi" ||
   profile?.family === "grok" ||
   /^grok/i.test(String(profile?.id || ""));
+
+/**
+ * What a reference slot (`studio.mediaInputs[].role`) can guide, by name. A slot with one of these
+ * roles steers the result rather than being where it starts (`start`, `end` or a plain `reference`),
+ * and only these slots may map a `strength` input.
+ */
+export const guidingRoles: Readonly<Record<string, string>> = Object.freeze({
+  identity: "Identity",
+  layout: "Pose/Layout",
+  style: "Style",
+});

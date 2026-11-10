@@ -7,10 +7,8 @@
  * where it is and is never written here: the layer is refreshed when the file changes and kept
  * when it goes, so the sync is idempotent. The other layers have no source file. `provider` holds
  * the Civitai and Hugging Face download specs, keyed by download id, which library/downloads.js
- * records here (migrate-runtime folded in the retired model-download-sources.json,
- * download-sources.js). `definitions` holds the model metadata migrate-runtime folded in from the
- * retired lora-catalogue.json `seed` and `admin` layers (lora-layers.js). Studio's own edits are a
- * layer above all of them.
+ * records here. `definitions` holds the model metadata migrate-runtime folded in from the retired
+ * lora-catalogue.json `seed` and `admin` layers. Studio's own edits are a layer above all of them.
  * On a conflict the more specific source wins: edits over definitions over provider details over
  * the manifest, except that provider metadata wins for links and hashes.
  *
@@ -32,8 +30,8 @@ export const catalogueKinds = Object.freeze({
 });
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
 const layerNames = ["definitions", "provider", "manifest"];
-// A layer Studio no longer reads is kept only while it holds something for migrate-runtime to fold
-// in (lora-layers.js); an empty one (a folded `seed` or `admin`) drops out on the next save.
+// A layer Studio no longer reads is kept only while it holds something, so nothing is lost; an
+// empty one (a folded `seed` or `admin`) drops out on the next save.
 const keptLayers = (layers) =>
   Object.fromEntries(
     Object.entries(isObject(layers) ? layers : {}).filter(
@@ -661,18 +659,10 @@ export function createCatalogueStore({
     return { sources: current.layers.provider, catalogue };
   }
 
-  /** Forgets what it read, so the next read takes the file as it is now (runtime-migrations.js). */
-  function reload() {
-    state = null;
-    hashIndex = null;
-    checkedAt = 0;
-  }
-
   return {
     file,
     sync,
     migrate,
-    reload,
     entries,
     entry,
     byHash,
@@ -693,9 +683,4 @@ export function catalogueStore(options = {}) {
   const dir = options.dataDir || currentDataDir();
   if (!stores.has(dir)) stores.set(dir, createCatalogueStore({ ...options, dataDir: dir }));
   return stores.get(dir);
-}
-
-/** Reloads a data folder's shared store from disk, when one is open. */
-export function reloadCatalogue(dataDir) {
-  stores.get(dataDir)?.reload();
 }

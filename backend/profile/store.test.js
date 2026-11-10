@@ -15,7 +15,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const { createGuideStore, createProfileStore, hashOf, livePrompting } = await import("./store.js");
 const editor = await import("./editor.js");
-const { loadMcpPrompting, mergedPrompting, ownPrompting } = await import("../mcp/prompting.js");
+const { loadMcpPrompting, mergedPrompting } = await import("../mcp/prompting.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 const quiet = { info: () => {}, warn: () => {} };
@@ -347,11 +347,10 @@ test("the guide loader reads the store, reloads on change and fills negatives", 
   assert.deepEqual([own.summary, own.negative], ["Edited in Studio.", { effect: "optional" }]);
 });
 
-test("a profile keeps only the prompting fields that differ from its guide", () => {
+test("a profile's own prompting fields go over its guide's", () => {
   const guide = { id: "krea2", summary: "S", rules: ["R"], mode: { id: "base", rules: ["M"] } };
-  const own = { id: "krea2", summary: "S", rules: ["R"], mode: { id: "fast", rules: ["F"] } };
-  assert.deepEqual(ownPrompting(guide, own), { mode: { id: "fast", rules: ["F"] } });
-  assert.deepEqual(mergedPrompting(guide, ownPrompting(guide, own)), own);
+  const own = { mode: { id: "fast", rules: ["F"] } };
+  assert.deepEqual(mergedPrompting(guide, own), { ...guide, ...own });
   assert.deepEqual(mergedPrompting(guide, {}), guide);
   assert.deepEqual(mergedPrompting(null, own), own);
   assert.equal(mergedPrompting(null, undefined), null);

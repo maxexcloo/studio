@@ -66,7 +66,9 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 ### Cloud Models
 
-`STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account. Studio never switches work to the cloud implicitly, except Animate and MCP video, which run on the other side and say so when the preferred one can't run.
+`STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
+
+**Where Work Runs** (Settings › Preferences) sets, per account, whether Chat, Prompt Writing, Images and Videos default to Cloud or Local (Local when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins, and `STUDIO_ASSISTANT_MODEL` always runs. Otherwise Studio never switches work to the cloud, and held video work never does.
 
 ### Accounts & Single Sign-On
 
@@ -136,7 +138,7 @@ node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --appl
 node backend/commands/migrate-runtime.mjs --restore /path/to/studio-data/.backups/STAMP --destination /empty/restore-rehearsal
 ```
 
-The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. To roll back, stop Studio, roll the data back to the snapshot and deploy the previous image. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
+The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. `--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results without a backup; supply it only for the one account that used Dream. To roll back, stop Studio, roll the data back to the snapshot and deploy the previous image. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
 
 ### Runtime Control
 

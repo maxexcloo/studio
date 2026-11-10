@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Select, Stack, Switch } from "@mantine/core";
+import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { icons } from "../../ui/icons";
 import { post } from "../../api";
@@ -9,7 +9,12 @@ import { useAccount } from "../auth/AccountGate";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { accountAdminQuery } from "./AccountAdmin";
 import { FinishStarredImages } from "./FinishStarredImages";
-import { preferencesQuery, useSavePreferences, useTileCaptions } from "./accountPreferences";
+import {
+  preferencesQuery,
+  useSavePreferences,
+  useTileCaptions,
+  type SidePreference,
+} from "./accountPreferences";
 
 /**
  * Delete Failed Items: everyone deletes their own; administrators of a multi-user Studio may choose
@@ -148,6 +153,69 @@ function ModelChoices() {
   );
 }
 
+const sides = [
+  { value: "cloud", label: "Cloud" },
+  { value: "local", label: "Local" },
+];
+/**
+ * Where Chat, Prompt Writing, Images and Videos run by default, Cloud or Local (unsaved, Local).
+ * Videos keeps its local Fast or Quality tier, which Animate's menu chooses.
+ */
+function WhereWorkRuns() {
+  const status = useQuery(preferencesQuery).data;
+  const save = useSavePreferences();
+  if (!status) return null;
+  const { preferences } = status;
+  const videos = preferences.videos === "cloud" ? "cloud" : "local";
+  const row = (
+    label: string,
+    description: string,
+    value: SidePreference,
+    change: (side: SidePreference) => void,
+  ) => (
+    <SettingRow label={label} description={description}>
+      <SegmentedControl
+        aria-label={label}
+        data={sides}
+        value={value}
+        onChange={(side) => change(side as SidePreference)}
+      />
+    </SettingRow>
+  );
+  return (
+    <SettingGroup title="Where Work Runs">
+      {row(
+        "Chat",
+        "The text model Chat starts with. A model you pick in Chat wins.",
+        preferences.chat || "local",
+        (chat) => save.mutate({ chat }),
+      )}
+      {row(
+        "Images",
+        "The model new images start on. A model you pick wins.",
+        preferences.images || "local",
+        (images) => save.mutate({ images }),
+      )}
+      {row(
+        "Prompt Writing",
+        "Where Improve Prompt, negative prompts and Animate’s prompts are written.",
+        preferences.writing || "local",
+        (writing) => save.mutate({ writing }),
+      )}
+      {row(
+        "Videos",
+        "Where new videos and Animate run. Local keeps Animate’s Fast or Quality choice.",
+        videos,
+        (side) =>
+          save.mutate({
+            videos:
+              side === "cloud" ? "cloud" : preferences.videos === "quality" ? "quality" : "fast",
+          }),
+      )}
+    </SettingGroup>
+  );
+}
+
 /** Settings › Preferences: how Studio works for this account, saved with it. */
 export function Preferences() {
   const keep = useKeepRecentPrompts(true);
@@ -202,6 +270,7 @@ export function Preferences() {
         </SettingRow>
         <SpicyPrompts />
       </SettingGroup>
+      <WhereWorkRuns />
       <SettingGroup title="Danger Zone" danger>
         <DeleteFailedItems />
       </SettingGroup>

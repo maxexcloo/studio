@@ -110,7 +110,8 @@ function useChatState() {
         content,
         references: draft.references.map((asset) => asset.id),
         generation: { input, operation: draft.operation, parentJobId: draft.parentJobId },
-        modelId,
+        // Without a picked model, Studio takes the account's default and says when it gave way.
+        ...(selectedModel ? { modelId: selectedModel } : {}),
         ...override,
       };
       const response = await request(`/api/sessions/${sessionId}/chat`, {

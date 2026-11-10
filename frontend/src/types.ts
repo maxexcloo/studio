@@ -46,8 +46,11 @@ export interface Profile {
     label?: string;
     required?: boolean;
     max?: number;
+    /** Where it goes (start, end, reference) or what it guides (shared/profiles.ts guidingRoles). */
     role?: string;
     follows?: string;
+    /** A guiding slot's strength input, with its range; the default is the graph's saved value. */
+    strength?: { min: number; max: number; step: number; default: number };
   }[];
   options?: Record<string, string[]>;
   encoderSlots?: { slot: string; label: string; options: string[]; default: string }[];
@@ -73,6 +76,8 @@ export interface ReferenceAsset {
   url?: string;
   width: number;
   height: number;
+  /** How strongly it guides, where its slot maps a strength; unset keeps the profile's default. */
+  strength?: number;
 }
 export interface GenerationInput extends Record<string, unknown> {
   kind: MediaKind;
@@ -90,7 +95,7 @@ export interface GenerationInput extends Record<string, unknown> {
   frames: number;
   /** `triggers`: all the LoRA's trigger words (true or unset), none (false) or the ones listed. */
   loras: { name: string; strength: number; enabled: boolean; triggers?: boolean | string[] }[];
-  referenceAssets: { slot: string; assetId: string }[];
+  referenceAssets: { slot: string; assetId: string; strength?: number }[];
   referenceDetails?: ReferenceAsset[];
   textEncoder?: string;
   textEncoders?: string[];
@@ -205,7 +210,10 @@ export interface Models {
   /** Each family's display name, from the catalogue. */
   familyLabels?: Record<string, string>;
   profiles: Profile[];
+  /** The account's defaults, on the side its Images and Videos preferences choose. */
   defaults?: { imageModel?: string; videoModel?: string };
+  /** Why a default runs on the other side from the account's preference. */
+  defaultNotes?: Partial<Record<MediaKind, string>>;
   workers?: {
     id: string;
     name: string;

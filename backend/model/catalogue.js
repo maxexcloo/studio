@@ -1,3 +1,4 @@
+import { isCloudProfile } from "../../shared/profiles.ts";
 import { mayUseFeature, visibleGenerationProfiles } from "../account-policy.js";
 import {
   allowedProfile,
@@ -342,6 +343,41 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     unavailableModels,
     workerWorkloads,
   };
+}
+
+/**
+ * The account's default image and video profiles on the side its Images and Videos preferences
+ * choose (account-preferences.js; Local unless Cloud): the deployment's default where it is on that
+ * side and can run, else that side's first that can. A side with none that can run (no cloud
+ * profile for the account, or local ones not installed or their workers Offline or Stopped) gives
+ * way to the other, and `defaultNotes` says so; with neither, the deployment's default stays and
+ * its jobs wait. A profile the person picks always wins over these.
+ */
+export function withPreferredDefaults(models, preferences) {
+  const defaults = { ...models.defaults };
+  const defaultNotes = {};
+  for (const kind of ["image", "video"]) {
+    const key = `${kind}Model`;
+    const cloudFirst = preferences[`${kind}s`] === "cloud";
+    const runnable = (models.profiles || []).filter(
+      (profile) =>
+        profile.kind === kind &&
+        profile.ready !== false &&
+        !["offline", "parked"].includes(profile.availability),
+    );
+    const pick = (cloud) => {
+      const side = runnable.filter((profile) => isCloudProfile(profile) === cloud);
+      return side.find((profile) => profile.id === defaults[key]) || side[0];
+    };
+    const preferred = pick(cloudFirst);
+    const other = preferred ? undefined : pick(!cloudFirst);
+    if (preferred || other) defaults[key] = (preferred || other).id;
+    if (other)
+      defaultNotes[kind] = cloudFirst
+        ? `No cloud ${kind} model is available, so this runs locally.`
+        : `No local ${kind} model is running, so this runs in the cloud.`;
+  }
+  return { ...models, defaults, defaultNotes };
 }
 
 export function modelsForAccount(models, req) {

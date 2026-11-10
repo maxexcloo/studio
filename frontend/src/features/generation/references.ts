@@ -18,6 +18,7 @@ import {
   referencePatch,
 } from "./payload";
 import { useGeneration } from "./GenerationProvider";
+import { guidingRoles } from "../../../../shared/profiles";
 
 export const galleryReferenceType = "application/x-studio-gallery-item";
 /** What an upload can be (backend/references.js): an image, or a video placed by its first frame. */
@@ -60,6 +61,10 @@ export function referenceCells(references: ReferenceAsset[], profile?: Profile) 
       slot: group[0].id,
       // Unlabelled slots read by their ID, such as Start or Image.
       label: group[0].label || group[0].id.replace(/^\w/, (letter) => letter.toUpperCase()),
+      // What it guides, where the profile names it: Identity, Pose/Layout or Style.
+      guides: Object.hasOwn(guidingRoles, group[0].role || "")
+        ? guidingRoles[group[0].role!]
+        : undefined,
       required: group.some((input) => input.required),
       capacity,
       assets,

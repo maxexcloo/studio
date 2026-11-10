@@ -62,14 +62,6 @@ export function repointWorkflowPreferences(canonical) {
   });
 }
 
-/**
- * After migrate-runtime rewrote the file (runtime-migrations.js): moves the loaded preferences,
- * which may hold a change not yet saved, onto the ids `canonical` gives and saves them.
- */
-export function reloadWorkflowPreferences(canonical) {
-  if (preferencesCache) repointWorkflowPreferences(canonical);
-}
-
 function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {
@@ -124,6 +116,9 @@ function validateWorkflow(workflow, info = {}, profile = null) {
     else if (!node) issues.push(`Mapped media input node is missing: ${mapping.node}`);
     else if (!(mapping.input in (node.inputs || {})))
       issues.push(`Mapped media input is missing: ${mapping.node}.${mapping.input}`);
+    const strength = mediaInput.strength;
+    if (strength && !(strength.input in (workflow.graph?.[strength.node]?.inputs || {})))
+      issues.push(`Mapped reference strength is missing: ${strength.node}.${strength.input}`);
   }
   if (online) {
     for (const classType of workflow.requiredNodes || []) {

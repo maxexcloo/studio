@@ -2,6 +2,7 @@
 import { referenceImageSize } from "../generation-defaults.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
+import { guidingRoles } from "../../shared/profiles.ts";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
@@ -64,7 +65,25 @@ export function mcpControls(profile) {
     controls.loras = { max: profile.maxLoras || 8 };
   const slots = profile.mediaInputs || [];
   if (slots.length)
-    controls.reference_asset_ids = { max: slots.length, slots: slots.map((slot) => slot.id) };
+    controls.reference_asset_ids = {
+      max: slots.length,
+      slots: slots.map((slot) => slot.id),
+      // What each slot guides, where the profile names it (Identity, Pose/Layout, Style).
+      ...(slots.some((slot) => Object.hasOwn(guidingRoles, slot.role || ""))
+        ? { roles: slots.map((slot) => guidingRoles[slot.role] ?? null) }
+        : {}),
+    };
+  const strengths = slots.filter((slot) => slot.strength);
+  if (strengths.length)
+    controls.reference_strengths = {
+      slots: Object.fromEntries(
+        strengths.map(({ id, strength: { min, max, step, default: fallback } }) => [
+          id,
+          { min, max, step, default: fallback },
+        ]),
+      ),
+      note: "One per reference_asset_ids entry, in order; only these slots take one.",
+    };
   if (slots.length && profile.aspectPolicy === "reference")
     controls.reference_role = {
       options: ["edit", "reference"],
@@ -142,6 +161,7 @@ export function assertAdjustable(profile, args) {
     "loras",
     "reference_asset_ids",
     "reference_role",
+    "reference_strengths",
     "upscale_quality",
   ]) {
     const value = args[field];

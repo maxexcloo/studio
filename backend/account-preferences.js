@@ -10,8 +10,10 @@ import {
  * (`preferences:` in single-user mode). Cloud Models, LoRAs and Uncensored Models only narrow
  * what the account's group grants (account-policy.js); they start on wherever the group grants
  * them. Spicy Prompts starts off and counts only with Uncensored Models (`explicitWording`).
- * `videos` is where Animate prefers to run (Cloud, or the local Fast or Quality tier); unsaved, it
- * is Fast where the account has local video, otherwise Cloud (animate-profile.js).
+ * `chat`, `writing` and `images` say where Chat, prompt writing and images run by default, Cloud or
+ * Local; `videos` where videos and Animate do (Cloud, or the local Fast or Quality tier). Unsaved,
+ * each is Local. The side that can't run gives way to the other, saying so; a model the person
+ * picks always wins (chat-settings.js, assistant.js, model/catalogue.js, animate-profile.js).
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -21,7 +23,12 @@ export const preferenceDefaults = Object.freeze({
   uncensoredModels: true,
 });
 /** Preferences that take one of a few values rather than on or off; they have no default. */
-const preferenceChoices = Object.freeze({ videos: ["cloud", "fast", "quality"] });
+const preferenceChoices = Object.freeze({
+  chat: ["cloud", "local"],
+  images: ["cloud", "local"],
+  videos: ["cloud", "fast", "quality"],
+  writing: ["cloud", "local"],
+});
 const dataDir = currentDataDir();
 const cache = new Map();
 const documentName = (ownerId) => `preferences:${ownerId}`;

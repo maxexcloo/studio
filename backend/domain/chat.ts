@@ -45,6 +45,11 @@ interface ChatOptions {
   models?: (ownerId: string) => Promise<ChatModel[]>;
   /** Whether a text model reads images; without it every model is taken to. */
   vision?: (modelId: string) => Promise<boolean>;
+  /**
+   * The model where the person picked none, from the account's Chat preference, and a `note` when
+   * it gave way to the other side (chat-settings.js); without it, the first listed.
+   */
+  defaultModel?: (ownerId: string, models: ChatModel[]) => Promise<{ id?: string; note: string }>;
   revision?: (
     ownerId: string,
     sessionId: string,
@@ -122,7 +127,12 @@ function generationContext(input: GenerationInput) {
   if (Array.isArray(input.referenceAssets))
     result.referenceAssets = input.referenceAssets
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({ assetId: item.assetId, source: item.source, slot: item.slot }));
+      .map((item) => ({
+        assetId: item.assetId,
+        source: item.source,
+        slot: item.slot,
+        ...(Number.isFinite(item.strength) ? { strength: item.strength } : {}),
+      }));
   if (Array.isArray(input.loras))
     result.loras = input.loras
       .slice(0, 8)
@@ -264,9 +274,7 @@ export class ChatService {
             available: models.length > 0,
             models,
             ...(models.length ? {} : { reason: "No text models are available for this account." }),
-            defaultModelId: models.some((model) => model.id === settings.model)
-              ? settings.model
-              : models[0]?.id,
+            defaultModelId: (await this.defaultModel(ownerId, settings, models)).id,
           }
         : {
             available: false,
@@ -282,6 +290,12 @@ export class ChatService {
           error instanceof Error ? error.message : "The text gateway configuration is incomplete.",
       };
     }
+  }
+  /** The configured model where it is listed, else the account's preferred one. */
+  private async defaultModel(ownerId: string, settings: ChatSettings, models: ChatModel[]) {
+    if (models.some((model) => model.id === settings.model))
+      return { id: settings.model, note: "" };
+    return (await this.options.defaultModel?.(ownerId, models)) ?? { id: models[0]?.id, note: "" };
   }
   private models(ownerId: string, settings: ChatSettings): Promise<ChatModel[]> {
     return this.options.models
@@ -497,7 +511,11 @@ export class ChatService {
         };
       }
       const models = await this.models(ownerId, settings);
-      const modelId = input.modelId || settings.model || models[0]?.id;
+      // A model the person picked wins; otherwise the default says when it gave way to the other side.
+      const preferred = input.modelId
+        ? { id: input.modelId, note: "" }
+        : await this.defaultModel(ownerId, settings, models);
+      const modelId = preferred.id || "";
       const selected = models.find((model) => model.id === modelId);
       if (!selected) throw failure("Choose a text model approved for this account.", 403);
       // Only a model that reads images gets the attached ones; the rest know them by ID.
@@ -538,6 +556,7 @@ export class ChatService {
         status: "streaming",
         modelId,
         provider: selected.provider,
+        ...(preferred.note ? { note: preferred.note } : {}),
       });
       assistant = reply;
       emit({ event: "message", data: reply });

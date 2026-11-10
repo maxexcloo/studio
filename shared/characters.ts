@@ -1,4 +1,4 @@
-import { isCloudProfile } from "./profiles.ts";
+import { guidingRoles, isCloudProfile } from "./profiles.ts";
 
 /**
  * Cards an account keeps to shoot a series (backend/cards.js stores them per account, one document
@@ -48,6 +48,24 @@ export const editsReferences = (profile: {
   provider?: string;
   editReferences?: boolean;
 }) => profile.editReferences === true || isCloudProfile(profile);
+
+/**
+ * The reference slot a profile's result is drawn from (img2img), if any: its start slot (else its
+ * first) on a profile that doesn't edit with its references, unless that slot only guides
+ * (Identity, Pose/Layout or Style, shared/profiles.ts).
+ */
+export function startImageSlot(profile: {
+  id?: string;
+  family?: string;
+  provider?: string;
+  editReferences?: boolean;
+  mediaInputs?: { id: string; role?: string }[];
+}) {
+  const slots = profile.mediaInputs || [];
+  const slot = slots.find((input) => input.role === "start") || slots[0];
+  if (!slot || editsReferences(profile) || Object.hasOwn(guidingRoles, slot.role || "")) return;
+  return slot.id;
+}
 
 /**
  * The profiles a character goes to, best first: those whose family keeps a face, hair and build

@@ -1,5 +1,5 @@
 import { useState, type DragEvent } from "react";
-import { Badge, Image, Menu, Text, UnstyledButton } from "@mantine/core";
+import { Badge, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
 import { ArrowLeft, ArrowRight, Plus, Replace } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { Profile, ReferenceAsset } from "../../types";
@@ -11,6 +11,7 @@ import {
   type ReferenceTarget,
 } from "./references";
 import { dragPicture } from "./Picker";
+import { StrengthControl } from "./StrengthControl";
 import classes from "./ReferencePicker.module.css";
 
 /** A placed reference dragged onto another slot moves there. */
@@ -169,6 +170,7 @@ export function ReferenceSlots({
           </div>
           <Text size="xs" c="dimmed" className={classes.caption}>
             {group.label}
+            {group.guides && group.guides !== group.label && ` · ${group.guides}`}
             {group.capacity > 1 && ` · ${group.assets.length}/${group.capacity}`}
             {group.required && (
               <Text span c={group.assets.length ? undefined : "yellow"} inherit>
@@ -179,5 +181,64 @@ export function ReferenceSlots({
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * How placed references play their roles: a Strength for each in a slot that maps one, and a note
+ * where one is the start image the result is drawn from (img2img) rather than a guide.
+ */
+export function ReferenceRoles({
+  references,
+  profile,
+  startSlot,
+  onChange,
+}: {
+  references: ReferenceAsset[];
+  profile?: Profile;
+  /** The img2img start slot (shared/characters.ts startImageSlot). */
+  startSlot?: string;
+  onChange: (references: ReferenceAsset[]) => void;
+}) {
+  const start = references.findIndex((asset) => asset.slot === startSlot);
+  const strengths = references.flatMap((asset, index) => {
+    const range = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.strength;
+    return range ? [{ asset, index, range }] : [];
+  });
+  if (start < 0 && !strengths.length) return null;
+  return (
+    <Stack gap="xs">
+      {start >= 0 && (
+        <Text size="xs" c="dimmed">
+          Reference {start + 1} is the start image: the result is drawn from it (img2img) rather
+          than guided by it.
+        </Text>
+      )}
+      {strengths.map(({ asset, index, range }) => {
+        const label = `${referenceLabel(asset, index, profile)} Strength`;
+        return (
+          <Stack key={referenceKey(asset)} gap={4}>
+            <Text size="xs" c="dimmed">
+              {label}
+            </Text>
+            <StrengthControl
+              label={label}
+              value={asset.strength ?? range.default}
+              min={range.min}
+              max={range.max}
+              step={range.step}
+              mark={range.default}
+              onChange={(strength) =>
+                onChange(
+                  references.map((reference) =>
+                    reference === asset ? { ...reference, strength } : reference,
+                  ),
+                )
+              }
+            />
+          </Stack>
+        );
+      })}
+    </Stack>
   );
 }

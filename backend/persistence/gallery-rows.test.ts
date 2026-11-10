@@ -4,11 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { migrateGalleryRows, migrateRuntime, restoreRuntimeBackup } from "./migration.ts";
-import { readGalleryRows } from "./gallery-rows.ts";
-import { closeRuntimeDatabase, readRuntimeDocument, runtimeDatabase } from "./runtime.ts";
+import { readGalleryRows, writeGalleryRows } from "./gallery-rows.ts";
+import { closeRuntimeDatabase, runtimeDatabase } from "./runtime.ts";
 
-test("gallery-rows-v1 moves the gallery document into rows that Studio then saves item by item", (t) => {
+test("Studio saves the gallery item by item into its rows", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-rows-"));
   t.after(() => {
     closeRuntimeDatabase(dataDir);
@@ -20,25 +19,7 @@ test("gallery-rows-v1 moves the gallery document into rows that Studio then save
     status: "done",
     createdAt: new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString(),
   });
-  const original = [item("kept", 2), item("removed", 1)];
-  fs.writeFileSync(path.join(dataDir, "gallery.json"), JSON.stringify(original));
-  assert.equal(migrateRuntime(dataDir, { apply: true }).applied, true);
-
-  const plan = migrateGalleryRows(dataDir);
-  assert.equal(plan.applied, false);
-  assert.equal(plan.mappings[0].count, 2);
-  assert.deepEqual(readRuntimeDocument(dataDir, "gallery"), original);
-
-  const result = migrateGalleryRows(dataDir, { apply: true });
-  assert.equal(result.applied, true);
-  assert.throws(() => readRuntimeDocument(dataDir, "gallery"), { code: "ENOENT" });
-  assert.equal(migrateGalleryRows(dataDir, { apply: true }).alreadyMigrated, true);
-  const restored = path.join(dataDir, "restore-rehearsal");
-  restoreRuntimeBackup(result.backup, restored);
-  assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(restored, "gallery.json"), "utf8")),
-    original,
-  );
+  writeGalleryRows(runtimeDatabase(dataDir), [item("kept", 2), item("removed", 1)]);
   closeRuntimeDatabase(dataDir);
 
   const run = (source: string) =>

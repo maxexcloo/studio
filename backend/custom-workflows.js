@@ -5,7 +5,7 @@ import { dataDir } from "./gallery/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
-import { profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
+import { guidingRoles, profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
 
 export { profileBackendLabels, sharedProfileFields };
 
@@ -54,24 +54,59 @@ function loraStackConfig(meta = {}) {
   };
 }
 
-function mediaInputsConfig(meta = {}, controls = {}) {
+/**
+ * A guiding slot's strength input and its range: declared bounds, else 0 to 2 (as LoRAs), widened
+ * to the graph's saved value, which is also the default.
+ */
+function strengthConfig(strength, graph = {}) {
+  if (!strength?.node || !strength?.input) return null;
+  const node = String(strength.node);
+  const input = String(strength.input);
+  const number = (value) =>
+    value !== "" && value !== null && Number.isFinite(Number(value)) ? Number(value) : undefined;
+  const saved = number(graph[node]?.inputs?.[input]);
+  const fallback = number(strength.default) ?? saved ?? 1;
+  return {
+    node,
+    input,
+    min: number(strength.min) ?? Math.min(0, fallback),
+    max: number(strength.max) ?? Math.max(2, fallback),
+    step: number(strength.step) ?? 0.05,
+    default: fallback,
+  };
+}
+
+function mediaInputsConfig(meta = {}, controls = {}, graph = {}) {
   const raw = Array.isArray(meta.mediaInputs) ? meta.mediaInputs : [];
   const normalized = raw
-    .map((item, index) => ({
-      id: safeId(item?.id || `reference-${index + 1}`),
-      kind: item?.kind === "image" ? "image" : "image",
-      label: String(item?.label || (index ? `Reference ${index + 1}` : "Reference image")),
-      required: Boolean(item?.required),
-      min: Math.max(0, Number(item?.min ?? (item?.required ? 1 : 0)) || 0),
-      // Each mapping writes one filename; several references need separate graph inputs.
-      max: 1,
-      control:
-        item?.control?.node && item?.control?.input
-          ? { node: String(item.control.node), input: String(item.control.input) }
-          : null,
-      ...(["start", "end", "reference"].includes(item?.role) ? { role: item.role } : {}),
-      ...(item?.follows ? { follows: safeId(item.follows) } : {}),
-    }))
+    .map((item, index) => {
+      // Only a guiding slot (Identity, Pose/Layout, Style) takes a strength.
+      const strength = Object.hasOwn(guidingRoles, item?.role)
+        ? strengthConfig(item.strength, graph)
+        : null;
+      return {
+        id: safeId(item?.id || `reference-${index + 1}`),
+        kind: item?.kind === "image" ? "image" : "image",
+        label: String(
+          item?.label ||
+            (Object.hasOwn(guidingRoles, item?.role) && guidingRoles[item.role]) ||
+            (index ? `Reference ${index + 1}` : "Reference image"),
+        ),
+        required: Boolean(item?.required),
+        min: Math.max(0, Number(item?.min ?? (item?.required ? 1 : 0)) || 0),
+        // Each mapping writes one filename; several references need separate graph inputs.
+        max: 1,
+        control:
+          item?.control?.node && item?.control?.input
+            ? { node: String(item.control.node), input: String(item.control.input) }
+            : null,
+        ...(["start", "end", "reference", ...Object.keys(guidingRoles)].includes(item?.role)
+          ? { role: item.role }
+          : {}),
+        ...(item?.follows ? { follows: safeId(item.follows) } : {}),
+        ...(strength ? { strength } : {}),
+      };
+    })
     .filter((item) => item.control);
   chainReferenceSlots(normalized);
   if (!normalized.length && controls.startImage?.node && controls.startImage?.input) {
@@ -214,7 +249,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
   const graph = graphFromJson(raw);
   const controls = meta.controls || {};
   const loraStack = loraStackConfig(meta);
-  const mediaInputs = mediaInputsConfig(meta, controls);
+  const mediaInputs = mediaInputsConfig(meta, controls, graph);
   const promptComposition = promptCompositionConfig(meta);
   const graphDefault = (key) => {
     const mapping = controls[key];

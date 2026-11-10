@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import type { QueueJob, ReferenceAsset, Session } from "../../types";
 import {
+  defaultProfile,
   draftForProfile,
   initialInput,
   inputForProfile,
@@ -34,7 +36,7 @@ function useDraftSubmit({
   embedded?: boolean;
   inlineError?: boolean;
 }) {
-  const { draft, setDraft, input, profile } = useGeneration();
+  const { draft, setDraft, input, profile, models } = useGeneration();
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,6 +69,12 @@ function useDraftSubmit({
     },
     // The pending tile is the confirmation: refresh the gallery now instead of waiting for its poll.
     onSuccess: ({ sessionId, jobId }) => {
+      // A default that gave way to the other side from the account's preference says so.
+      const note =
+        profile &&
+        draft.defaultedProfileId === profile.id &&
+        models.data?.defaultNotes?.[profile.kind];
+      if (note) notifications.show({ message: note });
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["sessions"] });
@@ -96,9 +104,12 @@ export function GenerationForm({
   const location = useLocation();
   const compare = useCompare();
   const phone = usePhone();
+  // A draft without a picked profile runs on the account's default, following it as it changes.
+  const preferred = defaultProfile(models.data, input.kind);
+  const defaulted = !input.profileId || draft.defaultedProfileId === input.profileId;
   useEffect(() => {
-    if (!input.profileId && profile) selectProfile(profile);
-  }, [input.profileId, profile]);
+    if (defaulted && preferred && preferred.id !== input.profileId) selectProfile(preferred, true);
+  }, [defaulted, preferred, input.profileId]);
   const submit = useDraftSubmit({ onSubmitted });
   const { label, blockedReason } = useSubmitState({
     input,
@@ -188,6 +199,7 @@ export function GenerationForm({
           sessionId: previous.sessionId,
           operation: previous.input.kind === "video" ? "animate" : "image",
           references: [],
+          defaultedProfileId: previous.defaultedProfileId,
           input: {
             ...(profile
               ? inputForProfile(initialInput, profile)

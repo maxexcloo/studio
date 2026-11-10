@@ -4,12 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { migrateGalleryRows, migrateRuntime, planRuntimeMigration } from "./migration.ts";
-import { readGalleryRows } from "./gallery-rows.ts";
+import { readGalleryRows, writeGalleryRows } from "./gallery-rows.ts";
 import { closeRuntimeDatabase, readRuntimeDocument, runtimeDatabase } from "./runtime.ts";
-import { DatabaseSync } from "node:sqlite";
 
-test("Studio refuses a folder still on JSON; once migrated, sign-in and gallery edits persist across restarts", (t) => {
+test("Studio refuses a folder still on JSON; on current storage, sign-in and gallery edits persist across restarts", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-authority-"));
   const earlier = fs.mkdtempSync(path.join(os.tmpdir(), "studio-authority-earlier-"));
   t.after(() => {
@@ -37,40 +35,41 @@ test("Studio refuses a folder still on JSON; once migrated, sign-in and gallery 
         ]),
       },
     });
-  // A data folder as JSON-era Studio left it: the accounts store and the gallery as files.
   run(
     `
     import {createLocalAccount} from './backend/account-store.js';
-    await createLocalAccount({username:'migration.example',password:'fixture password for migration',role:'administrator'});
+    await createLocalAccount({username:'authority.example',password:'fixture password for authority',role:'administrator'});
   `,
-    earlier,
+    dataDir,
   );
-  const legacyAccounts = JSON.stringify(readRuntimeDocument(earlier, "accounts"));
-  const legacyGallery = JSON.stringify([
-    { id: "kept", jobId: "kept-job", index: 0, type: "image", status: "pending" },
-  ]);
-  fs.writeFileSync(path.join(dataDir, "accounts.json"), legacyAccounts);
-  fs.writeFileSync(path.join(dataDir, "gallery.json"), legacyGallery);
-  assert.throws(() => run(`import './backend/storage-check.js';`), /run migrate-runtime/);
+  // A data folder as JSON-era Studio left it: the accounts store as a file.
+  fs.writeFileSync(
+    path.join(earlier, "accounts.json"),
+    JSON.stringify(readRuntimeDocument(dataDir, "accounts")),
+  );
+  assert.throws(
+    () => run(`import './backend/storage-check.js';`, earlier),
+    /accounts\.json, so it predates current storage/,
+  );
 
-  assert.equal(migrateRuntime(dataDir, { apply: true }).applied, true);
-  assert.throws(() => run(`import './backend/storage-check.js';`), /the gallery document/);
-  assert.equal(migrateGalleryRows(dataDir, { apply: true }).applied, true);
+  const kept = { id: "kept", jobId: "kept-job", index: 0, type: "image", status: "pending" };
+  writeGalleryRows(runtimeDatabase(dataDir), [kept]);
   closeRuntimeDatabase(dataDir);
   run(`
     import assert from 'node:assert/strict';
+    import './backend/storage-check.js';
     import {verifyLocalAccount,createAccountSession,accountSession} from './backend/account-store.js';
     import {gallery,setGallery,flushGalleryStrict} from './backend/gallery/store.js';
     import {runtimeDatabase} from './backend/persistence/runtime.ts';
     import {readGalleryRows} from './backend/persistence/gallery-rows.ts';
-    const account=await verifyLocalAccount('migration.example','fixture password for migration');
+    const account=await verifyLocalAccount('authority.example','fixture password for authority');
     assert.ok(account?.userId);
     const session=createAccountSession(account.userId);
     assert.equal(accountSession(session.token).userId,account.userId);
     assert.equal(gallery[0].id,'kept');
     const db=runtimeDatabase(${JSON.stringify(dataDir)});
     db.exec('PRAGMA query_only=ON');
-    setGallery([...gallery,{id:'after-migration',type:'image',status:'pending',createdAt:'2020-01-02T00:00:00Z'}]);
+    setGallery([...gallery,{id:'added',type:'image',status:'pending',createdAt:'2020-01-02T00:00:00Z'}]);
     await assert.rejects(flushGalleryStrict());
     assert.equal(readGalleryRows(db).length,1);
     db.exec('PRAGMA query_only=OFF');
@@ -85,22 +84,4 @@ test("Studio refuses a folder still on JSON; once migrated, sign-in and gallery 
     assert.ok(gallery.every(item=>item.status==='pending'));
   `);
   assert.equal(readGalleryRows(runtimeDatabase(dataDir)).length, 2);
-  assert.equal(fs.readFileSync(path.join(dataDir, "accounts.json"), "utf8"), legacyAccounts);
-  assert.equal(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8"), legacyGallery);
-});
-
-test("migration dry run reads an existing queue database without changing its schema or contents", (t) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dry-run-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const file = path.join(dataDir, "studio.sqlite");
-  const db = new DatabaseSync(file);
-  db.exec(
-    "CREATE TABLE existing_queue (id TEXT PRIMARY KEY); INSERT INTO existing_queue VALUES ('recorded')",
-  );
-  db.close();
-  const original = fs.readFileSync(file);
-  const names = fs.readdirSync(dataDir);
-  assert.equal(planRuntimeMigration(dataDir).alreadyMigrated, false);
-  assert.deepEqual(fs.readFileSync(file), original);
-  assert.deepEqual(fs.readdirSync(dataDir), names);
 });

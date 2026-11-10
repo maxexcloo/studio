@@ -181,6 +181,11 @@ the primary component reference and verify APIs against the installed version.
   the local tiers a profile offers, and the choice only when there are two.
   The preferred side falls back to the other, saying so; Extend keeps its
   video's model unless Cloud is preferred.
+- Settings › Preferences › Where Work Runs sets Cloud or Local for Chat, Prompt
+  Writing, Images and Videos. It sets only defaults: a model the person picks
+  wins, and a draft keeps following the default until then. A default on the
+  other side says so where its work shows: a notification on queuing, a line
+  under the Chat reply, the start of the written prompt's thinking.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
