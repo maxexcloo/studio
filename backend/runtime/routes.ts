@@ -64,6 +64,7 @@ export function createRuntimeRouter(
       controller.configure({
         automatic: request.body?.automatic,
         parkIdleMinutes: request.body?.parkIdleMinutes,
+        idleWorkload: request.body?.idleWorkload,
       }),
     ),
   );

@@ -307,13 +307,24 @@ function WorkloadLog({
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
-/** Automatic control starts stopped media workloads for queued work and parks idle ones; never text. */
+const kindLabels = { image: "Images", video: "Videos", text: "Text" } as const;
+
+/**
+ * Automatic control starts stopped media workloads for queued work and settles idle pools: it parks
+ * their idle media and starts the Run When Idle workload, the only text it ever starts.
+ */
 export function AutomaticControl() {
-  const settings = useQuery(runtimeStatusQuery).data?.settings;
-  if (!settings) return null;
-  return <AutomaticControlRows settings={settings} />;
+  const status = useQuery(runtimeStatusQuery).data;
+  if (!status) return null;
+  return <AutomaticControlRows settings={status.settings} workloads={status.workloads} />;
 }
-function AutomaticControlRows({ settings }: { settings: RuntimeSettings }) {
+function AutomaticControlRows({
+  settings,
+  workloads,
+}: {
+  settings: RuntimeSettings;
+  workloads: RuntimeStatus["workloads"];
+}) {
   const client = useQueryClient();
   const save = useMutation({
     meta: { inlineError: true },
@@ -325,11 +336,12 @@ function AutomaticControlRows({ settings }: { settings: RuntimeSettings }) {
     onSettled: () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey }),
   });
   const minutes = [...new Set([0, 10, 15, 30, 60, settings.parkIdleMinutes])].sort((x, y) => x - y);
+  const idleChoice = workloads.find((item) => item.id === settings.idleWorkload);
   return (
     <>
       <SettingRow
         label="Automatic Control"
-        description="Start image and video workers for queued work; text stays manual."
+        description="Start image and video workers for queued work, and settle the GPUs when Studio is idle."
       >
         <Switch
           aria-label="Automatic Control"
@@ -338,11 +350,11 @@ function AutomaticControlRows({ settings }: { settings: RuntimeSettings }) {
         />
       </SettingRow>
       <SettingRow
-        label="Park When Idle"
-        description="Stop an idle image or video worker after this long, under Automatic Control."
+        label="Idle After"
+        description="Time without queued or running work before Studio parks a GPU pool’s image and video workers."
       >
         <Select
-          aria-label="Park When Idle"
+          aria-label="Idle After"
           w={110}
           data={minutes.map((value) => ({
             value: String(value),
@@ -352,6 +364,36 @@ function AutomaticControlRows({ settings }: { settings: RuntimeSettings }) {
           allowDeselect={false}
           disabled={!settings.automatic}
           onChange={(value) => value && save.mutate({ parkIdleMinutes: Number(value) })}
+        />
+      </SettingRow>
+      <SettingRow
+        label="Run When Idle"
+        description={
+          idleChoice?.kind === "text"
+            ? "Then start this model. Automatic Control never stops text, so media work that needs its GPUs waits until it’s stopped."
+            : "Then start this model in its pool. Queued work still starts what it needs."
+        }
+      >
+        <Select
+          aria-label="Run When Idle"
+          w={200}
+          data={[
+            { value: "none", label: "None" },
+            ...(["image", "video", "text"] as const)
+              .map((kind) => ({
+                group: kindLabels[kind],
+                items: workloads
+                  .filter((item) => item.kind === kind)
+                  .map((item) => ({ value: item.id, label: item.label })),
+              }))
+              .filter((group) => group.items.length),
+          ]}
+          value={idleChoice?.id ?? "none"}
+          allowDeselect={false}
+          disabled={!settings.automatic || !settings.parkIdleMinutes}
+          onChange={(value) =>
+            value && save.mutate({ idleWorkload: value === "none" ? "" : value })
+          }
         />
       </SettingRow>
       {save.error && (
