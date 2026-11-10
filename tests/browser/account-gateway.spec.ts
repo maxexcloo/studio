@@ -293,7 +293,9 @@ test("Administrators change roles, reset passwords and delete galleries, account
 }) => {
   const state = await accountFixture(page);
   Object.assign(state.administration.accounts[1], { passwordSignIn: true });
-  Object.assign(state.galleryOwners, { member: 3 });
+  Object.assign(state.galleryOwners, {
+    member: { items: 3, images: 2, videos: 1, cloudJobs: 1, gpuMs: 150_000, bytes: 2_500_000 },
+  });
   state.administration.accessProfiles.push({
     id: "empty",
     name: "Empty",
@@ -313,6 +315,10 @@ test("Administrators change roles, reset passwords and delete galleries, account
       .getByRole("button", { name: "Actions for member@example.test", exact: true })
       .click()
       .then(() => page.getByRole("menuitem", { name: item, exact: true }).click());
+  await expect(
+    member.getByText("2 Images · 1 Video · 1 Cloud Job · 3 GPU min", { exact: true }),
+  ).toBeVisible();
+  await expect(member.getByText("2.5 MB", { exact: true })).toBeVisible();
   // Administrators can't change or delete their own account here.
   await expect(
     page

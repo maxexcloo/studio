@@ -87,9 +87,11 @@ test("one request deletes many of the account's own items and leaves another own
   assert.equal(fs.existsSync(other.file), true);
 });
 
-test("only an administrator counts and deletes another account's gallery", async () => {
+test("only an administrator sees each account's gallery and usage, and deletes another account's gallery", async () => {
   const alice = [finishedItem("alice", "alice-one"), finishedItem("alice", "alice-two")];
   const bob = finishedItem("bob", "bob-one");
+  // Only Bob's image is from the last 30 days; storage counts every file ("fixture", 7 bytes).
+  Object.assign(bob.item, { createdAt: new Date().toISOString(), durationMs: 60_000 });
   store.setGallery([...alice, bob].map(({ item }) => item));
   const as = (user, role = "user") => ({ "x-user": user, "x-role": role });
 
@@ -100,7 +102,11 @@ test("only an administrator counts and deletes another account's gallery", async
   assert.equal(store.gallery.length, 3);
 
   const counts = await fetch(`${base}/owners`, { headers: as("admin", "administrator") });
-  assert.deepEqual((await counts.json()).owners, { alice: 2, bob: 1 });
+  const usage = { videos: 0, cloudJobs: 0 };
+  assert.deepEqual((await counts.json()).owners, {
+    alice: { items: 2, images: 0, gpuMs: 0, bytes: 14, ...usage },
+    bob: { items: 1, images: 1, gpuMs: 60_000, bytes: 7, ...usage },
+  });
   const removed = await fetch(`${base}/owners/alice`, {
     method: "DELETE",
     headers: as("admin", "administrator"),
