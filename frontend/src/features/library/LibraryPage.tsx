@@ -15,6 +15,7 @@ import {
   type LibraryItem,
 } from "./LibraryCatalogueTable";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
+import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
@@ -120,6 +121,8 @@ export function LibraryPage() {
         sections={options}
         content={{
           characters: (heading) => <LibraryCharacters heading={heading} />,
+          outfits: (heading) => <LibraryPromptCards kind="outfits" heading={heading} />,
+          scenes: (heading) => <LibraryPromptCards kind="scenes" heading={heading} />,
           imports: (heading) => (
             <LibraryImports
               heading={heading}

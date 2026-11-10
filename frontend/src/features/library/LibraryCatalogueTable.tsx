@@ -6,6 +6,7 @@ import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { usePhone } from "../../ui/usePhone";
 
 export interface LibraryItem {
   key: string;
@@ -138,6 +139,7 @@ export function LibraryCatalogueTable({
   onEdit?: (item: LibraryItem) => void;
   updatePending?: boolean;
 }) {
+  const phone = usePhone();
   const [view, setView] = useState("installed");
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
@@ -293,11 +295,13 @@ export function LibraryCatalogueTable({
                 <Text size="sm" fw={500} truncate>
                   {resourceName(item)}
                 </Text>
-                <Text size="xs" c="dimmed" truncate hiddenFrom="sm">
-                  {[familySummary(item), typeLabel(item)]
-                    .filter((part) => part !== "Unclassified")
-                    .join(" · ")}
-                </Text>
+                {phone && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {[familySummary(item), typeLabel(item)]
+                      .filter((part) => part !== "Unclassified")
+                      .join(" · ")}
+                  </Text>
+                )}
                 {(item.description || item.note) && (
                   <Text size="xs" c="dimmed" lineClamp={1}>
                     {item.description || item.note}
@@ -325,7 +329,7 @@ export function LibraryCatalogueTable({
           {
             key: "family",
             header: "Family",
-            visibleFrom: "sm",
+            hideOnPhone: true,
             width: 170,
             sortValue: (item) => (item.families?.length ? familySummary(item) : undefined),
             cell: (item) => (
@@ -342,7 +346,7 @@ export function LibraryCatalogueTable({
           {
             key: "type",
             header: "Type",
-            visibleFrom: "sm",
+            hideOnPhone: true,
             width: 150,
             sortValue: (item) => (typeLabel(item) === "Unclassified" ? undefined : typeLabel(item)),
             cell: (item) => (

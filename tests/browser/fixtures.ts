@@ -78,6 +78,9 @@ export async function fixtures(page: Page) {
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
   const characters: any[] = [];
+  const outfits: any[] = [];
+  const scenes: any[] = [];
+  const cards = { characters, outfits, scenes };
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -721,8 +724,15 @@ export async function fixtures(page: Page) {
       if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
-    // Character cards, their images shown as reference assets.
-    if (path.startsWith("/api/characters")) {
+    // Character, outfit and scene cards, their images shown as reference assets.
+    const cardKind = path.match(/^\/api\/(characters|outfits|scenes)\b/)?.[1] as
+      | "characters"
+      | "outfits"
+      | "scenes"
+      | undefined;
+    if (cardKind) {
+      const list = cards[cardKind];
+      const noun = cardKind.slice(0, -1);
       const card = (fields: any, id: string) => ({
         id,
         name: fields.name,
@@ -739,7 +749,7 @@ export async function fixtures(page: Page) {
         missing: 0,
       });
       const id = decodeURIComponent(path.split("/")[3] || "");
-      const index = characters.findIndex((item) => item.id === id);
+      const index = list.findIndex((item) => item.id === id);
       // Generate References' jobs, listed with their gallery results.
       if (path.endsWith("/generated")) {
         characters[index].generated = {
@@ -758,18 +768,18 @@ export async function fixtures(page: Page) {
         return respond({ ok: true, character: characters[index] });
       }
       if (method === "POST") {
-        characters.push(card(body, `chr-${characters.length + 1}`));
-        return respond({ ok: true, character: characters.at(-1) }, 201);
+        list.push(card(body, `${noun}-${list.length + 1}`));
+        return respond({ ok: true, [noun]: list.at(-1) }, 201);
       }
       if (method === "PUT") {
-        characters[index] = card(body, id);
-        return respond({ ok: true, character: characters[index] });
+        list[index] = card(body, id);
+        return respond({ ok: true, [noun]: list[index] });
       }
       if (method === "DELETE") {
-        characters.splice(index, 1);
+        list.splice(index, 1);
         return respond({ ok: true });
       }
-      return respond({ characters });
+      return respond({ [cardKind]: list });
     }
     if (method === "GET" && path.startsWith("/api/reference-assets/")) {
       const id = decodeURIComponent(path.split("/")[3]);
@@ -921,6 +931,8 @@ export async function fixtures(page: Page) {
     chatRequests,
     referenceRequests,
     characters,
+    outfits,
+    scenes,
     galleryRequests,
     loraLibrary,
     loraOperations,
@@ -1347,6 +1359,11 @@ export async function serveDream(
       return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
+      if (method === "DELETE") {
+        const deleted = state.discarded.length;
+        state.discarded = [];
+        return route.fulfill({ json: { deleted } });
+      }
       const start = Number(url.searchParams.get("cursor") || 0);
       const limit = Number(url.searchParams.get("limit") || 40);
       return route.fulfill({

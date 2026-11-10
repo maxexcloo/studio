@@ -106,6 +106,10 @@ export function registerDreamRoutes(app: object, { dream }: { dream: Dream }) {
       payload: { items, nextCursor: start + limit < all.length ? String(start + limit) : "" },
     };
   });
+  route("DELETE", "/api/dream/discarded", (account) => ({
+    status: 200,
+    payload: { deleted: dream.deleteDiscards(owner(account)) },
+  }));
   route("POST", "/api/dream/pairs/:pairId/answer", (account, { params, body }) => {
     const answer = body?.answer;
     if (!["a", "b", "both", "neither"].includes(answer as string))

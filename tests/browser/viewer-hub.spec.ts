@@ -1605,3 +1605,36 @@ test("The viewer bar shows every action without scrolling on a tablet or narrow 
     });
   await expect.poll(clipped).toBe(false);
 });
+
+test("Face Check marks a result that shows someone else than its character, and Details says so", async ({
+  page,
+}, testInfo) => {
+  const identity = {
+    characterId: "chr-mara",
+    score: 0.31,
+    faces: 1,
+    drifted: true,
+    checkedAt: stamp,
+  };
+  const { viewer } = await seed(page, { identity }, async (_page, state) =>
+    state.characters.push({
+      id: "chr-mara",
+      name: "Mara",
+      description: "red-haired ranger",
+      referenceIds: [],
+      references: [],
+      missing: 0,
+    }),
+  );
+  await expect(
+    page.getByRole("img", { name: "Face Check: Face Differs", exact: true }),
+  ).toBeAttached();
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  }
+  await expect(
+    details.getByText("Looks like someone else, not Mara (face similarity 0.31).", { exact: true }),
+  ).toBeVisible();
+});
