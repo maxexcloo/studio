@@ -13,6 +13,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import type { Action } from "./ActionBar";
 import { itemAction } from "./itemActions";
+import { useItemMutation } from "./useItemMutation";
 
 const statusQuery = (quality: UpscaleQuality) => ({
   queryKey: ["upscale-status", quality],
@@ -21,6 +22,22 @@ const statusQuery = (quality: UpscaleQuality) => ({
 
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
+/**
+ * Stop for an upscale queued or running on a finished item: it cancels the upscale's queue job, and
+ * the item keeps its original, marked Upscale Cancelled in Details.
+ */
+export function useStopUpscale(item: MediaItem) {
+  const cache = useQueryClient();
+  const cancel = useItemMutation(item.id, "stop-upscale", {
+    mutationFn: (jobId: string) => post(`/api/queue/${encodeURIComponent(jobId)}/cancel`),
+    onSuccess: () =>
+      void Promise.all(
+        ["queue", "session", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+      ),
+  });
+  const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
+  return jobId ? { isPending: cancel.isPending, stop: () => cancel.mutate(jobId) } : null;
+}
 type UpscaleTarget = NonNullable<UpscaleRequest["target"]>;
 /**
  * Upscale's menu runs with its remembered settings: quality (Balanced until chosen), size (Automatic
@@ -35,7 +52,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   // The menu keeps its settings in place while another quality's status loads.
   const status = useQuery({ ...statusQuery(quality), enabled, placeholderData: keepPreviousData });
   const target = status.data?.targets.includes(size as Exclude<UpscaleTarget, 0>) ? size : 0;
-  const queue = useMutation({
+  const queue = useItemMutation(item.id, "upscale", {
     mutationFn: (request: Omit<UpscaleRequest, "galleryItemId">) =>
       post<UpscaleResponse>("/api/upscale", {
         galleryItemId: item.id,
@@ -66,6 +83,36 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
   };
 }
 /**
+ * Upscale for a selection: each image runs with Upscale's remembered settings, as its own menu
+ * would run it, read for the first.
+ */
+export function useUpscaleMany(items: MediaItem[]) {
+  const settings = useQuickUpscale(
+    items[0] ?? ({ id: "", type: "image" } as MediaItem),
+    items.length > 0,
+  );
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      Promise.all(
+        items.map((item) =>
+          post<UpscaleResponse>("/api/upscale", {
+            galleryItemId: item.id,
+            quality: settings.quality,
+            target: settings.target,
+            faceDetail: settings.faceDetail,
+          } satisfies UpscaleRequest),
+        ),
+      ),
+    onSettled: () =>
+      void Promise.all(
+        ["gallery", "queue", "session", "sessions"].map((key) =>
+          cache.invalidateQueries({ queryKey: [key] }),
+        ),
+      ),
+  });
+}
+/**
  * The media actions' Upscale: Show Upscale and Compare Upscale once there is one, its remembered
  * settings, then the run (MediaActions.tsx places it). Why the worker can't run it shows above them.
  */
@@ -87,7 +134,7 @@ export function useUpscaleAction(
   // Phones compare an upscale above its original.
   const phone = usePhone();
   const cache = useQueryClient();
-  const version = useMutation({
+  const version = useItemMutation(item.id, "upscale-version", {
     mutationFn: (active: boolean) =>
       post<{ upscaleActive: boolean }>("/api/upscale/toggle", { galleryItemId: item.id, active }),
     onSuccess: (result) => {

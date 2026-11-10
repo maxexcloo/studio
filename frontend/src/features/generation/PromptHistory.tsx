@@ -189,15 +189,26 @@ export function usePromptHistory({
       onOpenedChange={setOpened}
       target={<span />}
       headerEnd={
-        <Switch
-          // Remounts once loaded so the saved state appears without the thumb sliding.
-          key={keep.history.data ? "loaded" : "loading"}
-          label="Save Recent Prompts"
-          labelPosition="left"
-          checked={keep.history.data?.enabled ?? false}
-          disabled={!keep.history.data}
-          onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-        />
+        <>
+          <Switch
+            // Remounts once loaded so the saved state appears without the thumb sliding.
+            key={keep.history.data ? "loaded" : "loading"}
+            label="Save Recent Prompts"
+            labelPosition="left"
+            checked={keep.history.data?.enabled ?? false}
+            disabled={!keep.history.data}
+            onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+          />
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label="Clear Recent"
+            disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
+            onClick={() => edit.mutate({ action: "clear" })}
+          >
+            Clear
+          </Button>
+        </>
       }
       footer={{
         start: (
@@ -207,15 +218,6 @@ export function usePromptHistory({
             onClick={() => pin(value, true)}
           >
             Pin Current Prompt
-          </Button>
-        ),
-        end: (
-          <Button
-            variant="default"
-            disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
-            onClick={() => edit.mutate({ action: "clear" })}
-          >
-            Clear Recent
           </Button>
         ),
       }}

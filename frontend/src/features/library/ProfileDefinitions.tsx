@@ -7,6 +7,7 @@ import {
   Group,
   Menu,
   Modal,
+  Popover,
   Select,
   Stack,
   Text,
@@ -20,6 +21,7 @@ import { copyText } from "../../ui/clipboard";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
+import { usePhone, useTouch } from "../../ui/usePhone";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import {
   DefinitionEditor,
@@ -196,10 +198,11 @@ function useDefinitions() {
     const id = guideIdOf(entry);
     return id && (guideNames.get(id) || id);
   };
-  const users = new Map<string, number>();
+  // Each guide's profiles, by name.
+  const users = new Map<string, string[]>();
   for (const entry of profiles) {
     const guide = guideIdOf(entry);
-    if (guide) users.set(guide, (users.get(guide) || 0) + 1);
+    if (guide) users.set(guide, [...(users.get(guide) || []), entry.name || entry.id]);
   }
   return { profileList, guideList, profiles, guides, guideOf, users };
 }
@@ -231,6 +234,7 @@ function rowMenu(edit: (editing: Editing) => void, kind: DefinitionKind, noun: s
 
 /** Library › Profiles: generation profiles under the section's toolbar; each keeps its saved versions. */
 export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
+  const phone = usePhone();
   const [profileQuery, setProfileQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -377,16 +381,18 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                         .filter(Boolean)
                         .join(" · ") || entry.id}
                     </Text>
-                    <Text size="xs" c="dimmed" hiddenFrom="sm">
-                      {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
-                    </Text>
+                    {phone && (
+                      <Text size="xs" c="dimmed">
+                        {guideOf(entry) ? `Guide: ${guideOf(entry)}` : "No Guide"}
+                      </Text>
+                    )}
                   </>
                 ),
               },
               {
                 key: "guide",
                 header: "Guide",
-                visibleFrom: "sm",
+                hideOnPhone: true,
                 sortValue: guideOf,
                 cell: (entry) => (
                   <Text size="sm" c={guideOf(entry) ? undefined : "dimmed"}>
@@ -403,7 +409,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               {
                 key: "use",
                 header: "Last 30 Days",
-                visibleFrom: "md",
+                hideOnPhone: true,
                 sortValue: (entry) => statsOf(entry.id)?.runs,
                 cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
               },
@@ -437,6 +443,54 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
         />
       )}
     </Stack>
+  );
+}
+
+/**
+ * A guide's profile count, which reveals their names in a popover: on hover where there is a
+ * pointer that hovers, and on tap or click everywhere.
+ */
+function UsedBy({ guide, profiles = [] }: { guide: string; profiles?: string[] }) {
+  const [opened, setOpened] = useState(false);
+  const touch = useTouch();
+  if (!profiles.length)
+    return (
+      <Text size="sm" c="dimmed">
+        No Profiles
+      </Text>
+    );
+  return (
+    <Popover opened={opened} onChange={setOpened} position="bottom-start" shadow="md">
+      <Popover.Target>
+        <Button
+          size="compact-sm"
+          variant="subtle"
+          color="gray"
+          rightSection={<ChevronDown size={12} />}
+          aria-expanded={opened}
+          // A hover has opened it already, so a click there keeps it open; a tap toggles it.
+          onClick={() => setOpened(touch ? !opened : true)}
+          // Focus stays on the count, so Escape closes the popover from here; the Library beneath
+          // stays open, as a layer was above it when the key went down.
+          onKeyDown={(event) => event.key === "Escape" && setOpened(false)}
+          {...(!touch && {
+            onMouseEnter: () => setOpened(true),
+            onMouseLeave: () => setOpened(false),
+          })}
+        >
+          {plural(profiles.length, "Profile")}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown aria-label={`Profiles Using ${guide}`} aria-labelledby="" p="sm" maw={320}>
+        <Stack gap={4}>
+          {[...profiles].sort().map((name) => (
+            <Text key={name} size="sm">
+              {name}
+            </Text>
+          ))}
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -496,14 +550,8 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
             {
               key: "profiles",
               header: "Used By",
-              sortValue: (entry) => users.get(entry.packId) || 0,
-              cell: (entry) => (
-                <Text size="sm" c={users.has(entry.packId) ? undefined : "dimmed"}>
-                  {users.has(entry.packId)
-                    ? plural(users.get(entry.packId)!, "Profile")
-                    : "No Profiles"}
-                </Text>
-              ),
+              sortValue: (entry) => users.get(entry.packId)?.length || 0,
+              cell: (entry) => <UsedBy guide={entry.name} profiles={users.get(entry.packId)} />,
             },
             {
               key: "version",

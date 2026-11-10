@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
+import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 
 test("a full-body or wide shot of a person counts; portraits and empty scenes do not", () => {
   for (const prompt of [
@@ -78,4 +78,17 @@ test("finished prompts pass as exact prompts", () => {
     "Variation in light across a mountain ridge",
   ])
     assert.equal(exactPromptInstructions(prompt), "", prompt);
+});
+
+test("a prompt list must hold distinct prompts and must not be broken JSON", () => {
+  const body = "slim woman, soft round face, freckles, mole under the near eye";
+  // A long shared description with one changed view still counts as distinct.
+  assert.equal(promptListProblem([`Front view, ${body}`, `Side view, ${body}`]), "");
+  assert.equal(promptListProblem(["[not a list] of lanterns"]), "");
+  assert.match(
+    promptListProblem([`A woman, ${body}.`, `${body}, a WOMAN`]),
+    /^prompts 1 and 2 have the same words.*raise count/,
+  );
+  // A list whose JSON broke (a stray token before the closing bracket) would run as one prompt.
+  assert.match(promptListProblem(['["A tree", "A flower"先后]']), /isn't valid JSON/);
 });

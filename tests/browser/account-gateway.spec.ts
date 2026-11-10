@@ -227,6 +227,12 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await expect(page.getByRole("textbox", { name: "Group ID", exact: true })).toHaveValue(
     "member-cloud",
   );
+  // Characters is on for a new group, like Chat and Dream, and each permission says what it covers.
+  const characters = page.getByRole("checkbox", { name: "Characters", exact: true });
+  await expect(characters).toBeChecked();
+  await expect(characters).toHaveAccessibleDescription(
+    "Character cards that add their images and description to a prompt",
+  );
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "LoRAs", exact: true }).check();

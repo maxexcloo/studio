@@ -3,7 +3,22 @@
    does, so the sheet itself never scrolls. A drag on the header is the sheet's own, to pull it
    closed. */
 .sheetHeader {
+  gap: var(--mantine-spacing-xs);
   touch-action: none;
+}
+
+.sheetHeading {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-width: 0;
+}
+
+/* A field in the heading, such as a name being saved, gives way before its buttons. */
+.sheetHeading button {
+  flex-shrink: 0;
 }
 
 .sheetBody {
@@ -24,6 +39,32 @@
   padding-top: var(--mantine-spacing-sm);
   padding-inline: var(--mantine-spacing-md);
   border-top: 1px solid var(--studio-glass-border);
+}
+
+/* A popup's aside: on desktop a column beside the rest, divided from it to the top, whose own
+   content never sets the popup's height; on phones a section under the content. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--mantine-spacing-md);
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  min-height: 0;
+}
+
+.columns > .aside {
+  contain: size;
+  padding-left: var(--mantine-spacing-md);
+  border-left: 1px solid var(--studio-glass-border);
+}
+
+.sheetBody > .aside {
+  flex-shrink: 0;
+  margin-top: var(--mantine-spacing-sm);
 }
 
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */

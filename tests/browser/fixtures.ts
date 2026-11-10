@@ -77,6 +77,10 @@ export async function fixtures(page: Page) {
   const messages: any[] = [];
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
+  const characters: any[] = [];
+  const outfits: any[] = [];
+  const scenes: any[] = [];
+  const cards = { characters, outfits, scenes };
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -99,7 +103,11 @@ export async function fixtures(page: Page) {
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
-      item: gallery.find((item) => item.jobId === jobId) || null,
+      item:
+        gallery.find(
+          (item) =>
+            item.jobId === jobId && (!comparison.itemIds || item.id === comparison.itemIds[index]),
+        ) || null,
     })),
   });
   function recordGeneration(body: any, sessionId: string) {
@@ -239,24 +247,6 @@ export async function fixtures(page: Page) {
         },
       });
     }
-    if (path === "/api/workers")
-      return respond({
-        source: "STUDIO_WORKERS",
-        workers: [
-          {
-            id: "primary",
-            name: "Image Worker",
-            url: "http://comfyui-image:8188",
-            capabilities: ["image", "upscale", "models"],
-          },
-          {
-            id: "video",
-            name: "Video Worker",
-            url: "http://comfyui-video:8188",
-            capabilities: ["video"],
-          },
-        ],
-      });
     if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {
       administration.accessProfiles = administration.accessProfiles.filter(
         (group) => group.id !== decodeURIComponent(path.split("/")[4]),
@@ -641,6 +631,22 @@ export async function fixtures(page: Page) {
       }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
+    // Compare Selected records chosen gallery images.
+    if (path === "/api/comparisons" && method === "POST") {
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed: "",
+        requests: body.itemIds.map((id: string) => ({
+          input: { prompt: gallery.find((item) => item.id === id)?.prompt },
+        })),
+        jobIds: body.jobIds,
+        itemIds: body.itemIds,
+        labels: body.jobIds.map((_: string, index: number) => `Variant ${"ABCD"[index]}`),
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(showComparison(comparison), 201);
+    }
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
       const sessionId = body.sessionId || "session-compare";
@@ -690,6 +696,14 @@ export async function fixtures(page: Page) {
           { value: "portrait", label: "Portrait" },
           { value: "square", label: "Square" },
         ],
+        // The caption tags in the fixture gallery, most used first.
+        tags: [
+          ...gallery
+            .flatMap((item) => item.caption?.tags || [])
+            .reduce((counts, tag) => counts.set(tag, (counts.get(tag) || 0) + 1), new Map()),
+        ]
+          .sort(([, a], [, b]) => b - a)
+          .map(([tag, count]) => ({ value: tag, label: tag, count })),
         chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
     if (path === "/api/gallery") {
@@ -699,9 +713,73 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
+          (!url.searchParams.has("chat") ||
+            url.searchParams.getAll("chat").includes(i.sessionId)) &&
+          (!url.searchParams.has("tag") ||
+            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
+      // Find Similar ranks the image first.
+      const similar = url.searchParams.get("similar");
+      if (similar) items.sort((a, b) => Number(b.id === similar) - Number(a.id === similar));
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
+    }
+    // Character, outfit and scene cards, their images shown as reference assets.
+    const cardKind = path.match(/^\/api\/(characters|outfits|scenes)\b/)?.[1] as
+      | "characters"
+      | "outfits"
+      | "scenes"
+      | undefined;
+    if (cardKind) {
+      const list = cards[cardKind];
+      const noun = cardKind.slice(0, -1);
+      const card = (fields: any, id: string) => ({
+        id,
+        name: fields.name,
+        description: fields.description,
+        referenceIds: fields.referenceIds,
+        references: fields.referenceIds.map((asset: string) => ({
+          id: asset,
+          name: "Character Image",
+          thumbnailUrl: image,
+          url: image,
+          width: 1024,
+          height: 1024,
+        })),
+        missing: 0,
+      });
+      const id = decodeURIComponent(path.split("/")[3] || "");
+      const index = list.findIndex((item) => item.id === id);
+      // Generate References' jobs, listed with their gallery results.
+      if (path.endsWith("/generated")) {
+        characters[index].generated = {
+          jobIds: body.jobIds,
+          at: stamp,
+          results: gallery
+            .filter((item) => body.jobIds.includes(item.jobId))
+            .map((item) => ({
+              galleryItemId: item.id,
+              jobId: item.jobId,
+              status: item.status,
+              thumbnailUrl: item.thumbnailUrl,
+              prompt: item.prompt,
+            })),
+        };
+        return respond({ ok: true, character: characters[index] });
+      }
+      if (method === "POST") {
+        list.push(card(body, `${noun}-${list.length + 1}`));
+        return respond({ ok: true, [noun]: list.at(-1) }, 201);
+      }
+      if (method === "PUT") {
+        list[index] = card(body, id);
+        return respond({ ok: true, [noun]: list[index] });
+      }
+      if (method === "DELETE") {
+        list.splice(index, 1);
+        return respond({ ok: true });
+      }
+      return respond({ [cardKind]: list });
     }
     if (method === "GET" && path.startsWith("/api/reference-assets/")) {
       const id = decodeURIComponent(path.split("/")[3]);
@@ -852,6 +930,9 @@ export async function fixtures(page: Page) {
     messages,
     chatRequests,
     referenceRequests,
+    characters,
+    outfits,
+    scenes,
     galleryRequests,
     loraLibrary,
     loraOperations,
@@ -997,8 +1078,27 @@ export async function promptOptions(scope: Page | Locator, box: string, label: s
   return page.getByRole("menu").last();
 }
 
+// The phone viewer bar's own actions; the rest sit under its ⋯ More.
+const phoneBar = [
+  "Retry",
+  "Stop",
+  "Stop Upscale",
+  "Animate",
+  "Extend",
+  "Edit",
+  "Upscale",
+  "Star",
+  "Unstar",
+];
+
+/** Runs a viewer bar action: on the bar, or an item of the phone bar's More. */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  if ((page.viewportSize()?.width || 1440) < 768 && !phoneBar.includes(label)) {
+    await viewer.getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
+    return;
+  }
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))
@@ -1092,7 +1192,7 @@ export async function closeReferences(page: Page) {
   await expect(references).toBeHidden();
 }
 
-/** Saves the draft as a named stack or preset from its picker's footer. */
+/** Saves the draft as a named stack or preset from its picker. */
 export async function saveCurrent(page: Page, noun: "Preset" | "Stack", name: string) {
   await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
   const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });
@@ -1259,6 +1359,11 @@ export async function serveDream(
       return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
+      if (method === "DELETE") {
+        const deleted = state.discarded.length;
+        state.discarded = [];
+        return route.fulfill({ json: { deleted } });
+      }
       const start = Number(url.searchParams.get("cursor") || 0);
       const limit = Number(url.searchParams.get("limit") || 40);
       return route.fulfill({

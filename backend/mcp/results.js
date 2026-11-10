@@ -26,7 +26,7 @@ export const shortPrompt = (prompt) => {
   ).replace(/[\\`*_[\]<>#|]/g, "\\$&");
 };
 
-export function registerResultTools({ tool, server, media, actor, resolve }) {
+export function registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds }) {
   const { owner, refs } = actor;
   tool(
     server,
@@ -208,7 +208,7 @@ export function registerResultTools({ tool, server, media, actor, resolve }) {
           { jobId: resolve(job_id), index: output_index },
           ...(compare_to ? [{ jobId: resolve(compare_to), index: 0 }] : []),
         ],
-        { scope: refs, signal },
+        { scope: refs, signal, waitSeconds: imageWaitSeconds },
       ),
     { readOnlyHint: true },
   );

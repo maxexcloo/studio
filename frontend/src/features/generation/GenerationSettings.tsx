@@ -7,7 +7,6 @@ import {
   Select,
   SimpleGrid,
   Stack,
-  Switch,
   Text,
   TextInput,
   Tooltip,
@@ -16,7 +15,6 @@ import { Dices } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { iconChipProps } from "./chip";
-import { useGeneration } from "./GenerationProvider";
 import { controlRange, stepsRange } from "./payload";
 import { ChipPopup } from "./Picker";
 
@@ -43,10 +41,6 @@ export function GenerationSettings({
   opened: boolean;
   onOpenedChange: (opened: boolean) => void;
 }) {
-  const { models } = useGeneration();
-  const workers = models.data?.workers || [];
-  const workerIds = profile?.workerIds || [];
-  const worker = workers.find((worker) => worker.id === input.workerId);
   const capabilities = profile?.capabilities || {};
   const video = input.kind === "video";
   const inpaint = input.inpaint as { strength?: number; feather?: number } | undefined;
@@ -221,44 +215,6 @@ export function GenerationSettings({
         ),
       },
     );
-  // Fallback belongs with the worker it falls back from, so it sorts with Worker.
-  if (workerIds.length > 1)
-    fields.push({
-      label: "Worker",
-      wide: true,
-      control: (
-        <Stack gap="sm">
-          <Select
-            label="Worker"
-            comboboxProps={nested}
-            description="Automatic runs on the first worker free for it; a picked worker is waited for."
-            data={[
-              { value: "", label: "Automatic" },
-              ...workerIds.map((id) => {
-                const worker = workers.find((worker) => worker.id === id);
-                return {
-                  value: id,
-                  label: worker
-                    ? `${worker.name} · ${worker.available ? "Available" : worker.parked ? "Stopped" : "Offline"}`
-                    : id,
-                };
-              }),
-            ]}
-            value={input.workerId || ""}
-            allowDeselect={false}
-            onChange={(workerId) => onChange({ workerId: workerId || undefined })}
-          />
-          {input.workerId && (
-            <Switch
-              label="Allow Fallback to Another Worker"
-              description="Studio waits for the selected worker unless you allow another."
-              checked={Boolean(input.allowFallback)}
-              onChange={(event) => onChange({ allowFallback: event.currentTarget.checked })}
-            />
-          )}
-        </Stack>
-      ),
-    });
   fields.sort((a, b) => a.label.localeCompare(b.label));
   const content = (
     <Stack gap="sm">
@@ -269,13 +225,8 @@ export function GenerationSettings({
           </Box>
         ))}
       </SimpleGrid>
-      {(worker?.gpuDevices?.length || profile?.provider) && (
+      {(profile?.provider || profile?.encoderBuiltIn) && (
         <Stack gap={2}>
-          {!!worker?.gpuDevices?.length && (
-            <Text size="xs" c="dimmed">
-              GPU placement: {worker.gpuDevices.join(", ")}
-            </Text>
-          )}
           {profile?.provider && (
             <Text size="xs" c="dimmed">
               Provider: {profile.provider === "cliproxyapi" ? "CLIProxyAPI" : profile.provider}

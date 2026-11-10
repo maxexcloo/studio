@@ -11,8 +11,9 @@ import {
   Stack,
   Switch,
   Text,
+  type PopoverProps,
 } from "@mantine/core";
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
@@ -35,6 +36,7 @@ import {
   PickerGrid,
   PickerHeader,
   PickerTile,
+  PopupHeading,
   SaveCurrent,
   SavedList,
   SortMenu,
@@ -116,21 +118,6 @@ export function useLoraPicker() {
   const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "recommended");
   const [sort, setSort] = useState<SavedSort>("name-asc");
   const [loraSort, setLoraSort] = useState<LoraSort>("rating");
-  const controlsId = useId();
-  const trigger = useRef<HTMLButtonElement>(null);
-  const controls = useRef<HTMLDivElement>(null);
-  const wasOpened = useRef(false);
-  useLayoutEffect(() => {
-    if (
-      wasOpened.current &&
-      !opened &&
-      (document.activeElement === document.body ||
-        controls.current?.contains(document.activeElement))
-    ) {
-      trigger.current?.focus({ preventScroll: true });
-    }
-    wasOpened.current = opened;
-  }, [opened]);
   return {
     opened,
     setOpened,
@@ -144,9 +131,6 @@ export function useLoraPicker() {
     setSort,
     loraSort,
     setLoraSort,
-    controlsId,
-    trigger,
-    controls,
   };
 }
 export type LoraPickerState = ReturnType<typeof useLoraPicker>;
@@ -154,12 +138,12 @@ interface LoraPickerProps {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
+  /** Where the desktop popup opens: above the composer's rail by default. */
+  position?: PopoverProps["position"];
 }
-export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
+export function LoraPicker({ value, onChange, picker, position = "top-end" }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
-  const clear = () =>
-    onChange ? onChange({ ...input, loras: [] }) : context.update({ loras: [] });
   // The picker's data loads with the chip, so its first frame is final.
   const info = useQuery(loraInfoQuery);
   useQuery(loraLibraryQuery);
@@ -171,11 +155,9 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   };
   const trigger = (
     <Button
-      ref={picker.trigger}
       {...chipProps}
       aria-label="Choose LoRAs"
       aria-expanded={picker.opened}
-      aria-controls={picker.controlsId}
       rightSection={<ChevronDown size={14} />}
       onPointerEnter={warm}
       onFocus={warm}
@@ -196,31 +178,15 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   return (
     <ChipPopup
       title="LoRAs"
-      position="top-end"
+      position={position}
       width="min(46rem, calc(100vw - 2rem))"
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}
-      footer={{
-        end: (
-          <Button variant="default" disabled={!input.loras.length} onClick={clear}>
-            Clear LoRAs
-          </Button>
-        ),
-        apply: true,
-      }}
+      footer={{ apply: true }}
+      aside={<LoraStack value={value} onChange={onChange} picker={picker} />}
     >
-      <Stack
-        role="region"
-        id={picker.controlsId}
-        ref={picker.controls}
-        aria-label="LoRA Controls"
-        gap="sm"
-        flex={1}
-        mih={0}
-      >
-        <LoraControls value={value} onChange={onChange} picker={picker} />
-      </Stack>
+      <LoraChoices value={value} onChange={onChange} picker={picker} />
     </ChipPopup>
   );
 }
@@ -279,16 +245,8 @@ export function LoraThumbs({ file, title }: { file: string; title: string }) {
   );
 }
 
-function LoraControls({
-  value,
-  onChange,
-  picker,
-}: {
-  value?: GenerationInput;
-  onChange?: (input: GenerationInput) => void;
-  picker: LoraPickerState;
-}) {
-  const phone = usePhone();
+/** The draft, profile and catalogue the LoRA choices and stack share. */
+function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   const context = useGeneration();
   const input = value || context.input;
   const profile = value
@@ -297,16 +255,32 @@ function LoraControls({
   const update = (loras: Lora[]) =>
     onChange ? onChange({ ...input, loras }) : context.update({ loras });
   const info = useQuery(loraInfoQuery);
+  const metadata = info.data?.loras || {};
+  const title = (file: string) => loraTitle(metadata[file], file);
+  return {
+    input,
+    profile,
+    update,
+    info,
+    metadata,
+    title,
+    compatible: compatibleLoras(profile, metadata),
+  };
+}
+
+/** The LoRAs to choose from: tabs, search, sort and filter over the list. */
+function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
+  const phone = usePhone();
+  const { input, profile, update, info, metadata, title, compatible } = useLoraDraft({
+    value,
+    onChange,
+  });
   const library = useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
-  const metadata = info.data?.loras || {};
   const family = profile?.family || "";
-  const stacks = useLoraStacks(family);
-  const title = (file: string) => loraTitle(metadata[file], file);
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
   const available = profile?.options?.loras || [];
-  const compatible = compatibleLoras(profile, metadata);
   const ratings = library.data?.library.ratings || {};
   // A tab remembered from before Stacks left the tabs shows Recommended.
   const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "recommended";
@@ -349,7 +323,6 @@ function LoraControls({
             },
           ],
     );
-  const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   const empty =
     terms || filter !== "all"
       ? "No Matches"
@@ -425,108 +398,130 @@ function LoraControls({
       }
     />
   );
-  const stack = (
+  // Phones list the choices in a fixed-height pane above the stack, so adding one never moves them.
+  return (
+    <div className={classes.choices}>
+      {header}
+      {state ? (
+        <Stack h={phone ? "45dvh" : undefined} flex={1} mih={0}>
+          {state}
+        </Stack>
+      ) : (
+        <ScrollArea h={phone ? "45dvh" : undefined} flex={1}>
+          {choices}
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
+/** The chosen LoRAs in order, with Clear and Save Stack beside their heading, then saved stacks. */
+function LoraStack({ value, onChange, picker }: LoraPickerProps) {
+  const { input, profile, update, metadata, title, compatible } = useLoraDraft({
+    value,
+    onChange,
+  });
+  const stacks = useLoraStacks(profile?.family || "");
+  const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
+  return (
     <>
-      <Group justify="space-between" gap="xs">
-        <Group gap="xs">
-          <Text size="sm" fw={600}>
-            Stack
-          </Text>
-          {!!profile?.maxLoras && (
+      <PopupHeading
+        title="Stack"
+        detail={
+          !!profile?.maxLoras && (
             <Text size="xs" c={enabledCount > profile.maxLoras ? "yellow" : "dimmed"}>
               {enabledCount} of {profile.maxLoras} Enabled
             </Text>
-          )}
-        </Group>
-        <SaveCurrent
-          noun="Stack"
-          disabled={!input.loras.length || !stacks.ready}
-          onSave={(name) => stacks.save(name, input.loras)}
-        />
-      </Group>
-      {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
-        <Text size="xs" c="yellow">
-          This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the extras.
-        </Text>
-      )}
-      {input.loras.length ? (
-        <OrderedItems
-          kind="loras"
-          items={input.loras}
-          identity={(lora) => lora.name}
-          label={(lora) => title(lora.name)}
-          onChange={update}
-        >
-          {(lora) => (
-            <StackEntry
-              lora={lora}
-              title={title(lora.name)}
-              info={metadata[lora.name]}
-              compatible={compatible.includes(lora.name)}
-              onChange={(patch) =>
-                update(
-                  input.loras.map((item) =>
-                    item.name === lora.name ? { ...item, ...patch } : item,
-                  ),
-                )
-              }
-              onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
+          )
+        }
+        actions={
+          <>
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              aria-label="Clear LoRAs"
+              disabled={!input.loras.length}
+              onClick={() => update([])}
+            >
+              Clear
+            </Button>
+            <SaveCurrent
+              noun="Stack"
+              compact
+              disabled={!input.loras.length || !stacks.ready}
+              onSave={(name) => stacks.save(name, input.loras)}
             />
-          )}
-        </OrderedItems>
-      ) : (
-        <Text size="sm" c="dimmed">
-          Choose LoRAs or a saved stack.
-        </Text>
-      )}
-      {!!stacks.records.length && (
-        <>
-          <Group justify="space-between" gap="xs" mt="xs">
-            <Text size="sm" fw={600}>
-              Saved Stacks
+          </>
+        }
+      />
+      <ScrollArea className={classes.stack}>
+        <Stack gap="xs">
+          {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
+            <Text size="xs" c="yellow">
+              This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the
+              extras.
             </Text>
-            <SortMenu
-              label="Sort Stacks"
-              labels={savedSortLabels}
-              value={picker.sort}
-              onChange={picker.setSort}
-            />
-          </Group>
-          <SavedList
-            label="Saved LoRA Stacks"
-            noun="Stack"
-            items={savedItems(stacks.records, "", picker.sort)}
-            empty="No Saved Stacks"
-            replaces={input.loras.length > 0}
-            replaceMessage="Replace the current LoRAs with this stack?"
-            onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
-            onRename={stacks.rename}
-            onUpdate={(record) => stacks.update(record, input.loras)}
-            onDelete={stacks.remove}
-          />
-        </>
-      )}
-    </>
-  );
-  // Phones list the choices in a fixed-height pane above the stack, so adding one never moves them.
-  if (phone)
-    return (
-      <>
-        {header}
-        {state ? <Stack h="45dvh">{state}</Stack> : <ScrollArea h="45dvh">{choices}</ScrollArea>}
-        <Stack gap="xs">{stack}</Stack>
-      </>
-    );
-  return (
-    <div className={classes.panel}>
-      <div className={classes.column}>
-        {header}
-        {state || <ScrollArea flex={1}>{choices}</ScrollArea>}
-      </div>
-      <ScrollArea className={`${classes.column} ${classes.stackColumn}`}>
-        <Stack gap="xs">{stack}</Stack>
+          )}
+          {input.loras.length ? (
+            <OrderedItems
+              kind="loras"
+              items={input.loras}
+              identity={(lora) => lora.name}
+              label={(lora) => title(lora.name)}
+              onChange={update}
+            >
+              {(lora) => (
+                <StackEntry
+                  lora={lora}
+                  title={title(lora.name)}
+                  info={metadata[lora.name]}
+                  compatible={compatible.includes(lora.name)}
+                  onChange={(patch) =>
+                    update(
+                      input.loras.map((item) =>
+                        item.name === lora.name ? { ...item, ...patch } : item,
+                      ),
+                    )
+                  }
+                  onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
+                />
+              )}
+            </OrderedItems>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Choose LoRAs or a saved stack.
+            </Text>
+          )}
+          {!!stacks.records.length && (
+            <>
+              <Group justify="space-between" gap="xs" mt="xs">
+                <Text size="sm" fw={600}>
+                  Saved Stacks
+                </Text>
+                <SortMenu
+                  label="Sort Stacks"
+                  labels={savedSortLabels}
+                  value={picker.sort}
+                  onChange={picker.setSort}
+                />
+              </Group>
+              <SavedList
+                label="Saved LoRA Stacks"
+                noun="Stack"
+                items={savedItems(stacks.records, "", picker.sort)}
+                empty="No Saved Stacks"
+                replaces={input.loras.length > 0}
+                replaceMessage="Replace the current LoRAs with this stack?"
+                onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
+                onRename={stacks.rename}
+                onUpdate={(record) => stacks.update(record, input.loras)}
+                onDelete={stacks.remove}
+              />
+            </>
+          )}
+        </Stack>
       </ScrollArea>
-    </div>
+    </>
   );
 }
 

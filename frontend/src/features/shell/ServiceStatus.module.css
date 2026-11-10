@@ -21,29 +21,6 @@
   overflow-y: auto;
   touch-action: pan-y;
 }
-/* The status block sits above a link covering it; its own buttons (Start) stay on top. Its
-   padding reaches out past the rows, so their text lines up with the heading and queue above. */
-.status {
-  position: relative;
-  margin-inline: calc(-1 * var(--mantine-spacing-xs));
-  padding: 4px var(--mantine-spacing-xs);
-  border-radius: var(--mantine-radius-md);
-}
-.status:has(.statusLink:hover) {
-  background: var(--mantine-color-default-hover);
-}
-.status button {
-  position: relative;
-  z-index: 1;
-}
-.statusLink {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-.statusLink:focus-visible {
-  outline: 2px solid var(--mantine-primary-color-filled);
-}
 /* The desktop dropdown sizes the list to its rows, bounded above the service summary, with even
    gaps around the divider; an empty queue keeps a small minimum height with Empty Queue centred. */
 .dropdown {

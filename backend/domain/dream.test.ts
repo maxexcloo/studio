@@ -114,6 +114,11 @@ function fixture(t: TestContext, catalogue = profiles) {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
     },
+    remove: (ownerId, itemIds) => {
+      state.items = state.items.filter(
+        (item) => item.ownerId !== ownerId || !itemIds.includes(String(item.id)),
+      );
+    },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
     // As the LoRA policy would: klein.safetensors is for another model family.
     fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
@@ -252,7 +257,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
   assert.equal(job.input.kind, "image");
   assert.equal(job.input.profileId, "flux");
   assert.equal(job.input.prompt, "dream 1");
-  assert.equal(job.input.allowFallback, false);
   // The title written with the prompt goes to the result (gallery/store.js).
   assert.equal((job.input.writing as { title?: string }).title, "Fox Dream 1");
   assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {
@@ -620,28 +624,34 @@ test("starring an unseen, finished Dream result keeps it", (t) => {
   );
 });
 
-test("Dream keeps every discard, most recently discarded first", (t) => {
+test("Dream deletes discards after 30 days, and Delete All deletes an account's others", async (t) => {
   const { dream, state } = fixture(t);
-  const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString();
-  for (let index = 0; index < 600; index++)
-    state.items.push({
-      id: `old-${index}`,
-      ownerId: "alice",
-      type: "image",
-      status: "done",
-      dream: { prompt: "p", why: "", at: at(0), state: "discarded", decidedAt: at(index) },
-    });
-  state.items.push({
-    id: "fresh",
-    jobId: "job-fresh",
-    ownerId: "alice",
+  const daysAgo = (days: number) => new Date(state.clock - days * 86_400_000).toISOString();
+  const item = (id: string, ownerId: string, days: number, mark: "discarded" | "kept") => ({
+    id,
+    ownerId,
     type: "image",
     status: "done",
-    dream: { prompt: "p", why: "", at: at(0), state: "unseen" },
+    dream: { prompt: "p", why: "", at: daysAgo(days), state: mark, decidedAt: daysAgo(days) },
   });
-  dream.discard("alice", "fresh");
-  assert.equal(dream.discarded("alice").length, 601);
-  assert.equal(dream.discarded("alice")[0].id, "fresh");
+  state.items.push(
+    item("old", "alice", 31, "discarded"),
+    item("recent", "alice", 2, "discarded"),
+    item("older", "alice", 1, "discarded"),
+    item("kept", "alice", 90, "kept"),
+    item("bob-old", "bob", 40, "discarded"),
+    item("bob-recent", "bob", 1, "discarded"),
+  );
+  await dream.tick();
+  const ids = () => state.items.map((entry) => entry.id);
+  assert.deepEqual(ids(), ["recent", "older", "kept", "bob-recent"]);
+  assert.deepEqual(
+    dream.discarded("alice").map((entry) => entry.id),
+    ["older", "recent"],
+  );
+  const request = await serve(t, dream);
+  assert.deepEqual((await request("/discarded", {}, "DELETE")).body, { deleted: 2 });
+  assert.deepEqual(ids(), ["kept", "bob-recent"]);
 });
 
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {

@@ -192,7 +192,6 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
                   input: {
                     ...inputForProfile(previous.input, profile),
                     ...fit.settings,
-                    workerId: input.workerId,
                     prompt: preset.prompt,
                     negative: profile.capabilities.negativePrompt === false ? "" : preset.negative,
                     referenceAssets: [],

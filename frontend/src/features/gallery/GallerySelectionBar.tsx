@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { Shuffle } from "lucide-react";
 import { icons } from "../../ui/icons";
-import { failure } from "../../api";
+import { failure, post } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, withMore } from "./ActionBar";
 import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { itemAction, itemActionGroups } from "./itemActions";
@@ -15,12 +16,16 @@ import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
+import { useUpscaleMany } from "./UpscaleControls";
+import { animateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
-// Phones keep what acts on several items on the bar, in this order, and the rest under More.
+// Compare Selected sets out up to four images side by side, one per number key.
+const compareLimit = 4;
+// Phones keep what acts on several items on the bar and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
@@ -64,6 +69,37 @@ export function GallerySelectionBar({
   const favorites = useFavorites();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
+  // A set or run is animated or upscaled as a whole (Runs' Select Set).
+  const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
+  const upscale = useUpscaleMany(finishedImages);
+  const iterate = useIterate();
+  const animate = useMutation({
+    mutationFn: async (theme: AnimateTheme) => {
+      for (const item of finishedImages) await iterate(item, { kind: "animate", theme });
+    },
+  });
+  // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
+  // comparison votes per run.
+  const navigate = useNavigate();
+  const images =
+    selected.length >= 2 &&
+    selected.length <= compareLimit &&
+    selected.every((item) => item.type === "image" && item.status === "done");
+  const comparable =
+    images &&
+    selected.every((item) => item.jobId) &&
+    new Set(selected.map((item) => item.jobId)).size === selected.length;
+  const compare = useMutation({
+    mutationFn: () =>
+      post<{ id: string }>("/api/comparisons", {
+        jobIds: selected.map((item) => item.jobId),
+        itemIds: selected.map((item) => item.id),
+      }),
+    onSuccess: (comparison) => {
+      selection.end();
+      navigate(`/compare/${comparison.id}`);
+    },
+  });
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
   const shareKey = ready.map((item) => item.id).join("\n");
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
@@ -133,6 +169,27 @@ export function GallerySelectionBar({
           ],
         ],
       }),
+    finishedImages.length > 0 &&
+      itemAction("animate", {
+        loading: animate.isPending,
+        menu: [
+          (Object.keys(animateThemes) as AnimateTheme[])
+            .filter((theme) => theme !== "custom")
+            .map((theme) => ({
+              id: `animate-${theme}`,
+              label: animateThemes[theme],
+              icon: icons.animate,
+              disabled: animate.isPending,
+              onClick: () => animate.mutate(theme),
+            })),
+        ],
+      }),
+    finishedImages.length > 0 &&
+      itemAction("upscale", {
+        loading: upscale.isPending,
+        disabled: upscale.isPending,
+        onClick: () => upscale.mutate(),
+      }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
         disabled: pending || !failed.length,
@@ -144,6 +201,12 @@ export function GallerySelectionBar({
         disabled: pending || !runningJobs.length,
         loading: busy === "stop",
         onClick: () => void stopSelected(),
+      }),
+    images &&
+      itemAction("compare", {
+        disabled: !comparable || compare.isPending || pending,
+        loading: compare.isPending,
+        onClick: () => compare.mutate(),
       }),
     // Phones that share natively share instead of downloading.
     phone && typeof navigator.share === "function"
@@ -216,18 +279,8 @@ export function GallerySelectionBar({
         selection.select((item) => ids.has(item.id));
       },
     }));
-  const primary = primaryIds.flatMap((id) => actions.flat().filter((action) => action.id === id));
-  const more = actions.map((group) => group.filter((action) => !primaryIds.includes(action.id)));
   const bar = phone ? (
-    <ActionBarGroups
-      groups={[
-        // More shows only while it has something to list.
-        more.some((group) => group.length)
-          ? [...primary, { id: "more", label: "More", icon: icons.more, menu: more }]
-          : primary,
-      ]}
-      menuPosition="top-end"
-    />
+    <ActionBarGroups groups={[withMore(actions, primaryIds).flat()]} menuPosition="top-end" />
   ) : (
     <ActionBarGroups groups={actions} menuPosition="bottom-end" />
   );

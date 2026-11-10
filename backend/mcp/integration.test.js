@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { characterShots, composePrompt, withCharacter } from "../../shared/characters.ts";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -339,6 +340,15 @@ async function fixture(
     res.json({ asset: assets.get(req.params.id) }),
   );
   app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
+  // The account's character cards (backend/cards.js), set by a test.
+  const characters = [];
+  const outfits = [];
+  app.get("/api/characters", (_req, res) => res.json({ characters }));
+  app.get("/api/outfits", (_req, res) => res.json({ outfits }));
+  app.post("/api/characters/:id/generated", (req, res) => {
+    characters.find((card) => card.id === req.params.id).generated = req.body;
+    res.json({ ok: true });
+  });
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -403,6 +413,8 @@ async function fixture(
   return {
     app,
     assets,
+    characters,
+    outfits,
     uploads,
     base,
     mcp,
@@ -931,7 +943,16 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(media.getInstructions(), /Studio runs them exactly as written/);
   assert.match(
     media.getInstructions(),
-    /"N sets of K" is N distinct prompts with count K in one call/,
+    /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
+  );
+  // A chat keeps the user's own description and their no-LoRAs choice from turn to turn.
+  assert.match(
+    media.getInstructions(),
+    /own descriptions .* word for word, changing only what they ask/,
+  );
+  assert.match(
+    media.getInstructions(),
+    /if the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
   );
   assert.match(
     media.getInstructions(),
@@ -985,8 +1006,10 @@ test("media and administrator credentials discover only their own friendly tools
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters.
-    JSON.stringify(tools).length + media.getInstructions().length < 15200,
+    // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
+    // generate's character, to 15,700 for its character_views and to 16,000 for its shots (Studio
+    // writes a character's shots so the wording never drifts).
+    JSON.stringify(tools).length + media.getInstructions().length < 16000,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1404,6 +1427,44 @@ test("Generate accepts prompts sent as one JSON string", async (t) => {
     f.submitted.map((body) => body.prompt),
     ["A tree", "A flower"],
   );
+  // Broken JSON or repeated prompts are refused rather than run as one image or the same image twice.
+  for (const [prompts, refusal] of [
+    ['["A tree", "A flower"先后]', /isn't valid JSON/],
+    [["A tree", "a tree."], /^prompts 1 and 2 have the same words/],
+  ])
+    assert.match(texts(await call(client, "generate", { kind: "image", prompts })), refusal);
+  assert.equal(f.submitted.length, 2);
+});
+
+test("a call of several results is one titled set, each prompt titled by the chat or left to its prompt", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  await generate(client, {
+    title: "Variety Test",
+    titles: ["Fox Wizard"],
+    prompts: ["A fox wizard", "An owl at night"],
+    count: 2,
+  });
+  const sets = f.submitted.map((body) => body.resultSet);
+  assert.deepEqual(
+    sets.map(({ id: _id, ...set }) => set),
+    [
+      {
+        title: "Variety Test",
+        source: "studio-integration-fixture",
+        index: 0,
+        variation: "Fox Wizard",
+      },
+      { title: "Variety Test", source: "studio-integration-fixture", index: 1 },
+    ],
+  );
+  assert.equal(sets[0].id, sets[1].id);
+  // Without a title the set is named from the request; one result alone is no set.
+  await generate(client, { request: "owls in the snow please", prompts: ["An owl", "Two owls"] });
+  assert.equal(f.submitted.at(-1).resultSet.title, "Owls in the snow please");
+  assert.notEqual(f.submitted.at(-1).resultSet.id, sets[0].id);
+  await generate(client, { title: "Alone", prompts: ["A lone tree"] });
+  assert.equal(f.submitted.at(-1).resultSet, undefined);
 });
 
 test("partial queue failures retain successful owned jobs without retrying the submission", async (t) => {
@@ -1487,6 +1548,137 @@ test("uploaded references belong to their uploader and map to declared profile s
   assert.deepEqual(f.submitted[0].loras, [
     { name: "fixture-effect.safetensors", strength: -0.5, enabled: true },
   ]);
+});
+
+test("models lists the account's characters, and generate applies one by name: its first image goes in and its lead starts each prompt", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  const uploaded = data(
+    await call(client, "upload", { content_base64: png.toString("base64"), filename: "mara.png" }),
+  );
+  const assetId = uploaded.asset?.id || uploaded.id || uploaded.asset_id;
+  f.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red-haired ranger, green cloak",
+    referenceIds: [assetId, "side-view"],
+    references: [{ id: assetId }, { id: "side-view" }],
+  });
+  assert.deepEqual(data(await call(client, "models")).characters, [
+    { id: "chr-mara", name: "Mara", description: "red-haired ranger, green cloak", images: 2 },
+  ]);
+  // Identity lock: the named fixture profile starts from a reference (img2img), so it can't hold
+  // Mara's face and the call is refused, saying how to go on.
+  const forest = { profile_id: imageProfile.id, prompts: ["Walking through a misty forest"] };
+  const refused = await call(client, "generate", { ...forest, character: "mara" });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /can't hold Mara's face.*any_model: true/);
+  assert.equal(f.submitted.length, 0);
+  // When the user insists, the card's image stays out (its pose and layout would carry over), its
+  // description leads verbatim, and the reply warns.
+  const reply = await call(client, "generate", {
+    ...forest,
+    character: "mara",
+    any_model: true,
+  });
+  assert.notEqual(reply.isError, true);
+  assert.deepEqual(f.submitted[0].referenceAssets, []);
+  assert.equal(
+    f.submitted[0].prompt,
+    withCharacter("Walking through a misty forest", "red-haired ranger, green cloak", false),
+  );
+  assert.match(
+    reply.content[0].text,
+    /can't take Mara's image as a reference, so only the description carries the character/,
+  );
+  await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // Generate References: Studio writes one prompt per view, on one seed. On an img2img model the
+  // views come from the description alone, so the card's pose doesn't carry into every view.
+  const views = async () => {
+    const before = f.submitted.length;
+    const reply = await call(client, "generate", { character: "Mara", character_views: true });
+    assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
+    return { reply, queued: f.submitted.slice(before) };
+  };
+  const alone = await views();
+  assert.deepEqual(
+    alone.queued.map((job) => job.prompt),
+    characterShots("red-haired ranger, green cloak", false),
+  );
+  assert.equal(new Set(alone.queued.map((job) => job.seed)).size, 1);
+  assert.ok(alone.queued.every((job) => !job.referenceAssets.length));
+  assert.match(alone.reply.content[0].text, /from Mara's description alone/);
+  assert.equal(f.characters[0].generated.jobIds.length, 4);
+  assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
+  // Models that edit with references take the card's image for the views and new scenes, a family
+  // that keeps characters before any other.
+  const editor = (id, extra) => ({
+    ...structuredClone(imageProfile),
+    id,
+    label: id,
+    editReferences: true,
+    ...extra,
+  });
+  await f.profiles([
+    structuredClone(imageProfile),
+    editor("editor"),
+    editor("keeper", { keepsCharacters: true }),
+  ]);
+  const edited = await views();
+  assert.deepEqual(
+    edited.queued.map((job) => job.prompt),
+    characterShots("red-haired ranger, green cloak", true),
+  );
+  assert.ok(
+    edited.queued.every(
+      (job) => job.profileId === "keeper" && job.referenceAssets[0]?.assetId === assetId,
+    ),
+  );
+  // Without a named model a scene goes to it with only the card's first image: a second view of
+  // one person is drawn as a second person.
+  const before = f.submitted.length;
+  await call(client, "generate", { prompts: ["At the harbour"], character: "Mara" });
+  assert.equal(f.submitted[before].profileId, "keeper");
+  assert.deepEqual(f.submitted[before].referenceAssets, [{ slot: "reference", assetId }]);
+  assert.equal(
+    f.submitted[before].prompt,
+    withCharacter("At the harbour", "red-haired ranger, green cloak"),
+  );
+  // Shots: Studio writes each prompt itself, an outfit card by name giving its own description and
+  // other words staying as they are; models lists the cards.
+  f.outfits.push({
+    id: "out-1",
+    name: "Raincoat",
+    description: "a yellow raincoat and black boots",
+  });
+  assert.deepEqual(data(await call(client, "models")).outfits, [
+    { id: "out-1", name: "Raincoat", description: "a yellow raincoat and black boots" },
+  ]);
+  const shot = { scene: "a rainy street at night", action: "walking", camera: "full-length shot" };
+  const shots = await call(client, "generate", {
+    character: "Mara",
+    shots: [
+      { ...shot, outfit: "raincoat" },
+      { ...shot, outfit: "a green gown" },
+    ],
+  });
+  assert.notEqual(shots.isError, true, shots.content?.[0]?.text);
+  const description = "red-haired ranger, green cloak";
+  assert.deepEqual(
+    f.submitted.slice(-2).map((job) => [job.profileId, job.prompt]),
+    [
+      [
+        "keeper",
+        composePrompt({
+          character: description,
+          ...shot,
+          outfit: "a yellow raincoat and black boots",
+        }),
+      ],
+      ["keeper", composePrompt({ character: description, ...shot, outfit: "a green gown" })],
+    ],
+  );
+  await failure(client, "generate", { prompts: ["A tree"], shots: [shot] });
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
@@ -2546,7 +2738,9 @@ test("a client without a conversation header gets its MCP session's own result n
   const allPage = async (reply) => {
     const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
     return [
-      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(Result \d+)<\/h2>/g),
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(
+        /<h2>(Result \d+) · [^<]+<\/h2>/g,
+      ),
     ].map((match) => match[1]);
   };
   assert.deepEqual(await allPage(other), ["Result 1"]);
@@ -3423,9 +3617,17 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     "reads the cached catalogue at most once and needs no Models call",
   );
   // mode reference returns a reference asset for Generate, and a rerun keeps a result's references.
-  await failure(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" });
-  const { asset } = data(await call(client, "reuse", { job_id: "result 1", mode: "reference" }));
+  // Arguments a reference doesn't use are named back, not refused.
+  const extras = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" }),
+  );
+  assert.match(extras.asset.id, /^fixture-asset-/);
+  assert.match(extras.note, /^Ignored request: mode reference takes only job_id and output_index/);
+  const { asset, note } = data(
+    await call(client, "reuse", { job_id: "result 1", mode: "reference" }),
+  );
   assert.match(asset.id, /^fixture-asset-/);
+  assert.equal(note, undefined);
   const edit = data(
     await call(client, "generate", {
       kind: "image",
@@ -4341,10 +4543,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
-  assert.match(
-    generate.description,
-    /"4 sets of 2" is 4 distinct prompts with count 2; at most 10 images per call\./,
-  );
+  assert.match(generate.description, /at most 10 images per call\./);
   assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
@@ -4556,6 +4755,8 @@ test('replies label links Result N with one All Results page, and Result "all" s
   const queued = await call(client, "generate", {
     kind: "image",
     prompts: ["A bear", "A fox", "An owl"],
+    title: "Woodland",
+    titles: ["Bear Hug"],
   });
   const text = texts(queued);
   assert.equal(/Watch/i.test(text), false, "no Watch wording");
@@ -4576,14 +4777,42 @@ test('replies label links Result N with one All Results page, and Result "all" s
     outputs: [{ url: "/comfy/view?filename=bear.png" }],
   });
   html = await (await fetch(page)).text();
-  assert.match(html, /<h2>Result 1<\/h2><figure><a href="[A-Za-z0-9]{10}"><img/);
+  // One call's results sit under its set title, each under its own or its prompt's.
+  assert.match(
+    html,
+    /<h2>Woodland<\/h2><h3>Result 1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
+  );
+  assert.match(html, /<h3>Result 2 · A fox<\/h3>/);
+  assert.equal(html.match(/<h2>/g).length, 1);
   assert.equal(html.match(/Still generating/g).length, 2);
+  // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
+  assert.match(html, /<title>Woodland<\/title>.*<h1>Woodland<\/h1>/);
+  assert.match(html, /<details class="prompt"><summary>Prompt<\/summary><p>A bear<\/p><\/details>/);
+  assert.match(
+    await (await fetch(localLink(f, first.link))).text(),
+    /<title>Woodland › Bear Hug<\/title>.*<h1>Woodland › Bear Hug<\/h1>/,
+  );
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
   // "show me all": one call returns every finished result under its header, plus links for the rest.
   Object.assign(f.jobs.get(second.job_id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=fox.png" }],
   });
+  // Each finished result opens large in a viewer that flips through them in place, without script.
+  html = await (await fetch(page)).text();
+  assert.match(
+    html,
+    /<figure id="result-1"><a href="#view-1" aria-label="Open Woodland › Bear Hug Large">/,
+  );
+  assert.match(
+    html,
+    /<section class="slide" id="view-1" tabindex="-1" aria-label="Woodland › Bear Hug \(1 of 2\)">.*?<a href="#result-1">Close<\/a>.*?<a class="step next" href="#view-2" aria-label="Next Result">/,
+  );
+  assert.match(
+    html,
+    /id="view-2"[^>]*aria-label="Woodland › A fox \(2 of 2\)">.*?href="#view-1" aria-label="Previous Result"/,
+  );
+  assert.doesNotMatch(html, /<script/);
   const shown = await call(client, "result", { job_id: "all" });
   const body = texts(shown);
   assert.match(
@@ -4873,6 +5102,27 @@ test("Review does not poll or download a pending result, and refuses video", asy
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /still images/);
   assert.equal(f.downloads.length, 0);
+});
+
+test("Review waits for a result due within the wait, and says plainly when one isn't ready", async (t) => {
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 5 * 60_000 });
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  // Due in five minutes: no wait, and the reply says there is nothing to review yet, with its link.
+  let started = performance.now();
+  const early = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 2000, "doesn't wait for a result minutes away");
+  assert.match(
+    texts(early),
+    /^Result 1 is still running, so there is no image to review yet\..*\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
+  );
+  // Due in a moment, as when the user asks right after a result renders: review waits and sees it.
+  f.jobs.get(id).progress = { endsAt: Date.now() + 300 };
+  setTimeout(() => finish(f), 300);
+  started = performance.now();
+  const later = await call(client, "review", { job_id: "result 1" });
+  assert.ok(performance.now() - started < 5000, "returns once the result finishes");
+  assert.equal(later.content.filter((item) => item.type === "image").length, 1);
 });
 
 test("Reuse preserves the seed for a requested revision only, and refuses an unknown seed or changed profile", async (t) => {
@@ -5489,7 +5739,6 @@ test("an ordinary request never upscales, even for best quality or a profile def
     generate.description,
     /upscale_quality only when the user asks to upscale or enlarge/,
   );
-  assert.match(client.getInstructions(), /upscale only when the user asks to upscale or enlarge/);
 });
 
 test("request and prompts together run the prompts and keep the request as context", async (t) => {
@@ -5524,6 +5773,11 @@ test("request and prompts together run the prompts and keep the request as conte
   );
   const missing = await call(client, "generate", { kind: "image" });
   assert.match(texts(missing), /^Write the finished prompts yourself/);
+  // An empty call (a host that cancelled its arguments) is told what to send.
+  assert.match(
+    texts(await call(client, "generate", {})),
+    /as prompts, an array of strings.*\(this call had no arguments\)/,
+  );
 });
 
 test("one Generate call fans out over several models with the same prompts and returns at once", async (t) => {

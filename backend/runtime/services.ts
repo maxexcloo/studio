@@ -188,11 +188,14 @@ export function createServicesObserver({
     allowed,
     administrator = false,
     waitingWorkers = [],
+    running,
     loads,
   }: {
     allowed: ServiceKind[];
     administrator?: boolean;
     waitingWorkers?: string[];
+    /** The kind of job each media worker runs now, by worker id, for everyone's summary. */
+    running?: Map<string, ServiceKind>;
     /** Each worker's work, by id; administrators then get `workers`. */
     loads?: Map<string, WorkerLoad>;
   }): Promise<ServicesStatus> => {
@@ -239,6 +242,7 @@ export function createServicesObserver({
         ...target,
         ...observed,
         ...(administrator && endpoint ? { endpoint } : {}),
+        ...(kind !== "text" && running?.get(target.id) === kind ? { running: true } : {}),
       };
     };
     /** A media worker as a health target, with the Studio workloads serving its address. */

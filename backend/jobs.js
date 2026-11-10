@@ -16,7 +16,7 @@ import { customWorkflowGraph } from "./graphs.js";
 import { replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from "./gallery/store.js";
 import { generationSettings, outputsFrom } from "./gallery/records.js";
 import { forgetComfyRun } from "./comfy/traces.js";
-import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
+import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { warmNewOutputs } from "./media-warmup.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
@@ -577,6 +577,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
             ...(body.assistant ? { assistant: body.assistant } : {}),
             ...(body.writing ? { writing: body.writing } : {}),
             ...(body.chat ? { chat: body.chat } : {}),
+            ...(body.resultSet ? { resultSet: body.resultSet } : {}),
             ...(body.dream ? { dream: body.dream } : {}),
           },
         },
@@ -595,7 +596,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     /**
      * Into the gallery: each picture with its upscale riding on it.
      * `missed` is set when the upscale stopped or failed after the pictures were
-     * saved; they are kept at their generated size and the toast says so.
+     * saved; they are kept at their generated size, their upscale record saying why.
      */
     const deliver = async (results, missed = null) => {
       // ComfyUI as a worker: the pictures move into Studio media before anything shows them.
@@ -609,9 +610,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image" })
           : null;
       const outputs = results.map((result) => result.output);
-      const kept = missed
-        ? keptMessage({ cancelled: Boolean(missed.cancelled), count: outputs.length })
-        : "";
       const skipped = upscale?.skipped
         ? { status: "failed", quality: upscale.quality, progress: null, error: upscale.skipped }
         : null;
@@ -639,7 +637,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       });
       const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
       markWorkflowUsed(body.profileId || body.model || body.workflow || "");
-      setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
+      setTerminalJob(id, { status: "done", outputs: completed });
       // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
       await flushGalleryStrict();

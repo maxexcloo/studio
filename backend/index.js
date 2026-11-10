@@ -29,6 +29,7 @@ import {
   createTaste,
   itemValues,
   preferenceSignal,
+  setPreferenceSignals,
   registerTasteRoutes,
   tasteSignal,
 } from "./domain/taste.ts";
@@ -46,6 +47,8 @@ import {
 } from "./persistence/runtime.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
+import { createFaces } from "./providers/faces.ts";
+import { createFaceCheck } from "./domain/face-check.ts";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { workerLoads } from "./queue-eta.js";
@@ -141,8 +144,10 @@ import {
   onGalleryFilesDeleted,
   reloadGallerySizes,
   reloadGallerySources,
+  setGalleryFavorites,
 } from "./gallery/store.js";
 import { makePendingItems } from "./gallery/records.js";
+import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
@@ -153,12 +158,18 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
+import { listCards, registerCardRoutes } from "./cards.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
 
 import { loadLoraLibrary } from "./lora/stacks.js";
-import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
+import {
+  animatedPhoto,
+  bytesForReferenceAccount,
+  galleryStill,
+  referenceAssetForAccount,
+} from "./references.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
@@ -504,6 +515,7 @@ const assistantEngine = registerAssistantRoutes(app, {
 registerGalleryReadRoutes(app, {
   store,
   near: (text) => imageSearch.near(text),
+  similar: (item) => imageSearch.similar(item),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));
@@ -541,9 +553,29 @@ const taste = {
       ),
     ),
 };
+/** Hears which of an account's items were starred or unstarred, by hand or by animating a photo. */
+const itemsStarred = (ownerId, items, favorite) => {
+  if (favorite)
+    dream.starred(
+      ownerId,
+      items.map((item) => item.id),
+    );
+  finishing.starred(
+    ownerId,
+    items.map((item) => item.id),
+    favorite,
+  );
+  taste.record(ownerId, [
+    ...items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
+    ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+  ]);
+};
 // Every admitted job teaches the taste profile (iterations) and makes a waiting finishing upscale step aside.
+// Animating one of the account's photos, from the app or MCP, stars that photo.
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+  const photo = animatedPhoto(job);
+  if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
   finishing.admitted(job);
   captioner.interrupt();
   imageSearch.interrupt();
@@ -552,23 +584,7 @@ const jobAdmitted = (job) => {
   nextSteps.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
-  starred: (req, items, favorite) => {
-    const ownerId = ownerIdForRequest(req);
-    if (favorite)
-      dream.starred(
-        ownerId,
-        items.map((item) => item.id),
-      );
-    finishing.starred(
-      ownerId,
-      items.map((item) => item.id),
-      favorite,
-    );
-    taste.record(
-      ownerId,
-      items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    );
-  },
+  starred: (req, items, favorite) => itemsStarred(ownerIdForRequest(req), items, favorite),
 });
 
 registerPreferenceRoutes(app);
@@ -576,6 +592,7 @@ registerPromptHistoryRoutes(app);
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
+registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
@@ -605,6 +622,7 @@ const promptStage = createPromptStage({
   dream: () => dream,
   frame: assistant.image,
   caption: assistant.caption,
+  setPrompts: (job) => setPrompts(store, job),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
@@ -614,6 +632,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   completed: (items) => {
     void titler.completed(items);
     void imageSearch.completed(items);
+    void faceCheck.completed(items);
   },
   directCloud,
   generationRoutes,
@@ -649,10 +668,11 @@ registerRewriteRoutes(app, {
   queue: generationQueue,
   admit: admitGeneration,
   deleteMedia: deleteOwnedGalleryItems,
+  // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every queue poll.
   media: (ownerId, jobId) =>
-    galleryJobItems(jobId).filter(
-      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
-    ),
+    galleryJobItems(jobId)
+      .filter((item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item))
+      .map(({ nextSteps: _steps, ...item }) => item),
   ownsItem: (ownerId, id) => {
     const item = galleryItem(id);
     return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
@@ -660,6 +680,14 @@ registerRewriteRoutes(app, {
   title: chatTitle,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
+registerResultSetRoutes(app, {
+  store,
+  admit: admitGeneration,
+  item: (ownerId, id) => {
+    const item = galleryItem(id);
+    return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
+  },
+});
 registerMigrationRoutes(app, {
   dataDir,
   adminRefusal,
@@ -782,6 +810,7 @@ const dream = createDream({
       throw new Error("That Dream result is unavailable.");
     updateGalleryJob(itemId, { dream: mark });
   },
+  remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (account && !mayUseFeature(account, "loras")) return null;
@@ -934,6 +963,28 @@ const imageSearch = createImageSearch({
   persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
+// Face check (domain/face-check.ts): results made with a character, compared by face with its image.
+const faceCheck = createFaceCheck({
+  // Demo images are placeholders, and demo test runs must not download the models.
+  enabled: () => !demoMode && flagEnabled("STUDIO_FACE_CHECK"),
+  // Studio's Hugging Face fetch (mirror, token and proxy) only for Hugging Face; GitHub plainly.
+  faces: createFaces({
+    dataDir,
+    fetch: (url, init) =>
+      url.startsWith("https://huggingface.co/") ? hfFetch(url, init) : fetch(url, init),
+  }),
+  idle: galleryIdle,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  characters: (ownerId) => listCards("characters", ownerId),
+  image: galleryStill,
+  reference: (ownerId, assetId) =>
+    bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId),
+  save: (item, identity) => updateGalleryJob(galleryKey(item), { identity }),
+  load: runtimeLoad("face-check"),
+  persist: (document) => writeRuntimeDocument(dataDir, "face-check", document),
+});
+registerIdlePassRoutes(app, "/api/gallery/faces", { work: faceCheck, requireAdmin });
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
@@ -996,6 +1047,7 @@ dream.start();
 finishing.start();
 captioner.start();
 imageSearch.start();
+faceCheck.start();
 titler.start();
 suggester.start();
 nextSteps.start();

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Alert, Paper, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 import type { ChatMessage } from "../../../../shared/chat";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
@@ -13,7 +13,7 @@ import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatHeading, SessionList } from "./ChatWorkspace";
+import { ChatHeading, SessionList, useNewChatOpen } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { sessionQuery } from "./queries";
 import { iterationTiles, SessionIteration } from "./SessionIteration";
@@ -26,6 +26,7 @@ export function ChatPage() {
 export function SessionsPage() {
   const { draft } = useGeneration();
   const phone = usePhone();
+  const starting = useNewChatOpen();
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <>
@@ -42,7 +43,9 @@ export function SessionsPage() {
           <SessionList />
         </Stack>
       ) : (
-        <EmptyState fill>No Chat Selected</EmptyState>
+        <EmptyState fill>
+          {starting ? "Send a message to start this chat." : "No Chat Selected"}
+        </EmptyState>
       )}
       <ChatDock />
     </>
@@ -127,6 +130,14 @@ function SessionPage() {
   useLayoutEffect(() => {
     atBottom.current = true;
   }, [id]);
+  // A result's "From Chat" link (`#job-<id>`) opens at the turn that made it, not the latest.
+  const { hash } = useLocation();
+  useLayoutEffect(() => {
+    const target = !loading && hash.startsWith("#job-") && document.getElementById(hash.slice(1));
+    if (!target) return;
+    atBottom.current = false;
+    target.scrollIntoView({ block: "start" });
+  }, [loading, hash]);
   useEffect(() => {
     if (!session.data || draft.sessionId === id) return;
     const jobs = session.data.jobs,

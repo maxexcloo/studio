@@ -291,10 +291,6 @@
 :where(:root[data-phone]) .dock {
   padding-inline: var(--mantine-spacing-sm);
 }
-/* The phone bar spans the width, its actions centred in rows. */
-:where(:root[data-phone]) .dock > .actions {
-  align-items: stretch;
-}
 /* A phone held sideways keeps the full height for the media: the strip, prompt and actions stand
    beside it, at a portrait phone's width, below the top bar's buttons. */
 :where(:root[data-phone="sideways"]) .main {
@@ -305,4 +301,9 @@
   width: min(24rem, 45%);
   padding-inline: 0 calc(var(--mantine-spacing-sm) + env(safe-area-inset-right));
   padding-bottom: calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom));
+}
+
+/* A set's place shortens rather than pushing the top bar's buttons away. */
+.setPosition {
+  flex-shrink: 1;
 }

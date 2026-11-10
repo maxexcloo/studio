@@ -1,5 +1,14 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { closeLoras, create, fixtures, image, profiles, serveProfiles, stamp } from "./fixtures";
+import {
+  closeLoras,
+  create,
+  fixtures,
+  image,
+  profiles,
+  selectionMenuItem,
+  serveProfiles,
+  stamp,
+} from "./fixtures";
 
 const compareBy = (dialog: Locator, label: string) =>
   dialog
@@ -45,6 +54,19 @@ test("Compare from the composer queues one seeded variant per chosen local profi
   await expect(dialog.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A copper fox",
   );
+  if (testInfo.project.name === "desktop") {
+    // The LoRAs popup opens under its chip, high in the dialog, without covering it.
+    const chip = dialog.getByRole("button", { name: "Choose LoRAs", exact: true });
+    await chip.click();
+    const loras = page.getByRole("dialog", { name: "LoRAs", exact: true });
+    await expect(loras).toBeVisible();
+    const chipBottom = await chip.evaluate((element) => element.getBoundingClientRect().bottom);
+    await expect
+      .poll(() => loras.evaluate((element) => element.getBoundingClientRect().top))
+      .toBeGreaterThanOrEqual(chipBottom);
+    await closeLoras(page);
+    await expect(dialog).toBeVisible();
+  }
   await dialog.getByRole("textbox", { name: "Negative Prompt", exact: true }).fill("blurry");
   const chosen = dialog.getByRole("combobox", { name: "Profiles", exact: true });
   await chosen.click();
@@ -194,4 +216,55 @@ test("Compare remembers its mode and variants across a reload", async ({ page })
   await page.getByRole("button", { name: "Compare", exact: true }).click();
   await expect(dialog.getByRole("radio", { name: "Prompts", exact: true })).toBeChecked();
   await expect(promptB).toHaveValue("A silver fox");
+});
+
+test("Compare Selected sets chosen images side by side, and number keys star the winner", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const result = (id: string, jobId: string, prompt: string) => ({
+    id,
+    jobId,
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt,
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+    settings: { profileId: "image:test", seed: 7 },
+  });
+  state.gallery.push(
+    result("batch-0", "job-batch", "A tin owl"),
+    result("batch-1", "job-batch", "A glass owl"),
+    result("single", "job-single", "A felt owl"),
+  );
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: A felt owl", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const pick = (title: string) =>
+    page.getByRole("button", { name: `Select image: ${title}`, exact: true }).click();
+  await pick("A tin owl");
+  await pick("A glass owl");
+  // Two images of one run can't be compared: a comparison votes per run.
+  const compare = await selectionMenuItem(page, "Compare");
+  await expect(compare).toBeDisabled();
+  // Phones show it under More; Escape there closes only the menu.
+  if (await page.getByRole("menu").isVisible()) await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await pick("A tin owl");
+  await pick("A felt owl");
+  await (await selectionMenuItem(page, "Compare")).click();
+
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  expect(state.comparisons[0].itemIds).toEqual(["batch-1", "single"]);
+  await expect(page.getByText("Prompt: A glass owl", { exact: true })).toBeVisible();
+  await page.keyboard.press("2");
+  await expect(
+    page.getByRole("button", { name: "Clear Winner Variant B", exact: true }),
+  ).toBeAttached();
+  expect(state.comparisons[0].vote).toBe("job-single");
 });

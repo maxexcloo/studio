@@ -1,6 +1,12 @@
 import { useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api, post } from "../../api";
+import { appendGalleryFilters, type GalleryFilterValues } from "../gallery/GalleryFilters";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import {
   addReference,
@@ -227,4 +233,28 @@ export function useGalleryReference() {
       placement.addGalleryItem(item, null, options?.onSuccess),
     isPending: placement.adding,
   };
+}
+
+/**
+ * Finished gallery images to pick from, a page at a time. Uploads are gallery images too, behind
+ * the gallery's Uploads filter. The key and request match the gallery's Images view, so pages it
+ * already loaded show at once; searching and filtering keep the current tiles until the new ones
+ * arrive.
+ */
+export function useGalleryImages(search: string, filters: GalleryFilterValues, enabled: boolean) {
+  const listing = useInfiniteQuery({
+    queryKey: ["gallery", search, "image", filters],
+    enabled,
+    placeholderData: keepPreviousData,
+    initialPageParam: "",
+    queryFn: ({ pageParam }) =>
+      api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
+        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search }), filters)}`,
+      ),
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+  });
+  const items = (listing.data?.pages.flatMap((page) => page.items) || []).filter(
+    (item) => item.type === "image" && item.status === "done",
+  );
+  return { listing, items };
 }

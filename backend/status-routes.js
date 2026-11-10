@@ -14,7 +14,7 @@ import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { upscaleQualities } from "./upscale.js";
-import { capabilityForProfile, listWorkers, workerSource } from "./workers.js";
+import { capabilityForProfile } from "./workers.js";
 
 // Whether ComfyUI runs on this machine, for the bug report.
 const comfyIsLocal = () => {
@@ -39,22 +39,26 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       .map((job) => job.backend)
       .filter(Boolean);
     const administrator = !req.studioAccount || canAdmin(req);
+    // The kind of job each worker runs now, which everyone's status summary counts.
+    const jobs = new Map(queue.store.schedulable().map((job) => [job.id, job]));
+    const running = new Map(
+      [...queue.loads()].flatMap(([resource, load]) => {
+        const job = load.current && jobs.get(load.current);
+        return resource.startsWith("worker:") && job
+          ? [[resource.slice("worker:".length), job.input.kind === "video" ? "video" : "image"]]
+          : [];
+      }),
+    );
     res.json(
       await observeServices({
         allowed: ["image", "video", "text"],
         administrator,
         waitingWorkers,
+        running,
         // Each worker's work and its loaded model are for administrators only.
         ...(administrator ? { loads: workerLoads(queue) } : {}),
       }),
     );
-  });
-
-  // Settings › Workers: the deployment's workers and where they come from; Studio never edits them.
-  app.get("/api/workers", (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ source: workerSource(), workers: listWorkers() });
   });
 
   // Liveness, for the container health check and the test servers.

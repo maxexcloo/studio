@@ -13,6 +13,8 @@ import {
   libraryItemCategory,
   type LibraryItem,
 } from "./LibraryCatalogueTable";
+import { LibraryCharacters } from "../characters/LibraryCharacters";
+import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
@@ -27,6 +29,7 @@ export function LibraryPage() {
   const catalogueActive = ["models", "loras"].includes(activeSection);
   const catalogue = useQuery({
     queryKey: ["library"],
+    enabled: admin,
     queryFn: () =>
       api<{ items: LibraryItem[]; updates?: { checkedAt?: string; available: number } }>(
         "/api/library/items",
@@ -52,14 +55,15 @@ export function LibraryPage() {
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
     },
   });
-  // The last check or update's outcome, shown under the catalogue toolbar.
+  // The last check or update's outcome, shown under the catalogue toolbar; a check that finds
+  // nothing shows nothing.
   const updateNote =
     update.data &&
     (update.variables
       ? "Update queued. The current file stays until the new one is verified and free."
       : update.data.available
         ? `${update.data.available} updates available.`
-        : "Everything is up to date.");
+        : undefined);
   const items = catalogue.data?.items || [];
   const families = [
     ...new Set([
@@ -102,6 +106,9 @@ export function LibraryPage() {
         label="Library"
         sections={options}
         content={{
+          characters: (heading) => <LibraryCharacters heading={heading} />,
+          outfits: (heading) => <LibraryPromptCards kind="outfits" heading={heading} />,
+          scenes: (heading) => <LibraryPromptCards kind="scenes" heading={heading} />,
           imports: (heading) => (
             <LibraryImports
               heading={heading}

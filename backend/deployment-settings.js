@@ -60,6 +60,11 @@ export const catalogueFlags = [
     "The assistant model names each new chat from its first request; without it a chat stays New Chat until renamed.",
   ),
   flag(
+    "STUDIO_FACE_CHECK",
+    "Face Check",
+    "Each image made with a character is compared by face with the character's image on Studio's CPU, and marked when it shows someone else or the character twice. Downloads the face models (about 260 MB) into the data folder.",
+  ),
+  flag(
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
     "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",

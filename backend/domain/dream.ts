@@ -208,6 +208,9 @@ const tastePool = 100;
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
 const tickMs = 45_000;
+/** Discards older than this are deleted, checked once an hour. */
+const discardKeepMs = 30 * 86_400_000;
+const expiryMs = 3_600_000;
 /** Failed writes back off from one tick, doubling up to this. */
 const maxBackoffMs = 600_000;
 /** Dream explores the profile an account ran fewest jobs on over this many days. */
@@ -385,6 +388,8 @@ export function createDream(options: {
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
+  /** Deletes the owner's items and their files, as the gallery's own delete does. */
+  remove(ownerId: string, itemIds: string[]): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
   /** The LoRAs that can run on the profile (its model family), strengths within published ranges. */
@@ -1008,7 +1013,6 @@ export function createDream(options: {
         prompt: "",
         writing,
         loras,
-        allowFallback: false,
         referenceAssets: reference
           ? [
               {
@@ -1272,7 +1276,6 @@ export function createDream(options: {
         prompt: side.reword ? "" : base.prompt,
         ...(side.reword ? { writing: { kind: "dream", reword: base.prompt } } : {}),
         loras: side.loras,
-        allowFallback: false,
         referenceAssets: [],
       };
       const pair: DreamPair = {
@@ -1331,12 +1334,17 @@ export function createDream(options: {
   }
   let ticking = false;
   let next = 0;
+  let expiredAt = -Infinity;
   let timer: ReturnType<typeof setInterval> | undefined;
   const tickFailed = logFailure("Dream");
   async function tick() {
     if (ticking) return;
     ticking = true;
     try {
+      if (now() - expiredAt >= expiryMs) {
+        expiredAt = now();
+        for (const ownerId of options.owners()) deleteDiscards(ownerId, now() - discardKeepMs);
+      }
       // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
       // Dream up; Dream makes new work for that kind once the worker is back.
       const reach = new Map<Kind, Promise<Reach>>();
@@ -1393,6 +1401,14 @@ export function createDream(options: {
     pool(ownerId, "discarded").sort((a, b) =>
       String(b.dream?.decidedAt || "").localeCompare(String(a.dream?.decidedAt || "")),
     );
+  /** Deletes the owner's discards, or only those discarded before `before`; answers how many. */
+  function deleteDiscards(ownerId: string, before = Infinity) {
+    const ids = pool(ownerId, "discarded")
+      .filter((item) => Date.parse(item.dream?.decidedAt || item.createdAt || "") < before)
+      .map((item) => String(item.id));
+    if (ids.length) options.remove(ownerId, ids);
+    return ids.length;
+  }
   /** The owner's finished gallery images that are old enough to calibrate with. */
   const calibrationPool = (ownerId: string) => {
     const before = now() - calibrationAgeMs;
@@ -1502,6 +1518,8 @@ export function createDream(options: {
       return item;
     },
     discarded,
+    /** Delete All in Discards. */
+    deleteDiscards: (ownerId: string) => deleteDiscards(ownerId),
     async save(ownerId: string, patch: Partial<DreamSettings>) {
       const record = read(ownerId);
       record.settings = { ...record.settings, ...patch };

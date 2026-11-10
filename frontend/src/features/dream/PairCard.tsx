@@ -32,7 +32,11 @@ export function PairContent({
       <div className={classes.pair}>
         {card.items.map((item, index) => (
           <div key={item.id} className={classes.choice} data-side={index}>
-            <img src={mediaSource(item).url} alt={item.prompt || "Dream image"} draggable={false} />
+            <img
+              src={mediaSource(item).displayUrl}
+              alt={item.prompt || "Dream image"}
+              draggable={false}
+            />
             <Text size="sm" fw={500} className={classes.side}>
               {sideNames[index]}
               {card.labels ? ` · ${card.labels[index]}` : ""}

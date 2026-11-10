@@ -246,16 +246,25 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   ]);
 });
 
-test("Discarded Dream results stay listed and can be kept after all", async ({ page }) => {
+test("Discarded Dream results can be kept after all, or deleted all at once", async ({ page }) => {
   await fixtures(page);
+  const discarded = (id: string) =>
+    dreamItem(id, { dream: { prompt: "p", why: "", at: "", state: "discarded" } });
   const dream = await serveDream(page, {
-    discarded: [dreamItem("gone", { dream: { prompt: "p", why: "", at: "", state: "discarded" } })],
+    discarded: [discarded("gone"), discarded("other"), discarded("last")],
   });
   await page.goto("/dream");
   await page.getByText("Discarded", { exact: true }).click();
   await page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Keep Dream prompt gone", exact: true }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Delete All", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete All Discards", exact: true });
+  await confirm.getByRole("button", { name: "Delete All", exact: true }).click();
+  await expect(confirm).toBeHidden();
   await expect(page.getByText("No Discards", { exact: true })).toBeVisible();
-  expect(verdicts(dream)).toEqual(["POST /api/dream/gone/keep"]);
+  expect(verdicts(dream)).toEqual(["POST /api/dream/gone/keep", "DELETE /api/dream/discarded"]);
 });
 
 test("Full screen switches between a comparison's sides and judges from its bar", async ({
@@ -314,4 +323,19 @@ test("Full screen switches between a comparison's sides and judges from its bar"
     "POST /api/dream/solo/keep",
   ]);
   expect(dream.requests[0].body).toEqual({ answer: "neither" });
+});
+
+test("The Dream tab counts the results waiting for a verdict", async ({ page }) => {
+  await fixtures(page);
+  await serveDream(page, { unseen: ["one", "two", "three"].map((id) => dreamItem(id)) });
+  await page.goto("/images");
+  const tab = page
+    .getByRole("navigation", { name: "Creative Modes" })
+    .getByRole("link", { name: "Dream", exact: true });
+  await expect(tab).toHaveAccessibleDescription("3 Unseen");
+  await tab.click();
+  await expect(current(page)).toContainText("Dream prompt one");
+  await page.keyboard.press("ArrowRight");
+  await expect(current(page)).toContainText("Dream prompt two");
+  await expect(tab).toHaveAccessibleDescription("2 Unseen");
 });

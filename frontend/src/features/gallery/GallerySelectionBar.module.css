@@ -14,7 +14,8 @@
   background: var(--studio-glass-chrome);
   -webkit-backdrop-filter: var(--studio-glass-filter);
   backdrop-filter: var(--studio-glass-filter);
-  border-bottom: 1px solid var(--studio-glass-border);
+  /* Its rule sits inside the row, so the bar is exactly the toolbar's height and tiles stay put. */
+  box-shadow: inset 0 -1px 0 var(--studio-glass-border);
 }
 
 .count {

@@ -259,8 +259,8 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones show it on the
-  // bar.
+  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones list it under
+  // the bar's More.
   if (desktop) {
     await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
     await promptTool(viewer, "Prompt", "Continue in Chat");
@@ -363,6 +363,28 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
+});
+
+test("Edit › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+  const asked: unknown[] = [];
+  await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
+    page.route("**/api/result-sets/more", (route) => {
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
+    }),
+  );
+  await viewerAction(page, "Edit");
+  await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
+  await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
+});
+
+test("More Like This Set is offered only for a result in a set", async ({ page }) => {
+  await seed(page);
+  await viewerAction(page, "Edit");
+  await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test("Run Again and Edit Prompt draw a new seed; only Repeat Exactly keeps it", async ({
@@ -480,6 +502,124 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
       referenceAssets: [{ assetId: "asset-hub", slot: "start" }],
     },
   });
+});
+
+test("An Animate run stays with the image it started on while the viewer moves between images", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  const bird = "An amber bird";
+  const fox = "An ivory fox";
+  for (const [id, prompt, createdAt] of [
+    ["first", bird, stamp],
+    ["second", fox, "2026-01-01T00:00:00.000Z"],
+  ]) {
+    const item = {
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      width: 1024,
+      height: 1024,
+      createdAt,
+      settings: { profileId: "image:test" },
+    };
+    state.sessions.push({
+      id: `session-${id}`,
+      title: prompt,
+      inputs: {},
+      createdAt,
+      updatedAt: createdAt,
+    });
+    state.jobs.push({
+      id: item.jobId,
+      jobId: item.jobId,
+      sessionId: `session-${id}`,
+      status: "completed",
+      operation: "image",
+      input: { kind: "image", prompt, profileId: "image:test" },
+      items: [item],
+      outputs: [item],
+      createdAt,
+      updatedAt: createdAt,
+    });
+    state.gallery.push(item);
+  }
+  // The queue holds the animation's submission until released.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/sessions\/[^/]+\/generations$/, async (route) => {
+    await held;
+    await route.fallback();
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: `Open image: ${bird}`, exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const animate = viewer.getByRole("button", { name: "Animate", exact: true });
+  // Desktop uses the arrows, Chromium phones swipe and WebKit phones take the arrow keys.
+  const { isMobile, browserName } = testInfo.project.use;
+  const touch = isMobile && browserName !== "webkit" && (await page.context().newCDPSession(page));
+  /** Moves from one image to the other: the fox is next. */
+  async function move(from: string, to: string) {
+    const next = from === bird;
+    const shown = viewer.getByRole("img", { name: to, exact: true });
+    if (touch)
+      // A swipe as the last image is still settling slides back, so it swipes again.
+      await expect(async () => {
+        const box = (await viewer.getByRole("img", { name: from, exact: true }).boundingBox())!;
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const points = (dx: number) => [{ x: x + dx, y }];
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: points(0),
+        });
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: points(next ? -150 : 150),
+        });
+        await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await expect(shown).toBeVisible({ timeout: 1000 });
+      }).toPass();
+    else if (isMobile) await page.keyboard.press(next ? "ArrowRight" : "ArrowLeft");
+    else
+      await viewer
+        .getByRole("button", { name: `${next ? "Next" : "Previous"} Generation`, exact: true })
+        .click();
+    await expect(shown).toBeVisible();
+  }
+  await animate.click();
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect(animate).toHaveAttribute("data-loading");
+
+  await move(bird, fox);
+  await expect(animate).not.toHaveAttribute("data-loading");
+  await expect(animate).toBeEnabled();
+
+  await move(fox, bird);
+  await expect(animate).toHaveAttribute("data-loading");
+
+  // Released while the fox shows, the video still joins the bird's versions, not the fox's.
+  await move(bird, fox);
+  release();
+  await expect.poll(() => state.jobs.length).toBe(3);
+  expect(state.jobs[2]).toMatchObject({
+    operation: "animate",
+    parentJobId: "job-first",
+    parentItemId: "first",
+    input: {
+      kind: "video",
+      writing: { kind: "animate", theme: "living", source: bird },
+    },
+  });
+  const versions = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(versions).toHaveCount(0);
+  await move(fox, bird);
+  await expect(animate).not.toHaveAttribute("data-loading");
+  await expect(versions.getByRole("listitem")).toHaveCount(2);
 });
 
 test("Animate runs local Fast unless Quality is chosen, and keeps the choice as the account's", async ({
@@ -1227,9 +1367,30 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
-  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  if (phone) {
+    // Phones keep the bar to one row, with the rest under More and Delete last.
+    const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
+    const row = ["Animate", "Edit", "Upscale", "Star", "More"].map((name) =>
+      bar.getByRole("button", { name, exact: true }),
+    );
+    const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
+    expect(new Set(tops).size).toBe(1);
+    await row[4].click();
+    await expect(page.getByRole("menuitem")).toHaveText([
+      "Find Similar",
+      "Continue in Chat",
+      "Copy",
+      "Download",
+      "Delete",
+    ]);
+  }
+  const download = (phone ? page : dialog).getByRole(phone ? "menuitem" : "link", {
+    name: "Download",
+    exact: true,
+  });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  if (phone) await page.keyboard.press("Escape");
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);
@@ -1343,7 +1504,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
-  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toBeVisible();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await enabled.check();
@@ -1409,8 +1570,9 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
   }
 });
 
-test("A tablet's viewer bar shows every action without scrolling", async ({ page }, testInfo) => {
-  test.skip(!testInfo.project.use.isMobile, "Touch screens only");
+test("The viewer bar shows every action without scrolling on a tablet or narrow window", async ({
+  page,
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "tablet-study",
@@ -1422,13 +1584,19 @@ test("A tablet's viewer bar shows every action without scrolling", async ({ page
     width: 1024,
     height: 1024,
   });
-  await page.setViewportSize({ width: 1180, height: 820 });
+  // A tablet, or a narrow desktop window with Details open beside the media.
+  const mobile = testInfo.project.use.isMobile;
+  await page.setViewportSize(mobile ? { width: 1180, height: 820 } : { width: 1024, height: 768 });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Tablet Study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const remove = viewer.getByRole("button", { name: "Delete", exact: true });
   await expect(remove).toBeVisible();
-  // Touch targets outgrow one row, so the bar wraps rather than scrolling Delete out of sight.
+  if (!mobile)
+    await expect(
+      viewer.getByRole("complementary", { name: "Generation Details", exact: true }),
+    ).toBeVisible();
+  // The actions outgrow one row, so the bar wraps rather than scrolling Delete out of sight.
   const clipped = () =>
     remove.evaluate((button) => {
       const actions = button.closest('[role="group"] > *')!.getBoundingClientRect();
@@ -1436,4 +1604,37 @@ test("A tablet's viewer bar shows every action without scrolling", async ({ page
       return left < actions.left || right > actions.right;
     });
   await expect.poll(clipped).toBe(false);
+});
+
+test("Face Check marks a result that shows someone else than its character, and Details says so", async ({
+  page,
+}, testInfo) => {
+  const identity = {
+    characterId: "chr-mara",
+    score: 0.31,
+    faces: 1,
+    drifted: true,
+    checkedAt: stamp,
+  };
+  const { viewer } = await seed(page, { identity }, async (_page, state) =>
+    state.characters.push({
+      id: "chr-mara",
+      name: "Mara",
+      description: "red-haired ranger",
+      referenceIds: [],
+      references: [],
+      missing: 0,
+    }),
+  );
+  await expect(
+    page.getByRole("img", { name: "Face Check: Face Differs", exact: true }),
+  ).toBeAttached();
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  }
+  await expect(
+    details.getByText("Looks like someone else, not Mara (face similarity 0.31).", { exact: true }),
+  ).toBeVisible();
 });

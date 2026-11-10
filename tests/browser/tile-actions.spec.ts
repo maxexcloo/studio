@@ -26,7 +26,6 @@ async function galleryFixture(page: Page) {
     prompt: "A copper bird",
     width: 1024,
     height: 1024,
-    workerId: "worker-a",
     loras: [],
     referenceAssets: [],
   };
@@ -78,8 +77,15 @@ test("A tile can be starred and read back without opening the viewer", async ({
   await tile.hover();
   // Phones show a tile's star once it is starred; until then, selection stars it.
   if (testInfo.project.use.isMobile) {
+    const top = (await tile.boundingBox())!.y;
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
+    const selectable = page.getByRole("button", {
+      name: "Select image: A copper bird",
+      exact: true,
+    });
+    // The selection bar takes the toolbar's row at its height, so the tiles stay put.
+    await expect.poll(async () => (await selectable.boundingBox())?.y).toBe(top);
+    await selectable.click();
     await selectionAction(page, "Star").click();
     await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();
@@ -103,13 +109,14 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Compare,
+  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Compare, Find Similar,
   // Continue in Chat | Copy, Download | Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Animate",
     "Edit",
     "Upscale",
     "Compare",
+    "Find Similar",
     "Continue in Chat",
     "Copy",
     /^(Download|Share Image)$/,
@@ -369,4 +376,30 @@ test("On a phone held sideways, the tile menu fits the screen and expands option
   const remove = page.getByRole("menuitem", { name: "Delete", exact: true });
   await remove.scrollIntoViewIfNeeded();
   await expect(remove).toBeInViewport();
+});
+
+test("Find Similar ranks the gallery by an image from its tile menu or the viewer, as a removable filter", async ({
+  page,
+}) => {
+  const state = await galleryFixture(page);
+  state.gallery.push({ ...state.gallery[0], id: "tile-moth", jobId: "", prompt: "A paper moth" });
+  await page.reload();
+  await tileMenu(page);
+  await page.getByRole("menuitem", { name: "Find Similar", exact: true }).click();
+  const chip = (title: string) =>
+    page.getByRole("button", { name: `Remove Similar to ${title} Filter`, exact: true });
+  await expect(chip("A copper bird")).toBeVisible();
+  expect(state.galleryRequests.at(-1)).toContain("similar=tile-bird");
+
+  await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
+  await viewerAction(page, "Find Similar");
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+  await expect(chip("A paper moth")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(
+    "Open image: A paper moth",
+  );
+
+  await chip("A paper moth").click();
+  await expect(page).not.toHaveURL(/similar=/);
+  await expect(chip("A paper moth")).toBeHidden();
 });

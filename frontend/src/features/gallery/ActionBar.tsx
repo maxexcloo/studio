@@ -14,6 +14,7 @@ import {
 } from "@mantine/core";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { menuWidth } from "../../theme";
+import { icons } from "../../ui/icons";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -57,6 +58,18 @@ export type ActionGroups = Action[][];
 
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
 const hasOptions = (action: Action) => Boolean(action.menu && shown(action.menu).length);
+
+/**
+ * A phone bar on one row: the `kept` actions in their groups, the last ending with ⋯ More, which
+ * holds the rest in their groups while it has any.
+ */
+export function withMore(groups: ActionGroups, kept: string[]): ActionGroups {
+  const bar = shown(groups.map((group) => group.filter((action) => kept.includes(action.id))));
+  const more = groups.map((group) => group.filter((action) => !kept.includes(action.id)));
+  if (!more.some((group) => group.length)) return bar;
+  const button: Action = { id: "more", label: "More", icon: icons.more, menu: more };
+  return bar.length ? [...bar.slice(0, -1), [...bar[bar.length - 1], button]] : [[button]];
+}
 
 /** The action with this id in the groups or any of their options, for keyboard shortcuts. */
 export function findAction(groups: ActionGroups, id: string): Action | undefined {

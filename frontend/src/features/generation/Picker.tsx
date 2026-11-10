@@ -42,7 +42,37 @@ import classes from "./Picker.module.css";
  */
 
 /**
- * A chip's popup: a title row with its few controls, the content, then any `footer` actions.
+ * A popup's or column's heading: its title and any `detail`, with its actions, such as Clear, at
+ * the end.
+ */
+export function PopupHeading({
+  title,
+  detail,
+  actions,
+}: {
+  title: string;
+  detail?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <Group justify="space-between" gap="xs" mih={28}>
+      <Group gap="xs" wrap="nowrap" miw={0}>
+        <Text fw={500}>{title}</Text>
+        {detail}
+      </Group>
+      {actions && (
+        <Group gap="xs" wrap="nowrap">
+          {actions}
+        </Group>
+      )}
+    </Group>
+  );
+}
+
+/**
+ * A chip's popup: a `PopupHeading` with the title and its actions, the content, then any `footer`
+ * actions. An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it
+ * as a column beside everything else, divided to the top; phones under the content.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
  * between the header and the footer, pinned above the safe area, so a popover never opens a second
  * level there, unless the popup is `floating`: a small form, such as Settings, stays a
@@ -61,6 +91,7 @@ export function ChipPopup({
   withinPortal = true,
   floating = false,
   footer,
+  aside,
   children,
 }: {
   title: string;
@@ -79,10 +110,11 @@ export function ChipPopup({
   /** A popover on phones too, instead of a full-screen sheet. */
   floating?: boolean;
   /**
-   * Actions under the content: `start` (such as Save Preset), then `end` (such as Clear LoRAs).
-   * `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
+   * Actions under the content: `start` (such as Pin Current Prompt), with Clear and Save in the
+   * heading. `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
    */
-  footer?: { start?: ReactNode; end?: ReactNode; apply?: boolean };
+  footer?: { start?: ReactNode; apply?: boolean };
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   const phone = usePhone();
@@ -99,20 +131,12 @@ export function ChipPopup({
       event.target.setAttribute("data-mantine-stop-propagation", "true"),
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
-  const end = headerEnd && (
-    <Group gap="xs" wrap="nowrap">
-      {headerEnd}
-    </Group>
-  );
   const actions = footer && (
     <Group justify="space-between" gap="xs" wrap="nowrap">
       <Group gap="xs" wrap="nowrap">
         {footer.start}
       </Group>
-      <Group gap="xs" wrap="nowrap">
-        {footer.end}
-        {phone && footer.apply && <Button onClick={close}>Apply</Button>}
-      </Group>
+      {phone && footer.apply && <Button onClick={close}>Apply</Button>}
     </Group>
   );
   if (phone && !floating)
@@ -136,13 +160,21 @@ export function ChipPopup({
             {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
             <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
-              <Modal.Title>{title}</Modal.Title>
-              <Group gap="xs" wrap="nowrap">
-                {end}
-                <Modal.CloseButton aria-label={`Close ${title}`} />
-              </Group>
+              {/* The actions wrap under the title when they don't fit beside it; Close stays put. */}
+              <div className={classes.sheetHeading}>
+                <Modal.Title>{title}</Modal.Title>
+                {headerEnd && (
+                  <Group gap="xs" wrap="nowrap" ml="auto" miw={0}>
+                    {headerEnd}
+                  </Group>
+                )}
+              </div>
+              <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
-            <Modal.Body className={classes.sheetBody}>{children}</Modal.Body>
+            <Modal.Body className={classes.sheetBody}>
+              {children}
+              {aside && <div className={classes.aside}>{aside}</div>}
+            </Modal.Body>
             {actions && <div className={classes.sheetFooter}>{actions}</div>}
           </Modal.Content>
         </Modal.Root>
@@ -173,14 +205,14 @@ export function ChipPopup({
       >
         {/* Touch screens focus the popup itself, so its first field doesn't raise the keyboard. */}
         {touch && <FocusTrap.InitialFocus />}
-        <Stack gap="sm">
-          <Group justify="space-between" wrap="nowrap" mih={28}>
-            <Text fw={500}>{title}</Text>
-            {end}
-          </Group>
-          {children}
-          {actions}
-        </Stack>
+        <div className={aside ? classes.columns : undefined}>
+          <Stack gap="sm">
+            <PopupHeading title={title} actions={headerEnd} />
+            {children}
+            {actions}
+          </Stack>
+          {aside && <div className={classes.aside}>{aside}</div>}
+        </div>
       </Popover.Dropdown>
     </Popover>
   );
@@ -679,10 +711,13 @@ export function SavedList<T extends SavedItem>({
 export function SaveCurrent({
   noun,
   disabled,
+  compact = false,
   onSave,
 }: {
   noun: string;
   disabled: boolean;
+  /** A heading's action, sized and styled as its others. */
+  compact?: boolean;
   onSave: (name: string) => void;
 }) {
   const [naming, setNaming] = useState(false);
@@ -702,7 +737,8 @@ export function SaveCurrent({
   if (!naming)
     return (
       <Button
-        variant="default"
+        size={compact ? "compact-sm" : undefined}
+        variant={compact ? "subtle" : "default"}
         autoFocus={named.current}
         disabled={disabled}
         onClick={() => setNaming(true)}
@@ -711,9 +747,11 @@ export function SaveCurrent({
       </Button>
     );
   return (
-    <Group className={classes.reveal} gap="xs" wrap="nowrap">
+    <Group className={classes.reveal} gap="xs" wrap="nowrap" miw={0}>
       <TextInput
         autoFocus
+        size={compact ? "xs" : undefined}
+        miw={0}
         aria-label={`${noun} Name`}
         placeholder={`${noun} name`}
         value={name}
@@ -731,7 +769,7 @@ export function SaveCurrent({
           }
         }}
       />
-      <Button disabled={!name.trim()} onClick={save}>
+      <Button size={compact ? "compact-sm" : undefined} disabled={!name.trim()} onClick={save}>
         Save
       </Button>
     </Group>

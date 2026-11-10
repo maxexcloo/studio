@@ -11,9 +11,12 @@ import os
 
 from . import models
 from .files import delete_files, token_matches
+from .qwen import StudioTextEncodeQwenImage21
 
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+NODE_CLASS_MAPPINGS = {"StudioTextEncodeQwenImage21": StudioTextEncodeQwenImage21}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "StudioTextEncodeQwenImage21": "Text Encode Qwen Image 2.1 (Studio)"
+}
 VERSION = 2
 
 try:

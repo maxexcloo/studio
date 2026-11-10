@@ -4,7 +4,9 @@ import {
   Blend,
   CirclePause,
   CirclePlay,
+  ClipboardPaste,
   Columns2,
+  ContactRound,
   Copy,
   Download,
   Ellipsis,
@@ -15,15 +17,19 @@ import {
   Layers,
   Lightbulb,
   ListFilter,
+  MapPinned,
   MessageSquareShare,
   Moon,
   Pencil,
   Play,
+  Plus,
   Puzzle,
   RefreshCw,
   RotateCw,
   Rows2,
+  ScanSearch,
   ScrollText,
+  Shirt,
   Settings,
   Share,
   SlidersHorizontal,
@@ -43,11 +49,15 @@ import {
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */
 export const icons = {
+  /** Making a new record, such as New Character. */
+  add: Plus,
   animate: Play,
   /** Archiving a chat keeps it out of the Chats list; Unarchive brings it back. */
   archive: Archive,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
+  /** Character cards: their tab, section and Make Character. */
+  character: ContactRound,
   chat: MessageSquareShare,
   clear: X,
   /** Comparing variants: Compare runs and the composer's Compare. */
@@ -68,9 +78,12 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
+  /** An outfit card (Library › Outfits). */
+  outfit: Shirt,
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,
+  paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */
@@ -82,8 +95,12 @@ export const icons = {
   rename: TextCursorInput,
   resume: CirclePlay,
   retry: RotateCw,
+  /** A scene card (Library › Scenes). */
+  scene: MapPinned,
   settings: Settings,
   share: Share,
+  /** Find Similar: the gallery ranked by likeness to an image. */
+  similar: ScanSearch,
   star: Star,
   stop: Square,
   /** Short changes offered for an image or draft. */
