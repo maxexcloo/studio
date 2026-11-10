@@ -158,13 +158,30 @@ test("compare runs queue one seeded set, read back per owner and record the star
   );
   assert.equal((await request("", { jobIds: [jobs[0].id, "old-a"] }, "POST", "bob")).status, 404);
 
+  // Compare Selected names each job's chosen image, which shows and wins in place of its first.
+  gallery.push({ id: "w-1", jobId: winner.jobId, ownerId: "alice", type: "image", status: "done" });
+  const selected = await request("", {
+    jobIds: [winner.jobId, other.jobId],
+    itemIds: ["w-1", "o-0"],
+  });
+  assert.equal(selected.status, 201);
+  assert.deepEqual(
+    selected.body.variants.map((entry: { item: { id: string } }) => entry.item.id),
+    ["w-1", "o-0"],
+  );
+  assert.equal(
+    (await request("", { jobIds: [winner.jobId, other.jobId], itemIds: ["o-0", "w-1"] })).status,
+    404,
+    "an image must belong to its job",
+  );
+
   const history = (await request("")).body.comparisons;
   assert.deepEqual(
     history.map((entry: { id: string }) => entry.id),
-    [created.body.id, run.body.id, "legacy"],
+    [selected.body.id, created.body.id, run.body.id, "legacy"],
   );
   assert.deepEqual(
-    history[2].variants.map((entry: { label: string; item: unknown }) => [
+    history[3].variants.map((entry: { label: string; item: unknown }) => [
       entry.label,
       Boolean(entry.item),
     ]),
