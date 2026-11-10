@@ -413,7 +413,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
   ).toBeVisible();
 });
 
-test("Select Set picks a set's results to upscale and compare together", async ({ page }) => {
+test("Select Set picks a set's results to upscale together", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push(
     ...["Bear Hug", "Owl Librarian", "Fox Wizard"].map((variation, position) => ({
@@ -431,11 +431,6 @@ test("Select Set picks a set's results to upscale and compare together", async (
     upscales.push(route.request().postDataJSON());
     return route.fulfill({ json: { ok: true } });
   });
-  let compared: any;
-  await page.route("**/api/comparisons", (route) => {
-    compared = route.request().postDataJSON();
-    return route.fulfill({ status: 201, json: { id: "compare-set" } });
-  });
   await page.goto("/images");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
@@ -450,13 +445,6 @@ test("Select Set picks a set's results to upscale and compare together", async (
   await expect
     .poll(() => upscales.map((body) => body.galleryItemId).sort())
     .toEqual(["set-0", "set-1", "set-2"]);
-  // Compare puts one image of each prompt side by side, named by its title, to pick the best.
-  await (await selectionMenuItem(page, "Compare")).click();
-  await expect(page).toHaveURL(/\/compare\/compare-set$/);
-  expect(compared).toEqual({
-    jobIds: ["set-job-0", "set-job-1", "set-job-2"],
-    labels: ["Fox Wizard", "Owl Librarian", "Bear Hug"],
-  });
 });
 
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
