@@ -1,14 +1,13 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import {
-  closePopup,
   closeReferences,
   create,
   fixtures,
   image,
+  pickerTab,
   profiles,
   serveProfiles,
-  showOnly,
   showUploads,
   stamp,
 } from "./fixtures";
@@ -113,10 +112,8 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .getByRole("menu", { name: "Reference 10 · Reference Image", exact: true })
     .getByRole("menuitem", { name: "Move Earlier", exact: true })
     .click();
-  // Uploads off again: the gallery's generations.
-  await picker.getByRole("button", { name: "Filter Uploads", exact: true }).click();
-  await showOnly(page, "All");
-  await closePopup(page, "Filters");
+  // Back to the gallery's generations.
+  await pickerTab(page, "References", "Gallery");
   for (const label of ["Reference 11 · Start", "Reference 12 · End"]) {
     await cells.getByRole("button", { name: label, exact: true }).click();
     await page

@@ -58,8 +58,13 @@ import { useGroupFeature } from "../auth/AccountGate";
 import { CharacterChoices } from "../characters/CharacterChoices";
 import { PromptCardChoices } from "../characters/PromptCardChoices";
 
-const referenceTabs = [
+/** The gallery's images, all, starred or uploaded; then the Library's cards, with Characters. */
+const galleryTabs = [
   { value: "gallery" as const, label: "Gallery" },
+  { value: "starred" as const, label: "Starred" },
+  { value: "uploads" as const, label: "Uploads" },
+];
+const cardTabs = [
   { value: "characters" as const, label: "Characters" },
   { value: "outfits" as const, label: "Outfits" },
   { value: "scenes" as const, label: "Scenes" },
@@ -148,8 +153,14 @@ export function ReferencePicker({
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
   const { target: chosen, query, filters } = browser.state;
-  const tab = charactersOn ? browser.state.tab : "gallery";
-  const { uploads } = filters;
+  const referenceTabs = charactersOn ? [galleryTabs, cardTabs] : [galleryTabs];
+  const tab = referenceTabs.flat().some((item) => item.value === browser.state.tab)
+    ? browser.state.tab
+    : "gallery";
+  const galleryTab = galleryTabs.find((item) => item.value === tab);
+  const uploads = tab === "uploads";
+  // Starred and Uploads are the gallery's own filters, set by the tab.
+  const listedFilters = { ...filters, starred: tab === "starred", uploads };
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -231,7 +242,7 @@ export function ReferencePicker({
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
-  const { listing, items } = useGalleryImages(search, filters, opened);
+  const { listing, items } = useGalleryImages(search, listedFilters, opened);
   const listed = items.map((item, index) => ({
     id: item.id,
     name: item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result",
@@ -349,7 +360,7 @@ export function ReferencePicker({
         start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
         onChange={list.set}
       />
-      {!target && tab === "gallery" && (
+      {!target && galleryTab && (
         <Text size="xs" c="dimmed">
           All slots are filled. Choose a reference to replace it, or a selected image to remove it.
         </Text>
@@ -408,10 +419,10 @@ export function ReferencePicker({
         <>
           <PickerHeader
             label="References"
-            tabs={charactersOn ? referenceTabs : undefined}
+            tabs={referenceTabs}
             tab={tab}
             onTabChange={(tab) => browse({ tab })}
-            searched={uploads ? "Uploads" : "Gallery"}
+            searched={galleryTab?.label}
             query={query}
             onQueryChange={(query) => browse({ query })}
             filterCount={activeFilters.length}

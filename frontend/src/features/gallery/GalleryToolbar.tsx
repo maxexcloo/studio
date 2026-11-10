@@ -22,7 +22,7 @@ import { useGalleryColumns } from "./useGalleryLayout";
 import classes from "./GalleryFilters.module.css";
 
 /**
- * The gallery's one toolbar row: search, Filter ▾, Starred, the active filters as removable chips, the result
+ * The gallery's one toolbar row: search, Filter ▾, Starred and Uploads, the active filters as removable chips, the result
  * count, the zoom slider (desktop; phones pinch) and `actions` (Upload ▾, Select). Phones open the search from its
  * icon into the full row. Search narrows within the filters; filter changes keep the query.
  */
@@ -60,8 +60,9 @@ export function GalleryToolbar({
     if (query && phone) setSearching(true);
   }, [query, phone]);
   const chips = useActiveFilters({ kind, value, onChange }, extraChips);
+  // Clearing the filters leaves the Starred or Uploads toggle as it is.
   const clear = () => {
-    onChange(emptyGalleryFilters);
+    onChange({ ...emptyGalleryFilters, starred: value.starred, uploads: value.uploads });
     for (const chip of extraChips) chip.remove();
   };
   const toolbar = useRef<HTMLDivElement>(null);
@@ -178,15 +179,20 @@ export function GalleryToolbar({
           toggles={toggles}
         />
       </ChipPopup>
+      {/* Starred and Uploads show one at a time. */}
       <FilterToggle
         label="Starred"
         icon={icons.star}
         on={value.starred}
-        // Starred and Uploads show one at a time, as in the popup's Show.
         onToggle={() => onChange({ ...value, starred: !value.starred, uploads: false })}
       />
-      {/* The pressed Starred toggle stands for its chip. */}
-      <FilterChips chips={chips.filter((chip) => chip.key !== "starred")} onClear={clear} />
+      <FilterToggle
+        label="Uploads"
+        icon={icons.uploads}
+        on={value.uploads}
+        onToggle={() => onChange({ ...value, uploads: !value.uploads, starred: false })}
+      />
+      <FilterChips chips={chips} onClear={clear} />
       {results && !phone && (
         <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
           {results}

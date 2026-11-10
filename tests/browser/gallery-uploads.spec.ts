@@ -33,9 +33,10 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   ).toBeVisible();
   expect(sent).toEqual(["one.png", "broken.png", "two.png"]);
   // The gallery turns to Uploads to show them.
-  await expect(
-    page.getByRole("button", { name: "Remove Uploads Filter", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Uploads", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.locator("[data-media-id]")).toHaveCount(2);
 
   // A folder uploads what it holds that Studio takes, and says what it skipped.
@@ -87,9 +88,7 @@ test("Edit › Run Suggested Prompts on several uploads queues each suggested pr
       queued.push({ path: url.pathname, body: request.postDataJSON() });
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await showOnly(page, "Uploads");
-  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   for (const id of ["a", "b", "c"])
     await page.getByRole("button", { name: `Select image: Upload ${id}`, exact: true }).click();

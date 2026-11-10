@@ -68,9 +68,7 @@ test("A video uploads as a reference, and Edit Prompt runs an upload's suggested
     return route.fulfill({ json: { ok: true, sessionId: "session-recreate", jobId: "job-clip" } });
   });
   await page.goto("/video");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await showOnly(page, "Uploads");
-  await page.keyboard.press("Escape");
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Edit › Edit Prompt opens its suggested prompt.
   await viewerAction(page, "Edit");

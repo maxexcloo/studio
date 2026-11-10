@@ -20,7 +20,7 @@ export const publicAccountPaths = new Set([
 const ordinaryRoutes = [
   ["GET", /^\/api\/(ping|models|estimate|workflows|stats|animate\/profile)$/],
   ["GET", /^\/api\/services\/status$/],
-  ["GET", /^\/api\/accounts\/(mcp-token|me)$/],
+  ["GET", /^\/api\/accounts\/(mcp-token(\/reveal)?|me)$/],
   ["PATCH", /^\/api\/accounts\/me$/],
   ["POST", /^\/api\/accounts\/mcp-token(\/revoke)?$/],
   ["POST", /^\/api\/generate$/],

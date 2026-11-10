@@ -186,7 +186,10 @@ interface FilterProps {
   onChange: (value: GalleryFilterValues) => void;
 }
 
-/** The active filters as removable chips, one per value, plus any `extra` view choices. */
+/**
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Starred and
+ * Uploads have none: their own toggle or tab shows them.
+ */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
   extra: { key: string; label: string; remove: () => void }[] = [],
@@ -194,12 +197,6 @@ export function useActiveFilters(
   const { options } = useFacetOptions(kind, value);
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
-    ...(value.starred
-      ? [{ key: "starred", label: "Starred", remove: () => onChange({ ...value, starred: false }) }]
-      : []),
-    ...(value.uploads
-      ? [{ key: "uploads", label: "Uploads", remove: () => onChange({ ...value, uploads: false }) }]
-      : []),
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
     ...extra,
     ...facets.flatMap((facet) => {
@@ -347,8 +344,9 @@ export function FilterToggle({
 
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) on its own row, then Show (All, Starred or Uploads, one at a time), the view's
- * own `toggles` (such as All Versions), the date and each facet. Choices apply at once.
+ * (Grid or Runs) on its own row, then the view's own `toggles` (such as All Versions), the date and
+ * each facet. Starred and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
+ * Choices apply at once.
  */
 export function GalleryFilterPanel({
   kind,
@@ -358,15 +356,35 @@ export function GalleryFilterPanel({
   toggles,
 }: FilterProps & { view?: ReactNode; toggles?: ReactNode }) {
   const { facets, options } = useFacetOptions(kind, value);
-  const show = value.uploads ? "uploads" : value.starred ? "starred" : "all";
+  // Tags list the most used first, each with its count, and keep a chosen tag no longer among them.
+  const counts = new Map(options.tag.map((option) => [option.value, option.count]));
+  const lists = {
+    ...options,
+    tag: [
+      ...[...options.tag].sort((a, b) => (b.count ?? 0) - (a.count ?? 0)),
+      ...value.tag.filter((tag) => !counts.has(tag)).map((tag) => ({ value: tag, label: tag })),
+    ],
+  };
   // A clean name stands for all its recorded values; typing any part of it finds it.
-  const many = (key: "model" | "lora" | "chat", label: string) => (
+  const many = (key: "model" | "lora" | "chat" | "tag", label: string) => (
     <MultiSelect
       size="sm"
       label={label}
       placeholder={value[key].length ? undefined : "Any"}
-      data={options[key]}
-      value={options[key]
+      data={lists[key]}
+      renderOption={
+        key === "tag"
+          ? ({ option }) => (
+              <Group gap={6} wrap="nowrap">
+                {option.label}
+                <Text span size="xs" c="dimmed">
+                  {counts.get(option.value)}
+                </Text>
+              </Group>
+            )
+          : undefined
+      }
+      value={lists[key]
         .filter((option) => keysOf(option).some((item) => value[key].includes(item)))
         .map((option) => option.value)}
       onChange={(next) =>
@@ -374,7 +392,7 @@ export function GalleryFilterPanel({
           ...value,
           // In the order they were picked.
           [key]: next.flatMap((picked) =>
-            keysOf(options[key].find((option) => option.value === picked)!),
+            keysOf(lists[key].find((option) => option.value === picked)!),
           ),
         })
       }
@@ -386,7 +404,7 @@ export function GalleryFilterPanel({
       comboboxProps={{ withinPortal: false }}
     />
   );
-  const choices = (key: "size" | "aspect" | "tag", label: string) => (
+  const choices = (key: "size" | "aspect", label: string) => (
     <Input.Wrapper label={label}>
       <Group gap={6} mt={4} role="group" aria-label={label}>
         {options[key].map((option) => {
@@ -407,11 +425,6 @@ export function GalleryFilterPanel({
               }
             >
               {option.label}
-              {option.count !== undefined && (
-                <Text span size="xs" c="dimmed" ml={6}>
-                  {option.count}
-                </Text>
-              )}
             </FilterToggle>
           );
         })}
@@ -433,26 +446,8 @@ export function GalleryFilterPanel({
         </Button>
       )}
       {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
-      {/* One of these at a time, so a single choice rather than on/off chips. */}
-      <Input.Wrapper label="Show">
-        <SegmentedControl
-          aria-label="Show"
-          fullWidth
-          size="xs"
-          mt={4}
-          value={show}
-          onChange={(next) =>
-            onChange({ ...value, starred: next === "starred", uploads: next === "uploads" })
-          }
-          data={[
-            { value: "all", label: "All" },
-            { value: "starred", label: "Starred" },
-            { value: "uploads", label: "Uploads" },
-          ]}
-        />
-      </Input.Wrapper>
       {toggles}
-      <Divider />
+      {(view || toggles) && <Divider />}
       <Input.Wrapper label="Date">
         <SegmentedControl
           aria-label="Date"
@@ -468,12 +463,12 @@ export function GalleryFilterPanel({
       {many("model", "Models")}
       {many("lora", "LoRAs")}
       {(options.size.length > 0 || options.aspect.length > 0) && <Divider />}
-      {options.size.length > 0 && choices("size", "Size")}
       {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
-      {options.tag.length > 0 && (
+      {options.size.length > 0 && choices("size", "Size")}
+      {lists.tag.length > 0 && (
         <>
           <Divider />
-          {choices("tag", "Tags")}
+          {many("tag", "Tags")}
         </>
       )}
     </Stack>
