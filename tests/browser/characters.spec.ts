@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { characterShots, withCharacter } from "../../shared/characters";
+import { characterShots, outfitPart, scenePart, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
   create,
@@ -189,7 +189,7 @@ test("Make Character starts a card from a gallery image in Library › Character
   expect(state.characters).toEqual([]);
 });
 
-test("A member sees only Characters in the Library, and a group without Characters has neither tab nor Library", async ({
+test("A member sees only Characters, Outfits and Scenes in the Library, and a group without Characters has neither tab nor Library", async ({
   page,
 }) => {
   await fixtures(page);
@@ -200,7 +200,8 @@ test("A member sees only Characters in the Library, and a group without Characte
   const select = page.getByRole("combobox", { name: "Library Section", exact: true });
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
-  if (await nav.isVisible()) await expect(nav.getByRole("link")).toHaveText(["Characters"]);
+  if (await nav.isVisible())
+    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes"]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library");
@@ -244,5 +245,46 @@ test("Generate References queues one view per shot on a shared seed with the car
     "asset-front",
     "asset-side",
     `asset-${picked}`,
+  ]);
+});
+
+test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const raincoat = "a yellow raincoat and black rubber boots";
+  const harbour = "a foggy harbour at dawn";
+  state.outfits.push({ id: "outfit-1", name: "Raincoat", description: raincoat, references: [] });
+  state.scenes.push({ id: "scene-1", name: "Harbour", description: harbour, references: [] });
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("Walking slowly.");
+  const pick = async (tab: string, name: string) => {
+    await page.getByRole("button", { name: "Choose References", exact: true }).click();
+    const references = page.getByRole("region", { name: "References", exact: true });
+    await references.getByText(tab, { exact: true }).click();
+    await references.getByRole("button", { name, exact: true }).click();
+    await closeReferences(page);
+  };
+  // Picked scene first, the outfit still goes before it.
+  await pick("Scenes", "Use scene: Harbour");
+  await pick("Outfits", "Use outfit: Raincoat");
+  await expect(prompt).toHaveValue(`${outfitPart(raincoat)} ${scenePart(harbour)} Walking slowly.`);
+  await pick("Outfits", "Remove outfit: Raincoat");
+  await expect(prompt).toHaveValue(`${scenePart(harbour)} Walking slowly.`);
+  // Library › Outfits saves a new card.
+  await page.goto("/library#outfits");
+  await page.getByRole("button", { name: "New Outfit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New Outfit", exact: true });
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Gala");
+  await editor
+    .getByRole("textbox", { name: "Description", exact: true })
+    .last()
+    .fill("an emerald gown and gold heels");
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  expect(state.outfits.map((card) => [card.name, card.description])).toEqual([
+    ["Raincoat", raincoat],
+    ["Gala", "an emerald gown and gold heels"],
   ]);
 });

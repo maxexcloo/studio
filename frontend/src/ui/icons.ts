@@ -17,6 +17,7 @@ import {
   Layers,
   Lightbulb,
   ListFilter,
+  MapPinned,
   MessageSquareShare,
   Moon,
   Pencil,
@@ -28,6 +29,7 @@ import {
   Rows2,
   ScanSearch,
   ScrollText,
+  Shirt,
   Settings,
   Share,
   SlidersHorizontal,
@@ -76,6 +78,8 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
+  /** An outfit card (Library › Outfits). */
+  outfit: Shirt,
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,
@@ -91,6 +95,8 @@ export const icons = {
   rename: TextCursorInput,
   resume: CirclePlay,
   retry: RotateCw,
+  /** A scene card (Library › Scenes). */
+  scene: MapPinned,
   settings: Settings,
   share: Share,
   /** Find Similar: the gallery ranked by likeness to an image. */
