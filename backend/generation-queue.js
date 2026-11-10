@@ -186,6 +186,20 @@ export function createGenerationQueue({
       store,
       provider: cloudProvider,
       resolve: directCloud.resolve,
+      // A gone or disabled account's prompts never reach the text model.
+      soften: async (job, prompt, reason) => {
+        if (!assistantEngine || (job.ownerId && !accountAccessForId(job.ownerId)?.authenticated))
+          throw new Error("the prompt assistant is unavailable");
+        const written = await assistantEngine.rewrite({
+          prompt,
+          preset: "custom",
+          instruction: `The provider's moderation refused this prompt (${reason.slice(0, 200)}). Keep its subject, scene, action and camera; soften only the wording likely to have tripped moderation.`,
+          signal: AbortSignal.timeout(120_000),
+        });
+        if (written.source !== "assistant")
+          throw new Error(written.reason || "the prompt assistant did not answer");
+        return written.prompt;
+      },
       saveMedia: providerMediaWriter(mediaRoot, mediaSubfolder, writeBytesFileAsync, withPngText),
       saveGallery: async (job, outputs, request) => {
         await replaceGalleryJob(
