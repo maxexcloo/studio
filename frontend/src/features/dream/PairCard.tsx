@@ -8,7 +8,7 @@ export const sideNames = ["A", "B"] as const;
 
 /**
  * A pair card's content: its question over the two images, A and B side by side (stacked on
- * phones), each named by what it has of the thing that varies. Dragging toward a side lifts it and
+ * phones held upright), each named by what it has of the thing that varies. Dragging toward a side lifts it and
  * fades the other (`--dream-left`, `--dream-right` from `SwipeCard`).
  */
 export function PairContent({
