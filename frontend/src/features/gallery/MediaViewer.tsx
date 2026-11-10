@@ -290,6 +290,30 @@ export function MediaViewer({
   const toggleChrome = () => setChromeHidden((hidden) => !hidden);
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
+  // An action that turns busy disables its button, so focus falls to the page (a menu's return to
+  // it too); the stage takes focus back and the key that landed on the page.
+  useEffect(() => {
+    const regain = (event: KeyboardEvent) => {
+      const view = stage.current;
+      if (event.target !== document.body || !view) return;
+      view.focus();
+      const { key, code, altKey, ctrlKey, metaKey, shiftKey, repeat } = event;
+      const again = new KeyboardEvent("keydown", {
+        key,
+        code,
+        altKey,
+        ctrlKey,
+        metaKey,
+        shiftKey,
+        repeat,
+        bubbles: true,
+        cancelable: true,
+      });
+      if (!view.dispatchEvent(again)) event.preventDefault();
+    };
+    document.addEventListener("keydown", regain);
+    return () => document.removeEventListener("keydown", regain);
+  }, []);
   const shownId = useRef(item.id);
   useLayoutEffect(() => {
     if (shownId.current !== item.id && document.activeElement === document.body)
