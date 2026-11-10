@@ -20,6 +20,7 @@
  *   POST /api/library/imports/:id/exact       {index}: Use Exact File instead of its substitute
  *   POST /api/library/imports/:id/offers      {index}: download one offered version or variant
  *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance and updates
+ *   GET  /api/library/unused                  installed entries no profile names, and LoRAs no run used in 90 days
  *   GET  /api/library/updates                 update states; POST …/check checks now; POST …/apply {key, alternative?}
  *
  * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do. MCP's admin
@@ -368,6 +369,8 @@ export function registerLibraryRoutes(
     repoint = async () => [],
     /** What still uses a model file: ['the Flux Dev profile', …] (update clean-up, Decision 4). */
     references = async () => [],
+    /** The LoRA files a gallery run used in the last 90 days. */
+    recentLoras = () => new Set(),
     removeFile = removeInstalled,
     /** Takes a removed LoRA out of every account's stacks, strengths, ratings and recents (lora/stacks.js). */
     forget = forgetLora,
@@ -747,6 +750,42 @@ export function registerLibraryRoutes(
         { by: by(account), origin: origin(account, "admin") },
       );
       return ok({ key, fileRemoved: removed });
+    },
+    { imports: false },
+  );
+  // Unused: installed catalogue entries to consider removing, with their sizes. A model counts when
+  // nothing references it (the removal path's own check); a LoRA when no run used it in 90 days and
+  // no profile names it.
+  route(
+    "GET",
+    "/api/library/unused",
+    async () => {
+      const { files } = await latestInstalled().catch(() => ({ files: {} }));
+      const entries = catalogue().entries();
+      const sizes = new Map(workerInventory().files.map((item) => [item.path, item.size]));
+      const definitions = await profileDefinitions().catch(() => []);
+      const ran = recentLoras();
+      const unused = await Promise.all(
+        libraryItems({ installed: files, entries })
+          .filter((item) => item.installed && entries[item.key])
+          .map(async (item) => {
+            const lora = item.folder === "loras";
+            if (lora) {
+              const quoted = JSON.stringify(item.file);
+              if (ran.has(item.file) || definitions.some(({ text }) => text.includes(quoted)))
+                return null;
+            } else if ((await references({ folder: item.folder, file: item.file })).length)
+              return null;
+            return {
+              key: item.key,
+              title: item.title || item.file,
+              kind: item.kind,
+              bytes: Number(sizes.get(item.key) ?? entries[item.key].bytes) || 0,
+              reason: lora ? "No run in 90 days" : "No profile uses it",
+            };
+          }),
+      );
+      return ok({ items: unused.filter(Boolean) });
     },
     { imports: false },
   );

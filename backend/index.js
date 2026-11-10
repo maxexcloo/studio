@@ -468,6 +468,14 @@ const library = registerLibraryRoutes(app, {
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
   references: (model) => modelFileReferences(model, presetModels),
+  recentLoras: () => {
+    const since = Date.now() - 90 * 86_400_000;
+    return new Set(
+      gallery
+        .filter((item) => Date.parse(item.createdAt || "") >= since)
+        .flatMap((item) => (item.settings?.loras || []).map((lora) => lora.name)),
+    );
+  },
   profileDefinitions,
   schedule: !demoMode,
 });

@@ -309,3 +309,46 @@ test("uncatalogued model files take their family from the profiles naming them, 
   );
   assert.equal(families["loras/unknown.safetensors"], undefined, "LoRAs keep their own metadata");
 });
+
+test("Unused lists installed entries no profile uses and LoRAs no run used in 90 days", async (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-unused-"));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  const catalogue = createCatalogueStore({ dataDir, log: {} });
+  for (const key of [
+    "checkpoints/spare.safetensors",
+    "checkpoints/in-use.safetensors",
+    "loras/idle.safetensors",
+    "loras/recent.safetensors",
+    "loras/built-in.safetensors",
+    "loras/missing.safetensors",
+  ])
+    catalogue.edit(key, { title: key.split("/")[1] }, { by: "admin", origin: "admin" });
+  const app = express();
+  app.use(express.json());
+  registerLibraryRoutes(app, {
+    presets: {},
+    installed: async () => ({
+      checkpoints: ["spare.safetensors", "in-use.safetensors", "uncatalogued.safetensors"],
+      loras: ["idle.safetensors", "recent.safetensors", "built-in.safetensors"],
+    }),
+    loraInfo: async () => ({}),
+    catalogue: () => catalogue,
+    store: createImportStore({ dataDir, log: {} }),
+    schedule: false,
+    references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
+    recentLoras: () => new Set(["recent.safetensors"]),
+    profileDefinitions: async () => [{ name: "Fast", text: '{"lora": "built-in.safetensors"}' }],
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => server.close());
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/library/unused`);
+  const { items } = await response.json();
+  assert.deepEqual(
+    items.map((item) => [item.key, item.reason]),
+    [
+      ["loras/idle.safetensors", "No run in 90 days"],
+      ["checkpoints/spare.safetensors", "No profile uses it"],
+    ],
+  );
+});
