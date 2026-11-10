@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  assistantSettings,
   cleanPrompt,
   createAssistant,
   createThinkFilter,
@@ -51,22 +50,21 @@ function fakeGateway(reply, { models = ["cloud/auto", "cloud/vision", "local/aut
 }
 
 test("settings read the gateway, whose model is the cloud model", async () => {
-  assert.equal(assistantSettings({}), null);
+  assert.equal(gatewaySettings({}), null);
   assert.throws(
-    () => assistantSettings({ STUDIO_ASSISTANT_URL: "http://x.invalid" }),
+    () => gatewaySettings({ STUDIO_ASSISTANT_URL: "http://x.invalid" }),
     /needs STUDIO_ASSISTANT_KEY/,
   );
-  const plain = assistantSettings(gateway());
+  const plain = gatewaySettings(gateway());
   assert.deepEqual(
-    [plain.endpoint, plain.root, plain.cloud, plain.chosen],
+    [plain.endpoint, plain.root, plain.cloud],
     [
       "http://bifrost.invalid:4000/v1/chat/completions",
       "http://bifrost.invalid:4000",
       "cloud/auto",
-      "",
     ],
   );
-  // Local while a local text workload runs, else cloud; the administrator's model replaces both.
+  // Local while a local text workload runs, else cloud.
   const environment = gateway();
   let local = null;
   const engine = createAssistant(environment, { localText: async () => local });
@@ -86,8 +84,6 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   local = null;
   assert.equal(await engine.model("rewrite", true), "cloud/uncensored");
   environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
-  assert.equal(await engine.model("rewrite", true), "cloud/vision");
-  environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
   assert.equal(await engine.model("rewrite", true), "cloud/vision");
   assert.equal(createAssistant({}), null);
 });
@@ -114,9 +110,6 @@ test("prompt writing asks for the account's model, uncensored only where it may"
     ],
     [false, true],
   );
-  // The administrator's model always runs.
-  environment.STUDIO_ASSISTANT_MODEL = "chosen/model";
-  assert.equal(await write("local/auto", true), "chosen/model");
 });
 
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
@@ -403,9 +396,9 @@ test("Spicy runs on the assistant model", async () => {
   const seen = fakeGateway(() => json("A sultry scene."));
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
-  environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
+  environment.STUDIO_ASSISTANT_CLOUD_MODEL = "cloud/vision";
   const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
-  assert.equal(result.model, "cloud/vision", "a model chosen in Settings applies at once");
+  assert.equal(result.model, "cloud/vision", "a changed setting applies at once");
   assert.equal(seen.calls.at(-1).body.model, "cloud/vision");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
 });
@@ -677,17 +670,14 @@ test("title summarises the prompt in a few words, with reasoning off", async () 
   await assert.rejects(empty.title({ prompt: "a barn" }), /empty reply/);
 });
 
-test("chat turns reasoning off for structured calls unless the administrator chose the model", async () => {
+test("chat turns reasoning off for structured calls", async () => {
   const seen = fakeGateway(() => json("Fine."));
-  const environment = gateway();
-  const engine = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   const effort = async (call) => {
     await engine.chat({ model: await engine.model(call), call, messages: [] });
     return seen.calls.at(-1).body.reasoning_effort;
   };
   assert.deepEqual([await effort("describe"), await effort("rewrite")], ["none", undefined]);
-  environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
-  assert.deepEqual([await effort("describe"), await effort("caption")], [undefined, undefined]);
 });
 
 test("chat names a reply the token limit cut off", async () => {

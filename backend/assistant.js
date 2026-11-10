@@ -8,8 +8,7 @@
  * anything else the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
  * For an account with uncensored access a base `…/auto` alias becomes `…/uncensored`.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
- * STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and its effort.
- * Settings are read on every call, so a model chosen in Settings applies at once.
+ * Settings are read on every call, so a model picked in Settings applies at once.
  *
  * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
@@ -44,7 +43,6 @@ const gatewayKeys = [
   "STUDIO_ASSISTANT_KEY",
   "STUDIO_ASSISTANT_CLOUD_MODEL",
 ];
-export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // A gallery item's title, from its prompt.
 const titleInstructions =
   "Title what the text below describes: the prompt that made an image or video. Reply with only a concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
@@ -131,13 +129,6 @@ export function gatewayAddress(value, setting) {
       : `${base}/v1/chat/completions`;
   const root = endpoint.replace(/\/(?:v1\/)?chat\/completions$/, "");
   return { endpoint, root };
-}
-
-/** The gateway plus the model an administrator chose (empty for none), or null while the gateway is unset. */
-export function assistantSettings(environment = process.env) {
-  const gateway = gatewaySettings(environment);
-  if (!gateway) return null;
-  return { ...gateway, chosen: String(environment[assistantModelKey] || "").trim() };
 }
 
 /**
@@ -468,7 +459,7 @@ export function createAssistant(
     timeoutMs = 90_000,
     log = console,
     now = Date.now,
-    resolveSettings = () => assistantSettings(environment),
+    resolveSettings = () => gatewaySettings(environment),
     // The running local text model (runtime/services.ts); none without a runtime.
     localText = async () => null,
   } = {},
@@ -499,18 +490,17 @@ export function createAssistant(
   }
 
   /**
-   * The Bifrost model calls ask for: the administrator's choice, otherwise the account's `writer`
-   * (writerModel's input) for prompt writing, otherwise the route's, uncensored when `explicit`.
+   * The Bifrost model calls ask for: the account's `writer` (writerModel's input) for prompt
+   * writing, otherwise the route's, uncensored when `explicit`.
    */
   async function modelFor(task, explicit = false, writer) {
-    if (settings().chosen) return settings().chosen;
     if (writer) return writerModel(writer);
     return uncensoredAlias((await route()).model, explicit);
   }
 
   /** Whether the model calls take reads images: a local one as its workload says, any other always. */
   async function supportsVision(writer) {
-    if (!writer || settings().chosen) return (await route()).vision;
+    if (!writer) return (await route()).vision;
     const local = await localText();
     const model = writerModel(writer);
     return model.startsWith("local/") || model === local?.model ? Boolean(local?.vision) : true;
@@ -610,7 +600,7 @@ export function createAssistant(
       onThinking?.(text);
     };
     const timer = AbortSignal.timeout(ms ?? timeoutMs);
-    const effort = call && !settings().chosen ? reasoningEfforts[call] : null;
+    const effort = call ? reasoningEfforts[call] : null;
     const body = {
       model,
       messages,

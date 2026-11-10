@@ -12,26 +12,6 @@ import { databaseFile, readRuntimeDocument, writeRuntimeDocument } from "./persi
 const dataDir = currentDataDir();
 const documentName = "settings";
 
-function readSaved() {
-  // Reading alone never creates a database (tests import this without a data folder).
-  if (!fs.existsSync(databaseFile(dataDir))) return {};
-  try {
-    return readRuntimeDocument(dataDir, documentName);
-  } catch (error) {
-    if (error.code === "ENOENT") return {};
-    throw error;
-  }
-}
-
-const saved = readSaved();
-// Saved values fill in what the environment leaves unset; the environment always wins.
-const applied = new Set();
-for (const [key, value] of Object.entries(saved)) {
-  if (process.env[key]) continue;
-  process.env[key] = value;
-  applied.add(key);
-}
-
 export function settingSource(key) {
   const value = process.env[key];
   if (value === undefined || value === "") return { source: "default", locked: false };
@@ -101,6 +81,31 @@ export const catalogueFlags = [
     false,
   ),
 ];
+
+/** The default profiles Settings › Generation › Defaults saves. */
+export const defaultProfileKeys = ["STUDIO_DEFAULT_IMAGE_PROFILE", "STUDIO_DEFAULT_VIDEO_PROFILE"];
+const known = new Set([...defaultProfileKeys, ...catalogueFlags.map((item) => item.key)]);
+
+function readSaved() {
+  // Reading alone never creates a database (tests import this without a data folder).
+  if (!fs.existsSync(databaseFile(dataDir))) return {};
+  try {
+    return readRuntimeDocument(dataDir, documentName);
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw error;
+  }
+}
+
+// Keys Studio no longer saves are dropped as the document is read.
+const saved = Object.fromEntries(Object.entries(readSaved()).filter(([key]) => known.has(key)));
+// Saved values fill in what the environment leaves unset; the environment always wins.
+const applied = new Set();
+for (const [key, value] of Object.entries(saved)) {
+  if (process.env[key]) continue;
+  process.env[key] = value;
+  applied.add(key);
+}
 
 const flagOn = (item) => (process.env[item.key] ? process.env[item.key] !== "0" : item.defaultOn);
 

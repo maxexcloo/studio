@@ -14,13 +14,7 @@
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
  */
-import {
-  AssistantError,
-  assistantModelKey,
-  assistantSettings,
-  createAssistant,
-  uncensoredText,
-} from "./assistant.js";
+import { AssistantError, createAssistant, gatewaySettings, uncensoredText } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { ownerIdForRequest } from "./account-ownership.js";
@@ -33,8 +27,6 @@ const maxReferences = 4;
 const maxImageBytes = 12 * 1024 * 1024;
 const referenceEdge = 1024;
 const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/;
-
-export const assistantSettingKeys = Object.freeze([assistantModelKey]);
 
 export const promptAssistantOff = "The prompt assistant is off for this account.";
 
@@ -120,55 +112,26 @@ export function assistantRecord(value, loras = []) {
 }
 
 /**
- * Settings › Integrations: the assistant's gateway, chosen model and vision, and the models
- * to choose from: the gateway's and those of Studio's text workloads (`workloadModels`).
+ * Settings › Integrations › Prompt Assistant: whether the gateway is set, and the model Studio's
+ * own calls use now (the running local text model, otherwise the cloud model).
  */
-export async function assistantIntegration({
-  environment = process.env,
-  engine,
-  source,
-  workloadModels = [],
-}) {
-  let settings = null;
+export async function assistantIntegration({ environment = process.env, engine }) {
   let problem = "";
   try {
-    settings = assistantSettings(environment);
+    if (gatewaySettings(environment) && engine)
+      return { available: true, model: await engine.model("title") };
   } catch (error) {
     problem = error.message;
   }
-  const row = (key, effective) => ({
-    key,
-    configured: String(environment[key] || "").trim(),
-    effective,
-    ...source(key),
-  });
-  if (!settings || !engine)
-    return {
-      available: false,
-      note:
-        problem || "Set STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL to use the prompt assistant.",
-      models: [],
-      model: row(assistantModelKey, ""),
-    };
-  const [models, vision, model] = await Promise.all([
-    textModels(engine, workloadModels),
-    engine.supportsVision(),
-    engine.model("rewrite"),
-  ]);
-  return { available: true, models, model: { ...row(assistantModelKey, model), vision } };
+  return {
+    available: false,
+    note: problem || "Set STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL to use the prompt assistant.",
+  };
 }
 
 /** The text models to choose from: the gateway's and those of Studio's text workloads. */
 async function textModels(engine, workloadModels) {
   return [...new Set([...(await engine.listModels()), ...workloadModels])];
-}
-
-/** Checks a model name for the two assistant settings; '' clears it. */
-export function assistantSettingValue(key, value) {
-  if (!assistantSettingKeys.includes(key)) throw new Error("That setting cannot be changed here.");
-  const model = String(value ?? "").trim();
-  if (model && !modelPattern.test(model)) throw new Error("Choose a valid model name.");
-  return model;
 }
 
 /**
@@ -276,7 +239,7 @@ export function registerAssistantRoutes(
         })
         .map((profile) => profile.id);
       const writer = writerOf(account);
-      // Settings › Preferences' Prompt Writing picker: the text models, uncensored ones only for
+      // Settings › Preferences' Text picker: the text models, uncensored ones only for
       // accounts that may use them, and the one its writing asks for.
       const models = (await textModels(engine, workloadModels())).filter(
         (model) => writer.uncensored || !uncensoredText(model),
@@ -284,7 +247,6 @@ export function registerAssistantRoutes(
       res.json({
         ok: true,
         available: true,
-        model: await engine.model("rewrite", false, writer),
         vision: await engine.supportsVision(writer),
         writingModel: engine.writerModel(writer),
         models,

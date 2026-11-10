@@ -598,7 +598,7 @@ registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
-registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels, workloadModels });
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = createGenerationSubmission({

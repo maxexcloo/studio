@@ -18,7 +18,7 @@ export interface Deployment {
   integrations: {
     civitai: { token: { set: boolean } };
     huggingFace: { token: { set: boolean } };
-    assistant: { available: boolean; note?: string; models: string[]; model: Setting };
+    assistant: { available: boolean; note?: string; model?: string };
   };
 }
 /** Settings › Generation and Integrations: values an administrator saves for everyone. */
@@ -43,13 +43,6 @@ const applied = (data: Deployment, { key, value }: Change): Deployment => {
     catalogue: data.catalogue.map((flag) =>
       flag.key === key ? { ...flag, value: Boolean(value), source: "studio" } : flag,
     ),
-    integrations: {
-      ...data.integrations,
-      assistant: {
-        ...data.integrations.assistant,
-        model: setting(data.integrations.assistant.model),
-      },
-    },
   };
 };
 

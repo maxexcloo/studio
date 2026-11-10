@@ -1,11 +1,8 @@
-import {
-  assistantIntegration,
-  assistantSettingKeys,
-  assistantSettingValue,
-} from "./assistant-routes.js";
+import { assistantIntegration } from "./assistant-routes.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import {
   catalogueFlags,
+  defaultProfileKeys,
   describeFlag,
   isCatalogueFlag,
   saveDeploymentSetting,
@@ -17,13 +14,9 @@ import { requireAdmin } from "./route-access.js";
 
 /**
  * Settings › Deployment. `mediaModels` and `unavailableModels` are model/catalogue.js's;
- * `assistantEngine` is the prompt assistant, or undefined without one; `workloadModels()` lists
- * the models of the text workloads the assistant may use.
+ * `assistantEngine` is the prompt assistant, or undefined without one.
  */
-export function registerDeploymentRoutes(
-  app,
-  { assistantEngine, mediaModels, unavailableModels, workloadModels },
-) {
+export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels }) {
   /**
    * What the deployment decides, for Settings: each value with its source
    * (the deployment, saved from Settings, or the default) and whether it is locked.
@@ -57,11 +50,7 @@ export function registerDeploymentRoutes(
       integrations: {
         civitai: { token: civitaiTokenStatus() },
         huggingFace: { token: hfTokenStatus() },
-        assistant: await assistantIntegration({
-          engine: assistantEngine,
-          source: settingSource,
-          workloadModels: workloadModels(),
-        }),
+        assistant: await assistantIntegration({ engine: assistantEngine }),
       },
     });
   });
@@ -76,17 +65,7 @@ export function registerDeploymentRoutes(
         res.json({ ok: true, setting: { ...saveFlag(key, value), key } });
         return;
       }
-      if (assistantSettingKeys.includes(key)) {
-        res.json({
-          ok: true,
-          setting: {
-            ...saveDeploymentSetting(key, assistantSettingValue(key, value)),
-            key,
-          },
-        });
-        return;
-      }
-      if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
+      if (defaultProfileKeys.includes(key)) {
         const id = String(value || "").trim();
         if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
         res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
