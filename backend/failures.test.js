@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { describeFailure, failureTitles, troubleshootingAnchor } from "./failures.js";
 
-test("every failure headline has its own section in TROUBLESHOOTING.md, which the card links to", () => {
-  const doc = fs.readFileSync(new URL("../TROUBLESHOOTING.md", import.meta.url), "utf8");
+test("every failure headline has its own section in README.md › Troubleshooting, which the card links to", () => {
+  const doc = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
   // Windows checkouts can bring the file with \r\n line ends.
   const headings = doc
     .split(/\r?\n/)
     .filter((line) => line.startsWith("#"))
     .map((line) => line.replace(/^#+\s*/, ""));
   for (const title of failureTitles)
-    assert.ok(headings.includes(title), `TROUBLESHOOTING.md has no "### ${title}"`);
+    assert.ok(headings.includes(title), `README.md has no "#### ${title}"`);
   assert.equal(
     describeFailure({ message: "CUDA error: out of memory" }).help,
     "the-gpu-ran-out-of-memory",

@@ -1,5 +1,5 @@
 /**
- * The Library's routes (UI-PATTERNS › Library), administrators only:
+ * The Library's routes (AGENTS.md › UI Patterns), administrators only:
  *
  *   GET  /api/library/imports                 import history, newest first
  *   POST /api/library/imports {url}           import a Civitai image or model link, or a Hugging Face link

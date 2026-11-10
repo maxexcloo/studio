@@ -189,7 +189,7 @@ export function studioTheme({
     cursorType: "pointer",
     activeClassName: "",
     other: { background, motionDuration, transparency },
-    // One size and emphasis scale (UI-PATTERNS › Theme & Layout). Standard controls take these
+    // One size and emphasis scale (AGENTS.md › UI Patterns › Theme & Layout). Standard controls take these
     // defaults; compact surfaces (rows, toolbars, chip rails, popover forms) step down one tier.
     components: {
       ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
@@ -367,7 +367,7 @@ export function studioTheme({
             }
           : {},
       }),
-      // Every control that opens a picker shows ▾, as the chips do (UI-PATTERNS.md).
+      // Every control that opens a picker shows ▾, as the chips do (AGENTS.md › UI Patterns).
       MultiSelect: MultiSelect.extend({
         defaultProps: { rightSection: chevron },
         styles: { option: target },
