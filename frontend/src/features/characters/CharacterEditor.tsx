@@ -25,11 +25,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import {
-  maxCharacterDescription,
-  maxCharacterImages,
-  maxCharacterName,
-} from "../../../../shared/characters";
+import { maxCardDescription, maxCharacterImages, maxCardName } from "../../../../shared/characters";
 import { emptyGalleryFilters } from "../gallery/GalleryFilters";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -177,7 +173,7 @@ function CharacterForm({
           label="Name"
           placeholder="Mara"
           required
-          maxLength={maxCharacterName}
+          maxLength={maxCardName}
           data-autofocus
           value={name}
           onChange={(event) => setName(event.currentTarget.value)}
@@ -188,7 +184,7 @@ function CharacterForm({
           placeholder="Red-haired ranger, green cloak, scar over left eye"
           autosize
           minRows={2}
-          maxLength={maxCharacterDescription}
+          maxLength={maxCardDescription}
           value={description}
           onChange={setDescription}
           below={

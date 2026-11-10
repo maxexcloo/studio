@@ -7,7 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { characterShots, withCharacter } from "../../shared/characters.ts";
+import { characterShots, composePrompt, withCharacter } from "../../shared/characters.ts";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -340,9 +340,11 @@ async function fixture(
     res.json({ asset: assets.get(req.params.id) }),
   );
   app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
-  // The account's character cards (backend/characters.js), set by a test.
+  // The account's character cards (backend/cards.js), set by a test.
   const characters = [];
+  const outfits = [];
   app.get("/api/characters", (_req, res) => res.json({ characters }));
+  app.get("/api/outfits", (_req, res) => res.json({ outfits }));
   app.post("/api/characters/:id/generated", (req, res) => {
     characters.find((card) => card.id === req.params.id).generated = req.body;
     res.json({ ok: true });
@@ -412,6 +414,7 @@ async function fixture(
     app,
     assets,
     characters,
+    outfits,
     uploads,
     base,
     mcp,
@@ -1004,8 +1007,9 @@ test("media and administrator credentials discover only their own friendly tools
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
     // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
-    // generate's character and to 15,700 for its character_views.
-    JSON.stringify(tools).length + media.getInstructions().length < 15700,
+    // generate's character, to 15,700 for its character_views and to 16,000 for its shots (Studio
+    // writes a character's shots so the wording never drifts).
+    JSON.stringify(tools).length + media.getInstructions().length < 16000,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1640,6 +1644,41 @@ test("models lists the account's characters, and generate applies one by name: i
     f.submitted[before].prompt,
     withCharacter("At the harbour", "red-haired ranger, green cloak"),
   );
+  // Shots: Studio writes each prompt itself, an outfit card by name giving its own description and
+  // other words staying as they are; models lists the cards.
+  f.outfits.push({
+    id: "out-1",
+    name: "Raincoat",
+    description: "a yellow raincoat and black boots",
+  });
+  assert.deepEqual(data(await call(client, "models")).outfits, [
+    { id: "out-1", name: "Raincoat", description: "a yellow raincoat and black boots" },
+  ]);
+  const shot = { scene: "a rainy street at night", action: "walking", camera: "full-length shot" };
+  const shots = await call(client, "generate", {
+    character: "Mara",
+    shots: [
+      { ...shot, outfit: "raincoat" },
+      { ...shot, outfit: "a green gown" },
+    ],
+  });
+  assert.notEqual(shots.isError, true, shots.content?.[0]?.text);
+  const description = "red-haired ranger, green cloak";
+  assert.deepEqual(
+    f.submitted.slice(-2).map((job) => [job.profileId, job.prompt]),
+    [
+      [
+        "keeper",
+        composePrompt({
+          character: description,
+          ...shot,
+          outfit: "a yellow raincoat and black boots",
+        }),
+      ],
+      ["keeper", composePrompt({ character: description, ...shot, outfit: "a green gown" })],
+    ],
+  );
+  await failure(client, "generate", { prompts: ["A tree"], shots: [shot] });
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {

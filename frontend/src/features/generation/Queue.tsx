@@ -286,7 +286,9 @@ function QueueRow({
               <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
                 {[
                   profile && profileName(profile),
-                  statusLabels[job.status],
+                  job.operation === "upscale" && job.status === "running"
+                    ? "Upscaling"
+                    : statusLabels[job.status],
                   progress?.phase,
                   job.reason,
                 ]

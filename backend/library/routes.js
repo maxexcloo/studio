@@ -22,8 +22,8 @@
  *   GET  /api/library/items                   installed and catalogued LoRAs and models, with provenance and updates
  *   GET  /api/library/updates                 update states; POST …/check checks now; POST …/apply {key, alternative?}
  *
- * Imports follow the Presets & Civitai Imports deployment switch, as the saved images do. MCP's admin
- * tools (mcp/admin.js) call these same routes; their imports and edits record chat as the origin.
+ * MCP's admin tools (mcp/admin.js) call these same routes; their imports and edits record chat as
+ * the origin.
  */
 import fs from "node:fs";
 import path from "node:path";
