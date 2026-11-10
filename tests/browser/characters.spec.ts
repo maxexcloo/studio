@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { characterShots } from "../../shared/characters";
+import { characterShots, withCharacter } from "../../shared/characters";
 import {
   closeReferences,
   create,
@@ -34,7 +34,7 @@ async function openCharacters(page: Page) {
   return references;
 }
 
-test("Picking a character fills the reference slots and adds its description, and picking it again takes both out", async ({
+test("Picking a character places its first image and leads the prompt with it, and picking it again takes both out", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -43,14 +43,9 @@ test("Picking a character fills the reference slots and adds its description, an
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A misty forest path at dawn");
   const references = await openCharacters(page);
-  // The test profile takes one reference, so the card says it uses the first of its two.
-  await expect(references.getByText("Uses 1 of 2 images", { exact: true })).toBeVisible();
-  await expect(
-    references.getByText(
-      "Image Quality takes 1 reference, so a card with more adds its first image.",
-    ),
-  ).toBeVisible();
-  // The test profile starts from its reference (img2img), which the tab says.
+  await expect(references.getByText("2 images", { exact: true })).toBeVisible();
+  // The test profile starts from its reference (img2img) and no model edits with them, which the
+  // tab says.
   await expect(
     references.getByText(
       "Image Quality starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.",
@@ -61,15 +56,37 @@ test("Picking a character fills the reference slots and adds its description, an
     references.getByRole("button", { name: "Remove character: Mara", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await closeReferences(page);
-  await expect(prompt).toHaveValue(
-    "A misty forest path at dawn, red-haired ranger, green cloak, scar over left eye",
-  );
+  await expect(prompt).toHaveValue(withCharacter("A misty forest path at dawn", mara.description));
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await openCharacters(page);
   await page.getByRole("button", { name: "Remove character: Mara", exact: true }).click();
   await closeReferences(page);
   await expect(prompt).toHaveValue("A misty forest path at dawn");
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(0);
+});
+
+test("Picking a character on an img2img model moves the composer to a model that keeps characters", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara);
+  const keeper = {
+    ...profiles[0],
+    id: "image:keeper",
+    recipe: { modelLabel: "Keeper", label: "Fast" },
+    editReferences: true,
+    keepsCharacters: true,
+  };
+  await serveProfiles(page, [...profiles, keeper]);
+  await create(page);
+  const references = await openCharacters(page);
+  await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
+  await expect(references.getByText(/^Switched to .*Keeper/)).toBeVisible();
+  await closeReferences(page);
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    withCharacter("", mara.description),
+  );
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
 });
 
 test("New Character saves a name, description and gallery images from the References sheet", async ({
@@ -208,7 +225,7 @@ test("Generate References queues one view per shot on a shared seed with the car
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
   await page.getByRole("menuitem", { name: "Generate References", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(4);
-  expect(state.jobs.map((job) => job.input.prompt)).toEqual(characterShots(mara.description));
+  expect(state.jobs.map((job) => job.input.prompt)).toEqual(characterShots(mara.description, true));
   expect(new Set(state.jobs.map((job) => job.input.seed)).size).toBe(1);
   expect(state.jobs.every((job) => job.input.referenceAssets[0].assetId === "asset-front")).toBe(
     true,
