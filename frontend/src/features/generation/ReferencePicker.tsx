@@ -24,8 +24,14 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import { referenceCapacity, referenceDetails, referenceGroup, referenceGroups } from "./payload";
-import { useGeneration } from "./GenerationProvider";
+import {
+  referenceCapacity,
+  referenceDetails,
+  referenceGroup,
+  referenceGroups,
+  referencePatch,
+} from "./payload";
+import { inputForProfile, useGeneration } from "./GenerationProvider";
 import {
   galleryReferenceType,
   nextReferenceTarget,
@@ -295,9 +301,23 @@ export function ReferencePicker({
             references={references}
             prompt={prompt.value}
             profile={profile}
+            switchable={!value && !selectedProfile && !ownPrompt}
             onChange={(next) => {
-              list.set(next.references);
-              if (next.prompt !== prompt.value) prompt.onChange(next.prompt);
+              const editor = next.profile;
+              // The composer's draft moves to the character's model, its images and prompt with it.
+              if (editor)
+                setDraft((previous) => {
+                  const input = { ...inputForProfile(previous.input, editor), prompt: next.prompt };
+                  return {
+                    ...previous,
+                    references: next.references,
+                    input: { ...input, ...referencePatch(input, [], next.references, editor) },
+                  };
+                });
+              else {
+                list.set(next.references);
+                if (next.prompt !== prompt.value) prompt.onChange(next.prompt);
+              }
               settle();
             }}
             onLayer={setCharacterLayer}
