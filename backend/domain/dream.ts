@@ -379,7 +379,7 @@ export function createDream(options: {
   ): Promise<{ profiles: DreamProfile[]; defaults?: { imageModel?: string; videoModel?: string } }>;
   /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
   online(kind: Kind): Promise<{ text: Reach; media: Reach }>;
-  /** Whether text work (Chat replies, admitted local text) is running now. */
+  /** Whether admitted local text work is running now. */
   textBusy(): boolean;
   writer: DreamWriter | null;
   guide(profile: DreamProfile): unknown;
@@ -455,7 +455,7 @@ export function createDream(options: {
   }
   /**
    * The owner's Studio generations: visible gallery records of a job this Studio queued for the
-   * account (composer, Chat, MCP or Dream). Uploads, imports and records rebuilt without a job
+   * account (composer, MCP or Dream). Uploads, imports and records rebuilt without a job
    * never reach Dream, so it shows and learns only from what the account made here.
    */
   function generations(ownerId: string) {
@@ -869,7 +869,7 @@ export function createDream(options: {
 
   function session(ownerId: string, record: DreamRecord) {
     if (record.session && store.session(ownerId, record.session)) return record.session;
-    record.session = store.createSession(ownerId, "Dream", {}, { hidden: true }).id;
+    record.session = store.createSession(ownerId, "Dream").id;
     write(ownerId, record);
     return record.session;
   }

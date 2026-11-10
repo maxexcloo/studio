@@ -22,7 +22,6 @@ const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
 ]);
 
 const routes = {};
-const jobChats = new Map();
 // Image search (domain/image-search.ts): a test per search, or null.
 let near = () => null;
 registerGalleryReadRoutes(
@@ -32,7 +31,6 @@ registerGalleryReadRoutes(
     },
   },
   {
-    jobChats: () => jobChats,
     near: async (q) => near(q),
     store: new Store(openDatabase(":memory:")),
   },
@@ -257,38 +255,6 @@ test("gallery filter options cover the owned gallery without exposing other acco
     facets.aspects.map((aspect) => aspect.label),
     ["Landscape", "Portrait", "Square"],
   );
-});
-
-test("gallery items carry their Chat, which filters pages and lists as a facet", async () => {
-  galleryStore.setGallery([item("account-a", "job-a"), item("account-a", "job-b")]);
-  jobChats.set("job-a", { id: "chat-a", title: "Teapots" });
-  const request = (query) => ({
-    studioAccount: {
-      userId: "account-a",
-      role: "user",
-      authenticated: true,
-      features: {},
-    },
-    query,
-  });
-  try {
-    const page = await call(routes["/api/gallery"], request({ limit: "50" }));
-    assert.deepEqual(page.items.map((record) => [record.jobId, record.sessionId]).sort(), [
-      ["job-a", "chat-a"],
-      ["job-b", undefined],
-    ]);
-    assert.deepEqual(
-      (await call(routes["/api/gallery"], request({ limit: "50", chat: "chat-a" }))).items.map(
-        (record) => record.jobId,
-      ),
-      ["job-a"],
-    );
-    assert.deepEqual((await call(routes["/api/gallery/filters"], request({}))).chats, [
-      { value: "chat-a", label: "Teapots" },
-    ]);
-  } finally {
-    jobChats.clear();
-  }
 });
 
 test("search matches an image's caption as well as its prompt, within the account's own records", async () => {

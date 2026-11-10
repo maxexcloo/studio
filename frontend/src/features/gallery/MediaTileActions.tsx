@@ -13,19 +13,17 @@ import { mediaTitle } from "./mediaLabels";
 import { TrimVideoDialog } from "./videoEdits";
 import classes from "./MediaTileActions.module.css";
 
-/** Star, Download and More over a gallery tile or Chat result; the More menu doubles as its context menu. */
+/** Star, Download and More over a gallery tile; the More menu doubles as its context menu. */
 export function MediaTileActions({
   item,
   opened,
   onOpenedChange,
-  sessionId,
   omit,
   hideMore,
 }: {
   item: MediaItem;
   opened: boolean;
   onOpenedChange: (value: boolean) => void;
-  sessionId?: string;
   omit?: string[];
   /** Hides More for a tile whose menu opens by holding; the hidden button still anchors it. */
   hideMore?: boolean;
@@ -90,7 +88,6 @@ export function MediaTileActions({
               <MediaActionMenu
                 item={item}
                 transfer={transfer}
-                sessionId={sessionId}
                 omit={omit}
                 onApplied={() => onOpenedChange(false)}
                 onAnimate={setAnimating}
@@ -108,12 +105,7 @@ export function MediaTileActions({
         onDeleted={() => {}}
       />
       {animating && (
-        <AnimateDialog
-          item={item}
-          sessionId={sessionId}
-          theme={animating}
-          onClose={() => setAnimating(null)}
-        />
+        <AnimateDialog item={item} theme={animating} onClose={() => setAnimating(null)} />
       )}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>

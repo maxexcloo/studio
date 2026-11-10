@@ -40,7 +40,7 @@ function call(userId, body) {
   return res;
 }
 
-test("Recreate makes an upload the source of its runs, in one Recreate Chat", () => {
+test("Recreate makes an upload the source of its runs, in one Recreate session", () => {
   galleryStore.setGallery([
     {
       id: "upload",

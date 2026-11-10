@@ -74,7 +74,7 @@ export function ProfilePicker({
 }: {
   value?: GenerationInput;
   onChange?: (value: GenerationInput) => void;
-  /** An administrator choosing a parked profile also starts its worker, as a Chat model does. */
+  /** An administrator choosing a parked profile also starts its worker. */
   startParked?: boolean;
 } = {}) {
   const context = useGeneration();

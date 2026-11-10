@@ -78,7 +78,7 @@ export function GalleryPage() {
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
-  // A Chat card's set link (?set=<id>) shows that MCP result set alone until its chip is removed.
+  // A set link (?set=<id>) shows that MCP result set alone until its chip is removed.
   const setId = params.get("set") || "";
   // Find Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
   // within the filters, until its chip is removed.

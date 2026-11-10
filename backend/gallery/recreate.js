@@ -3,9 +3,9 @@ import { requireLocal } from "../route-access.js";
 import { gallery } from "./store.js";
 
 /**
- * Recreate's start: the Chat and job a run made from a finished item joins, so the run is one of
+ * Recreate's start: the session and job a run made from a finished item joins, so the run is one of
  * its versions. An item without a run of its own (an upload) gets a finished job holding it
- * (`store.recordFinished`) in a Recreate Chat, made once and reused. The composer then runs the
+ * (`store.recordFinished`) in a Recreate session, made once and reused. The composer then runs the
  * item's suggested prompt (domain/suggested-prompts.ts) there.
  */
 export function registerRecreateRoute(app, { store }) {

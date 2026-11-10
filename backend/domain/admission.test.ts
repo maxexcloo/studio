@@ -62,7 +62,10 @@ test("a Count whose derived ID is taken queues nothing, then and on retry", asyn
     });
   assert.equal((await request("run")).status, 409);
   assert.deepEqual(store.jobs("alice"), []);
-  assert.deepEqual(store.sessions("alice"), []);
+  assert.equal(
+    store.db.prepare("SELECT COUNT(*) AS n FROM studio_sessions WHERE owner_id = 'alice'").get()?.n,
+    0,
+  );
   assert.equal((await request("run")).status, 409);
   assert.deepEqual(store.jobs("alice"), []);
   assert.equal((await request("other")).status, 200);

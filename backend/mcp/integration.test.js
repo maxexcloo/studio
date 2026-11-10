@@ -2393,7 +2393,7 @@ test(
     assert.match(upload.reference_asset_id, /^gallery:/);
     assert.equal(upload.name, "holiday.png");
 
-    // LibreChat connects afresh for each turn and names its conversation: the turns are one MCP Chat.
+    // LibreChat connects afresh for each turn and names its conversation: the turns are one session.
     const turn = async (prompt) => {
       const librechat = new Client({ name: "librechat-fixture", version: "1.0.0" });
       t.after(() => librechat.close().catch(() => {}));
@@ -2419,16 +2419,19 @@ test(
     };
     const turns = [await turn("A first turn"), await turn("A second turn")];
     const api = async (route) => (await fetch(new URL(route, base))).json();
-    const chats = [];
-    for (const chat of (await api("/api/sessions")).sessions) {
-      const { jobs } = await api(`/api/sessions/${chat.id}`);
-      if (jobs.some((job) => turns.includes(job.id)))
-        chats.push({ ...chat, jobs: jobs.map((job) => job.id) });
-    }
-    assert.equal(chats.length, 1, "one conversation is one Chat");
-    assert.deepEqual(chats[0].jobs, turns);
-    assert.deepEqual(chats[0].mcp, { conversationId: "librechat-conversation" });
-    assert.equal(chats[0].title, "A first turn");
+    const sessions = new Set(
+      (await api("/api/queue")).jobs
+        .filter((job) => turns.includes(job.id))
+        .map((job) => job.sessionId),
+    );
+    assert.equal(sessions.size, 1, "one conversation is one session");
+    const { session, jobs } = await api(`/api/sessions/${[...sessions][0]}`);
+    assert.deepEqual(
+      jobs.map((job) => job.id),
+      turns,
+    );
+    assert.deepEqual(session.mcp, { conversationId: "librechat-conversation" });
+    assert.equal(session.title, "A first turn");
   },
 );
 
@@ -3936,11 +3939,6 @@ test("Search finds the account's own finished work through the gallery search, a
   // Bob sees his own work; what Alice's search found is hers now.
   assert.deepEqual((await search(bob, { query: "red" })).hits, [[fox, 0]]);
   await failure(bob, "review", { job_id: "studio-lantern" });
-  // Studio Chat runs the same tools in process.
-  const chat = await f.mcp.agent({ owner: "chat-owner", session: "chat-1" });
-  t.after(() => chat.close());
-  assert.ok(chat.tools.some((tool) => tool.name === "search"));
-  assert.match(chat.instructions, /For earlier or starred work, call search\./);
 });
 
 test("Search with uploads finds only the caller's uploads, an UploadLink adds one once, and Generate takes their references", async (t) => {

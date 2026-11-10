@@ -10,7 +10,7 @@ import { addGalleryItems, gallery } from "./store.js";
 /**
  * The Edit menu's video edits (Trim, …): ffmpeg writes the edited clip beside the original, which
  * stays, and it is saved as a new version of it, owned by the same account. The version is a
- * finished job made from the original (`store.recordFinished`), in the original's Chat.
+ * finished job made from the original (`store.recordFinished`), in the original's session.
  */
 export function registerVideoEditRoutes(app, { store }) {
   app.post("/api/gallery/video-edit", async (req, res) => {

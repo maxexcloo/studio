@@ -60,7 +60,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
     if (scope && !scopedSession) return { status: 404, payload: { error: "Session not found." } };
     const parent = scope?.parentJobId ? options.store.job(ownerId, scope.parentJobId) : undefined;
     if (scope?.parentJobId && parent?.sessionId !== scope.sessionId)
-      return { status: 400, payload: { error: "Parent generation must belong to this chat." } };
+      return { status: 400, payload: { error: "Parent generation must belong to this session." } };
     const clientId = String(input.clientJobId || "").replace(/[^\w-]/g, "");
     let release: (() => void) | undefined;
     if (clientId) {
@@ -80,7 +80,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
         const checked = await options.validate(input, account);
         if (checked.status >= 400) return checked;
         const title = String(input.prompt || "Generation").slice(0, 100);
-        // MCP work (its queue tier) joins its conversation's Chat; other unscoped work gets its own.
+        // MCP work (its queue tier) joins its conversation's session; other unscoped work gets its own.
         const session = () =>
           (
             scopedSession ||
@@ -108,7 +108,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             origin: {
               ...origin,
               ...(queueSet ? { queueSet } : {}),
-              // Otherwise a Chat run is made from its parent's result only when it uses it as its reference.
+              // Otherwise a run in its parent's session is made from its parent's result only when it uses it as its reference.
               parentItemId: scope?.parentItemId ?? (parent && referencedResult(input, parent)),
             },
           });

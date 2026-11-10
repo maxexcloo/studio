@@ -6,7 +6,6 @@ import express from "express";
 import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
-import { ChatStore } from "./chat-store.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
 import { everyone, Store } from "./store.ts";
@@ -148,7 +147,7 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
 
 test("A run from an item records it as its source, only when the item is the owner's", async () => {
   const store = new Store(openDatabase(":memory:"));
-  const chat = store.createSession("alice");
+  const session = store.createSession("alice");
   const items = new Map([
     ["/media/alice.png", "alice"],
     ["/media/bob.png", "bob"],
@@ -177,7 +176,7 @@ test("A run from an item records it as its source, only when the item is the own
   await once(server, "listening");
   const run = (parentItemId: string) =>
     fetch(
-      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${chat.id}/generations`,
+      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${session.id}/generations`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -185,7 +184,7 @@ test("A run from an item records it as its source, only when the item is the own
       },
     );
   try {
-    // Made outside the item's Chat, so with no parent run: the item alone is its source.
+    // Made outside the item's session, so with no parent run: the item alone is its source.
     const response = await run("/media/alice.png");
     assert.equal(response.status, 202);
     const { jobId } = (await response.json()) as { jobId: string };
@@ -193,132 +192,6 @@ test("A run from an item records it as its source, only when the item is the own
     assert.equal(store.job("alice", jobId)?.parentJobId, undefined);
     assert.equal((await run("/media/bob.png")).status, 400);
     assert.equal(store.jobs("alice").length, 1);
-  } finally {
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    store.close();
-  }
-});
-
-test("Deleting a chat is owner scoped, waits for active work and deletes only chosen results", async () => {
-  const store = new Store(openDatabase(":memory:"));
-  const chat = store.createSession("alice"),
-    other = store.createSession("bob");
-  const done = store.enqueue("alice", chat.id, {}, "image");
-  store.save({ ...done, status: "completed", outputs: [{ id: "kept" }, { id: "chosen" }] });
-  const active = store.save({ ...store.enqueue("alice", chat.id, {}, "image"), status: "running" });
-  store.enqueue("bob", other.id, {}, "image");
-  const deleted: string[][] = [];
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]) } });
-    next();
-  });
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
-    store,
-    queue: new GenerationQueue(store, {} as never),
-    deleteMedia: (ownerId, ids) => {
-      deleted.push([ownerId, ...ids]);
-      return { removed: ids, files: { deleted: ids.length, skipped: 0 } };
-    },
-  });
-  const server = app.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const remove = (user: string, id: string, mediaIds?: unknown) =>
-    fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${id}`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", "X-User": user },
-      body: JSON.stringify({ mediaIds }),
-    });
-  try {
-    assert.equal((await remove("bob", chat.id, ["chosen"])).status, 404);
-    const refused = await remove("alice", chat.id, ["chosen"]);
-    assert.equal(refused.status, 409);
-    assert.equal(((await refused.json()) as { reason: string }).reason, "active-jobs");
-    assert.deepEqual(deleted, []);
-    store.save({ ...active, status: "cancelled" });
-    const response = await remove("alice", chat.id, ["chosen", "foreign"]);
-    assert.equal(response.status, 200);
-    assert.deepEqual(((await response.json()) as { media: unknown }).media, {
-      removed: ["chosen"],
-      failed: [{ id: "foreign", error: "Not a result of this chat." }],
-      files: { deleted: 1, skipped: 0 },
-    });
-    assert.deepEqual(deleted, [["alice", "chosen"]]);
-    assert.equal(store.session("alice", chat.id), undefined);
-    assert.deepEqual(store.jobs("alice"), []);
-    assert.equal(store.jobs("bob").length, 1);
-    assert.ok(store.session("bob", other.id));
-  } finally {
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-    store.close();
-  }
-});
-
-test("Chats are searched, archived and deleted in bulk within the owner's own chats", async () => {
-  const db = openDatabase(":memory:");
-  const store = new Store(db);
-  const chats = new ChatStore(db);
-  const birds = store.createSession("alice", "Blue Birds"),
-    talk = store.createSession("alice", "Lighting"),
-    busy = store.createSession("alice", "Busy"),
-    foreign = store.createSession("bob", "Blue Birds");
-  chats.add("alice", talk.id, { role: "user", content: "Soft 100% daylight", status: "completed" });
-  store.save({ ...store.enqueue("alice", busy.id, {}, "image"), status: "running" });
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]) } });
-    next();
-  });
-  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
-    store,
-    queue: new GenerationQueue(store, {} as never),
-  });
-  const server = app.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions`;
-  const call = async (path: string, body?: unknown) => {
-    const response = await fetch(`${base}${path}`, {
-      method: body ? "POST" : "GET",
-      headers: { "Content-Type": "application/json", "X-User": "alice" },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return (await response.json()) as Record<string, any>;
-  };
-  const titles = async (query = "") =>
-    ((await call(query ? `?q=${encodeURIComponent(query)}` : "")).sessions as { title: string }[])
-      .map((chat) => chat.title)
-      .sort();
-  try {
-    assert.deepEqual(await titles("blue"), ["Blue Birds"]);
-    assert.deepEqual(await titles("100%"), ["Lighting"]);
-    assert.deepEqual(await titles("_"), []);
-
-    const before = store.session("alice", birds.id)!.updatedAt;
-    assert.deepEqual(
-      await call("/archive", { ids: [birds.id, foreign.id, "missing"], archived: true }),
-      { ids: [birds.id] },
-    );
-    assert.equal(store.session("alice", birds.id)?.archived, true);
-    assert.equal(store.session("alice", birds.id)?.updatedAt, before);
-    assert.equal(store.session("bob", foreign.id)?.archived, undefined);
-    await call("/archive", { ids: [birds.id], archived: false });
-    assert.equal(store.session("alice", birds.id)?.archived, undefined);
-
-    const deleted = await call("/delete", { ids: [birds.id, busy.id, foreign.id] });
-    assert.deepEqual(deleted.removed, [birds.id]);
-    assert.deepEqual(
-      deleted.failed.map((entry: { id: string; reason?: string }) => [entry.id, entry.reason]),
-      [
-        [busy.id, "active-jobs"],
-        [foreign.id, undefined],
-      ],
-    );
-    assert.deepEqual(await titles(), ["Busy", "Lighting"]);
-    assert.ok(store.session("bob", foreign.id));
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

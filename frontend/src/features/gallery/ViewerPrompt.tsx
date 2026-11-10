@@ -2,7 +2,6 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { useGroupFeature } from "../auth/AccountGate";
 import { icons } from "../../ui/icons";
 import {
   ProposalLabel,
@@ -14,8 +13,6 @@ import {
 } from "../generation/AskChange";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { Action, ActionGroups } from "./ActionBar";
-import { itemAction } from "./itemActions";
-import { useChatAction } from "./MediaActions";
 import { typedPrompt, type Iteration } from "./useMediaAction";
 import { useItemChange } from "./useItemChange";
 import classes from "./MediaViewer.module.css";
@@ -25,26 +22,21 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its tools are the text box's: Suggestions, Ask, then Continue in Chat (desktop; phones show it on
- * the action bar), which takes the item, and any change typed, to a new Chat. The bar has Copy.
+ * Its tools are the text box's: Suggestions, then Ask. The bar has Copy.
  */
 export function ViewerPrompt({
   item,
   groups,
   iterate,
   pending,
-  onApplied,
 }: {
   item: MediaItem;
   /** The item's actions, whose Upscale a change may run. */
   groups: ActionGroups;
   iterate: (iteration: Iteration) => void;
   pending?: Iteration;
-  onApplied: () => void;
 }) {
   const phone = usePhone();
-  const chat = useChatAction(item, onApplied);
-  const chatOn = useGroupFeature("chat");
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -55,7 +47,6 @@ export function ViewerPrompt({
     restore: setPrompt,
   });
   const change = ask.proposal;
-  const done = item.status === "done" && Boolean(item.url);
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
   const submit = change
@@ -83,8 +74,6 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  const continueInChat = itemAction("chat");
-  const typed = prompt.trim() !== original.trim() ? prompt.trim() : undefined;
   // Next steps, which Suggestions offers, are written for images; they load as the image opens.
   const offered = ask.available && item.type === "image";
   const suggestions = useChangeSuggestions({
@@ -113,14 +102,6 @@ export function ViewerPrompt({
         icon: icons.assistant,
         disabled: !prompt.trim() || ask.pending,
         onClick: () => ask.send(prompt, prompt.trim()),
-      },
-    done &&
-      chatOn &&
-      !phone && {
-        ...continueInChat,
-        id: "chat",
-        disabled: chat.isPending,
-        onClick: () => chat.mutate(typed),
       },
   ].filter((tool): tool is Action => Boolean(tool));
   // Phones generate from the editor's send arrow; a proposal's Run stays in the field.
@@ -155,7 +136,7 @@ export function ViewerPrompt({
       tools={tools}
       copy={false}
       send={send}
-      busy={ask.pending ? "Asking for a Change…" : chat.isPending ? "Starting a Chat…" : undefined}
+      busy={ask.pending ? "Asking for a Change…" : undefined}
       submit={change ? undefined : submit}
     />
   );

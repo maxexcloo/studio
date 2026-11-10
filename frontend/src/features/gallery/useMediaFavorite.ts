@@ -2,7 +2,7 @@ import { useIsMutating, useMutation, useQueryClient, type Query } from "@tanstac
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 
-/** Caches that hold media records: gallery pages (the reference picker's too), Chats and the queue. */
+/** Caches that hold media records: gallery pages (the reference picker's too) and the queue. */
 const mediaCaches = new Set(["gallery", "session", "queue"]);
 const holdsMedia = (query: Query) => mediaCaches.has(String(query.queryKey[0]));
 const favoritesKey = ["favorites"];

@@ -73,7 +73,7 @@ test("sessions and queue records are scoped to the authenticated owner", () => {
   }
 });
 
-test("an MCP conversation goes on in the first of the Chats its earlier jobs split into", () => {
+test("an MCP conversation goes on in the first of the sessions its earlier jobs split into", () => {
   const { store } = fixture();
   try {
     const chat = { conversationId: "librechat-conversation" };
@@ -87,7 +87,7 @@ test("an MCP conversation goes on in the first of the Chats its earlier jobs spl
     assert.deepEqual(store.session("alice", first.id)?.mcp, chat);
     assert.equal(store.mcpSession("alice", "A fourth turn", {}, chat.conversationId).id, first.id);
     assert.equal(store.session("alice", second.id)?.mcp, undefined);
-    // Another account's conversation of the same name is its own Chat.
+    // Another account's conversation of the same name is its own session.
     assert.notEqual(store.mcpSession("bob", "A turn", {}, chat.conversationId).id, first.id);
   } finally {
     store.close();

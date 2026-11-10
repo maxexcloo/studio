@@ -619,15 +619,6 @@ export class McpMedia {
       ...controls,
       ...(record.assistant ? { assistant: record.assistant } : {}),
       ...(record.conversation ? { chat: { conversationId: record.conversation } } : {}),
-      // Studio Chat's work joins its chat, made from `parent` when it reuses one of its results.
-      ...(record.session
-        ? {
-            studioSession: {
-              id: record.session,
-              ...(record.parent ? { parent: record.parent } : {}),
-            },
-          }
-        : {}),
       kind: profile.kind,
       profileId: profile_id,
       // A combined profile runs on the backend a call or record named while it has it, else its current one.
@@ -957,7 +948,7 @@ export class McpMedia {
     };
   }
   /**
-   * Gives an account's own Studio jobs and references (Studio Chat's) to it here, so tools take
+   * Gives an account's own Studio jobs and references to it here, so tools take
    * them, and numbers the jobs in this scope in their order; anything another owner has is left.
    */
   adopt(owner, scope, { jobs = [], assets = [] }) {

@@ -129,7 +129,7 @@ interface TasteReadOut {
 }
 /**
  * One account's taste profile: the stored taste, its scores (rebuilt from the signals on each read,
- * so they decay with time) read out, and a summary for Chat, suggestions and Dream's writer.
+ * so they decay with time) read out, and a summary for suggestions and Dream's writer.
  */
 export interface TasteRecord extends StoredTaste, TasteReadOut {
   summary: string;

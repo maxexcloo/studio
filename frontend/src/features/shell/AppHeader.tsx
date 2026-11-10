@@ -9,12 +9,12 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Image, Library, MessageCircle, Video } from "lucide-react";
+import { Image, Library, Video } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
-import { useGroupFeature } from "../auth/AccountGate";
+import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
 import { dreamQuery } from "../dream/queries";
 import { useLibraryAccess } from "../library/useLibraryAccess";
@@ -25,7 +25,6 @@ import { usePhone } from "../../ui/usePhone";
 import classes from "./AppHeader.module.css";
 
 const modes = [
-  { to: "/chat", label: "Chat", icon: MessageCircle },
   { to: "/dream", label: "Dream", icon: icons.dream },
   { to: "/images", label: "Images", icon: Image },
   { to: "/video", label: "Videos", icon: Video },
@@ -38,7 +37,8 @@ function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();
   const [root, setRoot] = useState<HTMLElement | null>(null);
   const [selected, setSelected] = useState<HTMLElement | null>(null);
-  const shown = { "/chat": useGroupFeature("chat"), "/dream": useGroupFeature("dream") };
+  const shown = { "/dream": useGroupFeature("dream") };
+  const chatUrl = useAccount().data?.chatUrl;
   // Dream's results waiting for a verdict, counted on its tab.
   const unseen =
     useQuery({
@@ -57,6 +57,28 @@ function ModeSwitcher({ mode }: { mode: string }) {
       wrap="nowrap"
     >
       <FloatingIndicator target={selected} parent={root} className={classes.indicator} />
+      {/* People chat on the deployment's chat site (LibreChat), which reaches Studio over MCP. */}
+      {chatUrl && (
+        <Tooltip label="Chat" disabled={!phone}>
+          <Button
+            component="a"
+            href={chatUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Chat"
+            aria-description="Opens in a new tab"
+            variant="subtle"
+            color="gray"
+            className={classes.mode}
+            px={phone ? 8 : 12}
+            size="sm"
+            radius="xl"
+            rightSection={phone ? undefined : <icons.external size={12} aria-hidden />}
+          >
+            {phone ? <icons.chat size={20} /> : "Chat"}
+          </Button>
+        </Tooltip>
+      )}
       {modes
         .filter((item) => shown[item.to as keyof typeof shown] !== false)
         .map((item) => {
@@ -101,7 +123,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
   );
 }
 /** `mode` is the creative-mode path, which stays behind Library and Settings. */
-export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
+export function AppHeader({ mode }: { mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
   const library = useLibraryAccess();
@@ -123,7 +145,7 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />
         </Link>
-        <StatusAction chat={chat} />
+        <StatusAction />
       </Group>
       <ModeSwitcher mode={mode} />
       {/* Appearance, Library, Settings, User: alphabetical. */}

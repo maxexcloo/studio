@@ -6,9 +6,7 @@ const png = await sharp({ create: { width: 24, height: 16, channels: 3, backgrou
   .png()
   .toBuffer();
 
-test("Prompt paste and Chat file drop attach owned references before submission", async ({
-  page,
-}) => {
+test("Prompt paste attaches an owned reference before submission", async ({ page }) => {
   const state = await fixtures(page);
   let uploads = 0;
   let release!: () => void;
@@ -59,16 +57,6 @@ test("Prompt paste and Chat file drop attach owned references before submission"
     await page.getByRole("button", { name: "Generate Image", exact: true }).click();
     await expect.poll(() => state.jobs.length).toBe(1);
     expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "upload-1", slot: "image" }]);
-    await page.getByRole("link", { name: "Chat", exact: true }).first().click();
-    await page
-      .getByRole("textbox", { name: "Message", exact: true })
-      .fill("Discuss the dropped reference");
-    await page.locator("[data-composer-dock]").dispatchEvent("dragover", { dataTransfer: files });
-    await page.locator("[data-composer-dock]").dispatchEvent("drop", { dataTransfer: files });
-    await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Send Message", exact: true }).click();
-    await expect.poll(() => state.chatRequests.length).toBe(1);
-    expect(state.chatRequests[0].references).toEqual(["upload-2"]);
   } finally {
     release();
   }

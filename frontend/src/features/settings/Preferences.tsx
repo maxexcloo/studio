@@ -138,7 +138,7 @@ function ModelChoices() {
       {choice(
         "cloudModels",
         "Cloud Models",
-        "Offer the cloud models you have access to. Off hides them here, in Chat and over MCP.",
+        "Offer the cloud models you have access to. Off hides them here and over MCP.",
       )}
       {choice(
         "loras",
@@ -165,7 +165,7 @@ const videoChoices: { value: VideosPreference; label: string }[] = [
   { value: "quality", label: "Quality" },
 ];
 /**
- * Where Chat, Prompt Writing, Images and Videos run by default: Cloud or Local, and for Videos
+ * Where Prompt Writing, Images and Videos run by default: Cloud or Local, and for Videos
  * Cloud or the local Fast or Quality tier (unsaved, Local and Fast).
  */
 function WhereWorkRuns() {
@@ -191,13 +191,6 @@ function WhereWorkRuns() {
   );
   return (
     <SettingGroup title="Where Work Runs">
-      {row(
-        "Chat",
-        "The text model Chat starts with. A model you pick in Chat wins.",
-        sides,
-        preferences.chat || "local",
-        (chat) => save.mutate({ chat }),
-      )}
       {row(
         "Images",
         "The model new images start on. A model you pick wins.",

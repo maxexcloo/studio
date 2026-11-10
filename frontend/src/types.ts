@@ -148,8 +148,6 @@ export interface MediaItem {
   filename?: string;
   /** The saved file's name, for downloads. */
   outputName?: string;
-  /** The Chat whose generation made this item. */
-  sessionId?: string;
   /**
    * The MCP result set it belongs to: one generate call's id, title and asking client (`source`),
    * and this result's prompt position and own title (`variation`), when the chat gave one.

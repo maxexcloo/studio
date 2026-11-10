@@ -2,7 +2,7 @@
 
 Studio is a media workspace for generating images and video, refining results and continuing an idea through saved visual sessions. It connects to ComfyUI and cloud providers, with account isolation, model imports and native MCP tools.
 
-Use Images and Videos to generate and edit media, or Chat to develop an idea through conversation and saved iterations.
+Use Images and Videos to generate and edit media. Conversations happen on a chat site such as LibreChat, which reaches Studio through its MCP tools; the navigation's Chat item opens it.
 
 ## Development
 
@@ -68,7 +68,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
 
-**Where Work Runs** (Settings › Preferences) sets, per account, whether Chat, Prompt Writing (including Ask for a Change) and Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins, and `STUDIO_ASSISTANT_MODEL` always runs. Otherwise Studio never switches work to the cloud, and held video work never does.
+**Where Work Runs** (Settings › Preferences) sets, per account, whether Prompt Writing (including Ask for a Change) and Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins, and `STUDIO_ASSISTANT_MODEL` always runs. Otherwise Studio never switches work to the cloud, and held video work never does.
 
 ### Accounts & Single Sign-On
 
@@ -83,20 +83,20 @@ Single sign-on (Pocket ID or another OpenID Connect provider) needs `STUDIO_OIDC
 MCP clients reach `/mcp` in one of three ways:
 
 - **Personal token:** an account's own token from Settings › Account, where only that account can view and copy it again, as `Authorization: Bearer <token>`, or in the path (`/mcp/<token>`) for a client that sends no headers. Only an administrator's own token reaches the admin tools.
-- **Trusted gateway:** a chat gateway such as Bifrost sends `STUDIO_MCP_API_KEY` with its user's ID in `x-ai-user-id` (and email in `x-ai-user-email`, which links or creates the matching ordinary account). Administrators link other IDs in **Settings › Users › Chat Gateway**. `x-studio-conversation-id` scopes result numbers to one chat.
+- **Trusted gateway:** a chat gateway such as Bifrost (for LibreChat) sends `STUDIO_MCP_API_KEY` with its user's ID in `x-ai-user-id` (and email in `x-ai-user-email`, which links or creates the matching ordinary account). Administrators link other IDs in **Settings › Users › Chat Gateway**. `x-studio-conversation-id` scopes result numbers to one chat.
 - **GPU control:** `CONTROL_MCP_API_KEY` gets only the GPU tools (`gpu_status`, `workloads`, `preview`, `apply`, `mode`, `restart`, `operation`) and needs [Runtime Control](#runtime-control).
 
 `STUDIO_MCP_PUBLIC_URL` is the internet-facing host: it takes only personal tokens, and signed result, upload and export links use it. The shared keys work only on the other allowed hosts, such as the in-cluster service name.
 
 Every MCP action calls the route its UI action calls with the caller's own credential, so ownership, group features and administrator checks apply as in the app.
 
-### Prompt Assistant & Chat
+`STUDIO_CHAT_URL` (such as `https://chat.excloo.com`) adds a Chat item to the navigation that opens that chat site in a new tab; unset, there is none.
 
-The prompt assistant and Chat use an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). While a text workload runs, calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) instead. `STUDIO_ASSISTANT_MODEL` replaces that choice for every call. Without the gateway, the assistant is off.
+### Prompt Assistant
 
-`STUDIO_CHAT_MODELS` lists the models Chat may use, as IDs or prefixes ending in `*` (such as `local/auto,cloud/*`); empty leaves Chat unavailable. Chat runs Studio's own MCP tools in process.
+The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). While a text workload runs, calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) instead. `STUDIO_ASSISTANT_MODEL` replaces that choice for every call. Without the gateway, the assistant is off.
 
-**Background AI** (**Settings › Generation**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_CHAT_TITLES`, `STUDIO_FACE_CHECK`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
+**Background AI** (**Settings › Generation**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 
 `mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway; `--record` writes the replies back for review.
 
@@ -128,7 +128,7 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the
 
 ### Data & Migrations
 
-`studio.sqlite` in the data folder holds the queue, sessions, Chat, accounts, the gallery and the other runtime records; profiles, guides, `config/models.json`, `library/catalogue.json` and media stay files. Studio refuses to start on a folder whose storage predates the current format and names what is pending.
+`studio.sqlite` in the data folder holds the queue, sessions, accounts, the gallery and the other runtime records; profiles, guides, `config/models.json`, `library/catalogue.json` and media stay files. Studio refuses to start on a folder whose storage predates the current format and names what is pending.
 
 Data moves only through `migrate-runtime`, run with Studio stopped. Take a ZFS snapshot of the data first, then dry-run, apply and rehearse the restore of the backup it writes under `.backups/`:
 
@@ -138,7 +138,12 @@ node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --appl
 node backend/commands/migrate-runtime.mjs --restore /path/to/studio-data/.backups/STAMP --destination /empty/restore-rehearsal
 ```
 
-The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. `--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results without a backup; supply it only for the one account that used Dream. To roll back, stop Studio, roll the data back to the snapshot and deploy the previous image. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
+The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. Two steps are pending, both safe online:
+
+- `chatRecords` deletes what Studio's own Chat stored: the `studio_chat_messages` table, the Chats list's session marks, the Chat preference and each group's Chat feature. Sessions (which hold the queue's job records), MCP's records and the gateway links stay. It keeps no backup, so its `--restore` is impossible.
+- `pruneBackups` deletes the data folder's `backups/` (copies kept by profile edits, removals, merges and backend combines) and `.backups/` (earlier migration backups and version snapshots), listing each folder with its size first. Their `--restore`s are then impossible.
+
+`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results without a backup; supply it only for the one account that used Dream. To roll back, stop Studio, roll the data back to the snapshot and deploy the previous image. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
 
 ### Runtime Control
 
@@ -173,10 +178,6 @@ Read the startup error for the missing setting, occupied port or invalid mounted
 #### Profiles or Models Are Missing
 
 Check the live profile and catalogue definitions in Library. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
-
-#### Chat Is Unavailable
-
-Check the Chat status and administrator-configured gateway endpoint, key and allowed model list. Keep gateway credentials server-side. A media request still needs permission for its selected profile. See [Configuration](#configuration).
 
 ### Generation Failures
 

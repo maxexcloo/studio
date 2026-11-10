@@ -333,7 +333,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     } catch {
       /* a run matters more than its history */
     }
-    // The one place every path (composer, Chat, Compare, Dream, MCP) gets its LoRAs' trigger words,
+    // The one place every path (composer, Compare, Dream, MCP) gets its LoRAs' trigger words,
     // never the prompt field: history and `typedPrompt` keep what was typed, the run and its
     // gallery record the prompt that ran.
     if (body.loras?.length) {

@@ -14,7 +14,7 @@ import { chipProps } from "./chip";
 import classes from "./GenerationInputControls.module.css";
 
 /**
- * A rail chip that opens its option list: the composer's Profile and Chat's text model. `swatch`
+ * A rail chip that opens its option list: the composer's Profile and prompt ideas. `swatch`
  * is a readiness colour beside the name; `target` adds attributes to the chip itself. Touch screens
  * list the options without a search, which Mantine would focus on opening and so raise the keyboard.
  */

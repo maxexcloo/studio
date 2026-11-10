@@ -50,7 +50,6 @@ const featureLabels = {
     label: "Characters",
     description: "Character cards that add their images and description to a prompt",
   },
-  chat: { label: "Chat", description: "Studio Chat and its generation tools" },
   cloudModels: { label: "Cloud Models", description: "Every cloud-provider profile" },
   dream: { label: "Dream", description: "The Dream deck of drawn ideas" },
   loras: { label: "LoRAs", description: "Style and subject adapters on compatible models" },
@@ -107,7 +106,7 @@ function GroupEditor({
       allModels: false,
       generationProfiles: [],
       // As the server reads a group without them (backend/account-policy.js).
-      features: { characters: true, chat: true, dream: true, promptAssistant: true },
+      features: { characters: true, dream: true, promptAssistant: true },
     },
   });
   const save = useMutation({
@@ -346,7 +345,6 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
                 {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
                 {!group.features.characters && groupFeature(false, "Characters")}
-                {!group.features.chat && groupFeature(false, "Chat")}
                 {!group.features.dream && groupFeature(false, "Dream")}
                 {!group.features.promptAssistant && groupFeature(false, "Prompt Assistant")}
               </Group>

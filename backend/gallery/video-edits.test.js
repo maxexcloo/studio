@@ -55,7 +55,7 @@ async function call(userId, body) {
   return res;
 }
 
-/** A two-second clip with sound in Alice's media folder, made by a job in her Chat. */
+/** A two-second clip with sound in Alice's media folder, made by a job in her session. */
 function seed() {
   const subfolder = media.mediaSubfolder("alice");
   const file = media.mediaPath("clip.mp4", subfolder);
