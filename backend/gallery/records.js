@@ -228,11 +228,12 @@ export function generationSettings(body) {
       ? { width: body.requestedSize.width, height: body.requestedSize.height }
       : {}),
     referenceAssets: Array.isArray(body.referenceAssets)
-      ? body.referenceAssets.map(({ slot, assetId, source, name }) => ({
+      ? body.referenceAssets.map(({ slot, assetId, source, name, strength }) => ({
           slot,
           assetId,
           source,
           name,
+          ...(Number.isFinite(strength) ? { strength } : {}),
         }))
       : [],
     // A first reference that only guided: kept, so a retry runs it the same way (Edit is the default).

@@ -581,6 +581,7 @@ export async function stageReferenceAssetsForAccount(
       slot,
       assetId,
       source: String(reference?.source || ""),
+      ...(Number.isFinite(reference?.strength) ? { strength: reference.strength } : {}),
       ...uploaded,
       ...(unique ? { temporary: true } : {}),
       ...(bytes.width ? { width: bytes.width, height: bytes.height } : {}),

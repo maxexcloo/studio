@@ -1,7 +1,10 @@
 import "./fixtures/sample-profiles.js";
 import "./fixtures/local-worker.js";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { userWorkflowsDir } from "./custom-workflows.js";
 import {
   composeWorkflowPrompt,
   customWorkflowGraph,
@@ -183,4 +186,44 @@ test("a request without steps (a fixed-step profile) keeps the graph's own steps
   };
   assert.equal((await customWorkflowGraph(request))["373"].inputs.steps, 2);
   assert.equal((await customWorkflowGraph({ ...request, steps: 6 }))["373"].inputs.steps, 6);
+});
+
+test("a guiding reference's strength reaches its mapped input; without one the graph keeps its own", async () => {
+  fs.writeFileSync(
+    path.join(userWorkflowsDir, "style-guided.json"),
+    JSON.stringify({
+      studio: {
+        id: "style-guided",
+        kind: "image",
+        controls: { prompt: { node: "4", input: "text" } },
+        mediaInputs: [
+          {
+            id: "style",
+            role: "style",
+            control: { node: "1", input: "image" },
+            strength: { node: "3", input: "strength" },
+          },
+        ],
+      },
+      1: { class_type: "LoadImage", inputs: { image: "example.png" } },
+      2: { class_type: "CLIPVisionEncode", inputs: { image: ["1", 0] } },
+      3: { class_type: "StyleModelApply", inputs: { clip_vision_output: ["2", 0], strength: 0.6 } },
+      4: { class_type: "CLIPTextEncode", inputs: { text: "" } },
+    }),
+  );
+  const request = {
+    workflow: "custom:style-guided",
+    prompt: "A lighthouse",
+    width: 1024,
+    height: 1024,
+    seed: 42,
+    referenceAssets: [{ slot: "style", assetId: "asset-1", comfyName: "staged.png" }],
+  };
+  assert.equal((await customWorkflowGraph(request))["3"].inputs.strength, 0.6);
+  const graph = await customWorkflowGraph({
+    ...request,
+    referenceAssets: [{ ...request.referenceAssets[0], strength: 1.25 }],
+  });
+  assert.equal(graph["1"].inputs.image, "staged.png");
+  assert.equal(graph["3"].inputs.strength, 1.25);
 });

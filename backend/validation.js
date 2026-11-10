@@ -149,14 +149,22 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (kind !== customWorkflow.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
   const referenceAssets = Array.isArray(input.referenceAssets)
     ? input.referenceAssets
-        .map((item) => ({
-          slot:
+        .map((item) => {
+          const slot =
             String(item?.slot || "reference")
               .replace(/[^a-z0-9._-]/gi, "")
-              .slice(0, 80) || "reference",
-          assetId: String(item?.assetId || "").slice(0, 2048),
-          source: String(item?.source || "").slice(0, 40),
-        }))
+              .slice(0, 80) || "reference";
+          // A strength only where the slot maps one (a guiding role), within its range.
+          const range = customWorkflow.mediaInputs?.find((input) => input.id === slot)?.strength;
+          return {
+            slot,
+            assetId: String(item?.assetId || "").slice(0, 2048),
+            source: String(item?.source || "").slice(0, 40),
+            ...(range && item?.strength != null && item.strength !== ""
+              ? { strength: snapNumber(item.strength, range.default, range) }
+              : {}),
+          };
+        })
         .filter((item) => item.assetId)
     : [];
   validateReferenceSlots(referenceAssets, customWorkflow, input);

@@ -3,6 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { post } from "../../api";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
+import { guidingRoles } from "../../../../shared/profiles";
+
+/** A reference slot's roles: where it goes, then what it guides (Identity, Pose/Layout, Style). */
+const roleOptions = [
+  { value: "start", label: "Start" },
+  { value: "end", label: "End" },
+  { value: "reference", label: "Reference" },
+  ...Object.entries(guidingRoles).map(([value, label]) => ({ value, label })),
+];
 
 interface WorkflowNode {
   id: string;
@@ -22,6 +31,8 @@ interface Connection {
   mapping: unknown;
   readOnly?: boolean;
   onChange: (mapping: Record<string, unknown>) => void;
+  /** A reference slot's role; unset reads as a plain reference. */
+  role?: { value: string | null; onChange: (role: string | null) => void };
 }
 
 /** One control or reference per row, choosing the workflow node and input it feeds. */
@@ -88,6 +99,26 @@ function ConnectionTable({
             </>
           ),
         },
+        ...(rows.some((row) => row.role)
+          ? [
+              {
+                key: "role",
+                header: "Role",
+                cell: ({ field, role }: Connection) =>
+                  role && (
+                    <Select
+                      aria-label={`${field} Role`}
+                      placeholder="Reference"
+                      clearable
+                      data={roleOptions}
+                      value={role.value}
+                      disabled={disabled}
+                      onChange={role.onChange}
+                    />
+                  ),
+              },
+            ]
+          : []),
         {
           key: "node",
           header: "Node",
@@ -211,22 +242,54 @@ export function WorkflowConnections({
           nodes={nodes}
           disabled={disabled}
           empty="No Reference Inputs"
-          rows={mediaInputs.map((slot, index) => ({
-            key: `${index}`,
-            label: record(slot)
+          rows={mediaInputs.flatMap((slot, index) => {
+            const label = record(slot)
               ? String(slot.label || slot.id || `Reference ${index + 1}`)
-              : `Reference ${index + 1}`,
-            field: `Reference ${record(slot) ? String(slot.id || index + 1) : index + 1}`,
-            detail: record(slot) ? String(slot.id || "") : undefined,
-            mapping: record(slot) ? slot.control : undefined,
-            onChange: (next) =>
+              : `Reference ${index + 1}`;
+            const field = `Reference ${record(slot) ? String(slot.id || index + 1) : index + 1}`;
+            const update = (patch: Record<string, unknown>) =>
               onChange(
                 "mediaInputs",
                 mediaInputs.map((entry, entryIndex) =>
-                  entryIndex === index ? { ...slot, control: next } : entry,
+                  entryIndex === index ? { ...slot, ...patch } : entry,
                 ),
-              ),
-          }))}
+              );
+            const role = record(slot) && typeof slot.role === "string" ? slot.role : null;
+            const rows: Connection[] = [
+              {
+                key: `${index}`,
+                label,
+                field,
+                detail: record(slot) ? String(slot.id || "") : undefined,
+                mapping: record(slot) ? slot.control : undefined,
+                onChange: (control) => update({ control }),
+                role: record(slot)
+                  ? {
+                      value: role,
+                      // Only a guiding role takes a strength.
+                      onChange: (next) =>
+                        update({
+                          role: next ?? undefined,
+                          ...(next && Object.hasOwn(guidingRoles, next)
+                            ? {}
+                            : { strength: undefined }),
+                        }),
+                    }
+                  : undefined,
+              },
+            ];
+            // A guiding slot's strength: the input that sets how strongly it guides, if the graph has one.
+            if (role && Object.hasOwn(guidingRoles, role))
+              rows.push({
+                key: `${index}-strength`,
+                label: `${label} Strength`,
+                field: `${field} Strength`,
+                detail: "Optional. Lets people set how strongly it guides.",
+                mapping: record(slot) && record(slot.strength) ? slot.strength : {},
+                onChange: (strength) => update({ strength }),
+              });
+            return rows;
+          })}
         />
       )}
     </Stack>

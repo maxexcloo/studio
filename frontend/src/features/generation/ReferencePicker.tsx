@@ -40,7 +40,8 @@ import {
   useReferencePlacement,
   type ReferenceTarget,
 } from "./references";
-import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
+import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
+import { startImageSlot } from "../../../../shared/characters";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
@@ -185,7 +186,13 @@ export function ReferencePicker({
       return;
     }
     const rest = current.filter((reference) => reference !== asset);
-    const next = placeReference(rest, { ...asset, slot: undefined }, profile, into);
+    // Another role starts from its own default strength.
+    const next = placeReference(
+      rest,
+      { ...asset, slot: undefined, strength: undefined },
+      profile,
+      into,
+    );
     if (next !== rest) list.set(next);
   }
   function dropData(data: DataTransfer, into: ReferenceTarget | null = chosen) {
@@ -308,6 +315,12 @@ export function ReferencePicker({
           settle();
         }}
         onDrop={dropData}
+      />
+      <ReferenceRoles
+        references={references}
+        profile={profile}
+        startSlot={profile?.kind === "image" ? startImageSlot(profile) : undefined}
+        onChange={list.set}
       />
       {!target && tab === "gallery" && (
         <Text size="xs" c="dimmed">

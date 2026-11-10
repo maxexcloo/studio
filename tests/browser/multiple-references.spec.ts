@@ -219,3 +219,72 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "asset-kept", slot: "images" }]);
   expect(state.gallery.some((item) => item.id === "kept")).toBe(true);
 });
+
+test("A guiding reference takes its Strength, and an img2img start image says so", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const profile: Profile = {
+    ...profiles[0],
+    mediaInputs: [
+      { id: "image", label: "Image" },
+      {
+        id: "style",
+        label: "Style",
+        role: "style",
+        strength: { min: 0, max: 2, step: 0.05, default: 0.6 },
+      },
+    ],
+  };
+  await serveProfiles(page, [profile]);
+  for (const id of ["first", "second"])
+    state.gallery.push({
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      prompt: `${id} study`,
+      url: image,
+      thumbnailUrl: image,
+      width: 1024,
+      height: 1024,
+      createdAt: stamp,
+    });
+  await page.route("**/api/reference-assets/from-gallery", (route) => {
+    const body = route.request().postDataJSON();
+    return route.fulfill({
+      json: {
+        asset: {
+          id: `asset-${body.galleryItemId}`,
+          galleryItemId: body.galleryItemId,
+          name: "upload.png",
+          url: image,
+          thumbnailUrl: image,
+          width: 1024,
+          height: 1024,
+        },
+      },
+    });
+  });
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A lighthouse at dusk");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  for (const name of ["first", "second"])
+    await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
+  // The test profile doesn't edit with its references, so the first one is where the result starts.
+  await expect(picker.getByText("Reference 1 is the start image", { exact: false })).toBeVisible();
+  const strength = picker.getByRole("textbox", {
+    name: "Reference 2 · Style Strength",
+    exact: true,
+  });
+  await expect(strength).toHaveValue("0.6");
+  await strength.fill("1.2");
+  await closeReferences(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([
+    { assetId: "asset-first", slot: "image" },
+    { assetId: "asset-second", slot: "style", strength: 1.2 },
+  ]);
+});

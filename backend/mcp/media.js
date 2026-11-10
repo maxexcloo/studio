@@ -520,6 +520,7 @@ export class McpMedia {
       loras = [],
       reference_asset_ids = [],
       reference_role,
+      reference_strengths = [],
       count = mcpGenerationCount,
       seed,
       // Every job takes `seed` itself rather than counting up from it (Generate References' views).
@@ -621,6 +622,9 @@ export class McpMedia {
       referenceAssets: reference_asset_ids.map((id, index) => ({
         slot: slots[index].id,
         assetId: id,
+        ...(Number.isFinite(reference_strengths[index])
+          ? { strength: reference_strengths[index] }
+          : {}),
       })),
     };
     // A video's length comes only from Reuse's length (videoLength).
@@ -1310,6 +1314,11 @@ export class McpMedia {
     };
     if (settings.referenceRole && controls.reference_role)
       args.reference_role = settings.referenceRole;
+    const strengths = (settings.referenceAssets || [])
+      .filter((asset) => asset?.assetId)
+      .map((asset) => (Number.isFinite(asset.strength) ? asset.strength : null));
+    if (controls.reference_strengths && strengths.some((value) => value !== null))
+      args.reference_strengths = strengths;
     // Only what this run changed from the profile's defaults, and only what MCP may adjust.
     const recorded = {
       width: item.width,
