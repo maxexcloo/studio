@@ -171,6 +171,8 @@ function generationDetails(
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
       // An upscale's size as the model drew it.
       ["Original Size", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
+      // A stopped upscale leaves the picture at the size it was made.
+      ["Upscale", item.upscale?.status === "cancelled" ? "Cancelled" : ""],
       ["Duration", video && settings.duration ? `${settings.duration}s` : ""],
       ["Frames", video ? settings.frames : ""],
       ["FPS", video ? settings.fps : ""],

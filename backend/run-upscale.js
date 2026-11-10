@@ -145,11 +145,3 @@ export function runUpscaleState(embed, upscale) {
     error: "",
   };
 }
-
-/** The toast for a run whose pictures were kept without their upscale. */
-export function keptMessage({ cancelled = false, count = 1 } = {}) {
-  const what = count > 1 ? "The pictures are" : "The picture is";
-  return cancelled
-    ? `Upscale stopped. ${what} kept at the generated size.`
-    : `The upscale failed. ${what} kept at the generated size.`;
-}
