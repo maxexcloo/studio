@@ -42,6 +42,11 @@ COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
 COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
 COPY LICENSE NOTICE /opt/studio/
+# The packaged Radiance runtime and the notices must be in the image.
+RUN test -x /opt/radiance/runtime/ld-linux-x86-64.so.2 \
+    && test -x /opt/radiance/bin/radiance \
+    && test -s /opt/studio/LICENSE \
+    && test -s /opt/studio/NOTICE
 # Avoid a ROCm profiler-registration thread spinning while GPU contexts are idle.
 ENV HSA_TOOLS_DISABLE_REGISTER=1
 WORKDIR /root/ComfyUI
