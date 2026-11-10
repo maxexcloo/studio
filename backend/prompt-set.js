@@ -9,9 +9,8 @@ import { writerGuide } from "./domain/writing-standard.ts";
 const shownPrompts = 12;
 
 /**
- * Resolves to `{ prompt, title, thinking, model }` for one new variation of the set, written where
- * the account's Prompt Writing preference (`prefer`) chooses, the thinking led by the note where the
- * other side wrote it; throws AssistantError.
+ * Resolves to `{ prompt, title, thinking, model }` for one new variation of the set, written by the
+ * account's prompt `writer` (assistant.js `writerModel`); throws AssistantError.
  */
 export async function writeSetPrompt({
   engine,
@@ -19,15 +18,12 @@ export async function writeSetPrompt({
   guide,
   title,
   prompts,
-  prefer,
+  writer,
   signal,
   onThinking,
   onDelta,
 }) {
-  const model = await engine.model("rewrite", false, prefer);
-  // The thinking starts with why the other side wrote it, where it did.
-  const note = await engine.writerNote(prefer);
-  if (note) onThinking?.(`${note}\n\n`);
+  const model = await engine.model("rewrite", false, writer);
   const reply = await engine.chat({
     call: "rewrite",
     model,
@@ -68,7 +64,7 @@ export async function writeSetPrompt({
   const named = replyTitle(written.title);
   return {
     prompt,
-    thinking: note ? `${note}\n\n${reply.thinking || ""}` : reply.thinking,
+    thinking: reply.thinking,
     model,
     ...(named ? { title: named } : {}),
   };

@@ -93,7 +93,6 @@ const calls = [];
 const engine = {
   model: async (call) => `local/${call}`,
   supportsVision: async () => false,
-  writerNote: async () => "",
   chat: async (body) => {
     calls.push(body);
     body.onThinking?.("A push-in suits a bird.");

@@ -17,12 +17,12 @@ import { requireAdmin } from "./route-access.js";
 
 /**
  * Settings › Deployment. `mediaModels` and `unavailableModels` are model/catalogue.js's;
- * `assistantEngine` is the prompt assistant, or undefined without one; `runtime` lists the text
- * workloads whose models the assistant may use.
+ * `assistantEngine` is the prompt assistant, or undefined without one; `workloadModels()` lists
+ * the models of the text workloads the assistant may use.
  */
 export function registerDeploymentRoutes(
   app,
-  { assistantEngine, mediaModels, runtime, unavailableModels },
+  { assistantEngine, mediaModels, unavailableModels, workloadModels },
 ) {
   /**
    * What the deployment decides, for Settings: each value with its source
@@ -60,10 +60,7 @@ export function registerDeploymentRoutes(
         assistant: await assistantIntegration({
           engine: assistantEngine,
           source: settingSource,
-          // The gateway lists only running models; stopped text workloads' models are choices too.
-          workloadModels: (runtime?.controller.workloads || [])
-            .filter((item) => item.kind === "text" && item.model)
-            .map((item) => item.model),
+          workloadModels: workloadModels(),
         }),
       },
     });

@@ -11,11 +11,7 @@ export type ChangeAction = (typeof changeActions)[number];
 export interface Change extends NextStep {
   action: ChangeAction;
 }
-/**
- * `POST /api/suggestions`: none, with the reason, where the account or the text model can't. A
- * change's `note` says when it was written on the other side from the account's Prompt Writing
- * preference.
- */
+/** `POST /api/suggestions`: none, with the reason, where the account or the text model can't. */
 export type Suggestions<T = string | NextStep> =
-  | { suggestions: T[]; reason?: undefined; note?: string }
-  | { suggestions: []; reason: string; note?: undefined };
+  | { suggestions: T[]; reason?: undefined }
+  | { suggestions: []; reason: string };

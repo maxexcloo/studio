@@ -92,25 +92,31 @@ test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(createAssistant({}), null);
 });
 
-test("prompt writing runs where the account prefers, saying when the other side wrote it", async () => {
+test("prompt writing asks for the account's model, uncensored only where it may", async () => {
   const environment = gateway();
-  let local = { model: "local/auto", vision: false };
+  const local = { model: "local/auto", vision: false };
   const engine = createAssistant(environment, { localText: async () => local });
+  const write = (picked, uncensored) => engine.model("rewrite", false, { picked, uncensored });
   assert.deepEqual(
-    [await engine.model("rewrite", false, "cloud"), await engine.writerNote("cloud")],
-    ["cloud/auto", ""],
+    [await write(undefined, true), await write(undefined, false)],
+    ["cloud/uncensored", "cloud/auto"],
   );
   assert.deepEqual(
-    [await engine.model("rewrite", false, "local"), await engine.writerNote("local")],
-    ["local/auto", ""],
+    [await write("local/auto", false), await write("local/uncensored", true)],
+    ["local/auto", "local/uncensored"],
   );
-  local = null;
-  assert.equal(await engine.model("rewrite", false, "local"), "cloud/auto");
-  assert.match(await engine.writerNote("local"), /No local text model is running/);
-  // Calls for no account keep the usual route without a note; the administrator's model always runs.
-  assert.equal(await engine.writerNote(), "");
+  // An uncensored pick the account may no longer use gives way to the cloud model.
+  assert.equal(await write("local/uncensored", false), "cloud/auto");
+  assert.deepEqual(
+    [
+      await engine.supportsVision({ picked: "local/auto", uncensored: false }),
+      await engine.supportsVision({ uncensored: false }),
+    ],
+    [false, true],
+  );
+  // The administrator's model always runs.
   environment.STUDIO_ASSISTANT_MODEL = "chosen/model";
-  assert.equal(await engine.writerNote("local"), "");
+  assert.equal(await write("local/auto", true), "chosen/model");
 });
 
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {

@@ -11,7 +11,7 @@
  * (writingIssue). The stage resolves the job's profile and guide and streams the thinking and the
  * prompt into the item; a failure throws with the reason, which fails the item.
  */
-import { mayUseFeature } from "./account-policy.js";
+import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
@@ -84,8 +84,7 @@ export function createPromptStage({
     if (issue) throw new Error(issue.error);
     const profile = (await profiles(access)).find((item) => item.id === job.input.profileId);
     if (!profile) throw new Error("The model is no longer available to this account.");
-    // Written where the account's Prompt Writing preference says.
-    const prefer = accountPreferences(job.ownerId || "").writing === "cloud" ? "cloud" : "local";
+    const writer = promptWriter(access, accountPreferences(job.ownerId || ""));
     if (writing.kind === "set")
       return writeSetPrompt({
         engine,
@@ -93,7 +92,7 @@ export function createPromptStage({
         guide: guide(profile),
         title: job.input.resultSet?.title || "",
         prompts: setPrompts(job),
-        prefer,
+        writer,
         signal,
         onThinking,
         onDelta,
@@ -107,7 +106,7 @@ export function createPromptStage({
       writing,
       clip: animateClip(job.input, profile),
       explicit: !access || mayUseFeature(access, "uncensoredModels"),
-      prefer,
+      writer,
       frame: () => frame(access, start),
       caption: () => caption(access, start),
       signal,
