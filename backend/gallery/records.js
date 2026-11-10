@@ -91,8 +91,8 @@ const shortText = (value, max) =>
 
 /**
  * The MCP result set a run belongs to (mcp/media.js queue): one generate call's id and title, the
- * client that asked (`source`), and this run's prompt position and its own title (`variation`);
- * null for anything else.
+ * client that asked (`source`), the character card it was made with (`character`), and this run's
+ * prompt position and its own title (`variation`); null for anything else.
  */
 export function storedResultSet(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -101,6 +101,11 @@ export function storedResultSet(value) {
   if (!id || !title) return null;
   const variation = shortText(value.variation, 80);
   const source = shortText(value.source, 40);
+  const characterId =
+    typeof value.character?.id === "string" && /^[\w-]{1,64}$/.test(value.character.id)
+      ? value.character.id
+      : "";
+  const characterName = shortText(value.character?.name, 80);
   const index = Number.isInteger(value.index) && value.index >= 0 ? Math.min(value.index, 99) : 0;
   return {
     id,
@@ -108,6 +113,9 @@ export function storedResultSet(value) {
     index,
     ...(variation ? { variation } : {}),
     ...(source ? { source } : {}),
+    ...(characterId && characterName
+      ? { character: { id: characterId, name: characterName } }
+      : {}),
   };
 }
 

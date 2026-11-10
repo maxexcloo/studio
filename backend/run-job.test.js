@@ -74,7 +74,13 @@ const waitFor = async (check, what, ms = 5000) => {
 test("a run goes from queued through progress to a finished gallery image", async () => {
   const id = "job-success";
   // An MCP call's set travels from the pending tile to the finished one, kept to its known fields.
-  const resultSet = { id: "set-1", title: "Variety Test", index: 2, variation: "Fox Wizard" };
+  const resultSet = {
+    id: "set-1",
+    title: "Variety Test",
+    index: 2,
+    variation: "Fox Wizard",
+    character: { id: "chr-mara", name: "Mara" },
+  };
   const body = sdxlRequest({ resultSet: { ...resultSet, extra: "dropped" } });
   queue(id, body);
   assert.deepEqual(store.gallery.find((item) => item.jobId === id).resultSet, resultSet);
