@@ -104,9 +104,15 @@ class WorkerModelTests(unittest.TestCase):
             ("loras", "../x.safetensors"),
             ("loras", "/tmp/x.safetensors"),
             ("loras", "x\\y.safetensors"),
+            ("loras", "x.pt"),
+            ("ultralytics_bbox", "x.safetensors"),
         ]:
             with self.assertRaises(ValueError):
                 target(self.root, folder, name)
+        # Pickled weights only in the detector folder.
+        self.assertEqual(
+            target(self.root, "ultralytics_bbox", "face.pt").name, "face.pt"
+        )
         outside = self.root / "outside.safetensors"
         outside.write_bytes(b"keep")
         self.file.symlink_to(outside)

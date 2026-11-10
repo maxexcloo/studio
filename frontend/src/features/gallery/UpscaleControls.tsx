@@ -1,3 +1,4 @@
+import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   UpscaleQuality,
@@ -5,11 +6,12 @@ import type {
   UpscaleResponse,
   UpscaleStatus,
 } from "../../../../shared/upscale";
-import { api, post } from "../../api";
+import { api, failure, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { Eye, ScanFace } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
+import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
 import type { Action } from "./ActionBar";
 import { itemAction } from "./itemActions";
@@ -76,6 +78,24 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
         ? "Needs the face detector"
         : "Needs Impact Pack"
       : undefined;
+  // An administrator can fetch the catalogue's face detector from here; Library › Downloads shows it.
+  const admin = useIsAdmin();
+  const faceDownload = useMutation({
+    mutationFn: (id: string) => post("/api/models/downloads", { id }),
+    onSuccess: () => {
+      notifications.show({
+        message: "Downloading the face detector in Library › Downloads.",
+      });
+      void cache.invalidateQueries({ queryKey: ["library-downloads"] });
+    },
+    onError: failure,
+  });
+  const download = admin && detector?.nodesInstalled ? detector.download : undefined;
+  const downloadFaceDetector = download && {
+    label: download.label,
+    pending: faceDownload.isPending,
+    run: () => faceDownload.mutate(download.id),
+  };
   return {
     queue,
     status,
@@ -85,6 +105,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
     setTarget: setSize,
     faceAvailable,
     faceMissing,
+    downloadFaceDetector,
     faceDetail,
     setFaceDetail: setFace,
     run: () => queue.mutate({ quality, target, faceDetail }),
@@ -244,6 +265,18 @@ export function useUpscaleAction(
                   keepOpen: true,
                   onClick: () => quick.setFaceDetail(!quick.faceDetail),
                 },
+                ...(quick.downloadFaceDetector
+                  ? [
+                      {
+                        id: "upscale-face-download",
+                        label: "Download Face Detector",
+                        description: quick.downloadFaceDetector.label,
+                        icon: icons.download,
+                        disabled: quick.downloadFaceDetector.pending,
+                        onClick: quick.downloadFaceDetector.run,
+                      },
+                    ]
+                  : []),
               ]
             : []),
         ],
