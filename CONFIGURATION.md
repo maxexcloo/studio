@@ -226,6 +226,7 @@ Every account whose group has **Prompt Assistant** may use the prompt assistant.
 **Background AI** (**Settings › Generation**, administrators) has a switch for each model call Studio makes on its own. Each is on by default and `0` turns it off, and an off switch means the call is never made, with nothing shown in its place. What a person asks for (Improve, Ask for a Change, Animate, Chat replies, taste Refresh) has no switch.
 
 - `STUDIO_CHAT_TITLES` (**Chat Titles**): names a new chat from its first request; off, it stays New Chat until renamed.
+- `STUDIO_FACE_CHECK` (**Face Check**, YuNet and AuraFace on the CPU rather than the assistant model): compares each image made with a character (a job whose references include a card's first image) with that image by face, while Studio is idle and as results finish. A result is marked drifted below a cosine similarity of 0.40, or with a second face. The models (about 260 MB, MIT and Apache-2.0) download into `face-check/` in the data folder the first time; Settings › Generation's Check Faces covers earlier images.
 - `STUDIO_GALLERY_CAPTIONS` (**Gallery Captions**) and `STUDIO_IMAGE_SEARCH` (**Image Search**, SigLIP 2 rather than the assistant model): the gallery search aids described below.
 - `STUDIO_GALLERY_TITLES` (**Gallery Titles**): titles finished images and videos.
 - `STUDIO_NEXT_STEPS` (**Next Steps**): the Suggestions menu's changes for a finished image (written ahead while idle and when the viewer opens) and for the composer's draft; off, the menu offers none.
