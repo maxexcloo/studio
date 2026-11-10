@@ -149,7 +149,7 @@ Every MCP action calls the route its UI action calls, with the caller's own cred
 | UI action                                                                       | MCP tool and action                                                        |
 | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Composer generation, variations, sizes, LoRAs, references                       | `generate` (`models` to look up), `upload`, `upload_link`                  |
-| References › Characters, Generate References (Characters feature)              | `models` lists them, `generate` `character` (`character_views`)            |
+| References › Characters, Generate References (Characters feature)               | `models` lists them, `generate` `character` (`character_views`)            |
 | Edit › Run Again and Repeat Exactly, Animate, Extend, Use as Reference          | `reuse` `again` (`preserve_seed`), `animate`, `extend`, `reference`        |
 | Upscale                                                                         | `reuse` `upscale`                                                          |
 | Compare models side by side                                                     | `generate` with several profiles (a comparison page)                       |

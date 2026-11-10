@@ -7,7 +7,6 @@ import {
   withoutCharacter,
   type Character,
 } from "../../../../shared/characters";
-import { referenceCapacity, referenceGroupAssets, referenceGroups } from "../generation/payload";
 import { nextReferenceTarget, placeReference } from "../generation/references";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
