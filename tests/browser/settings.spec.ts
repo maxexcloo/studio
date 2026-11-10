@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, openTheme, section, signIn, stamp, expectNoChatOpen } from "./fixtures";
+import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -53,19 +53,17 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect(danger.getByText("2 deleted.", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
+  // Each worker's status comes first, one line each: what it runs, its state, what waits for it
+  // and its free memory.
+  const workers = page.getByRole("region", { name: "Workers", exact: true });
+  await expect(workers.getByRole("listitem")).toHaveText([
+    "Image Worker · Images, Upscale, Model Library · Busy · 2 Queued · 8.0 GiB Free",
+    /^Video Worker · Videos · Offline · 0 Queued/,
+  ]);
+  // Service health sits below, with the rarely changed controls.
+  await expect(page.getByRole("status", { name: "Services", exact: true })).toHaveText(
     "Text: Running · Images: Running · Videos: Offline",
   );
-  // Workers listed by the deployment show read-only with where they come from.
-  const workers = page.getByRole("region", { name: "Workers", exact: true });
-  await expect(workers).toContainText("Listed by the deployment in STUDIO_WORKERS");
-  await expect(workers).toContainText("Image Worker");
-  await expect(workers).toContainText("Images, Upscale, Model Library · http://comfyui-image:8188");
-  // Each worker's health and work: what runs, what waits, what it last ran and when it frees up.
-  await expect(workers).toContainText(
-    /Running · Busy · 2 Queued · Last Ran .+ · 8\.0 GiB Free · Free in about [45] min/,
-  );
-  await expect(workers).toContainText("Offline · Idle · 0 Queued");
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);
@@ -342,7 +340,10 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
   const popup = await page.locator('.mantine-Popover-dropdown[role="dialog"]').boundingBox();
   expect(popup!.y).toBeGreaterThanOrEqual(68);
   await page.getByRole("button", { name: "Use Blue Colour", exact: true }).click();
-  await page.getByRole("button", { name: "Use Warm Background", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Background", exact: true })
+    .getByText("Warm", { exact: true })
+    .click();
   await page.getByText("Fast", { exact: true }).click();
   await page.getByText("Round", { exact: true }).click();
   await page.getByText("Dark", { exact: true }).click();
@@ -354,9 +355,7 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
     "aria-pressed",
     "true",
   );
-  await expect(
-    page.getByRole("button", { name: "Use Warm Background", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("radio", { name: "Warm", exact: true })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
@@ -375,7 +374,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   ).toBeVisible();
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Settings: Workers", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Services", exact: true })).toContainText(
+  await expect(page.getByRole("status", { name: "Services", exact: true })).toContainText(
     "Images: Running",
   );
   await section(page, "Settings", "About");
@@ -386,10 +385,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   );
 });
 
-test("Status summarises service health and opens Workers over the current page", async ({
-  page,
-  isMobile,
-}) => {
+test("Status summarises each kind's workers and state, quietly", async ({ page, isMobile }) => {
   await fixtures(page);
   await page.goto("/chat");
   // Desktop keeps the queue in Chat, beside the Chats sidebar; phones list the Chats.
@@ -403,22 +399,13 @@ test("Status summarises service health and opens Workers over the current page",
     name: isMobile ? "Chats" : "Generations",
     exact: true,
   });
-  await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
-  // A link covering the whole status block opens Workers.
-  const workers = drawer.getByRole("link", { name: "Open Workers", exact: true });
-  const block = (await drawer.getByRole("region", { name: "Service Status" }).boundingBox())!;
-  expect((await workers.boundingBox())!.height).toBeGreaterThan(block.height);
-  await workers.click();
-  await expect(drawer).toBeHidden();
-  const settings = page.getByRole("dialog", { name: /^Settings/ });
-  // Observe-only Workers shows the service line and why nothing can be switched.
-  await expect(settings.getByRole("region", { name: "Services", exact: true })).toContainText(
-    "Videos: Offline",
+  const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
+  await expect(summary).toHaveText(
+    "Images1 worker · IdleVideos1 worker · OfflineText1 local model · Running",
   );
-  await expect(settings.getByText(/runtime control is not configured/)).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page).toHaveURL(/\/chat$/);
-  await expectNoChatOpen(page);
+  // Nothing in it acts.
+  await expect(summary.getByRole("link")).toHaveCount(0);
+  await expect(summary.getByRole("button")).toHaveCount(0);
 });
 
 test("Workers switch GPU workloads only through a reviewed preview", async ({ page }) => {
@@ -580,7 +567,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   expect(previews.at(-1)).toEqual({ start: ["video"] });
 });
 
-test("A parked service reads as parked, and administrators start it from Status", async ({
+test("Status counts running workers, reads a parked service as Stopped and offers no Start", async ({
   page,
 }) => {
   await fixtures(page);
@@ -591,7 +578,9 @@ test("A parked service reads as parked, and administrators start it from Status"
           image: {
             state: "healthy",
             reason: "A direct runtime is healthy.",
-            endpoints: [{ id: "image", label: "Image", state: "healthy", reason: "Ready" }],
+            endpoints: [
+              { id: "image", label: "Image", state: "healthy", reason: "Ready", running: true },
+            ],
           },
           video: {
             state: "parked",
@@ -611,42 +600,14 @@ test("A parked service reads as parked, and administrators start it from Status"
       },
     }),
   );
-  await page.route("**/api/runtime", (route) =>
-    route.fulfill({
-      json: {
-        settings: { automatic: false, parkIdleMinutes: 0 },
-        pools: [],
-        history: [],
-        workloads: [],
-      },
-    }),
-  );
-  const previews: unknown[] = [];
-  const applied: unknown[] = [];
-  await page.route("**/api/runtime/preview", (route) => {
-    previews.push(route.request().postDataJSON());
-    return route.fulfill({
-      json: { target: ["video"], stop: [], start: ["video"], keep: [], signature: "fixture" },
-    });
-  });
-  await page.route("**/api/runtime/apply", (route) => {
-    applied.push(route.request().postDataJSON());
-    return route.fulfill({ status: 202, json: { id: "next", status: "running" } });
-  });
-  await page.route("**/api/runtime/operations/next", (route) =>
-    route.fulfill({ json: { id: "next", status: "running", progress: "Starting Video." } }),
-  );
   await page.goto("/images");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Running · Some Stopped");
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
-  await expect(drawer.getByLabel("Videos: Stopped", { exact: true })).toBeVisible();
-  // Nothing stops, so choosing Start is the request itself.
-  await drawer.getByRole("button", { name: "Start Videos", exact: true }).click();
-  await expect(drawer.getByText("Starting Video.", { exact: true })).toBeVisible();
-  expect(previews).toEqual([{ start: ["video"] }]);
-  expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
+  await expect(drawer.getByLabel("Images: 1 worker · 1 running", { exact: true })).toBeVisible();
+  await expect(drawer.getByLabel("Videos: 1 worker · Stopped", { exact: true })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Start Videos" })).toHaveCount(0);
 });
 
 test("Settings › Integrations picks the assistant model from the gateway's and text workloads' models", async ({

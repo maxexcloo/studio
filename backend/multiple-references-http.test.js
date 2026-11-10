@@ -118,7 +118,6 @@ test(
       kind: "image",
       model: profile.model,
       workflow: profile.workflow,
-      workerId: "chosen",
       prompt: "Combine these ten references",
       count: 1,
       referenceAssets: references,

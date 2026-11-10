@@ -651,10 +651,11 @@ registerRewriteRoutes(app, {
   queue: generationQueue,
   admit: admitGeneration,
   deleteMedia: deleteOwnedGalleryItems,
+  // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every queue poll.
   media: (ownerId, jobId) =>
-    galleryJobItems(jobId).filter(
-      (item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item),
-    ),
+    galleryJobItems(jobId)
+      .filter((item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item))
+      .map(({ nextSteps: _steps, ...item }) => item),
   ownsItem: (ownerId, id) => {
     const item = galleryItem(id);
     return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));

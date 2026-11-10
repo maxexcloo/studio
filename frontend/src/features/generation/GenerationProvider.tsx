@@ -53,10 +53,6 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
     profileId: profile.id,
     model: profile.model,
     workflow: profile.workflow,
-    // A picked worker carries over while the profile runs there; otherwise Automatic.
-    workerId: profile.workerIds?.includes(String(previous.workerId))
-      ? previous.workerId
-      : undefined,
     loras: previous.loras,
   };
 }

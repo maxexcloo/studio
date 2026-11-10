@@ -16,6 +16,8 @@ export interface ServiceEndpoint {
   memoryFree?: number;
   /** The Studio workloads serving it, in start order; does not establish which model is loaded. */
   workloads?: string[];
+  /** A media worker running a job of this kind now. */
+  running?: boolean;
 }
 
 /** One media worker, for administrators: its health, what it runs and what waits for it. */
