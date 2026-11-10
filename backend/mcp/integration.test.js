@@ -1556,14 +1556,21 @@ test("models lists the account's characters, and generate applies one by name: i
   assert.deepEqual(data(await call(client, "models")).characters, [
     { id: "chr-mara", name: "Mara", description: "red-haired ranger, green cloak", images: 2 },
   ]);
+  // Identity lock: the named fixture profile starts from a reference (img2img), so it can't hold
+  // Mara's face and the call is refused, saying how to go on.
+  const forest = { profile_id: imageProfile.id, prompts: ["Walking through a misty forest"] };
+  const refused = await call(client, "generate", { ...forest, character: "mara" });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /can't hold Mara's face.*any_model: true/);
+  assert.equal(f.submitted.length, 0);
+  // When the user insists, the card's image stays out (its pose and layout would carry over), its
+  // description leads verbatim, and the reply warns.
   const reply = await call(client, "generate", {
-    profile_id: imageProfile.id,
-    prompts: ["Walking through a misty forest"],
+    ...forest,
     character: "mara",
+    any_model: true,
   });
   assert.notEqual(reply.isError, true);
-  // The named fixture profile starts from a reference (img2img), so the card's image stays out (its
-  // pose and layout would carry over), its description leads verbatim, and the reply warns.
   assert.deepEqual(f.submitted[0].referenceAssets, []);
   assert.equal(
     f.submitted[0].prompt,

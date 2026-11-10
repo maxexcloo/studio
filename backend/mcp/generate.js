@@ -470,7 +470,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; character_views queues its views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; character_views queues views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -786,6 +786,8 @@ export function registerGenerateTools({
       character: z.string().min(1).optional(),
       // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
       character_views: z.boolean().optional(),
+      // The user insists on a model that can't hold the character's face (the refusal says so).
+      any_model: z.boolean().optional(),
       aspect: z
         .string()
         .optional()
@@ -860,7 +862,9 @@ export function registerGenerateTools({
     if (views && !args.character)
       throw new Error("character_views needs character: the name or id of the card.");
     const card = args.character ? await characterFor(args.character, signal, views) : null;
+    const anyModel = args.any_model === true;
     delete args.character;
+    delete args.any_model;
     // The views share one seed and, where the profile edits with references, the card's first
     // image, which each plan's prompts then follow (characterShots).
     if (views)
@@ -985,6 +989,16 @@ export function registerGenerateTools({
       (target, index) =>
         targets.findIndex((other) => other.profile.id === target.profile.id) === index,
     );
+    // Identity lock: a character runs only where its image is edited with, never as text alone or
+    // an img2img start image, unless the user insists on the model.
+    const unable =
+      card?.referenceIds.length && !views && !anyModel
+        ? targets.filter(({ profile }) => !profile.mediaInputs?.length || !editsReferences(profile))
+        : [];
+    if (unable.length)
+      throw new Error(
+        `${unable.map(({ profile }) => profile.label || profile.id).join(", ")} can't hold ${card.name}'s face: it takes no reference to edit with, so each image would show someone else. Leave the model out (Studio picks ${keeper ? keeper.label || keeper.id : "one that edits with references"}), or pass any_model: true only if the user insists on it.`,
+      );
     const jobs = targets.length * (args.prompts?.length || 1) * count;
     if (jobs > maxJobsPerCall)
       throw new Error(
