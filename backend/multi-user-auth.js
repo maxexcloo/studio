@@ -176,7 +176,7 @@ const asMcpAdmin = (access) =>
 /**
  * The account an MCP call acts as on a route, called in process (mcp/studio-requests.js): by the
  * account's personal token (`{ token }`), as a bearer request is; or by Studio's own word for
- * `owner` (`{ internal: true }`: a gateway-linked account, Studio Chat, a result or upload link).
+ * `owner` (`{ internal: true }`: a gateway-linked account, a result or upload link).
  */
 export function mcpAccount(owner, credential, method, routePath) {
   if (credential?.token) {
@@ -237,11 +237,14 @@ function accountCookie(req, value, maxAge = 0) {
 }
 
 function publicStatus(req) {
-  if (!multiUserEnabled) return { ok: true, mode: "single-user" };
+  // The chat site the navigation links to (LibreChat), if the deployment names one.
+  const chat = process.env.STUDIO_CHAT_URL ? { chatUrl: process.env.STUDIO_CHAT_URL } : {};
+  if (!multiUserEnabled) return { ok: true, mode: "single-user", ...chat };
   const account = accountForRequest(req);
   return {
     ok: true,
     mode: "multi-user",
+    ...chat,
     signedIn: Boolean(account),
     account: account
       ? {

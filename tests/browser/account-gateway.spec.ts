@@ -200,19 +200,14 @@ test("Signed out with single sign-on goes straight to it, and a failed return sh
   expect(starts).toBe(2);
 });
 
-test("A group without Chat or Dream hides them and leaves their routes for Images", async ({
-  page,
-}) => {
+test("A group without Dream hides it and leaves its route for Images", async ({ page }) => {
   await fixtures(page);
-  await signIn(page, { id: "member", role: "user", features: { chat: false, dream: false } });
+  await signIn(page, { id: "member", role: "user", features: { dream: false } });
   await page.goto("/dream");
   await expect(page).toHaveURL(/\/images$/);
   const modes = page.getByRole("navigation", { name: "Creative Modes" });
   await expect(modes.getByRole("link", { name: "Images", exact: true })).toBeVisible();
-  await expect(modes.getByRole("link", { name: "Chat", exact: true })).toHaveCount(0);
   await expect(modes.getByRole("link", { name: "Dream", exact: true })).toHaveCount(0);
-  await page.goto("/chat");
-  await expect(page).toHaveURL(/\/images$/);
 });
 
 test("Administrators save and verify per-user cloud and uncensored access through assigned groups", async ({
@@ -227,7 +222,7 @@ test("Administrators save and verify per-user cloud and uncensored access throug
   await expect(page.getByRole("textbox", { name: "Group ID", exact: true })).toHaveValue(
     "member-cloud",
   );
-  // Characters is on for a new group, like Chat and Dream, and each permission says what it covers.
+  // Characters is on for a new group, like Dream, and each permission says what it covers.
   const characters = page.getByRole("checkbox", { name: "Characters", exact: true });
   await expect(characters).toBeChecked();
   await expect(characters).toHaveAccessibleDescription(

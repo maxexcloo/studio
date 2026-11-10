@@ -4,7 +4,6 @@ import {
   create,
   fixtures,
   image,
-  openNav,
   profiles,
   serveProfiles,
   showUploads,
@@ -12,7 +11,7 @@ import {
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
-test("Multiple owned references preserve order, role identity and capacity through generation and Chat", async ({
+test("Multiple owned references preserve order, role identity and capacity through generation", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -100,27 +99,6 @@ test("Multiple owned references preserve order, role identity and capacity throu
       slot: asset.slot,
     })),
   ).toEqual(expected);
-  await openNav(page, "Chat");
-  await page
-    .getByRole("textbox", { name: "Message", exact: true })
-    .fill("Explain how the selected references fit together");
-  // Focusing the message slides the chip rail in. Its chips sit still at their start, below the
-  // box, before they move, so a click then can land before they arrive: wait until they are in.
-  await expect(
-    page.getByRole("group", { name: "Chat Inputs", exact: true }).locator(".."),
-  ).toHaveCSS("opacity", "1");
-  await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  for (const name of ["second", "first"])
-    await page.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
-  // The same image fills End too once that slot is chosen.
-  await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await closeReferences(page);
-  await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect.poll(() => state.chatRequests.length).toBe(1);
-  expect(state.chatRequests[0].references).toEqual(["asset-second", "asset-first", "asset-first"]);
-  expect(state.chatRequests[0].generation.input.referenceAssets).toEqual(expected);
-  expect(state.jobs).toHaveLength(1);
 });
 
 test("Removing a picked reference keeps its upload; confirmed deletion removes only the owned upload", async ({

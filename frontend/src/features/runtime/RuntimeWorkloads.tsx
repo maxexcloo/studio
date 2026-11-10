@@ -379,7 +379,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
       post<RuntimePreview>("/api/runtime/preview", { workloads }),
     onSuccess: setPreview,
   });
-  // Start one stopped workload beside what runs, making room as a Chat model start does.
+  // Start one stopped workload beside what runs, making room as a profile's start does.
   const starting = useMutation({
     mutationFn: (workload: string) =>
       post<RuntimePreview>("/api/runtime/preview", { start: [workload] }),

@@ -25,6 +25,8 @@ interface AccountStatus {
   needsRecoveryAdmin?: boolean;
   account?: Pick<Account, "id" | "role" | "features"> | null;
   oidc?: { label: string };
+  /** The chat site (STUDIO_CHAT_URL) the navigation links to, if the deployment names one. */
+  chatUrl?: string;
 }
 export function useAccount() {
   return useQuery({
@@ -39,10 +41,10 @@ export function useIsAdmin() {
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
 /**
- * A group feature that is on unless the account's group turns it off (Characters, Chat, Dream,
- * Prompt Assistant).
+ * A group feature that is on unless the account's group turns it off (Characters, Dream, Prompt
+ * Assistant).
  */
-export function useGroupFeature(feature: "characters" | "chat" | "dream" | "promptAssistant") {
+export function useGroupFeature(feature: "characters" | "dream" | "promptAssistant") {
   return useAccount().data?.account?.features?.[feature] !== false;
 }
 export const ownAccountQuery = queryOptions({

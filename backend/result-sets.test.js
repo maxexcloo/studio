@@ -4,7 +4,7 @@ import { findDirectRoute } from "./domain/direct-route.ts";
 import { createPromptStage, writingRequest } from "./prompt-stage.js";
 import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 
-const set = { id: "set-a", title: "Variety Test", source: "Chat" };
+const set = { id: "set-a", title: "Variety Test", source: "LibreChat" };
 const job = (id, index, prompt, extra = {}) => ({
   id,
   ownerId: "alice",

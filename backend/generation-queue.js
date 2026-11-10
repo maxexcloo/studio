@@ -352,7 +352,7 @@ export function createGenerationQueue({
     if (combined?.backendIds?.length)
       input.profileBackend = combined.backendIds.includes(wanted) ? wanted : combined.backend;
     else delete input.profileBackend;
-    // Every path (composer, Chat, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
+    // Every path (composer, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
     const sized = (await mediaModels().catch(() => null))?.models?.profiles?.find(
       (profile) => profile.id === input.profileId,
     );

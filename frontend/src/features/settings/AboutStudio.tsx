@@ -39,12 +39,10 @@ const credits = [
   },
 ];
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
-// Grouped by where each key works: the gallery, composer, Chat, the viewer, then Dream and Compare.
+// Grouped by where each key works: the gallery, composer, the viewer, then Dream and Compare.
 const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["/"], [mod, "F"]], action: "Search the Gallery" },
   { keys: [[mod, "Enter"]], action: "Generate" },
-  { keys: [["Enter"]], action: "Send a Chat Message" },
-  { keys: [["Shift", "Enter"]], action: "New Line in Chat" },
   { keys: [["←"], ["→"]], action: "Previous or Next in the Viewer" },
   { keys: [["F"]], action: "Star the Viewed Item" },
   { keys: [["E"]], action: "Edit the Viewed Image" },
@@ -141,7 +139,7 @@ export function AboutStudio() {
       <Stack align="center" gap={6} py="md">
         <StudioLogo order={2} />
         <Text size="sm" c="dimmed" ta="center">
-          An image, video and chat studio for your own models.
+          An image and video studio for your own models.
           {outputs ? ` ${outputs.toLocaleString()} results made here · no telemetry.` : ""}
         </Text>
       </Stack>

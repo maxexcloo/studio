@@ -41,13 +41,6 @@ const notFound = { status: 404, payload: { error: "Not found." } };
 // A cancel the worker could not confirm yet (busy, or a proxy answering for it); recovery finishes it.
 export const unconfirmedCancel =
   "Cancellation could not be confirmed. The recorded job remains available for recovery.";
-const idList = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((id) => typeof id === "string");
-/** Why a chat with work still running cannot be deleted yet. */
-const busyChat = {
-  "active-jobs": "This chat has generations in progress. Cancel them before deleting the chat.",
-  "active-chat": "This chat is still responding. Stop it before deleting the chat.",
-};
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 
@@ -57,34 +50,25 @@ export function registerRewriteRoutes(
     store,
     queue,
     admit,
-    deleteMedia,
     media,
     ownsItem,
-    title,
   }: {
     store: Store;
     queue: GenerationQueue;
-    /** domain/admission.ts's: a Chat's generations are admitted as every other request. */
+    /** domain/admission.ts's: a session's generations are admitted as every other request. */
     admit?: (
       input: GenerationInput,
       account?: GenerationAccount,
       scope?: GenerationScope,
     ) => Promise<DomainResponse>;
-    /** Viewer deletion of the owner's gallery items; returns the IDs it removed. */
-    deleteMedia?: (
-      ownerId: string,
-      ids: string[],
-    ) => { removed: string[]; files: { deleted: number; skipped: number } };
     /**
      * The owner's gallery records of a job. A job's own results are what its adapter reported (a
-     * cloud provider's bare files, or a snapshot taken on completion), so the queue and Chat show the
+     * cloud provider's bare files, or a snapshot taken on completion), so the queue shows the
      * gallery's records instead: each with its prompt, settings, title and star.
      */
     media?: (ownerId: string, jobId: string) => QueueMedia[];
     /** Whether the owner has this gallery item, which a run may then be made from. */
     ownsItem?: (ownerId: string, id: string) => boolean;
-    /** Titles a chat started by its first generation; must not reject. */
-    title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
   },
 ) {
   const shown = (ownerId: string, jobs: OwnedJob[]) =>
@@ -117,36 +101,6 @@ export function registerRewriteRoutes(
     });
     return preset ? res.json({ preset }) : missing(res);
   });
-  app.get("/api/sessions", (req, res) =>
-    res.json({
-      sessions: store.sessions(
-        owner(req),
-        typeof req.query?.q === "string" ? req.query.q.trim() : "",
-      ),
-    }),
-  );
-  // Many chats in one request each, like the gallery's; another account's chats are never touched.
-  app.post("/api/sessions/archive", (req, res) => {
-    if (!idList(req.body?.ids) || typeof req.body.archived !== "boolean")
-      return res.status(400).json({ error: "Chat IDs and archived are required." });
-    return res.json({ ids: store.archiveSessions(owner(req), req.body.ids, req.body.archived) });
-  });
-  // Deletes each chat that has nothing running; their results stay in the gallery.
-  app.post("/api/sessions/delete", (req, res) => {
-    if (!idList(req.body?.ids)) return res.status(400).json({ error: "Chat IDs are required." });
-    const ownerId = owner(req);
-    const removed: string[] = [],
-      failed: { id: string; reason?: string; error: string }[] = [];
-    for (const id of new Set(req.body.ids)) {
-      const outcome = store.session(ownerId, id)?.hidden
-        ? "missing"
-        : store.deleteSession(ownerId, id);
-      if (outcome === "deleted") removed.push(id);
-      else if (outcome === "missing") failed.push({ id, error: "That chat was not found." });
-      else failed.push({ id, reason: outcome, error: busyChat[outcome] });
-    }
-    return res.json({ removed, failed });
-  });
   app.post("/api/sessions", (req, res) => {
     if (req.body?.inputs !== undefined && !object(req.body.inputs))
       return res.status(400).json({ error: "Inputs must be an object." });
@@ -158,59 +112,12 @@ export function registerRewriteRoutes(
       ),
     });
   });
+  // A session's jobs, with their gallery records.
   app.get("/api/sessions/:id", (req, res) => {
     const session = store.session(owner(req), req.params.id);
     return session
       ? res.json({ session, jobs: shown(owner(req), store.jobs(owner(req), session.id)) })
       : missing(res);
-  });
-  app.patch("/api/sessions/:id", (req, res) => {
-    if (req.body?.inputs !== undefined && !object(req.body.inputs))
-      return res.status(400).json({ error: "Inputs must be an object." });
-    const patch = {
-      ...(typeof req.body?.title === "string" ? { title: req.body.title } : {}),
-      ...(object(req.body?.inputs) ? { inputs: req.body.inputs } : {}),
-    };
-    const session = store.updateSession(owner(req), req.params.id, patch);
-    return session ? res.json({ session }) : missing(res);
-  });
-  // Deletes the chat; `mediaIds` names results of this chat to delete from the gallery as well.
-  app.delete("/api/sessions/:id", (req, res) => {
-    const ownerId = owner(req);
-    if (!store.session(ownerId, req.params.id)) return missing(res);
-    const requested = req.body?.mediaIds ?? [];
-    if (!idList(requested))
-      return res.status(400).json({ error: "Media IDs must be a list of result IDs." });
-    const busy = (reason: keyof typeof busyChat | undefined) =>
-      reason && res.status(409).json({ reason, error: busyChat[reason] });
-    const refused = busy(store.sessionActivity(ownerId, req.params.id));
-    if (refused) return refused;
-    const results = new Set(
-      shown(ownerId, store.jobs(ownerId, req.params.id)).flatMap((job) =>
-        [...job.items, ...job.outputs].map((item) => item.id),
-      ),
-    );
-    const ids = [...new Set(requested as string[])];
-    const media = { removed: [] as string[], failed: [] as { id: string; error: string }[] };
-    const deletable = ids.filter((id) => results.has(id));
-    for (const id of ids)
-      if (!results.has(id)) media.failed.push({ id, error: "Not a result of this chat." });
-    let files;
-    if (deletable.length) {
-      if (!deleteMedia) return res.status(501).json({ error: "Media deletion is unavailable." });
-      const outcome = deleteMedia(ownerId, deletable);
-      files = outcome.files;
-      media.removed = outcome.removed;
-      for (const id of deletable)
-        if (!outcome.removed.includes(id))
-          media.failed.push({ id, error: "That item was not found." });
-    }
-    const outcome = store.deleteSession(ownerId, req.params.id);
-    if (outcome === "missing") return missing(res);
-    return (
-      busy(outcome === "deleted" ? undefined : outcome) ||
-      res.json({ ok: true, media: { ...media, ...(files ? { files } : {}) } })
-    );
   });
   app.post("/api/sessions/:id/generations", async (req, res) => {
     if (!store.session(owner(req), req.params.id)) return missing(res);
@@ -222,7 +129,7 @@ export function registerRewriteRoutes(
         ? store.jobs(owner(req), req.params.id).find((job) => job.id === parentJobId)
         : undefined;
     if (parentJobId !== undefined && !parent)
-      return res.status(400).json({ error: "Parent generation must belong to this chat." });
+      return res.status(400).json({ error: "Parent generation must belong to this session." });
     // The result a run is made from is the owner's: one of the parent's results or a gallery item.
     if (
       parentItemId !== undefined &&
@@ -235,7 +142,6 @@ export function registerRewriteRoutes(
     )
       return res.status(400).json({ error: "Parent result must be one of your items." });
     if (!admit) return res.status(501).json({ error: "Generation is unavailable." });
-    const first = !store.jobs(owner(req), req.params.id).length;
     const admitted = await admit(input, req.studioAccount as GenerationAccount | undefined, {
       sessionId: req.params.id,
       operation: operation as GenerationScope["operation"],
@@ -244,8 +150,6 @@ export function registerRewriteRoutes(
     });
     if (admitted.status >= 400) return res.status(admitted.status).json(admitted.payload);
     const job = store.job(owner(req), String(admitted.payload.jobId))!;
-    if (title && typeof input.prompt === "string" && input.prompt.trim() && first)
-      void title(req.studioAccount, req.params.id, input.prompt);
     return res
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });

@@ -254,30 +254,6 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
   await expect(field).toHaveValue("add rain");
 });
 
-test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
-  page,
-}) => {
-  const { viewer } = await seed(page);
-  const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's prompt ⋯ carries a change typed over the prompt into the Chat; phones list it under
-  // the bar's More.
-  if (desktop) {
-    await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
-    await promptTool(viewer, "Prompt", "Continue in Chat");
-  } else await viewerAction(page, "Continue in Chat");
-  await expect(viewer).toBeHidden();
-  await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(
-    desktop ? "make it night" : "",
-  );
-  await page.getByRole("textbox", { name: "Message", exact: true }).focus();
-  await expect(
-    page
-      .getByRole("button", { name: "Choose References", exact: true })
-      .getByRole("img", { name: /^Reference 1/ }),
-  ).toBeVisible();
-});
-
 test("Viewer runs queue into the strip and Edit › Edit Prompt opens the composer", async ({
   page,
 }) => {
@@ -340,7 +316,7 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   page,
 }) => {
   const { state, viewer } = await seed(page, {}, async (_page, state) => {
-    // Neither run is listed any more (a deleted Chat, say): the version kept its source.
+    // Neither run is listed any more (cleared from the queue, say): the version kept its source.
     state.jobs.length = 0;
     state.gallery.unshift({
       ...state.gallery[0],
@@ -359,7 +335,7 @@ test("A version keeps its strip once the runs have left the queue, and runs from
     "An amber bird at night",
   );
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
-  // Its source's Chat is gone, so a run from it starts a Chat and still records where it came from.
+  // Its source's run is gone, so a run from it starts a session and still records where it came from.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
@@ -1462,7 +1438,6 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     await row[4].click();
     await expect(page.getByRole("menuitem")).toHaveText([
       "Find Similar",
-      "Continue in Chat",
       "Copy",
       "Download",
       "Delete",

@@ -33,7 +33,6 @@ import {
   registerTasteRoutes,
   tasteSignal,
 } from "./domain/taste.ts";
-import { createChatRouter } from "./domain/chat-routes.ts";
 import { queuePriority, Store } from "./domain/store.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
@@ -64,7 +63,6 @@ import { createAssistantContext } from "./assistant-context.js";
 import { modelFileReferences, profileDefinitions } from "./library/file-users.js";
 import { draftCheckpointProfile } from "./profile/import-draft.js";
 import { createGenerationQueue } from "./generation-queue.js";
-import { createSessionChat } from "./chat-service.js";
 import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
 import { registerUpscaleRoutes } from "./upscale-routes.js";
 import { registerJobRoutes } from "./job-routes.js";
@@ -521,15 +519,6 @@ registerGalleryReadRoutes(app, {
   store,
   near: (text) => imageSearch.near(text),
   similar: (item) => imageSearch.similar(item),
-  jobChats: (req) => {
-    const ownerId = ownerIdForRequest(req);
-    const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));
-    return new Map(
-      store
-        .jobs(ownerId)
-        .map((job) => [job.id, { id: job.sessionId, title: titles.get(job.sessionId) }]),
-    );
-  },
 });
 
 registerLoraRoutes(app, { comfyDownMessage, loadComfyContext });
@@ -647,10 +636,6 @@ const { generationQueue, queueResourceFor, validateGenerationInput } = createGen
   store,
 });
 registerStatusRoutes(app, { observeServices, queue: generationQueue });
-// Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
-function chatTitle(account, sessionId, prompt) {
-  return sessionChat.title(account?.userId || "", sessionId, prompt);
-}
 const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
@@ -672,7 +657,6 @@ registerRewriteRoutes(app, {
   store,
   queue: generationQueue,
   admit: admitGeneration,
-  deleteMedia: deleteOwnedGalleryItems,
   // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every queue poll.
   media: (ownerId, jobId) =>
     galleryJobItems(jobId)
@@ -682,7 +666,6 @@ registerRewriteRoutes(app, {
     const item = galleryItem(id);
     return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
   },
-  title: chatTitle,
 });
 registerMaintenanceRoutes(app, { store, queue: generationQueue, adminRefusal });
 registerResultSetRoutes(app, {
@@ -720,25 +703,19 @@ registerCompareRoutes(app, {
       ...others.map((id) => preferenceSignal(winner, { jobId: id, values: values(id) })),
     ]);
   },
-  title: chatTitle,
 });
 registerTasteRoutes(app, { taste });
-/** Whether text work (Chat replies, admitted local text) is running now; Dream and captions wait for it. */
+/** Whether admitted local text work is running now; Dream and captions wait for it. */
 const textBusy = () =>
   Boolean(
     runtime?.controller
       .status()
-      .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0) ||
-    store.db
-      .prepare(
-        "SELECT 1 FROM studio_chat_messages WHERE json_extract(record, '$.status') = 'streaming' LIMIT 1",
-      )
-      .get(),
+      .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0),
   );
 /** Whether what the owner is offered may be worded explicitly. */
 const explicitFor = (ownerId) =>
   explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
-// Suggestions (domain/suggestions.ts): composer ideas, viewer next steps and Chat context from taste.
+// Suggestions (domain/suggestions.ts): composer ideas and viewer next steps from taste.
 const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
@@ -1022,28 +999,6 @@ const nextSteps = createNextStepWork({
   image: smallImage,
 });
 
-// Studio Chat (chat-service.js).
-const sessionChat = createSessionChat({
-  admit: admitGeneration,
-  catalogueModels,
-  mcp,
-  referenceImage: assistant.image,
-  runtime,
-  store,
-  taste,
-  tasteWriter,
-  validate: validateGenerationInput,
-});
-// A group's Chat feature gates Studio Chat; single-user mode has no account and keeps it.
-app.use(
-  "/api",
-  createChatRouter(sessionChat, (req) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "chat"))
-      throw Object.assign(new Error("Chat is off for this account."), { status: 403 });
-    return ownerIdForRequest(req);
-  }),
-);
-
 generationQueue.start();
 dream.start();
 finishing.start();
@@ -1063,7 +1018,7 @@ const upscale = registerUpscaleRoutes(app, {
 
 registerJobRoutes(app, { store, queue: generationQueue });
 // MCP calls Studio's routes in process (mcp/studio-requests.js).
-const mcpDomainRequest = createMcpDomainRequest({ app, admit: admitGeneration, store });
+const mcpDomainRequest = createMcpDomainRequest({ app, admit: admitGeneration });
 registerGalleryErrorRoutes(app);
 
 registerGalleryDeleteRoute(app);

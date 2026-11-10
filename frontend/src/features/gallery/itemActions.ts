@@ -2,7 +2,6 @@ import { icons } from "../../ui/icons";
 import type { Action, ActionGroups } from "./ActionBar";
 
 const definitions = {
-  chat: { label: "Continue in Chat", icon: icons.chat },
   animate: { label: "Animate", icon: icons.animate },
   edit: { label: "Edit", icon: icons.edit },
   retry: { label: "Retry", icon: icons.retry },
@@ -18,14 +17,14 @@ const definitions = {
 };
 type ItemActionId = keyof typeof definitions;
 /**
- * The sections and order everywhere: Animate, Edit, Upscale | Compare, Find Similar, Continue in
- * Chat | Copy, Download | Star, Delete. Retry and Stop lead for unfinished work and running
+ * The sections and order everywhere: Animate, Edit, Upscale | Compare, Find Similar | Copy,
+ * Download | Star, Delete. Retry and Stop lead for unfinished work and running
  * upscales; Compare shows only in menus and the selection bar; Share takes Download's place where
  * phones share.
  */
 const sections: ItemActionId[][] = [
   ["retry", "stop", "animate", "edit", "upscale"],
-  ["compare", "similar", "chat"],
+  ["compare", "similar"],
   ["copy", "download", "share"],
   ["star", "delete"],
 ];

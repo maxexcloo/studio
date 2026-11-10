@@ -11,10 +11,9 @@ import {
 } from "@mantine/core";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, MessagesSquare } from "lucide-react";
+import { Activity } from "lucide-react";
 import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { SessionList } from "../sessions/ChatWorkspace";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
@@ -22,21 +21,17 @@ import classes from "./ServiceStatus.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
 
 /**
- * The one header entry to work in progress, Chats and service health on every breakpoint. Desktop
- * opens the queue as a dropdown under the icon, also in Chat, whose sidebar lists the Chats; phones
- * slide in a drawer, with the Chats in Chat.
+ * The one header entry to work in progress and service health on every breakpoint. Desktop opens
+ * the queue as a dropdown under the icon; phones slide in a drawer.
  */
-export function StatusAction({ chat }: { chat: boolean }) {
+export function StatusAction() {
   const [opened, setOpened] = useState(false);
   const close = () => setOpened(false);
   const phone = usePhone();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
   const generating = queue.data?.jobs.some((job) => !terminalStatuses.has(job.status));
-  const chats = chat && phone;
-  const title = chats ? "Chats" : "Generations";
-  // In Chat on phones it is plainly the Chats list, still coloured by service health.
-  const Icon = chats ? MessagesSquare : Activity;
+  const title = "Generations";
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
   const target = useRef<HTMLButtonElement>(null);
@@ -64,7 +59,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
   const trigger = (
     <ActionIcon
       ref={target}
-      aria-label={chats ? "Open Chats" : "Open Status"}
+      aria-label="Open Status"
       aria-description={generating ? "Generating" : summary.label}
       aria-haspopup="dialog"
       aria-expanded={opened}
@@ -72,12 +67,10 @@ export function StatusAction({ chat }: { chat: boolean }) {
       color={generating ? "gray" : summary.colour}
       onClick={() => setOpened(!opened)}
     >
-      {generating ? <Loader size={18} color="gray" /> : <Icon size={19} />}
+      {generating ? <Loader size={18} color="gray" /> : <Activity size={19} />}
     </ActionIcon>
   );
-  const tooltip = [chats && "Chats", generating ? "Generating" : summary.label]
-    .filter(Boolean)
-    .join(" · ");
+  const tooltip = generating ? "Generating" : summary.label;
   const status = <ServiceHealthSummary />;
   if (!phone)
     return (
@@ -128,13 +121,15 @@ export function StatusAction({ chat }: { chat: boolean }) {
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Group gap="xs" wrap="nowrap">
-              {!chats && <QueueActions />}
+              <QueueActions />
               <Drawer.CloseButton aria-label={`Close ${title}`} />
             </Group>
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
-            <div className={classes.list}>{chats ? <SessionList close={close} /> : <Queue />}</div>
+            <div className={classes.list}>
+              <Queue />
+            </div>
             <Divider />
             {status}
           </Drawer.Body>

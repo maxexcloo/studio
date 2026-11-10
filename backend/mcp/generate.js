@@ -187,11 +187,7 @@ export function registerGenerateTools({
       signal,
     });
     const expected = endsAt === null ? null : Math.max(0, endsAt - Date.now());
-    // Studio Chat shows the set as a card that follows it, so its turn never waits.
-    const seconds =
-      !actor.session && expected !== null && expected <= imageWaitSeconds * 1000
-        ? imageWaitSeconds
-        : 0;
+    const seconds = expected !== null && expected <= imageWaitSeconds * 1000 ? imageWaitSeconds : 0;
     // A set that outlasted its wait has no ETA left worth giving.
     const left = seconds ? 0 : expected;
     const markdown = await media.settle(owner, submission, seconds, { scope: refs, signal });
@@ -462,7 +458,7 @@ export function registerGenerateTools({
     try {
       const queued = await media.queue(owner, args, refs, {
         ...record,
-        ...(actor.session ? { session: actor.session } : conversation ? { conversation } : {}),
+        ...(conversation ? { conversation } : {}),
       });
       return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
     } catch (error) {
@@ -793,7 +789,7 @@ export function registerGenerateTools({
         .max(16)
         .optional()
         .describe(
-          `From search uploads, upload${actor.session ? "" : ", upload_link"} or reuse mode reference. models gives each profile's references.max.`,
+          `From search uploads, upload, upload_link or reuse mode reference. models gives each profile's references.max.`,
         ),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
@@ -1162,7 +1158,7 @@ export function registerGenerateTools({
       id: crypto.randomUUID(),
       // A character's set is named for it unless the chat named the set.
       title: title || card?.name || replyTitle(request) || promptWords(args.prompts[0]),
-      source: actor.session ? "Chat" : actor.client || "MCP",
+      source: actor.client || "MCP",
       ...(card ? { character: { id: card.id, name: card.name } } : {}),
     };
     for (const item of plans) if (resultSet) item.plan.result_set = resultSet;
@@ -1434,7 +1430,6 @@ export function registerGenerateTools({
           ? { request: request || recorded.request }
           : {}),
         ...(carried ? { assistant: carried } : {}),
-        parent: id,
       });
       const dropped = plan.droppedLoras?.length
         ? `Left out ${plan.droppedLoras.length === 1 ? "a LoRA" : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(", ")}); tell the user. `

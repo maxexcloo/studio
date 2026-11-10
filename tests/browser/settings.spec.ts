@@ -277,8 +277,8 @@ test("Where Work Runs in Settings › Preferences saves where each area runs", a
   const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
-  await expect(where.getByRole("radiogroup")).toHaveCount(4);
-  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(3);
+  await expect(where.getByRole("radiogroup")).toHaveCount(3);
+  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(2);
   // Videos offers Animate's three choices, its saved tier showing.
   await expect(area("Videos").getByRole("radio")).toHaveCount(3);
   await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
@@ -290,7 +290,6 @@ test("Where Work Runs in Settings › Preferences saves where each area runs", a
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Fast");
   await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
-  expect(state.preferences.preferences.chat).toBeUndefined();
 });
 
 test("Spicy Prompts shows in Settings › Preferences only with Uncensored Models", async ({
@@ -410,20 +409,13 @@ test("Administrator accounts retain worker visibility and attribution", async ({
   );
 });
 
-test("Status summarises each kind's workers and state, quietly", async ({ page, isMobile }) => {
+test("Status summarises each kind's workers and state, quietly", async ({ page }) => {
   await fixtures(page);
-  await page.goto("/chat");
-  // Desktop keeps the queue in Chat, beside the Chats sidebar; phones list the Chats.
-  const status = page.getByRole("button", {
-    name: isMobile ? "Open Chats" : "Open Status",
-    exact: true,
-  });
+  await page.goto("/images");
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
   await status.click();
-  const drawer = page.getByRole("dialog", {
-    name: isMobile ? "Chats" : "Generations",
-    exact: true,
-  });
+  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
   const summary = drawer.getByRole("region", { name: "Service Status", exact: true });
   await expect(summary).toHaveText(
     "Images1 worker · IdleVideos1 worker · OfflineText1 local model · Running",

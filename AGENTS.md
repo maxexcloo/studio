@@ -89,8 +89,7 @@ the primary component reference and verify APIs against the installed version.
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
 - Search clears only its query. Filters preserve it. Toolbars open search from
-  an icon; the phone Chats list keeps it open, with New Chat at the row's end.
-  Controls opening a picker or menu show ▾, small beside an action bar's icon;
+  an icon. Controls opening a picker or menu show ▾, small beside an action bar's icon;
   icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
   alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
@@ -134,8 +133,7 @@ the primary component reference and verify APIs against the installed version.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
   other phone text boxes open the shared full-screen editor. Only the send
   stands beside the text, with one ⋯ menu of its `tools`: the box's own
-  (Suggestions, Ask for a Change or Improve Prompt, Recent Prompts, Continue in
-  Chat), then Copy where the page has no other, then Clear, which turns into
+  (Suggestions, Ask for a Change or Improve Prompt, Recent Prompts), then Copy where the page has no other, then Clear, which turns into
   Undo until the text next changes. The phone editor shows them as buttons, not
   a menu, and a box without tools has no ⋯.
 - Respect safe areas and the phone keyboard. The viewport uses
@@ -146,21 +144,13 @@ the primary component reference and verify APIs against the installed version.
   visible names where their icons alone are ambiguous. Preserve focus trapping,
   Escape and return focus in dialogs and viewers.
 - Scope shortcuts to the active surface; do not capture typing, composition or
-  another overlay. On phones, Chats rows and gallery tiles without Tile Captions
-  hide their menu button and open that menu on hold; other gallery tiles hold
+  another overlay. On phones, gallery tiles without Tile Captions hide their
+  menu button and open that menu on hold; other gallery tiles hold
   to select. Holds cancel on movement and their release opens nothing.
   Right-click, the Menu key and Shift+F10 open the same menu.
 
 ### Generation & Media
 
-- Gallery and Chat cards share generation controls, while each card's draft
-  remains independent. Editing an old Chat card sends its source job and full
-  normalised input through the assistant and creates a new iteration without
-  changing the original; do not bypass it with a direct queue request.
-- The collapsed Chat composer holds only its message and Send. Focusing the
-  message expands it in place, built as the gallery composer: the text with its
-  tools, then a `ChipRail` (the text model where there is a choice, and
-  References) beside Send. Pressing outside, Escape or tabbing away collapses it.
 - Preserve exact profile IDs and account-owned asset IDs. Display readable
   profile, family and reference-role names rather than backend filenames.
   Profile options carry short facts (model or family · kind · Cloud or Local
@@ -181,17 +171,16 @@ the primary component reference and verify APIs against the installed version.
   the local tiers a profile offers, and the choice only when there are two.
   The preferred side falls back to the other, saying so; Extend keeps its
   video's model unless Cloud is preferred.
-- Settings › Preferences › Where Work Runs sets Cloud or Local for Chat, Prompt
+- Settings › Preferences › Where Work Runs sets Cloud or Local for Prompt
   Writing (Ask for a Change included) and Images, and Videos' Cloud | Fast |
   Quality as Animate's menus do. It sets only defaults: a model the person picks
   wins, and a draft keeps following the default until then. A default on the
   other side says so where its work shows: a notification on queuing or on a
-  proposal, a line under the Chat reply, the start of the written prompt's
-  thinking.
+  proposal, the start of the written prompt's thinking.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs. Suggestions never move layout or act on their own.
-  Ideas for an empty prompt or Chat message are one Suggestions ▾ chip in the
+  Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own.
 - Queue access belongs to the header status action. Under the queue, its popup
@@ -205,7 +194,7 @@ the primary component reference and verify APIs against the installed version.
   command; bulk retry deduplicates IDs, retains unsuccessful items and preserves
   unrelated selection. Stop requests cancellation but accepted work may remain
   active until the provider confirms or results are saved. Clear Failed removes
-  queue entries without deleting their records or Chat cards. Pause holds
+  queue entries without deleting their records. Pause holds
   unstarted work in place (all accounts for a multi-user administrator); started
   work finishes. Reordering affects only the account's waiting work,
   preserving other accounts and queue tiers. Started background work finishes.
@@ -226,16 +215,16 @@ the primary component reference and verify APIs against the installed version.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds under Expand; its tags always show. Prompt and
   Negative Prompt alone have a Copy beside their heading.
-- Version grouping has one owner in `gallery/versions.ts`; sharing a Chat or
+- Version grouping has one owner in `gallery/versions.ts`; sharing a session or
   prompt alone does not group results. Keep source and derived relationships
   visible, even when a result stands alone.
 - Viewers fill the viewport independently of workspace width. Empty-stage
   clicks close; media, native video controls and actions remain interactive.
   Images open fitted without exceeding their real size. Keep the current image
   visible until the next version loads, then refit before painting. Navigation
-  stops at the first and last item. A result from a Chat iteration or run of
-  several, like their Open All, flips through only those results; other results
-  flip through their Chat or gallery. Closing reveals and focuses the current
+  stops at the first and last item. A result from a run of several, like its
+  Open All, flips through only that run's results; other results flip through
+  the gallery. Closing reveals and focuses the current
   tile.
 - On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strips, prompt,
   actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
@@ -277,11 +266,7 @@ the primary component reference and verify APIs against the installed version.
 - Routine success appears where it happened: a saved row, a copy check or a
   brief action label (`useFlash`). Notifications serve failures, Undo and
   outcomes with nowhere else to show. Generation submission and completion
-  appear in their gallery, strip or card. Keep notifications clear of actions.
-- Render assistant Markdown with the shared safe renderer and Mantine
-  typography. Defer parsing streamed changes; keep scroll anchored only while
-  the user remains at the bottom. Preserve partial replies, thinking and tool
-  history without mixing connection status into the conversation.
+  appear in their gallery or strip. Keep notifications clear of actions.
 - Dream results stay in their own pool until liked; Like and Pass teach taste.
   The deck's bar offers only large Pass and Like, or a comparison's A and B
   larger than Neither and Both; the viewer's bar offers every choice.

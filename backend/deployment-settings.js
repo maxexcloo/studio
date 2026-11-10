@@ -50,15 +50,10 @@ const flag = (key, label, description, defaultOn = true) => ({
 
 /**
  * Settings › Generation switches. Background AI (A–Z) covers every model call Studio makes on its
- * own; what a person asks for (Improve, Ask for a Change, Animate, Chat replies) is never switched
+ * own; what a person asks for (Improve, Ask for a Change, Animate) is never switched
  * off here. Run While Busy sits with the gallery passes.
  */
 export const catalogueFlags = [
-  flag(
-    "STUDIO_CHAT_TITLES",
-    "Chat Titles",
-    "The assistant model names each new chat from its first request; without it a chat stays New Chat until renamed.",
-  ),
   flag(
     "STUDIO_FACE_CHECK",
     "Face Check",
@@ -102,7 +97,7 @@ export const catalogueFlags = [
   flag(
     "STUDIO_GALLERY_WHILE_BUSY",
     "Run While Busy",
-    "Caption, index and title the gallery even while Studio is generating or chatting, instead of waiting until it is idle.",
+    "Caption, index and title the gallery even while Studio is generating, instead of waiting until it is idle.",
     false,
   ),
 ];

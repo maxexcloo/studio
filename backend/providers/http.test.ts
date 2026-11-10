@@ -141,7 +141,7 @@ test(
       );
       assert.equal(output.provider, "cliproxyapi");
       assert.equal(output.settings.modelName, "grok-imagine-image-2.0");
-      // Chat shows the gallery's record, with its prompt and settings, not the provider's bare file.
+      // The session shows the gallery's record, with its prompt and settings, not the provider's bare file.
       const [shown] = (await api(`/api/sessions/${accepted.sessionId}`)).jobs[0].items;
       assert.equal(shown.id, output.id);
       assert.equal(shown.prompt, "A white bird");

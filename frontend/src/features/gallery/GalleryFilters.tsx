@@ -36,7 +36,7 @@ interface GalleryFilterOption {
 }
 const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
-const facets = ["model", "lora", "size", "aspect", "tag", "chat"] as const;
+const facets = ["model", "lora", "size", "aspect", "tag"] as const;
 type Facet = (typeof facets)[number];
 type GalleryDate = "" | "day" | "week" | "month" | "year";
 const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
@@ -60,7 +60,6 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   size: [],
   aspect: [],
   tag: [],
-  chat: [],
   date: "",
   starred: false,
   uploads: false,
@@ -92,7 +91,6 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
         aspects: GalleryFilterOption[];
         /** The most used caption tags, with counts. */
         tags: GalleryFilterOption[];
-        chats: GalleryFilterOption[];
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
 
@@ -175,7 +173,6 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       tag: facets.data?.tags || [],
-      chat: facets.data?.chats || [],
     } satisfies Record<Facet, GalleryFilterOption[]>,
   };
 }
@@ -360,7 +357,7 @@ export function GalleryFilterPanel({
   const { facets, options } = useFacetOptions(kind, value);
   const show = value.uploads ? "uploads" : value.starred ? "starred" : "all";
   // A clean name stands for all its recorded values; typing any part of it finds it.
-  const many = (key: "model" | "lora" | "chat", label: string) => (
+  const many = (key: "model" | "lora", label: string) => (
     <MultiSelect
       size="sm"
       label={label}

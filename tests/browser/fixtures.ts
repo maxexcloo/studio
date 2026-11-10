@@ -74,8 +74,6 @@ export async function fixtures(page: Page) {
   const jobs: any[] = [];
   const presets: any[] = [];
   const gallery: any[] = [];
-  const messages: any[] = [];
-  const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
   const characters: any[] = [];
   const outfits: any[] = [];
@@ -281,7 +279,8 @@ export async function fixtures(page: Page) {
       Object.assign(account!, body);
       return respond({ account });
     }
-    if (path === "/api/accounts/status") return respond({ mode: "single-user" });
+    if (path === "/api/accounts/status")
+      return respond({ mode: "single-user", chatUrl: "https://chat.example.test" });
     if (path === "/api/models") return respond({ profiles, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running and the account has no Cloud: Animate takes the local video profile.
@@ -292,96 +291,6 @@ export async function fixtures(page: Page) {
         cloud: false,
         offers: { cloud: false, fast: false, quality: true },
       });
-    if (path === "/api/chat/status")
-      return respond({
-        available: true,
-        models: [{ id: "text:test", label: "Studio Assistant", provider: "Fixture Gateway" }],
-        defaultModelId: "text:test",
-      });
-    if (path.match(/^\/api\/sessions\/[^/]+\/chat$/)) {
-      const sessionId = path.split("/")[3];
-      if (method === "GET")
-        return respond({
-          available: true,
-          messages: messages.filter((message) => message.sessionId === sessionId),
-        });
-      chatRequests.push(body);
-      const user = {
-        id: `message-${messages.length + 1}`,
-        sessionId,
-        role: "user",
-        content: body.content,
-        status: "completed",
-        revision: body.revision,
-        createdAt: nextStamp(),
-      };
-      const assistant: any = {
-        id: `message-${messages.length + 2}`,
-        sessionId,
-        role: "assistant",
-        content: "",
-        status: "streaming",
-        createdAt: nextStamp(),
-      };
-      const events: any[] = [
-        { event: "message", data: user },
-        { event: "message", data: { ...assistant } },
-        { event: "thinking", data: { id: assistant.id, text: "Light first, then subject." } },
-        {
-          event: "delta",
-          data: {
-            id: assistant.id,
-            text: "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)",
-          },
-        },
-      ];
-      assistant.thinking = "Light first, then subject.";
-      assistant.content =
-        "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)";
-      if (
-        body.content === "Create a blue bird" ||
-        body.revision ||
-        body.content.startsWith("Generate a variation:")
-      ) {
-        assistant.content = body.revision
-          ? "I’ll use your revised settings for this variation."
-          : "I’ll create a blue bird with your selected settings.";
-        const input = {
-          ...(body.revision?.input || body.generation.input),
-          prompt:
-            body.revision?.input.prompt ||
-            (body.content === "Create a blue bird"
-              ? "A blue bird in soft daylight"
-              : body.generation.input.prompt),
-          operation: body.revision?.operation || body.generation.operation || "image",
-          parentJobId: body.revision?.sourceJobId || body.generation?.parentJobId,
-        };
-        const job = recordGeneration(input, sessionId);
-        assistant.jobId = job.id;
-        // A card revision runs as submitted; anything else is the agent's generate call.
-        if (body.revision) assistant.draft = { operation: "image", input };
-        else
-          assistant.steps = [
-            {
-              id: `call-${messages.length + 2}`,
-              tool: "generate",
-              input: { prompts: [input.prompt] },
-              status: "completed",
-              output: "Queued on Test Image. Chose Test Image, the default.",
-            },
-          ];
-        events.push({ event: "generation", data: { jobIds: [job.id] } });
-      }
-      assistant.status = "completed";
-      messages.push(user, assistant);
-      events.push({ event: "message", data: assistant }, { event: "done", data: {} });
-      return route.fulfill({
-        contentType: "text/event-stream",
-        body: events
-          .map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-          .join(""),
-      });
-    }
     if (path === "/api/loras/library") return respond({ found: true, library: loraLibrary });
     if (path === "/api/loras/library/ops" && method === "POST") {
       for (const operation of body.ops) {
@@ -560,53 +469,10 @@ export async function fixtures(page: Page) {
       job.status = "cancelled";
       return respond({ job });
     }
-    if (path === "/api/sessions" && method === "GET") {
-      const query = (url.searchParams.get("q") || "").toLowerCase();
-      return respond({
-        sessions: sessions.filter(
-          (session) =>
-            !query ||
-            session.title.toLowerCase().includes(query) ||
-            messages.some(
-              (message) =>
-                message.sessionId === session.id && message.content.toLowerCase().includes(query),
-            ),
-        ),
-      });
-    }
-    if (path === "/api/sessions/archive") {
-      const chosen = sessions.filter((session) => body.ids.includes(session.id));
-      for (const session of chosen)
-        if (body.archived) session.archived = true;
-        else delete session.archived;
-      return respond({ ids: chosen.map((session) => session.id) });
-    }
-    if (path === "/api/sessions/delete") {
-      const removed: string[] = [],
-        failed: any[] = [];
-      for (const id of body.ids) {
-        const owned = jobs.filter((job) => job.sessionId === id);
-        if (owned.some((job) => !["completed", "failed", "cancelled"].includes(job.status)))
-          failed.push({
-            id,
-            reason: "active-jobs",
-            error: "This chat has generations in progress. Cancel them before deleting the chat.",
-          });
-        else {
-          sessions.splice(
-            sessions.findIndex((session) => session.id === id),
-            1,
-          );
-          for (const job of owned) jobs.splice(jobs.indexOf(job), 1);
-          removed.push(id);
-        }
-      }
-      return respond({ removed, failed });
-    }
     if (path === "/api/sessions" && method === "POST") {
       const session = {
         id: `session-${sessions.length + 1}`,
-        title: body.title || "New Chat",
+        title: body.title || "",
         inputs: body.inputs,
         createdAt: stamp,
         updatedAt: stamp,
@@ -621,23 +487,6 @@ export async function fixtures(page: Page) {
     }
     if (path.match(/^\/api\/sessions\/[^/]+$/)) {
       const session = sessions.find((s) => s.id === path.split("/")[3]);
-      if (method === "PATCH") Object.assign(session, { title: body.title, titleSource: "user" });
-      if (method === "DELETE") {
-        const owned = jobs.filter((job) => job.sessionId === session.id);
-        if (owned.some((job) => !["completed", "failed", "cancelled"].includes(job.status)))
-          return respond(
-            {
-              reason: "active-jobs",
-              error: "This chat has generations in progress. Cancel them before deleting the chat.",
-            },
-            409,
-          );
-        const ids: string[] = body.mediaIds || [];
-        sessions.splice(sessions.indexOf(session), 1);
-        for (const job of owned) jobs.splice(jobs.indexOf(job), 1);
-        gallery.splice(0, gallery.length, ...gallery.filter((item) => !ids.includes(item.id)));
-        return respond({ ok: true, media: { removed: ids, failed: [] } });
-      }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
     // Compare Selected records chosen gallery images.
@@ -713,7 +562,6 @@ export async function fixtures(page: Page) {
         ]
           .sort(([, a], [, b]) => b - a)
           .map(([tag, count]) => ({ value: tag, label: tag, count })),
-        chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
     if (path === "/api/gallery") {
       galleryRequests.push(url.search);
@@ -723,8 +571,6 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
           (url.searchParams.get("favorites") !== "1" || i.favorite) &&
-          (!url.searchParams.has("chat") ||
-            url.searchParams.getAll("chat").includes(i.sessionId)) &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
@@ -937,8 +783,6 @@ export async function fixtures(page: Page) {
     galleryOwners,
     ownAccount,
     preferences,
-    messages,
-    chatRequests,
     referenceRequests,
     characters,
     outfits,
@@ -1043,13 +887,6 @@ export async function selectionMenuItem(page: Page, label: string) {
   if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);
   await selectionAction(page, "More").click();
   return page.getByRole("menuitem", { name: label, exact: true });
-}
-
-/** Chat with nothing open: desktop says so; phones list the chats in its place. */
-export async function expectNoChatOpen(page: Page) {
-  if ((page.viewportSize()?.width || 1440) < 768)
-    await expect(page.getByRole("region", { name: "Chats", exact: true })).toBeVisible();
-  else await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
 }
 
 /** Turns on Compare Upscale in the viewer's Upscale menu. */

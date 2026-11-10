@@ -14,8 +14,7 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
-  /** Where Chat, prompt writing and images run by default; unsaved, Local. */
-  chat?: SidePreference;
+  /** Where prompt writing and images run by default; unsaved, Local. */
   images?: SidePreference;
   writing?: SidePreference;
   /** Unsaved, Fast where the account has local video, otherwise Cloud. */
@@ -60,7 +59,6 @@ export function useSavePreferences() {
       if ("images" in patch || "videos" in patch)
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
       if ("videos" in patch) void client.invalidateQueries({ queryKey: ["animate-profile"] });
-      if ("chat" in patch) void client.invalidateQueries({ queryKey: ["chat-status"] });
       if ("writing" in patch) void client.invalidateQueries({ queryKey: ["assistant"] });
     },
     onError: () => client.invalidateQueries({ queryKey: preferencesQuery.queryKey }),
