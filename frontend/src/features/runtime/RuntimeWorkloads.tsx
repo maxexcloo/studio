@@ -38,7 +38,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { SettingRow } from "../../ui/SettingRows";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -134,6 +134,17 @@ function logText(entry: RuntimeOperation) {
     ...(entry.finishedAt ? [`${time(entry.finishedAt)}  ${entry.error || entry.progress}`] : []),
   ].join("\n");
 }
+
+/** Workload ids as their names, "None" for none. */
+const workloadNames = (workloads: RuntimeStatus["workloads"]) => (ids: string[]) =>
+  ids.length
+    ? ids.map((id) => workloads.find((item) => item.id === id)?.label ?? id).join(", ")
+    : "None";
+/** What a change did, as "Before → After" or "Restart X". */
+const changeLine = (names: (ids: string[]) => string) => (entry: RuntimeOperation) =>
+  entry.type === "restart"
+    ? `Restart ${names(entry.start)}`
+    : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
 
 /** A change's one-line summary: what it did, how it ended, who asked and when. */
 const changeSummary = (entry: RuntimeOperation, change: (entry: RuntimeOperation) => string) =>
@@ -370,7 +381,7 @@ function AutomaticControlRows({
         label="Run When Idle"
         description={
           idleChoice?.kind === "text"
-            ? "Then start this model. Automatic Control never stops text, so media work that needs its GPUs waits until it’s stopped."
+            ? "Then start this model. Automatic Control never stops text; administrators can swap it out from the queue."
             : "Then start this model in its pool. Queued work still starts what it needs."
         }
       >
@@ -396,6 +407,16 @@ function AutomaticControlRows({
           }
         />
       </SettingRow>
+      <SettingRow
+        label="Let Everyone Swap Models"
+        description="Accounts that aren’t administrators can also swap text out for their waiting work."
+      >
+        <Switch
+          aria-label="Let Everyone Swap Models"
+          checked={settings.everyoneSwaps === true}
+          onChange={(event) => save.mutate({ everyoneSwaps: event.currentTarget.checked })}
+        />
+      </SettingRow>
       {save.error && (
         <Alert color="red" title="Couldn’t Save Automatic Control">
           {save.error.message}
@@ -405,14 +426,13 @@ function AutomaticControlRows({
   );
 }
 
-/** Settings › Workers: which GPU deployments run, a previewed switch, restarts and the change history. */
+/** Settings › Workers: which GPU deployments run, a previewed switch and restarts. */
 export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
   const client = useQueryClient();
   const status = useQuery(runtimeStatusQuery);
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
-  const [allChanges, setAllChanges] = useState(false);
   const [logId, setLogId] = useState("");
   const [workloadLogId, setWorkloadLogId] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
@@ -448,13 +468,10 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
   const { workloads, operation, history } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
-  const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
+  const names = workloadNames(workloads);
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
   const chosen = selection ?? running;
-  const change = (entry: RuntimeOperation) =>
-    entry.type === "restart"
-      ? `Restart ${names(entry.start)}`
-      : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
+  const change = changeLine(names);
   // One short line for the running change, or for the latest one if it didn't finish.
   const failed = operation ? undefined : unfinished(history[0]);
   const shown = operation ?? failed;
@@ -466,258 +483,268 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         ? { doing: "Switching to", verb: "switch to", ids: shown.start }
         : { doing: "Stopping", verb: "stop", ids: shown.stop });
   return (
+    <Stack gap="md">
+      <DataTable
+        label="GPU Workloads"
+        rows={workloads}
+        rowKey={(item) => item.id}
+        rowName={(item) => item.label}
+        empty="No GPU Workloads"
+        compact
+        columns={[
+          {
+            key: "run",
+            header: "Run",
+            width: 44,
+            cell: (item) => (
+              <Checkbox
+                aria-label={`Run ${item.label}`}
+                checked={chosen.includes(item.id)}
+                disabled={Boolean(operation)}
+                onChange={(event) =>
+                  setSelection(
+                    event.currentTarget.checked
+                      ? [...chosen, item.id]
+                      : chosen.filter((id) => id !== item.id),
+                  )
+                }
+              />
+            ),
+          },
+          {
+            key: "workload",
+            header: "Workload",
+            main: true,
+            sortValue: (item) => item.label,
+            cell: (item) => {
+              const short = changePhase(item.id, item.phase, operation, failed).failed;
+              const note =
+                short ||
+                item.reason ||
+                reasons[item.id] ||
+                (item.acceptedOperations > 0 &&
+                  `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
+              return (
+                <>
+                  <Text size="sm" fw={500}>
+                    {item.label}
+                  </Text>
+                  {note && (
+                    <Text
+                      size="xs"
+                      c={short ? "red" : "dimmed"}
+                      style={{ overflowWrap: "anywhere" }}
+                    >
+                      {note}
+                    </Text>
+                  )}
+                </>
+              );
+            },
+          },
+          {
+            key: "gpus",
+            header: "GPUs",
+            hideOnPhone: true,
+            sortValue: (item) => item.gpus,
+            cell: (item) => <Text size="sm">{item.gpus}</Text>,
+          },
+          {
+            key: "state",
+            header: "State",
+            sortValue: (item) => phaseLabel(item.phase),
+            cell: (item) => {
+              const { pending } = changePhase(item.id, item.phase, operation);
+              const phase = pending ?? item.phase;
+              return (
+                <Badge
+                  color={phaseColour(phase)}
+                  miw="max-content"
+                  leftSection={pending && <Loader size={10} color="currentColor" />}
+                >
+                  {phaseLabel(phase)}
+                </Badge>
+              );
+            },
+          },
+        ]}
+        rowActions={(item) => (
+          <>
+            {item.phase === "parked" || item.phase === "down" ? (
+              <Menu.Item
+                leftSection={<icons.resume size={16} />}
+                disabled={Boolean(operation)}
+                onClick={() => starting.mutate(item.id)}
+              >
+                Start
+              </Menu.Item>
+            ) : (
+              <Menu.Item
+                leftSection={<icons.retry size={16} />}
+                disabled={Boolean(operation) || item.phase !== "running"}
+                onClick={() => setRestarting(item.id)}
+              >
+                Restart
+              </Menu.Item>
+            )}
+            <Menu.Item
+              leftSection={<icons.log size={16} />}
+              onClick={() => setWorkloadLogId(item.id)}
+            >
+              View Log
+            </Menu.Item>
+          </>
+        )}
+      />
+      <Group justify="space-between" gap="xs">
+        {shown && line ? (
+          <Group gap="xs" wrap="nowrap" role="status" miw={0}>
+            {operation && <Loader size="xs" />}
+            <Text size="sm" c={operation ? undefined : "red"} style={{ overflowWrap: "anywhere" }}>
+              {operation
+                ? `${line.doing} ${names(line.ids)}…`
+                : `Couldn’t ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
+            </Text>
+            <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
+              View Log
+            </Button>
+          </Group>
+        ) : (
+          <span />
+        )}
+        <Group gap="xs" ml="auto">
+          <Button
+            variant="default"
+            disabled={!selection || sameSet(chosen, running)}
+            onClick={() => setSelection(null)}
+          >
+            Reset
+          </Button>
+          <Button
+            disabled={Boolean(operation) || sameSet(chosen, running)}
+            loading={previewing.isPending}
+            onClick={() => previewing.mutate(chosen)}
+          >
+            Preview Changes
+          </Button>
+        </Group>
+      </Group>
+      <OperationLog
+        entry={history.find((entry) => entry.id === logId)}
+        change={change}
+        onClose={() => setLogId("")}
+      />
+      <WorkloadLog
+        workload={workloads.find((item) => item.id === workloadLogId)}
+        history={history}
+        change={change}
+        onClose={() => setWorkloadLogId("")}
+      />
+      <ConfirmDialog
+        opened={Boolean(preview)}
+        title="Apply GPU Placement"
+        action="Apply"
+        pending={applying.isPending}
+        error={applying.error?.message}
+        onConfirm={() => applying.mutate(preview!)}
+        onClose={() => {
+          setPreview(null);
+          applying.reset();
+        }}
+      >
+        {preview && <PlacementChanges preview={preview} label={label} />}
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={Boolean(restarting)}
+        title={`Restart ${restarting ? label(restarting) : ""}`}
+        action="Restart"
+        pending={restart.isPending}
+        error={restart.error?.message}
+        onConfirm={() => restart.mutate(restarting!)}
+        onClose={() => {
+          setRestarting(null);
+          restart.reset();
+        }}
+      >
+        Accepted work finishes first, then it restarts with the same model and GPUs.
+      </ConfirmDialog>
+    </Stack>
+  );
+}
+
+/** Settings › Workers › Services & Control: the runtime changes, the latest three until Show All. */
+export function RuntimeHistory() {
+  const status = useQuery(runtimeStatusQuery).data;
+  const [allChanges, setAllChanges] = useState(false);
+  const [logId, setLogId] = useState("");
+  if (!status?.history.length) return null;
+  const { history } = status;
+  const change = changeLine(workloadNames(status.workloads));
+  return (
     <>
-      <Stack gap="md">
+      <SettingRow label="History" description="Recent GPU changes, newest first, and who asked." />
+      <Stack gap={4} align="flex-start">
         <DataTable
-          label="GPU Workloads"
-          rows={workloads}
-          rowKey={(item) => item.id}
-          rowName={(item) => item.label}
-          empty="No GPU Workloads"
-          compact
+          label="Runtime Changes"
+          rows={allChanges ? history : history.slice(0, 3)}
+          rowKey={(entry) => entry.id}
+          rowName={change}
+          empty="No Changes"
+          rowActions={(entry) => (
+            <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(entry.id)}>
+              View Log
+            </Menu.Item>
+          )}
           columns={[
             {
-              key: "run",
-              header: "Run",
-              width: 44,
-              cell: (item) => (
-                <Checkbox
-                  aria-label={`Run ${item.label}`}
-                  checked={chosen.includes(item.id)}
-                  disabled={Boolean(operation)}
-                  onChange={(event) =>
-                    setSelection(
-                      event.currentTarget.checked
-                        ? [...chosen, item.id]
-                        : chosen.filter((id) => id !== item.id),
-                    )
-                  }
-                />
+              key: "time",
+              header: "Time",
+              cell: (entry) => (
+                <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                  {new Date(entry.startedAt).toLocaleString(undefined, {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </Text>
               ),
             },
             {
-              key: "workload",
-              header: "Workload",
+              key: "change",
+              header: "Change",
               main: true,
-              sortValue: (item) => item.label,
-              cell: (item) => {
-                const short = changePhase(item.id, item.phase, operation, failed).failed;
-                const note =
-                  short ||
-                  item.reason ||
-                  reasons[item.id] ||
-                  (item.acceptedOperations > 0 &&
-                    `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
-                return (
-                  <>
-                    <Text size="sm" fw={500}>
-                      {item.label}
-                    </Text>
-                    {note && (
-                      <Text
-                        size="xs"
-                        c={short ? "red" : "dimmed"}
-                        style={{ overflowWrap: "anywhere" }}
-                      >
-                        {note}
-                      </Text>
-                    )}
-                  </>
-                );
-              },
+              cell: (entry) => (
+                <Text
+                  size="sm"
+                  truncate
+                  title={`${entry.error || entry.progress} · ${entry.requestedBy}`}
+                >
+                  {change(entry)}
+                  {entry.error && ` · ${entry.error}`}
+                </Text>
+              ),
             },
             {
-              key: "gpus",
-              header: "GPUs",
-              hideOnPhone: true,
-              sortValue: (item) => item.gpus,
-              cell: (item) => <Text size="sm">{item.gpus}</Text>,
-            },
-            {
-              key: "state",
-              header: "State",
-              sortValue: (item) => phaseLabel(item.phase),
-              cell: (item) => {
-                const { pending } = changePhase(item.id, item.phase, operation);
-                const phase = pending ?? item.phase;
-                return (
-                  <Badge
-                    color={phaseColour(phase)}
-                    miw="max-content"
-                    leftSection={pending && <Loader size={10} color="currentColor" />}
-                  >
-                    {phaseLabel(phase)}
-                  </Badge>
-                );
-              },
+              key: "result",
+              header: "Result",
+              cell: (entry) => (
+                <Badge color={operationColour(entry.status)} miw="max-content">
+                  {operationLabel(entry.status)}
+                </Badge>
+              ),
             },
           ]}
-          rowActions={(item) => (
-            <>
-              {item.phase === "parked" || item.phase === "down" ? (
-                <Menu.Item
-                  leftSection={<icons.resume size={16} />}
-                  disabled={Boolean(operation)}
-                  onClick={() => starting.mutate(item.id)}
-                >
-                  Start
-                </Menu.Item>
-              ) : (
-                <Menu.Item
-                  leftSection={<icons.retry size={16} />}
-                  disabled={Boolean(operation) || item.phase !== "running"}
-                  onClick={() => setRestarting(item.id)}
-                >
-                  Restart
-                </Menu.Item>
-              )}
-              <Menu.Item
-                leftSection={<icons.log size={16} />}
-                onClick={() => setWorkloadLogId(item.id)}
-              >
-                View Log
-              </Menu.Item>
-            </>
-          )}
         />
-        <Group justify="space-between" gap="xs">
-          {shown && line ? (
-            <Group gap="xs" wrap="nowrap" role="status" miw={0}>
-              {operation && <Loader size="xs" />}
-              <Text
-                size="sm"
-                c={operation ? undefined : "red"}
-                style={{ overflowWrap: "anywhere" }}
-              >
-                {operation
-                  ? `${line.doing} ${names(line.ids)}…`
-                  : `Couldn’t ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
-              </Text>
-              <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
-                View Log
-              </Button>
-            </Group>
-          ) : (
-            <span />
-          )}
-          <Group gap="xs" ml="auto">
-            <Button
-              variant="default"
-              disabled={!selection || sameSet(chosen, running)}
-              onClick={() => setSelection(null)}
-            >
-              Reset
-            </Button>
-            <Button
-              disabled={Boolean(operation) || sameSet(chosen, running)}
-              loading={previewing.isPending}
-              onClick={() => previewing.mutate(chosen)}
-            >
-              Preview Changes
-            </Button>
-          </Group>
-        </Group>
-        <OperationLog
-          entry={history.find((entry) => entry.id === logId)}
-          change={change}
-          onClose={() => setLogId("")}
-        />
-        <WorkloadLog
-          workload={workloads.find((item) => item.id === workloadLogId)}
-          history={history}
-          change={change}
-          onClose={() => setWorkloadLogId("")}
-        />
-        <ConfirmDialog
-          opened={Boolean(preview)}
-          title="Apply GPU Placement"
-          action="Apply"
-          pending={applying.isPending}
-          error={applying.error?.message}
-          onConfirm={() => applying.mutate(preview!)}
-          onClose={() => {
-            setPreview(null);
-            applying.reset();
-          }}
-        >
-          {preview && <PlacementChanges preview={preview} label={label} />}
-        </ConfirmDialog>
-        <ConfirmDialog
-          opened={Boolean(restarting)}
-          title={`Restart ${restarting ? label(restarting) : ""}`}
-          action="Restart"
-          pending={restart.isPending}
-          error={restart.error?.message}
-          onConfirm={() => restart.mutate(restarting!)}
-          onClose={() => {
-            setRestarting(null);
-            restart.reset();
-          }}
-        >
-          Accepted work finishes first, then it restarts with the same model and GPUs.
-        </ConfirmDialog>
+        {history.length > 3 && (
+          <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
+            {allChanges ? "Show Less" : "Show All"}
+          </Button>
+        )}
       </Stack>
-      {!!history.length && (
-        <SettingGroup title="History">
-          <Stack gap={4} align="flex-start">
-            <DataTable
-              label="Runtime Changes"
-              rows={allChanges ? history : history.slice(0, 3)}
-              rowKey={(entry) => entry.id}
-              rowName={change}
-              empty="No Changes"
-              rowActions={(entry) => (
-                <Menu.Item leftSection={<icons.log size={16} />} onClick={() => setLogId(entry.id)}>
-                  View Log
-                </Menu.Item>
-              )}
-              columns={[
-                {
-                  key: "time",
-                  header: "Time",
-                  cell: (entry) => (
-                    <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                      {new Date(entry.startedAt).toLocaleString(undefined, {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
-                    </Text>
-                  ),
-                },
-                {
-                  key: "change",
-                  header: "Change",
-                  main: true,
-                  cell: (entry) => (
-                    <Text
-                      size="sm"
-                      truncate
-                      title={`${entry.error || entry.progress} · ${entry.requestedBy}`}
-                    >
-                      {change(entry)}
-                      {entry.error && ` · ${entry.error}`}
-                    </Text>
-                  ),
-                },
-                {
-                  key: "result",
-                  header: "Result",
-                  cell: (entry) => (
-                    <Badge color={operationColour(entry.status)} miw="max-content">
-                      {operationLabel(entry.status)}
-                    </Badge>
-                  ),
-                },
-              ]}
-            />
-            {history.length > 3 && (
-              <Button variant="subtle" size="compact-sm" onClick={() => setAllChanges(!allChanges)}>
-                {allChanges ? "Show Less" : "Show All"}
-              </Button>
-            )}
-          </Stack>
-        </SettingGroup>
-      )}
+      <OperationLog
+        entry={history.find((entry) => entry.id === logId)}
+        change={change}
+        onClose={() => setLogId("")}
+      />
     </>
   );
 }

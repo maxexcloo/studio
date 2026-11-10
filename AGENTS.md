@@ -194,7 +194,8 @@ the primary component reference and verify APIs against the installed version.
   models and state, or Cloud only. Report actual endpoint health:
   configuration alone does not prove readiness. A deliberately parked worker
   reads Stopped, not failing; an unexpectedly unavailable one remains a
-  failure. Runtime controls belong in Settings › Workers.
+  failure. Runtime controls belong in Settings › Workers; only media work
+  waiting on GPUs a text model holds offers its swap where the work shows.
 - Keep recorded provider work and saving visible. Retry uses the shared queue
   command; bulk retry deduplicates IDs, retains unsuccessful items and preserves
   unrelated selection. Stop requests cancellation but accepted work may remain

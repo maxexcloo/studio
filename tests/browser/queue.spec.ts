@@ -99,3 +99,60 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await expect(queue.getByText("Negative: blurry", { exact: true })).toBeHidden();
 });
+
+test("work waiting on GPUs a text model holds offers a swap that asks first", async ({ page }) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.route("**/api/services/status", (route) =>
+    route.fulfill({
+      json: {
+        services: {},
+        runtime: { configured: true, automaticLifecycle: true, swap: true, reason: "" },
+      },
+    }),
+  );
+  const swaps: unknown[] = [];
+  await page.route("**/api/queue/held/swap", (route) => {
+    const body = route.request().postDataJSON() ?? {};
+    swaps.push(body);
+    return route.fulfill({
+      json: body.signature
+        ? { id: "swap", status: "running", requestedBy: "account:admin: swap to images" }
+        : {
+            target: ["image"],
+            stop: ["text"],
+            start: ["image"],
+            keep: [],
+            signature: "fixture",
+            labels: { image: "Images Worker", text: "Text" },
+            runWhenIdle: "Text",
+          },
+    });
+  });
+  state.jobs.push({
+    id: "held",
+    jobId: "held",
+    sessionId: "s",
+    operation: "image",
+    status: "waiting",
+    reason: "Waiting for a GPU: Text (Run When Idle) is running; stop it in Settings › Workers.",
+    input: { prompt: "held", kind: "image" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await page.goto("/");
+  // Queuing it says so once, with the swap.
+  await expect(page.getByText("A text model holds the GPUs this work needs.")).toBeVisible();
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await queue.getByRole("button", { name: "Swap to Images", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Swap to Images", exact: true });
+  await expect(confirm).toContainText("Stop Text and start Images Worker?");
+  await expect(confirm).toContainText("Run When Idle may start Text again once Studio is idle.");
+  expect(swaps).toEqual([{}]);
+  await confirm.getByRole("button", { name: "Swap", exact: true }).click();
+  await expect(confirm).toBeHidden();
+  expect(swaps).toEqual([{}, { signature: "fixture" }]);
+});

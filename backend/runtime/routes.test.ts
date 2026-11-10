@@ -5,7 +5,7 @@ import express from "express";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { RuntimeController, type Workload } from "./controller.ts";
 import { KubernetesEngine } from "./kubernetes.ts";
-import { createRuntimeRouter } from "./routes.ts";
+import { createRuntimeRouter, createSwapRouter } from "./routes.ts";
 
 /** One GPU, shared by every workload given; `running` start with a ready pod. */
 function runtime(workloads: Pick<Workload, "id" | "kind" | "url">[], running: string[]) {
@@ -140,4 +140,49 @@ test("the logs route tails each pod's first container, falling back to its last 
     },
   });
   assert.equal((await get("/workloads/missing/logs")).status, 400);
+});
+
+test("the swap route lets ordinary accounts swap only with Let Everyone Swap Models on", async (context) => {
+  const { kube, controller } = runtime(
+    [
+      { id: "text", kind: "text", url: "http://text.invalid" },
+      { id: "media", kind: "image", url: "http://media.invalid" },
+    ],
+    ["text"],
+  );
+  const app = express();
+  app.use(express.json());
+  app.use(
+    createSwapRouter(controller, {
+      admin: (request) => request.get("x-role") === "admin",
+      // Only job "waiting" waits, on the media workload.
+      workloads: (_request, id) => (id === "waiting" ? ["media"] : []),
+      requestedBy: (request) => `account:${request.get("x-role")}`,
+    }),
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  context.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const swap = async (role: string, id: string, body: unknown = {}) => {
+    const response = await fetch(`${base}/api/queue/${id}/swap`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-role": role },
+      body: JSON.stringify(body),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  assert.deepEqual(await swap("user", "waiting"), {
+    status: 403,
+    body: { error: "Only an administrator can swap models." },
+  });
+  assert.equal((await swap("admin", "other")).status, 404);
+  assert.deepEqual((await swap("admin", "waiting")).body.stop, ["text"]);
+  controller.configure({ automatic: false, parkIdleMinutes: 0, everyoneSwaps: true });
+  const preview = await swap("user", "waiting");
+  assert.deepEqual([preview.body.stop, preview.body.labels.text], [["text"], "text"]);
+  const applied = await swap("user", "waiting", { signature: preview.body.signature });
+  assert.equal(applied.body.requestedBy, "account:user: swap to images");
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale gpu/text 0", "gone gpu/text", "scale gpu/media 1"]);
 });

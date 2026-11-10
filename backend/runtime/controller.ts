@@ -1,13 +1,15 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { createHash, randomUUID } from "node:crypto";
 import type { ServiceKind } from "../../shared/services.ts";
-import type {
-  RuntimeOperation,
-  RuntimePodLog,
-  RuntimePreview,
-  RuntimeSettings,
-  RuntimeStatus,
-  WorkloadPhase,
+import {
+  textHoldsGpus,
+  type RuntimeOperation,
+  type RuntimePodLog,
+  type RuntimePreview,
+  type RuntimeSettings,
+  type RuntimeStatus,
+  type RuntimeSwap,
+  type WorkloadPhase,
 } from "../../shared/runtime.ts";
 import type { DeploymentState } from "./kubernetes.ts";
 
@@ -171,7 +173,7 @@ export class RuntimeController {
     return this.workloads.find((item) => item.id === this.settings.idleWorkload);
   }
   /** `idleWorkload` "" or absent is None. */
-  configure({ automatic, parkIdleMinutes, idleWorkload }: RuntimeSettings) {
+  configure({ automatic, parkIdleMinutes, idleWorkload, everyoneSwaps }: RuntimeSettings) {
     if (typeof automatic !== "boolean")
       throw new RuntimeRequestError("automatic must be true or false.");
     if (!Number.isInteger(parkIdleMinutes) || parkIdleMinutes < 0 || parkIdleMinutes > 1440)
@@ -179,10 +181,13 @@ export class RuntimeController {
     if (idleWorkload !== undefined && typeof idleWorkload !== "string")
       throw new RuntimeRequestError("idleWorkload must be a workload id or empty.");
     if (idleWorkload) this.workload(idleWorkload);
+    if (everyoneSwaps !== undefined && typeof everyoneSwaps !== "boolean")
+      throw new RuntimeRequestError("everyoneSwaps must be true or false.");
     this.record.settings = {
       automatic,
       parkIdleMinutes,
       ...(idleWorkload ? { idleWorkload } : {}),
+      ...(everyoneSwaps ? { everyoneSwaps } : {}),
     };
     // Idle time counts from the change, not from before automatic control was on.
     this.lastUsed.clear();
@@ -634,6 +639,16 @@ export class RuntimeController {
     return preview;
   }
 
+  /** Running text in `workload`'s pool that leaves it too few GPUs; empty when it fits. */
+  private textBlocking(workload: Workload, states: Map<string, DeploymentState>) {
+    const blocking = this.runningText(states).filter(
+      (id) => this.workload(id).pool === workload.pool,
+    );
+    return this.usage([...blocking, workload.id], workload.pool) > this.pools[workload.pool]
+      ? blocking
+      : [];
+  }
+
   /**
    * Automatic lifecycle: start a media workload in place of media in its pool, idle ones first. If
    * running text holds the GPUs it needs, nothing changes and the work waits.
@@ -642,17 +657,59 @@ export class RuntimeController {
     this.claim();
     try {
       const states = await this.states();
-      const text = this.runningText(states);
-      const blocking = text.filter((id) => this.workload(id).pool === workload.pool);
-      if (
-        blocking.length &&
-        this.usage([...blocking, workload.id], workload.pool) > this.pools[workload.pool]
-      )
+      const blocking = this.textBlocking(workload, states);
+      if (blocking.length)
         throw new RuntimeUnavailable(
-          `Waiting for a GPU: ${blocking.map((id) => `${this.workload(id).label}${id === this.idleWorkload?.id ? " (Run When Idle)" : ""}`).join(", ")} ${blocking.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`,
+          textHoldsGpus(
+            blocking.map(
+              (id) =>
+                `${this.workload(id).label}${id === this.idleWorkload?.id ? " (Run When Idle)" : ""}`,
+            ),
+          ),
         );
-      const plan = this.placementWith(workload, states, text);
+      const plan = this.placementWith(workload, states, this.runningText(states));
       this.begin("apply", plan, "automatic");
+    } finally {
+      this.claimed = false;
+    }
+  }
+
+  /**
+   * The swap for waiting media work: stop the running text that holds the GPUs its first candidate
+   * needs, and start it. Someone chooses this; automatic control never stops text on its own.
+   */
+  private swapPlan(candidates: string[], states: Map<string, DeploymentState>) {
+    const choices = candidates.map((id) => this.workload(id));
+    if (!choices.length) throw new RuntimeRequestError("Name a workload to start.");
+    if (choices.some((item) => states.get(item.id)!.replicas > 0))
+      throw new RuntimeConflict(`${choices[0].label} is already starting.`);
+    if (!this.textBlocking(choices[0], states).length)
+      throw new RuntimeConflict(`No text workload holds the GPUs ${choices[0].label} needs.`);
+    return this.placementWith(choices[0], states);
+  }
+  async previewSwap(candidates: string[]): Promise<RuntimeSwap> {
+    const { holders: _holders, ...preview } = this.swapPlan(candidates, await this.states());
+    const idle = this.idleWorkload;
+    return {
+      ...preview,
+      labels: Object.fromEntries(
+        [...preview.stop, ...preview.start, ...preview.keep].map((id) => [
+          id,
+          this.workload(id).label,
+        ]),
+      ),
+      ...(idle && preview.stop.includes(idle.id) ? { runWhenIdle: idle.label } : {}),
+    };
+  }
+  /** Apply a previewed swap, recorded as `<requestedBy>: swap to images` (or videos). */
+  async swap(candidates: string[], signature: string, requestedBy: string) {
+    this.claim();
+    try {
+      const plan = this.swapPlan(candidates, await this.states());
+      if (plan.signature !== signature)
+        throw new RuntimeConflict("The workloads changed since this preview; preview again.");
+      const kind = this.workload(plan.start[0]).kind === "video" ? "videos" : "images";
+      return this.begin("apply", plan, `${requestedBy}: swap to ${kind}`);
     } finally {
       this.claimed = false;
     }

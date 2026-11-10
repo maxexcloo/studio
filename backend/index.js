@@ -54,6 +54,7 @@ import { workerLoads } from "./queue-eta.js";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { createSwapRouter } from "./runtime/routes.ts";
 import { createLocalText, createServicesObserver } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
@@ -111,7 +112,7 @@ import {
   root,
   setListeningPort,
 } from "./comfy/comfy.js";
-import { clientOf } from "./access.js";
+import { canAdmin, clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -376,13 +377,15 @@ function requireSignedIn(req, res, next) {
 }
 
 app.use(requireSignedIn);
+const runtimeRequester = (req) =>
+  req.studioAccount?.userId ? `account:${req.studioAccount.userId}` : "local";
 registerRuntimeStatus(
   app,
   runtime,
   (req, res, next) => {
     if (requireAdmin(req, res)) next();
   },
-  (req) => (req.studioAccount?.userId ? `account:${req.studioAccount.userId}` : "local"),
+  runtimeRequester,
 );
 const observeServices = createServicesObserver({
   workers: listWorkers,
@@ -626,22 +629,31 @@ const promptStage = createPromptStage({
   setPrompts: (job) => setPrompts(store, job),
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
-const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
-  assistantEngine,
-  catalogue,
-  cloudProvider,
-  completed: (items) => {
-    void titler.completed(items);
-    void imageSearch.completed(items);
-    void faceCheck.completed(items);
-  },
-  directCloud,
-  generationRoutes,
-  promptStage,
-  recoverRunningJobs,
-  runtime,
-  store,
-});
+const { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkloads } =
+  createGenerationQueue({
+    assistantEngine,
+    catalogue,
+    cloudProvider,
+    completed: (items) => {
+      void titler.completed(items);
+      void imageSearch.completed(items);
+      void faceCheck.completed(items);
+    },
+    directCloud,
+    generationRoutes,
+    promptStage,
+    recoverRunningJobs,
+    runtime,
+    store,
+  });
+if (runtime)
+  app.use(
+    createSwapRouter(runtime.controller, {
+      admin: (req) => !req.studioAccount || canAdmin(req),
+      workloads: (req, id) => waitingWorkloads(ownerIdForRequest(req), id),
+      requestedBy: runtimeRequester,
+    }),
+  );
 registerStatusRoutes(app, { observeServices, queue: generationQueue });
 const admitGeneration = createGenerationAdmission({
   store,

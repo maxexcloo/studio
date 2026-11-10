@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { Queue, QueueActions, useQueue } from "../generation/Queue";
+import { SwapNotice } from "../runtime/JobSwap";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -72,42 +73,47 @@ export function StatusAction() {
   );
   const tooltip = generating ? "Generating" : summary.label;
   const status = <ServiceHealthSummary />;
+  const notice = <SwapNotice jobs={queue.data?.jobs} />;
   if (!phone)
     return (
-      <Popover
-        opened={opened}
-        onChange={setOpened}
-        position="bottom-start"
-        width={400}
-        closeOnClickOutside={false}
-        closeOnEscape={false}
-        returnFocus
-        shadow="md"
-      >
-        <Tooltip label={tooltip} disabled={opened}>
-          <Popover.Target>{trigger}</Popover.Target>
-        </Tooltip>
-        <Popover.Dropdown
-          ref={dropdown}
-          aria-label={title}
-          aria-labelledby=""
-          className={classes.dropdown}
+      <>
+        <Popover
+          opened={opened}
+          onChange={setOpened}
+          position="bottom-start"
+          width={400}
+          closeOnClickOutside={false}
+          closeOnEscape={false}
+          returnFocus
+          shadow="md"
         >
-          <Group justify="space-between" wrap="nowrap" mih={28}>
-            <Text fw={500}>{title}</Text>
-            <QueueActions />
-          </Group>
-          <div className={classes.list}>
-            <Queue />
-          </div>
-          <Divider />
-          {status}
-        </Popover.Dropdown>
-      </Popover>
+          <Tooltip label={tooltip} disabled={opened}>
+            <Popover.Target>{trigger}</Popover.Target>
+          </Tooltip>
+          <Popover.Dropdown
+            ref={dropdown}
+            aria-label={title}
+            aria-labelledby=""
+            className={classes.dropdown}
+          >
+            <Group justify="space-between" wrap="nowrap" mih={28}>
+              <Text fw={500}>{title}</Text>
+              <QueueActions />
+            </Group>
+            <div className={classes.list}>
+              <Queue />
+            </div>
+            <Divider />
+            {status}
+          </Popover.Dropdown>
+        </Popover>
+        {notice}
+      </>
     );
   return (
     <>
       <Tooltip label={tooltip}>{trigger}</Tooltip>
+      {notice}
       <Drawer.Root
         id="status"
         opened={opened}
