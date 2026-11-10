@@ -122,6 +122,14 @@ export interface MediaItem {
   title?: string;
   /** What the image shows, from Gallery Captions; older captions have no tags. */
   caption?: { text: string; tags?: string[]; model?: string; at?: string };
+  /** Face Check's comparison with the character whose image made it (backend/domain/face-check.ts). */
+  identity?: {
+    characterId: string;
+    score: number | null;
+    faces: number;
+    drifted: boolean;
+    checkedAt: string;
+  };
   /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
   suggestedPrompt?: string;
   createdAt?: string;

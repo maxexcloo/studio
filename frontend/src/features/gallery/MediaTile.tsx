@@ -368,6 +368,13 @@ export function MediaTile({
       {versions && versions.length > 1 && !selecting && (
         <VersionBadge count={versions.length} current={version} />
       )}
+      {item.identity?.drifted && !selecting && (
+        // Face Check found someone else, or the character twice; Details says which.
+        <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
+          <icons.character size={12} />
+          Face
+        </div>
+      )}
       {!selecting && actions}
       {selecting && (
         <Checkbox
