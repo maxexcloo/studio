@@ -1,8 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ActionIcon, Anchor, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { MessageCircle, X } from "lucide-react";
-import { Link } from "react-router";
+import { SquareCheck, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { easing } from "../../theme";
@@ -12,6 +11,7 @@ import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
+import { FromChat } from "./FromChat";
 import { MediaTile } from "./MediaTile";
 import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 import classes from "./RunsView.module.css";
@@ -62,7 +62,6 @@ export function RunsView({
   focusItem,
   caption,
   detail,
-  chatTitle,
   renderActions,
   onSelectionMenu,
   onTryAgain,
@@ -222,7 +221,6 @@ export function RunsView({
               hold={hold}
               caption={caption}
               detail={detail}
-              chatTitle={chatTitle}
               renderActions={renderActions}
               onSelectionMenu={onSelectionMenu}
               onTryAgain={onTryAgain}
@@ -253,7 +251,6 @@ const RunsRow = memo(function RunsRow({
   hold,
   caption,
   detail,
-  chatTitle,
   renderActions,
   onSelectionMenu,
   onTryAgain,
@@ -274,10 +271,12 @@ const RunsRow = memo(function RunsRow({
       ref={panel}
       run={row.panel}
       columns={columns}
-      chat={row.panel.items[0].sessionId}
-      chatTitle={chatTitle}
       detail={detail}
       onOpenAll={() => open(row.panel.items[0], runKey(row.panel.items[0]))}
+      onSelect={() => {
+        const ids = new Set(row.panel.items.map((item) => item.id));
+        selection.select((item) => ids.has(item.id));
+      }}
       onClose={() => collapse(row.panel)}
     >
       {row.panel.items.map((item) => (
@@ -378,25 +377,24 @@ function RunPanel({
   ref,
   run,
   columns,
-  chat,
-  chatTitle,
   detail,
   onOpenAll,
+  onSelect,
   onClose,
   children,
 }: {
   ref: React.Ref<HTMLDivElement>;
   run: Run;
   columns: number;
-  chat?: string;
-  chatTitle: (id: string) => string | undefined;
   detail: (item: MediaItem) => string;
   onOpenAll: () => void;
+  /** Selects the run's results, for the selection bar's actions on them all. */
+  onSelect: () => void;
   onClose: () => void;
   children: React.ReactNode;
 }) {
   const title = runTitle(run);
-  const source = run.items[0].resultSet?.source;
+  const selectLabel = run.items[0].resultSet ? "Select Set" : "Select Run";
   return (
     <Paper
       ref={ref}
@@ -423,47 +421,16 @@ function RunPanel({
             {title}
           </Text>
           <Group gap="xs" c="dimmed" fz="xs" wrap="wrap" style={{ rowGap: 0 }}>
-            {source ? (
-              // An MCP set: "5 Images · from Chat · …", the source linking to the Chat it joined.
-              <span>
-                {countLabel(run)} · from{" "}
-                {chat ? (
-                  <Anchor
-                    component={Link}
-                    to={`/chat/${chat}`}
-                    inherit
-                    c="dimmed"
-                    underline="always"
-                  >
-                    {source}
-                  </Anchor>
-                ) : (
-                  source
-                )}{" "}
-                · {detail(run.items[0])}
-              </span>
-            ) : (
-              <>
-                <span>{[countLabel(run), detail(run.items[0])].join(" · ")}</span>
-                {chat && (
-                  <Anchor
-                    component={Link}
-                    to={`/chat/${chat}`}
-                    inherit
-                    c="dimmed"
-                    underline="always"
-                  >
-                    <Group gap={4} wrap="nowrap" component="span">
-                      <MessageCircle size={12} />
-                      {chatTitle(chat) || "Open Chat"}
-                    </Group>
-                  </Anchor>
-                )}
-              </>
-            )}
+            <span>{[countLabel(run), detail(run.items[0])].join(" · ")}</span>
+            <FromChat item={run.items[0]} />
           </Group>
         </Stack>
         <Group gap={4} wrap="nowrap">
+          <Tooltip label={selectLabel}>
+            <ActionIcon aria-label={selectLabel} variant="subtle" color="gray" onClick={onSelect}>
+              <SquareCheck size={18} />
+            </ActionIcon>
+          </Tooltip>
           <Tooltip label="Open All">
             <ActionIcon aria-label="Open All" variant="subtle" color="gray" onClick={onOpenAll}>
               <icons.openAll size={18} />

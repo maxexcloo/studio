@@ -713,7 +713,8 @@ export async function fixtures(page: Page) {
           (!url.searchParams.has("chat") ||
             url.searchParams.getAll("chat").includes(i.sessionId)) &&
           (!url.searchParams.has("tag") ||
-            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))),
+            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
       );
       // Find Similar ranks the image first.
       const similar = url.searchParams.get("similar");
