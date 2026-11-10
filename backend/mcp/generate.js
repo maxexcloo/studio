@@ -46,6 +46,7 @@ import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
 import {
   characterImages,
+  composePrompt,
   characterProfiles,
   characterShots,
   editsReferences,
@@ -470,7 +471,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; character_views queues views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -548,11 +549,18 @@ export function registerGenerateTools({
         }
         const catalogue = await media.catalogue(owner);
         const access = await media.access(owner);
-        // Characters are an extra here: a failed listing leaves them out rather than the models.
-        const { characters = [] } =
+        // Cards are an extra here: a failed listing leaves them out rather than the models.
+        const cards = async (cardKind) =>
           !access || access.features.characters
-            ? await media.request("GET", "/api/characters", undefined, owner).catch(() => ({}))
-            : {};
+            ? ((await media.request("GET", `/api/${cardKind}`, undefined, owner).catch(() => ({})))[
+                cardKind
+              ] ?? [])
+            : [];
+        const [characters, outfits, scenes] = await Promise.all(
+          ["characters", "outfits", "scenes"].map(cards),
+        );
+        const cardList = (items) =>
+          items.map(({ id, name, description }) => ({ id, name, description }));
         const shown = (value) => kind === "all" || kind === value;
         const services = catalogue.backends
           ? Object.fromEntries(
@@ -608,6 +616,8 @@ export function registerGenerateTools({
                 })),
               }
             : {}),
+          ...(outfits.length ? { outfits: cardList(outfits) } : {}),
+          ...(scenes.length ? { scenes: cardList(scenes) } : {}),
         });
       }
       if (!profiles.some((profile) => profile.id === profile_id))
@@ -788,6 +798,19 @@ export function registerGenerateTools({
       character_views: z.boolean().optional(),
       // The user insists on a model that can't hold the character's face (the refusal says so).
       any_model: z.boolean().optional(),
+      // Shots Studio writes itself (shared/characters.ts composePrompt); outfit and scene may name a card.
+      shots: z
+        .array(
+          z.object({
+            outfit: z.string().optional(),
+            scene: z.string().optional(),
+            action: z.string().optional(),
+            camera: z.string().optional(),
+          }),
+        )
+        .min(1)
+        .max(maxJobsPerCall)
+        .optional(),
       aspect: z
         .string()
         .optional()
@@ -874,6 +897,36 @@ export function registerGenerateTools({
         seed: args.seed ?? crypto.randomInt(2 ** 31),
         same_seed: true,
       });
+    // Shots: Studio writes each prompt from its parts, an outfit or scene card's own description
+    // where one is named, so the assistant never rewords the character, outfit or place.
+    const shots = args.shots;
+    delete args.shots;
+    if (shots && (args.prompts || views)) throw new Error("Pass shots or prompts, not both.");
+    const lists = {};
+    const cardText = async (kind, value) => {
+      const wanted = value?.trim();
+      if (!wanted) return value;
+      lists[kind] ??=
+        (
+          await media.request("GET", `/api/${kind}`, undefined, owner, { signal }).catch(() => ({}))
+        )[kind] ?? [];
+      const found = lists[kind].find(
+        (item) => item.id === wanted || item.name.toLowerCase() === wanted.toLowerCase(),
+      );
+      return found ? found.description : wanted;
+    };
+    const parts = shots
+      ? await Promise.all(
+          shots.map(async (shot) => ({
+            ...shot,
+            outfit: await cardText("outfits", shot.outfit),
+            scene: await cardText("scenes", shot.scene),
+          })),
+        )
+      : null;
+    const shotPrompts = (fromImage) =>
+      parts.map((shot) => composePrompt({ character: card?.description, ...shot, fromImage }));
+    if (parts) args.prompts = shotPrompts(true);
     if (!args.prompts)
       throw new Error(
         `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${Object.keys(input).length ? "" : " (this call had no arguments)"}. Then call generate again.`,
@@ -1029,16 +1082,18 @@ export function registerGenerateTools({
                 ...(card
                   ? { reference_asset_ids: [...named, ...card.referenceIds.slice(0, room)] }
                   : {}),
-                // Its lead starts each prompt verbatim, as in the composer.
-                ...(card
-                  ? {
-                      prompts: views
-                        ? characterShots(card.description, room > 0)
-                        : args.prompts.map((prompt) =>
-                            withCharacter(prompt, card.description, room > 0),
-                          ),
-                    }
-                  : {}),
+                // Its lead starts each prompt verbatim, as in the composer; shots are written whole.
+                ...(parts
+                  ? { prompts: shotPrompts(room > 0) }
+                  : card
+                    ? {
+                        prompts: views
+                          ? characterShots(card.description, room > 0)
+                          : args.prompts.map((prompt) =>
+                              withCharacter(prompt, card.description, room > 0),
+                            ),
+                      }
+                    : {}),
                 profile_id: profile.id,
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
