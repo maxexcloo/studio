@@ -215,7 +215,7 @@ function ChatComposer() {
       {expanded && (
         <ChipRail label="Chat Inputs">
           {choosable && <ChatModelPicker disabled={replying} runtime={runtime} />}
-          <ReferencePicker />
+          <ReferencePicker prompt={{ value: text, onChange: setText }} />
           {ideas.chip}
         </ChipRail>
       )}
