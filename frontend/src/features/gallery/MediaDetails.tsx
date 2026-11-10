@@ -292,16 +292,22 @@ function DetailSection({
   );
 }
 
-/** Face Check's finding for a result made with a character, naming the character. */
-function FaceCheck({ identity }: { identity: NonNullable<MediaItem["identity"]> }) {
+/**
+ * Face Check's finding for a result made with a character, naming the character, and whether it is
+ * the automatic redo of a result whose face drifted.
+ */
+function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRedo">) {
   const characters = useQuery(charactersQuery);
   const name =
-    characters.data?.find((card) => card.id === identity.characterId)?.name || "the character";
+    characters.data?.find((card) => card.id === identity?.characterId)?.name || "the character";
   return (
     <DetailSection title="Face Check">
-      <Text size="sm" c={identity.drifted ? "orange" : undefined}>
-        {identityNote(identity, name)}
-      </Text>
+      {faceRedo && <Text size="sm">Redone automatically after the face drifted.</Text>}
+      {identity && (
+        <Text size="sm" c={identity.drifted ? "orange" : undefined}>
+          {identityNote(identity, name)}
+        </Text>
+      )}
     </DetailSection>
   );
 }
@@ -506,7 +512,9 @@ export function MediaDetails({
   return (
     <Stack gap="lg" fz="sm">
       <Caption item={item} />
-      {item.identity && <FaceCheck identity={item.identity} />}
+      {(item.identity || item.faceRedo) && (
+        <FaceCheck identity={item.identity} faceRedo={item.faceRedo} />
+      )}
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
       {item.source && (

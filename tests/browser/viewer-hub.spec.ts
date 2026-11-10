@@ -1691,7 +1691,7 @@ test("The viewer bar shows every action without scrolling on a tablet or narrow 
   await expect.poll(clipped).toBe(false);
 });
 
-test("Face Check marks a result that shows someone else than its character, and Details says so", async ({
+test("Face Check marks a result that shows someone else than its character, and Details says so and that it was redone", async ({
   page,
 }, testInfo) => {
   const identity = {
@@ -1701,7 +1701,7 @@ test("Face Check marks a result that shows someone else than its character, and 
     drifted: true,
     checkedAt: stamp,
   };
-  const { viewer } = await seed(page, { identity }, async (_page, state) =>
+  const { viewer } = await seed(page, { identity, faceRedo: true }, async (_page, state) =>
     state.characters.push({
       id: "chr-mara",
       name: "Mara",
@@ -1721,5 +1721,8 @@ test("Face Check marks a result that shows someone else than its character, and 
   }
   await expect(
     details.getByText("Looks like someone else, not Mara (face similarity 0.31).", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    details.getByText("Redone automatically after the face drifted.", { exact: true }),
   ).toBeVisible();
 });

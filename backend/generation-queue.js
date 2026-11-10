@@ -281,17 +281,18 @@ export function createGenerationQueue({
       settled: async (job) => {
         await generationAdapter.settled(job);
         if (job.status !== "completed") return;
-        // Its results keep the result it was made from, once the run has left the queue too.
+        // Its results keep the result it was made from, once the run has left the queue too, and
+        // whether Face Check's redo made them (domain/face-redo.ts).
         if (job.parentItemId)
-          updateGalleryJob(
-            job.id,
-            resultSource(job, job.parentItemId, {
+          updateGalleryJob(job.id, {
+            ...resultSource(job, job.parentItemId, {
               parent: job.parentJobId ? store.job(job.ownerId, job.parentJobId) : undefined,
               source: gallery.find(
                 (item) => item.id === job.parentItemId && (item.ownerId || "") === job.ownerId,
               ),
             }),
-          );
+            ...(job.faceRedo ? { faceRedo: true } : {}),
+          });
         const items = gallery.filter(
           (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
         );

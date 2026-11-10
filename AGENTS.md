@@ -283,6 +283,8 @@ the primary component reference and verify APIs against the installed version.
   Studio is idle and respects its buffer and caps. Its jobs show in the
   person's queue with a Dream badge, wait below everyone's own work and are not
   reordered; Stop All leaves them to Dream's own pause.
+- Face Redo queues one Run Again of a drifted character result in its owner's
+  own queue as a version of it, never a redo of a redo; Details says so.
 
 ### Motion & Verification
 
