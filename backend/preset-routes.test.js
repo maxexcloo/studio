@@ -13,7 +13,6 @@ import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, ".env");
-process.env.STUDIO_ENABLE_PRESETS = "1";
 delete process.env.CIVITAI_API_TOKEN;
 writeRuntimeDocument(dir, "presets", [
   {
@@ -283,35 +282,6 @@ test("browser-supplied downloads and paths cannot bypass preview resolution", as
   assert.equal(response.status, 400);
   const thumbnail = await fetch(base + "/api/presets/not-an-id/thumbnail");
   assert.equal(thumbnail.status, 400);
-});
-
-test("disabled instances refuse every preset and provider download route", async () => {
-  try {
-    for (const enabled of [undefined, "0"]) {
-      if (enabled === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
-      else process.env.STUDIO_ENABLE_PRESETS = enabled;
-      const { mockModelResult, offlineModelResult } = await import("./model/models.js");
-      assert.equal(mockModelResult().features.presets, false);
-      assert.equal(offlineModelResult().features.presets, false);
-      for (const [method, url] of [
-        ["GET", "/api/presets"],
-        ["POST", "/api/presets"],
-        ["POST", "/api/presets/import"],
-        ["POST", "/api/presets/resolve"],
-        ["DELETE", "/api/presets/42"],
-        ["GET", "/api/presets/42/thumbnail"],
-        ["GET", "/api/presets/42/media"],
-        ["GET", "/api/library/downloads"],
-        ["POST", "/api/library/downloads"],
-        ["POST", "/api/library/downloads/preview"],
-      ]) {
-        const response = await fetch(base + url, { method });
-        assert.equal(response.status, 404, `${method} ${url} with flag ${enabled}`);
-      }
-    }
-  } finally {
-    process.env.STUDIO_ENABLE_PRESETS = "1";
-  }
 });
 
 test("split workflow imports queue verified model, encoder, VAE and LoRA files and retain their associations", async () => {

@@ -18,7 +18,6 @@ const child = fork("backend/index.js", [], {
     STUDIO_DATA_DIR: data,
     STUDIO_DEMO: "1",
     STUDIO_ENV_FILE: path.join(data, ".env"),
-    STUDIO_ENABLE_PRESETS: "1",
     // Never send an image to a real assistant model from a test run.
     STUDIO_GALLERY_CAPTIONS: "0",
     HOST: "127.0.0.1",

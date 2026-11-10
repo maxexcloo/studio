@@ -23,7 +23,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await serveProfiles(page, [profile], { presets: true });
+  await serveProfiles(page, [profile]);
   for (const id of ["first", "second", "third"])
     state.gallery.push({
       id,
@@ -129,7 +129,7 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await serveProfiles(page, [profile], { presets: true });
+  await serveProfiles(page, [profile]);
   state.gallery.push({
     id: "kept",
     jobId: "kept-job",

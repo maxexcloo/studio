@@ -189,8 +189,6 @@ Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` opens ga
 
 ## Civitai Images & Downloads
 
-Imports into the **Library** are disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer them; keep it unset or `0` everywhere else. The server enforces this switch for saved images, thumbnails, imports, provider downloads and Civitai token settings, and the Library's Imports and Inspiration sections follow the server’s feature flag. The Library itself (LoRAs, Models and Downloads) is always there for administrators, and existing catalogue downloads remain available independently.
-
 Open the **Library** from the navigation. **Imports** accepts a Civitai image or model link or a Hugging Face file or repository link and records each import in `studio.sqlite` (`studio_library_imports`) with its grade (Exact, Close or Partial) and reasons. A Civitai image appears in **Inspiration** and in this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations; a LoRA writes its catalogue entry; a checkpoint is recorded. Missing files wait for **Download Missing**, which queues them through the configured downloader; paid, early-access and restricted Civitai files are never downloaded and show why. Filename conflicts stay explicit. **Clear Failed** removes every failed import record (also the `imports` admin tool's `clear_failed`) and **Remove** in an import's ⋯ menu removes one; downloaded files stay. Existing saved presets migrate to gallery images when the Library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models. An administrator removes a catalogue entry and its installed file with the `catalogue_edit` admin tool's `remove`, refused while a profile still names the file; a LoRA first leaves every account's stacks, saved stacks, strengths, ratings and recents; undo brings the entry back for the file to be downloaded again.
 
 **Use Settings** applies the image’s recipe to its installed image workflow without starting a generation. Exact resource matches use SHA-256, including renamed files. Missing LoRAs, unknown weights and unsupported resource types require attention; **Use Prompt** is available independently. Civitai metadata is optional, and additional processing such as ControlNet, high-resolution passes and CLIP skip needs a matching workflow. Imported settings cannot guarantee an identical image.
@@ -271,7 +269,7 @@ ratio and a liked caption tag are drawn by their scores. The rest explore
 exactly one thing, in turn: a little-used profile, an unrated LoRA no result has
 taught yet, or new ground for the prompt (half from an import, where allowed).
 Thumbs-down LoRAs are never loaded. Import and Inspiration ideas need
-administrator access, Uncensored Models and enabled imports. Results stay
+administrator access and Uncensored Models. Results stay
 outside the gallery, search, exports and MCP until kept; Star also keeps them.
 Discards are deleted after 30 days, or at once with Delete All. Variations keeps a result and queues new seeds as
 user work; More Like This keeps it and steers upcoming ideas toward it.
