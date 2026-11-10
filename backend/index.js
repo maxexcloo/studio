@@ -141,8 +141,6 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
   onGalleryFilesDeleted,
-  reloadGallerySizes,
-  reloadGallerySources,
   setGalleryFavorites,
 } from "./gallery/store.js";
 import { makePendingItems } from "./gallery/records.js";
@@ -695,11 +693,7 @@ registerResultSetRoutes(app, {
     return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
   },
 });
-registerMigrationRoutes(app, {
-  dataDir,
-  adminRefusal,
-  reload: { gallerySizes: reloadGallerySizes, gallerySources: reloadGallerySources },
-});
+registerMigrationRoutes(app, { dataDir, adminRefusal });
 registerCompareRoutes(app, {
   store,
   admit: admitGeneration,

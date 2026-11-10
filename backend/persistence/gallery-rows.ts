@@ -5,8 +5,6 @@ import type { DatabaseSync } from "node:sqlite";
  * the items that changed. The `gallery-rows-v1` step of migrate-runtime moved the older `gallery`
  * document into it.
  */
-export const galleryRowsMigration = "gallery-rows-v1";
-
 type GalleryItem = { url?: unknown; id?: unknown; outputName?: unknown; filename?: unknown };
 
 export function galleryKey(item: GalleryItem | null | undefined): string {

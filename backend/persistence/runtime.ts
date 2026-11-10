@@ -6,33 +6,26 @@ import { DatabaseSync } from "node:sqlite";
 import { createGalleryTable } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
-/** The JSON stores runtime-json-v1 moves into SQLite. */
+/** The JSON stores runtime-json-v1 moved into SQLite. */
 export const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
 /**
- * The JSON files json-stores-v1 (persistence/json-stores.ts) moves into SQLite, relative to the
- * data folder, `.bak` copies included: documents, each account's prompt histories and LoRA stacks
+ * The JSON files json-stores-v1 moved into SQLite, relative to the data folder, `.bak` copies
+ * included: documents, each account's prompt histories and LoRA stacks
  * (in `accounts/<key>/`, at the top in single-user mode), import records and ingested runs.
  */
 export const jsonStoreSource =
   /^(?:(workflow-preferences|timings|model-types|presets|library\/updates|mcp-assistant|comparisons|mcp-ownership)|(?:accounts\/([0-9a-f]{64})\/)?(prompt-history|negative-prompt-history|lora-stacks)|library\/imports\/(imp-[a-z0-9]{6,40})|media-ingested)\.json(\.bak)?$/;
 
-export const jsonStoresMigration = "json-stores-v1";
+const jsonStoresMigration = "json-stores-v1";
 
 /**
- * The words older builds stored for a job's or result's end, and Studio's own, which the
- * `status-words-v1` step (persistence/status-words.ts) rewrites in gallery rows and in the gallery
- * items queue records carry: their `status` and `upscale.status`.
+ * The words older builds stored for a job's or result's end, which the `status-words-v1` step
+ * rewrote in gallery rows and in the gallery items queue records carry: their `status` and
+ * `upscale.status`.
  */
-export const statusWordsMigration = "status-words-v1";
-export const statusWords: Readonly<Record<string, string>> = {
-  error: "failed",
-  canceled: "cancelled",
-  canceling: "cancelling",
-};
-const oldWords = `(${Object.keys(statusWords)
-  .map((word) => `'${word}'`)
-  .join(", ")})`;
+const statusWordsMigration = "status-words-v1";
+const oldWords = "('error', 'canceled', 'canceling')";
 const holdsOldWord = (item: string) =>
   `json_extract(${item}, '$.status') IN ${oldWords} OR json_extract(${item}, '$.upscale.status') IN ${oldWords}`;
 const holdsOldItem = (list: string) =>
@@ -41,7 +34,7 @@ const hasTable = (db: DatabaseSync, name: string) =>
   Boolean(db.prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?").get(name));
 
 /** The gallery rows and queue records that still hold an old status word. */
-export function oldStatusRows(db: DatabaseSync) {
+function oldStatusRows(db: DatabaseSync) {
   return {
     gallery: hasTable(db, "studio_gallery")
       ? (db
@@ -59,7 +52,7 @@ export function oldStatusRows(db: DatabaseSync) {
 }
 
 /** The json-stores-v1 sources in a data folder, sorted. */
-export function jsonStoreFiles(dataDir: string): string[] {
+function jsonStoreFiles(dataDir: string): string[] {
   const list = (dir: string) => {
     try {
       return fs.readdirSync(path.join(dataDir, dir)).map((name) => (dir ? `${dir}/${name}` : name));
@@ -114,30 +107,12 @@ export function withOfflineDatabase<T>(dataDir: string, read: (db: DatabaseSync)
 }
 
 /** Whether a migration (such as `runtime-json-v1`) has committed in this database. */
-export function hasMigration(db: DatabaseSync, name: string) {
+function hasMigration(db: DatabaseSync, name: string) {
   return Boolean(
     db
       .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'studio_migrations'")
       .get() && db.prepare("SELECT name FROM studio_migrations WHERE name = ?").get(name),
   );
-}
-
-/** Offline inspection of stopped studios. */
-export function readOfflineRuntime(dataDir: string, names: readonly string[] = []) {
-  const result: { migrated: boolean; documents: Record<string, unknown> } = {
-    migrated: false,
-    documents: {},
-  };
-  withOfflineDatabase(dataDir, (db) => {
-    result.migrated = hasMigration(db, "runtime-json-v1");
-    if (!result.migrated) return;
-    const read = db.prepare("SELECT value FROM studio_documents WHERE name = ?");
-    for (const name of names) {
-      const row = read.get(name) as { value: string } | undefined;
-      if (row) result.documents[name] = JSON.parse(row.value);
-    }
-  });
-  return result;
 }
 
 /** Opens a database with Studio's settings; the server shares one connection through runtimeDatabase. */
@@ -171,8 +146,8 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
  * Studio keeps accounts, deletion markers, the gallery and the stores json-stores-v1 moved only in
  * SQLite. A data folder still on the older JSON files (`runtime-json-v1` or `json-stores-v1` not
  * applied), the single gallery document (`gallery-rows-v1` not applied) or records with old status
- * words (`status-words-v1` not applied) must go through
- * migrate-runtime first, so Studio refuses to start on one rather than ignore what it holds.
+ * words (`status-words-v1` not applied) predates current storage, so Studio refuses to start on one
+ * rather than ignore what it holds. The steps that migrate it were removed after v2026.11.10.4.
  */
 export function assertCurrentStorage(dataDir: string): void {
   const files = legacyFiles.filter((name) => fs.existsSync(path.join(dataDir, name)));
@@ -195,7 +170,7 @@ export function assertCurrentStorage(dataDir: string): void {
   }
   if (pending.length)
     throw new Error(
-      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it. For a local data folder, run once: node backend/commands/migrate-runtime.mjs --data-dir ${dataDir} --apply`,
+      `${dataDir} still holds ${pending.join(", ")}, so it predates current storage. Migrate it first with migrate-runtime from Studio v2026.11.10.4, the last release with those steps (see CONFIGURATION.md, SQLite Migration & Rollback), then start this Studio.`,
     );
 }
 
@@ -217,7 +192,7 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
 
 /**
  * A document's value, or undefined without one. A folder without a database stays without one, so
- * migrate-runtime's dry runs read through this.
+ * dry runs read through this.
  */
 export function savedDocument(dataDir: string, name: string): unknown {
   if (!fs.existsSync(databaseFile(dataDir))) return undefined;

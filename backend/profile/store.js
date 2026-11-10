@@ -7,8 +7,8 @@
  * marker and who saved it. profile/editor.js still writes `.studio-edits.json` for every profile
  * Studio changed or drafted (the retired seed deploy read it to skip them).
  * `<data>/workflows/.studio-aliases.json` maps a removed profile id to the profile that replaced it
- * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile/merge.js,
- * profile/backends.js and profile/rename.js), so records that still name the old id resolve to the kept profile
+ * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile/merge.js
+ * and profile/backends.js, and by renames migrate-runtime applied), so records that still name the old id resolve to the kept profile
  * through `canonical`, and a per-backend id merged into a combined profile runs on its own backend
  * (`aliasBackend`).
  *
@@ -329,28 +329,6 @@ export function createProfileStore({
     return next;
   }
 
-  /**
-   * Gives profile `from` the id `to` (profile/rename.js): its alias first, so an interrupted
-   * rename resolves and finishes on a second run, then its version history, meta and edit record,
-   * then `text` (the file's new body, written by the caller) as its next version.
-   */
-  function rename(from, to, text, { by = "", note = "" } = {}) {
-    if (!validId(from) || !validId(to) || from === to) throw new Error("Choose two profile ids.");
-    if (aliases()[from]?.to !== to) addAliases([{ from, to, reason: "renamed" }], { by });
-    if (fs.existsSync(historyDir(from)) && !fs.existsSync(historyDir(to))) {
-      fs.mkdirSync(path.dirname(historyDir(to)), { recursive: true });
-      fs.renameSync(historyDir(from), historyDir(to));
-    }
-    for (const file of [metaFile, editsFile]) {
-      const records = readObject(file);
-      if (!Object.hasOwn(records, from)) continue;
-      records[to] ??= records[from];
-      delete records[from];
-      writeJsonFile(file, records);
-    }
-    return record(to, text, { by, aiDrafted: meta(to)?.aiDrafted === true, note });
-  }
-
   const meta = (id) => readMeta()[id] || null;
 
   /**
@@ -376,7 +354,6 @@ export function createProfileStore({
     migrate,
     markExported,
     known,
-    rename,
     meta,
     metas: readMeta,
   };
@@ -651,7 +628,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
    * Removes every binding, variant and negatives entry keyed by one of `profileIds`
    * (`custom:<id>`), and copies `from`'s binding and negatives to `to` where `to` has none, as a new
    * version: Combine Backends gives the combined profile its default backend's and drops the ids it
-   * merged; migrate-runtime drops the ids of profiles that no longer exist.
+   * merged.
    */
   function moveProfileBindings({ remove = [], from = "", to = "" }, { by = "", note = "" } = {}) {
     const store = read();
@@ -663,49 +640,6 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
           next[key][to] = structuredClone(next[key][from]);
     for (const key of bindingSections) for (const id of remove) delete next[key][id];
     return writeBindings(store, next, { by, origin: "studio", note });
-  }
-
-  /**
-   * Renames packs (`{from: to}`) with their meta and versions, and moves the bindings and
-   * negatives of renamed profiles (`{"custom:<from>": "custom:<to>"}`) onto the new key (a key
-   * the new id already has keeps its own), as one version of the bindings (profile/rename.js).
-   * A pack whose new id is taken stays. Returns the packs it renamed and the bindings it moved.
-   */
-  function rename({ packs = {}, profiles = {} }, { by = "", note = "" } = {}) {
-    const store = read();
-    if (!store) return { packs: [], bindings: 0 };
-    store.packs = { ...(store.packs || {}) };
-    store.meta = { ...(store.meta || {}) };
-    const renamed = [];
-    for (const [from, to] of Object.entries(packs)) {
-      if (!store.packs[from] || store.packs[to]) continue;
-      if (!validPackId(to)) throw new Error("Choose a valid guide id.");
-      store.packs[to] = store.packs[from];
-      delete store.packs[from];
-      if (store.meta[from]) store.meta[to] = store.meta[from];
-      delete store.meta[from];
-      if (fs.existsSync(historyDir(from)) && !fs.existsSync(historyDir(to)))
-        fs.renameSync(historyDir(from), historyDir(to));
-      renamed.push(from);
-    }
-    const next = structuredClone(bindingsOf(store));
-    const packOf = (id) => (Object.hasOwn(packs, id) && store.packs[packs[id]] ? packs[id] : id);
-    for (const kinds of Object.values(next.families))
-      if (isObject(kinds)) for (const kind of Object.keys(kinds)) kinds[kind] = packOf(kinds[kind]);
-    let moved = 0;
-    for (const key of ["profiles", "negatives"])
-      for (const [from, to] of Object.entries(profiles)) {
-        if (!Object.hasOwn(next[key], from)) continue;
-        next[key][to] ??= next[key][from];
-        delete next[key][from];
-        moved += 1;
-      }
-    for (const binding of Object.values(next.profiles))
-      if (isObject(binding) && binding.pack) binding.pack = packOf(binding.pack);
-    if (hashOf(next) !== hashOf(bindingsOf(store)))
-      writeBindings(store, next, { by, origin: "studio", note });
-    else if (renamed.length) writeStore(store);
-    return { packs: renamed, bindings: moved };
   }
 
   function approve(packId, { by = "" } = {}) {
@@ -785,7 +719,6 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     saveBindings,
     revertBindings,
     moveProfileBindings,
-    rename,
     markExported,
     configFile,
     read,

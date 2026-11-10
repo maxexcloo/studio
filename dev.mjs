@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { migrateRuntime } from "./backend/persistence/migration.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
 const { values } = parseArgs({ options: { demo: { type: "boolean" } } });
@@ -20,8 +19,6 @@ const environment = {
   STUDIO_MULTI_USER: "0",
 };
 if (values.demo) environment.STUDIO_DEMO = "1";
-const migration = migrateRuntime(dataDir, { apply: true });
-if (migration.conflicts.length) throw new Error(migration.conflicts.join("\n"));
 
 const children = [
   spawn(process.execPath, ["--watch", "--watch-preserve-output", "backend/index.js"], {
