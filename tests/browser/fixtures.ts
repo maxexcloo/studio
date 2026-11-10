@@ -239,24 +239,6 @@ export async function fixtures(page: Page) {
         },
       });
     }
-    if (path === "/api/workers")
-      return respond({
-        source: "STUDIO_WORKERS",
-        workers: [
-          {
-            id: "primary",
-            name: "Image Worker",
-            url: "http://comfyui-image:8188",
-            capabilities: ["image", "upscale", "models"],
-          },
-          {
-            id: "video",
-            name: "Video Worker",
-            url: "http://comfyui-video:8188",
-            capabilities: ["video"],
-          },
-        ],
-      });
     if (path.match(/^\/api\/accounts\/profiles\/[^/]+$/) && method === "DELETE") {
       administration.accessProfiles = administration.accessProfiles.filter(
         (group) => group.id !== decodeURIComponent(path.split("/")[4]),
@@ -997,8 +979,17 @@ export async function promptOptions(scope: Page | Locator, box: string, label: s
   return page.getByRole("menu").last();
 }
 
+// The phone viewer bar's own actions; the rest sit under its ⋯ More.
+const phoneBar = ["Retry", "Stop", "Animate", "Extend", "Edit", "Upscale", "Star", "Unstar"];
+
+/** Runs a viewer bar action: on the bar, or an item of the phone bar's More. */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  if ((page.viewportSize()?.width || 1440) < 768 && !phoneBar.includes(label)) {
+    await viewer.getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
+    return;
+  }
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))
@@ -1092,7 +1083,7 @@ export async function closeReferences(page: Page) {
   await expect(references).toBeHidden();
 }
 
-/** Saves the draft as a named stack or preset from its picker's footer. */
+/** Saves the draft as a named stack or preset from its picker. */
 export async function saveCurrent(page: Page, noun: "Preset" | "Stack", name: string) {
   await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
   const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });

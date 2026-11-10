@@ -81,6 +81,36 @@ export function storedChatRecord(value) {
   return id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id) ? { conversationId: id } : null;
 }
 
+const shortText = (value, max) =>
+  typeof value === "string"
+    ? value
+        .replace(/[\x00-\x1f\x7f]+/g, " ")
+        .trim()
+        .slice(0, max)
+    : "";
+
+/**
+ * The MCP result set a run belongs to (mcp/media.js queue): one generate call's id and title, the
+ * client that asked (`source`), and this run's prompt position and its own title (`variation`);
+ * null for anything else.
+ */
+export function storedResultSet(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = typeof value.id === "string" && /^[\w-]{1,64}$/.test(value.id) ? value.id : "";
+  const title = shortText(value.title, 80);
+  if (!id || !title) return null;
+  const variation = shortText(value.variation, 80);
+  const source = shortText(value.source, 40);
+  const index = Number.isInteger(value.index) && value.index >= 0 ? Math.min(value.index, 99) : 0;
+  return {
+    id,
+    title,
+    index,
+    ...(variation ? { variation } : {}),
+    ...(source ? { source } : {}),
+  };
+}
+
 /**
  * How the queue's writing stage wrote a result's prompt (prompt-stage.js): its kind, text model
  * and thinking; null for anything else.
@@ -139,6 +169,7 @@ export function makePendingItems(id, body) {
     // The prompt the queue's writing stage wrote keeps its thinking, under the prompt in Details.
     ...(storedWritingRecord(body.writing) ? { writing: storedWritingRecord(body.writing) } : {}),
     ...(body.chat ? { chat: body.chat } : {}),
+    ...(storedResultSet(body.resultSet) ? { resultSet: storedResultSet(body.resultSet) } : {}),
     ...(body.dream ? { dream: body.dream } : {}),
     ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
   }));

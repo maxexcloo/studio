@@ -87,8 +87,14 @@ the primary component reference and verify APIs against the installed version.
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; compact choices may use a
-  fitted popover. The sheet's header holds the title, any action and Close;
-  its footer (Clear, then Apply where choices apply as made) stays pinned
+  fitted popover. Its heading (`PopupHeading`) holds the title, then its
+  actions at the end (beside Close on phones, wrapping under the title when they
+  don't fit): every popup's or sheet's Clear
+  and Save, such as Save Stack or Save Preset, sit there, not in its footer, as
+  compact subtle buttons with Clear first. A side column, such as the LoRA
+  stack, has its own heading with its actions; desktop shows it beside the
+  content, divided to the top, and phones under it. The phone sheet's footer
+  (other actions, then Apply where choices apply as made) stays pinned
   above the safe area while the content between scrolls, with one scroll owner
   per form. On touch screens, tablets included, chip popups and option lists open
   with the keyboard down: a popup's search waits for a tap, and chip option lists
@@ -138,8 +144,8 @@ the primary component reference and verify APIs against the installed version.
   and disabled entries. Trigger words are applied when submitting, without
   altering the typed prompt; reuse restores the typed prompt and Details
   shows what ran.
-- Preserve actual model/provider metadata. Worker defaults to Automatic; wait
-  for an explicitly picked worker unless the user permits fallback. Animate displays its choice before queuing. Its
+- Preserve actual model/provider metadata. Studio routes work to a worker
+  itself; there is no worker choice. Animate displays its choice before queuing. Its
   menus show one choice, Cloud | Fast | Quality, where the account prefers
   videos to run: an account preference, not a menu setting, so Settings can
   show it too. Cloud shows with the Cloud Models grant, Fast and Quality for
@@ -152,10 +158,13 @@ the primary component reference and verify APIs against the installed version.
   Ideas for an empty prompt or Chat message are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own.
-- Queue access belongs to the header status action. Report actual endpoint
-  health: configuration alone does not prove readiness. A deliberately parked
-  worker reads Stopped, not failing; an unexpectedly unavailable one remains
-  a failure. Runtime controls belong in Settings › Workers.
+- Queue access belongs to the header status action. Under the queue, its popup
+  summarises each kind in one quiet, read-only line for everyone: Images and
+  Videos as their workers and Idle, N running or Stopped; Text as its local
+  models and state, or Cloud only. Report actual endpoint health:
+  configuration alone does not prove readiness. A deliberately parked worker
+  reads Stopped, not failing; an unexpectedly unavailable one remains a
+  failure. Runtime controls belong in Settings › Workers.
 - Keep recorded provider work and saving visible. Retry uses the shared queue
   command; bulk retry deduplicates IDs, retains unsuccessful items and preserves
   unrelated selection. Stop requests cancellation but accepted work may remain
@@ -169,11 +178,13 @@ the primary component reference and verify APIs against the installed version.
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download | Star,
   Delete. Edit changes the item itself (Edit Image, or a video's Trim and the
   like), then reuses its prompt: Edit Prompt and Use as Reference stage the
-  composer, Run Again and Repeat Exactly queue from where they are; menu options expand in place on phones and
-  touch screens. On phones and touch screens the viewer bar shows every action,
-  wrapping onto another row rather than using More or scrolling; the phone bar
-  drops its prompt field while Details is open. Gallery selection uses the shared
-  contextual selection bar and confirms deletion.
+  composer, Run Again and Repeat Exactly queue from where they are; menu options
+  expand in place on phones and touch screens. The phone viewer bar keeps to one
+  row: Retry, Stop, Animate, Edit, Upscale and Star, then ⋯ More with the rest
+  in their sections, Delete last. Elsewhere the viewer bar shows every action,
+  wrapping onto another row rather than using More or scrolling. The phone bar
+  drops its prompt field while Details is open. Gallery selection uses the
+  shared contextual selection bar and confirms deletion.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds under Expand; its tags always show. Prompt and
   Negative Prompt alone have a Copy beside their heading.

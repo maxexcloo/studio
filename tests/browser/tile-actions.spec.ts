@@ -26,7 +26,6 @@ async function galleryFixture(page: Page) {
     prompt: "A copper bird",
     width: 1024,
     height: 1024,
-    workerId: "worker-a",
     loras: [],
     referenceAssets: [],
   };
@@ -78,8 +77,15 @@ test("A tile can be starred and read back without opening the viewer", async ({
   await tile.hover();
   // Phones show a tile's star once it is starred; until then, selection stars it.
   if (testInfo.project.use.isMobile) {
+    const top = (await tile.boundingBox())!.y;
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
+    const selectable = page.getByRole("button", {
+      name: "Select image: A copper bird",
+      exact: true,
+    });
+    // The selection bar takes the toolbar's row at its height, so the tiles stay put.
+    await expect.poll(async () => (await selectable.boundingBox())?.y).toBe(top);
+    await selectable.click();
     await selectionAction(page, "Star").click();
     await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();

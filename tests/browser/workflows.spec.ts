@@ -103,7 +103,6 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.profileId).toBe("image:fast");
-  expect(state.jobs[1].input.workerId).toBeUndefined();
   if (testInfo.project.use.isMobile)
     await expect(page.getByRole("dialog", { name: "Generate" })).toBeHidden();
   await page.screenshot({
