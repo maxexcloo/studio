@@ -37,6 +37,16 @@ test("a catalogue entry carries the other builds of its part, and who publishes 
   });
 });
 
+test("the face detector downloads as pickled weights into its own folder only", async () => {
+  setDownloadTransport(async () => {});
+  const detector = catalogueDownload("detector:face_yolov8m:0");
+  assert.equal(detector.folder, "ultralytics_bbox");
+  assert.equal(detector.label, "Face Detector (YOLOv8m)");
+  startDownload(detector);
+  assert.equal((await settle("face_yolov8m.pt")).status, "done");
+  assert.throws(() => startDownload(spec("other.pt")), /isn’t a downloadable model file/);
+});
+
 test("a build gone from its address falls back to the next one by itself", async () => {
   setDownloadTransport(async (entry, _signal, { finalError }) => {
     if (entry.file === "gone.safetensors")

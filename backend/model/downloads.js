@@ -25,13 +25,17 @@ import { civitaiFetch } from "../civitai/access.js";
  * half. The worker checks a finished file against its catalogue SHA-256.
  */
 
-const allowedFolders = new Set([
-  "text_encoders",
-  "vae",
-  "diffusion_models",
-  "checkpoints",
-  "loras",
-  "clip_vision",
+// The file types each folder accepts. Ultralytics detectors exist only as pickled `.pt`, so that
+// type is allowed in their folder alone (the catalogue's face detector, checked against its hash).
+const weights = /\.(safetensors|gguf)$/i;
+const allowedFolders = new Map([
+  ["checkpoints", weights],
+  ["clip_vision", weights],
+  ["diffusion_models", weights],
+  ["loras", weights],
+  ["text_encoders", weights],
+  ["ultralytics_bbox", /\.pt$/i],
+  ["vae", weights],
 ]);
 const allowedHosts = new Set(["civitai.com", "huggingface.co"]);
 
@@ -79,7 +83,7 @@ function checkSpec(spec) {
   if (!allowedFolders.has(spec.folder))
     throw new Error("That file doesn’t belong in a ComfyUI model folder.");
   const name = path.basename(String(spec.file || ""));
-  if (!name || name !== spec.file || !/\.(safetensors|gguf)$/i.test(name))
+  if (!name || name !== spec.file || !allowedFolders.get(spec.folder).test(name))
     throw new Error("That isn’t a downloadable model file.");
   const url = new URL(spec.url);
   if (

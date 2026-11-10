@@ -159,6 +159,14 @@ test("face detail on an imported workflow's image loads the workflow's model fil
   );
 });
 
+test("without a face detector, Face Detail offers the catalogue's", () => {
+  const detectors = (names) => ({
+    UltralyticsDetectorProvider: { input: { required: { model_name: combo(names) } } },
+  });
+  assert.equal(upscaleStatus(detectors([])).faceDetail.download.id, "detector:face_yolov8m:0");
+  assert.equal(upscaleStatus(detectors(["bbox/face_yolov8m.pt"])).faceDetail.download, undefined);
+});
+
 test("the size menu's 2K/4K reach their long side, whatever the scale", () => {
   // 4K on a model drawn at 2K: doubles. On a square 1024: four times, not capped at 2816.
   assert.deepEqual(

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { catalogueDownload } from "./catalogue-downloads.js";
 import { comfy, localOutputFile, optionsFor } from "./comfy/comfy.js";
 import { families } from "./family-catalogue.js";
 import { classifyModel } from "./model/families.js";
@@ -129,6 +130,18 @@ function requiredModelsFor(quality, info) {
   ].map((model) => ({ ...model, ...modelFiles[model.file] }));
 }
 
+/** The Ultralytics face detector Face Detail loads, or undefined. */
+function faceDetector(info) {
+  return optionsFor(info, "UltralyticsDetectorProvider", "model_name")
+    .map(String)
+    .find((name) => /face/i.test(name));
+}
+
+function faceDetectorDownload() {
+  const { id, label, bytes } = catalogueDownload("detector:face_yolov8m:0");
+  return { id, label, bytes };
+}
+
 function missingNodeClasses(info, classes) {
   return classes.filter((className) => !info?.[className]);
 }
@@ -181,6 +194,8 @@ export function upscaleStatus(info = {}, quality = "balanced") {
       missingNodes: missingNodeClasses(info, faceDetailNodeClasses),
       detectors: optionsFor(info, "UltralyticsDetectorProvider", "model_name").map(String),
       samModels: optionsFor(info, "SAMLoader", "model_name").map(String),
+      // The catalogue's face detector, for an administrator to download, while none is installed.
+      ...(faceDetector(info) ? {} : { download: faceDetectorDownload() }),
     },
   };
 }
@@ -280,9 +295,7 @@ function faceDetailStack(graph, body, imageSource, info) {
       `Face detail needs this image’s model, ${model}, and ComfyUI doesn’t have it. Turn off face detail to upscale this image.`,
     );
   }
-  const detector = optionsFor(info, "UltralyticsDetectorProvider", "model_name").find((name) =>
-    /face/i.test(String(name)),
-  );
+  const detector = faceDetector(info);
   if (!detector)
     throw new Error("Face detail needs an Ultralytics face detector model for the Impact Pack.");
   const sam = optionsFor(info, "SAMLoader", "model_name")
