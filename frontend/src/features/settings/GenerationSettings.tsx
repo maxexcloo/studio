@@ -90,6 +90,13 @@ export function GenerationSettings() {
           remaining="to index"
           progressLabel="Index Progress"
         />
+        <GalleryPass
+          route="/api/gallery/faces"
+          label="Check Faces"
+          description="Compare images made with a character with the character's image by face, on the CPU while Studio is idle. The first run downloads the models."
+          remaining="to check"
+          progressLabel="Face Check Progress"
+        />
         {whileBusy && flagRow(whileBusy)}
         <UnfinishedItems />
       </SettingGroup>
