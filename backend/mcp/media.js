@@ -511,6 +511,8 @@ export class McpMedia {
       reference_role,
       count = mcpGenerationCount,
       seed,
+      // Every job takes `seed` itself rather than counting up from it (Generate References' views).
+      same_seed = false,
       negative_prompt,
       cfg,
       denoise,
@@ -674,7 +676,7 @@ export class McpMedia {
                 prompt: ran ?? "",
                 ...(writing ? { writing } : {}),
                 count: size,
-                seed: seed === undefined ? "" : String(seed + images),
+                seed: seed === undefined ? "" : String(same_seed ? seed : seed + images),
               },
               owner,
             );

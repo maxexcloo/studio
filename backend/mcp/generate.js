@@ -42,7 +42,7 @@ import { resolutions } from "../../shared/resolution.ts";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
-import { withCharacter } from "../../shared/characters.ts";
+import { characterShots, withCharacter } from "../../shared/characters.ts";
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
@@ -461,7 +461,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character; character_views queues its reference views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -773,6 +773,8 @@ export function registerGenerateTools({
       reference_role: z.enum(["edit", "reference"]).optional(),
       // A character's name or id (models lists them).
       character: z.string().min(1).optional(),
+      // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
+      character_views: z.boolean().optional(),
       aspect: z
         .string()
         .optional()
@@ -813,7 +815,7 @@ export function registerGenerateTools({
     },
   );
   /** The account's character by id or name, with the images it still has, owned for this call. */
-  const characterFor = async (value, signal) => {
+  const characterFor = async (value, signal, views = false) => {
     const { characters = [] } = await media.request("GET", "/api/characters", undefined, owner, {
       signal,
     });
@@ -823,7 +825,7 @@ export function registerGenerateTools({
       characters.find((item) => item.name.toLowerCase() === wanted);
     if (!card) throw new Error(`No character "${value}". Call models to list them.`);
     const referenceIds = card.references.map((asset) => asset.id);
-    if (!referenceIds.length)
+    if (!referenceIds.length && !views)
       throw new Error(`${card.name} has no images left. Ask the user to add some in Studio.`);
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
@@ -841,8 +843,20 @@ export function registerGenerateTools({
     } = structuredClone(input);
     if (args.reference_asset_ids)
       args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
-    const card = args.character ? await characterFor(args.character, signal) : null;
+    const views = args.character_views === true;
+    delete args.character_views;
+    if (views && !args.character)
+      throw new Error("character_views needs character: the name or id of the card.");
+    const card = args.character ? await characterFor(args.character, signal, views) : null;
     delete args.character;
+    // The views share one seed and, where the profile takes references, the card's first image.
+    if (views)
+      Object.assign(args, {
+        prompts: characterShots(card.description),
+        count: 1,
+        seed: args.seed ?? crypto.randomInt(2 ** 31),
+        same_seed: true,
+      });
     if (!args.prompts)
       throw new Error(
         "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call generate again.",
@@ -852,6 +866,8 @@ export function registerGenerateTools({
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
       );
     const several = Boolean(profile_ids || each_profile);
+    if (several && views)
+      throw new Error("character_views queues on one model: pass profile_id or leave it out.");
     if (several && args.loras?.length)
       throw new Error(
         "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
@@ -862,7 +878,8 @@ export function registerGenerateTools({
       if (instructed) throw new Error(instructed);
     }
     // A character's description joins each prompt, as picking its card does in the composer.
-    if (card) args.prompts = args.prompts.map((prompt) => withCharacter(prompt, card.description));
+    if (card && !views)
+      args.prompts = args.prompts.map((prompt) => withCharacter(prompt, card.description));
     // "count: 4" beside four prompts means one image each, not sixteen.
     if (
       args.count > 1 &&
@@ -875,7 +892,7 @@ export function registerGenerateTools({
     assertJobCount(args.prompts?.length || 1, count);
     const named = args.reference_asset_ids || [];
     // A character needs a model that takes references; its images then fill what room each has.
-    const references = named.length + (card ? 1 : 0);
+    const references = named.length + (card?.referenceIds.length ? 1 : 0);
     // Cloud (Grok) profiles only when the user asks for Grok or the cloud.
     const cloud = asksForCloud(request);
     let targets;
@@ -943,7 +960,10 @@ export function registerGenerateTools({
               const sized = mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
                 throw new Error("Pass aspect or width and height, not both.");
-              const room = Math.max(0, referenceCount(profile).max - named.length);
+              const room = Math.min(
+                Math.max(0, referenceCount(profile).max - named.length),
+                views ? 1 : Infinity,
+              );
               const plan = {
                 ...args,
                 ...sized,
@@ -954,7 +974,7 @@ export function registerGenerateTools({
                 ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
               };
               const fewer =
-                card && room < card.referenceIds.length
+                card && !views && room < card.referenceIds.length
                   ? `${card.name}: ${room} of ${card.referenceIds.length} images fit this model. `
                   : "";
               return { profile, note: `${note || ""}${fewer}`, plan, source: "exact" };
@@ -1018,13 +1038,24 @@ export function registerGenerateTools({
       plan.face_detail = true;
     }
     const submission = await submit(profile, plan, recordOf({ plan }));
+    let viewsNote = "";
+    if (views) {
+      await media.request(
+        "POST",
+        `/api/characters/${encodeURIComponent(card.id)}/generated`,
+        { jobIds: submission.queued.jobs.map((job) => job.job_id) },
+        owner,
+        { signal },
+      );
+      viewsNote = `Studio wrote one prompt per view for ${card.name}; once they finish, the user picks which to keep on the card in Studio. `;
+    }
     return respond(
       submission.queued,
       profile,
       signal,
       submission.guide,
       source,
-      `${tierNote || ""}${faceNote}`,
+      `${tierNote || ""}${faceNote}${viewsNote}`,
     );
   };
   tool(

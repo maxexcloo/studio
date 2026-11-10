@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import { characterShots } from "../../shared/characters.ts";
 import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -342,6 +343,10 @@ async function fixture(
   // The account's character cards (backend/characters.js), set by a test.
   const characters = [];
   app.get("/api/characters", (_req, res) => res.json({ characters }));
+  app.post("/api/characters/:id/generated", (req, res) => {
+    characters.find((card) => card.id === req.params.id).generated = req.body;
+    res.json({ ok: true });
+  });
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -989,8 +994,8 @@ test("media and administrator credentials discover only their own friendly tools
     // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes),
     // then from 10,200 for Search, from 10,900 for Gallery, Queue, Dream and Taste, and from 14,500
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
-    // gallery filters, and to 15,300 for generate's character.
-    JSON.stringify(tools).length + media.getInstructions().length < 15300,
+    // gallery filters, to 15,300 for generate's character and to 15,400 for its character_views.
+    JSON.stringify(tools).length + media.getInstructions().length < 15400,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1524,6 +1529,23 @@ test("models lists the account's characters, and generate applies one by name: i
   );
   assert.match(reply.content[0].text, /Mara: 1 of 2 images fit this model\./);
   await failure(client, "generate", { prompts: ["A tree"], character: "Nobody" });
+  // Generate References: Studio writes one prompt per view, on one seed, with the card's first image.
+  const before = f.submitted.length;
+  const views = await call(client, "generate", {
+    profile_id: imageProfile.id,
+    character: "Mara",
+    character_views: true,
+  });
+  assert.notEqual(views.isError, true, views.content?.[0]?.text);
+  const queued = f.submitted.slice(before);
+  assert.deepEqual(
+    queued.map((job) => job.prompt),
+    characterShots("red-haired ranger, green cloak"),
+  );
+  assert.equal(new Set(queued.map((job) => job.seed)).size, 1);
+  assert.ok(queued.every((job) => job.referenceAssets[0]?.assetId === assetId));
+  assert.equal(f.characters[0].generated.jobIds.length, 4);
+  assert.match(views.content[0].text, /once they finish, the user picks which to keep/);
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {

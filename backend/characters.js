@@ -7,7 +7,7 @@ import {
 } from "../shared/characters.ts";
 import { mayUseFeature } from "./account-policy.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { dataDir } from "./gallery/store.js";
+import { dataDir, galleryJobItems, isGalleryHidden } from "./gallery/store.js";
 import { ownerDocumentName, savedDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { referenceAssetMetadataForAccount, referenceExistsForAccount } from "./references.js";
 import { localRefusal } from "./route-access.js";
@@ -26,7 +26,25 @@ export function listCharacters(ownerId = "") {
 const save = (ownerId, characters) =>
   writeRuntimeDocument(dataDir, document(ownerId), { characters });
 
-/** A card as the account sees it: its images that still exist, as reference assets. */
+/** Generate References' results so far, the account's own visible gallery items. */
+function generatedResults(ownerId, generated) {
+  return generated.jobIds.flatMap((jobId) =>
+    galleryJobItems(jobId)
+      .filter((item) => (item.ownerId || "") === ownerId && !isGalleryHidden(item))
+      .map((item) => ({
+        galleryItemId: item.id,
+        jobId,
+        status: item.status,
+        thumbnailUrl: item.thumbnailUrl || item.url || "",
+        prompt: item.prompt || "",
+      })),
+  );
+}
+
+/**
+ * A card as the account sees it: its images that still exist, as reference assets, and any
+ * generated references waiting to be picked.
+ */
 export function shownCharacter(account, character) {
   const references = character.referenceIds.flatMap((id) => {
     try {
@@ -35,7 +53,19 @@ export function shownCharacter(account, character) {
       return [];
     }
   });
-  return { ...character, references, missing: character.referenceIds.length - references.length };
+  return {
+    ...character,
+    references,
+    missing: character.referenceIds.length - references.length,
+    ...(character.generated
+      ? {
+          generated: {
+            ...character.generated,
+            results: generatedResults(account?.userId || "", character.generated),
+          },
+        }
+      : {}),
+  };
 }
 
 /** The account's card by its ID, else by its name (any case), else undefined. */
@@ -120,10 +150,29 @@ export function registerCharacterRoutes(app) {
     const characters = listCharacters(ownerId);
     const index = characters.findIndex((character) => character.id === params.id);
     if (index < 0) return { status: 404, payload: { ok: false, error: "No such character." } };
+    // Saving the card is where generated references are picked, so it ends their wait.
+    const { generated: _picked, ...kept } = characters[index];
     const character = {
-      ...characters[index],
+      ...kept,
       ...cleanCard(account, body),
       updatedAt: new Date().toISOString(),
+    };
+    save(ownerId, characters.with(index, character));
+    return { status: 200, payload: { ok: true, character: shownCharacter(account, character) } };
+  });
+
+  // Generate References queued these jobs (the app's and MCP's generate); the card lists their
+  // results until it is next saved.
+  route("POST", "/api/characters/:id/generated", (account, ownerId, { params, body }) => {
+    const characters = listCharacters(ownerId);
+    const index = characters.findIndex((character) => character.id === params.id);
+    if (index < 0) return { status: 404, payload: { ok: false, error: "No such character." } };
+    const jobIds = Array.isArray(body?.jobIds) ? body.jobIds.map(String) : [];
+    if (!jobIds.length || jobIds.length > 8 || !jobIds.every((id) => /^[\w-]{1,100}$/.test(id)))
+      throw new CharacterError("Pass the 1 to 8 jobs Generate References queued.");
+    const character = {
+      ...characters[index],
+      generated: { jobIds, at: new Date().toISOString() },
     };
     save(ownerId, characters.with(index, character));
     return { status: 200, payload: { ok: true, character: shownCharacter(account, character) } };

@@ -120,6 +120,14 @@ test(
       });
       assert.equal(refused.status, 400);
     }
+    // Generate References' jobs wait on the card until it is next saved.
+    const generated = await call(`/api/characters/${id}/generated`, {
+      method: "POST",
+      cookie: cookies.artist,
+      body: { jobIds: ["job-front", "job-side"] },
+    });
+    assert.deepEqual(generated.body.character.generated.jobIds, ["job-front", "job-side"]);
+    assert.deepEqual(generated.body.character.generated.results, []);
     const updated = await call(`/api/characters/${id}`, {
       method: "PUT",
       cookie: cookies.artist,
@@ -128,8 +136,8 @@ test(
     assert.equal(updated.status, 200);
     const listed = (await call("/api/characters", { cookie: cookies.artist })).body.characters;
     assert.deepEqual(
-      listed.map((item) => [item.name, item.referenceIds]),
-      [["Mara the Ranger", [side.id]]],
+      listed.map((item) => [item.name, item.referenceIds, item.generated]),
+      [["Mara the Ranger", [side.id], undefined]],
     );
     // Cards are per account, and a group without Characters is refused.
     assert.deepEqual(

@@ -34,7 +34,7 @@ import { emptyGalleryFilters } from "../gallery/GalleryFilters";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { uploadTypes, useGalleryImages } from "../generation/references";
-import { useSaveCharacter, type CharacterCard } from "./queries";
+import { charactersQuery, useSaveCharacter, type CharacterCard } from "./queries";
 
 /** What a new card starts from, such as Make Character's image. */
 export interface CharacterStart {
@@ -50,13 +50,16 @@ export function CharacterEditor({
   character,
   start,
   onClose,
-  onSaved,
+  onGenerate,
+  generating = false,
 }: {
   opened: boolean;
   character?: CharacterCard;
   start?: CharacterStart;
   onClose: () => void;
-  onSaved?: (card: CharacterCard) => void;
+  /** Generate References for a saved card. */
+  onGenerate?: (card: CharacterCard) => void;
+  generating?: boolean;
 }) {
   const phone = usePhone();
   return (
@@ -75,7 +78,8 @@ export function CharacterEditor({
           character={character}
           start={start}
           onClose={onClose}
-          onSaved={onSaved}
+          onGenerate={onGenerate}
+          generating={generating}
         />
       )}
     </Modal>
@@ -86,12 +90,14 @@ function CharacterForm({
   character,
   start,
   onClose,
-  onSaved,
+  onGenerate,
+  generating,
 }: {
   character?: CharacterCard;
   start?: CharacterStart;
   onClose: () => void;
-  onSaved?: (card: CharacterCard) => void;
+  onGenerate?: (card: CharacterCard) => void;
+  generating?: boolean;
 }) {
   const [name, setName] = useState(character?.name || "");
   const [description, setDescription] = useState(character?.description || "");
@@ -104,8 +110,12 @@ function CharacterForm({
   const save = useSaveCharacter(character?.id);
   const { listing, items } = useGalleryImages(query, emptyGalleryFilters, true);
   const full = images.length >= maxCharacterImages;
+  // The card as it stands now, for Generate References' results as they finish.
+  const characters = useQuery({ ...charactersQuery, enabled: Boolean(character) });
+  const current = characters.data?.find((card) => card.id === character?.id) || character;
+  const generated = current?.generated?.results || [];
   const fromGallery = useMutation({
-    mutationFn: async (item: MediaItem) =>
+    mutationFn: async (item: Pick<MediaItem, "id">) =>
       (
         await post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", {
           galleryItemId: item.id,
@@ -151,10 +161,7 @@ function CharacterForm({
             referenceIds: images.map((asset) => asset.id),
           },
           {
-            onSuccess: (card) => {
-              onSaved?.(card);
-              onClose();
-            },
+            onSuccess: onClose,
           },
         );
       }}
@@ -229,6 +236,58 @@ function CharacterForm({
             ))}
           </SimpleGrid>
         </Stack>
+        {current && onGenerate && (
+          <Stack gap={6}>
+            <Group justify="space-between" wrap="nowrap">
+              <Text size="sm" fw={500}>
+                Generated References
+              </Text>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                leftSection={<icons.variations size={15} />}
+                loading={generating}
+                onClick={() => onGenerate(current)}
+              >
+                Generate References
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              {generated.length
+                ? "Pick the ones to keep. Saving ends the wait for the rest, which stay in the gallery."
+                : "A front portrait and full-body front, side and back views on a plain background, from the description and the first image."}
+            </Text>
+            {generated.length > 0 && (
+              <PickerGrid label="Generated References">
+                {generated.map((result, index) => {
+                  const selected = images.some(
+                    (asset) => asset.galleryItemId === result.galleryItemId,
+                  );
+                  const done = result.status === "done";
+                  return (
+                    <PickerTile
+                      key={result.galleryItemId}
+                      label={`${selected ? "Remove" : "Add"} generated reference ${index + 1}`}
+                      selected={selected}
+                      disabled={!done || full || fromGallery.isPending}
+                      image={done ? result.thumbnailUrl : undefined}
+                      placeholder={done ? undefined : icons.variations}
+                      onToggle={() =>
+                        selected
+                          ? setImages(
+                              images.filter(
+                                (asset) => asset.galleryItemId !== result.galleryItemId,
+                              ),
+                            )
+                          : fromGallery.mutate({ id: result.galleryItemId })
+                      }
+                    />
+                  );
+                })}
+              </PickerGrid>
+            )}
+          </Stack>
+        )}
         <Group gap="xs" wrap="nowrap">
           <SearchInput
             style={{ flex: 1 }}
