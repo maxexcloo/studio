@@ -135,6 +135,7 @@ import {
   importedImageFile,
   outputFileSize,
   recordsFromComfyHistory,
+  removeGalleryItems,
   setGallery,
   cleanupGalleryState,
   updateGalleryJob,
@@ -695,7 +696,19 @@ registerResultSetRoutes(app, {
     return item && (item.ownerId || "") === ownerId && !isGalleryHidden(item) ? item : undefined;
   },
 });
-registerMigrationRoutes(app, { dataDir, adminRefusal });
+registerMigrationRoutes(app, {
+  dataDir,
+  adminRefusal,
+  // missingComfyOutputs asks the worker that made a record for its file, as publicGalleryBuffer reads it.
+  gallery: {
+    items: () => gallery,
+    check: (item) =>
+      withComfyBackend(item.settings?.comfyBackend, () =>
+        comfy(item.url.replace(/^\/comfy/, ""), { method: "HEAD", timeout: 15_000 }),
+      ),
+    remove: removeGalleryItems,
+  },
+});
 registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
