@@ -3,11 +3,14 @@ import type { MediaItem, Profile } from "../../types";
 import { isProfile, shownProfileName } from "../generation/payload";
 
 /**
- * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the text
- * model's title, else the prompt's first clause until it is written.
+ * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the title
+ * a chat gave it in its result set, else the text model's, else the prompt's first clause until
+ * that is written.
  */
-export function mediaTitle(item: Pick<MediaItem, "prompt" | "title">) {
-  return item.title || promptWords(item.prompt) || "Untitled Generation";
+export function mediaTitle(item: Pick<MediaItem, "prompt" | "title" | "resultSet">) {
+  return (
+    item.resultSet?.variation || item.title || promptWords(item.prompt) || "Untitled Generation"
+  );
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
