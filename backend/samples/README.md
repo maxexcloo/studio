@@ -104,7 +104,10 @@ offers a Strength for it, and MCP `generate` takes `reference_strengths`:
 The graph's saved value is the default; `min` and `max` default to 0 and 2.
 Slots without a role or strength run as before. On an image profile that doesn't
 edit with its references, the start slot (else the first) is an img2img start
-image unless it guides, and the References sheet says so.
+image unless it guides, and the References sheet says so; its Strength there is
+the profile's mapped `denoise`. A character's image goes into an `identity` slot
+(such as PuLID's face input), and Studio picks such a profile for a character
+alongside the families that edit with references.
 
 Visual workflow imports prefer ComfyUI's `widgets_values_named` map when it is
 available. This avoids positional drift from UI-only widget values such as

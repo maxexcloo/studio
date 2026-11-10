@@ -25,7 +25,13 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import { referenceCapacity, referenceDetails, referenceGroup, referenceGroups } from "./payload";
+import {
+  controlRange,
+  referenceCapacity,
+  referenceDetails,
+  referenceGroup,
+  referenceGroups,
+} from "./payload";
 import { draftForProfile, useGeneration } from "./GenerationProvider";
 import {
   galleryReferenceType,
@@ -65,6 +71,7 @@ export function ReferencePicker({
   onChange,
   profile: selectedProfile,
   input: selectedInput,
+  onInputChange,
   opened: controlled,
   onOpenedChange,
   browser: controlledBrowser,
@@ -87,6 +94,8 @@ export function ReferencePicker({
   onChange?: (references: ReferenceAsset[]) => void;
   profile?: Profile;
   input?: GenerationInput;
+  /** Changes the editor's own input, such as the denoise an img2img start image's Strength sets. */
+  onInputChange?: (patch: Partial<GenerationInput>) => void;
   opened?: boolean;
   onOpenedChange?: (opened: boolean) => void;
 }) {
@@ -118,6 +127,24 @@ export function ReferencePicker({
     profile,
   );
   const placement = useReferencePlacement(list);
+  // An img2img start image's Strength is the profile's denoise, where the profile maps one.
+  const input = selectedInput || draft.input;
+  const startSlot = profile?.kind === "image" ? startImageSlot(profile) : undefined;
+  const denoiseRange =
+    profile?.capabilities.denoise === true
+      ? controlRange(profile, "denoise", { min: 0, max: 1, step: 0.05 })
+      : null;
+  const denoise = denoiseRange && {
+    value:
+      typeof input.denoise === "number" ? input.denoise : Number(profile?.defaults.denoise ?? 1),
+    min: denoiseRange.min ?? 0,
+    max: denoiseRange.max ?? 1,
+    step: denoiseRange.step ?? 0.05,
+    onChange: (value: number) =>
+      onInputChange
+        ? onInputChange({ denoise: value })
+        : setDraft((previous) => ({ ...previous, input: { ...previous.input, denoise: value } })),
+  };
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
   const { target: chosen, query, filters } = browser.state;
@@ -319,7 +346,7 @@ export function ReferencePicker({
       <ReferenceRoles
         references={references}
         profile={profile}
-        startSlot={profile?.kind === "image" ? startImageSlot(profile) : undefined}
+        start={startSlot ? { slot: startSlot, denoise: denoise || undefined } : undefined}
         onChange={list.set}
       />
       {!target && tab === "gallery" && (

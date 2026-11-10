@@ -1716,6 +1716,50 @@ test("models lists the account's characters, and generate applies one by name: i
   await failure(client, "generate", { prompts: ["A tree"], shots: [shot] });
 });
 
+test("a character's image goes into an Identity slot, on a profile Studio picks first for it", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  const upload = async (filename) => {
+    const uploaded = data(
+      await call(client, "upload", { content_base64: png.toString("base64"), filename }),
+    );
+    return uploaded.asset?.id || uploaded.id || uploaded.asset_id;
+  };
+  const face = await upload("mara.png");
+  const pose = await upload("pose.png");
+  f.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red-haired ranger, green cloak",
+    referenceIds: [face],
+    references: [{ id: face }],
+  });
+  // Neither edits with references; only the second keeps a face, through its Identity slot.
+  await f.profiles([
+    structuredClone(imageProfile),
+    {
+      ...structuredClone(imageProfile),
+      id: "pulid",
+      label: "pulid",
+      mediaInputs: [
+        { id: "start", kind: "image", min: 0, max: 1, required: false },
+        { id: "face", kind: "image", role: "identity", min: 0, max: 1, required: false },
+      ],
+    },
+  ]);
+  const reply = await call(client, "generate", {
+    prompts: ["At the harbour"],
+    character: "Mara",
+    reference_asset_ids: [pose],
+  });
+  assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
+  assert.equal(f.submitted[0].profileId, "pulid");
+  assert.deepEqual(f.submitted[0].referenceAssets, [
+    { slot: "start", assetId: pose },
+    { slot: "face", assetId: face },
+  ]);
+});
+
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
