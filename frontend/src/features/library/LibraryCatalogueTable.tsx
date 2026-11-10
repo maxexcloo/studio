@@ -5,7 +5,7 @@ import { icons } from "../../ui/icons";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 
 export interface LibraryItem {
   key: string;
@@ -67,6 +67,15 @@ const canUpdate = (item: LibraryItem) =>
   item.installed &&
   item.update?.state === "available" &&
   !["downloading", "kept", "removed"].includes(item.applied?.state || "");
+/** Which version an update downloads for free: the newest, else its free alternative, else none. */
+export const freeUpdate = (item: LibraryItem) =>
+  !canUpdate(item)
+    ? null
+    : item.update?.latest?.downloadable
+      ? "latest"
+      : item.update?.freeAlternative?.downloadable
+        ? "alternative"
+        : null;
 const updating = (item: LibraryItem) =>
   canUpdate(item) || (item.installed && !!item.applied && item.applied.state !== "removed");
 const familiesOf = (item: LibraryItem) =>
@@ -110,6 +119,7 @@ export function LibraryCatalogueTable({
   label,
   onUpdate,
   onCheckUpdates,
+  onUpdateAll,
   checkingUpdates = false,
   updateNote,
   onEdit,
@@ -120,6 +130,8 @@ export function LibraryCatalogueTable({
   label: "Models" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
   onCheckUpdates?: () => void;
+  /** Applies every free update, models and LoRAs alike; absent when there are none. */
+  onUpdateAll?: () => void;
   checkingUpdates?: boolean;
   /** What the last update check or update did. */
   updateNote?: string;
@@ -206,20 +218,30 @@ export function LibraryCatalogueTable({
             setModelType(null);
           }}
           actions={
-            onCheckUpdates && (
-              <Tooltip label="Check Updates">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Check Updates"
-                  loading={checkingUpdates}
+            <>
+              {onUpdateAll && (
+                <ToolbarAction
+                  label="Update All"
+                  icon={<icons.download size={16} />}
                   disabled={updatePending}
-                  onClick={onCheckUpdates}
-                >
-                  <icons.refresh size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )
+                  onClick={onUpdateAll}
+                />
+              )}
+              {onCheckUpdates && (
+                <Tooltip label="Check Updates">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Check Updates"
+                    loading={checkingUpdates}
+                    disabled={updatePending}
+                    onClick={onCheckUpdates}
+                  >
+                    <icons.refresh size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </>
           }
         />
       </SectionHeader>
@@ -358,21 +380,21 @@ export function LibraryCatalogueTable({
               )}
               {onUpdate &&
                 canUpdate(item) &&
-                (latest?.downloadable && !latest.unavailable ? (
+                (freeUpdate(item) === "latest" ? (
                   <Menu.Item
                     leftSection={<icons.download size={16} />}
                     disabled={updatePending}
                     onClick={() => onUpdate(item)}
                   >
-                    Update to {latest.name}
+                    Update to {latest?.name}
                   </Menu.Item>
-                ) : free?.downloadable && !free.unavailable ? (
+                ) : freeUpdate(item) === "alternative" ? (
                   <Menu.Item
                     leftSection={<icons.download size={16} />}
                     disabled={updatePending}
                     onClick={() => onUpdate(item, true)}
                   >
-                    Update to {free.name}
+                    Update to {free?.name}
                   </Menu.Item>
                 ) : (
                   <Menu.Item leftSection={<icons.download size={16} />} disabled>
