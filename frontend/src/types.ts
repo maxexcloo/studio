@@ -97,8 +97,6 @@ export interface GenerationInput extends Record<string, unknown> {
   resolutionTier?: Resolution;
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
-  /** The worker picked to run it, which it waits for; Automatic when absent. */
-  workerId?: string;
 }
 export interface MediaItem {
   id: string;
@@ -135,6 +133,11 @@ export interface MediaItem {
   outputName?: string;
   /** The Chat whose generation made this item. */
   sessionId?: string;
+  /**
+   * The MCP result set it belongs to: one generate call's id, title and asking client (`source`),
+   * and this result's prompt position and own title (`variation`), when the chat gave one.
+   */
+  resultSet?: { id: string; title: string; index: number; variation?: string; source?: string };
   /** The result this one was made from, kept from its run (backend/version-sources.js `resultSource`). */
   parentItemId?: string;
   parentJobId?: string;
@@ -201,6 +204,5 @@ export interface Models {
     /** The Studio workloads serving it, which an administrator can start. */
     workloads?: string[];
     capabilities: string[];
-    gpuDevices?: string[];
   }[];
 }

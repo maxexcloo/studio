@@ -194,3 +194,41 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect(viewer.getByRole("img", { name: "A large image", exact: true })).toBeVisible();
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
+
+test("The viewer shows a server picture's display copy up to its size, and the original past it", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  for (const [id, width] of [
+    ["fits", 2048],
+    ["past", 4096],
+  ] as const)
+    state.gallery.push({
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      prompt: `A ${id} image`,
+      url: `/comfy/view?filename=${id}.png&subfolder=&type=output`,
+      thumbnailUrl: `/comfy/thumb?filename=${id}.png&subfolder=&type=output`,
+      width,
+      height: width,
+      createdAt: stamp,
+    });
+  await page.route("**/comfy/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: original }),
+  );
+  await page.goto("/images");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await page.getByRole("button", { name: "Open image: A fits image", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "A fits image", exact: true })).toHaveAttribute(
+    "src",
+    "/comfy/thumb?filename=fits.png&subfolder=&type=output&size=display",
+  );
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: A past image", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "A past image", exact: true })).toHaveAttribute(
+    "src",
+    "/comfy/view?filename=past.png&subfolder=&type=output",
+  );
+});

@@ -343,6 +343,73 @@ test("Runs fan a stacked run out in place, open it to flip through and link its 
   await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
 });
 
+test("An MCP result set is one titled run whose viewer names each result's place and jumps along its strip", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.sessions.push({ id: "chat-a", title: "Bird Chat", inputs: {}, createdAt: stamp });
+  const set = { id: "set-a", title: "Variety Test", source: "Chat" };
+  // Newest first, as the gallery lists them; the second prompt has no title of its own.
+  state.gallery.push(
+    ...[
+      ["Bear Hug", 2],
+      [undefined, 1],
+      ["Fox Wizard", 0],
+    ].map(([variation, index], position) => ({
+      ...results(1)[0],
+      id: `set-${index}`,
+      jobId: `set-job-${index}`,
+      sessionId: "chat-a",
+      prompt: `Set prompt ${index}, detailed`,
+      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
+      resultSet: { ...set, index, ...(variation ? { variation } : {}) },
+    })),
+    ...results(1),
+  );
+  await page.goto("/images");
+  // The grid captions each result by its own title, or its prompt's first words.
+  await expect(
+    page.getByRole("button", { name: "Open image: Fox Wizard", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open image: Set prompt 1", exact: true }),
+  ).toBeVisible();
+  // Runs stacks the set under its title, in prompt order, from the Chat that asked.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByText("Runs", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
+  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
+  const tiles = run.getByRole("button", { name: /^Open image: / });
+  await expect(tiles).toHaveCount(3);
+  expect(await tiles.evaluateAll((all) => all.map((tile) => tile.ariaLabel))).toEqual([
+    "Open image: Fox Wizard",
+    "Open image: Set prompt 1",
+    "Open image: Bear Hug",
+  ]);
+  await expect(run.getByRole("link", { name: "Chat", exact: true })).toHaveAttribute(
+    "href",
+    "/chat/chat-a",
+  );
+  // The viewer names the result's place in its set and jumps along the set's strip.
+  await run.getByRole("button", { name: "Open All", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(
+    viewer.getByText("Variety Test › Fox Wizard (1 of 3)", { exact: true }),
+  ).toBeVisible();
+  const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
+  await expect(strip.getByRole("listitem")).toHaveCount(3);
+  await strip.getByRole("listitem", { name: "Show Bear Hug (3 of 3)", exact: true }).click();
+  await expect(viewer.getByText("Variety Test › Bear Hug (3 of 3)", { exact: true })).toBeVisible();
+  await expect(
+    viewer.getByRole("img", { name: "Set prompt 2, detailed", exact: true }),
+  ).toBeVisible();
+  await strip.getByRole("listitem", { name: "Show Set prompt 1 (2 of 3)", exact: true }).click();
+  await expect(
+    viewer.getByText("Variety Test › Set prompt 1 (2 of 3)", { exact: true }),
+  ).toBeVisible();
+});
+
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
   const state = await fixtures(page);
   const job = (id: string, status: string, extra = {}) => ({
@@ -770,4 +837,37 @@ test("On a phone held sideways, Gallery Filters fits the screen and scrolls", as
   const square = filters.getByRole("button", { name: "Square", exact: true });
   await square.scrollIntoViewIfNeeded();
   await expect(square).toBeInViewport();
+});
+
+test("The Tags facet lists the most used caption tags with counts and filters by them", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      caption: { text: "", tags: index ? ["beach", "sunset"] : ["snow"] },
+    })),
+  );
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const tags = page.getByRole("group", { name: "Tags", exact: true });
+  await expect(tags.getByRole("button")).toHaveText(["beach2", "sunset2", "snow1"]);
+  await tags.getByRole("button", { name: "snow 1", exact: true }).click();
+  await expect(tags.getByRole("button", { name: "snow 1", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(state.galleryRequests.at(-1)).toContain("tag=snow");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeHidden();
+  await page.getByRole("button", { name: "Remove snow Filter", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
+  ).toBeVisible();
 });

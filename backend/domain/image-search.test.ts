@@ -78,11 +78,20 @@ test("idle work reads finished images once and search matches those that look al
   await search.near("ginger cat");
   assert.deepEqual(texts, ["ginger cat"], "a repeated search reuses its vector");
 
+  const like = search.similar(items[0])!;
+  assert.deepEqual(
+    items.map((record) => like(record)),
+    [1, 0, undefined],
+    "Find Similar scores stored vectors; unread items have none",
+  );
+  assert.equal(search.similar(items[2]), null, "an image not read yet has nothing to compare");
+
   downloaded = false;
   assert.equal(await search.near("dog"), null, "a search never downloads the model");
   downloaded = true;
   enabled = false;
   assert.equal(await search.near("dog"), null, "off in Settings");
+  assert.equal(search.similar(items[0]), null, "Find Similar too");
 });
 
 test("images whose files are gone fail alone and never stall the pass", async () => {

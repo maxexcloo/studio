@@ -22,6 +22,7 @@ import {
   promptTitle,
   storedAssistantRecord,
   storedChatRecord,
+  storedResultSet,
   storedWritingRecord,
 } from "./records.js";
 
@@ -350,18 +351,23 @@ export function galleryFilter({
   workflow = "",
   size = "",
   aspect = "",
+  tag = "",
 } = {}) {
   const terms = String(q || "")
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 12);
-  if (!terms.length && !favorites && !hasGalleryFilters({ lora, model, workflow, size, aspect }))
+  if (
+    !terms.length &&
+    !favorites &&
+    !hasGalleryFilters({ lora, model, workflow, size, aspect, tag })
+  )
     return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;
-    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect })) return false;
+    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect, tag })) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
     return terms.every((term) => text.includes(term)) || Boolean(near?.(item));
@@ -416,7 +422,11 @@ function afterCursor(item, cursor = "") {
   );
 }
 
-/** A page of the gallery; uploaded images (references.js) are listed only, and alone, with `uploads`. */
+/**
+ * A page of the gallery; uploaded images (references.js) are listed only, and alone, with `uploads`.
+ * `rank` (Find Similar) orders by its score instead, highest first, leaving out items it can't score;
+ * its cursor is then the position.
+ */
 export function pageGallery({
   type = "",
   limit = 200,
@@ -424,9 +434,26 @@ export function pageGallery({
   includeFailed = true,
   uploads = false,
   filter = null,
+  rank = null,
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
   const entry = visibleItems({ type, includeFailed, uploads, filter });
+  if (rank) {
+    const all = entry.items
+      .map((item) => ({ item, score: rank(item) }))
+      .filter(({ score }) => score !== undefined)
+      .sort((a, b) => b.score - a.score)
+      .map(({ item }) => item);
+    const start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
+    const end = start + safeLimit;
+    return {
+      items: all.slice(start, end),
+      nextCursor: end < all.length ? `r|${end}` : "",
+      hasMore: end < all.length,
+      revision: galleryRevision,
+      totalApprox: all.length,
+    };
+  }
   const all = entry.items;
   const start = pageStart(entry, cursor);
   const items = all.slice(start, start + safeLimit);
@@ -819,6 +846,9 @@ export function recordsFromComfyHistory(history) {
           ? { assistant: storedAssistantRecord(saved.assistant) }
           : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
+        ...(storedResultSet(saved.resultSet)
+          ? { resultSet: storedResultSet(saved.resultSet) }
+          : {}),
         ...(storedWritingRecord(saved.writing)
           ? { writing: storedWritingRecord(saved.writing) }
           : {}),
@@ -990,6 +1020,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         // A title the writing stage gave with the prompt; domain/titles.ts writes the rest.
         ...(replyTitle(body.writing?.title) ? { title: replyTitle(body.writing.title) } : {}),
         ...(body.chat ? { chat: body.chat } : {}),
+        ...(storedResultSet(body.resultSet) ? { resultSet: storedResultSet(body.resultSet) } : {}),
         ...(body.dream ? { dream: body.dream } : {}),
         outputName: item.filename,
         promptId: job.promptId || "",

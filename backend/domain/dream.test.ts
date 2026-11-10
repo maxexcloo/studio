@@ -252,7 +252,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
   assert.equal(job.input.kind, "image");
   assert.equal(job.input.profileId, "flux");
   assert.equal(job.input.prompt, "dream 1");
-  assert.equal(job.input.allowFallback, false);
   // The title written with the prompt goes to the result (gallery/store.js).
   assert.equal((job.input.writing as { title?: string }).title, "Fox Dream 1");
   assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {

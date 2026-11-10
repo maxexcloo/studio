@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { maxJobsPerCall } from "./controls.js";
 import { McpMedia, maxUploadMegabytes, uploadPage } from "./media.js";
@@ -32,7 +33,7 @@ const generateDedupeWindowMs = 120_000;
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide (sent once, with models or a model's first generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To find earlier work, call search. For an attached image, call upload_link; once the user uploads it, generate takes its reference_asset_id. To animate or extend, pass reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. Stopped or Offline models still queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide (sent once, with models or a model's first generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call; for distinct prompts pass a short set title and titles, one each. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no models call. Tools and these instructions name no models, workers, LoRAs or features, as those change: for what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "with another model", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To find earlier work, call search. For an attached image, call upload_link; once the user uploads it, generate takes its reference_asset_id. To animate or extend, pass reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. Stopped or Offline models still queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
 const unlinkedMessage =
   "This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -153,6 +154,9 @@ export function registerMcpRoutes(
   const previews = new Map();
   // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
   const inflight = new Map();
+  // The name each MCP session's client gave on initialize (LibreChat, a Grok connector), so its
+  // result sets say where they came from; a session another replica began reads as plain MCP.
+  const clientNames = new Map();
   // Studio Chat's in-process client numbers its requests from 0 like any other, so its session
   // keeps a LibreChat cancel from reaching its calls, and the reverse.
   const inflightKey = (actor, requestId) =>
@@ -228,8 +232,14 @@ export function registerMcpRoutes(
     const conversation = String(req.headers["x-studio-conversation-id"] || "");
     if (conversation.length > 256 || /[\x00-\x1f\x7f]/.test(conversation))
       return res.status(400).json({ error: "Invalid conversation identity." });
+    // The MCP session id handed out on initialize (see handle), which a client resends for that chat.
+    const session = String(req.headers["mcp-session-id"] || "");
+    if (session.length > 256 || /[^\x21-\x7e]/.test(session))
+      return res.status(400).json({ error: "Invalid MCP session id." });
     const owner = account?.userId || (scope === "media" ? media.owner(user, token) : null);
-    // Result numbers ("result 3") are per conversation when the client names one, otherwise per account.
+    // Result numbers ("result 3") are per conversation: the one the client names (LibreChat), else its MCP
+    // session (a client that sends no headers, such as Grok), else the account's.
+    const chat = conversation || (session && `mcp-session:${session}`);
     const assistant = scope === "media" && assistantFor(account);
     // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
     // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
@@ -242,7 +252,8 @@ export function registerMcpRoutes(
       assistant,
       admin,
       conversation,
-      refs: scope === "media" && owner ? media.referenceScope(owner, conversation) : "",
+      client: clientNames.get(session) || "",
+      refs: scope === "media" && owner ? media.referenceScope(owner, chat) : "",
     };
     next();
   };
@@ -349,8 +360,13 @@ export function registerMcpRoutes(
         inflight.get(inflightKey(req.mcpActor, message.params.requestId))?.abort();
       }
     const server = create(req.mcpActor);
+    // Stateless, but initialize hands out a session id: the client resends it on each call from that
+    // chat, and the guard scopes result numbers by it. Studio keeps no session state, so any replica
+    // serves it, also after a restart.
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: [req.body].flat().some(isInitializeRequest)
+        ? () => crypto.randomUUID()
+        : undefined,
       enableJsonResponse: true,
     });
     res.once("close", () => {
@@ -360,6 +376,16 @@ export function registerMcpRoutes(
     try {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
+      const name = [req.body]
+        .flat()
+        .find(isInitializeRequest)
+        ?.params.clientInfo?.name?.replace(/[\x00-\x1f\x7f]+/g, " ")
+        .trim()
+        .slice(0, 40);
+      if (name && transport.sessionId) {
+        if (clientNames.size >= 1000) clientNames.delete(clientNames.keys().next().value);
+        clientNames.set(transport.sessionId, name);
+      }
     } catch {
       if (!res.headersSent)
         res.status(500).json({
