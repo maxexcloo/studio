@@ -62,6 +62,58 @@ test("Gallery continues near the bottom and retains loaded results when the next
   await expect(retry).toBeHidden();
 });
 
+test("Select All takes every match across pages, and the search and Starred stay while selecting", async ({
+  page,
+}) => {
+  await fixtures(page);
+  // Every other result is starred; the gallery pages them 60 at a time unless asked for more.
+  const items = results(130).map((item, index) => ({ ...item, favorite: index % 2 === 0 }));
+  const requests: URLSearchParams[] = [];
+  await page.route("**/api/gallery?**", async (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    requests.push(query);
+    const matches = items.filter(
+      (item) =>
+        item.prompt.includes(query.get("q") || "") &&
+        (query.get("favorites") !== "1" || item.favorite),
+    );
+    const start = Number(query.get("cursor") || 0);
+    const end = start + Number(query.get("limit"));
+    await route.fulfill({
+      json: {
+        items: matches.slice(start, end),
+        nextCursor: end < matches.length ? String(end) : "",
+        hasMore: end < matches.length,
+        totalApprox: matches.length,
+      },
+    });
+  });
+  await page.goto("/images");
+  const starred = page.getByRole("button", { name: "Starred", exact: true });
+  await starred.click();
+  await expect(starred).toHaveAttribute("aria-pressed", "true");
+  await (await gallerySearch(page)).fill("Browse");
+  await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
+    "Browse",
+  );
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  await expect(status).toHaveText("65 Selected");
+  // The rest loaded in one larger page, within the same search and filter.
+  const rest = requests.find((query) => query.get("limit") === "500");
+  expect([rest?.get("q"), rest?.get("favorites")]).toEqual(["Browse", "1"]);
+  const unstar = page.waitForRequest("**/api/gallery/favorite");
+  await selectionAction(page, "Unstar").click();
+  expect((await unstar).postDataJSON().ids).toHaveLength(65);
+  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
+    "Browse",
+  );
+  expect([requests.at(-1)?.get("q"), requests.at(-1)?.get("favorites")]).toEqual(["Browse", "1"]);
+});
+
 test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
   page,
 }, testInfo) => {
