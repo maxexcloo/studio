@@ -32,6 +32,7 @@ import { writeBytesFileAsync } from "../json-store.js";
 import { civitaiJson } from "../civitai/access.js";
 import { versionResource } from "../civitai/import.js";
 import { hfFetch } from "../hf-access.js";
+import { withCatalogueSources } from "../catalogue-downloads.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { currentDataDir } from "../data-dir.js";
 import { fileStem } from "../image-metadata.js";
@@ -492,7 +493,7 @@ export function registerLibraryRoutes(
     );
   const updates = createUpdateChecker({
     catalogue: {
-      entries: () => catalogue().entries({ throttleMs: 5000 }),
+      entries: () => withCatalogueSources(catalogue().entries({ throttleMs: 5000 })),
       edit: (...args) => catalogue().edit(...args),
     },
     installed: installedKeys,

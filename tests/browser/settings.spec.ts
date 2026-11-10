@@ -506,10 +506,13 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.goto("/settings");
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "History", exact: true })).toBeVisible();
-  // Idle parking applies only under automatic control, which saves 0 as Never.
-  const park = page.getByRole("combobox", { name: "Park When Idle", exact: true });
+  // Idle settling applies only under automatic control, which saves 0 as Never.
+  const park = page.getByRole("combobox", { name: "Idle After", exact: true });
+  const idle = page.getByRole("combobox", { name: "Run When Idle", exact: true });
   await expect(park).toBeDisabled();
   await expect(park).toHaveValue("Never");
+  await expect(idle).toBeDisabled();
+  await expect(idle).toHaveValue("None");
   // The switch follows the saved settings, so it turns on once the save is read back.
   await page.getByRole("switch", { name: "Automatic Control", exact: true }).click({ force: true });
   await expect(park).toBeEnabled();
@@ -518,6 +521,12 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.getByRole("option", { name: "15 Min", exact: true }).click();
   await expect(park).toHaveValue("15 Min");
   expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15 });
+  // Any workload can run when idle; a text choice says media work that needs its GPUs waits.
+  await idle.click();
+  await page.getByRole("option", { name: "Text", exact: true }).click();
+  await expect(idle).toHaveValue("Text");
+  expect(settings).toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text" });
+  await expect(page.getByText(/never stops text, so media work/)).toBeVisible();
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
   const changes = page.getByRole("table", { name: "Runtime Changes" });

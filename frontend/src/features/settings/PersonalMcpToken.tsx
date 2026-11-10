@@ -13,16 +13,21 @@ import { useSettingsSection } from "./SettingsNavigation";
 export interface McpTokenStatus {
   endpoint: string;
   enabled: boolean;
+  /** Whether the token can be shown again: one issued before tokens were kept can't. */
+  viewable: boolean;
   createdAt: string;
 }
 
-/** Settings › Account › MCP Access, with Revoke Token in the section's Danger Zone. */
+/**
+ * Settings › Account › MCP Access, with Revoke Token in the section's Danger Zone. The account's
+ * own token loads while the section shows, hidden until Show, so Copy works within the tap.
+ */
 export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   const client = useQueryClient();
   const visible = useSettingsSection() === "account";
-  const active = useRef(true);
   const visit = useRef(0);
-  const [issuedToken, setIssuedToken] = useState("");
+  const [token, setToken] = useState("");
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState("");
@@ -32,33 +37,38 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
     queryFn: () => api<McpTokenStatus>("/api/accounts/mcp-token"),
     initialData: initial,
   });
+  const viewable = visible && Boolean(status.data?.viewable);
+  // The token stays in this mounted view, never in a query or mutation cache, and leaves with it.
   useEffect(() => {
-    active.current = visible;
-    if (!visible) setIssuedToken("");
-    return () => {
-      active.current = false;
-      visit.current++;
-    };
-  }, [visible]);
+    const current = ++visit.current;
+    if (!viewable) {
+      setToken("");
+      setShown(false);
+      return;
+    }
+    api<{ token: string }>("/api/accounts/mcp-token/reveal").then(
+      (result) => current === visit.current && setToken(result.token),
+      (error: Error) => current === visit.current && setError(error.message),
+    );
+  }, [viewable, status.data?.createdAt]);
   const change = async (revoke: boolean) => {
     if (busy) return;
     setBusy(true);
     setError("");
     const startedVisit = visit.current;
     try {
-      // Issued credentials stay in this mounted view, never in a query or mutation cache.
-      if (revoke) {
-        await post("/api/accounts/mcp-token/revoke");
-        if (active.current) setIssuedToken("");
-      } else {
+      if (revoke) await post("/api/accounts/mcp-token/revoke");
+      else {
         const result = await post<{ token: string }>("/api/accounts/mcp-token");
-        if (active.current && startedVisit === visit.current) setIssuedToken(result.token);
+        if (startedVisit === visit.current) {
+          setToken(result.token);
+          setShown(true);
+        }
       }
       await client.invalidateQueries({ queryKey: ["personal-mcp-status"] });
       await client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
     } catch (error) {
-      if (active.current)
-        setError(error instanceof Error ? error.message : "Couldn’t update the MCP token");
+      setError(error instanceof Error ? error.message : "Couldn’t update the MCP token");
     } finally {
       setBusy(false);
       setRevoking(false);
@@ -112,26 +122,39 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
             {status.data?.enabled ? "Rotate Token" : "Create Token"}
           </Button>
         </SettingRow>
-        {issuedToken && (
-          <Stack gap="xs" py="sm">
-            <TextInput
-              label="New MCP Token"
-              description="Shown only during this visit. Store it in your MCP client before leaving Account."
-              value={issuedToken}
-              readOnly
-              autoComplete="off"
-              onFocus={(event) => event.currentTarget.select()}
-            />
-            <Group gap="xs">
-              {copyButton(issuedToken, "token", "Copy Token")}
-              {copyButton(
-                endpoint && `${endpoint.replace(/\/+$/, "")}/${issuedToken}`,
-                "tokenUrl",
-                "Copy URL with Token",
-              )}
-            </Group>
-          </Stack>
-        )}
+        {status.data?.enabled &&
+          (status.data.viewable ? (
+            <Stack gap="xs" py="sm">
+              <TextInput
+                label="Your MCP Token"
+                value={shown ? token : "•".repeat(24)}
+                readOnly
+                autoComplete="off"
+                onFocus={(event) => shown && event.currentTarget.select()}
+              />
+              <Group gap="xs">
+                <Button
+                  size="compact-sm"
+                  variant="default"
+                  leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
+                  disabled={!token}
+                  onClick={() => setShown(!shown)}
+                >
+                  {shown ? "Hide" : "Show"}
+                </Button>
+                {copyButton(token, "token", "Copy Token")}
+                {copyButton(
+                  endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`,
+                  "tokenUrl",
+                  "Copy URL with Token",
+                )}
+              </Group>
+            </Stack>
+          ) : (
+            <Text size="sm" c="dimmed" py="sm">
+              Rotate to view. This token was created before Studio kept tokens to show again.
+            </Text>
+          ))}
       </SettingGroup>
       {status.data?.enabled && (
         <SettingGroup title="Danger Zone" danger>

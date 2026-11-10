@@ -198,7 +198,7 @@ const dreamed = (card: DeckCard) =>
 
 function Caption({ item }: { item: DreamItem }) {
   const info = useQuery(loraInfoQuery);
-  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's favourites.
+  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Starred LoRAs.
   const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
     .filter((lora) => lora?.name && lora.enabled !== false)
     .map((lora) => String(lora.name));

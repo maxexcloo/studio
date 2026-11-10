@@ -6,6 +6,7 @@ import test from "node:test";
 import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
 import { createCatalogueStore } from "./catalogue.js";
 import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
+import { withCatalogueSources } from "../catalogue-downloads.js";
 
 const { model } = JSON.parse(
   fs.readFileSync(new URL("../fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
@@ -54,6 +55,7 @@ test("a newer free version of the same family is an update; a paid newest one su
 
 test("a Hugging Face file with a new checksum on main is an update under its own name", () => {
   const entry = {
+    file: "style.safetensors",
     sha256: sha("a"),
     source: { provider: "hf", repo: "org/flux", path: "loras/style.safetensors" },
   };
@@ -73,6 +75,23 @@ test("a Hugging Face file with a new checksum on main is an update under its own
     ],
   );
   assert.equal(hfUpdate(entry, { sha: "b".repeat(40), siblings: [] }).state, "error");
+});
+
+test("an installed catalogue download is checked at its pinned commit and updates under its own name", () => {
+  const key = "text_encoders/pony-v7-pile-t5xl.fp16.safetensors";
+  const entry = withCatalogueSources({ [key]: { file: "pony-v7-pile-t5xl.fp16.safetensors" } })[
+    key
+  ];
+  assert.equal(entry.source.repo, "purplesmartai/pony-v7-base");
+  assert.match(entry.source.revision, /^[a-f0-9]{40}$/);
+  const moved = {
+    sha: "d".repeat(40),
+    siblings: [{ rfilename: entry.source.path, lfs: { sha256: sha("e"), size: 9 } }],
+  };
+  assert.equal(hfUpdate(entry, moved).latest.file, "pony-v7-pile-t5xl.fp16-ddddddd.safetensors");
+  // A file of the same name from another source keeps its own entry.
+  const other = { file: "pony-v7-pile-t5xl.fp16.safetensors", sha256: sha("f") };
+  assert.equal(withCatalogueSources({ [key]: other })[key], other);
 });
 
 function harness(t, { references = async () => [], repoint } = {}) {

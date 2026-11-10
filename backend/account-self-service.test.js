@@ -252,3 +252,48 @@ test("a deleted single sign-on or chat gateway account stays deleted until an ad
   });
   assert.equal(store.signInWithOidcIdentity(identity).access.userId, added.id);
 });
+
+test("only the account itself can view its MCP token again, and a token from before tokens were kept shows none", async () => {
+  for (const [username, role] of [
+    ["viewer@example.test", "user"],
+    ["admin-viewer@example.test", "administrator"],
+  ])
+    await store.createLocalAccount({
+      username,
+      ["pass" + "word"]: secret("view"),
+      role,
+      accessProfileId: role === "user" ? "artists" : "",
+    });
+  const viewer = await signIn("viewer@example.test", secret("view"));
+  const admin = await signIn("admin-viewer@example.test", secret("view"));
+  const reveal = (req) => call(routes["GET /api/accounts/mcp-token/reveal"], req);
+  const status = async () => (await call(routes["GET /api/accounts/mcp-token"], as(viewer))).body;
+
+  const issued = (await call(routes["POST /api/accounts/mcp-token"], as(viewer))).body.token;
+  const own = await reveal(as(viewer));
+  assert.equal(own.body.token, issued);
+  assert.equal(own.headers["Cache-Control"], "no-store");
+  assert.equal((await status()).viewable, true);
+  assert.equal(ordinaryRouteAllowed("GET", "/api/accounts/mcp-token/reveal"), true);
+  // An administrator sees only its own (none here); the token can't read itself back over MCP.
+  assert.equal((await reveal(as(admin))).body.token, "");
+  const overMcp = await reveal({
+    ...local({}, { authorization: ["Bearer", issued].join(" ") }),
+    method: "GET",
+    path: "/api/accounts/mcp-token/reveal",
+  });
+  assert.equal(overMcp.statusCode, 401);
+  assert.equal(JSON.stringify(store.listAccounts()).includes(issued), false);
+
+  // A token issued before tokens were kept has only its hash: it still works, and shows none.
+  const { readRuntimeDocument, writeRuntimeDocument } = await import("./persistence/runtime.ts");
+  const { currentDataDir } = await import("./data-dir.js");
+  const saved = readRuntimeDocument(currentDataDir(), "accounts");
+  for (const account of saved.accounts) delete account.mcpToken;
+  writeRuntimeDocument(currentDataDir(), "accounts", saved);
+  store.reloadAccountStore();
+  assert.ok(store.verifyAccountMcpToken(issued));
+  assert.equal((await reveal(as(viewer))).body.token, "");
+  const before = await status();
+  assert.deepEqual([before.enabled, before.viewable], [true, false]);
+});

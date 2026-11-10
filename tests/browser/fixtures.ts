@@ -1003,20 +1003,19 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
 }
 
 /** Chooses what an open Filters popup shows: All, Starred or Uploads. */
+/** Shows the gallery's Starred or Uploads alone with its toolbar toggle, or All with neither. */
 export async function showOnly(page: Page, choice: "All" | "Starred" | "Uploads") {
-  await page
-    .getByRole("dialog", { name: "Filters", exact: true })
-    .getByRole("radiogroup", { name: "Show", exact: true })
-    .getByText(choice, { exact: true })
-    .click();
+  const toggle = (name: string) => page.getByRole("button", { name, exact: true });
+  for (const name of ["Starred", "Uploads"]) {
+    const on = (await toggle(name).getAttribute("aria-pressed")) === "true";
+    if (on !== (name === choice)) await toggle(name).click();
+    await expect(toggle(name)).toHaveAttribute("aria-pressed", String(name === choice));
+  }
 }
 
-/** Shows the reference picker's Uploads, which lists uploaded images. */
+/** Shows the reference picker's Uploads tab, which lists uploaded images. */
 export async function showUploads(page: Page) {
-  const picker = page.getByRole("region", { name: "References", exact: true });
-  await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
-  await showOnly(page, "Uploads");
-  await closePopup(page, "Filters");
+  await pickerTab(page, "References", "Uploads");
 }
 
 /**
@@ -1082,7 +1081,7 @@ export async function savedAction(
 /** Chooses a picker tab, such as LoRAs › Stacks. */
 export async function pickerTab(page: Page, picker: string, tab: string) {
   await page
-    .getByRole("radiogroup", { name: `${picker} View`, exact: true })
+    .getByRole("group", { name: `${picker} View`, exact: true })
     .getByText(tab, { exact: true })
     .click();
 }
