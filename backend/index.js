@@ -29,6 +29,7 @@ import {
   createTaste,
   itemValues,
   preferenceSignal,
+  setPreferenceSignals,
   registerTasteRoutes,
   tasteSignal,
 } from "./domain/taste.ts";
@@ -565,10 +566,12 @@ registerGalleryHistoryRoutes(app, {
       items.map((item) => item.id),
       favorite,
     );
-    taste.record(
-      ownerId,
-      items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    );
+    taste.record(ownerId, [
+      ...items.map((item) =>
+        tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item)),
+      ),
+      ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+    ]);
   },
 });
 
