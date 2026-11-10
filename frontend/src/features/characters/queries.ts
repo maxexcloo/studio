@@ -111,3 +111,41 @@ export function removeCharacter(card: CharacterCard, references: ReferenceAsset[
     prompt: withoutCharacter(prompt, card.description),
   };
 }
+
+/** An outfit or scene card as `/api/<kind>` lists it (backend/cards.js). */
+export interface PromptCard {
+  id: string;
+  name: string;
+  description: string;
+  references: ReferenceAsset[];
+}
+export type PromptCardKind = "outfits" | "scenes";
+
+export const promptCardsQuery = (kind: PromptCardKind) =>
+  queryOptions({
+    queryKey: [kind],
+    queryFn: async () => (await api<Record<PromptCardKind, PromptCard[]>>(`/api/${kind}`))[kind],
+  });
+
+/** Saves a new outfit or scene, or `id`'s changes, and refreshes its list. */
+export function useSavePromptCard(kind: PromptCardKind, id?: string) {
+  const client = useQueryClient();
+  return useMutation({
+    meta: { inlineError: true },
+    mutationFn: (fields: { name: string; description: string; referenceIds: string[] }) =>
+      api(id ? `/api/${kind}/${encodeURIComponent(id)}` : `/api/${kind}`, {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(fields),
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [kind] }),
+  });
+}
+
+export function useDeletePromptCard(kind: PromptCardKind) {
+  const client = useQueryClient();
+  return useMutation({
+    meta: { inlineError: true },
+    mutationFn: (id: string) => api(`/api/${kind}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [kind] }),
+  });
+}

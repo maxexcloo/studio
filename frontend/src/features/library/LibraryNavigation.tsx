@@ -9,7 +9,7 @@ export const librarySections = {
   characters: {
     label: "Characters",
     description:
-      "Your character cards: images and a description that picking one adds to a prompt.",
+      "Your character cards: an image and lasting looks that picking one leads a prompt with.",
     icon: icons.character,
     group: "What You Have",
   },
@@ -33,11 +33,23 @@ export const librarySections = {
     group: "What You Have",
     initial: true,
   },
+  outfits: {
+    label: "Outfits",
+    description: "Outfits to dress a character in, the same across a series of shots.",
+    icon: icons.outfit,
+    group: "What You Have",
+  },
   profiles: {
     label: "Profiles",
     description: "Generation profiles and their workflows. Every saved version is kept.",
     icon: FileCog,
     admin: true,
+    group: "What You Have",
+  },
+  scenes: {
+    label: "Scenes",
+    description: "Places, light and time of day to reuse across a series of shots.",
+    icon: icons.scene,
     group: "What You Have",
   },
   downloads: {
@@ -63,7 +75,7 @@ export const librarySections = {
     group: "Getting More",
   },
 };
-/** Administrators see the whole Library; other accounts only their Characters. */
+/** Administrators see the whole Library; other accounts only their Characters, Outfits and Scenes. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
   const { presets, characters } = useLibraryAccess();
@@ -71,7 +83,7 @@ export function useLibraryNavigation() {
     admin,
     imports: admin && presets,
     options: visibleSections(librarySections, admin, (key) =>
-      key === "characters"
+      ["characters", "outfits", "scenes"].includes(key)
         ? characters
         : admin && (presets || (key !== "imports" && key !== "presets")),
     ),

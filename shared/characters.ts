@@ -112,25 +112,28 @@ export function withCharacter(prompt: string, description: string, fromImage = t
 }
 
 /** The prompt without a card's lead and the space that joined it. */
-export function withoutCharacter(prompt: string, description: string) {
-  const lead = characterLead(description);
-  const at = prompt.indexOf(lead);
-  if (at < 0) return prompt;
-  const before = prompt.slice(0, at).trimEnd();
-  const after = prompt.slice(at + lead.length).trimStart();
-  return before && after ? `${before} ${after}` : before || after;
-}
+export const withoutCharacter = (prompt: string, description: string) =>
+  withoutPart(prompt, characterLead(description));
 
 const sentence = (text = "") => {
   const words = text.trim().replace(/[\s.,;:]+$/, "");
   return words && `${words[0].toUpperCase()}${words.slice(1)}.`;
 };
+/** What the person wears, as written; an outfit names its footwear, or the reference's carries over. */
+export const outfitPart = (outfit = "") =>
+  outfit.trim() ? `The person wears ${outfit.trim().replace(/[\s.,;:]+$/, "")}.` : "";
+/** The place, which with a character's image replaces that image's own background. */
+export function scenePart(scene = "", withImage = false) {
+  const place = sentence(scene);
+  return place && withImage
+    ? `${place.slice(0, -1)}, in place of the reference image's background.`
+    : place;
+}
 /**
  * A shot composed from its parts, in the order and wording that held a character across ten outfits
  * and scenes on live (10 Nov): the character's lead (characterLead, with its image unless
- * `fromImage` is false), what the person wears (an outfit names its footwear, or the reference's
- * shoes or bare feet carry over), the scene, which replaces the reference image's own background,
- * then the action and the camera.
+ * `fromImage` is false), what the person wears (outfitPart), the scene (scenePart), then the action
+ * and the camera.
  */
 export function composePrompt({
   character,
@@ -147,17 +150,41 @@ export function composePrompt({
   camera?: string;
   fromImage?: boolean;
 }) {
-  const withImage = character !== undefined && fromImage;
-  const place = sentence(scene);
   return [
     character === undefined ? "" : characterLead(character, fromImage),
-    outfit?.trim() ? `The person wears ${outfit.trim().replace(/[\s.,;:]+$/, "")}.` : "",
-    place && withImage
-      ? `${place.slice(0, -1)}, in place of the reference image's background.`
-      : place,
+    outfitPart(outfit),
+    scenePart(scene, character !== undefined && fromImage),
     sentence(action),
     sentence(camera),
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+/**
+ * The prompt with `part` (an outfit's or scene's sentence) placed after the last of `after` it holds
+ * (the parts that come first: a character's lead, an outfit), else at the start; unchanged when it
+ * already holds it.
+ */
+export function withPart(prompt: string, part: string, after: string[] = []) {
+  if (!part || prompt.includes(part)) return prompt;
+  const at = Math.max(
+    0,
+    ...after.filter(Boolean).map((text) => {
+      const found = prompt.indexOf(text);
+      return found < 0 ? 0 : found + text.length;
+    }),
+  );
+  const before = prompt.slice(0, at).trimEnd();
+  const rest = prompt.slice(at).trimStart();
+  return [before, part, rest].filter(Boolean).join(" ");
+}
+
+/** The prompt without `part` and the space that joined it. */
+export function withoutPart(prompt: string, part: string) {
+  const at = part ? prompt.indexOf(part) : -1;
+  if (at < 0) return prompt;
+  const before = prompt.slice(0, at).trimEnd();
+  const after = prompt.slice(at + part.length).trimStart();
+  return before && after ? `${before} ${after}` : before || after;
 }
