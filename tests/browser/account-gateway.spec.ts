@@ -97,44 +97,52 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
   expect(attempts).toBe(2);
 });
 
-test("Personal MCP credentials can be issued, rotated and revoked without retaining the shown token across sections", async ({
+test("Personal MCP credentials can be issued, viewed again hidden until Show, rotated and revoked", async ({
   page,
 }) => {
   await accountFixture(page);
-  const status = { endpoint: "https://studio.example.test/mcp", enabled: false, createdAt: "" };
+  const status = {
+    endpoint: "https://studio.example.test/mcp",
+    enabled: false,
+    viewable: false,
+    createdAt: "",
+  };
   let issued = 0;
   let revoked = 0;
   let finishLateIssuance!: () => void;
   const lateIssuance = new Promise<void>((resolve) => {
     finishLateIssuance = resolve;
   });
+  const current = () => (status.viewable ? `browser-fixture-token-${issued}` : "");
   await page.route("**/api/accounts/mcp-token", async (route) => {
     if (route.request().method() === "POST") {
       issued++;
-      status.enabled = true;
-      status.createdAt = stamp;
+      Object.assign(status, { enabled: true, viewable: true, createdAt: stamp });
       if (issued === 3) await lateIssuance;
-      return route.fulfill({
-        json: { ok: true, token: `browser-fixture-token-${issued}`, createdAt: stamp },
-      });
+      return route.fulfill({ json: { ok: true, token: current(), createdAt: stamp } });
     }
     return route.fulfill({ json: { ok: true, ...status } });
   });
+  await page.route("**/api/accounts/mcp-token/reveal", (route) =>
+    route.fulfill({ json: { ok: true, token: current() } }),
+  );
   await page.route("**/api/accounts/mcp-token/revoke", (route) => {
     revoked++;
-    status.enabled = false;
-    status.createdAt = "";
-    return route.fulfill({ json: { ok: true, enabled: false, createdAt: "" } });
+    Object.assign(status, { enabled: false, viewable: false, createdAt: "" });
+    return route.fulfill({ json: { ok: true, ...status } });
   });
   await page.goto("/settings#account");
   await expect(page.getByText(status.endpoint, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
-  const token = page.getByRole("textbox", { name: "New MCP Token", exact: true });
+  const token = page.getByRole("textbox", { name: "Your MCP Token", exact: true });
   await expect(token).toHaveValue("browser-fixture-token-1");
   await expect(page.getByText("Token Active", { exact: true })).toBeVisible();
+  // Back in Account, the token is hidden until Show.
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
-  await expect(token).toHaveCount(0);
+  await expect(token).not.toHaveValue(/browser-fixture/);
+  await page.getByRole("button", { name: "Show", exact: true }).click();
+  await expect(token).toHaveValue("browser-fixture-token-1");
   await page.getByRole("button", { name: "Rotate Token", exact: true }).click();
   await expect(token).toHaveValue("browser-fixture-token-2");
   // Revoking sits in the Danger Zone and confirms first.
@@ -148,14 +156,20 @@ test("Personal MCP credentials can be issued, rotated and revoked without retain
     .click();
   await expect(page.getByText("No Token Issued", { exact: true })).toBeVisible();
   await expect(token).toHaveCount(0);
+  // A token issued while away from Account stays hidden on return.
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
   await expect.poll(() => issued).toBe(3);
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
   finishLateIssuance();
   await expect(page.getByRole("button", { name: "Rotate Token", exact: true })).toBeEnabled();
-  await expect(token).toHaveCount(0);
+  await expect(token).not.toHaveValue(/browser-fixture/);
   expect({ issued, revoked }).toEqual({ issued: 3, revoked: 1 });
+  // A token from before tokens were kept can't be shown: Rotate to view.
+  status.viewable = false;
+  await page.reload();
+  await expect(page.getByText(/^Rotate to view\./)).toBeVisible();
+  await expect(token).toHaveCount(0);
 });
 
 test("Sign-in gate keeps account data behind authentication", async ({ page }) => {

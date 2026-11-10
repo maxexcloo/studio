@@ -82,7 +82,7 @@ Single sign-on (Pocket ID or another OpenID Connect provider) needs `STUDIO_OIDC
 
 MCP clients reach `/mcp` in one of three ways:
 
-- **Personal token:** an account's own token from Settings, as `Authorization: Bearer <token>`, or in the path (`/mcp/<token>`) for a client that sends no headers. Only an administrator's own token reaches the admin tools.
+- **Personal token:** an account's own token from Settings › Account, where only that account can view and copy it again, as `Authorization: Bearer <token>`, or in the path (`/mcp/<token>`) for a client that sends no headers. Only an administrator's own token reaches the admin tools.
 - **Trusted gateway:** a chat gateway such as Bifrost sends `STUDIO_MCP_API_KEY` with its user's ID in `x-ai-user-id` (and email in `x-ai-user-email`, which links or creates the matching ordinary account). Administrators link other IDs in **Settings › Users › Chat Gateway**. `x-studio-conversation-id` scopes result numbers to one chat.
 - **GPU control:** `CONTROL_MCP_API_KEY` gets only the GPU tools (`gpu_status`, `workloads`, `preview`, `apply`, `mode`, `restart`, `operation`) and needs [Runtime Control](#runtime-control).
 
