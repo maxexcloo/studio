@@ -102,7 +102,7 @@ The prompt assistant and Chat use an OpenAI-compatible gateway (Bifrost): `STUDI
 
 ### Downloads & Imports
 
-Library › Imports takes Civitai image and model links and Hugging Face file or repository links. Downloads stream to the `models` worker, resume against their recorded source and check published SHA-256 values. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` apply to Hugging Face downloads.
+Library › Imports takes Civitai image and model links and Hugging Face file or repository links. Downloads stream to the `models` worker, resume against their recorded source and check published SHA-256 values. Hugging Face files, the built-in catalogue's included, download at a pinned commit; the daily update check offers an Update when a file changes upstream. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` apply to Hugging Face downloads.
 
 ### Profiles, Guides & Catalogue
 
