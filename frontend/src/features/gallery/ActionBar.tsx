@@ -83,7 +83,7 @@ export function findAction(groups: ActionGroups, id: string): Action | undefined
 
 /**
  * A menu's setting rather than an action: a segmented choice, or an on/off option that keeps the
- * menu open (Review Prompt First, Face Detail).
+ * menu open (Review Prompt, Face Detail).
  */
 const isSetting = (action: Action) =>
   Boolean(action.choice || (action.keepOpen && action.checked !== undefined));

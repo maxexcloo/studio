@@ -662,7 +662,7 @@ test("Animate runs local Fast unless Quality is chosen, and keeps the choice as 
   expect(state.jobs[1].input).toMatchObject({ profileId: "video:test" });
 });
 
-test("Review Prompt First writes the motion prompt for editing, and Run queues exactly that prompt", async ({
+test("Review Prompt writes the motion prompt for editing, and Run queues exactly that prompt", async ({
   page,
 }) => {
   const asked: unknown[] = [];
@@ -675,7 +675,7 @@ test("Review Prompt First writes the motion prompt for editing, and Run queues e
     }),
   );
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  const review = page.getByRole("menuitem", { name: "Review Prompt First", exact: true });
+  const review = page.getByRole("menuitem", { name: "Review Prompt", exact: true });
   await expect(review).toHaveAttribute("aria-checked", "false");
   await review.click();
   await expect(review).toHaveAttribute("aria-checked", "true");

@@ -1,7 +1,7 @@
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt for the
  * frame a clip starts from and a theme, as the queue item's writing stage (prompt-stage.js) or for
- * Review Prompt First (assistant-routes.js), through the same engine (assistant.js). The writer
+ * Review Prompt (assistant-routes.js), through the same engine (assistant.js). The writer
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
