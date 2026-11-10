@@ -1206,8 +1206,12 @@ export async function closePresets(page: Page) {
   await closePopup(page, "Presets");
 }
 
-/** Loads a saved stack or preset, confirming when it replaces what the draft has. */
-export async function loadSaved(page: Page, noun: "Preset" | "Stack", name: string) {
+/** Loads a saved stack or preset, or an inspiration, confirming when it replaces what the draft has. */
+export async function loadSaved(
+  page: Page,
+  noun: "Preset" | "Stack" | "Inspiration",
+  name: string,
+) {
   await page.getByRole("button", { name: `Load ${noun}: ${name}`, exact: true }).click();
   const replace = page.getByRole("button", { name: "Replace", exact: true });
   if (await replace.isVisible()) await replace.click();

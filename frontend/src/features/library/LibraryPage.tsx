@@ -1,13 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { Alert, SimpleGrid } from "@mantine/core";
+import { Alert } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
-import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
 import {
   LibraryCatalogueTable,
   libraryItemCategory,
@@ -39,11 +37,6 @@ export function LibraryPage() {
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
         ? 2000
         : false,
-  });
-  const presets = useQuery({
-    queryKey: ["presets"],
-    queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),
-    enabled: admin,
   });
   const update = useMutation({
     mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
@@ -111,19 +104,6 @@ export function LibraryPage() {
           scenes: (heading) => <LibraryPromptCards kind="scenes" heading={heading} />,
           imports: (heading) => (
             <LibraryImports heading={heading} active={activeSection === "imports"} admin={admin} />
-          ),
-          presets: presets.isPending ? (
-            <LoadingState label="Loading Inspiration" fill />
-          ) : presets.error ? (
-            <Alert color="red">{presets.error.message}</Alert>
-          ) : !presets.data.presets.length ? (
-            <EmptyState>No Inspiration</EmptyState>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-              {presets.data.presets.map((preset) => (
-                <InspirationPreset key={preset.id} preset={preset} />
-              ))}
-            </SimpleGrid>
           ),
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
