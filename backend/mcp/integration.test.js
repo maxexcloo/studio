@@ -346,8 +346,10 @@ async function fixture(
   // The account's character cards (backend/cards.js), set by a test.
   const characters = [];
   const outfits = [];
+  const scenes = [];
   app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.get("/api/outfits", (_req, res) => res.json({ outfits }));
+  app.get("/api/scenes", (_req, res) => res.json({ scenes }));
   app.post("/api/characters/:id/generated", (req, res) => {
     characters.find((card) => card.id === req.params.id).generated = req.body;
     res.json({ ok: true });
@@ -424,6 +426,7 @@ async function fixture(
     assets,
     characters,
     outfits,
+    scenes,
     uploads,
     base,
     mcp,
@@ -1758,6 +1761,101 @@ test("a character's image goes into an Identity slot, on a profile Studio picks 
     { slot: "start", assetId: pose },
     { slot: "face", assetId: face },
   ]);
+});
+
+test("behind STUDIO_CARD_IMAGES a shot's outfit and scene images follow the character's where slots take them, else stay words", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  const upload = async (filename) => {
+    const uploaded = data(
+      await call(client, "upload", { content_base64: png.toString("base64"), filename }),
+    );
+    return uploaded.asset?.id || uploaded.id || uploaded.asset_id;
+  };
+  const [face, coat, harbour] = [
+    await upload("mara.png"),
+    await upload("coat.png"),
+    await upload("harbour.png"),
+  ];
+  f.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red-haired ranger",
+    referenceIds: [face],
+    references: [{ id: face }],
+  });
+  f.outfits.push({
+    id: "out-1",
+    name: "Raincoat",
+    description: "a yellow raincoat",
+    references: [{ id: coat }],
+  });
+  f.scenes.push({
+    id: "scn-1",
+    name: "Harbour",
+    description: "a harbour at dawn",
+    references: [{ id: harbour }],
+  });
+  const slot = (id, role) => ({
+    id,
+    kind: "image",
+    ...(role ? { role } : {}),
+    min: 0,
+    max: 1,
+    required: false,
+  });
+  // Guiding roles (#474): the face to Identity, the outfit to Style, the scene to Pose/Layout.
+  await f.profiles([
+    {
+      ...structuredClone(imageProfile),
+      id: "guided",
+      label: "guided",
+      mediaInputs: [
+        slot("start", "start"),
+        slot("face", "identity"),
+        slot("look", "style"),
+        slot("pose", "layout"),
+      ],
+    },
+  ]);
+  const shoot = async (action) => {
+    const before = f.submitted.length;
+    const reply = await call(client, "generate", {
+      character: "Mara",
+      shots: [{ outfit: "Raincoat", scene: "Harbour", action }],
+    });
+    assert.notEqual(reply.isError, true, reply.content?.[0]?.text);
+    return { text: reply.content[0].text, job: f.submitted[before] };
+  };
+  // Off by default: the cards are words only, as before.
+  const off = await shoot("walking");
+  assert.deepEqual(off.job.referenceAssets, [{ slot: "face", assetId: face }]);
+  process.env.STUDIO_CARD_IMAGES = "1";
+  t.after(() => delete process.env.STUDIO_CARD_IMAGES);
+  const on = await shoot("walking slowly");
+  assert.deepEqual(on.job.referenceAssets, [
+    { slot: "face", assetId: face },
+    { slot: "look", assetId: coat },
+    { slot: "pose", assetId: harbour },
+  ]);
+  assert.doesNotMatch(on.text, /described in words/);
+  // An editing model with one spare slot takes the outfit's image; the scene stays words.
+  await f.profiles([
+    {
+      ...structuredClone(imageProfile),
+      id: "editor",
+      label: "editor",
+      editReferences: true,
+      keepsCharacters: true,
+      mediaInputs: [slot("image1"), slot("image2")],
+    },
+  ]);
+  const tight = await shoot("running");
+  assert.deepEqual(tight.job.referenceAssets, [
+    { slot: "image1", assetId: face },
+    { slot: "image2", assetId: coat },
+  ]);
+  assert.match(tight.text, /Scene described in words; this model takes 2 references\./);
 });
 
 test("image Result returns one short linked preview that opens the unchanged original", async (t) => {
