@@ -35,7 +35,7 @@ import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { useQueue, useQueueAction } from "../generation/Queue";
+import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
 import { useChatText } from "../sessions/ChatProvider";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
@@ -185,6 +185,32 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 }
 
 /**
+ * Edit › Make Character: opens Library › Characters with a new card started from the image, where
+ * the prompt assistant can describe it.
+ */
+function useCharacterAction(item: MediaItem, onApplied: () => void): Action | null {
+  const characters = useGroupFeature("characters");
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (!characters || item.type !== "image") return null;
+  return {
+    id: "make-character",
+    label: "Make Character",
+    description: "Start a character card from this image",
+    icon: icons.character,
+    onClick: () => {
+      onApplied();
+      navigate("/library#characters", {
+        state: {
+          backgroundLocation: location.state?.backgroundLocation || location,
+          characterFrom: item.id,
+        },
+      });
+    },
+  };
+}
+
+/**
  * Continue in Chat: a new Chat about the result, with it attached as the reference and its settings
  * as the generation input, so the conversation can rework its prompt or edit the image. A `message`
  * (the change asked for in the viewer) starts the Chat's unsent message.
@@ -261,6 +287,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const character = useCharacterAction(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
@@ -280,6 +307,7 @@ export function useMediaActions(
     onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
   });
   const chat = useChatAction(item, onApplied);
+  const navigate = useNavigate();
   const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
@@ -293,6 +321,17 @@ export function useMediaActions(
     onVersionChange,
   });
   const assistant = useQuery(assistantQuery);
+  // The assistant writes new variations into the item's MCP result set, in the queue.
+  const client = useQueryClient();
+  const moreLikeSet = useMutation({
+    mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
+    onSuccess: () =>
+      void Promise.all(
+        [queueQuery.queryKey, ["gallery"], ["session"]].map((queryKey) =>
+          client.invalidateQueries({ queryKey }),
+        ),
+      ),
+  });
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
@@ -456,6 +495,7 @@ export function useMediaActions(
                     onClick: () => action.mutate("image"),
                   },
               ...(image && reference ? [reference] : []),
+              ...(image && character ? [character] : []),
             ],
             item.uploaded
               ? []
@@ -474,12 +514,32 @@ export function useMediaActions(
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
+                  ...(item.resultSet && assistant.data?.available
+                    ? [
+                        {
+                          id: "more-like-set",
+                          label: "More Like This Set",
+                          description: `Two new variations for ${item.resultSet.title}`,
+                          icon: icons.suggestions,
+                          disabled: moreLikeSet.isPending,
+                          onClick: () => moreLikeSet.mutate(),
+                        },
+                      ]
+                    : []),
                 ],
           ]
         : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
+    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
+    image &&
+      itemAction("similar", {
+        onClick: () => {
+          onApplied();
+          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+        },
+      }),
     upscale,
     // Its options sort alphabetically.
     itemAction("copy", {

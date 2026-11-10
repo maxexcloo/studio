@@ -4,6 +4,7 @@ import {
   Blend,
   CirclePause,
   CirclePlay,
+  ClipboardPaste,
   Columns2,
   ContactRound,
   Copy,
@@ -25,6 +26,7 @@ import {
   RefreshCw,
   RotateCw,
   Rows2,
+  ScanSearch,
   ScrollText,
   Settings,
   Share,
@@ -77,6 +79,7 @@ export const icons = {
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,
+  paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */
@@ -90,6 +93,8 @@ export const icons = {
   retry: RotateCw,
   settings: Settings,
   share: Share,
+  /** Find Similar: the gallery ranked by likeness to an image. */
+  similar: ScanSearch,
   star: Star,
   stop: Square,
   /** Short changes offered for an image or draft. */

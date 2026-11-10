@@ -1,21 +1,17 @@
-import { useState } from "react";
-import { ActionIcon, Alert, getDefaultZIndex, Menu, ScrollArea, Stack, Text } from "@mantine/core";
+import { Alert, ScrollArea, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import type { Profile, ReferenceAsset } from "../../types";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { menuWidth } from "../../theme";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
-import { CharacterEditor } from "./CharacterEditor";
+import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import {
   applyCharacter,
   characterApplied,
   charactersQuery,
   referenceLimit,
   removeCharacter,
-  useDeleteCharacter,
   type CharacterCard,
 } from "./queries";
 
@@ -48,15 +44,12 @@ export function CharacterChoices({
   onLayer: (open: boolean) => void;
 }) {
   const characters = useQuery(charactersQuery);
-  const [editing, setEditing] = useState<CharacterCard | "new" | null>(null);
-  const [deleting, setDeleting] = useState<CharacterCard | null>(null);
-  const deletion = useDeleteCharacter();
+  const dialogs = useCharacterDialogs(onLayer);
   const limit = referenceLimit(profile);
   const words = query.trim().toLowerCase();
   const cards = (characters.data || []).filter(
     (card) => !words || `${card.name} ${card.description}`.toLowerCase().includes(words),
   );
-  const layer = (open: boolean) => onLayer(open);
   if (characters.isPending) return <LoadingState fill label="Loading Characters" />;
   if (characters.error) return <Alert color="red">{characters.error.message}</Alert>;
   return (
@@ -73,10 +66,7 @@ export function CharacterChoices({
             title="New Character"
             selected={false}
             placeholder={icons.add}
-            onToggle={() => {
-              setEditing("new");
-              layer(true);
-            }}
+            onToggle={() => dialogs.edit()}
           />
           {cards.map((card) => {
             const applied = characterApplied(card, references, prompt);
@@ -98,72 +88,19 @@ export function CharacterChoices({
                   )
                 }
                 action={
-                  <Menu position="bottom-end" width={menuWidth} withinPortal={false}>
-                    <Menu.Target>
-                      <ActionIcon variant="default" aria-label={`Actions for ${card.name}`}>
-                        <icons.more size={14} />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item
-                        leftSection={<icons.edit size={16} />}
-                        onClick={() => {
-                          setEditing(card);
-                          layer(true);
-                        }}
-                      >
-                        Edit Character
-                      </Menu.Item>
-                      <Menu.Item
-                        color="red"
-                        leftSection={<icons.delete size={16} />}
-                        onClick={() => {
-                          deletion.reset();
-                          setDeleting(card);
-                          layer(true);
-                        }}
-                      >
-                        Delete Character
-                      </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
+                  <CharacterMenu
+                    card={card}
+                    withinPortal={false}
+                    onEdit={() => dialogs.edit(card)}
+                    onDelete={() => dialogs.remove(card)}
+                  />
                 }
               />
             );
           })}
         </PickerGrid>
       </ScrollArea.Autosize>
-      <CharacterEditor
-        opened={editing !== null}
-        character={editing === "new" ? undefined : editing || undefined}
-        onClose={() => {
-          setEditing(null);
-          layer(false);
-        }}
-      />
-      <ConfirmDialog
-        opened={deleting !== null}
-        title="Delete Character"
-        action="Delete Character"
-        pending={deletion.isPending}
-        error={deletion.error?.message}
-        zIndex={getDefaultZIndex("overlay")}
-        onConfirm={() =>
-          deleting &&
-          deletion.mutate(deleting.id, {
-            onSuccess: () => {
-              setDeleting(null);
-              layer(false);
-            },
-          })
-        }
-        onClose={() => {
-          setDeleting(null);
-          layer(false);
-        }}
-      >
-        {`Delete ${deleting?.name}? Its images stay in the gallery.`}
-      </ConfirmDialog>
+      {dialogs.dialogs}
     </Stack>
   );
 }

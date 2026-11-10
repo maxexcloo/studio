@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { Shuffle } from "lucide-react";
 import { icons } from "../../ui/icons";
-import { failure } from "../../api";
+import { failure, post } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
@@ -22,6 +23,8 @@ import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
+// Compare Selected sets out up to four images side by side, one per number key.
+const compareLimit = 4;
 // Phones keep what acts on several items on the bar and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
@@ -67,12 +70,34 @@ export function GallerySelectionBar({
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
   // A set or run is animated or upscaled as a whole (Runs' Select Set).
-  const images = ready.filter((item) => item.type === "image" && !item.uploaded);
-  const upscale = useUpscaleMany(images);
+  const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
+  const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
   const animate = useMutation({
     mutationFn: async (theme: AnimateTheme) => {
-      for (const item of images) await iterate(item, { kind: "animate", theme });
+      for (const item of finishedImages) await iterate(item, { kind: "animate", theme });
+    },
+  });
+  // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
+  // comparison votes per run.
+  const navigate = useNavigate();
+  const images =
+    selected.length >= 2 &&
+    selected.length <= compareLimit &&
+    selected.every((item) => item.type === "image" && item.status === "done");
+  const comparable =
+    images &&
+    selected.every((item) => item.jobId) &&
+    new Set(selected.map((item) => item.jobId)).size === selected.length;
+  const compare = useMutation({
+    mutationFn: () =>
+      post<{ id: string }>("/api/comparisons", {
+        jobIds: selected.map((item) => item.jobId),
+        itemIds: selected.map((item) => item.id),
+      }),
+    onSuccess: (comparison) => {
+      selection.end();
+      navigate(`/compare/${comparison.id}`);
     },
   });
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
@@ -144,7 +169,7 @@ export function GallerySelectionBar({
           ],
         ],
       }),
-    images.length > 0 &&
+    finishedImages.length > 0 &&
       itemAction("animate", {
         loading: animate.isPending,
         menu: [
@@ -159,7 +184,7 @@ export function GallerySelectionBar({
             })),
         ],
       }),
-    images.length > 0 &&
+    finishedImages.length > 0 &&
       itemAction("upscale", {
         loading: upscale.isPending,
         disabled: upscale.isPending,
@@ -176,6 +201,12 @@ export function GallerySelectionBar({
         disabled: pending || !runningJobs.length,
         loading: busy === "stop",
         onClick: () => void stopSelected(),
+      }),
+    images &&
+      itemAction("compare", {
+        disabled: !comparable || compare.isPending || pending,
+        loading: compare.isPending,
+        onClick: () => compare.mutate(),
       }),
     // Phones that share natively share instead of downloading.
     phone && typeof navigator.share === "function"

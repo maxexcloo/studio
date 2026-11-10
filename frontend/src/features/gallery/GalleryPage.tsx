@@ -37,7 +37,7 @@ import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
-import { mediaDetail } from "./mediaLabels";
+import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
 import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -69,7 +69,6 @@ export function GalleryPage() {
   const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const [pagingFailed, setPagingFailed] = useState(false);
-  useEffect(() => setPagingFailed(false), [search, kind, filters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
@@ -81,6 +80,23 @@ export function GalleryPage() {
   const linkedQuery = params.get("q");
   // A Chat card's set link (?set=<id>) shows that MCP result set alone until its chip is removed.
   const setId = params.get("set") || "";
+  // Find Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
+  // within the filters, until its chip is removed.
+  const similar = params.get("similar") || "";
+  const removeSimilar = useCallback(
+    () =>
+      setParams((next) => {
+        next.delete("similar");
+        return next;
+      }),
+    [setParams],
+  );
+  useEffect(() => setPagingFailed(false), [search, kind, filters, similar]);
+  useEffect(() => {
+    if (!similar) return;
+    setSelected(null);
+    window.scrollTo(0, 0);
+  }, [similar]);
   useEffect(() => {
     if (linkedQuery === null) return;
     setQuery(linkedQuery);
@@ -105,17 +121,18 @@ export function GalleryPage() {
     }),
   }).data;
   const galleryKey = useMemo(
-    () => ["gallery", search, kind, filters, setId],
-    [search, kind, filters, setId],
+    () => ["gallery", search, kind, filters, similar, setId],
+    [search, kind, filters, similar, setId],
   );
   const galleryPage = useCallback(
     (cursor: string) => {
       const params = new URLSearchParams({ limit: "60", cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
+      if (similar) params.set("similar", similar);
       if (setId) params.set("set", setId);
       return api<Page>(`/api/gallery?${params}`);
     },
-    [search, kind, filters, setId],
+    [search, kind, filters, similar, setId],
   );
   const gallery = useInfiniteQuery({
     queryKey: galleryKey,
@@ -197,12 +214,16 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
-  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters]));
-  const hasFilters = JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped;
+  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters, similar]));
+  const hasFilters =
+    JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   const clearFilters = () => {
     setFilters(emptyGalleryFilters);
     setAllVersions(true);
+    removeSimilar();
   };
+  // The image ranks first, being most like itself, unless the filters leave it out.
+  const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
   // Stable, so the views' memoised tiles render only when their own item changes.
   const openItem = useCallback((item: MediaItem, run?: string) => {
@@ -241,7 +262,8 @@ export function GalleryPage() {
   }
   // New uploads show at once under the Uploads filter.
   const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
-  const View = view === "runs" ? RunsView : MediaGrid;
+  // A ranking has no runs to group: it shows as a grid.
+  const View = view === "runs" && !similar ? RunsView : MediaGrid;
   return (
     <Stack
       gap="sm"
@@ -287,6 +309,15 @@ export function GalleryPage() {
           onChange={setFilters}
           count={gallery.data?.pages.at(-1)?.totalApprox}
           extraChips={[
+            ...(similar
+              ? [
+                  {
+                    key: "similar",
+                    label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
+                    remove: removeSimilar,
+                  },
+                ]
+              : []),
             ...(setId
               ? [
                   {
@@ -389,7 +420,13 @@ export function GalleryPage() {
             )
           }
         >
-          {search || hasFilters ? "No Matches" : kind === "video" ? "No Videos" : "No Images"}
+          {similar
+            ? "No Similar Images Yet"
+            : search || hasFilters
+              ? "No Matches"
+              : kind === "video"
+                ? "No Videos"
+                : "No Images"}
         </EmptyState>
       )}
       {gallery.hasNextPage && (
