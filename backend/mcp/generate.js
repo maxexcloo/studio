@@ -50,7 +50,9 @@ import {
   composePrompt,
   characterProfiles,
   characterShots,
-  editsReferences,
+  identitySlot,
+  keepsCharacterFaces,
+  keepsIdentity,
   startImageSlot,
   withCharacter,
 } from "../../shared/characters.ts";
@@ -1027,7 +1029,7 @@ export function registerGenerateTools({
         localUnlessAsked(await media.profiles("image", owner), { request }),
         [defaultId],
       );
-      for (const pool of [ranked.filter((profile) => profile.keepsCharacters), ranked]) {
+      for (const pool of [ranked.filter(keepsCharacterFaces), ranked]) {
         try {
           const editor = chooseProfile(pool, {
             kind: "image",
@@ -1055,7 +1057,7 @@ export function registerGenerateTools({
     // an img2img start image, unless the user insists on the model.
     const unable =
       card?.referenceIds.length && !views && !anyModel
-        ? targets.filter(({ profile }) => !profile.mediaInputs?.length || !editsReferences(profile))
+        ? targets.filter(({ profile }) => !keepsIdentity(profile))
         : [];
     if (unable.length)
       throw new Error(
@@ -1080,16 +1082,27 @@ export function registerGenerateTools({
               const sized = exact ? null : mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
                 throw new Error("Pass aspect, or both width and height.");
-              // A character sends its first image (characterImages), only to a model that edits
-              // with it: as an img2img start image its pose and layout (a whole sheet) carry over.
-              const room = editsReferences(profile)
+              // A character sends its first image (characterImages), only to a model that keeps its
+              // face: into its Identity slot, the named references filling the others in order, or
+              // after them on a model that edits with references. As an img2img start image its
+              // pose and layout (a whole sheet) would carry over.
+              const identity = identitySlot(profile);
+              const room = keepsIdentity(profile)
                 ? Math.min(Math.max(0, referenceCount(profile).max - named.length), characterImages)
                 : 0;
+              const others = (profile.mediaInputs || [])
+                .map((slot) => slot.id)
+                .filter((id) => id !== identity);
               const plan = {
                 ...args,
                 ...sized,
                 ...(card
-                  ? { reference_asset_ids: [...named, ...card.referenceIds.slice(0, room)] }
+                  ? {
+                      reference_asset_ids: [...named, ...card.referenceIds.slice(0, room)],
+                      ...(identity && room
+                        ? { reference_slots: [...others.slice(0, named.length), identity] }
+                        : {}),
+                    }
                   : {}),
                 // Its lead starts each prompt verbatim, as in the composer; shots are written whole.
                 ...(parts

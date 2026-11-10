@@ -49,6 +49,23 @@ export const editsReferences = (profile: {
   editReferences?: boolean;
 }) => profile.editReferences === true || isCloudProfile(profile);
 
+/** A profile's Identity slot (shared/profiles.ts), such as PuLID's face input: where a character's image goes. */
+export const identitySlot = (profile: { mediaInputs?: { id: string; role?: string }[] }) =>
+  profile.mediaInputs?.find((input) => input.role === "identity")?.id;
+
+/** Whether a character's image keeps its face on a profile: it edits with it or has an Identity slot. */
+export const keepsIdentity = (
+  profile: Parameters<typeof editsReferences>[0] & {
+    mediaInputs?: { id: string; role?: string }[];
+  },
+) => Boolean(profile.mediaInputs?.length && (editsReferences(profile) || identitySlot(profile)));
+
+/** Characters go to these first: a family that keeps them, or a profile with an Identity slot. */
+export const keepsCharacterFaces = (profile: {
+  keepsCharacters?: boolean;
+  mediaInputs?: { id: string; role?: string }[];
+}) => profile.keepsCharacters === true || Boolean(identitySlot(profile));
+
 /**
  * The reference slot a profile's result is drawn from (img2img), if any: its start slot (else its
  * first) on a profile that doesn't edit with its references, unless that slot only guides
@@ -68,9 +85,10 @@ export function startImageSlot(profile: {
 }
 
 /**
- * The profiles a character goes to, best first: those whose family keeps a face, hair and build
- * across new outfits and scenes (the family catalogue's `keepsCharacters`), then any other that
- * edits with references; `preferred` ids lead within each. Never an img2img-only profile.
+ * The profiles a character goes to, best first: those that keep a face, hair and build across new
+ * outfits and scenes (a family with the catalogue's `keepsCharacters`, or an Identity slot such as
+ * PuLID's), then any other that edits with references; `preferred` ids lead within each. Never an
+ * img2img-only profile.
  */
 export function characterProfiles<
   P extends {
@@ -79,16 +97,14 @@ export function characterProfiles<
     provider?: string;
     editReferences?: boolean;
     keepsCharacters?: boolean;
-    mediaInputs?: unknown[];
+    mediaInputs?: { id: string; role?: string }[];
   },
 >(profiles: P[], preferred: (string | undefined)[] = []) {
   const rank = (profile: P) => {
     const at = preferred.indexOf(profile.id);
-    return (profile.keepsCharacters ? 0 : 1000) + (at < 0 ? 999 : at);
+    return (keepsCharacterFaces(profile) ? 0 : 1000) + (at < 0 ? 999 : at);
   };
-  return profiles
-    .filter((profile) => profile.mediaInputs?.length && editsReferences(profile))
-    .sort((left, right) => rank(left) - rank(right));
+  return profiles.filter(keepsIdentity).sort((left, right) => rank(left) - rank(right));
 }
 
 /**

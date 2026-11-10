@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { characterProfiles, editsReferences } from "../../../../shared/characters";
+import { characterProfiles, keepsIdentity } from "../../../../shared/characters";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
@@ -52,7 +52,7 @@ export function CharacterChoices({
   const models = useQuery(modelsQuery);
   const [switched, setSwitched] = useState("");
   const editor =
-    switchable && profile?.kind === "image" && !editsReferences(profile)
+    switchable && profile?.kind === "image" && !keepsIdentity(profile)
       ? characterProfiles(
           (models.data?.profiles || []).filter(
             (item) => item.kind === "image" && item.ready !== false,
@@ -74,7 +74,7 @@ export function CharacterChoices({
           {`Switched to ${switched}, which keeps a character's face and build in new scenes.`}
         </Text>
       )}
-      {!editor && profile && !editsReferences(profile) && cards.length > 0 && (
+      {!editor && profile && !keepsIdentity(profile) && cards.length > 0 && (
         <Text size="xs" c="dimmed">
           {`${profileName(profile)} starts from a reference image (img2img), so a character's pose and layout carry over. For new scenes, choose a model that edits with references.`}
         </Text>

@@ -234,6 +234,7 @@ export function GenerationEditor({
       onOpenedChange={setReferenceOpen}
       profile={profile}
       input={input}
+      onInputChange={onChange}
       value={references}
       onChange={onReferencesChange}
       prompt={{ value: String(input.prompt || ""), onChange: (prompt) => onChange({ prompt }) }}
