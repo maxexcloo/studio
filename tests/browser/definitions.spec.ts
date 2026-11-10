@@ -267,7 +267,9 @@ test("Model classification saves and reads back while definition administration 
     "Original",
   );
   administrator = false;
-  await signIn(page, { id: "account-a", role: "user" });
+  // Without Characters an ordinary account has no Library at all (characters.spec.ts covers the
+  // Characters-only Library a member gets with it).
+  await signIn(page, { id: "account-a", role: "user", features: { characters: false } });
   await serveProfiles(page, profiles, { presets: false });
   await page.goto("/library");
   await expect(page).toHaveURL(/\/images$/);
