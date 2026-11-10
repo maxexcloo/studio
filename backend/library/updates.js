@@ -299,6 +299,31 @@ export function createUpdateChecker({
   }
 
   /**
+   * Update All: applies every available update that downloads for free (the latest version, else
+   * its free alternative), skipping those already under way. One that fails to start leaves the
+   * rest going and says why.
+   */
+  async function applyAll({ by = "" } = {}) {
+    const current = load();
+    const free = (choice) => Boolean(choice?.spec);
+    let started = 0;
+    const failed = [];
+    for (const [key, item] of Object.entries(current.byEntry)) {
+      if (item.state !== "available") continue;
+      if (["downloading", "kept", "removed"].includes(current.applied[key]?.state)) continue;
+      const alternative = !free(item.latest);
+      if (alternative && !free(item.freeAlternative)) continue;
+      try {
+        await apply(key, { alternative, by });
+        started++;
+      } catch (error) {
+        failed.push({ key, error: error.message });
+      }
+    }
+    return { started, failed };
+  }
+
+  /**
    * Finishes updates whose download has landed: the catalogue moves to the new file, then the
    * old file is removed when nothing references it (Decision 4), or kept with the reason.
    */
@@ -439,6 +464,7 @@ export function createUpdateChecker({
     check,
     summary,
     apply,
+    applyAll,
     settle,
     reload: () => {
       state = null;
