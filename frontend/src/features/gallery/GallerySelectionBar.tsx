@@ -15,6 +15,14 @@ import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
+import { useUpscaleMany } from "./UpscaleControls";
+import { animateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
+import { mediaTitle } from "./mediaLabels";
+import { inRunOrder } from "./resultSets";
+import { post } from "../../api";
+import { useNavigate } from "react-router";
+import { compareVariants } from "../../../../shared/compare";
+import type { Comparison } from "../compare/queries";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
@@ -64,6 +72,26 @@ export function GallerySelectionBar({
   const favorites = useFavorites();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
+  // A set or run is animated, upscaled or compared as a whole (Runs' Select Set).
+  const images = ready.filter((item) => item.type === "image" && !item.uploaded);
+  const upscale = useUpscaleMany(images);
+  const iterate = useIterate();
+  const animate = useMutation({
+    mutationFn: async (theme: AnimateTheme) => {
+      for (const item of images) await iterate(item, { kind: "animate", theme });
+    },
+  });
+  // One image of each run side by side, labelled by its title; voting stars the best.
+  const navigate = useNavigate();
+  const compared = inRunOrder([...new Map(images.map((item) => [item.jobId, item])).values()]);
+  const compare = useMutation({
+    mutationFn: () =>
+      post<Comparison>("/api/comparisons", {
+        jobIds: compared.map((item) => item.jobId),
+        labels: compared.map((item) => mediaTitle(item).slice(0, 80)),
+      }),
+    onSuccess: (comparison) => navigate(`/compare/${comparison.id}`),
+  });
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
   const shareKey = ready.map((item) => item.id).join("\n");
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
@@ -132,6 +160,34 @@ export function GallerySelectionBar({
             },
           ],
         ],
+      }),
+    images.length > 0 &&
+      itemAction("animate", {
+        loading: animate.isPending,
+        menu: [
+          (Object.keys(animateThemes) as AnimateTheme[])
+            .filter((theme) => theme !== "custom")
+            .map((theme) => ({
+              id: `animate-${theme}`,
+              label: animateThemes[theme],
+              icon: icons.animate,
+              disabled: animate.isPending,
+              onClick: () => animate.mutate(theme),
+            })),
+        ],
+      }),
+    images.length > 0 &&
+      itemAction("upscale", {
+        loading: upscale.isPending,
+        disabled: upscale.isPending,
+        onClick: () => upscale.mutate(),
+      }),
+    compared.length >= compareVariants.min &&
+      itemAction("compare", {
+        description: "Pick the best side by side; it's starred",
+        disabled: compared.length > compareVariants.max,
+        loading: compare.isPending,
+        onClick: () => compare.mutate(),
       }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {

@@ -1,7 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { X } from "lucide-react";
+import { SquareCheck, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
 import { easing } from "../../theme";
@@ -273,6 +273,10 @@ const RunsRow = memo(function RunsRow({
       columns={columns}
       detail={detail}
       onOpenAll={() => open(row.panel.items[0], runKey(row.panel.items[0]))}
+      onSelect={() => {
+        const ids = new Set(row.panel.items.map((item) => item.id));
+        selection.select((item) => ids.has(item.id));
+      }}
       onClose={() => collapse(row.panel)}
     >
       {row.panel.items.map((item) => (
@@ -375,6 +379,7 @@ function RunPanel({
   columns,
   detail,
   onOpenAll,
+  onSelect,
   onClose,
   children,
 }: {
@@ -383,10 +388,13 @@ function RunPanel({
   columns: number;
   detail: (item: MediaItem) => string;
   onOpenAll: () => void;
+  /** Selects the run's results, for the selection bar's actions on them all. */
+  onSelect: () => void;
   onClose: () => void;
   children: React.ReactNode;
 }) {
   const title = runTitle(run);
+  const selectLabel = run.items[0].resultSet ? "Select Set" : "Select Run";
   return (
     <Paper
       ref={ref}
@@ -418,6 +426,11 @@ function RunPanel({
           </Group>
         </Stack>
         <Group gap={4} wrap="nowrap">
+          <Tooltip label={selectLabel}>
+            <ActionIcon aria-label={selectLabel} variant="subtle" color="gray" onClick={onSelect}>
+              <SquareCheck size={18} />
+            </ActionIcon>
+          </Tooltip>
           <Tooltip label="Open All">
             <ActionIcon aria-label="Open All" variant="subtle" color="gray" onClick={onOpenAll}>
               <icons.openAll size={18} />
