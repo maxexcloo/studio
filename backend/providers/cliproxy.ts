@@ -15,6 +15,7 @@ interface ProviderImage {
 }
 interface ProviderVideo {
   status: string;
+  error?: { message?: string } | string;
   video?: { url?: string };
   video_url?: string;
   output_url?: string;
@@ -85,7 +86,10 @@ export class CliProxyMedia {
         new Error(
           `CLIProxyAPI returned HTTP ${response.status}${reason ? `: ${reason}` : "; inspect provider health."}`,
         ),
-        { providerRejected: response.status >= 400 && response.status < 500 },
+        {
+          status: response.status,
+          providerRejected: response.status >= 400 && response.status < 500,
+        },
       );
     }
     return (await response.json()) as T;
