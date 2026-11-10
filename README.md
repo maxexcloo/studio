@@ -35,7 +35,7 @@ Run one application replica with `Recreate`; two schedulers must not control the
 
 ## Configuration
 
-Studio reads its settings from the environment, or from `.env` in the project folder at start (the shell wins). Values an administrator saves in **Settings › Generation** and **Settings › Integrations** live in `studio.sqlite` and apply at once; a value the environment sets shows as locked there. Studio never writes an env file.
+Studio reads its settings from the environment, or from `.env` in the project folder at start (the shell wins). Values an administrator saves in **Settings › Generation** live in `studio.sqlite` and apply at once; a value the environment sets shows as locked there. Studio never writes an env file.
 
 ```bash
 HOST=127.0.0.1
@@ -68,7 +68,7 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
 
-**Where Work Runs** (Settings › Preferences) sets, per account, whether Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins. Otherwise Studio never switches work to the cloud, and held video work never does. Prompt Writing picks the gateway text model for the account's prompt writing; see Prompt Assistant.
+**Where Work Runs** (Settings › Preferences) sets, per account, whether Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins. Otherwise Studio never switches work to the cloud, and held video work never does. Text picks the gateway text model for the account's prompt writing; see Prompt Assistant.
 
 ### Accounts & Single Sign-On
 
@@ -94,7 +94,7 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 ### Prompt Assistant
 
-The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing (Improve Prompt, negatives, Animate's prompts, More Like This Set and Ask for a Change) uses the text model each account picks in **Settings › Preferences › Where Work Runs › Prompt Writing**, from the gateway's models and Studio's text workloads; Bifrost routes aliases such as `cloud/auto` and `local/auto` itself. Unsaved, it is the cloud model's uncensored alias (`cloud/uncensored`) for accounts with Uncensored Models, otherwise the cloud model; uncensored models are offered and used only for those accounts. Other calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. `STUDIO_ASSISTANT_MODEL` replaces every choice for every call. Without the gateway, the assistant is off.
+The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing (Improve Prompt, negatives, Animate's prompts, More Like This Set and Ask for a Change) uses the text model each account picks in **Settings › Preferences › Where Work Runs › Text**, from the gateway's models and Studio's text workloads; Bifrost routes aliases such as `cloud/auto` and `local/auto` itself. Unsaved, it is the cloud model's uncensored alias (`cloud/uncensored`) for accounts with Uncensored Models, otherwise the cloud model; uncensored models are offered and used only for those accounts. Other calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
 
 **Background AI** (**Settings › Generation**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 

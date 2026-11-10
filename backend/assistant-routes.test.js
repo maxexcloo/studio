@@ -10,13 +10,8 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-assistant-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, "studio-env");
-const {
-  registerAssistantRoutes,
-  assistantIntegration,
-  assistantRecord,
-  assistantSettingValue,
-  imageFromDataUrl,
-} = await import("./assistant-routes.js");
+const { registerAssistantRoutes, assistantIntegration, assistantRecord, imageFromDataUrl } =
+  await import("./assistant-routes.js");
 const { createAssistant } = await import("./assistant.js");
 const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
 
@@ -104,6 +99,8 @@ const loras = [
 ];
 registerAssistantRoutes(app, {
   engine,
+  // A stopped text workload's model is offered too, though the gateway lists only running ones.
+  workloadModels: () => ["local/auto", "local/stopped"],
   profiles: async (req) =>
     [plain, uncensored].filter(
       (profile) =>
@@ -235,15 +232,15 @@ test("Spicy needs Uncensored Models, whatever the profile, and runs on the uncen
     403,
   );
   assert.equal((await get("/api/assistant", "user")).spicy, false);
-  // Prompt Writing offers and defaults to uncensored models only for accounts that may use them.
+  // Text offers and defaults to uncensored models only for accounts that may use them.
   const writing = (status) => [status.writingModel, status.models];
   assert.deepEqual(writing(await get("/api/assistant", "user")), [
     "cloud/auto",
-    ["cloud/auto", "local/auto"],
+    ["cloud/auto", "local/auto", "local/stopped"],
   ]);
   assert.deepEqual(writing(await get("/api/assistant", "spicy")), [
     "cloud/uncensored",
-    ["cloud/auto", "cloud/uncensored", "local/auto"],
+    ["cloud/auto", "cloud/uncensored", "local/auto", "local/stopped"],
   ]);
   assert.equal(
     (await get("/api/assistant", "spicy")).presets.some((preset) => preset.id === "spicy"),
@@ -293,31 +290,12 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
   );
 });
 
-test("Settings rows: gateway models, vision and validated model names", async () => {
-  const source = () => ({ source: "default", locked: false });
-  // A stopped text workload's model is offered too, though the gateway lists only running ones.
-  const integration = await assistantIntegration({
-    environment,
-    engine,
-    source,
-    workloadModels: ["local/auto", "local/stopped"],
+test("Settings › Integrations shows the gateway's state and the model Studio's own calls use", async () => {
+  assert.deepEqual(await assistantIntegration({ environment, engine }), {
+    available: true,
+    model: "cloud/auto",
   });
-  assert.deepEqual(
-    [
-      integration.available,
-      integration.models,
-      integration.model.effective,
-      integration.model.vision,
-    ],
-    [true, ["cloud/auto", "cloud/uncensored", "local/auto", "local/stopped"], "cloud/auto", true],
-  );
-  assert.equal(
-    (await assistantIntegration({ environment: {}, engine: null, source })).available,
-    false,
-  );
-  assert.equal(assistantSettingValue("STUDIO_ASSISTANT_MODEL", " cloud/vision "), "cloud/vision");
-  assert.throws(() => assistantSettingValue("STUDIO_ASSISTANT_MODEL", "bad\nmodel"), /valid model/);
-  assert.throws(() => assistantSettingValue("STUDIO_ASSISTANT_KEY", "x"), /cannot be changed/);
+  assert.equal((await assistantIntegration({ environment: {}, engine: null })).available, false);
   assert.deepEqual(imageFromDataUrl("data:image/png;base64,AAAA"), {
     mime: "image/png",
     data: "AAAA",
