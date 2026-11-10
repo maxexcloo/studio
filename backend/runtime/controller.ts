@@ -166,12 +166,24 @@ export class RuntimeController {
   get parkIdleAfterMs() {
     return this.settings.parkIdleMinutes * 60_000;
   }
-  configure({ automatic, parkIdleMinutes }: RuntimeSettings) {
+  /** The workload to run while its pool is idle, if it is still configured. */
+  private get idleWorkload() {
+    return this.workloads.find((item) => item.id === this.settings.idleWorkload);
+  }
+  /** `idleWorkload` "" or absent is None. */
+  configure({ automatic, parkIdleMinutes, idleWorkload }: RuntimeSettings) {
     if (typeof automatic !== "boolean")
       throw new RuntimeRequestError("automatic must be true or false.");
     if (!Number.isInteger(parkIdleMinutes) || parkIdleMinutes < 0 || parkIdleMinutes > 1440)
       throw new RuntimeRequestError("parkIdleMinutes must be a whole number from 0 to 1440.");
-    this.record.settings = { automatic, parkIdleMinutes };
+    if (idleWorkload !== undefined && typeof idleWorkload !== "string")
+      throw new RuntimeRequestError("idleWorkload must be a workload id or empty.");
+    if (idleWorkload) this.workload(idleWorkload);
+    this.record.settings = {
+      automatic,
+      parkIdleMinutes,
+      ...(idleWorkload ? { idleWorkload } : {}),
+    };
     // Idle time counts from the change, not from before automatic control was on.
     this.lastUsed.clear();
     this.parkedCache = undefined;
@@ -538,6 +550,8 @@ export class RuntimeController {
         `Waiting for ${choices[index].label} to start.${reason && !["Loading.", "Starting."].includes(reason) ? ` ${reason}` : ""}`,
       );
     }
+    // Queued work waiting for these keeps their pool from counting as idle.
+    for (const item of choices) this.lastUsed.set(item.id, this.now());
     const [workload] = choices;
     if (!this.automaticLifecycle)
       throw new RuntimeUnavailable(
@@ -547,7 +561,7 @@ export class RuntimeController {
       );
     if (workload.kind === "text")
       throw new RuntimeUnavailable(
-        `${workload.label} is stopped; automatic control never starts text workloads. Start it in Settings › Workers.`,
+        `${workload.label} is stopped; automatic control doesn’t start text for queued work. Start it in Settings › Workers.`,
       );
     if (this.current || this.claimed)
       throw new RuntimeUnavailable(
@@ -635,7 +649,7 @@ export class RuntimeController {
         this.usage([...blocking, workload.id], workload.pool) > this.pools[workload.pool]
       )
         throw new RuntimeUnavailable(
-          `Waiting for a GPU: ${blocking.map((id) => this.workload(id).label).join(", ")} ${blocking.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`,
+          `Waiting for a GPU: ${blocking.map((id) => `${this.workload(id).label}${id === this.idleWorkload?.id ? " (Run When Idle)" : ""}`).join(", ")} ${blocking.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`,
         );
       const plan = this.placementWith(workload, states, text);
       this.begin("apply", plan, "automatic");
@@ -674,28 +688,47 @@ export class RuntimeController {
   }
 
   /**
-   * Automatic lifecycle: park running media workloads that have had no work for `parkIdleAfterMs`,
-   * so idle GPUs can rest; queued work starts them again. Text is never parked (callers outside
-   * Studio use it), and a workload first seen running counts as used then.
+   * Automatic lifecycle, every 30 seconds: park running media workloads that have had no work for
+   * `parkIdleAfterMs`, so idle GPUs can rest, and start the Run When Idle workload once nothing is
+   * queued or running in its pool for as long, if it fits beside running text. Queued work starts
+   * what it needs as usual, stopping a media idle choice like any idle media. Automatic control
+   * stops no text workload (callers outside Studio use them) and starts only the one chosen here.
+   * A workload first seen running counts as used then.
    */
-  async parkIdle() {
+  async settleIdle() {
     if (!this.automaticLifecycle || !this.parkIdleAfterMs || this.current || this.claimed) return;
     this.claim();
     try {
       const states = await this.states();
       const now = this.now();
+      const chosen = this.idleWorkload;
+      const unused = (id: string) => {
+        const last = this.lastUsed.get(id);
+        return !this.active.has(id) && (last === undefined || now - last >= this.parkIdleAfterMs);
+      };
       const running = this.workloads.filter((item) => states.get(item.id)!.replicas > 0);
       const idle = running.filter((item) => {
-        if (item.kind === "text" || this.active.has(item.id)) return false;
+        if (item.kind === "text" || item === chosen || this.active.has(item.id)) return false;
         if (!this.lastUsed.has(item.id)) this.lastUsed.set(item.id, now);
-        return now - this.lastUsed.get(item.id)! >= this.parkIdleAfterMs;
+        return unused(item.id);
       });
-      if (!idle.length) return;
       const target = running.filter((item) => !idle.includes(item)).map((item) => item.id);
+      // An idle pool's media is all parked above, so only running text can leave it too full.
+      const start =
+        chosen &&
+        !target.includes(chosen.id) &&
+        this.workloads.every((item) => item.pool !== chosen.pool || unused(item.id)) &&
+        this.usage([...target, chosen.id], chosen.pool) <= this.pools[chosen.pool];
+      if (start) target.push(chosen.id);
+      if (!idle.length && !start) return;
+      const changes = [
+        ...(idle.length ? [`parking ${idle.map((item) => item.label).join(", ")}`] : []),
+        ...(start ? [`starting ${chosen.label} (Run When Idle)`] : []),
+      ];
       this.begin(
         "apply",
         this.plan(target, states),
-        `automatic: parking ${idle.map((item) => item.label).join(", ")} after ${minutes(this.parkIdleAfterMs)} without work`,
+        `automatic: ${changes.join(" and ")} after ${minutes(this.parkIdleAfterMs)} without work`,
       );
     } finally {
       this.claimed = false;

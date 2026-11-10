@@ -46,11 +46,16 @@ export interface RuntimeOperation {
   error?: string;
 }
 
-/** Automatic control starts and parks media workloads; text is never started or stopped by it. */
+/**
+ * Automatic control starts media workloads for queued work and settles idle pools. It stops no text
+ * workload and starts only a text workload chosen as `idleWorkload`.
+ */
 export interface RuntimeSettings {
   automatic: boolean;
-  /** Minutes without work before automatic control parks a media workload; 0 never. */
+  /** Minutes without queued or running work before a pool is idle; 0 never. */
   parkIdleMinutes: number;
+  /** The workload to start once its pool is idle, parking its idle media; absent (or "" when set) is None. */
+  idleWorkload?: string;
 }
 
 /** The tail of one pod's container log (`GET /api/runtime/workloads/:id/logs`), oldest line first. */

@@ -55,10 +55,10 @@ export async function loadRuntime(
         }
       : {}),
   });
-  // Restores the last placement after an outside stop; parking needs automatic control.
+  // Restores the last placement after an outside stop; settling idle pools needs automatic control.
   setInterval(() => {
     void controller.reconcile().catch(() => {});
-    void controller.parkIdle().catch(() => {});
+    void controller.settleIdle().catch(() => {});
   }, 30_000).unref();
   return { controller };
 }
