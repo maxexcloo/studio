@@ -25,7 +25,7 @@ export const accountRoles = Object.freeze({ administrator: "administrator", user
 /**
  * What varies between groups beyond their models. Everything else (generation, references, the
  * gallery, prompt history and upscaling) comes with an account. Characters gates character cards
- * (characters.js) and the `character` generate takes. Prompt Assistant gates every text
+ * (cards.js, with outfits and scenes) and the `character` generate takes. Prompt Assistant gates every text
  * the assistant writes for a person (Improve, Ask for a Change, Suggestions, prompt ideas, Animate's
  * themes, negative and LoRA suggestions, suggested prompts); Chat gates only Studio Chat.
  */

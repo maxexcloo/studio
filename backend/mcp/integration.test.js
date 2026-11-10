@@ -340,7 +340,7 @@ async function fixture(
     res.json({ asset: assets.get(req.params.id) }),
   );
   app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
-  // The account's character cards (backend/characters.js), set by a test.
+  // The account's character cards (backend/cards.js), set by a test.
   const characters = [];
   app.get("/api/characters", (_req, res) => res.json({ characters }));
   app.post("/api/characters/:id/generated", (req, res) => {
