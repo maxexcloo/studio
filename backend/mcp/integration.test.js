@@ -940,7 +940,13 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(media.getInstructions(), /Studio runs them exactly as written/);
   assert.match(
     media.getInstructions(),
-    /"N sets of K" is N distinct prompts with count K in one call/,
+    /"N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting/,
+  );
+  // A chat keeps the user's own description and their no-LoRAs choice from turn to turn.
+  assert.match(media.getInstructions(), /own descriptive wording .* verbatim in later prompts/);
+  assert.match(
+    media.getInstructions(),
+    /once the user declines LoRAs, pass loras: \[\] for the rest of the chat/,
   );
   assert.match(
     media.getInstructions(),
@@ -4457,10 +4463,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
     "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "generate");
-  assert.match(
-    generate.description,
-    /"4 sets of 2" is 4 distinct prompts with count 2; at most 10 images per call\./,
-  );
+  assert.match(generate.description, /at most 10 images per call\./);
   assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
@@ -5635,7 +5638,6 @@ test("an ordinary request never upscales, even for best quality or a profile def
     generate.description,
     /upscale_quality only when the user asks to upscale or enlarge/,
   );
-  assert.match(client.getInstructions(), /upscale only when the user asks to upscale or enlarge/);
 });
 
 test("request and prompts together run the prompts and keep the request as context", async (t) => {
