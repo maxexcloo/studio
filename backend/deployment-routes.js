@@ -12,7 +12,6 @@ import {
   saveFlag,
   settingSource,
 } from "./deployment-settings.js";
-import { presetsEnabled } from "./features.js";
 import { hfTokenStatus } from "./hf-access.js";
 import { requireAdmin } from "./route-access.js";
 
@@ -56,7 +55,7 @@ export function registerDeploymentRoutes(
       },
       catalogue: catalogueFlags.map(describeFlag),
       integrations: {
-        civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
+        civitai: { token: civitaiTokenStatus() },
         huggingFace: { token: hfTokenStatus() },
         assistant: await assistantIntegration({
           engine: assistantEngine,

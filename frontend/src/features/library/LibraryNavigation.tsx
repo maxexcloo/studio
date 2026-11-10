@@ -78,14 +78,11 @@ export const librarySections = {
 /** Administrators see the whole Library; other accounts only their Characters, Outfits and Scenes. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
-  const { presets, characters } = useLibraryAccess();
+  const { characters } = useLibraryAccess();
   return {
     admin,
-    imports: admin && presets,
     options: visibleSections(librarySections, admin, (key) =>
-      ["characters", "outfits", "scenes"].includes(key)
-        ? characters
-        : admin && (presets || (key !== "imports" && key !== "presets")),
+      ["characters", "outfits", "scenes"].includes(key) ? characters : admin,
     ),
   };
 }

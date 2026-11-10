@@ -13,7 +13,6 @@ import {
 } from "./gallery/store.js";
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
-import { presetsEnabled } from "./features.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import {
@@ -78,10 +77,6 @@ export function registerPresetRoutes(
   const route =
     (handler, write = false) =>
     async (req, res) => {
-      if (!presetsEnabled()) {
-        res.status(404).json({ ok: false, error: "Imports are off for this deployment." });
-        return;
-      }
       if (write && !requireLocal(req, res)) return;
       res.setHeader("Cache-Control", "no-store");
       try {

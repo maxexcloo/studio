@@ -640,7 +640,7 @@ test("Settings › Integrations picks the assistant model from the gateway's and
         },
         catalogue: [],
         integrations: {
-          civitai: { token: { set: false }, presets: false },
+          civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
           assistant: {
             available: true,
@@ -707,7 +707,7 @@ test("Settings › Generation switches follow at once and settle back after a fa
           },
         ],
         integrations: {
-          civitai: { token: { set: false }, presets: false },
+          civitai: { token: { set: false } },
           huggingFace: { token: { set: false } },
           assistant: { available: false, models: [], model: setting("STUDIO_ASSISTANT_MODEL") },
         },

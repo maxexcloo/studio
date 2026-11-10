@@ -16,7 +16,7 @@ export interface Deployment {
   };
   catalogue: Flag[];
   integrations: {
-    civitai: { token: { set: boolean }; presets: boolean };
+    civitai: { token: { set: boolean } };
     huggingFace: { token: { set: boolean } };
     assistant: { available: boolean; note?: string; models: string[]; model: Setting };
   };
