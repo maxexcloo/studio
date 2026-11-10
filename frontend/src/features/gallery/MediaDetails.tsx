@@ -345,6 +345,11 @@ function DetailsPrompt({ item }: { item: MediaItem }) {
       >
         <DetailText>{item.prompt || "No prompt recorded."}</DetailText>
       </DetailSection>
+      {item.refusedPrompt && (
+        <DetailSection title="Refused Prompt" copy={item.refusedPrompt}>
+          <DetailText>{item.refusedPrompt}</DetailText>
+        </DetailSection>
+      )}
       {item.negative && (
         <DetailSection title="Negative Prompt" copy={item.negative}>
           <DetailText>{item.negative}</DetailText>
