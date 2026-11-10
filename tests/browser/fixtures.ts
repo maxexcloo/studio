@@ -912,7 +912,7 @@ export async function fixtures(page: Page) {
           },
         ],
       });
-    if (path === "/api/gallery/captions" || path === "/api/gallery/embeddings")
+    if (["/api/gallery/captions", "/api/gallery/embeddings", "/api/gallery/faces"].includes(path))
       return respond({
         state: "finished",
         active: false,

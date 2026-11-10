@@ -1,4 +1,4 @@
-import { Fragment, useId, useState, type ComponentProps, type ReactNode } from "react";
+import { Fragment, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
   Button,
@@ -231,15 +231,24 @@ function OptionsMenu({
   const [opened, setOpened] = useState(false);
   // Each opening starts with every option collapsed.
   const [opening, setOpening] = useState(0);
+  const dropdown = useRef<HTMLDivElement>(null);
   return (
     <Menu
       position={position}
       width={menuWidth}
-      onChange={setOpened}
+      onChange={(open) => {
+        setOpened(open);
+        // The closing menu lets go of focus at once rather than at the end of its transition: an
+        // option that turns its control busy disables it, so focus can't return there, and keys
+        // meanwhile would land in the fading menu instead of the page around it.
+        const focused = document.activeElement;
+        if (!open && focused instanceof HTMLElement && dropdown.current?.contains(focused))
+          focused.blur();
+      }}
       onOpen={() => setOpening((count) => count + 1)}
     >
       {target(opened)}
-      <Menu.Dropdown>
+      <Menu.Dropdown ref={dropdown}>
         {note(action)}
         <ActionMenuItems key={opening} groups={action.menu!} />
       </Menu.Dropdown>
