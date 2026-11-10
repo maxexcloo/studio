@@ -12,7 +12,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -53,6 +53,12 @@ const views = [
   { value: "attention", label: "Needs Files" },
 ];
 
+/** Library › Imports' records, newest first. */
+export const importsQuery = queryOptions({
+  queryKey: ["imports"],
+  queryFn: () => api<{ imports: ImportRecord[]; vision?: ImportVision }>("/api/library/imports"),
+});
+
 /** Library › Imports: a link or an image becomes a graded import that can be reviewed. */
 export function LibraryImports({
   heading,
@@ -72,8 +78,7 @@ export function LibraryImports({
   const [deleting, setDeleting] = useState<ImportRecord | null>(null);
   const [cleared, flashCleared] = useFlash<number>();
   const imports = useQuery({
-    queryKey: ["imports"],
-    queryFn: () => api<{ imports: ImportRecord[]; vision?: ImportVision }>("/api/library/imports"),
+    ...importsQuery,
     enabled: active,
     refetchInterval: active ? 4000 : false,
   });
