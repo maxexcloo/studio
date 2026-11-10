@@ -46,6 +46,8 @@ import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
 import {
+  cardImageNote,
+  cardImageSlots,
   characterImages,
   composePrompt,
   characterProfiles,
@@ -903,31 +905,42 @@ export function registerGenerateTools({
     // where one is named, so the assistant never rewords the character, outfit or place.
     const shots = args.shots;
     delete args.shots;
+    // Outfit and scene card images as references: off until a live proof run shows they help.
+    const cardImages = process.env.STUDIO_CARD_IMAGES === "1";
     if (shots && (args.prompts || views)) throw new Error("Pass shots or prompts, not both.");
     const lists = {};
-    const cardText = async (kind, value) => {
+    const cardNamed = async (kind, value) => {
       const wanted = value?.trim();
-      if (!wanted) return value;
+      if (!wanted) return undefined;
       lists[kind] ??=
         (
           await media.request("GET", `/api/${kind}`, undefined, owner, { signal }).catch(() => ({}))
         )[kind] ?? [];
-      const found = lists[kind].find(
+      return lists[kind].find(
         (item) => item.id === wanted || item.name.toLowerCase() === wanted.toLowerCase(),
       );
-      return found ? found.description : wanted;
     };
     const parts = shots
       ? await Promise.all(
-          shots.map(async (shot) => ({
-            ...shot,
-            outfit: await cardText("outfits", shot.outfit),
-            scene: await cardText("scenes", shot.scene),
-          })),
+          shots.map(async (shot) => {
+            const [outfit, scene] = await Promise.all([
+              cardNamed("outfits", shot.outfit),
+              cardNamed("scenes", shot.scene),
+            ]);
+            return {
+              ...shot,
+              outfit: outfit ? outfit.description : shot.outfit,
+              scene: scene ? scene.description : shot.scene,
+              // Each card's image, which joins the character's only behind STUDIO_CARD_IMAGES.
+              images: { outfit: outfit?.references?.[0]?.id, scene: scene?.references?.[0]?.id },
+            };
+          }),
         )
       : null;
     const shotPrompts = (fromImage) =>
-      parts.map((shot) => composePrompt({ character: card?.description, ...shot, fromImage }));
+      parts.map(({ images: _images, ...shot }) =>
+        composePrompt({ character: card?.description, ...shot, fromImage }),
+      );
     if (parts) args.prompts = shotPrompts(true);
     if (!args.prompts)
       throw new Error(
@@ -1124,13 +1137,49 @@ export function registerGenerateTools({
                 named.length && startImageSlot(profile)
                   ? `${profile.label || profile.id} starts from the reference image (img2img): its pose and layout carry over and a face drifts in new scenes. Tell the user; ${keeper ? `${keeper.label || keeper.id}` : "a model that edits with references"} keeps the same person in new outfits and scenes. `
                   : "";
+              // A shot's outfit and scene card images follow the character's where the profile has
+              // slots that take them (cardImageSlots); a card without one stays words, and says so.
+              let cards = "";
+              if (cardImages && parts && room) {
+                const slots = profile.mediaInputs || [];
+                const taken = plan.reference_asset_ids.map(
+                  (_id, index) => plan.reference_slots?.[index] || slots[index]?.id,
+                );
+                const words = new Set();
+                const extra = parts.map(({ images }) => {
+                  const placed = cardImageSlots(profile, taken, {
+                    outfit: Boolean(images.outfit),
+                    scene: Boolean(images.scene),
+                  });
+                  return [
+                    ["outfit", "Outfit"],
+                    ["scene", "Scene"],
+                  ].flatMap(([key, label]) => {
+                    if (!images[key]) return [];
+                    if (!placed[key]) {
+                      words.add(label);
+                      return [];
+                    }
+                    return [{ assetId: images[key], slot: placed[key] }];
+                  });
+                });
+                if (extra.some((items) => items.length)) {
+                  media.adopt(owner, refs, {
+                    assets: extra.flat().map((item) => item.assetId),
+                  });
+                  plan.prompt_references = extra;
+                }
+                cards = [...words]
+                  .map((label) => `${cardImageNote(label, slots.length)} `)
+                  .join("");
+              }
               const alone =
                 views && card.referenceIds.length && !room
                   ? `The views come from ${card.name}'s description alone: this model doesn't edit with references. `
                   : "";
               return {
                 profile,
-                note: `${note || ""}${start}${img2img}${alone}`,
+                note: `${note || ""}${start}${img2img}${alone}${cards}`,
                 plan,
                 source: "exact",
               };

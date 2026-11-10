@@ -40,6 +40,11 @@ export const catalogueFlags = [
     "Each image made with a character is compared by face with the character's image on Studio's CPU, and marked when it shows someone else or the character twice. Downloads the face models (about 260 MB) into the data folder.",
   ),
   flag(
+    "STUDIO_FACE_REDO",
+    "Face Redo",
+    "When Face Check marks a result from the last day as drifted, Studio runs it once more with a new seed in its owner's queue, as a version of it. A redo that drifts too is not redone.",
+  ),
+  flag(
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
     "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",

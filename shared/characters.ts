@@ -3,7 +3,8 @@ import { guidingRoles, isCloudProfile } from "./profiles.ts";
 /**
  * Cards an account keeps to shoot a series (backend/cards.js stores them per account, one document
  * per kind): a character (1–4 reference images and its lasting looks), an outfit and a scene (a
- * description, with at most one image to recognise it by; only a character's image goes to a model).
+ * description, with at most one image to recognise it by, which goes to a model only behind
+ * `STUDIO_CARD_IMAGES`: cardImageSlots).
  */
 export const maxCharacterImages = 4;
 export const maxCardName = 60;
@@ -163,6 +164,38 @@ export function scenePart(scene = "", withImage = false) {
     ? `${place.slice(0, -1)}, in place of the reference image's background.`
     : place;
 }
+/**
+ * The slots an outfit card's and a scene card's images go to beside a character's (MCP generate's
+ * shots, behind `STUDIO_CARD_IMAGES` until proven on live), given the slots already `taken`: an
+ * outfit a Style slot, a scene a Pose/Layout slot, else each the next plain slot on a profile that
+ * edits with its references, outfit first. Never an Identity, start or end slot, nor a plain slot on
+ * an img2img profile, where the image would be what the result is drawn from. A card left without
+ * a slot stays words only (cardImageNote).
+ */
+export function cardImageSlots(
+  profile: Parameters<typeof editsReferences>[0] & {
+    mediaInputs?: { id: string; role?: string }[];
+  },
+  taken: string[],
+  wanted: { outfit?: boolean; scene?: boolean },
+) {
+  const free = (profile.mediaInputs || []).filter((slot) => !taken.includes(slot.id));
+  const plain = editsReferences(profile)
+    ? free.filter((slot) => !slot.role || slot.role === "reference")
+    : [];
+  const roleSlot = (role: string) => free.find((slot) => slot.role === role)?.id;
+  const outfit = wanted.outfit ? roleSlot("style") || plain.shift()?.id : undefined;
+  const scene = wanted.scene ? roleSlot("layout") || plain.shift()?.id : undefined;
+  return {
+    ...(outfit ? { outfit } : {}),
+    ...(scene ? { scene } : {}),
+  };
+}
+
+/** What a reply says of a card whose image found no slot (cardImageSlots). */
+export const cardImageNote = (kind: "Outfit" | "Scene", references: number) =>
+  `${kind} described in words; this model takes ${references} reference${references === 1 ? "" : "s"}.`;
+
 /**
  * A shot composed from its parts, in the order and wording that held a character across ten outfits
  * and scenes on live (10 Nov): the character's lead (characterLead, with its image unless

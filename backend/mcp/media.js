@@ -534,6 +534,9 @@ export class McpMedia {
       reference_strengths = [],
       // Set by generate only, never by a caller: the slot each reference fills, by place.
       reference_slots = [],
+      // Set by generate only: each prompt's own references after those, `{ assetId, slot }` (a shot's
+      // outfit and scene card images, shared/characters.ts cardImageSlots).
+      prompt_references = [],
       count = mcpGenerationCount,
       seed,
       // Every job takes `seed` itself rather than counting up from it (Generate References' views).
@@ -591,7 +594,11 @@ export class McpMedia {
       slots.some((slot) => slot.required && !placed.some((item) => item.slot === slot.id))
     )
       throw new Error("Supply the references required by this profile.");
-    for (const id of reference_asset_ids) this.own(owner, id, "assets");
+    for (const id of [
+      ...reference_asset_ids,
+      ...prompt_references.flat().map((item) => item.assetId),
+    ])
+      this.own(owner, id, "assets");
     if (reference_role !== undefined) {
       if (!reference_asset_ids.length || profile.aspectPolicy !== "reference")
         throw new Error(
@@ -699,6 +706,9 @@ export class McpMedia {
                 queueSet,
                 ...(resultSet ? { resultSet } : {}),
                 prompt: ran ?? "",
+                ...(prompt_references[position]?.length
+                  ? { referenceAssets: [...placed, ...prompt_references[position]] }
+                  : {}),
                 ...(writing ? { writing } : {}),
                 count: size,
                 seed: seed === undefined ? "" : String(same_seed ? seed : seed + images),
