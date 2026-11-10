@@ -38,8 +38,11 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
-/** A group feature that is on unless the account's group turns it off (Chat, Dream, Prompt Assistant). */
-export function useGroupFeature(feature: "chat" | "dream" | "promptAssistant") {
+/**
+ * A group feature that is on unless the account's group turns it off (Characters, Chat, Dream,
+ * Prompt Assistant).
+ */
+export function useGroupFeature(feature: "characters" | "chat" | "dream" | "promptAssistant") {
   return useAccount().data?.account?.features?.[feature] !== false;
 }
 export const ownAccountQuery = queryOptions({

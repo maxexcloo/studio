@@ -131,6 +131,11 @@ export interface MediaItem {
   outputName?: string;
   /** The Chat whose generation made this item. */
   sessionId?: string;
+  /**
+   * The MCP result set it belongs to: one generate call's id, title and asking client (`source`),
+   * and this result's prompt position and own title (`variation`), when the chat gave one.
+   */
+  resultSet?: { id: string; title: string; index: number; variation?: string; source?: string };
   /** The result this one was made from, kept from its run (backend/version-sources.js `resultSource`). */
   parentItemId?: string;
   parentJobId?: string;

@@ -22,6 +22,7 @@ import {
   promptTitle,
   storedAssistantRecord,
   storedChatRecord,
+  storedResultSet,
   storedWritingRecord,
 } from "./records.js";
 
@@ -840,6 +841,9 @@ export function recordsFromComfyHistory(history) {
           ? { assistant: storedAssistantRecord(saved.assistant) }
           : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
+        ...(storedResultSet(saved.resultSet)
+          ? { resultSet: storedResultSet(saved.resultSet) }
+          : {}),
         ...(storedWritingRecord(saved.writing)
           ? { writing: storedWritingRecord(saved.writing) }
           : {}),
@@ -1011,6 +1015,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         // A title the writing stage gave with the prompt; domain/titles.ts writes the rest.
         ...(replyTitle(body.writing?.title) ? { title: replyTitle(body.writing.title) } : {}),
         ...(body.chat ? { chat: body.chat } : {}),
+        ...(storedResultSet(body.resultSet) ? { resultSet: storedResultSet(body.resultSet) } : {}),
         ...(body.dream ? { dream: body.dream } : {}),
         outputName: item.filename,
         promptId: job.promptId || "",

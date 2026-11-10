@@ -38,6 +38,7 @@ import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
+import { inRunOrder, runKey } from "./resultSets";
 import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
@@ -71,7 +72,8 @@ export function GalleryPage() {
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
-  // The run whose results the viewer flips through; unset, it flips through the whole gallery.
+  // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
+  // flips through the whole gallery.
   const [run, setRun] = useState<string>();
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
@@ -448,7 +450,7 @@ export function GalleryPage() {
           item={currentMedia(loaded, selected)}
           items={
             run
-              ? loaded.filter((candidate) => candidate.jobId === run)
+              ? inRunOrder(loaded.filter((candidate) => runKey(candidate) === run))
               : versions
                 ? [...versions.values()].map(
                     (group) => group.find((version) => version.id === selected.id) || group[0],

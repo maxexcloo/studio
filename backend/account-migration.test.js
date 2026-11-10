@@ -69,6 +69,7 @@ test("waiting accounts join the default group and groups keep only the features 
   assert.equal(next.requireApproval, undefined);
   assert.equal(next.defaultAccessProfileId, "user");
   assert.deepEqual(next.profiles.user.features, {
+    characters: true,
     chat: true,
     cloudModels: false,
     dream: true,
@@ -78,6 +79,7 @@ test("waiting accounts join the default group and groups keep only the features 
   });
   // Prompt Assistant is read again, so a group that turned it off keeps it off.
   assert.deepEqual(next.profiles.artists.features, {
+    characters: true,
     chat: true,
     cloudModels: false,
     dream: true,
