@@ -17,8 +17,26 @@
 }
 
 /* A field in the heading, such as a name being saved, gives way before its buttons. */
+.heading button,
 .sheetHeading button {
   flex-shrink: 0;
+}
+
+/* A heading's actions sit at its end; a name being saved takes the rest of the row, the title and
+   any detail stepping aside. */
+.actions {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.heading:has([data-naming]),
+.sheetHeading:has([data-naming]) {
+  flex-wrap: nowrap;
+}
+
+.heading:has([data-naming]) > :first-child,
+.sheetHeading:has([data-naming]) > :first-child {
+  display: none;
 }
 
 .sheetBody {
@@ -67,8 +85,7 @@
   margin-top: var(--mantine-spacing-sm);
 }
 
-/* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs,
-   and tab groups under one another. */
+/* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
 .header {
   display: flex;
   flex-direction: column;
@@ -80,6 +97,31 @@
   flex-wrap: wrap;
   gap: var(--mantine-spacing-xs);
   align-items: center;
+}
+
+/* One bar of tabs, scrolling sideways where it is wider than the screen, with a line before each
+   later group. */
+.tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  flex-shrink: 0;
+}
+
+.tab:has([data-group-start]) {
+  margin-inline-start: 9px;
+}
+
+.tab:has([data-group-start])::before {
+  content: "";
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-start: -5px;
+  width: 1px;
+  background: var(--mantine-color-default-border);
 }
 
 /* Search, Filter and the actions never wrap apart. */
@@ -279,6 +321,12 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* A popup's list at a set height, scrolling inside it, such as the Presets popup's. */
+.list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Saved stacks and presets: one row each, its menu at the end. */

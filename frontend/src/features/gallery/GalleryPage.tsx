@@ -377,20 +377,20 @@ export function GalleryPage() {
         actions={
           <>
             <GalleryUpload upload={upload} />
-            {!selection.selecting && (
-              <Tooltip label="Select Items" disabled={!phone}>
-                <Button
-                  {...(phone ? iconChipProps : chipProps)}
-                  ref={selectionButton}
-                  aria-label="Select Items"
-                  leftSection={phone ? undefined : <SquareCheck size={15} />}
-                  disabled={!items.length}
-                  onClick={selection.start}
-                >
-                  {phone ? <SquareCheck size={16} /> : "Select"}
-                </Button>
-              </Tooltip>
-            )}
+            {/* Select stays in place, pressed while selecting; pressing it again ends selection. */}
+            <Tooltip label="Select Items" disabled={!phone}>
+              <Button
+                {...(phone ? iconChipProps : chipProps)}
+                ref={selectionButton}
+                aria-label="Select Items"
+                aria-pressed={selection.selecting}
+                leftSection={phone ? undefined : <SquareCheck size={15} />}
+                disabled={!items.length && !selection.selecting}
+                onClick={selection.selecting ? doneSelecting : selection.start}
+              >
+                {phone ? <SquareCheck size={16} /> : "Select"}
+              </Button>
+            </Tooltip>
           </>
         }
       />
