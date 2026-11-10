@@ -14,6 +14,7 @@ import {
   useSavePreferences,
   useTileCaptions,
   type SidePreference,
+  type VideosPreference,
 } from "./accountPreferences";
 
 /**
@@ -153,32 +154,38 @@ function ModelChoices() {
   );
 }
 
-const sides = [
+const sides: { value: SidePreference; label: string }[] = [
   { value: "cloud", label: "Cloud" },
   { value: "local", label: "Local" },
 ];
+/** Videos' choices, as Animate's menu offers them: Cloud, or the local Fast or Quality tier. */
+const videoChoices: { value: VideosPreference; label: string }[] = [
+  { value: "cloud", label: "Cloud" },
+  { value: "fast", label: "Fast" },
+  { value: "quality", label: "Quality" },
+];
 /**
- * Where Chat, Prompt Writing, Images and Videos run by default, Cloud or Local (unsaved, Local).
- * Videos keeps its local Fast or Quality tier, which Animate's menu chooses.
+ * Where Chat, Prompt Writing, Images and Videos run by default: Cloud or Local, and for Videos
+ * Cloud or the local Fast or Quality tier (unsaved, Local and Fast).
  */
 function WhereWorkRuns() {
   const status = useQuery(preferencesQuery).data;
   const save = useSavePreferences();
   if (!status) return null;
   const { preferences } = status;
-  const videos = preferences.videos === "cloud" ? "cloud" : "local";
-  const row = (
+  const row = <T extends string>(
     label: string,
     description: string,
-    value: SidePreference,
-    change: (side: SidePreference) => void,
+    data: { value: T; label: string }[],
+    value: T,
+    change: (choice: T) => void,
   ) => (
     <SettingRow label={label} description={description}>
       <SegmentedControl
         aria-label={label}
-        data={sides}
+        data={data}
         value={value}
-        onChange={(side) => change(side as SidePreference)}
+        onChange={(choice) => change(choice as T)}
       />
     </SettingRow>
   );
@@ -187,30 +194,30 @@ function WhereWorkRuns() {
       {row(
         "Chat",
         "The text model Chat starts with. A model you pick in Chat wins.",
+        sides,
         preferences.chat || "local",
         (chat) => save.mutate({ chat }),
       )}
       {row(
         "Images",
         "The model new images start on. A model you pick wins.",
+        sides,
         preferences.images || "local",
         (images) => save.mutate({ images }),
       )}
       {row(
         "Prompt Writing",
-        "Where Improve Prompt, negative prompts and Animate’s prompts are written.",
+        "Where Improve Prompt, Ask for a Change, negative prompts and Animate’s prompts are written.",
+        sides,
         preferences.writing || "local",
         (writing) => save.mutate({ writing }),
       )}
       {row(
         "Videos",
-        "Where new videos and Animate run. Local keeps Animate’s Fast or Quality choice.",
-        videos,
-        (side) =>
-          save.mutate({
-            videos:
-              side === "cloud" ? "cloud" : preferences.videos === "quality" ? "quality" : "fast",
-          }),
+        "Where new videos and Animate run, as Animate’s menu sets it too.",
+        videoChoices,
+        preferences.videos || "fast",
+        (videos) => save.mutate({ videos }),
       )}
     </SettingGroup>
   );

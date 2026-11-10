@@ -18,13 +18,17 @@ function fixture(
     image?: boolean;
     explicit?: (owner: string) => boolean;
     switches?: { ideas?: boolean; nextSteps?: boolean };
+    writing?: "cloud" | "local";
   } = {},
 ) {
   const calls: Message[][] = [];
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({}),
-    model: async () => "text",
+    // Writing preferred locally falls back to the cloud, as with no local text model running.
+    model: async (_call, _explicit, prefer) => (prefer ? "cloud/auto" : "text"),
+    writerNote: async (prefer) =>
+      prefer === "local" ? "No local text model is running, so the cloud wrote this." : "",
     chat: async ({ messages }) => {
       const seen = messages.map(({ role, content }) =>
         typeof content === "string"
@@ -81,6 +85,7 @@ function fixture(
             edits: "instruction",
           }
         : null,
+    writingSide: () => options.writing,
     now: () => clock,
   });
   return {
@@ -345,6 +350,23 @@ test("a requested change picks one of the offered actions and rewrites the promp
   // Upscale keeps the prompt as it was.
   answer = { action: "upscale", label: "Sharper", prompt: "ignored" };
   assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
+});
+
+test("a requested change follows Prompt Writing, saying when the other side wrote it", async () => {
+  const reply = () =>
+    JSON.stringify({ action: "edit", label: "Night", prompt: "A harbour at night" });
+  const ask = (writing: "cloud" | "local") =>
+    fixture({ reply, writing }).suggestions.suggest("alice", {
+      surface: "change",
+      jobId: "job-a",
+      request: "make it night",
+      actions: ["edit"],
+    });
+  assert.equal((await ask("cloud")).note, undefined);
+  assert.equal(
+    (await ask("local")).note,
+    "No local text model is running, so the cloud wrote this.",
+  );
 });
 
 test("a change to the composer's draft rewrites its prompt and can't upscale", async () => {
