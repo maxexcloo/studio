@@ -157,3 +157,21 @@
   right: var(--mantine-spacing-xs);
   z-index: 2;
 }
+
+/* Face Check's mark on a result that shows someone else or the character twice. */
+.drift {
+  position: absolute;
+  top: calc(var(--mantine-spacing-xs) + 6px);
+  left: calc(var(--mantine-spacing-xs) + 6px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding-inline: 8px;
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-color-orange-filled);
+  color: white;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 500;
+  pointer-events: none;
+}
