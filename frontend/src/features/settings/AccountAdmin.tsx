@@ -32,6 +32,7 @@ import {
 import { api, post } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { formatBytes } from "../../ui/bytes";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
@@ -417,11 +418,31 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
 
 type UserAction = "delete" | "disable" | "gallery" | "password" | "role";
 
-/** Each account's visible gallery size, by account ID (administrators only). */
+/** An account's visible gallery items and stored bytes, and what it made in the last 30 days. */
+interface GalleryOwner {
+  items: number;
+  images: number;
+  videos: number;
+  cloudJobs: number;
+  gpuMs: number;
+  bytes: number;
+}
+/** Each account's gallery and usage, by account ID (administrators only). */
 export const galleryOwnersQuery = queryOptions({
   queryKey: ["gallery-owners"],
-  queryFn: () => api<{ owners: Record<string, number> }>("/api/gallery/owners"),
+  queryFn: () => api<{ owners: Record<string, GalleryOwner> }>("/api/gallery/owners"),
 });
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+/** The last 30 days in brief: only what the account made, with its GPU minutes. */
+const usageLine = (usage?: GalleryOwner) =>
+  [
+    usage?.images && plural(usage.images, "Image"),
+    usage?.videos && plural(usage.videos, "Video"),
+    usage?.cloudJobs && plural(usage.cloudJobs, "Cloud Job"),
+    usage?.gpuMs && `${Math.max(1, Math.round(usage.gpuMs / 60_000))} GPU min`,
+  ]
+    .filter(Boolean)
+    .join(" · ") || "None";
 
 /** 16 random URL-safe characters. */
 const generatedPassword = () =>
@@ -563,7 +584,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
     onSettled: refresh,
   });
   const galleries = useQuery(galleryOwnersQuery);
-  const galleryOf = (account: Account) => galleries.data?.owners[account.id] || 0;
+  const ownerOf = (account: Account) => galleries.data?.owners[account.id];
+  const galleryOf = (account: Account) => ownerOf(account)?.items || 0;
   const removeGallery = useMutation({
     mutationFn: (id: string) =>
       api(`/api/gallery/owners/${encodeURIComponent(id)}`, { method: "DELETE" }),
@@ -670,6 +692,27 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   All Groups
                 </Text>
               ),
+          },
+          {
+            key: "usage",
+            header: "Last 30 Days",
+            sortValue: (account) =>
+              (ownerOf(account)?.images || 0) + (ownerOf(account)?.videos || 0),
+            cell: (account) => (
+              <Text size="xs" c="dimmed">
+                {usageLine(ownerOf(account))}
+              </Text>
+            ),
+          },
+          {
+            key: "storage",
+            header: "Storage",
+            sortValue: (account) => ownerOf(account)?.bytes,
+            cell: (account) => (
+              <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                {formatBytes(ownerOf(account)?.bytes) || "None"}
+              </Text>
+            ),
           },
         ]}
         rowActions={(account) => {
