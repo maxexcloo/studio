@@ -4732,12 +4732,14 @@ test("aspect picks the profile’s own preset and resolution its long edge", asy
   assert.equal(f.submitted.at(-1).tiledDecode, true);
   assert.equal(f.submitted.at(-1).autoUpscale, null);
   assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
+  // An exact size sent beside an aspect wins, rather than costing the chat a retry.
+  assert.deepEqual(await size({ aspect: "portrait", width: 768, height: 1024 }), [768, 1024]);
   // Not drawn at 4K: drawn at 2K, then upscaled.
   assert.deepEqual(await size({ resolution: "4K" }), [1536, 2048]);
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", target: 4096 });
   for (const [args, message] of [
     [{ aspect: "sideways" }, /Choose aspect from landscape, portrait, square/],
-    [{ aspect: "landscape", width: 1344, height: 768 }, /not both/],
+    [{ aspect: "landscape", width: 1344 }, /Pass aspect, or both width and height/],
   ]) {
     const refused = await call(client, "generate", { kind: "image", prompts: ["An egg"], ...args });
     assert.equal(refused.isError, true);

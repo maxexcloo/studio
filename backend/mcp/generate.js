@@ -1068,9 +1068,11 @@ export function registerGenerateTools({
         ? previewed.plans
         : await Promise.all(
             targets.map(async ({ profile, note }) => {
-              const sized = mcpSize(profile, { aspect });
+              // An exact width and height win over an aspect sent beside them.
+              const exact = args.width !== undefined && args.height !== undefined;
+              const sized = exact ? null : mcpSize(profile, { aspect });
               if (sized && (args.width !== undefined || args.height !== undefined))
-                throw new Error("Pass aspect or width and height, not both.");
+                throw new Error("Pass aspect, or both width and height.");
               // A character sends its first image (characterImages), only to a model that edits
               // with it: as an img2img start image its pose and layout (a whole sheet) carry over.
               const room = editsReferences(profile)
