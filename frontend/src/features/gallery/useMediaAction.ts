@@ -232,6 +232,7 @@ export const animateThemes = {
   cinematic: "Cinematic Camera",
   living: "Living Photo",
   action: "Action",
+  dialogue: "Dialogue",
   spicy: "Spicy",
   custom: "Custom",
 } as const;
