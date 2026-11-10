@@ -25,14 +25,8 @@ import {
   emptyGalleryFilters,
   useActiveFilters,
 } from "../gallery/GalleryFilters";
-import {
-  referenceCapacity,
-  referenceDetails,
-  referenceGroup,
-  referenceGroups,
-  referencePatch,
-} from "./payload";
-import { inputForProfile, useGeneration } from "./GenerationProvider";
+import { referenceCapacity, referenceDetails, referenceGroup, referenceGroups } from "./payload";
+import { draftForProfile, useGeneration } from "./GenerationProvider";
 import {
   galleryReferenceType,
   nextReferenceTarget,
@@ -74,7 +68,16 @@ export function ReferencePicker({
   onOpenedChange,
   browser: controlledBrowser,
   prompt: ownPrompt,
+  onCharacterProfile,
 }: {
+  /**
+   * Where the sheet may move the model for a picked character, which then takes the character's
+   * references and prompt: the composer's form (GenerationEditor) passes its draft's.
+   */
+  onCharacterProfile?: (
+    profile: Profile,
+    next: { references: ReferenceAsset[]; prompt: string },
+  ) => void;
   browser?: ReferenceBrowser;
   /** The text a character's description joins: the editor's prompt or Chat's message. */
   prompt?: { value: string; onChange: (value: string) => void };
@@ -346,19 +349,12 @@ export function ReferencePicker({
             references={references}
             prompt={prompt.value}
             profile={profile}
-            switchable={!value && !selectedProfile && !ownPrompt}
+            switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile && !ownPrompt)}
             onChange={(next) => {
               const editor = next.profile;
               // The composer's draft moves to the character's model, its images and prompt with it.
-              if (editor)
-                setDraft((previous) => {
-                  const input = { ...inputForProfile(previous.input, editor), prompt: next.prompt };
-                  return {
-                    ...previous,
-                    references: next.references,
-                    input: { ...input, ...referencePatch(input, [], next.references, editor) },
-                  };
-                });
+              if (editor && onCharacterProfile) onCharacterProfile(editor, next);
+              else if (editor) setDraft((previous) => draftForProfile(previous, editor, next));
               else {
                 list.set(next.references);
                 if (next.prompt !== prompt.value) prompt.onChange(next.prompt);

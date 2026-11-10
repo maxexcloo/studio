@@ -121,6 +121,7 @@ export function GenerationEditor({
   profile,
   onChange,
   onReferencesChange,
+  onCharacterProfile,
   onKindChange,
   onClear,
   onSubmit: submitDraft,
@@ -142,6 +143,11 @@ export function GenerationEditor({
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   onReferencesChange: (references: ReferenceAsset[]) => void;
+  /** The composer's: a picked character moves the draft to a model that keeps faces. */
+  onCharacterProfile?: (
+    profile: Profile,
+    next: { references: ReferenceAsset[]; prompt: string },
+  ) => void;
   /** Receives the profile the gallery would choose for that output, if any. */
   onKindChange: (kind: MediaKind, profile?: Profile) => void;
   onClear: () => void;
@@ -231,6 +237,7 @@ export function GenerationEditor({
       value={references}
       onChange={onReferencesChange}
       prompt={{ value: String(input.prompt || ""), onChange: (prompt) => onChange({ prompt }) }}
+      onCharacterProfile={onCharacterProfile}
     />
   );
   const settings = { opened: settingsOpen, onOpenedChange: setSettingsOpen };

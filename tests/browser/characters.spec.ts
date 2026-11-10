@@ -73,7 +73,8 @@ test("Picking a character on an img2img model moves the composer to a model that
   const keeper = {
     ...profiles[0],
     id: "image:keeper",
-    recipe: { modelLabel: "Keeper", label: "Fast" },
+    label: "Keeper Fast",
+    displayName: "Keeper Fast",
     editReferences: true,
     keepsCharacters: true,
   };
@@ -81,7 +82,11 @@ test("Picking a character on an img2img model moves the composer to a model that
   await create(page);
   const references = await openCharacters(page);
   await references.getByRole("button", { name: "Use character: Mara", exact: true }).click();
-  await expect(references.getByText(/^Switched to .*Keeper/)).toBeVisible();
+  await expect(
+    references.getByText(
+      "Switched to Keeper Fast, which keeps a character's face and build in new scenes.",
+    ),
+  ).toBeVisible();
   await closeReferences(page);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     withCharacter("", mara.description),
