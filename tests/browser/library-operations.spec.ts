@@ -16,7 +16,16 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
 }) => {
   await fixtures(page);
   await page.goto("/library");
-  const order = ["Guides", "LoRAs", "Models", "Profiles", "Downloads", "Imports", "Inspiration"];
+  const order = [
+    "Characters",
+    "Guides",
+    "LoRAs",
+    "Models",
+    "Profiles",
+    "Downloads",
+    "Imports",
+    "Inspiration",
+  ];
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Models");
@@ -31,7 +40,7 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
     await expect(nav.getByRole("link")).toHaveText(order);
     await expect(
       nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(4));
+    ).toHaveText(order.slice(5));
   }
 });
 

@@ -185,6 +185,32 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 }
 
 /**
+ * Edit › Make Character: opens Library › Characters with a new card started from the image, where
+ * the prompt assistant can describe it.
+ */
+function useCharacterAction(item: MediaItem, onApplied: () => void): Action | null {
+  const characters = useGroupFeature("characters");
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (!characters || item.type !== "image") return null;
+  return {
+    id: "make-character",
+    label: "Make Character",
+    description: "Start a character card from this image",
+    icon: icons.character,
+    onClick: () => {
+      onApplied();
+      navigate("/library#characters", {
+        state: {
+          backgroundLocation: location.state?.backgroundLocation || location,
+          characterFrom: item.id,
+        },
+      });
+    },
+  };
+}
+
+/**
  * Continue in Chat: a new Chat about the result, with it attached as the reference and its settings
  * as the generation input, so the conversation can rework its prompt or edit the image. A `message`
  * (the change asked for in the viewer) starts the Chat's unsent message.
@@ -261,6 +287,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const character = useCharacterAction(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
@@ -456,6 +483,7 @@ export function useMediaActions(
                     onClick: () => action.mutate("image"),
                   },
               ...(image && reference ? [reference] : []),
+              ...(image && character ? [character] : []),
             ],
             item.uploaded
               ? []
