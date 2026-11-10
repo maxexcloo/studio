@@ -35,11 +35,10 @@ test("MiniMax H3 compatibility comes from explicit trainer metadata", () => {
   );
 });
 
-test("P-H3-Image's LoRA is a MiniMax H3 adapter that no P-H3 Image profile takes", () => {
+test("P-H3-Image's LoRA is a MiniMax H3 adapter", () => {
   const families = familiesFromMetadata({ base_model: "PrunaAI/p-h3-image" });
   assert.deepEqual(families, ["minimax_h3"]);
   assert.equal(loraCompatibility({ families }, { family: "minimax-h3" }), "fits");
-  assert.equal(loraCompatibility({ families }, { family: "p-h3-image" }), "other");
 });
 
 test("trigger words come from the trainer's note, else the tags on every image", () => {

@@ -32,7 +32,7 @@ export async function draftCheckpointProfile(record, options, { engine, info }) 
         })
         .filter(Boolean),
     info,
-    // A base model's families as the file's name narrows them (P-H3-Image from MiniMax H3).
+    // A base model's families as the file's name narrows them (MiniMax H3 Image from MiniMax H3).
     families: (baseModel, file) =>
       familiesFromMetadata({ base_model: String(baseModel || "") }).map((id) =>
         refinedFamily(id, file),
