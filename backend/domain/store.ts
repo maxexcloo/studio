@@ -12,13 +12,15 @@ import type { DreamOrigin } from "./dream.ts";
 /** Queue tiers on one resource, lower first; finishing upscales and then Dream run below MCP. */
 export const queuePriority = { manual: 0, mcp: 1, finishing: 2, dream: 3 } as const;
 /**
- * Where a job was admitted from: its tier, for an MCP call the set it was enqueued with, and for a
- * Dream job its prompt and note, which its gallery items carry until the person keeps them.
+ * Where a job was admitted from: its tier, for an MCP call the set it was enqueued with, for a
+ * Dream job its prompt and note, which its gallery items carry until the person keeps them, and
+ * `faceRedo` for Face Check's automatic redo of its `parentItemId` (domain/face-redo.ts).
  */
 export interface QueueOrigin {
   priority?: number;
   queueSet?: string;
   dream?: DreamOrigin;
+  faceRedo?: true;
 }
 /**
  * `cleared` takes a failed job out of the queue panel; its record stays. `dream` is
@@ -196,6 +198,7 @@ export class Store {
             priority: origin.priority ?? queuePriority.manual,
             queueSet: origin.queueSet,
             ...(origin.dream ? { dream: origin.dream } : {}),
+            ...(origin.faceRedo ? { faceRedo: origin.faceRedo } : {}),
             // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
             status: awaitsWriting(input) ? "writing" : "queued",
             reason: "",
@@ -508,6 +511,7 @@ export function publicJob({
   priority,
   queueSet: _queueSet,
   dream: _dream,
+  faceRedo: _faceRedo,
   ...job
 }: OwnedJob): QueueJob {
   return priority === queuePriority.dream ? { ...job, dream: true } : job;

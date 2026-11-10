@@ -135,6 +135,8 @@ export interface MediaItem {
     drifted: boolean;
     checkedAt: string;
   };
+  /** Face Check's automatic redo of its source result, whose face drifted (backend/domain/face-redo.ts). */
+  faceRedo?: boolean;
   /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
   suggestedPrompt?: string;
   createdAt?: string;

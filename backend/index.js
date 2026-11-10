@@ -48,6 +48,7 @@ import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { createSiglip, siglipVersion } from "./providers/siglip.ts";
 import { createFaces } from "./providers/faces.ts";
 import { createFaceCheck } from "./domain/face-check.ts";
+import { createFaceRedo } from "./domain/face-redo.ts";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { workerLoads } from "./queue-eta.js";
@@ -992,11 +993,26 @@ const faceCheck = createFaceCheck({
   image: galleryStill,
   reference: (ownerId, assetId) =>
     bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId),
-  save: (item, identity) => updateGalleryJob(galleryKey(item), { identity }),
+  save: (item, identity) => {
+    updateGalleryJob(galleryKey(item), { identity });
+    if (identity.drifted) void faceRedo(item, identity);
+  },
   load: runtimeLoad("face-check"),
   persist: (document) => writeRuntimeDocument(dataDir, "face-check", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/faces", { work: faceCheck, requireAdmin });
+// Face redo (domain/face-redo.ts): a drifted result made with a character runs once more, new seed.
+const faceRedo = createFaceRedo({
+  enabled: () => flagEnabled("STUDIO_FACE_REDO"),
+  account: (ownerId) => {
+    if (!multiUserEnabled) return undefined;
+    const account = ownerId ? accountAccessForId(ownerId) : null;
+    return account?.authenticated ? account : null;
+  },
+  job: (ownerId, jobId) => store.job(ownerId, jobId),
+  jobs: (ownerId) => store.jobs(ownerId),
+  admit: admitGeneration,
+});
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
