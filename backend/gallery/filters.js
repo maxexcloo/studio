@@ -1,5 +1,5 @@
 /**
- * Structured gallery filters. `lora`, `model`, `size` and `aspect` each take
+ * Structured gallery filters. `lora`, `model`, `size`, `aspect` and `tag` each take
  * one value or several: any of a filter's values matches, and every filter
  * that is on must match. `workflow` is a single value.
  */
@@ -53,7 +53,7 @@ export function filterValues(value) {
 
 /** Whether any structured filter is on. */
 export function hasGalleryFilters(filters = {}) {
-  return ["lora", "model", "workflow", "size", "aspect"].some(
+  return ["lora", "model", "workflow", "size", "aspect", "tag"].some(
     (key) => filterValues(filters[key]).length,
   );
 }
@@ -83,5 +83,25 @@ export function matchesGalleryFilters(item, filters = {}) {
   if (sizes.length && !sizes.includes(sizeBandOf(item))) return false;
   const aspects = filterValues(filters.aspect);
   if (aspects.length && !aspects.includes(aspectOf(item))) return false;
+  // Caption tags (domain/captions.ts) match whole.
+  const tags = filterValues(filters.tag);
+  if (tags.length && !captionTags(item).some((tag) => tags.includes(tag))) return false;
   return true;
+}
+
+/** An item's caption tags, lowercase as the captioner writes them. */
+export const captionTags = (item) =>
+  Array.isArray(item?.caption?.tags)
+    ? item.caption.tags.filter((tag) => typeof tag === "string")
+    : [];
+
+/** The most used caption tags among `items` with their counts, most first, then A–Z. */
+export function topCaptionTags(items, limit = 30) {
+  const counts = new Map();
+  for (const item of items)
+    for (const tag of new Set(captionTags(item))) counts.set(tag, (counts.get(tag) || 0) + 1);
+  return [...counts]
+    .sort(([a, x], [b, y]) => y - x || a.localeCompare(b))
+    .slice(0, limit)
+    .map(([tag, count]) => ({ value: tag, label: tag, count }));
 }
