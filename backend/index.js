@@ -182,6 +182,7 @@ import {
   explicitWording,
   mayUseFeature,
   mayUseGenerationProfile,
+  promptWriter,
 } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
 import {
@@ -505,8 +506,14 @@ registerProfileRoutes(app, {
 // The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature,
 // reading what an account may use (assistant-context.js).
 const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
+// The gateway lists only running models; stopped text workloads' models are choices too.
+const workloadModels = () =>
+  (runtime?.controller.workloads || [])
+    .filter((item) => item.kind === "text" && item.model)
+    .map((item) => item.model);
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
+  workloadModels,
   frame: (req, id) => assistant.image(req.studioAccount, id),
   caption: (req, id) => assistant.caption(req.studioAccount, id),
   profiles: assistant.profiles,
@@ -591,7 +598,7 @@ registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
-registerDeploymentRoutes(app, { assistantEngine, mediaModels, runtime, unavailableModels });
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels, workloadModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = createGenerationSubmission({
@@ -735,7 +742,8 @@ const suggestions = createSuggestions({
       ownerId ? accountAccessForId(ownerId) : undefined,
       item.settings?.profileId || "",
     ),
-  writingSide: (ownerId) => (accountPreferences(ownerId).writing === "cloud" ? "cloud" : "local"),
+  promptWriter: (ownerId) =>
+    promptWriter(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId)),
 });
 registerSuggestionRoutes(app, {
   suggestions,

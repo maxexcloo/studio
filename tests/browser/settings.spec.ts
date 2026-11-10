@@ -268,24 +268,47 @@ test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for i
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
-test("Where Work Runs in Settings › Preferences saves where each area runs", async ({ page }) => {
+test("Where Work Runs in Settings › Preferences saves where each area runs and the writing model", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   await signIn(page, { id: "member", role: "user" });
   state.preferences.preferences.videos = "quality";
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        presets: [],
+        model: "cloud/uncensored",
+        writingModel: "cloud/uncensored",
+        models: ["cloud/auto", "cloud/uncensored", "local/auto"],
+      },
+    }),
+  );
   await page.goto("/settings#preferences");
   const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
   const area = (name: string) => where.getByRole("radiogroup", { name, exact: true });
   const choose = (name: string, choice: string) =>
     area(name).locator("label").filter({ hasText: choice }).click();
-  await expect(where.getByRole("radiogroup")).toHaveCount(3);
-  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(2);
+  await expect(where.getByRole("radiogroup")).toHaveCount(2);
+  await expect(area("Images").getByRole("radio", { name: "Local" })).toBeChecked();
   // Videos offers Animate's three choices, its saved tier showing.
   await expect(area("Videos").getByRole("radio")).toHaveCount(3);
   await expect(area("Videos").getByRole("radio", { name: "Quality" })).toBeChecked();
   await choose("Images", "Cloud");
   await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
-  await choose("Prompt Writing", "Cloud");
-  await expect.poll(() => state.preferences.preferences.writing).toBe("cloud");
+  // Prompt Writing picks the gateway text model, unsaved the account's default.
+  const writing = where.getByRole("combobox", { name: "Prompt Writing", exact: true });
+  await expect(writing).toHaveValue("cloud/uncensored");
+  await writing.click();
+  await expect(page.getByRole("option")).toHaveText([
+    "cloud/auto",
+    "cloud/uncensored",
+    "local/auto",
+  ]);
+  await page.getByRole("option", { name: "local/auto", exact: true }).click();
+  await expect.poll(() => state.preferences.preferences.writingModel).toBe("local/auto");
+  await expect(writing).toHaveValue("local/auto");
   await choose("Videos", "Cloud");
   await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
   await choose("Videos", "Fast");
