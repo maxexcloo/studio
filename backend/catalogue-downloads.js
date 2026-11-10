@@ -10,6 +10,7 @@ import { encoderKinds, vaeKinds } from "./model/components.js";
 // `sha256` names. When a file changes upstream, the Library's update check offers it as an Update
 // (library/updates.js); moving a pin here means updating that repository's hashes and sizes too.
 const revisions = {
+  "Bingsu/adetailer": "53cc19de382014514d9d4038601d261a7faa9b7b",
   "black-forest-labs/flux-3-image-klein-comfy": "9d36114cf7a2e03a45c28f5cc4987d20ebfdb6c1",
   "black-forest-labs/FLUX.2-klein-4b-fp8": "5b4408e59397a4a37ccb46afe426d8ed86379441",
   "circlestone-labs/Anima": "f973fc41ec7545364ac9776c2440285f43ff2a30",
@@ -693,6 +694,21 @@ export const checkpointDownloads = {
   ],
 };
 
+// The Impact Pack's face detector for Face Detail (upscale.js), in Subpack's `ultralytics_bbox`
+// folder (models/ultralytics/bbox). Ultralytics loads only pickled `.pt` weights, so the worker
+// accepts that one type in this one folder; the pinned hash is what makes it the reviewed file.
+export const detectorDownloads = {
+  face_yolov8m: [
+    {
+      file: "face_yolov8m.pt",
+      label: "Face Detector (YOLOv8m)",
+      url: hf("Bingsu/adetailer", "face_yolov8m.pt"),
+      bytes: 52_026_019,
+      sha256: "717923c19b3f4bbf5250b728f1fa6b2cb72a33aed1d236ea9caf0e21ad943e5f",
+    },
+  ],
+};
+
 /** What a download is called in the queue and the top pill: the part, not its file name. */
 function partLabel(kind, key, file) {
   if (kind === "encoder" && encoderKinds[key]) return `${encoderKinds[key].label} text encoder`;
@@ -721,6 +737,7 @@ const downloadSources = {
   model: [modelDownloads, "diffusion_models"],
   checkpoint: [checkpointDownloads, "checkpoints"],
   vision: [visionDownloads, "clip_vision"],
+  detector: [detectorDownloads, "ultralytics_bbox"],
 };
 
 /**

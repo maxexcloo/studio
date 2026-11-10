@@ -30,7 +30,9 @@ only weight bytes and safe resume metadata reach this node. No provider URL or
 credential is stored in its sidecar files. Configured ComfyUI folder aliases and
 extra model roots are respected; new files enter the first configured root.
 Allowed folders are checkpoints, clip_vision, diffusion_models, loras,
-text_encoders and vae. Only `.safetensors` and `.gguf` files are accepted.
+text_encoders, ultralytics_bbox and vae. Only `.safetensors` and `.gguf` files
+are accepted, except in ultralytics_bbox (Impact Subpack's face detectors),
+which accepts only `.pt`.
 
 Local model storage remains the default. In worker mode, a local mirror mount
 is never used for downloads; use Downloads for the active worker library.
