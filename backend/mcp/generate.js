@@ -325,10 +325,10 @@ export function registerGenerateTools({
       },
     };
   };
-  /** Studio's usual pick; with several to choose from, the note says which. */
-  const picked = ({ pool, profile }) => ({
+  /** Studio's usual pick; with several to choose from, the note says which, and where it gave way to the other side. */
+  const picked = ({ pool, profile, note }) => ({
     profile,
-    note: pool.length < 2 ? "" : `Chose ${profile.label || profile.id}, the default. `,
+    note: `${pool.length < 2 ? "" : `Chose ${profile.label || profile.id}, the default. `}${note || ""}`,
   });
   /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
   const namedInTier = (profiles, value, wanted) => {

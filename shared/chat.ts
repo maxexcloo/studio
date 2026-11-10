@@ -19,6 +19,8 @@ export interface ChatModel {
   workloads?: string[];
   /** For accounts that may not start workloads: every workload serving it was stopped on purpose. */
   parked?: boolean;
+  /** Runs on a local text model rather than in the cloud. */
+  local?: boolean;
 }
 /** One tool call of a reply's agent loop, as the reply's tool trail shows it. */
 export interface ChatStep {
@@ -58,6 +60,8 @@ export interface ChatMessage {
   modelId?: string;
   actualModelId?: string;
   provider?: string;
+  /** Why the reply ran on the other side from the account's Chat preference. */
+  note?: string;
 }
 export interface ChatInput {
   content: string;

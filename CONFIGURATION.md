@@ -48,7 +48,7 @@ On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video
 per address. When `STUDIO_WORKERS` is set, it lists the workers
 instead. Without either, Studio starts with no workers.
 
-**Routing:** Studio queues work on an online worker that runs it; there is no worker choice: one that has the profile, then a free one, then one that last ran the same model, then the one with the fewest queued jobs, then list order (the first for manual work, the last for MCP, Dream and finishing work, keeping the first free for manual work). Until it starts, work waiting behind busy work moves to an idle worker that runs its profile, preferring one that last ran the same model, manual work first; a queued job on an idle worker moves only to another idle worker that last ran its model. The model a worker last ran only orders idle workers: no work waits while a worker that can run it is idle. A worker that stops, restarts or goes offline counts as having nothing loaded. One local video runs at a time across all workers, because two at once on one-GPU workers sharing a node run it out of system memory: a second video waits with "Waiting for another video to finish" while images and cloud videos still run beside it (a two-GPU worker holds its node alone, so the rule never holds it back). Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for [Animate](#cloud-models), which never waits on a stopped video worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
+**Routing:** Studio queues work on an online worker that runs it; there is no worker choice: one that has the profile, then a free one, then one that last ran the same model, then the one with the fewest queued jobs, then list order (the first for manual work, the last for MCP, Dream and finishing work, keeping the first free for manual work). Until it starts, work waiting behind busy work moves to an idle worker that runs its profile, preferring one that last ran the same model, manual work first; a queued job on an idle worker moves only to another idle worker that last ran its model. The model a worker last ran only orders idle workers: no work waits while a worker that can run it is idle. A worker that stops, restarts or goes offline counts as having nothing loaded. One local video runs at a time across all workers, because two at once on one-GPU workers sharing a node run it out of system memory: a second video waits with "Waiting for another video to finish" while images and cloud videos still run beside it (a two-GPU worker holds its node alone, so the rule never holds it back). Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for an account's [default models](#cloud-models) and [Animate](#cloud-models), which never wait on a stopped worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
 ## Cloud Models
 
@@ -74,7 +74,20 @@ Animate's menus set the preference (the `videos` account preference). MCP
 Review Prompt First shows the model and lets you edit the written prompt before Run;
 Custom prompts and Animate in Composer remain available.
 
-Other MCP video follows the same rule while the local video worker is off: it goes to a cloud profile the account is granted and the reply says so, or, with none granted, is refused with the reason. Studio's own composer and held video work never switch to the cloud.
+Other MCP video follows the same rule while the local video worker is off: it goes to a cloud profile the account is granted and the reply says so, or, with none granted, is refused with the reason. Held video work never switches to the cloud.
+
+**Where Work Runs** (Settings › Preferences) sets, per account, whether Chat,
+Prompt Writing, Images and Videos run in the Cloud or Locally by default;
+unsaved, each is Local. Images and Videos set the composer's and MCP
+`generate`'s default profile (the deployment default where it is on that side,
+else that side's first); Chat its default text model (a local one while one of
+its text workloads runs); Prompt Writing the text route of Improve Prompt,
+negative prompts and Animate's and More Like This Set's written prompts. When
+the chosen side can't run (no cloud profile or model for the account, or local
+models not installed or their workers Offline or Stopped), Studio uses the
+other and says so: in a notification on queuing, under the Chat reply, at the
+start of the written prompt's thinking, and in MCP replies. A model the person
+picks always wins, and an administrator's `STUDIO_ASSISTANT_MODEL` always runs.
 
 ## Model Manifest
 
@@ -173,7 +186,7 @@ UI-only by design: signing in, passwords, email, MCP tokens, single sign-on and 
 
 Studio's Chat tab uses the assistant's text gateway (`STUDIO_ASSISTANT_URL` and `STUDIO_ASSISTANT_KEY`, below) with its own model list:
 
-- `STUDIO_CHAT_MODELS`: comma-separated permitted model IDs or prefixes ending in `*`, such as `local/auto,cloud/*`. Missing or empty configuration leaves Chat unavailable. Chat offers the models this gateway's catalogue returns, plus permitted models of Studio's text workloads while they are stopped (the gateway lists only running ones); the first permitted model is the default. Selected models are checked again for every message.
+- `STUDIO_CHAT_MODELS`: comma-separated permitted model IDs or prefixes ending in `*`, such as `local/auto,cloud/*`. Missing or empty configuration leaves Chat unavailable. Chat offers the models this gateway's catalogue returns, plus permitted models of Studio's text workloads while they are stopped (the gateway lists only running ones); the account's Chat preference picks the default (see Where Work Runs). Selected models are checked again for every message.
 
 Chat follows the group's Chat feature. Its gateway is independent of prompt assistance. Chat is an agent over Studio's own MCP server, run in process: the same instructions, tools (all but `upload` and `upload_link`, since Chat attaches its references itself), prompting guides sent once per chat, model and LoRA choice and admin-tool rule as an MCP client such as LibreChat gets, so both behave alike. Each reply runs on the server, surviving a hidden page or dropped connection, for up to eight model calls: it looks things up, calls tools, reads their answers and continues, then answers in words; the tools it called stay under the reply as its trail. Its work joins the chat as the person's own queue work, one job per image; results already in the chat are named to it by ref ("result 1") and its attached references by ID, and the composer's selection is only a fallback for what the request leaves open. Attached images reach the text model only when it reads images (a text workload marked `vision`, or a cloud model). Earlier replies' tool calls and answers, and failed replies with their reason, stay in its context. Editing and submitting a generation card records its changed settings in the conversation, then generates once, exactly as submitted, after the assistant finishes its reply. Each iteration retains the assistant's text, actual text model and linked results; a model the gateway names only by its ID is listed by a name read from it (`local/auto` as Local · Auto, `cloud/glm-flash-uncensored` as Cloud · GLM Flash Uncensored), and a routing alias such as `local/auto` under the model that last answered for it, in its group (Local · Qwen3.6 27B). Interrupted text responses retain their partial content, and recorded media actions are not automatically resubmitted. Without an MCP key or accounts, `/mcp` is not served but Chat still runs the tools.
 
@@ -213,7 +226,7 @@ Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server env
 
 The prompt assistant uses an OpenAI-compatible Bifrost gateway: `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL`. Credentials remain server-side. Without the gateway, the assistant is off. Bifrost fixture compatibility is separate from live gateway verification.
 
-Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_ASSISTANT_CLOUD_MODEL`, such as `cloud/auto`. For an account with uncensored access an `…/auto` alias becomes `…/uncensored` (Bifrost defines both); any other model is used as it is. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, the taste summary, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts) sends none and gets the model's default.
+Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_ASSISTANT_CLOUD_MODEL`, such as `cloud/auto`. An account whose Prompt Writing preference is Cloud writes its prompts on the cloud model. For an account with uncensored access an `…/auto` alias becomes `…/uncensored` (Bifrost defines both); any other model is used as it is. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, the taste summary, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts) sends none and gets the model's default.
 
 - `STUDIO_ASSISTANT_MODEL`: a model, such as `refuseless/glm-5.3-flash-abliterated`, that replaces the alias for every call and sends no `reasoning_effort`. Unset, Studio picks as above. Administrators choose it under **Settings › Integrations › Prompt Assistant › Model** from the gateway's models and those of Studio's text workloads, or **Automatic** to leave it unset.
 
@@ -279,7 +292,7 @@ owned by the account, never uploads or imports, without GPU work; their answers
 teach taste without changing the gallery unless explicitly starred.
 
 **Settings › Preferences** follow the account: Tile Captions, Cloud Models,
-LoRAs, Uncensored Models and Spicy Prompts. Feature switches can only narrow the
+LoRAs, Uncensored Models, Spicy Prompts and [Where Work Runs](#cloud-models). Feature switches can only narrow the
 group's grants. Spicy Prompts is off until enabled and needs Uncensored Models.
 A browser's old Tile Captions preference is imported only if the account has
 none, then removed from the browser.

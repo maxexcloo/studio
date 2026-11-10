@@ -268,6 +268,34 @@ test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for i
   await expect.poll(() => state.preferences.preferences.uncensoredModels).toBe(false);
 });
 
+test("Where Work Runs in Settings › Preferences saves Cloud or Local for each area", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "member", role: "user" });
+  state.preferences.preferences.videos = "quality";
+  await page.goto("/settings#preferences");
+  const where = page.getByRole("region", { name: "Where Work Runs", exact: true });
+  const choose = (area: string, side: string) =>
+    where
+      .getByRole("radiogroup", { name: area, exact: true })
+      .locator("label")
+      .filter({ hasText: side })
+      .click();
+  await expect(where.getByRole("radiogroup")).toHaveCount(4);
+  await expect(where.getByRole("radio", { name: "Local", checked: true })).toHaveCount(4);
+  await choose("Images", "Cloud");
+  await expect.poll(() => state.preferences.preferences.images).toBe("cloud");
+  await choose("Prompt Writing", "Cloud");
+  await expect.poll(() => state.preferences.preferences.writing).toBe("cloud");
+  // Videos' Cloud replaces its local tier; Local then runs Fast.
+  await choose("Videos", "Cloud");
+  await expect.poll(() => state.preferences.preferences.videos).toBe("cloud");
+  await choose("Videos", "Local");
+  await expect.poll(() => state.preferences.preferences.videos).toBe("fast");
+  expect(state.preferences.preferences.chat).toBeUndefined();
+});
+
 test("Spicy Prompts shows in Settings › Preferences only with Uncensored Models", async ({
   page,
 }) => {
