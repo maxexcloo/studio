@@ -39,6 +39,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   });
   const viewable = visible && Boolean(status.data?.viewable);
   // The token stays in this mounted view, never in a query or mutation cache, and leaves with it.
+  // Each visit to the section starts hidden, even for a token issued while away.
   useEffect(() => {
     const current = ++visit.current;
     if (!viewable) {
@@ -50,7 +51,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       (result) => current === visit.current && setToken(result.token),
       (error: Error) => current === visit.current && setError(error.message),
     );
-  }, [viewable, status.data?.createdAt]);
+  }, [visible, viewable, status.data?.createdAt]);
   const change = async (revoke: boolean) => {
     if (busy) return;
     setBusy(true);
