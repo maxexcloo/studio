@@ -6,6 +6,7 @@ import {
   gallerySearch,
   image,
   selectionAction,
+  selectionMenuItem,
   showOnly,
   stamp,
   touch,
@@ -412,6 +413,40 @@ test("An MCP result set is one titled run whose viewer names each result's place
   ).toBeVisible();
 });
 
+test("Select Set picks a set's results to upscale together", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...["Bear Hug", "Owl Librarian", "Fox Wizard"].map((variation, position) => ({
+      ...results(1)[0],
+      id: `set-${2 - position}`,
+      jobId: `set-job-${2 - position}`,
+      prompt: `Set prompt ${2 - position}`,
+      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
+      resultSet: { id: "set-a", title: "Variety Test", index: 2 - position, variation },
+    })),
+    ...results(1),
+  );
+  const upscales: any[] = [];
+  await page.route("**/api/upscale", (route) => {
+    upscales.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByText("Runs", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Run: Variety Test, 3 Images", exact: true }).click();
+  const run = page.getByRole("region", { name: "Run: Variety Test", exact: true });
+  await run.getByRole("button", { name: "Select Set", exact: true }).click();
+  await expect(
+    page.getByRole("group", { name: "Gallery Selection", exact: true }).getByRole("status"),
+  ).toHaveText("3 Selected");
+  await (await selectionMenuItem(page, "Upscale")).click();
+  await expect
+    .poll(() => upscales.map((body) => body.galleryItemId).sort())
+    .toEqual(["set-0", "set-1", "set-2"]);
+});
+
 test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
   const state = await fixtures(page);
   const job = (id: string, status: string, extra = {}) => ({
@@ -633,7 +668,8 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("1 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(0);
+  // Animate and Upscale, which run on every selected image, wait under a phone's More.
+  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
   // The selects sit beside the count; phones name them by what they select.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
     phone ? "All" : "Select All",
@@ -641,7 +677,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(0);
+  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
