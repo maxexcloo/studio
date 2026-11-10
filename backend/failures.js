@@ -71,7 +71,7 @@ const noOutputTitle = "No image was saved";
 const learnedTitle = "Needs a separate part";
 const genericTitle = "Generation failed";
 
-/** Every headline a failure can have, each a section of TROUBLESHOOTING.md. */
+/** Every headline a failure can have, each a section of README.md › Troubleshooting. */
 export const failureTitles = [
   ...hints.map((item) => item.title),
   noOutputTitle,
@@ -79,7 +79,7 @@ export const failureTitles = [
   genericTitle,
 ];
 
-/** The TROUBLESHOOTING.md anchor for a headline, the way GitHub makes it from the heading. */
+/** The README.md anchor for a headline, the way GitHub makes it from the heading. */
 export function troubleshootingAnchor(title = "") {
   return String(title)
     .trim()
