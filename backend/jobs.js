@@ -577,6 +577,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
             ...(body.assistant ? { assistant: body.assistant } : {}),
             ...(body.writing ? { writing: body.writing } : {}),
             ...(body.chat ? { chat: body.chat } : {}),
+            ...(body.resultSet ? { resultSet: body.resultSet } : {}),
             ...(body.dream ? { dream: body.dream } : {}),
           },
         },

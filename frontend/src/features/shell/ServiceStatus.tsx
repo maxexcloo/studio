@@ -12,8 +12,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
-import { Link, useLocation } from "react-router";
-import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { SessionList } from "../sessions/ChatWorkspace";
@@ -32,8 +30,6 @@ export function StatusAction({ chat }: { chat: boolean }) {
   const [opened, setOpened] = useState(false);
   const close = () => setOpened(false);
   const phone = usePhone();
-  const admin = useIsAdmin();
-  const location = useLocation();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
   const generating = queue.data?.jobs.some((job) => !terminalStatuses.has(job.status));
@@ -82,21 +78,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
   const tooltip = [chats && "Chats", generating ? "Generating" : summary.label]
     .filter(Boolean)
     .join(" · ");
-  // For administrators the whole status block opens Settings › Workers.
-  const status = (
-    <div className={classes.status}>
-      {admin && (
-        <Link
-          to="/settings#workers"
-          state={{ backgroundLocation: location }}
-          className={classes.statusLink}
-          aria-label="Open Workers"
-          onClick={close}
-        />
-      )}
-      <ServiceHealthSummary />
-    </div>
-  );
+  const status = <ServiceHealthSummary />;
   if (!phone)
     return (
       <Popover

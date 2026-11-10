@@ -118,6 +118,21 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   };
   let pack = structuredClone(original),
     version = 1;
+  await page.route("**/api/profiles/editable", (route) =>
+    route.fulfill({
+      json: {
+        profiles: [
+          { id: "fox", name: "Fox Quality", family: "test", kind: "image", version: 1 },
+          { id: "owl", name: "Owl Fast", family: "test", kind: "image", version: 1 },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/profiles/guide-bindings", (route) =>
+    route.fulfill({
+      json: { bindings: { profiles: {}, families: { test: { image: "owned" } } } },
+    }),
+  );
   const saved: (typeof original)[] = [structuredClone(original)];
   await page.route("**/api/profiles/guides**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -166,6 +181,16 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await expect(page.getByRole("table", { name: "Editable Guides", exact: true })).toContainText(
     "Owned Guide",
   );
+  // Its profile count reveals their names.
+  const usedBy = page.getByRole("button", { name: "2 Profiles", exact: true });
+  await usedBy.click();
+  await expect(
+    page.getByRole("dialog", { name: "Profiles Using Owned Guide", exact: true }),
+  ).toContainText("Fox QualityOwl Fast");
+  // Escape from the count closes only the popover.
+  await usedBy.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Profiles Using Owned Guide" })).toBeHidden();
+  await expect(page.getByRole("table", { name: "Editable Guides", exact: true })).toBeVisible();
   await editDefinition(page, "Guide");
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Updated guidance.",
