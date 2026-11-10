@@ -4,6 +4,7 @@ import {
   Blend,
   CirclePause,
   CirclePlay,
+  ClipboardPaste,
   Columns2,
   ContactRound,
   Copy,
@@ -78,6 +79,7 @@ export const icons = {
   moreLikeThis: Wand,
   /** Opening every result of a run or Chat iteration in the viewer. */
   openAll: GalleryHorizontalEnd,
+  paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
   /** Editing a prompt and the composer's settings. */
