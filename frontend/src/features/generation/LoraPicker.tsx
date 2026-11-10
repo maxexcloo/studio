@@ -72,12 +72,13 @@ const typeNames: Record<string, string> = {
 };
 /**
  * Which LoRAs the picker lists, narrowest first: Recommended match the profile's family (the
- * default), Favourites are this family's thumbs up and All lists every one it can load. Saved stacks sit with
+ * default), Starred are this family's thumbs up and All lists every one it can load. Saved stacks sit with
  * the stack they replace, not among these.
  */
 const loraTabs = [
   { value: "recommended", label: "Recommended" },
-  { value: "favourites", label: "Favourites" },
+  // The stored tab value keeps its earlier name.
+  { value: "favourites", label: "Starred" },
   { value: "all", label: "All" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
@@ -328,7 +329,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
       : tab === "recommended"
         ? "No Recommended LoRAs"
         : tab === "favourites"
-          ? "No Favourites"
+          ? "No Starred LoRAs"
           : "No LoRAs";
   // Loading and empty states take the scroll pane's place, centred in its space.
   const state = info.isPending ? (
