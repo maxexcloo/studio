@@ -14,7 +14,7 @@ import { galleryFilter, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
-import { galleryAspects, gallerySizeBands } from "./filters.js";
+import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal } from "../route-access.js";
@@ -51,8 +51,8 @@ export function galleryJobResponse(store, account, id, settings = false) {
  */
 export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
   /**
-   * A gallery search from the query string, or null. `lora`, `model`, `size`
-   * and `aspect` may repeat (any of them matches); `q` and `workflow` are
+   * A gallery search from the query string, or null. `lora`, `model`, `size`,
+   * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
   const many = (value) =>
@@ -69,7 +69,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
       favorites: query.favorites === "1",
       workflow: one(query.workflow),
       ...Object.fromEntries(
-        ["lora", "model", "size", "aspect"].map((key) => [key, many(query[key])]),
+        ["lora", "model", "size", "aspect", "tag"].map((key) => [key, many(query[key])]),
       ),
     });
   }
@@ -106,6 +106,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near, store }) {
         description: band.detail,
       })),
       aspects: galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.label })),
+      tags: topCaptionTags(items),
       chats: [
         ...new Map(
           items

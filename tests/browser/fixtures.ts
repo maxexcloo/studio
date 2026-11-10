@@ -672,6 +672,14 @@ export async function fixtures(page: Page) {
           { value: "portrait", label: "Portrait" },
           { value: "square", label: "Square" },
         ],
+        // The caption tags in the fixture gallery, most used first.
+        tags: [
+          ...gallery
+            .flatMap((item) => item.caption?.tags || [])
+            .reduce((counts, tag) => counts.set(tag, (counts.get(tag) || 0) + 1), new Map()),
+        ]
+          .sort(([, a], [, b]) => b - a)
+          .map(([tag, count]) => ({ value: tag, label: tag, count })),
         chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
     if (path === "/api/gallery") {
@@ -681,7 +689,10 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
+          (!url.searchParams.has("chat") ||
+            url.searchParams.getAll("chat").includes(i.sessionId)) &&
+          (!url.searchParams.has("tag") ||
+            url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))),
       );
       return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }

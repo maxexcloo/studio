@@ -351,18 +351,23 @@ export function galleryFilter({
   workflow = "",
   size = "",
   aspect = "",
+  tag = "",
 } = {}) {
   const terms = String(q || "")
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 12);
-  if (!terms.length && !favorites && !hasGalleryFilters({ lora, model, workflow, size, aspect }))
+  if (
+    !terms.length &&
+    !favorites &&
+    !hasGalleryFilters({ lora, model, workflow, size, aspect, tag })
+  )
     return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;
-    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect })) return false;
+    if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect, tag })) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
     return terms.every((term) => text.includes(term)) || Boolean(near?.(item));
