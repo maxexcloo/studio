@@ -713,6 +713,9 @@ export function registerLibraryRoutes(
     return ok(await updates.check({ keys }));
   });
   route("POST", "/api/library/updates/apply", async (account, { body }) => {
+    // Update All: `{ all: true }` applies every free update at once.
+    if (body?.all === true)
+      return ok({ ...updates.summary(), ...(await updates.applyAll({ by: by(account) })) });
     const applied = await updates.apply(String(body?.key || ""), {
       alternative: body?.alternative === true,
       by: by(account),

@@ -291,6 +291,49 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
   expect(applied).toHaveLength(2);
 });
 
+test("Update All applies every free update in one request", async ({ page }) => {
+  await fixtures(page);
+  let all = false;
+  const item = (name: string, update: object) => ({
+    key: `loras/${name}.safetensors`,
+    title: name,
+    file: `${name}.safetensors`,
+    folder: "loras",
+    kind: "lora",
+    installed: true,
+    families: ["test"],
+    update: { state: "available", ...update },
+    ...(all ? { applied: { state: "downloading", note: "Downloading." } } : {}),
+  });
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          item("Style", { latest: { name: "Style 2", downloadable: true } }),
+          item("Detail", {
+            latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
+            freeAlternative: { name: "Detail 2", downloadable: true },
+          }),
+        ],
+      },
+    }),
+  );
+  const requests: unknown[] = [];
+  await page.route("**/api/library/updates/apply", (route) => {
+    requests.push(route.request().postDataJSON());
+    all = true;
+    return route.fulfill({ json: { ok: true, available: 2, started: 2, failed: [] } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "LoRAs");
+  const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
+  await loras.getByRole("button", { name: "Update All", exact: true }).click();
+  await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
+  await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();
+  expect(requests).toEqual([{ all: true }]);
+});
+
 test("A checkpoint profile draft can be retried after failure and refreshed into the model choices", async ({
   page,
 }) => {
