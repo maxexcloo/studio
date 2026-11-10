@@ -8,6 +8,7 @@ on:
       - LICENSE
       - NOTICE
       - worker/**
+      - "!worker/**/*.md"
   push:
     branches: [main]
     paths:
@@ -16,16 +17,17 @@ on:
       - LICENSE
       - NOTICE
       - worker/**
+      - "!worker/**/*.md"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Only pull requests cancel superseded runs: every main commit must publish its sha image, which
-# Studio's release job tags latest and versioned when the worker changed since the last release.
+# A newer push supersedes a running one: Studio's release job takes the worker image of any commit
+# from the last worker change onwards, so the latest build covers the ones it cancels.
 concurrency:
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-  group: worker-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: true
+  group: worker-${{ github.ref }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}-worker
