@@ -264,10 +264,20 @@ function OptionsMenu({
   // Each opening starts with every option collapsed.
   const [opening, setOpening] = useState(0);
   const dropdown = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
   return (
     <Menu
       position={position}
       width={menuWidth}
+      // An option that moves focus itself (AI's Custom… to the prompt) keeps it; otherwise it
+      // returns to the control that opened the menu.
+      returnFocus={false}
+      onClose={() =>
+        setTimeout(() => {
+          if (!document.activeElement || document.activeElement === document.body)
+            opener.current?.focus({ preventScroll: true });
+        })
+      }
       onChange={(open) => {
         setOpened(open);
         // The closing menu lets go of focus at once rather than at the end of its transition: an
@@ -277,7 +287,11 @@ function OptionsMenu({
         if (!open && focused instanceof HTMLElement && dropdown.current?.contains(focused))
           focused.blur();
       }}
-      onOpen={() => setOpening((count) => count + 1)}
+      onOpen={() => {
+        opener.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setOpening((count) => count + 1);
+      }}
     >
       {target(opened)}
       <Menu.Dropdown ref={dropdown}>
