@@ -52,7 +52,7 @@
   line-height: 26px;
   position: relative;
   min-width: 36px;
-  margin: 6px 2px;
+  margin-block: 2px;
   overflow: visible;
 }
 

@@ -31,6 +31,7 @@ import {
   Puzzle,
   Redo2,
   RefreshCw,
+  RotateCcw,
   RotateCw,
   Rows2,
   ScanSearch,
@@ -104,6 +105,8 @@ export const icons = {
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
   rename: TextCursorInput,
+  /** Returning a text to where it started, such as the viewer's prompt. */
+  reset: RotateCcw,
   resume: CirclePlay,
   retry: RotateCw,
   /** A scene card (Library › Scenes). */

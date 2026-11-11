@@ -139,10 +139,13 @@ the primary component reference and verify APIs against the installed version.
   next changes. The menu is one level deep: a tool's options (suggested changes,
   Improve Prompt's styles) are listed first under its name, never in a submenu.
   A box that opens the phone editor has no ⋯ beside it: the editor shows the
-  tools as named buttons in a bar above the keyboard, ending with the send, and
-  its header holds only the title and Done. A box without tools has no ⋯. The
-  viewer's prompt rests on one line ending in an ellipsis and shows the whole
-  prompt while focused.
+  tools as named buttons in a bar above the keyboard, then Clear as an icon
+  beside the sends, as in the composer, and its header holds only the title and
+  Done. A box without tools has no ⋯. Suggestions holds Refresh Suggestions
+  under its options. The viewer's prompt resets to the item's prompt rather
+  than clearing, and its phone editor sends Ask for a Change beside Generate.
+  It rests on one line ending in an ellipsis and shows the whole prompt while
+  focused.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -190,7 +193,8 @@ the primary component reference and verify APIs against the installed version.
   the proposed action runs. Suggestions never move layout or act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
-  text and ideas never show as a row of their own.
+  text and ideas never show as a row of their own. Custom Animation's
+  instruction offers Suggestions of what could happen, written from the image.
 - Queue access belongs to the header status action. Under the queue, its popup
   summarises each kind in one quiet, read-only line for everyone: Images and
   Videos as their workers and Idle, N running or Stopped; Text as its local
@@ -210,11 +214,11 @@ the primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
-  Similar | Star, Delete. Edit changes the item itself (Edit Image, or a video's
-  Trim and the like) with Recreate in Composer under it, then Use as Character
-  (starting a card in Library › Characters) and Use as Reference, then Run Again
-  and Run Again, Same Seed, which queue from where they are; menu options expand
-  in place on phones and touch screens. The phone viewer bar fits every action
+  Similar | Star, Delete. Edit leads with Run Again and Run Again, Same Seed,
+  which queue from where they are, then Use as Character (starting a card in
+  Library › Characters) and Use as Reference, then what changes the item itself
+  (Edit Image, or a video's Trim and the like) with Recreate in Composer last;
+  menu options expand in place on phones and touch screens. The phone viewer bar fits every action
   on one row at a compact size, without More; elsewhere the viewer bar shows
   every action, wrapping onto another row rather than using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
@@ -223,8 +227,8 @@ the primary component reference and verify APIs against the installed version.
   every action while they fit and keeps ⋯ More for the rest. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
 - Details sections show their content in full rather than scrolling it in a
-  box. Only a long caption folds, with Expand under it; its tags always
-  show. Prompt and Negative Prompt alone have a Copy beside their heading.
+  box. Only a long caption folds, with Expand at the end of its last line; its
+  tags always show. Prompt and Negative Prompt alone have a Copy beside their heading.
 - Version grouping has one owner in `gallery/versions.ts`; sharing a session or
   prompt alone does not group results. Keep source and derived relationships
   visible, even when a result stands alone.

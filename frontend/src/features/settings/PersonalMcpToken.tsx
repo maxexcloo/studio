@@ -19,7 +19,7 @@ export interface McpTokenStatus {
 }
 
 /**
- * Settings › Account › MCP Access, with Revoke Token in the section's Danger Zone. The account's
+ * Settings › Account › MCP Access, with Rotate Token and Revoke Token in the section's Danger Zone. The account's
  * own token loads while the section shows, hidden until Show, so Copy works within the tap.
  */
 export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
@@ -29,7 +29,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   const [token, setToken] = useState("");
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [revoking, setRevoking] = useState(false);
+  const [confirming, setConfirming] = useState<"rotate" | "revoke" | null>(null);
   const [error, setError] = useState("");
   const { copied, copy } = useCopy();
   const status = useQuery({
@@ -72,7 +72,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       setError(error instanceof Error ? error.message : "Couldn’t update the MCP token");
     } finally {
       setBusy(false);
-      setRevoking(false);
+      setConfirming(null);
     }
   };
   const endpoint = status.data?.endpoint || "";
@@ -113,15 +113,17 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
           <Badge color={status.data?.enabled ? "green" : "gray"} miw="max-content">
             {status.data?.enabled ? "Token Active" : "No Token Issued"}
           </Badge>
-          <Button
-            size="compact-sm"
-            variant="default"
-            loading={busy && !revoking}
-            disabled={!status.data || busy}
-            onClick={() => void change(false)}
-          >
-            {status.data?.enabled ? "Rotate Token" : "Create Token"}
-          </Button>
+          {status.data && !status.data.enabled && (
+            <Button
+              size="compact-sm"
+              variant="default"
+              loading={busy}
+              disabled={busy}
+              onClick={() => void change(false)}
+            >
+              Create Token
+            </Button>
+          )}
         </SettingRow>
         {status.data?.enabled &&
           (status.data.viewable ? (
@@ -153,12 +155,27 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
             </Stack>
           ) : (
             <Text size="sm" c="dimmed" py="sm">
-              Rotate to view. This token was created before Studio kept tokens to show again.
+              Rotate it in the Danger Zone to view. This token was created before Studio kept tokens
+              to show again.
             </Text>
           ))}
       </SettingGroup>
       {status.data?.enabled && (
         <SettingGroup title="Danger Zone" danger>
+          <SettingRow
+            label="Rotate Token"
+            description="Issues a new token; MCP clients using the old one lose access at once."
+          >
+            <Button
+              size="compact-sm"
+              color="red"
+              variant="light"
+              disabled={busy}
+              onClick={() => setConfirming("rotate")}
+            >
+              Rotate Token
+            </Button>
+          </SettingRow>
           <SettingRow
             label="Revoke Token"
             description="MCP clients using your token lose access at once."
@@ -168,18 +185,29 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
               color="red"
               variant="light"
               disabled={busy}
-              onClick={() => setRevoking(true)}
+              onClick={() => setConfirming("revoke")}
             >
               Revoke Token
             </Button>
           </SettingRow>
           <ConfirmDialog
-            opened={revoking}
+            opened={confirming === "rotate"}
+            title="Rotate Token"
+            action="Rotate"
+            pending={busy}
+            onConfirm={() => void change(false)}
+            onClose={() => setConfirming(null)}
+          >
+            Rotate your MCP token? Clients using the old one stop working until they get the new
+            one.
+          </ConfirmDialog>
+          <ConfirmDialog
+            opened={confirming === "revoke"}
             title="Revoke Token"
             action="Revoke"
             pending={busy}
             onConfirm={() => void change(true)}
-            onClose={() => setRevoking(false)}
+            onClose={() => setConfirming(null)}
           >
             Revoke your MCP token? Clients using it stop working until you create a new one.
           </ConfirmDialog>

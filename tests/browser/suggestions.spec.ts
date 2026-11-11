@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, editorMenu, fixtures, image, promptMenu, stamp } from "./fixtures";
+import { create, editorMenu, fixtures, image, promptMenu, stamp, viewerAction } from "./fixtures";
 
 const ideas = [
   "A lighthouse in rolling fog at blue hour",
@@ -84,7 +84,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("Viewer Suggestions load in the ⋯ menu, Refresh Suggestions replaces them and Ask for a Change… hands over the field", async ({
+test("Viewer Suggestions load with Refresh Suggestions in their menu, and Ask for a Change waits for a change", async ({
   page,
 }, testInfo) => {
   // Phones show the tools as buttons in the prompt's editor, Suggestions holding its own options.
@@ -111,41 +111,79 @@ test("Viewer Suggestions load in the ⋯ menu, Refresh Suggestions replaces them
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeDisabled();
   release[0]();
-  const actions = phone ? [] : ["Ask for a Change…", "Refresh Suggestions", "Clear Prompt"];
+  const actions = phone ? [] : ["Ask for a Change…", "Reset Prompt"];
   await expect(menu.getByRole("menuitem")).toHaveText([
     ...steps.map((step) => step.label),
+    "Refresh Suggestions",
     ...actions,
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
-  if (phone) {
-    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-    // Escape closes only the menu; the editor stays.
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
-    await editor.getByRole("button", { name: "Refresh Suggestions", exact: true }).click();
-    await editor.getByRole("button", { name: "Suggestions", exact: true }).click();
-  } else await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
+  await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
-  await expect(menu.getByRole("menuitem")).toHaveText(["Snowfall", ...actions]);
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    "Snowfall",
+    "Refresh Suggestions",
+    ...actions,
+  ]);
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
-  // With the prompt as it was, Ask for a Change… selects it for a change typed over it; phones
-  // open the editor for it.
   if (phone) {
+    // The editor asks from a send beside Generate once a change is typed, with Reset beside them.
+    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
-    await page
-      .getByRole("dialog", { name: "Prompt", exact: true })
-      .getByRole("button", { name: "Ask for a Change…", exact: true })
-      .click();
-  } else await menu.getByRole("menuitem", { name: "Ask for a Change…", exact: true }).click();
+    const ask = editor.getByRole("button", { name: "Ask for a Change", exact: true });
+    const reset = editor.getByRole("button", { name: "Reset Prompt", exact: true });
+    await expect(ask).toBeDisabled();
+    await expect(reset).toBeDisabled();
+    await editor.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
+    await expect(ask).toBeEnabled();
+    await reset.click();
+    await expect(editor.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+      "An amber bird",
+    );
+    return;
+  }
+  // With the prompt as it was, Ask for a Change… selects it for a change typed over it.
+  await menu.getByRole("menuitem", { name: "Ask for a Change…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   if (page.viewportSize()!.width >= 768) {
     await expect(field).toBeFocused();
     await page.keyboard.type("make it night");
     await expect(field).toHaveValue("make it night");
-  } else await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
+  }
+});
+
+test("Custom Animation suggests what could happen from the image, filling the instruction", async ({
+  page,
+}, testInfo) => {
+  const phone = testInfo.project.use.isMobile;
+  await openViewer(page);
+  const asked: any[] = [];
+  const motion = [
+    { label: "Wings Unfold", request: "The bird spreads its wings and takes off." },
+    { label: "Slow Push In", request: "The camera slowly pushes in on the bird." },
+  ].map((idea) => ({ ...idea, prompt: idea.request }));
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "animate") return route.fallback();
+    asked.push(body);
+    return route.fulfill({ json: { suggestions: motion } });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await viewerAction(page, "Animate");
+  await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
+  const menu = phone
+    ? await editorMenu(dialog, "Instruction", "Suggestions")
+    : await promptMenu(dialog, "Instruction");
+  await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
+  expect(asked).toEqual([{ surface: "animate", jobId: "job-hub", fresh: false }]);
+  await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(
+    "The bird spreads its wings and takes off.",
+  );
 });
 
 test("No ideas or suggestions show when Studio has none", async ({ page }, testInfo) => {

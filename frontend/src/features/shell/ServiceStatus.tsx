@@ -145,12 +145,14 @@ export function StatusAction() {
         <Drawer.Content {...swipe}>
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
-            <Drawer.CloseButton aria-label={`Close ${title}`} />
+            {/* The queue's actions sit beside Close, as on desktop beside the title. */}
+            <Group gap="xs" wrap="nowrap">
+              <QueueActions />
+              <Drawer.CloseButton aria-label={`Close ${title}`} />
+            </Group>
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
-            {/* The queue's actions have a row of their own, as the drawer is too narrow beside the title. */}
-            <QueueActions />
             <div className={classes.list}>
               <Queue />
             </div>
