@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 FROM docker.io/stilldeadcode/radiance:1.17.0 AS radiance
-FROM docker.io/yanwk/comfyui-boot:rocm-20261104 AS comfyui-boot
+FROM docker.io/yanwk/comfyui-boot:rocm-20261111 AS comfyui-boot
 
 FROM comfyui-boot AS sources
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
