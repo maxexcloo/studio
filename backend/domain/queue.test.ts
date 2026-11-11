@@ -457,6 +457,40 @@ test("an idle worker with another model loaded takes work waiting behind a busy 
   }
 });
 
+test("work routed to a worker that can't take it moves to one that can, and Dream waits for it", async () => {
+  const queue = fixture();
+  const { store, submitted } = queue;
+  // Primary isn't reachable: only secondary is ready.
+  queue.adapter.alternatives = () => ["worker:secondary"];
+  try {
+    const session = store.createSession("alice");
+    const dream = store.enqueue(
+      "alice",
+      session.id,
+      { profileId: "krea" },
+      "image",
+      undefined,
+      "worker:secondary",
+      undefined,
+      { priority: queuePriority.dream },
+    ).id;
+    const mine = store.enqueue(
+      "alice",
+      session.id,
+      { profileId: "krea" },
+      "image",
+      undefined,
+      "worker:primary",
+    ).id;
+    await queue.queue.tick();
+    assert.equal(store.job("alice", mine)!.resource, "worker:secondary");
+    assert.deepEqual(submitted, [mine]);
+    assert.notEqual(store.job("alice", dream)!.status, "starting");
+  } finally {
+    store.close();
+  }
+});
+
 test("a job is not observed while its submission is in flight, and a cancel then reaches it", async () => {
   const { store, queue, adapter, submitted } = fixture();
   const started = deferred();
