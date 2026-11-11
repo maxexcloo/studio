@@ -12,7 +12,7 @@ import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
 // Desktop names Animate, Edit, Upscale, Copy, Download and Similar beside their icons. Phones show
-// icons on one row: these, then ⋯ More holding the rest.
+// every action as a compact icon on one row.
 const labelled = ["animate", "edit", "upscale", "copy", "download", "similar"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */

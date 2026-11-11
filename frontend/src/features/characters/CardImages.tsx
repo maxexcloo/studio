@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import type { CardKind } from "../../../../shared/characters";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -47,10 +48,12 @@ export function CardDialog({
   children: ReactNode;
 }) {
   const phone = usePhone();
+  const id = useId();
   return (
     <Modal
+      id={id}
       opened={opened}
-      onClose={onClose}
+      onClose={closeWhenTop(id, onClose)}
       title={title}
       size="lg"
       fullScreen={phone}
