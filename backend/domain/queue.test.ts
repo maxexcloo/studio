@@ -7,6 +7,7 @@ import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationQueueAdapter } from "./generation-adapter.ts";
 import {
   GenerationQueue,
+  goneOutputs,
   type JobObservation,
   type QueueAdapter,
   unreachableCancelReason,
@@ -188,6 +189,61 @@ test("a save that fails the job (an unjoinable Extend) settles it as failed", as
     assert.equal(store.job("alice", job.id)?.status, "failed");
     assert.equal(store.job("alice", job.id)?.reason, "Studio couldn’t join it.");
     assert.deepEqual(events, [`released:${job.id}`]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a save that finds its outputs gone fails after three tries; other failures keep trying", async () => {
+  const { store, queue, adapter, observations, events } = fixture();
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image");
+    await queue.tick();
+    observations.set(job.id, { status: "completed", outputs: [{ url: "/media/a.png" }] });
+    adapter.saveOutputs = async () => {
+      throw goneOutputs("Its outputs are no longer on its worker.");
+    };
+    await queue.tick();
+    await queue.tick();
+    assert.equal(store.job("alice", job.id)?.status, "saving");
+    await queue.tick();
+    assert.equal(store.job("alice", job.id)?.status, "failed");
+    assert.equal(store.job("alice", job.id)?.reason, "Its outputs are no longer on its worker.");
+    assert.deepEqual(events, [`released:${job.id}`]);
+  } finally {
+    store.close();
+  }
+});
+
+test("Stop ends a job stuck saving, and one mid-save once that save fails", async () => {
+  const { store, queue, adapter, observations, events } = fixture();
+  try {
+    const session = store.createSession("alice");
+    const stuck = store.enqueue("alice", session.id, {}, "image");
+    await queue.tick();
+    observations.set(stuck.id, { status: "completed", outputs: [{ url: "/media/a.png" }] });
+    let save = deferred();
+    adapter.saveOutputs = async () => {
+      await save.promise;
+      throw new Error("Comfy 503");
+    };
+    const saving = queue.tick();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal((await queue.cancel("alice", stuck.id))?.status, "saving");
+    save.resolve();
+    await saving;
+    assert.equal(store.job("alice", stuck.id)?.status, "cancelled");
+
+    const idle = store.enqueue("alice", session.id, {}, "image");
+    await queue.tick();
+    observations.set(idle.id, { status: "completed", outputs: [{ url: "/media/b.png" }] });
+    save = deferred();
+    save.resolve();
+    await queue.tick();
+    assert.equal(store.job("alice", idle.id)?.status, "saving");
+    assert.equal((await queue.cancel("alice", idle.id))?.status, "cancelled");
+    assert.deepEqual(events, [`released:${stuck.id}`, `released:${idle.id}`]);
   } finally {
     store.close();
   }

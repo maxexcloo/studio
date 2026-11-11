@@ -78,9 +78,13 @@ function cleanSnapshot(value) {
   };
 }
 
+/** Families and workflows left with no stacks or strengths drop out, so emptied ones clear themselves. */
+const withoutEmpty = (entries) =>
+  Object.fromEntries(entries.filter(([, value]) => Object.keys(value).length));
+
 function cleanSnapshots(value) {
   const source = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(
+  return withoutEmpty(
     Object.entries(source).map(([key, list]) => {
       const seen = new Set();
       const stacks = (Array.isArray(list) ? list : [])
@@ -93,7 +97,7 @@ function cleanSnapshots(value) {
 
 function cleanStrengths(value) {
   const source = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(
+  return withoutEmpty(
     Object.entries(source).map(([workflow, entries]) => [
       workflow,
       Object.fromEntries(

@@ -54,7 +54,7 @@ test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () 
     { op: "stack.delete", key, id: "x" },
     { op: "stack.delete", key, id: "x" },
   ]);
-  assert.deepEqual(loadLoraLibrary().snapshots[key], []);
+  assert.equal(loadLoraLibrary().snapshots[key], undefined);
   applyLoraOps([
     { op: "rating", name: "a", rating: "up" },
     { op: "rating", name: "a", rating: "up" },
@@ -130,6 +130,17 @@ test("a removed LoRA leaves every account's stacks, strengths, ratings and recen
   const library = loadLoraLibrary("account-c");
   assert.deepEqual(
     [library.strengths.fast, library.ratings, library.recents, library.snapshots[key][0].loras],
-    [{}, {}, ["kept.safetensors"], []],
+    [undefined, {}, ["kept.safetensors"], []],
   );
+});
+
+test("families and workflows left empty drop out of the library", () => {
+  clearLoraState();
+  saveLoraLibrary({
+    strengths: { "custom:image-boogu-base": {}, fast: { "a.safetensors": 0.5 } },
+    snapshots: { "family:krea2": [], [key]: [stack("k", "Krea")] },
+  });
+  const library = applyLoraOps([{ op: "stack.delete", key, id: "k" }]);
+  assert.deepEqual(library.strengths, { fast: { "a.safetensors": 0.5 } });
+  assert.deepEqual(library.snapshots, {});
 });
