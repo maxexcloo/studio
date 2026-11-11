@@ -1,10 +1,10 @@
 {
   "studio": {
     "id": "flux2-real-dream-image-edit",
-    "name": "Flux 2 Real Dream Image Edit",
-    "description": "Precise one-image edits with Flux 2 and Qwen image-edit conditioning.",
+    "name": "Real Dream Klein 9B · Fast · 2 Steps · 1 Reference",
+    "description": "Precise one-image edits with Real Dream, a FLUX.2 [klein] 9B fine-tune, and Qwen image-edit conditioning.",
     "kind": "image",
-    "family": "flux2-edit",
+    "family": "flux2_klein_9b",
     "controls": {
       "prompt": { "node": "372", "input": "prompt" },
       "startImage": { "node": "369", "input": "image" },

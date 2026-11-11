@@ -1,7 +1,7 @@
 {
   "studio": {
     "id": "sdxl-base-refiner",
-    "name": "SDXL Base + Refiner",
+    "name": "SDXL Base + Refiner · Quality · 25 Steps",
     "description": "SDXL 1.0 the way it shipped: the base model lays out the image, the refiner finishes the last fifth of the steps. From Comfy-Org's SDXL refiner template.",
     "kind": "image",
     "family": "sdxl",

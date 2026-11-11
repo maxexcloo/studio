@@ -8,6 +8,7 @@ import {
 } from "../custom-workflows.js";
 import { classifyModel } from "./families.js";
 import { families } from "../family-catalogue.js";
+import { loraFamilyId } from "../../shared/profiles.ts";
 import { canonicalProfileId } from "../profile/store.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
 
@@ -367,7 +368,7 @@ export function inferModels(
     if (Number(defaults.frames)) frameRange.default = Number(defaults.frames);
     if (Number(defaults.fps)) fpsRange.default = Number(defaults.fps);
     if (Number(defaults.duration)) durationRange.default = Number(defaults.duration);
-    if (String(workflow.family || "").replaceAll("-", "_") === "minimax_h3") {
+    if (loraFamilyId(workflow.family) === "minimax_h3") {
       // H3 renders 124 to 362 frames on a 17n + 5 grid; a node that declares less (Radiance: 345) wins.
       Object.assign(frameRange, {
         default: Number(defaults.frames || 124),
@@ -426,8 +427,7 @@ export function inferModels(
           workflow.aspectRatios,
           { width: widthRange, height: heightRange },
         ),
-        aspectDefault:
-          families[String(workflow.family || "").replaceAll("-", "_")]?.aspectDefault || "",
+        aspectDefault: families[loraFamilyId(workflow.family)]?.aspectDefault || "",
         // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
         native: workflowFamilyValue(workflow, "native"),
         // Whether the family edits with its references, rather than starting from one (img2img).
