@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
 
 /** Every dialog's footer: Cancel, then its one primary action (`children`), at the right. */
@@ -48,6 +48,14 @@ export function ConfirmDialog({
   const close = () => {
     if (!pending) onClose();
   };
+  // Read as it opens, before the dialog takes focus.
+  const origin = useRef<{ element?: HTMLElement; dialog?: HTMLElement | null }>({});
+  const wasOpen = useRef(false);
+  if (opened && !wasOpen.current && document.activeElement instanceof HTMLElement) {
+    const element = document.activeElement;
+    origin.current = { element, dialog: element.closest<HTMLElement>('[role="dialog"]') };
+  }
+  wasOpen.current = opened;
   return (
     <Modal
       opened={opened}
@@ -58,21 +66,14 @@ export function ConfirmDialog({
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}
       closeButtonProps={{ disabled: pending }}
-      // Where the action took its trigger away (Clear All empties its list), focus falls outside
-      // the dialog under it, which then ignores Escape; it goes back into that dialog.
-      onExitTransitionEnd={() =>
-        // Once the dialog has gone and Mantine has tried to return focus.
-        setTimeout(() => {
-          const top = [
-            ...document.querySelectorAll<HTMLElement>(
-              ".mantine-Modal-content, .mantine-Drawer-content",
-            ),
-          ]
-            .filter((dialog) => dialog.getClientRects().length)
-            .at(-1);
-          if (top && !top.contains(document.activeElement)) top.focus({ preventScroll: true });
-        })
-      }
+      // Where the action took away what had focus as the dialog opened (Clear All empties its
+      // list), Mantine can't return focus to it; it goes to the dialog it was in instead, which
+      // would otherwise lose Escape. After Mantine's own attempt.
+      onExitTransitionEnd={() => {
+        const { element, dialog } = origin.current;
+        if (element && !element.isConnected)
+          setTimeout(() => dialog?.isConnected && dialog.focus({ preventScroll: true }));
+      }}
     >
       <FocusTrap.InitialFocus />
       <Stack>
