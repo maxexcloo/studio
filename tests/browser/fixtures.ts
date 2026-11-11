@@ -69,6 +69,37 @@ profiles.push({
   defaults: { width: 1024, height: 1024, steps: 4, cfg: 1 },
 });
 
+/** Two image backends with different reference and LoRA capacities. */
+export function combinedImageProfile(radianceReferences = 4): Profile {
+  const shared = {
+    ...profiles[0],
+    id: "custom:combined",
+    label: "Combined Image",
+    backend: "radiance",
+  };
+  const variants = [
+    { id: "comfyui", references: 10, width: 2048, maxLoras: 8 },
+    { id: "radiance", references: radianceReferences, width: 1536, maxLoras: 4 },
+  ].map((backend) => ({
+    id: backend.id,
+    label: backend.id === "radiance" ? "Radiance" : "ComfyUI",
+    ready: true,
+    profile: {
+      ...shared,
+      backend: backend.id,
+      defaults: { ...shared.defaults, width: backend.width, height: backend.width },
+      maxLoras: backend.maxLoras,
+      capabilities: { ...shared.capabilities, startImage: backend.references > 0 },
+      mediaInputs: Array.from({ length: backend.references }, (_, index) => ({
+        id: index ? `reference-${index + 1}` : "reference",
+        label: "Reference Image",
+        ...(index ? { follows: index > 1 ? `reference-${index}` : "reference" } : {}),
+      })),
+    },
+  }));
+  return { ...variants[1].profile, backendOptions: variants };
+}
+
 export async function fixtures(page: Page) {
   let sessions = 0;
   const jobs: any[] = [];

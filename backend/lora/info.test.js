@@ -82,6 +82,27 @@ test("FLUX.3 Klein provider and training metadata do not fall back to FLUX.1", (
   assert.deepEqual(familiesFromMetadata({ base_model: "Flux.1 Dev" }), ["flux1"]);
 });
 
+test("provider and local catalogue metadata retain compatible name-refined I2V models", () => {
+  for (const [baseModel, family] of [
+    ["Wan Video", "wan22_14b_i2v"],
+    ["HunyuanVideo 1.5", "hunyuan15_i2v"],
+  ]) {
+    const name = "effect.safetensors";
+    const info = { families: familiesFromMetadata({ base_model: baseModel }), triggers: [] };
+    for (const view of [
+      {
+        catalogue: {},
+        sources: { source: { id: "civitai:1:2", folder: "loras", file: name, baseModel } },
+      },
+      { catalogue: { [name]: { baseModel } }, sources: {} },
+    ]) {
+      const enriched = catalogueLoraInfo(name, info, view);
+      assert.equal(loraCompatibility(enriched, { family }), "fits", `${baseModel}: ${family}`);
+      assert.equal(loraCompatibility(enriched, { family: "sdxl" }), "other");
+    }
+  }
+});
+
 test("LoRA details come from the catalogue definitions and edits; a left-over lora-catalogue.json is ignored", () => {
   const data = process.env.STUDIO_DATA_DIR;
   fs.mkdirSync(path.join(data, "library"), { recursive: true });

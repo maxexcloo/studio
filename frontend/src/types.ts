@@ -29,7 +29,13 @@ export interface Profile {
   aliasBackends?: Record<string, string>;
   /** A combined profile: the backend it runs on now, and every backend it has. */
   backend?: string;
-  backendOptions?: { id: string; label: string; ready?: boolean; reason?: string }[];
+  backendOptions?: {
+    id: string;
+    label: string;
+    ready?: boolean;
+    reason?: string;
+    profile?: Omit<Profile, "backendOptions">;
+  }[];
   /** Why it isn't ready, such as its backend's missing nodes. */
   readyReason?: string;
   defaults: Record<string, string | number>;

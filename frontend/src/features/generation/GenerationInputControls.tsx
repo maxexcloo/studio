@@ -6,7 +6,7 @@ import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
-import { backendLabel, controlRange } from "./payload";
+import { backendInputPatch, backendLabel, controlRange } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
 import classes from "./GenerationInputControls.module.css";
@@ -227,7 +227,7 @@ export function GenerationInputControls({
         <ChoiceChip
           label="Backend"
           value={input.profileBackend || profile.backend}
-          onChange={(profileBackend) => onChange({ profileBackend })}
+          onChange={(profileBackend) => onChange(backendInputPatch(input, profile, profileBackend))}
           data={backends.map((option) => ({
             value: option.id,
             label: option.label || backendLabel(option.id),

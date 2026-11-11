@@ -44,7 +44,16 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   const names = ["explicit.safetensors", "film.safetensors", "unknown.safetensors"];
   const models = {
     loras: names,
-    profiles: [{ id: "local", capabilities: { lora: true }, options: { loras: names } }],
+    profiles: [
+      {
+        id: "local",
+        capabilities: { lora: true },
+        options: { loras: names },
+        backendOptions: [
+          { id: "radiance", profile: { capabilities: { lora: true }, options: { loras: names } } },
+        ],
+      },
+    ],
   };
   const member = (uncensoredModels) => ({
     authenticated: true,
@@ -58,6 +67,10 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   const limited = shown(member(false));
   assert.deepEqual(limited.loras, ["film.safetensors", "unknown.safetensors"]);
   assert.deepEqual(limited.profiles[0].options.loras, limited.loras);
+  assert.deepEqual(limited.profiles[0].backendOptions[0].profile.options.loras, limited.loras);
+  const disabled = shown({ ...member(false), features: { loras: false } });
+  assert.equal(disabled.profiles[0].backendOptions[0].profile.capabilities.lora, false);
+  assert.deepEqual(disabled.profiles[0].backendOptions[0].profile.options.loras, []);
   assert.equal(loraAllowed(member(false))("explicit.safetensors"), false);
 
   assert.deepEqual(shown(member(true)).loras, names);
