@@ -58,7 +58,7 @@ export const icons = {
   animate: Play,
   /** The prompt assistant and its ideas. */
   assistant: Sparkles,
-  /** Character cards: their tab, section and Make Character. */
+  /** Character cards: their tab, section and Use as Character. */
   character: ContactRound,
   /** The chat site (LibreChat) the navigation links to. */
   chat: MessageCircle,

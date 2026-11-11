@@ -38,7 +38,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { SettingRow } from "../../ui/SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -672,7 +672,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   );
 }
 
-/** Settings › Workers › Services & Control: the runtime changes, the latest three until Show All. */
+/** Settings › Workers › History: the runtime changes, the latest three until Show All. */
 export function RuntimeHistory() {
   const status = useQuery(runtimeStatusQuery).data;
   const [allChanges, setAllChanges] = useState(false);
@@ -681,8 +681,10 @@ export function RuntimeHistory() {
   const { history } = status;
   const change = changeLine(workloadNames(status.workloads));
   return (
-    <>
-      <SettingRow label="History" description="Recent GPU changes, newest first, and who asked." />
+    <SettingGroup title="History">
+      <Text size="sm" c="dimmed">
+        Recent GPU changes, newest first, and who asked.
+      </Text>
       <Stack gap={4} align="flex-start">
         <DataTable
           label="Runtime Changes"
@@ -745,6 +747,6 @@ export function RuntimeHistory() {
         change={change}
         onClose={() => setLogId("")}
       />
-    </>
+    </SettingGroup>
   );
 }

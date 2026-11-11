@@ -373,14 +373,21 @@ export function ActionBarGroups({
   labelled = [],
   menuPosition = "top",
   wrap = false,
+  compact = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
   menuPosition?: FloatingPosition;
   wrap?: boolean;
+  /** Fits every action across the row at a smaller size (the phone viewer's bar). */
+  compact?: boolean;
 }) {
   return (
-    <div className={classes.actions} data-wrap={wrap || undefined}>
+    <div
+      className={classes.actions}
+      data-wrap={wrap || undefined}
+      data-compact={compact || undefined}
+    >
       {shown(groups).map((group, index) => {
         const controls = group.map((action) => (
           <ActionControl

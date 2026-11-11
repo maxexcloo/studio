@@ -541,9 +541,9 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   });
   await page.goto("/settings");
   await section(page, "Settings", "Workers");
-  // The change history sits with the rarely changed controls.
-  const control = page.getByRole("region", { name: "Services & Control", exact: true });
-  await expect(control.getByText("History", { exact: true })).toBeVisible();
+  // The change history has its own section after the rarely changed controls.
+  const history = page.getByRole("region", { name: "History", exact: true });
+  await expect(history).toBeVisible();
   // Idle settling applies only under automatic control, which saves 0 as Never.
   const park = page.getByRole("combobox", { name: "Idle After", exact: true });
   const idle = page.getByRole("combobox", { name: "Run When Idle", exact: true });
@@ -573,7 +573,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     .toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text", everyoneSwaps: true });
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
-  const changes = control.getByRole("table", { name: "Runtime Changes" });
+  const changes = history.getByRole("table", { name: "Runtime Changes" });
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(3);
   await page.getByRole("button", { name: "Show All", exact: true }).click();
   await expect(changes.getByRole("row", { name: "Restart Text" })).toHaveCount(4);

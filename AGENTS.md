@@ -211,20 +211,19 @@ the primary component reference and verify APIs against the installed version.
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
   Similar | Star, Delete. Edit changes the item itself (Edit Image, or a video's
-  Trim and the like), then reuses its prompt: Recreate and Use as Reference
-  stage the composer, Make Character starts a card in Library › Characters, Run
-  Again and Run Again, Same Seed queue from where they are; menu options expand
-  in place on phones and touch screens. The phone viewer bar keeps to one row:
-  Retry, Stop, Animate, Edit, Upscale and Star, then ⋯ More with the rest in
-  their sections, Delete last. Elsewhere the viewer bar shows every action, wrapping onto another
-  row rather than using More or scrolling. The phone bar drops its prompt field
+  Trim and the like) with Recreate in Composer under it, then Use as Character
+  (starting a card in Library › Characters) and Use as Reference, then Run Again
+  and Run Again, Same Seed, which queue from where they are; menu options expand
+  in place on phones and touch screens. The phone viewer bar fits every action
+  on one row at a compact size, without More; elsewhere the viewer bar shows
+  every action, wrapping onto another row rather than using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
   bar under the search and filters, which stay in place; its quick selects take
   every match, not only loaded pages, and it confirms deletion. The phone bar shows
   every action while they fit and keeps ⋯ More for the rest. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
 - Details sections show their content in full rather than scrolling it in a
-  box. Only a long caption folds, with Expand on its last line; its tags always
+  box. Only a long caption folds, with Expand under it; its tags always
   show. Prompt and Negative Prompt alone have a Copy beside their heading.
 - Version grouping has one owner in `gallery/versions.ts`; sharing a session or
   prompt alone does not group results. Keep source and derived relationships
