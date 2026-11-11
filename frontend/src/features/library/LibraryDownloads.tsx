@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Badge, Group, Menu, Progress, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
 import type { Models } from "../../types";
+import { formatBytes } from "../../ui/bytes";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 interface ModelDownload {
@@ -40,15 +42,11 @@ const statusColours: Record<string, string> = {
   error: "red",
   paused: "yellow",
 };
-const bytes = (value = 0) =>
-  value >= 1024 ** 3
-    ? `${(value / 1024 ** 3).toFixed(1)} GiB`
-    : `${(value / 1024 ** 2).toFixed(1)} MiB`;
-
 const downloadKey = (item: ModelDownload) => item.id || `${item.folder}/${item.file}`;
 
-export function LibraryDownloads({ active }: { active: boolean }) {
+export function LibraryDownloads({ heading, active }: { heading: ReactNode; active: boolean }) {
   const client = useQueryClient();
+  const [search, setSearch] = useState("");
   const seenCompleted = useRef(new Set<string>());
   const query = useQuery({
     queryKey: ["library-downloads"],
@@ -96,15 +94,25 @@ export function LibraryDownloads({ active }: { active: boolean }) {
   });
   return (
     <Stack gap="md">
-      {query.error && <Alert color="red">{query.error.message}</Alert>}
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Downloads"
+          query={search}
+          onQueryChange={downloads.length ? setSearch : undefined}
+        />
+      </SectionHeader>
       {/* A failed first load shows only its error, not an empty list. */}
-      {(query.data || query.isPending) && (
+      {query.error && !query.data ? (
+        <Alert color="red">{query.error.message}</Alert>
+      ) : (
         <DataTable
           label="Model Downloads"
           rows={downloads}
           rowKey={downloadKey}
           rowName={(item) => item.file}
           loading={query.isPending && "Loading Downloads"}
+          query={search}
+          searchText={(item) => [item.label, item.file, item.folder, statusLabel(item.status)]}
           empty="No Downloads"
           columns={[
             {
@@ -132,8 +140,8 @@ export function LibraryDownloads({ active }: { active: boolean }) {
                         }
                       />
                       <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                        {bytes(item.receivedBytes)}
-                        {item.totalBytes ? ` / ${bytes(item.totalBytes)}` : ""}
+                        {formatBytes(item.receivedBytes) || "0 B"}
+                        {item.totalBytes ? ` / ${formatBytes(item.totalBytes)}` : ""}
                       </Text>
                     </Group>
                   )}

@@ -533,7 +533,7 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
           query={guideQuery}
           searchText={(entry) => [entry.name, entry.packId]}
           initialSort={{ key: "name", descending: false }}
-          empty={guides.length ? "No Matches" : "No Guides"}
+          empty="No Guides"
           columns={[
             {
               key: "name",

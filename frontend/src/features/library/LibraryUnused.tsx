@@ -6,7 +6,6 @@ import { formatBytes } from "../../ui/bytes";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
-import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 
 interface UnusedItem {
@@ -53,8 +52,6 @@ export function LibraryUnused({ heading }: { heading: ReactNode }) {
       </SectionHeader>
       {unused.error ? (
         <Alert color="red">{unused.error.message}</Alert>
-      ) : unused.isPending ? (
-        <LoadingState label="Loading Unused" fill />
       ) : (
         <>
           {total > 0 && (
@@ -67,6 +64,7 @@ export function LibraryUnused({ heading }: { heading: ReactNode }) {
             rows={items}
             rowKey={(item) => item.key}
             rowName={(item) => item.title}
+            loading={unused.isPending && "Loading Unused"}
             query={query}
             searchText={(item) => [item.title, item.key]}
             initialSort={{ key: "size", descending: true }}
