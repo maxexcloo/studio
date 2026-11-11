@@ -107,6 +107,7 @@ function ReferenceRole({
     <>
       <SegmentedControl
         aria-label="Reference Role"
+        size="sm"
         radius="xl"
         className={classes.roles}
         value={role}
