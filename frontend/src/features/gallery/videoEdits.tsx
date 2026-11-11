@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
-import { Alert, Button, Group, Modal, RangeSlider, Stack, Text } from "@mantine/core";
+import { Alert, Button, Modal, RangeSlider, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { usePhone } from "../../ui/usePhone";
 import { queueQuery } from "../generation/Queue";
 import { playbackUrl } from "./mediaSource";
@@ -99,11 +100,11 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
             {time(duration)}.
           </Text>
           {save.error && <Alert color="red">{save.error.message}</Alert>}
-          <Group justify="flex-end">
+          <DialogFooter pending={save.isPending} onCancel={onClose}>
             <Button type="submit" loading={save.isPending} disabled={!duration}>
               Save Version
             </Button>
-          </Group>
+          </DialogFooter>
         </Stack>
       </form>
     </Modal>
