@@ -16,7 +16,6 @@ import { presetPlacement } from "./gpu.js";
 import { McpMedia } from "./media.js";
 import { withPreferredDefaults } from "../model/catalogue.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
-import { adminToolNames } from "./admin.js";
 import { pausedReason } from "../../shared/queue.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fakeStudio } from "../fixtures/fake-studio.js";
@@ -5432,8 +5431,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
       user === "librechat-admin" ? adminAccount : user === "librechat-user" ? plainAccount : null,
     gatewayAdminTools: () => gatewayAdmin,
   });
-  const has = (names) => adminToolNames.filter((name) => names.includes(name));
-  assert.deepEqual(adminToolNames, [
+  const adminToolNames = [
     "library",
     "lookup",
     "import",
@@ -5448,7 +5446,8 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "placement",
     "accounts",
     "maintenance",
-  ]);
+  ];
+  const has = (names) => adminToolNames.filter((name) => names.includes(name));
   const direct = await toolNames(await f.client("", adminToken));
   assert.deepEqual(
     has(direct),
