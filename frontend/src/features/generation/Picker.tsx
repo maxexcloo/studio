@@ -122,13 +122,16 @@ export function ChipPopup({
   const close = () => onOpenedChange(false);
   // Pulling the phone sheet down by its header, or its content from the top, closes it.
   const swipe = useSwipeClose("down", close);
-  // The popup handles its own Escape, so the composer's Drawer behind it stays open.
+  // The popup handles its own Escape, so the composer's Drawer behind it stays open. A dialog it
+  // opens, such as a card editor, portals elsewhere and keeps its own Escape.
   const layer = {
     "data-composer-layer": true,
     "data-chip-popup": true,
     "aria-label": title,
-    onFocusCapture: (event: FocusEvent<HTMLElement>) =>
-      event.target.setAttribute("data-mantine-stop-propagation", "true"),
+    onFocusCapture: (event: FocusEvent<HTMLElement>) => {
+      if (event.currentTarget.contains(event.target))
+        event.target.setAttribute("data-mantine-stop-propagation", "true");
+    },
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
   const actions = footer && (

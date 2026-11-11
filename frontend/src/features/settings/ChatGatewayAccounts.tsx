@@ -86,6 +86,8 @@ export function ChatGateway({
             <Button
               variant="default"
               size="compact-sm"
+              // The wide row's Select takes the room the buttons leave.
+              flex="none"
               disabled={change.isPending || !choices[identity]}
               aria-label={`Link ${identity}`}
               onClick={() =>
@@ -98,6 +100,7 @@ export function ChatGateway({
               variant="subtle"
               color="gray"
               size="compact-sm"
+              flex="none"
               disabled={change.isPending}
               aria-label={`Dismiss ${identity}`}
               onClick={() => change.mutate({ kind: "dismiss", identity })}
