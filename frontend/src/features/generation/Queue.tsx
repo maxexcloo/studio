@@ -617,6 +617,12 @@ const bulk = {
 export function QueueActions() {
   const queue = useQueue();
   const action = useQueueAction();
+  // Only Stop All's own request spins it, not Pause or Clear Failed.
+  const stoppingAll =
+    useIsMutating({
+      mutationKey: queueActionKey,
+      predicate: (mutation) => (mutation.state.variables as QueueAction)?.action === "cancel-all",
+    }) > 0;
   const everyone = usePausesEveryone();
   const [confirming, setConfirming] = useState<keyof typeof bulk>();
   if (!queue.data) return null;
@@ -666,7 +672,7 @@ export function QueueActions() {
           label="Stop All"
           icon={icons.stop}
           stop
-          pending={action.isPending}
+          pending={stoppingAll}
           onClick={() => setConfirming("cancel-all")}
         />
       )}
