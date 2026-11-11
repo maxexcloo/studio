@@ -652,6 +652,28 @@ test("character describes a card's image as one short phrase of lasting details"
   assert.equal(seen.calls[0].body.reasoning_effort, "none");
 });
 
+test("rateCardImages scores each image as the card kind's reference, in order", async () => {
+  const seen = fakeGateway(() =>
+    json('{"ratings":[{"rating":5,"note":"Sharp face"},{"rating":9,"note":"Clear"}]}'),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const image = { mime: "image/jpeg", data: "AAAA" };
+  assert.deepEqual(await engine.rateCardImages({ kind: "outfits", images: [image, image] }), {
+    ratings: [
+      { rating: 5, note: "Sharp face" },
+      { rating: 5, note: "Clear" },
+    ],
+    model: "cloud/auto",
+  });
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /2 images.*whole outfit.*footwear/s);
+  assert.equal(user.content.filter((part) => part.type === "image_url").length, 2);
+  // A reply that doesn't rate every image is unusable.
+  const short = fakeGateway(() => json('{"ratings":[{"rating":3}]}'));
+  const failing = createAssistant(gateway(), { fetchImpl: short.fetchImpl, log: quiet });
+  await assert.rejects(failing.rateCardImages({ kind: "scenes", images: [image, image] }));
+});
+
 test("title summarises the prompt in a few words, with reasoning off", async () => {
   const seen = fakeGateway(() =>
     json('<think>A barn, so…</think>Title: "Red Barn at Golden Hour Over Wheat Fields".'),

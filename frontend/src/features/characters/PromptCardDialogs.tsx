@@ -6,7 +6,7 @@ import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { menuWidth } from "../../theme";
 import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
-import { CardDialog, CardForm, CardImages } from "./CardImages";
+import { CardDialog, CardForm, CardImages, DescribeImage } from "./CardImages";
 import {
   useDeletePromptCard,
   useSavePromptCard,
@@ -135,8 +135,10 @@ function PromptCardForm({
         maxLength={maxCardDescription}
         value={description}
         onChange={setDescription}
+        below={<DescribeImage kind={kind} image={images[0]} onDescribed={setDescription} />}
       />
       <CardImages
+        kind={kind}
         max={cardKinds[kind].images.max}
         note="Optional: one image to recognise it by."
         value={images}
