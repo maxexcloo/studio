@@ -313,27 +313,6 @@ export class Store {
   }
 
   /**
-   * The owner's queue as the Queue shows it, in queue order, without failed jobs the person cleared:
-   * every unfinished job and only the `finished` most recent finished ones, read through the indexes.
-   */
-  queued(ownerId: string, finished: number): OwnedJob[] {
-    const terminal = [...terminalStatuses];
-    const rows = this.db
-      .prepare(
-        `SELECT rowid, created_at, record FROM studio_queue WHERE owner_id = ? AND status IN (${openStatuses.map(() => "?").join(", ")})
-        UNION ALL SELECT * FROM (SELECT rowid, created_at, record FROM studio_queue
-          WHERE owner_id = ? AND status IN (${terminal.map(() => "?").join(", ")})
-            AND json_extract(record, '$.cleared') IS NOT 1
-          ORDER BY created_at DESC, rowid DESC LIMIT ?)
-        ORDER BY created_at, rowid`,
-      )
-      .all(ownerId, ...openStatuses, ownerId, ...terminal, finished);
-    return rows
-      .map((row) => JSON.parse(row.record as string) as OwnedJob)
-      .filter((job) => !job.cleared);
-  }
-
-  /**
    * What a scheduler tick weighs, in queue order: every unfinished job, and the finished ones it
    * still counts, which are those created since the oldest unfinished job (overtakes) and those in
    * an unfinished job's set (a started set keeps its place). Read through the status index.

@@ -29,11 +29,8 @@ interface Router {
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
 const ownerOf = (account: RouteAccount) => account?.userId || "";
-/**
- * The finished jobs the Queue lists, most recent first; older ones stay in the gallery. Polling
- * every finished record made each read parse the whole history.
- */
-const listedFinished = 200;
+/** The person's queue, Dream's background jobs included, without failed jobs the person cleared. */
+const listed = (store: Store, ownerId: string) => store.jobs(ownerId).filter((job) => !job.cleared);
 /** What Stop All and Cancel Pending act on: the person's own unfinished work, as Dream's pause stops Dream's. */
 const ownWork = (store: Store, ownerId: string) =>
   store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
@@ -171,7 +168,7 @@ export function registerRewriteRoutes(
       payload: {
         // Polled while work runs: a job with gallery records drops the adapter's copies of them,
         // which every reader passes over for the records.
-        jobs: shown(ownerId, store.queued(ownerId, listedFinished)).map((job) =>
+        jobs: shown(ownerId, listed(store, ownerId)).map((job) =>
           job.items.length ? { ...job, outputs: [] } : job,
         ),
         paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
@@ -227,9 +224,7 @@ export function registerRewriteRoutes(
     return { status: 200, payload: { outcomes } satisfies QueueCancelAllResponse };
   });
   directRoute(app, "POST", "/api/queue/clear-failed", (account) => {
-    const failed = store
-      .jobs(ownerOf(account))
-      .filter((job) => job.status === "failed" && !job.cleared);
+    const failed = listed(store, ownerOf(account)).filter((job) => job.status === "failed");
     failed.forEach((job) => clear(store, job));
     return { status: 200, payload: { cleared: failed.length } };
   });

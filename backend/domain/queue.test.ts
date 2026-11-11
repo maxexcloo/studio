@@ -585,7 +585,7 @@ test("a tick reads unfinished work and only the finished jobs it still weighs", 
   }
 });
 
-test("narrow reads: unfinished jobs, jobs since a time and the capped queue listing", () => {
+test("narrow reads: unfinished jobs and jobs since a time", () => {
   const store = new Store(openDatabase(":memory:"));
   try {
     const sessions = { alice: store.createSession("alice").id, bob: store.createSession("bob").id };
@@ -597,9 +597,9 @@ test("narrow reads: unfinished jobs, jobs since a time and the capped queue list
         .run(`2026-11-04T10:0${minute}:00.000Z`, job.id);
       return job.id;
     };
-    const old = enqueue("alice", 1, "completed");
+    enqueue("alice", 1, "completed");
     const waiting = enqueue("alice", 2, "waiting");
-    const failed = enqueue("alice", 3, "failed");
+    enqueue("alice", 3, "failed");
     const cleared = enqueue("alice", 4, "failed", true);
     const running = enqueue("alice", 5, "running");
     const recent = enqueue("alice", 6, "cancelled");
@@ -613,10 +613,6 @@ test("narrow reads: unfinished jobs, jobs since a time and the capped queue list
       running,
       recent,
     ]);
-    // Unfinished work always shows; of the finished, only the most recent uncleared ones.
-    assert.deepEqual(ids(store.queued("alice", 2)), [waiting, failed, running, recent]);
-    assert.deepEqual(ids(store.queued("alice", 1)), [waiting, running, recent]);
-    assert.deepEqual(ids(store.queued("alice", 10)), [old, waiting, failed, running, recent]);
   } finally {
     store.close();
   }
