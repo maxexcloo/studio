@@ -269,8 +269,27 @@ test("Compare from the tile menu keeps the result's seed, compares prompts with 
     [1234567, "A jade bird", "feathers"],
   ]);
   await expect(page.getByText("Seed 1234567", { exact: false })).toBeVisible();
+  expect(state.jobs.every((job: any) => job.parentItemId === "source")).toBe(true);
   await page.getByRole("button", { name: "Open Prompt B", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("2");
+  await expect(page.getByRole("button", { name: "Compare Again", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Compare Again", exact: true }).click();
+  await dialog
+    .getByRole("group", { name: "Variant B", exact: true })
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("A jade bird in flight");
+  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-2$/);
+  expect(state.jobs.slice(2).map((job: any) => job.parentItemId)).toEqual([
+    `${run.jobIds[1]}:0`,
+    `${run.jobIds[1]}:0`,
+  ]);
+  expect(state.jobs.slice(2).map((job: any) => job.parentJobId)).toEqual([
+    run.jobIds[1],
+    run.jobIds[1],
+  ]);
 });
 
 test("Compare remembers its mode and variants across a reload", async ({ page }) => {
@@ -321,22 +340,28 @@ test("Compare Selected sets chosen images side by side, and number keys star the
     page.getByRole("button", { name: `Select image: ${title}`, exact: true }).click();
   await pick("A tin owl");
   await pick("A glass owl");
-  // Two images of one run can't be compared: a comparison votes per run.
-  const compare = await selectionMenuItem(page, "Compare");
-  await expect(compare).toBeDisabled();
-  // Phones show it under More; Escape there closes only the menu.
-  if (await page.getByRole("menu").isVisible()) await page.keyboard.press("Escape");
-  await expect(page.getByRole("menu")).toBeHidden();
-  await pick("A tin owl");
-  await pick("A felt owl");
   await (await selectionMenuItem(page, "Compare")).click();
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
-  expect(state.comparisons[0].itemIds).toEqual(["batch-1", "single"]);
-  await expect(page.getByText("Prompt: A glass owl", { exact: true })).toBeVisible();
+  expect(state.comparisons[0].itemIds).toEqual(["batch-0", "batch-1"]);
+  await expect(page.getByText("Prompt: A tin owl", { exact: true })).toBeVisible();
   await page.keyboard.press("2");
   await expect(
     page.getByRole("button", { name: "Clear Winner Variant B", exact: true }),
   ).toBeAttached();
-  expect(state.comparisons[0].vote).toBe("job-single");
+  expect(state.comparisons[0].vote).toBe("job-batch");
+  expect(state.comparisons[0].winnerItemId).toBe("batch-1");
+  await expect(
+    page.getByRole("button", { name: "Star Variant A as Winner", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("1");
+  await expect(
+    page.getByRole("button", { name: "Clear Winner Variant A", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(state.comparisons[0].winnerItemId).toBe("batch-0");
+  await page.keyboard.press("1");
+  await expect(
+    page.getByRole("button", { name: "Star Variant A as Winner", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  expect(state.comparisons[0].winnerItemId).toBeNull();
 });

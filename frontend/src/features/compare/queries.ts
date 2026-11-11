@@ -14,6 +14,8 @@ export interface Comparison {
   negative?: string;
   /** The starred winner's job ID. */
   vote: string | null;
+  /** The exact starred image, even when variants share a batch. */
+  winnerItemId: string | null;
   variants: { jobId: string; label: string; item: MediaItem | null }[];
 }
 

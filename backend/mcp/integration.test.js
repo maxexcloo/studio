@@ -14,6 +14,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { presetPlacement } from "./gpu.js";
 import { McpMedia } from "./media.js";
+import { registerGenerateTools } from "./generate.js";
 import { withPreferredDefaults } from "../model/catalogue.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { pausedReason } from "../../shared/queue.ts";
@@ -148,6 +149,7 @@ async function fixture(
     String(req.headers["x-studio-account"] || req.headers.authorization || "");
   const submitted = [];
   const downloads = [];
+  let comparisons = [];
   let failAfter = Infinity;
   let failResponse = [503, { error: "Fixture backend offline" }];
   let completeOnSubmit = false;
@@ -198,6 +200,14 @@ async function fixture(
   app.post("/api/comparisons", (req, res) =>
     res.status(201).json({ id: `fixture-comparison-${req.body.jobIds.join("-")}` }),
   );
+  app.get("/api/comparisons", (req, res) => {
+    const ids = String(req.query.jobIds || "").split(",");
+    res.json({
+      comparisons: comparisons.filter((comparison) =>
+        comparison.variants.some(({ jobId }) => ids.includes(jobId)),
+      ),
+    });
+  });
   // Studio's estimate for a set: jobEtaMs per run once given, like a model with trusted timings.
   app.get("/api/estimate", (req, res) =>
     res.json({ ok: true, ...(jobEtaMs ? { ms: jobEtaMs * Number(req.query.runs) } : {}) }),
@@ -443,6 +453,9 @@ async function fixture(
     },
     completeOnSubmit: () => {
       completeOnSubmit = true;
+    },
+    comparisons: (records) => {
+      comparisons = records;
     },
     jobLookupFails: (value) => {
       jobLookupFails = value;
@@ -2076,7 +2089,7 @@ test("owned completed results remain available after the transient job expires",
   assert.notEqual(result.isError, true);
   assert.deepEqual(
     f.requests.slice(before).map((request) => request.path),
-    [`/jobs/${id}`, `/gallery/jobs/${id}`],
+    [`/jobs/${id}`, `/gallery/jobs/${id}`, "/comparisons"],
   );
   assert.equal(links(result).length, 1);
   const reused = data(await call(client, "reuse", { job_id: id, mode: "reference" }));
@@ -5373,6 +5386,108 @@ test("Review does not poll or download a pending result, and refuses video", asy
   assert.equal(f.downloads.length, 0);
 });
 
+test("Review compares any two outputs of one batch", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  finish(f);
+  f.jobs.get(id).outputs = [0, 1, 2].map((index) => ({
+    url: `/comfy/view?filename=batch-${index}.png`,
+  }));
+  const result = await call(client, "review", {
+    job_id: "result 1",
+    output_index: 1,
+    compare_to: "result 1",
+    compare_to_output_index: 2,
+  });
+  assert.equal(result.isError, undefined);
+  assert.deepEqual(
+    reviewed(result).map((record) => record.output_index),
+    [1, 2],
+  );
+  assert.deepEqual(
+    f.downloads.map((url) => new URL(url, f.base).searchParams.get("filename")),
+    ["batch-1.png", "batch-2.png"],
+  );
+  assert.equal(f.submitted.length, 1);
+});
+
+test("comparison winners return to chat with the exact output and can be reused", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client, { seed: 7 }));
+  finish(f);
+  f.jobs.get(id).outputs = [0, 1, 2].map((index) => ({
+    url: `/comfy/view?filename=winner-${index}.png`,
+  }));
+  const comparison = {
+    id: "fixture-batch-comparison",
+    vote: id,
+    winnerItemId: `${id}-2`,
+    variants: [1, 2].map((index) => ({
+      jobId: id,
+      label: `Option ${index}`,
+      item: { id: `${id}-${index}`, jobId: id, status: "done", index },
+    })),
+  };
+  f.comparisons([comparison]);
+  const winner = data(await call(client, "status", { job_id: "result 1" })).comparisons[0].winner;
+  assert.deepEqual([winner.job_id, winner.output_index, winner.ref], [id, 2, "result 1"]);
+  for (const [name, args] of [
+    ["result", { job_id: "result 1" }],
+    ["result", { job_id: "all" }],
+    ["search", { query: "" }],
+  ]) {
+    const reply = await call(client, name, args);
+    assert.equal(data(reply).comparisons[0].winner.output_index, 2);
+    // LibreChat forwards only content to the model, not structuredContent.
+    const context = /Studio comparisons: (.+)/.exec(texts(reply));
+    assert.deepEqual(JSON.parse(context[1])[0].winner, winner);
+  }
+  assert.match(
+    texts(await call(client, "handover", { summary: "Continue with the winner." })),
+    new RegExp(`winner: job_id ${id}, output_index 2`),
+  );
+  const rerun = data(
+    await call(client, "reuse", {
+      job_id: winner.job_id,
+      output_index: winner.output_index,
+      preserve_seed: true,
+      prompt: "The same scene at dusk",
+    }),
+  );
+  assert.equal(rerun.status, "queued");
+  assert.equal(f.submitted.at(-1).parentItemId, `${id}-2`);
+  assert.equal(f.submitted.at(-1).seed, "7");
+  comparison.vote = null;
+  assert.equal(
+    data(await call(client, "status", { job_id: "result 1" })).comparisons[0].winner,
+    null,
+  );
+});
+
+test("comparison metadata cannot adopt another MCP account's winner", async (t) => {
+  const f = await fixture(t);
+  const alice = await f.client("alice");
+  const bob = await f.client("bob");
+  const first = jobId(await generate(alice));
+  const second = jobId(await generate(bob));
+  finish(f);
+  f.comparisons([
+    {
+      id: "fixture-mixed-comparison",
+      vote: second,
+      variants: [first, second].map((jobId) => ({
+        jobId,
+        label: jobId,
+        item: { id: `${jobId}-0`, jobId, index: 0, status: "done" },
+      })),
+    },
+  ]);
+  assert.equal(data(await call(alice, "status", { job_id: first })).comparisons, undefined);
+  await failure(alice, "reuse", { job_id: second });
+});
+
 test("Review waits for a result due within the wait, and says plainly when one isn't ready", async (t) => {
   const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 5 * 60_000 });
   const client = await f.client();
@@ -5982,6 +6097,94 @@ test("a repeated identical Generate within the minute is one request: the same j
   );
   await call(client, "generate", { ...args, prompts: ["A harbour"] });
   assert.equal(f.submitted.length, 2);
+});
+
+test("a pending Generate stays deduplicated, then expires from its settled reply", async (t) => {
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  let finish;
+  let started;
+  const finishing = new Promise((resolve) => {
+    finish = resolve;
+  });
+  const probing = new Promise((resolve) => {
+    started = resolve;
+  });
+  let queued = 0;
+  let generate;
+  registerGenerateTools({
+    tool: (_server, name, _title, _description, _schema, action) => {
+      if (name === "generate") generate = action;
+    },
+    server: {},
+    media: {
+      profiles: async () => [imageProfile],
+      queue: async () => ({
+        status: "queued",
+        jobs: [
+          {
+            job_id: `job-${++queued}`,
+            ref: `result ${queued}`,
+            link: `https://fixture.test/${queued}`,
+          },
+        ],
+      }),
+      finishTimes: async () => {
+        started();
+        await finishing;
+        throw new Error("The ETA wait was interrupted.");
+      },
+    },
+    actor: { owner: "alice", refs: "chat-1" },
+    generateDedupeMs: 120_000,
+    reviewedGuides: new Map(),
+    recentGenerates: new Map(),
+    previews: new Map(),
+  });
+  const args = { profile_id: imageProfile.id, prompts: ["A lighthouse"], count: 1 };
+  const first = generate(args);
+  await probing;
+  now += 120_001;
+  const pendingRetry = generate(args);
+  assert.equal(queued, 1);
+  finish();
+  const [original, repeated] = await Promise.all([first, pendingRetry]);
+  assert.deepEqual(data(repeated).jobs, data(original).jobs);
+  now += 120_000;
+  assert.deepEqual(data(await generate(args)).jobs, data(original).jobs);
+  now++;
+  const next = await generate(args);
+  assert.equal(queued, 2);
+  assert.notEqual(data(next).jobs[0].job_id, data(original).jobs[0].job_id);
+});
+
+test("a Generate retry retains accepted jobs when its reply is interrupted", async (t) => {
+  const f = await fixture(t, { generateDedupeMs: 60_000 });
+  t.mock.method(McpMedia.prototype, "finishTimes", async () => {
+    throw new Error("The client cancelled its ETA wait.");
+  });
+  const client = await f.client();
+  const args = { profile_id: imageProfile.id, prompts: ["A lighthouse"], count: 1 };
+  const first = await call(client, "generate", args);
+  const second = await call(client, "generate", args);
+  assert.equal(f.submitted.length, 1);
+  assert.deepEqual(data(second).jobs, data(first).jobs);
+  assert.match(texts(second), /never resubmit/);
+  assert.match(texts(second), new RegExp(data(first).jobs[0].link));
+});
+
+test("a Generate retry retains earlier model sets when a later model refuses submission", async (t) => {
+  const f = await fixture(t, { generateDedupeMs: 60_000 });
+  const other = { ...structuredClone(imageProfile), id: "fixture-image-other", label: "Other" };
+  await f.profiles([imageProfile, other]);
+  f.failAfter(1);
+  const client = await f.client();
+  const args = { profile_ids: [imageProfile.id, other.id], prompts: ["A lighthouse"], count: 1 };
+  const first = await call(client, "generate", args);
+  f.failAfter(Infinity);
+  const second = await call(client, "generate", args);
+  assert.equal(f.submitted.length, 1);
+  assert.deepEqual(data(second).jobs, data(first).jobs);
 });
 
 test("an ordinary request never upscales, even for best quality or a profile default", async (t) => {
