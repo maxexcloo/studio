@@ -185,8 +185,7 @@ export class GenerationQueue {
       return loads.get(resource)!;
     };
     for (const resource of this.loaded.keys()) at(resource);
-    for (const job of this.store.schedulable()) {
-      if (terminalStatuses.has(job.status)) continue;
+    for (const job of this.store.openJobs()) {
       if (this.acceptedIds.has(job.id))
         Object.assign(at(job.resource), { busy: true, current: job.id });
       else at(job.resource).queued += 1;

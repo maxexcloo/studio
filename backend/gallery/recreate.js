@@ -17,17 +17,10 @@ export function registerRecreateRoute(app, { store }) {
     if (!item)
       return res.status(404).json({ ok: false, error: "That item is no longer in the gallery." });
     const ownerId = item.ownerId || "";
+    const upload = store.uploadJob(ownerId, item.id);
     const job =
       (item.jobId && store.job(ownerId, item.jobId)) ||
-      store
-        .jobs(ownerId)
-        .find(
-          (entry) =>
-            entry.resource === "studio" &&
-            !entry.parentJobId &&
-            entry.outputs[0]?.id === item.id &&
-            store.session(ownerId, entry.sessionId),
-        ) ||
+      (upload && store.session(ownerId, upload.sessionId) && upload) ||
       store.recordFinished(
         ownerId,
         store.createSession(ownerId, "Recreate", { prompt: item.suggestedPrompt || "" }).id,
