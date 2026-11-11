@@ -494,7 +494,9 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
     acceptedOperations: 0,
   });
   let settings = { automatic: false, parkIdleMinutes: 0 };
+  let refuse = false;
   await page.route("**/api/runtime/settings", (route) => {
+    if (refuse) return route.fulfill({ status: 500, json: { error: "The cluster refused." } });
     settings = route.request().postDataJSON();
     return route.fulfill({ json: settings });
   });
@@ -557,7 +559,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await expect(park).toHaveValue("Never");
   await expect(idle).toBeDisabled();
   await expect(idle).toHaveValue("None");
-  // The switch follows the saved settings, so it turns on once the save is read back.
+  // The switch turns on at once and stays on once the save is read back.
   await page.getByRole("switch", { name: "Automatic Control", exact: true }).click({ force: true });
   await expect(park).toBeEnabled();
   expect(settings).toEqual({ automatic: true, parkIdleMinutes: 0 });
@@ -577,6 +579,13 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await expect
     .poll(() => settings)
     .toEqual({ automatic: true, parkIdleMinutes: 15, idleWorkload: "text", everyoneSwaps: true });
+  // A refused save turns the switch back and says why.
+  refuse = true;
+  const swaps = page.getByRole("switch", { name: "Let Everyone Swap Models", exact: true });
+  await swaps.click({ force: true });
+  await expect(page.getByText("The cluster refused.", { exact: true })).toBeVisible();
+  await expect(swaps).toBeChecked();
+  refuse = false;
   const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
   await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
   const changes = history.getByRole("table", { name: "Runtime Changes" });
