@@ -14,6 +14,7 @@ import {
   preferencesQuery,
   useSavePreferences,
   useTileCaptions,
+  type GalleryWorkPreference,
   type SidePreference,
   type VideosPreference,
 } from "./accountPreferences";
@@ -222,6 +223,33 @@ function WhereWorkRuns() {
   );
 }
 
+const galleryWorkChoices = [
+  { value: "none", label: "None" },
+  { value: "running", label: "In Progress" },
+  { value: "queued", label: "Queued" },
+];
+/** Which unfinished work the gallery shows: none (unsaved), work in progress, or queued work too. */
+function GalleryWork() {
+  const status = useQuery(preferencesQuery).data;
+  const save = useSavePreferences();
+  if (!status) return null;
+  return (
+    <SettingRow
+      wide
+      label="Unfinished Work"
+      description="Show generations in the gallery before they finish: none, those in progress, or queued ones too."
+    >
+      <SegmentedControl
+        aria-label="Unfinished Work"
+        fullWidth
+        data={galleryWorkChoices}
+        value={status.preferences.galleryWork || "none"}
+        onChange={(choice) => save.mutate({ galleryWork: choice as GalleryWorkPreference })}
+      />
+    </SettingRow>
+  );
+}
+
 /** Settings › Preferences: how Studio works for this account, saved with it. */
 export function Preferences() {
   const keep = useKeepRecentPrompts(true);
@@ -246,6 +274,7 @@ export function Preferences() {
           </Button>
         </SettingRow>
         <FinishStarredImages />
+        <GalleryWork />
         <SettingRow
           label="Tile Captions"
           description="Show each tile’s title and details on phones. Desktop shows them on hover."

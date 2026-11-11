@@ -7,6 +7,8 @@ import { modelsQuery } from "../generation/GenerationProvider";
 export type VideosPreference = "cloud" | "fast" | "quality";
 /** Where the account prefers images to run; the other side takes over, saying so, when it can't. */
 export type SidePreference = "cloud" | "local";
+/** Which unfinished work the gallery shows: none, work in progress, or queued work too. */
+export type GalleryWorkPreference = "none" | "running" | "queued";
 /** The account's own preferences (backend/account-preferences.js). */
 export interface Preferences {
   cloudModels: boolean;
@@ -14,6 +16,8 @@ export interface Preferences {
   spicyPrompts: boolean;
   tileCaptions: boolean;
   uncensoredModels: boolean;
+  /** Which unfinished work the gallery shows; unsaved, none. */
+  galleryWork?: GalleryWorkPreference;
   /** Where images run by default; unsaved, Local. */
   images?: SidePreference;
   /** The text model prompt writing asks for; unsaved, the assistant's default (`/api/assistant`). */
@@ -56,6 +60,8 @@ export function useSavePreferences() {
       // Explicit wording (Spicy Prompts with Uncensored Models) changes what suggestions say.
       if ("spicyPrompts" in patch || "uncensoredModels" in patch)
         void client.invalidateQueries({ queryKey: ["suggestions"] });
+      // The gallery shows the unfinished work the account chose.
+      if ("galleryWork" in patch) void client.invalidateQueries({ queryKey: ["gallery"] });
       // Default models follow where the account prefers each area to run.
       if ("images" in patch || "videos" in patch)
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
