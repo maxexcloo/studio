@@ -132,7 +132,7 @@ An API workflow can opt in to Studio's LoRA picker with an existing rgthree Powe
 
 The referenced node must be `Power Lora Loader (rgthree)` and already have its model and CLIP wiring connected. Studio replaces only its `lora_` inputs using the selected LoRAs, in sidebar order.
 
-The simpler rgthree stack used by the sample Flux 2 edit profile is also
+The simpler rgthree stack used by the sample Real Dream edit profile is also
 supported:
 
 ```json
