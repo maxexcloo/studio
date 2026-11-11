@@ -28,6 +28,11 @@ export interface Action {
   description?: string;
   /** Every bar action has one; a menu option may go without (a suggested change). */
   icon?: LucideIcon;
+  /**
+   * A bar's main choice, such as Dream's Pass and Like: when labelled, a full-size round button in
+   * this variant, at the bar's ends around the smaller icons.
+   */
+  emphasis?: "default" | "filled";
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
   /** An on/off option: a checked menu item (Show Upscale), or with `keepOpen` a switch row. */
@@ -314,12 +319,14 @@ function ActionControl({
         : { onClick }),
   } as const;
   const icon = Icon && <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
+  const emphasis = action.emphasis && { variant: action.emphasis, color: undefined, radius: "xl" };
   const control = labelled ? (
     <Button
-      size="sm"
+      size={emphasis ? undefined : "sm"}
       leftSection={icon}
       rightSection={chevron ? <ChevronDown size={14} /> : undefined}
       {...props}
+      {...emphasis}
     >
       {label}
     </Button>

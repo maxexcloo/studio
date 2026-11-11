@@ -17,7 +17,6 @@ import {
   Modal,
   Popover,
   type PopoverProps,
-  SegmentedControl,
   Stack,
   Text,
   TextInput,
@@ -28,6 +27,7 @@ import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
+import { ScrollingSegments } from "../../ui/ScrollingSegments";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
 import { menuWidth } from "../../theme";
@@ -256,9 +256,8 @@ export function PickerHeader<Tab extends string>({
     <Box className={classes.header}>
       <div className={classes.headerRow}>
         {tabs && (
-          <SegmentedControl
+          <ScrollingSegments
             aria-label={`${label} View`}
-            className={classes.tabs}
             classNames={{ control: classes.tab }}
             value={tab}
             onChange={(value) => onTabChange?.(value as Tab)}

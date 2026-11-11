@@ -188,9 +188,10 @@ function WhereWorkRuns() {
     value: T,
     change: (choice: T) => void,
   ) => (
-    <SettingRow label={label}>
+    <SettingRow wide label={label}>
       <SegmentedControl
         aria-label={label}
+        fullWidth
         data={data}
         value={value}
         onChange={(choice) => change(choice as T)}
@@ -211,7 +212,6 @@ function WhereWorkRuns() {
             allowDeselect={false}
             searchable
             nothingFoundMessage="No Matches"
-            w={{ base: "100%", sm: 240 }}
           />
         </SettingRow>
       )}

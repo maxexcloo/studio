@@ -42,7 +42,6 @@ export function GenerationSettings() {
           searchable
           clearable
           nothingFoundMessage="No Matches"
-          w={{ base: "100%", sm: 240 }}
         />
       </SettingRow>
     );

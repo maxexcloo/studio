@@ -35,6 +35,8 @@ export function referenceDetails(
   }));
 }
 type ReferenceSlot = NonNullable<Profile["mediaInputs"]>[number];
+/** The reference slots a profile declares, or a card's images (CardImages). */
+export type SlotLayout = Pick<Profile, "mediaInputs">;
 
 /** A placed reference as a run sends it: its asset, slot and any strength set. */
 const referenceAsset = (asset: ReferenceAsset) => ({
@@ -43,7 +45,7 @@ const referenceAsset = (asset: ReferenceAsset) => ({
   ...(asset.strength !== undefined ? { strength: asset.strength } : {}),
 });
 
-export function referenceGroups(profile?: Profile): ReferenceSlot[][] {
+export function referenceGroups(profile?: SlotLayout): ReferenceSlot[][] {
   const groups: ReferenceSlot[][] = [];
   for (const slot of profile?.mediaInputs?.length
     ? profile.mediaInputs
@@ -59,7 +61,7 @@ export function referenceGroups(profile?: Profile): ReferenceSlot[][] {
   return groups;
 }
 
-export function referenceGroup(profile?: Profile, slot?: string) {
+export function referenceGroup(profile?: SlotLayout, slot?: string) {
   const groups = referenceGroups(profile);
   return groups.find((group) => group.some((input) => input.id === slot)) || groups[0];
 }
@@ -75,7 +77,7 @@ export function referenceGroupAssets(references: ReferenceAsset[], group: Refere
 export function addReference(
   references: ReferenceAsset[],
   asset: ReferenceAsset,
-  profile?: Profile,
+  profile?: SlotLayout,
   slot = profile?.mediaInputs?.[0]?.id || "image",
 ) {
   const group = referenceGroup(profile, slot);

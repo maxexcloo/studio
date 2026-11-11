@@ -99,18 +99,8 @@
   align-items: center;
 }
 
-/* One bar of tabs, scrolling sideways where it is wider than the screen, with a line before each
-   later group. */
-.tabs {
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tab {
-  flex-shrink: 0;
-}
-
+/* One bar of tabs (`ScrollingSegments` scrolls it where it is wider than the screen), with a line
+   before each later group. */
 .tab:has([data-group-start]) {
   margin-inline-start: 9px;
 }
