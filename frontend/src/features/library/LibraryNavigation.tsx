@@ -4,60 +4,60 @@ import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
 
-// What the studio has, then where more comes from, each alphabetical; the Library opens on Models.
+// Grouped as the navigation lists them, each group alphabetical; the Library opens on Models.
 export const librarySections = {
   characters: {
     label: "Characters",
     description:
       "Your character cards: an image and lasting looks that picking one leads a prompt with.",
     icon: icons.character,
-    group: "What You Have",
-  },
-  guides: {
-    label: "Guides",
-    description: "Prompting guides for profiles and families. Every saved version is kept.",
-    icon: BookOpen,
-    admin: true,
-    group: "What You Have",
-  },
-  loras: {
-    label: "LoRAs",
-    description: "Style and subject adapters for compatible models.",
-    icon: icons.loras,
-    group: "What You Have",
-  },
-  models: {
-    label: "Models",
-    description: "Checkpoints, diffusion models, text encoders and VAEs, with their families.",
-    icon: Boxes,
-    group: "What You Have",
-    initial: true,
+    group: "Cards",
   },
   outfits: {
     label: "Outfits",
     description: "Outfits to dress a character in, the same across a series of shots.",
     icon: icons.outfit,
-    group: "What You Have",
-  },
-  profiles: {
-    label: "Profiles",
-    description: "Generation profiles and their workflows. Every saved version is kept.",
-    icon: FileCog,
-    admin: true,
-    group: "What You Have",
+    group: "Cards",
   },
   scenes: {
     label: "Scenes",
     description: "Places, light and time of day to reuse across a series of shots.",
     icon: icons.scene,
-    group: "What You Have",
+    group: "Cards",
+  },
+  loras: {
+    label: "LoRAs",
+    description: "Style and subject adapters for compatible models.",
+    icon: icons.loras,
+    group: "Catalogue",
+  },
+  models: {
+    label: "Models",
+    description: "Checkpoints, diffusion models, text encoders and VAEs, with their families.",
+    icon: Boxes,
+    group: "Catalogue",
+    initial: true,
   },
   unused: {
     label: "Unused",
     description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
     icon: ArchiveX,
     admin: true,
-    group: "What You Have",
+    group: "Catalogue",
+  },
+  guides: {
+    label: "Guides",
+    description: "Prompting guides for profiles and families. Every saved version is kept.",
+    icon: BookOpen,
+    admin: true,
+    group: "Generation",
+  },
+  profiles: {
+    label: "Profiles",
+    description: "Generation profiles and their workflows. Every saved version is kept.",
+    icon: FileCog,
+    admin: true,
+    group: "Generation",
   },
   downloads: {
     label: "Downloads",
