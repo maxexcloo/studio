@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, fixtures, image, promptMenu, stamp } from "./fixtures";
+import { create, editorMenu, fixtures, image, promptMenu, stamp } from "./fixtures";
 
 const ideas = [
   "A lighthouse in rolling fog at blue hour",
@@ -93,7 +93,9 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
 
 test("Viewer Suggestions load in the ⋯ menu, Refresh Suggestions replaces them and Ask for a Change… hands over the field", async ({
   page,
-}) => {
+}, testInfo) => {
+  // Phones show the tools as buttons in the prompt's editor, Suggestions holding its own options.
+  const phone = testInfo.project.use.isMobile;
   await openViewer(page);
   const asked: any[] = [];
   const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
@@ -110,24 +112,40 @@ test("Viewer Suggestions load in the ⋯ menu, Refresh Suggestions replaces them
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   // One level deep: the suggested changes first, then the prompt's actions.
-  const menu = await promptMenu(viewer, "Prompt");
+  const menu = phone
+    ? await editorMenu(viewer, "Prompt", "Suggestions")
+    : await promptMenu(viewer, "Prompt");
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeDisabled();
   release[0]();
-  const actions = ["Ask for a Change…", "Refresh Suggestions", "Clear Prompt"];
+  const actions = phone ? [] : ["Ask for a Change…", "Refresh Suggestions", "Clear Prompt"];
   await expect(menu.getByRole("menuitem")).toHaveText([
     ...steps.map((step) => step.label),
     ...actions,
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
-  await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
+  if (phone) {
+    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+    // Escape closes only the menu; the editor stays.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await editor.getByRole("button", { name: "Refresh Suggestions", exact: true }).click();
+    await editor.getByRole("button", { name: "Suggestions", exact: true }).click();
+  } else await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
   await expect(menu.getByRole("menuitem")).toHaveText(["Snowfall", ...actions]);
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
   // With the prompt as it was, Ask for a Change… selects it for a change typed over it; phones
   // open the editor for it.
-  await menu.getByRole("menuitem", { name: "Ask for a Change…", exact: true }).click();
+  if (phone) {
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await page
+      .getByRole("dialog", { name: "Prompt", exact: true })
+      .getByRole("button", { name: "Ask for a Change…", exact: true })
+      .click();
+  } else await menu.getByRole("menuitem", { name: "Ask for a Change…", exact: true }).click();
   await expect(page.getByRole("menu")).toHaveCount(0);
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   if (page.viewportSize()!.width >= 768) {
@@ -137,15 +155,23 @@ test("Viewer Suggestions load in the ⋯ menu, Refresh Suggestions replaces them
   } else await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeVisible();
 });
 
-test("No ideas or suggestions show when Studio has none", async ({ page }) => {
+test("No ideas or suggestions show when Studio has none", async ({ page }, testInfo) => {
+  const phone = testInfo.project.use.isMobile;
   await openViewer(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const menu = await promptMenu(viewer, "Prompt");
+  const menu = phone
+    ? await editorMenu(viewer, "Prompt", "Suggestions")
+    : await promptMenu(viewer, "Prompt");
   await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
+  if (phone) {
+    // Escape closes the editor first, then the viewer.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeHidden();
+  }
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await create(page);
