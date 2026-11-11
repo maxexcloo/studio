@@ -84,10 +84,9 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("Viewer Suggestions load with Refresh Suggestions in their menu, and Ask for a Change waits for a change", async ({
+test("The viewer's AI menu loads Suggestions with Refresh Suggestions, then Custom… and Review First", async ({
   page,
 }, testInfo) => {
-  // Phones show the tools as buttons in the prompt's editor, Suggestions holding its own options.
   const phone = testInfo.project.use.isMobile;
   await openViewer(page);
   const asked: any[] = [];
@@ -104,34 +103,26 @@ test("Viewer Suggestions load with Refresh Suggestions in their menu, and Ask fo
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  // One level deep: the suggested changes first, then the prompt's actions.
-  const menu = phone
-    ? await editorMenu(viewer, "Prompt", "Suggestions")
-    : await promptMenu(viewer, "Prompt");
+  await viewerAction(page, "AI");
+  const menu = page.getByRole("menu");
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeDisabled();
   release[0]();
-  const actions = phone ? [] : ["Ask for a Change…", "Reset Prompt"];
-  await expect(menu.getByRole("menuitem")).toHaveText([
-    ...steps.map((step) => step.label),
-    "Refresh Suggestions",
-    ...actions,
-  ]);
+  for (const label of [...steps.map((step) => step.label), "Refresh Suggestions", "Custom…"])
+    await expect(menu.getByRole("menuitem", { name: label, exact: true })).toBeVisible();
+  await expect(menu.getByText("Review First", { exact: true })).toBeVisible();
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
   await expect(thinking).toBeVisible();
   release[1]();
-  await expect(menu.getByRole("menuitem")).toHaveText([
-    "Snowfall",
-    "Refresh Suggestions",
-    ...actions,
-  ]);
+  await expect(menu.getByRole("menuitem", { name: "Snowfall", exact: true })).toBeVisible();
   expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
+  // With the prompt as it was, Custom… selects it for a change typed over it; phones open the
+  // editor, which asks from a send beside Generate once a change is typed, with Reset beside them.
+  await menu.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   if (phone) {
-    // The editor asks from a send beside Generate once a change is typed, with Reset beside them.
     const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
     const ask = editor.getByRole("button", { name: "Ask for a Change", exact: true });
     const reset = editor.getByRole("button", { name: "Reset Prompt", exact: true });
     await expect(ask).toBeDisabled();
@@ -144,9 +135,6 @@ test("Viewer Suggestions load with Refresh Suggestions in their menu, and Ask fo
     );
     return;
   }
-  // With the prompt as it was, Ask for a Change… selects it for a change typed over it.
-  await menu.getByRole("menuitem", { name: "Ask for a Change…", exact: true }).click();
-  await expect(page.getByRole("menu")).toHaveCount(0);
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   if (page.viewportSize()!.width >= 768) {
     await expect(field).toBeFocused();
@@ -186,31 +174,16 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
-test("No ideas or suggestions show when Studio has none", async ({ page }, testInfo) => {
-  const phone = testInfo.project.use.isMobile;
+test("No ideas or suggestions show when Studio has none", async ({ page }) => {
   await openViewer(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const menu = phone
-    ? await editorMenu(viewer, "Prompt", "Suggestions")
-    : await promptMenu(viewer, "Prompt");
+  await viewerAction(page, "AI");
+  const menu = page.getByRole("menu");
   await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
-  if (phone) {
-    // With the keyboard up, a tool's menu takes focus from the text without closing the editor.
-    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
-    await editor.getByRole("textbox", { name: "Prompt", exact: true }).click();
-    await editor.getByRole("button", { name: "Suggestions", exact: true }).click();
-    await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeVisible();
-    await expect(editor).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("menu")).toHaveCount(0);
-    // Escape closes the editor first, then the viewer.
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeHidden();
-  }
   await page.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   await create(page);

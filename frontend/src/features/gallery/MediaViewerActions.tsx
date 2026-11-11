@@ -8,12 +8,12 @@ import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { AnimateTheme, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
-import { ViewerPrompt } from "./ViewerPrompt";
+import { useViewerPrompt, ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, Upscale, Copy, Download and Similar beside their icons. Phones show
-// every action as a compact icon on one row.
-const labelled = ["animate", "edit", "upscale", "copy", "download", "similar"];
+// Desktop names Animate, Edit, AI, Upscale, Copy, Download and Similar beside their icons. Phones
+// show every action as a compact icon on one row.
+const labelled = ["animate", "edit", "ai", "upscale", "copy", "download", "similar"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -68,7 +68,7 @@ export function MediaViewerActions({
   const transfer = useMediaTransfer(item, true);
   const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const [trimming, setTrimming] = useState(false);
-  const groups = useMediaActions(item, {
+  const itemGroups = useMediaActions(item, {
     transfer,
     compare,
     iterate,
@@ -82,7 +82,17 @@ export function MediaViewerActions({
     onTrim: () => setTrimming(true),
     onVersionChange,
   });
-  if (shortcuts) shortcuts.current = groups;
+  const prompt = useViewerPrompt(item, { groups: itemGroups, iterate });
+  // AI follows Edit: the prompt's assistance, beside the item's own iterations.
+  const groups = prompt.ai
+    ? itemGroups.map((group) => {
+        const edit = group.findIndex((action) => action.id === "edit");
+        return edit < 0
+          ? group
+          : [...group.slice(0, edit + 1), prompt.ai!, ...group.slice(edit + 1)];
+      })
+    : itemGroups;
+  if (shortcuts) shortcuts.current = itemGroups;
   return (
     <ActionBarSurface
       ref={ref}
@@ -93,13 +103,7 @@ export function MediaViewerActions({
     >
       {item.jobId && (
         <Box className={classes.promptRow} display={promptHidden ? "none" : undefined}>
-          <ViewerPrompt
-            key={item.id}
-            item={item}
-            groups={groups}
-            iterate={iterate}
-            pending={pending}
-          />
+          <ViewerPrompt state={prompt} iterate={iterate} pending={pending} />
         </Box>
       )}
       {phone ? (
