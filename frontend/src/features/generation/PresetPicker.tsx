@@ -40,7 +40,7 @@ const presetParts = [
     value: "size",
     label: "Size",
     noun: "size",
-    keys: ["width", "height", "resolutionTier", "tiledDecode"],
+    keys: ["width", "height", "resolution", "resolutionTier", "tiledDecode"],
   },
   { value: "loras", label: "LoRAs", noun: "LoRAs", keys: ["loras"] },
   {
