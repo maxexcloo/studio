@@ -314,7 +314,6 @@ export function GenerationEditor({
           <Group justify="space-between" gap="xs">
             <SegmentedControl
               aria-label="Generation Output"
-              size={phone ? "md" : "sm"}
               radius="xl"
               style={{ flexShrink: 0 }}
               value={input.kind}
