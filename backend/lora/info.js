@@ -1,6 +1,6 @@
 import { comfy } from "../comfy/comfy.js";
 import { families as modelFamilies } from "../family-catalogue.js";
-import { enrichLocalLoraInfo, enrichLoraInfo } from "./catalogue.js";
+import { enrichLocalLoraInfo, enrichLoraInfo, withFamilyRefinements } from "./catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
@@ -140,29 +140,11 @@ export function triggersFromMetadata(metadata = {}) {
 const label = (ids) =>
   [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(" / ");
 
-/**
- * The families a LoRA fits, with the ones that only narrow them by name
- * (`refines`): a Wan 14B LoRA fits Wan 2.2 14B I2V, a HunyuanVideo 1.5 one its I2V model.
- */
-function withRefinements(ids) {
-  const all = new Set(ids);
-  for (let grew = true; grew;) {
-    grew = false;
-    for (const [id, spec] of Object.entries(families)) {
-      if (spec.refines && all.has(spec.refines.family) && !all.has(id)) {
-        all.add(id);
-        grew = true;
-      }
-    }
-  }
-  return [...all];
-}
-
 function describe(metadata) {
   const found = familiesFromMetadata(metadata);
   // The label names what it was made for; the list also holds the models that share its layout.
   const base = label(found);
-  const ids = withRefinements(found);
+  const ids = withFamilyRefinements(found, families);
   const about = ["modelspec.title", "ss_output_name", "name"]
     .map((key) => metadata?.[key])
     .filter((value) => typeof value === "string")

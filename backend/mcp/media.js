@@ -348,27 +348,56 @@ export class McpMedia {
     const models = await this.catalogue(owner);
     return (models.profiles || [])
       .filter((profile) => profile.ready !== false && (kind === "all" || profile.kind === kind))
-      .map((listed) => {
-        // Each profile and image mode carries its guide merged with its own fields (mcp/prompting.js).
-        const profile = { ...listed, ...listed.imageModes?.generate };
-        const imageModes =
-          profile.imageModes &&
-          Object.fromEntries(
-            Object.entries(profile.imageModes).map(([name, mode]) => [
-              name,
-              mode?.prompting
-                ? { ...mode, prompting: this.prompting({ ...profile, prompting: mode.prompting }) }
-                : mode,
-            ]),
-          );
-        const prompting = this.prompting(profile);
-        return {
-          ...profile,
-          ...(imageModes ? { imageModes } : {}),
-          ...(prompting ? { prompting } : {}),
-        };
-      });
+      .map((listed) => this.profileWithPrompting(listed));
   }
+  profileWithPrompting(listed) {
+    // Each profile and image mode carries its guide merged with its own fields (mcp/prompting.js).
+    const profile = { ...listed, ...listed.imageModes?.generate };
+    const imageModes =
+      profile.imageModes &&
+      Object.fromEntries(
+        Object.entries(profile.imageModes).map(([name, mode]) => [
+          name,
+          mode?.prompting
+            ? { ...mode, prompting: this.prompting({ ...profile, prompting: mode.prompting }) }
+            : mode,
+        ]),
+      );
+    const prompting = this.prompting(profile);
+    return {
+      ...profile,
+      ...(imageModes ? { imageModes } : {}),
+      ...(prompting ? { prompting } : {}),
+    };
+  }
+  profileForBackend(profile, backend) {
+    const option = profile.backendOptions?.find((option) => option.id === backend);
+    if (!option?.profile) return profile;
+    const {
+      aliases,
+      aliasBackends,
+      backendOptions,
+      failing,
+      workerIds,
+      availability,
+      readiness,
+      namedBackend,
+    } = profile;
+    return this.profileWithPrompting({
+      ...option.profile,
+      aliases,
+      aliasBackends,
+      backendOptions,
+      failing,
+      workerIds,
+      availability,
+      readiness,
+      namedBackend,
+      ready: option.ready,
+      readyReason: option.reason,
+    });
+  }
+
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
    * Cloud (Grok) profiles join when the user asked for the cloud (`cloud`) or the account's default is one: its
@@ -557,6 +586,7 @@ export class McpMedia {
     } = args;
     let profile = (await this.profiles("all", owner)).find((item) => item.id === profile_id);
     if (!profile) throw new Error("Choose a ready profile from models.");
+    profile = this.profileForBackend(profile, profile_backend);
     const cloud = isCloudVideo(profile);
     if (cloud) await this.checkCloudJobs();
     if (cloud && this.cloudPause())
@@ -1361,13 +1391,16 @@ export class McpMedia {
       throw new Error(
         "The profile behind this result is no longer available to this account. Call generate instead.",
       );
+    // A saved run keeps its backend's controls and limits as well as its backend id.
+    const backend = settings.profileBackend || profileAliasBackend(settings.profileId);
+    const selected = this.profileForBackend(base, backend);
     const references = (settings.referenceAssets || [])
       .map((asset) => asset?.assetId)
       .filter(Boolean);
-    const profile = references.length ? { ...base, ...base.imageModes?.reference } : base;
+    const profile = references.length
+      ? { ...selected, ...selected.imageModes?.reference }
+      : selected;
     const controls = mcpControls(profile);
-    // The backend it ran on: recorded, else the one its old per-backend id names.
-    const backend = settings.profileBackend || profileAliasBackend(settings.profileId);
     const args = {
       profile_id: base.id,
       ...(backend && base.backend ? { profile_backend: backend } : {}),
@@ -1418,7 +1451,7 @@ export class McpMedia {
       : { loras: [], droppedNames: [] };
     if (loras.length) args.loras = loras;
     return {
-      profile: base,
+      profile: selected,
       args,
       ...(droppedNames.length
         ? { droppedLoras: droppedNames.map((name) => loraName(name, infos[name])) }
@@ -1427,6 +1460,7 @@ export class McpMedia {
   }
   /** Generate arguments that run a finished output on another profile of its kind, at its proportions and with its references. */
   retarget(item, profile, { count = 1 } = {}) {
+    profile = this.profileForBackend(profile, profile.namedBackend);
     const references = (item.settings?.referenceAssets || [])
       .map((asset) => asset?.assetId)
       .filter(Boolean);

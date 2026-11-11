@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createCatalogueStore } from "./catalogue.js";
+import { enrichLocalLoraInfo } from "../lora/catalogue.js";
+import { loraCompatibility, strengthRange } from "../lora/policy.js";
+import { mcpLoras, prepareLoras } from "../mcp/controls.js";
+import { loraDefaultStrength } from "../../shared/profiles.ts";
 
 const hex = (digit) => digit.repeat(64);
 const quiet = { info: () => {}, warn: () => {} };
@@ -287,8 +291,80 @@ test("the LoRA view keeps the older shapes, with Studio’s edits applied", (t) 
     sourceUrl: "https://civitai.red/models/1",
     tags: ["a", "b"],
     strengthRange: { min: 0, max: 1, step: 0.05, default: 0.5 },
+    recommendedStrength: 0.5,
   });
   assert.equal(catalogue["seed-only.safetensors"].title, "Seed Only");
+});
+
+test("partial LoRA strength recommendations survive saved definitions and edits without inventing control bounds", (t) => {
+  const f = fixture(t);
+  const catalogueFile = path.join(f.dir, "library/catalogue.json");
+  const saved = JSON.parse(fs.readFileSync(catalogueFile, "utf8"));
+  const examples = [
+    { default: 2, max: 3 },
+    { default: 1, min: 1, max: 2 },
+    { default: 1.5, max: 2 },
+  ];
+  for (const [index, strength] of examples.entries())
+    saved.layers.definitions[`loras/recommended-${index}.safetensors`] = {
+      baseModel: "Krea 2",
+      strength,
+    };
+  saved.layers.definitions["loras/seed-only.safetensors"].strength = {
+    min: 0,
+    max: 2,
+    step: 0.1,
+    default: 1,
+  };
+  fs.writeFileSync(catalogueFile, JSON.stringify(saved));
+  const store = f.store();
+  store.edit("loras/style.safetensors", { strength: examples[2] });
+  store.edit("loras/seed-only.safetensors", { strength: examples[2] });
+  for (const [name, expected] of [
+    ...examples.map((strength, index) => [`recommended-${index}.safetensors`, strength.default]),
+    ["style.safetensors", 1.5],
+    ["seed-only.safetensors", 1.5],
+  ]) {
+    const info = enrichLocalLoraInfo(
+      { families: [], triggers: [] },
+      name,
+      store.loraView().catalogue,
+      families,
+      { krea2: { label: "Krea 2" } },
+    );
+    assert.equal(strengthRange(info), null, "partial bounds do not replace controls");
+    assert.equal(loraDefaultStrength(info, 1), expected, "the browser's initial strength");
+    const profile = { family: "krea2", options: { loras: [name] } };
+    assert.equal(
+      mcpLoras(profile, { [name]: info }, { names: [name] }).loras[0].strength.recommended,
+      expected,
+    );
+    assert.equal(prepareLoras(profile, { [name]: info }, [{ name }])[0].strength, expected);
+    assert.equal(
+      prepareLoras(profile, { [name]: info }, [{ name, strength: 0.5 }])[0].strength,
+      0.5,
+      "an explicit strength still wins",
+    );
+  }
+});
+
+test("saved LoRA family overrides govern compatibility through the catalogue view", (t) => {
+  const f = fixture(t);
+  const store = f.store();
+  store.edit("loras/style.safetensors", { families: ["sdxl"] });
+  const read = () =>
+    enrichLocalLoraInfo(
+      { families: ["krea2"], triggers: [] },
+      "style.safetensors",
+      store.loraView().catalogue,
+      families,
+      { krea2: { label: "Krea 2" }, sdxl: { label: "SDXL" } },
+    );
+  assert.equal(loraCompatibility(read(), { family: "sdxl" }), "fits");
+  assert.equal(loraCompatibility(read(), { family: "flux1" }), "other");
+  assert.equal(loraCompatibility(read(), { family: "krea2" }), "other");
+  store.edit("loras/style.safetensors", { families: [] });
+  assert.deepEqual(read().families, [], "explicitly clearing the family leaves it unknown");
 });
 
 test("explicit Original/Finetune classification persists and projects through Library", async (t) => {

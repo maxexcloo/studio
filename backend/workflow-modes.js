@@ -15,20 +15,20 @@ export function selectImageMode(workflow, body) {
   const references = (body.referenceAssets || []).filter((item) => item?.comfyName);
   const hasImage = hasReferenceImage(body);
   const mode = resolveImageMode(workflow, body);
-  if (mode === workflow) return workflow;
+  if (mode === workflow && workflow.kind !== "video") return workflow;
   const selected = { ...workflow, ...mode, graph: structuredClone(mode.graph || workflow.graph) };
-  if (!hasImage) return selected;
+  if (!hasImage && selected.kind !== "video") return selected;
 
   const slots = selected.mediaInputs || [];
-  if (references.length && slots.length && !references.some((item) => item.slot === slots[0].id)) {
-    throw new Error("Add the first reference image before additional references.");
-  }
-  for (const [index, slot] of slots.entries()) {
-    if (
-      references.some((item) => item.slot === slot.id) ||
-      (index === 0 && (body.startImage || body.startImageId))
-    )
+  const supplied = new Set(references.map((item) => item.slot));
+  if (slots.length && (body.startImage || body.startImageId)) supplied.add(slots[0].id);
+  for (const slot of slots) {
+    if (supplied.has(slot.id)) {
+      if (slot.follows && !supplied.has(slot.follows))
+        throw new Error("Add the preceding reference image before additional references.");
       continue;
+    }
+    if (slot.required || slot.min > 0) continue;
     omitReference(selected.graph, slot.control?.node);
   }
   return selected;
@@ -63,7 +63,13 @@ function omitReference(graph, loader) {
         delete graph[id];
         removed.push(id);
       } else if (
-        affected.every(([name]) => name.startsWith("images.") || name.startsWith("ref_images."))
+        affected.every(
+          ([name]) =>
+            name.startsWith("images.") ||
+            name.startsWith("ref_images.") ||
+            name === "first_frame" ||
+            name === "last_frame",
+        )
       ) {
         for (const [name] of affected) delete node.inputs[name];
       } else {

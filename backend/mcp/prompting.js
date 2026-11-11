@@ -51,5 +51,7 @@ export function loadMcpPrompting(file) {
       result.negative = negatives[profile.id];
     return result;
   };
+  for (const [family, kinds] of Object.entries(families))
+    for (const kind of Object.keys(kinds)) guideOf({ family, kind });
   return (profile) => mergedPrompting(guideOf(profile), profile.prompting);
 }

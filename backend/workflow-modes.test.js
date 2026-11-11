@@ -356,3 +356,99 @@ test("a MOSS-Image edit drops the references it was not given from both encoders
       ["images.image_0"],
     );
 });
+
+test("optional video Start and End frames keep their slots independently", async () => {
+  const keyframes = {
+    graph: {
+      start: { class_type: "LoadImage", inputs: { image: "example-start.png" } },
+      end: { class_type: "LoadImage", inputs: { image: "example-end.png" } },
+      h3: {
+        class_type: "MiniMaxH3ImageToVideo",
+        inputs: {
+          prompt: "",
+          length: 192,
+          first_frame: ["start", 0],
+          last_frame: ["end", 0],
+        },
+      },
+      save: { class_type: "SaveVideo", inputs: { video: ["h3", 0], filename_prefix: "frames" } },
+    },
+    studio: {
+      id: "optional-keyframes",
+      kind: "video",
+      family: "minimax_h3",
+      controls: {
+        prompt: { node: "h3", input: "prompt" },
+        frames: { node: "h3", input: "length" },
+        startImage: { node: "start", input: "image" },
+      },
+      mediaInputs: [
+        {
+          id: "reference",
+          kind: "image",
+          label: "Start",
+          role: "start",
+          control: { node: "start", input: "image" },
+        },
+        {
+          id: "end",
+          kind: "image",
+          label: "End",
+          role: "end",
+          control: { node: "end", input: "image" },
+        },
+      ],
+    },
+  };
+  saveImportedWorkflow(keyframes);
+  const frameInfo = {
+    ...info,
+    LoadImage: list({ image: ["STRING"] }),
+    MiniMaxH3ImageToVideo: list({
+      prompt: ["STRING"],
+      length: ["INT", { default: 192, min: 5, max: 3600, step: 17 }],
+    }),
+    SaveVideo: list(),
+  };
+  for (const slots of [[], ["reference"], ["end"], ["reference", "end"]]) {
+    const body = sanitizeGenerateBody(
+      {
+        kind: "video",
+        workflow: "custom:optional-keyframes",
+        model: "custom:optional-keyframes",
+        prompt: "The scene moves from Start towards End.",
+        referenceAssets: slots.map((slot) => ({ slot, assetId: `asset-${slot}` })),
+      },
+      frameInfo,
+    );
+    for (const reference of body.referenceAssets)
+      reference.comfyName = `staged-${reference.slot}.png`;
+    const final = await customWorkflowGraph(body);
+    validateGraph(final);
+    assert.equal(final.h3.inputs.prompt, body.prompt);
+    for (const [slot, loader, input] of [
+      ["reference", "start", "first_frame"],
+      ["end", "end", "last_frame"],
+    ]) {
+      if (slots.includes(slot)) {
+        assert.equal(final[loader].inputs.image, `staged-${slot}.png`);
+        assert.deepEqual(final.h3.inputs[input], [loader, 0]);
+      } else {
+        assert.equal(final[loader], undefined);
+        assert.equal(final.h3.inputs[input], undefined);
+      }
+    }
+  }
+  keyframes.studio.id = "linked-keyframes";
+  keyframes.studio.mediaInputs[1].follows = "reference";
+  saveImportedWorkflow(keyframes);
+  await assert.rejects(
+    customWorkflowGraph({
+      kind: "video",
+      workflow: "custom:linked-keyframes",
+      prompt: "The scene moves towards End.",
+      referenceAssets: [{ slot: "end", comfyName: "staged-end.png" }],
+    }),
+    /Add the preceding reference image/,
+  );
+});

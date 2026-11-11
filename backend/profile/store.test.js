@@ -326,6 +326,67 @@ test("guide bindings are edited, removed, reverted and approved as versions, and
   assert.deepEqual(Object.keys(store.read().packs).sort(), ["krea2", "other"]);
 });
 
+test("guide edits and family bindings must keep a usable prompting mode", (t) => {
+  const dir = scratch(t);
+  const store = guidesIn(dir);
+  const original = store.pack("krea2");
+  assert.throws(
+    () => store.save("krea2", { modes: { video: { rules: ["Video only."] } } }),
+    /Choose a prompting mode/,
+  );
+  assert.equal(store.pack("krea2").hash, original.hash);
+  assert.equal(store.versions("krea2").length, 0);
+
+  store.save("video", { modes: { video: { rules: ["Video only."] } } });
+  const before = store.bindings();
+  assert.throws(
+    () => store.saveBindings({ families: { krea2: { image: "video" } } }),
+    /Choose a prompting mode/,
+  );
+  assert.equal(store.bindings().hash, before.hash);
+  assert.equal(store.versions("_bindings").length, 0);
+  assert.equal(
+    livePrompting({ dataDir: dir })({ family: "krea2", kind: "image" }).summary,
+    original.pack.summary,
+  );
+});
+
+test("profile bindings and guide edits resolve the stored profile's kind before saving", (t) => {
+  const dir = scratch(t);
+  const workflows = path.join(dir, "workflows");
+  fs.mkdirSync(workflows);
+  fs.writeFileSync(path.join(workflows, "image-test.json"), profile("Image", { family: "krea2" }));
+  const store = guidesIn(dir);
+  store.save("mixed", { modes: { video: { rules: ["Video only."] } } });
+  const binding = { profiles: { "custom:image-test": { pack: "mixed" } } };
+  assert.throws(() => store.saveBindings(binding), /Choose a prompting mode/);
+
+  store.save("mixed", { modes: { image: { rules: ["Image."] }, video: { rules: ["Video."] } } });
+  store.saveBindings(binding);
+  const current = store.pack("mixed");
+  assert.throws(
+    () => store.save("mixed", { modes: { video: { rules: ["Video only."] } } }),
+    /Choose a prompting mode/,
+  );
+  assert.equal(store.pack("mixed").hash, current.hash);
+  assert.equal(store.versions("mixed").length, 2);
+
+  store.save("mixed", {
+    default_mode: "base",
+    modes: { base: { rules: ["Shared default."] } },
+  });
+  assert.equal(
+    livePrompting({ dataDir: dir })({ id: "custom:image-test", family: "krea2", kind: "image" })
+      .mode.id,
+    "base",
+  );
+  store.saveBindings({ profiles: { "custom:image-test": { pack: "mixed", mode: "base" } } });
+  assert.throws(
+    () => store.save("mixed", { default_mode: "other", modes: { other: {} } }),
+    /Invalid MCP prompting profile binding/,
+  );
+});
+
 test("the guide loader reads the store, reloads on change and fills negatives", (t) => {
   const dir = scratch(t);
   const prompting = livePrompting({ dataDir: dir, log: quiet });

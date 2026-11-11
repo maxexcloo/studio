@@ -394,21 +394,30 @@ export function modelsForAccount(models, req) {
   if (!req.studioAccount) return models;
   const lorasOn = mayUseFeature(req.studioAccount, "loras");
   const allowed = lorasOn ? loraAllowed(req.studioAccount) : null;
+  const applyLoraAccess = (profile) => {
+    const own = lorasOn
+      ? Array.isArray(profile.options?.loras)
+        ? {
+            ...profile,
+            options: { ...profile.options, loras: profile.options.loras.filter(allowed) },
+          }
+        : profile
+      : {
+          ...profile,
+          capabilities: { ...profile.capabilities, lora: false },
+          options: { ...profile.options, loras: [] },
+        };
+    return profile.backendOptions?.length
+      ? {
+          ...own,
+          backendOptions: profile.backendOptions.map((option) =>
+            option.profile ? { ...option, profile: applyLoraAccess(option.profile) } : option,
+          ),
+        }
+      : own;
+  };
   const profiles = visibleGenerationProfiles(models.profiles || [], req.studioAccount).map(
-    (profile) => {
-      if (lorasOn)
-        return Array.isArray(profile.options?.loras)
-          ? {
-              ...profile,
-              options: { ...profile.options, loras: profile.options.loras.filter(allowed) },
-            }
-          : profile;
-      return {
-        ...profile,
-        capabilities: { ...profile.capabilities, lora: false },
-        options: { ...profile.options, loras: [] },
-      };
-    },
+    applyLoraAccess,
   );
   return {
     ...models,
