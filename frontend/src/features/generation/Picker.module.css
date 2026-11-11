@@ -81,8 +81,13 @@
 }
 
 .sheetBody > .aside {
-  flex-shrink: 0;
   margin-top: var(--mantine-spacing-sm);
+}
+
+/* With a section under the content (the LoRA stack), the body scrolls as one: nothing in it
+   shrinks, or a long stack would squeeze the list to nothing and draw over the search. */
+.sheetBody:has(> .aside) > * {
+  flex-shrink: 0;
 }
 
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */
