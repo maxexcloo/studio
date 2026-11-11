@@ -132,25 +132,9 @@ export function useQueueAction(jobId?: string) {
       matching(value) ? undefined : action.mutateAsync(value),
   };
 }
-/**
- * Retries failed jobs through the shared `useTryAgain`. A retried job joins its set again, so a
- * set member's failed original leaves the queue.
- */
-function useRetryJobs(jobs: QueueJob[]) {
-  const tryAgain = useTryAgain(jobs.flatMap((job) => job.items));
-  const action = useQueueAction();
-  return async (ids: string[]) => {
-    const accepted = await tryAgain(ids);
-    await Promise.allSettled(
-      jobs
-        .filter((job) => job.queueSet && accepted.has(job.id))
-        .map((job) => action.mutateAsync({ id: job.id, action: "clear" })),
-    );
-  };
-}
 export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {
   const action = useQueueAction(job.id);
-  const retryJobs = useRetryJobs([job]);
+  const retryJobs = useTryAgain(job.items);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
   const label = retry ? "Retry" : "Stop";
@@ -526,7 +510,7 @@ function QueueSetRow({
     await Promise.allSettled(unfinished.map((id) => action.mutateAsync({ id, action: "cancel" })));
     setBusy(undefined);
   };
-  const retryJobs = useRetryJobs(members);
+  const retryJobs = useTryAgain(members.flatMap((job) => job.items));
   const retry = async () => {
     setBusy("retry");
     await retryJobs(failed);
