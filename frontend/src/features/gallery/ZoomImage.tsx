@@ -9,6 +9,7 @@ import classes from "./ZoomImage.module.css";
 
 export function ZoomImage({
   src,
+  original,
   alt,
   width,
   height,
@@ -18,6 +19,8 @@ export function ZoomImage({
   onTap,
 }: {
   src: string;
+  /** The full picture `src` may be a smaller copy of, loaded once zoom passes the copy's pixels. */
+  original?: string;
   alt: string;
   /** The gallery's already-loaded thumbnail, shown at full size until the image itself loads. */
   placeholder?: string;
@@ -38,6 +41,9 @@ export function ZoomImage({
   const [versionFailed, setVersionFailed] = useState(false);
   const [versionRetry, setVersionRetry] = useState(0);
   const [failed, setFailed] = useState(false);
+  // The original zoom has needed: it stays once loaded, and a version change starts from its copy.
+  const [sharpened, setSharpened] = useState<string>();
+  const wanted = original && sharpened === original ? original : src;
   const zoom = useMediaZoom({ ...size, disabled: loading || failed });
   const image = useRef<HTMLImageElement>(null);
   const suppressClick = useRef(false);
@@ -58,7 +64,7 @@ export function ZoomImage({
   } | null>(null);
 
   useEffect(() => {
-    if (src === displayedSrc) {
+    if (wanted === displayedSrc) {
       setSwitching(false);
       setVersionFailed(false);
       if (zoom.picture.current?.querySelector("img")?.naturalWidth) setFailed(false);
@@ -68,12 +74,12 @@ export function ZoomImage({
     const replacement = new window.Image();
     setSwitching(true);
     setVersionFailed(false);
-    replacement.src = src;
+    replacement.src = wanted;
     void replacement
       .decode()
       .then(() => {
         if (current) {
-          setDisplayedSrc(src);
+          setDisplayedSrc(wanted);
           setFailed(false);
         }
       })
@@ -86,11 +92,23 @@ export function ZoomImage({
     return () => {
       current = false;
     };
-  }, [src, displayedSrc, versionRetry]);
+  }, [wanted, displayedSrc, versionRetry]);
+  // Sharpening is quiet: the copy stays in view until the original has decoded, and stays if it fails.
+  const sharpening = wanted !== src;
 
   function loaded(node: HTMLImageElement) {
+    const { naturalWidth: w, naturalHeight: h } = node;
+    // A copy stands in at its original's recorded size, so Actual Size and the percentage hold.
+    const scale =
+      original &&
+      node.getAttribute("src") !== original &&
+      width &&
+      height &&
+      Math.abs(width / height - w / h) < 0.01
+        ? Math.max(1, width / w)
+        : 1;
     setFailed(false);
-    setSize({ width: node.naturalWidth, height: node.naturalHeight });
+    setSize({ width: Math.round(w * scale), height: Math.round(h * scale) });
     setLoading(false);
   }
   // A cached image shows in the first frame rather than after its load event.
@@ -248,7 +266,11 @@ export function ZoomImage({
           zoom.manualZoom();
         }}
         onPinch={zoom.revealControls}
-        onTransform={zoom.onTransform}
+        onTransform={(ref, state) => {
+          zoom.onTransform(ref, state);
+          const shown = image.current?.naturalWidth;
+          if (original && shown && state.scale * size.width > shown) setSharpened(original);
+        }}
       >
         <TransformComponent
           // Native focus scrolling must not shift the library's transformed viewport.
@@ -292,7 +314,7 @@ export function ZoomImage({
           </button>
         </TransformComponent>
       </TransformWrapper>
-      {((loading && !placeholder) || switching) && (
+      {((loading && !placeholder) || (switching && !sharpening)) && (
         <Loader
           className={classes.loading}
           aria-label={switching ? "Loading Selected Version" : "Loading Image"}
@@ -303,7 +325,7 @@ export function ZoomImage({
           This image is unavailable.
         </Text>
       )}
-      {versionFailed && !switching && (
+      {versionFailed && !switching && !sharpening && (
         <Stack
           className={classes.loading}
           gap="xs"

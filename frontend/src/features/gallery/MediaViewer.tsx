@@ -731,6 +731,7 @@ export function MediaViewer({
                       <ZoomImage
                         key={item.id}
                         src={source.displayUrl}
+                        original={source.url}
                         alt={item.prompt || "Generated Image"}
                         placeholder={source.thumbnailUrl}
                         width={source.width}
