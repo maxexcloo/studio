@@ -93,12 +93,13 @@ export function WorkspaceSectionSelect({
         miw={0}
         flex={1}
         // One size in Library and Settings: the trigger at 16 px (iOS zooms below that) rather than
-        // the modal title's, options at body size, and every section listed without scrolling.
+        // the modal title's, options at body size, and every section and group listed without
+        // scrolling where the screen has the room.
         styles={{
           input: { fontSize: "var(--mantine-font-size-md)" },
           option: { fontSize: "var(--mantine-font-size-sm)" },
         }}
-        maxDropdownHeight={420}
+        maxDropdownHeight="min(640px, 75dvh)"
         data={data}
         value={active}
         allowDeselect={false}

@@ -20,20 +20,19 @@ import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
-import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
+import {
+  gradeColours,
+  LibraryImportReview,
+  stateLabel,
+  type ImportRecord,
+  type ImportVision,
+} from "./LibraryImportReview";
 
-const gradeColours: Record<string, string> = { Exact: "green", Close: "yellow", Partial: "orange" };
 /** Sorts the best grade first and unknown grades after the known ones. */
 function gradeRank(grade: string) {
   const rank = Object.keys(gradeColours).indexOf(grade);
   return rank < 0 ? Infinity : rank;
 }
-const stateLabels: Record<string, string> = {
-  failed: "Failed",
-  "needs-files": "Needs Files",
-  ready: "Ready",
-  resolving: "Resolving",
-};
 interface RedditImport {
   title: string;
   imported: number;
@@ -46,9 +45,6 @@ const isRedditLink = (url: string) => {
     return false;
   }
 };
-const stateLabel = (state: string) =>
-  stateLabels[state] ||
-  state.replace(/(^|-)([a-z])/g, (_, gap, letter) => `${gap ? " " : ""}${letter.toUpperCase()}`);
 const views = [
   { value: "all", label: "All" },
   { value: "attention", label: "Needs Files" },
@@ -146,20 +142,6 @@ export function LibraryImports({
       refresh();
     },
   });
-  if (reviewId)
-    return (
-      <Stack gap="md">
-        {heading}
-        <LibraryImportReview
-          id={reviewId}
-          active={active}
-          vision={imports.data?.vision}
-          admin={admin}
-          onBack={() => setReviewId(null)}
-          onOpen={setReviewId}
-        />
-      </Stack>
-    );
   const records = imports.data?.imports || [];
   const nameOf = (record: ImportRecord) =>
     record.title || record.name || record.image?.name || record.input?.url || record.id;
@@ -331,6 +313,16 @@ export function LibraryImports({
               </Menu.Item>
             </>
           )}
+        />
+      )}
+      {reviewId && (
+        <LibraryImportReview
+          id={reviewId}
+          active={active}
+          vision={imports.data?.vision}
+          admin={admin}
+          onClose={() => setReviewId(null)}
+          onOpen={setReviewId}
         />
       )}
       <ConfirmDialog
