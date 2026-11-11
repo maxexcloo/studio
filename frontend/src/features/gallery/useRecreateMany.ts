@@ -66,7 +66,7 @@ export function useRecreateMany() {
           .filter(Boolean)
           .join(" "),
       });
-      for (const queryKey of [queueQuery.queryKey, ["gallery"], ["sessions"]])
+      for (const queryKey of [queueQuery.queryKey, ["gallery"]])
         void client.invalidateQueries({ queryKey });
     },
   });
