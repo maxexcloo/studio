@@ -26,8 +26,10 @@ import classes from "./GallerySelectionBar.module.css";
 const shareLimit = 20;
 // Compare Selected sets out up to four images side by side, one per number key.
 const compareLimit = 4;
-// Phones keep what acts on several items on the bar and the rest under More.
+// Phones show every action on the bar while they fit its room (ActionBar.tsx's `withMore`);
+// beyond it they keep what acts on several items there and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
+const phoneRoom = 7;
 
 /**
  * The contextual selection bar under the toolbar: the count and the quick selects, then on
@@ -53,6 +55,12 @@ export function GallerySelectionBar({
   const [busy, setBusy] = useState<"retry" | "stop" | null>(null);
   const latestSelection = useRef(selection);
   latestSelection.current = selection;
+  /**
+   * A finished action leaves selection mode; the items it failed for stay selected, with its error
+   * shown by the action itself.
+   */
+  const settle = (failedIds: string[] = []) =>
+    failedIds.length ? latestSelection.current.retain(failedIds) : latestSelection.current.end();
   const selected = selection.selectedItems;
   const ready = selected.filter((item) => item.status === "done" && item.url);
   const running = selected.filter((item) => !finished(item));
@@ -76,7 +84,15 @@ export function GallerySelectionBar({
   const iterate = useIterate();
   const animate = useMutation({
     mutationFn: async (theme: AnimateTheme) => {
-      for (const item of finishedImages) await iterate(item, { kind: "animate", theme });
+      const failed: string[] = [];
+      let error: unknown;
+      for (const item of finishedImages)
+        await iterate(item, { kind: "animate", theme }).catch((reason: unknown) => {
+          failed.push(item.id);
+          error ??= reason;
+        });
+      if (error) failure(error);
+      settle(failed);
     },
   });
   // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
@@ -122,6 +138,7 @@ export function GallerySelectionBar({
     if (!prepared) return prepare.mutate();
     try {
       await navigator.share({ files: prepared });
+      settle();
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) failure(error);
     }
@@ -130,10 +147,9 @@ export function GallerySelectionBar({
     setBusy("retry");
     try {
       const accepted = await tryAgain(failed.map((job) => job.id));
-      const current = latestSelection.current;
-      current.retain(
-        current.selectedItems
-          .filter((item) => !accepted.has(item.jobId || ""))
+      settle(
+        latestSelection.current.selectedItems
+          .filter((item) => item.status === "failed" && !accepted.has(item.jobId || ""))
           .map((item) => item.id),
       );
     } finally {
@@ -143,8 +159,16 @@ export function GallerySelectionBar({
   async function stopSelected() {
     setBusy("stop");
     try {
-      await Promise.allSettled(
+      const outcomes = await Promise.allSettled(
         runningJobs.map((id) => cancel.mutateAsync({ id, action: "cancel" })),
+      );
+      const unstopped = new Set(
+        runningJobs.filter((_id, index) => outcomes[index].status === "rejected"),
+      );
+      settle(
+        latestSelection.current.selectedItems
+          .filter((item) => unstopped.has(item.jobId || ""))
+          .map((item) => item.id),
       );
     } finally {
       setBusy(null);
@@ -164,7 +188,10 @@ export function GallerySelectionBar({
               label: "Run Suggested Prompts",
               icon: Shuffle,
               disabled: recreate.isPending,
-              onClick: () => recreate.mutate(uploads),
+              onClick: () =>
+                recreate.mutate(uploads, {
+                  onSuccess: ({ failed }) => settle(failed.map((entry) => entry.id)),
+                }),
             },
           ],
         ],
@@ -188,7 +215,13 @@ export function GallerySelectionBar({
       itemAction("upscale", {
         loading: upscale.isPending,
         disabled: upscale.isPending,
-        onClick: () => upscale.mutate(),
+        onClick: () =>
+          upscale.mutate(undefined, {
+            onSuccess: ({ failed, error }) => {
+              if (error) failure(error);
+              settle(failed);
+            },
+          }),
       }),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
@@ -227,7 +260,11 @@ export function GallerySelectionBar({
       label: allStarred ? "Unstar" : "Star",
       pressed: allStarred,
       disabled: !ready.length || pending,
-      onClick: () => favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+      onClick: () =>
+        favorites.mutate(
+          { ids: ready.map((item) => item.id), favorite: !allStarred },
+          { onSuccess: () => settle() },
+        ),
     }),
     itemAction("delete", {
       disabled: !deletable.length || pending,
@@ -284,7 +321,10 @@ export function GallerySelectionBar({
       },
     }));
   const bar = phone ? (
-    <ActionBarGroups groups={[withMore(actions, primaryIds).flat()]} menuPosition="top-end" />
+    <ActionBarGroups
+      groups={[withMore(actions, primaryIds, phoneRoom).flat()]}
+      menuPosition="top-end"
+    />
   ) : (
     <ActionBarGroups groups={actions} menuPosition="bottom-end" />
   );
@@ -369,7 +409,7 @@ export function GallerySelectionBar({
         opened={confirm}
         ids={deletable.map((item) => item.id)}
         close={() => setConfirm(false)}
-        onDeleted={(_deleted, failed) => selection.retain(failed)}
+        onDeleted={(_deleted, failed) => settle(failed)}
       />
     </>
   );

@@ -129,11 +129,12 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
       </ActionIcon>
     </Tooltip>
   ) : (
+    // The viewer's status, styled as a tile's Stop and Retry.
     <Button
-      variant={retry ? "default" : "subtle"}
-      color={retry ? undefined : "red"}
-      size={retry ? "sm" : "compact-sm"}
-      style={{ alignSelf: "start" }}
+      variant="default"
+      size="sm"
+      radius="xl"
+      leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
       loading={action.isPending}
       disabled={action.isPending}
       onClick={onClick}

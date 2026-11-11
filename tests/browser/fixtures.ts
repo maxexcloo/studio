@@ -882,9 +882,10 @@ export async function touch(target: Locator, type: string, y = 100) {
   );
 }
 
-/** A selection action beyond the bulk ones: on the desktop bar, or an item of the phone's More. */
+/** A selection action: on the bar, or an item of the phone's More when the bar has no room for it. */
 export async function selectionMenuItem(page: Page, label: string) {
-  if ((page.viewportSize()?.width || 1440) >= 768) return selectionAction(page, label);
+  const inline = selectionAction(page, label);
+  if ((page.viewportSize()?.width || 1440) >= 768 || (await inline.isVisible())) return inline;
   await selectionAction(page, "More").click();
   return page.getByRole("menuitem", { name: label, exact: true });
 }

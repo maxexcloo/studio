@@ -84,7 +84,7 @@ const dropdown = {
   "--popover-border-color": "var(--studio-glass-border)",
   boxShadow: "var(--mantine-shadow-lg)",
 } as CSSProperties;
-// Translucent sticky headers would show scrolled content through the title.
+// Title rows sit on their surface; dialogs scroll only their body beneath them.
 const overlayHeader = { background: "transparent" } satisfies CSSProperties;
 const overlayTitle = { fontWeight: 600 } satisfies CSSProperties;
 
@@ -294,13 +294,25 @@ export function studioTheme({
           size: "lg",
         },
         classNames: { inner: classes.dialogInner, content: classes.dialogContent },
+        // The body scrolls under a fixed title row, so a table's rows and sort header never pass
+        // under the title, as they would with Mantine's sticky header over a scrolling content.
         styles: (_theme, props) => ({
-          content: props.fullScreen
-            ? {}
-            : {
-                border: "1px solid var(--mantine-color-default-border)",
-                boxShadow: "var(--mantine-shadow-xl)",
-              },
+          content: {
+            display: "flex",
+            flexDirection: "column",
+            ...(props.fullScreen
+              ? {}
+              : {
+                  border: "1px solid var(--mantine-color-default-border)",
+                  boxShadow: "var(--mantine-shadow-xl)",
+                }),
+          },
+          body: {
+            flex: "1 1 auto",
+            minHeight: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+          },
           header: overlayHeader,
           title: overlayTitle,
         }),

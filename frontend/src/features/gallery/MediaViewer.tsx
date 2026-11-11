@@ -287,6 +287,15 @@ export function MediaViewer({
   const toggleChrome = () => setChromeHidden((hidden) => !hidden);
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
+  // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's.
+  useLayoutEffect(() => {
+    const view = stage.current;
+    if (!chromeHidden || !view) return;
+    const box = view.getBoundingClientRect();
+    const x = window.innerWidth / 2 - (box.left + box.width / 2);
+    const y = window.innerHeight / 2 - (box.top + box.height / 2);
+    view.style.setProperty("--studio-viewer-centre", `${x}px ${y}px`);
+  }, [chromeHidden]);
   // An action that turns busy disables its button, so focus falls to the page (a menu's return to
   // it too); the stage takes focus back and the key that landed on the page.
   useEffect(() => {

@@ -139,17 +139,7 @@ function ResultStrip({
   choose?: (item: MediaItem) => void;
 }) {
   return (
-    <ScrollArea
-      type="never"
-      className={classes.strip}
-      // Work in progress stays in sight while a tap hides the viewer's chrome.
-      data-running={
-        entries.some(
-          ({ item }) => !item || !["done", "failed", "cancelled"].includes(item.status),
-        ) || undefined
-      }
-      onClick={(event) => event.stopPropagation()}
-    >
+    <ScrollArea type="never" className={classes.strip} onClick={(event) => event.stopPropagation()}>
       <Group gap={6} wrap="nowrap" role="list" aria-label={label} justify="center" px={2} py={2}>
         {entries.map(({ key, item: result }, index) => {
           const shown = result?.id === current.id;

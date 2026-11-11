@@ -255,8 +255,8 @@ export function registerRewriteRoutes(
 
 /**
  * Settings › Generation › Unfinished Items, for administrators: every account's jobs that have not
- * finished, oldest first, to retry (end it and queue it again) or delete (end it and take it out of
- * the queue).
+ * finished, oldest first, to retry (end it and queue it again), stop or delete (end it and take it
+ * out of the queue, keeping its records), one at a time or every listed job at once.
  */
 export function registerMaintenanceRoutes(
   app: Router,
@@ -314,5 +314,49 @@ export function registerMaintenanceRoutes(
     const job = target(body);
     if (!job) return notFound;
     return { status: 200, payload: { job: publicJob(await end(job)) } };
+  });
+  // The listed jobs at once, each named once however often it is sent.
+  const targets = (body: Record<string, unknown> | undefined) => {
+    const jobs = new Map<string, OwnedJob>();
+    for (const entry of Array.isArray(body?.jobs) ? body.jobs : []) {
+      const job = target(entry as Record<string, unknown>);
+      if (job) jobs.set(`${job.ownerId}/${job.id}`, job);
+    }
+    return [...jobs.values()];
+  };
+  directRoute(app, "POST", "/api/maintenance/unfinished/retry-all", async (account, { body }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const jobs = targets(body);
+    // One at a time, so the retries queue in the listed order.
+    for (const job of jobs) {
+      await end(job);
+      queue.requeue(job);
+    }
+    void queue.tick();
+    return { status: 202, payload: { retried: jobs.length } };
+  });
+  // Stop for each: accepted work may stay active until its provider confirms.
+  directRoute(app, "POST", "/api/maintenance/unfinished/cancel-all", async (account, { body }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const outcomes = await Promise.all(
+      targets(body).map((job) =>
+        queue.cancel(job.ownerId, job.id).then(
+          () => true,
+          () => false,
+        ),
+      ),
+    );
+    return outcomes.every(Boolean)
+      ? { status: 200, payload: { requested: outcomes.length } }
+      : { status: 503, payload: { error: unconfirmedCancel } };
+  });
+  directRoute(app, "POST", "/api/maintenance/unfinished/delete-all", async (account, { body }) => {
+    const refusal = adminRefusal(account);
+    if (refusal) return refusal;
+    const jobs = targets(body);
+    for (const job of jobs) await end(job);
+    return { status: 200, payload: { cleared: jobs.length } };
   });
 }
