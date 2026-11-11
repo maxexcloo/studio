@@ -186,22 +186,28 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  // Phones ask or generate from the editor's sends; a proposal's Run stays in the field.
-  const sends = [
-    ...(ask.available && phone
-      ? [
-          {
-            label: "Ask for a Change",
-            text: "Ask",
-            icon: icons.assistant,
-            disabled: !typed || ask.pending,
-            keepOpen: true,
-            onSubmit: () => ask.send(prompt, prompt.trim()),
-          },
-        ]
-      : []),
-    submit,
-  ];
+  // Phones ask or generate from the editor's named sends, and a proposal's Undo and Run show there
+  // too; at rest, Undo and Run stand beside the field.
+  const sends = change
+    ? [
+        { label: "Undo", icon: icons.undo, disabled: false, keepOpen: true, onSubmit: ask.undo },
+        submit,
+      ]
+    : [
+        ...(ask.available && phone
+          ? [
+              {
+                label: "Ask for a Change",
+                text: "Ask",
+                icon: icons.assistant,
+                disabled: !typed || ask.pending,
+                keepOpen: true,
+                onSubmit: () => ask.send(prompt, prompt.trim()),
+              },
+            ]
+          : []),
+        submit,
+      ];
   const send = (
     <>
       {change && <UndoButton onClick={ask.undo} />}
@@ -242,7 +248,7 @@ export function ViewerPrompt({
             ? "Improving the prompt…"
             : undefined
       }
-      submit={change ? undefined : sends}
+      submit={sends}
     />
   );
 }
