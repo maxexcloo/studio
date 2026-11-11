@@ -384,19 +384,17 @@ function QueueRow({
               style={{ flexShrink: 0 }}
             />
             <Stack gap={2} flex={1} miw={0}>
-              <Group wrap="nowrap" gap={6}>
-                <Text size="sm" lineClamp={1}>
-                  {String(job.input?.prompt || "Generation")}
-                </Text>
-                {job.dream && (
-                  <Badge size="xs" color="gray" miw="max-content">
-                    Dream
-                  </Badge>
-                )}
-              </Group>
+              <Text size="sm" lineClamp={1}>
+                {String(job.input?.prompt || "Generation")}
+              </Text>
               <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={phone ? 1 : 2}>
                 {status}
               </Text>
+              {job.dream && (
+                <Badge size="xs" color="gray" miw="max-content">
+                  Dream
+                </Badge>
+              )}
             </Stack>
           </Group>
         </UnstyledButton>
@@ -660,7 +658,7 @@ export function QueueActions() {
     </Tooltip>
   );
   return (
-    // At the end of the row it shares, or of its own row in the phone drawer.
+    // At the end of the heading it shares: beside the title, or beside the phone drawer's Close.
     <Group gap={4} wrap="nowrap" justify="flex-end">
       {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
         pause.actions.forEach((key) => action.mutate({ id: "", action: key })),

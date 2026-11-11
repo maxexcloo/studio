@@ -293,7 +293,11 @@ export function studioTheme({
           radius: "lg",
           size: "lg",
         },
-        classNames: { inner: classes.dialogInner, content: classes.dialogContent },
+        classNames: {
+          inner: classes.dialogInner,
+          content: classes.dialogContent,
+          body: classes.dialogBody,
+        },
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
         // under the title, as they would with Mantine's sticky header over a scrolling content.
         styles: (_theme, props) => ({
@@ -386,9 +390,21 @@ export function studioTheme({
         defaultProps: { rightSection: chevron },
         styles: { option: target },
       }),
+      // A Select without search is a button in effect: its read-only text takes no selection, so a
+      // tap on a phone doesn't raise the selection or autofill bar.
       Select: Select.extend({
-        defaultProps: { checkIconPosition: "right", rightSection: chevron },
-        styles: { option: target },
+        defaultProps: { checkIconPosition: "right", rightSection: chevron, autoComplete: "off" },
+        styles: (_theme, props) => ({
+          option: target,
+          input: props.searchable
+            ? {}
+            : {
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+                caretColor: "transparent",
+              },
+        }),
       }),
       Switch: Switch.extend({
         styles: {

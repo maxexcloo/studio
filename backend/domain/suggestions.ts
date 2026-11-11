@@ -18,8 +18,8 @@ import {
 } from "./writing-standard.ts";
 import { maxPromptCharacters } from "../../shared/queue.ts";
 
-type SuggestionSurface = "composer" | "viewer" | "change" | "draft";
-// The viewer's next steps may send the image along.
+type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
+// The viewer's next steps and Animate's motion ideas may send the image along.
 type Writer = TasteWriter<ReturnType<typeof userContent>>;
 // `spicy` marks steps worded explicitly, so a change of explicitWording writes them again.
 type SavedSteps = { steps: NextStep[]; at: string; spicy?: true };
@@ -63,7 +63,7 @@ interface Router {
   post(path: string, handler: (req: Request, res: Response) => unknown): unknown;
 }
 
-const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "change", "draft"]);
+const surfaces = new Set<SuggestionSurface>(["composer", "viewer", "animate", "change", "draft"]);
 const cacheMs = 10 * 60_000;
 const cacheLimit = 500;
 const maxIdea = 160;
@@ -153,8 +153,8 @@ function describeItem(item: SuggestionItem) {
 
 /**
  * Short, taste-led suggestions from the text model: prompt ideas for an empty composer, next-step
- * chips for a finished image in the viewer (from its prompt, settings, caption and, where the
- * running text model reads images, the image itself), and the action
+ * chips for a finished image in the viewer and motion ideas for animating it (`animate`), from its
+ * prompt, settings, caption and, where the running text model reads images, the image itself; the action
  * and prompt for a change asked for in plain words to a finished result (`change`) or to the
  * composer's draft (`draft`), never cached or saved; a `draft` without a request gets change ideas
  * for its prompt, as an image gets next steps. Answers are
@@ -250,6 +250,16 @@ export function createSuggestions({
         data,
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>", "prompt": "<the rewritten prompt>"}]}.',
       ],
+      // Animate's instruction says what happens; its writer turns the instruction into the prompt.
+      animate: [
+        `You suggest what could happen when an image a person made in a media studio becomes a short video, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
+        "Suggest three or four distinct ideas that fit what the image shows, such as the subject's motion or action, a camera move or the atmosphere.",
+        contentRule(spicy),
+        avoidFiller(),
+        'Each has a label of at most four words in Title Case (such as "Slow Push In", "Hair in the Wind" or "Turns to Camera") and one short sentence saying what happens in the video.',
+        data,
+        'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<what happens>"}]}.',
+      ],
       viewer: [
         `You suggest next steps for an image a person just made in a media studio, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
         "Suggest three or four distinct changes, such as lighting, framing, time of day, mood or style.",
@@ -299,7 +309,8 @@ export function createSuggestions({
       .map((step: Record<string, unknown>) => ({
         label: titleCase(clean(step?.label, 40)),
         request: clean(step?.request, 160),
-        prompt: clean(step?.prompt, maxPromptCharacters),
+        // A motion idea is itself the instruction Animate's writer takes.
+        prompt: clean(surface === "animate" ? step?.request : step?.prompt, maxPromptCharacters),
       }))
       .filter((step: NextStep) => {
         if (!step.label || !step.request || !step.prompt || labels.has(step.label)) return false;
@@ -464,7 +475,8 @@ export function createSuggestions({
       },
     ): Promise<Suggestions<string | NextStep | Change>> {
       const surface = body.surface as SuggestionSurface;
-      if (!surfaces.has(surface)) throw failure("Choose composer, viewer, change or draft.", 400);
+      if (!surfaces.has(surface))
+        throw failure("Choose composer, viewer, animate, change or draft.", 400);
       if (
         body.prompt !== undefined &&
         (typeof body.prompt !== "string" || body.prompt.length > maxPromptCharacters)
@@ -515,21 +527,23 @@ export function createSuggestions({
       // Switched off, the menu or ideas simply have none; the model is never asked.
       if (surface === "composer" && !ideas())
         return empty("Prompt Ideas is off in Settings › Generation.");
-      if ((surface === "viewer" || surface === "draft") && !nextSteps())
+      if ((surface === "viewer" || surface === "animate" || surface === "draft") && !nextSteps())
         return empty("Suggestions are off in Settings › Generation.");
       let source: SuggestionItem | undefined;
-      if (surface === "viewer") {
+      if (surface === "viewer" || surface === "animate") {
         if (typeof body.jobId !== "string" || !body.jobId) throw failure("Choose a result.", 400);
         source = item(ownerId, body.jobId);
         if (!source) throw failure("Result not found.", 404);
         if (source.type === "video" || source.status !== "done")
-          return empty("Next steps are offered for finished images.");
+          return empty(
+            `${surface === "animate" ? "Motion ideas" : "Next steps"} are offered for finished images.`,
+          );
       }
       const model = writer(ownerId);
       if (!model) return empty("This account can't use suggestions.");
       const fresh = body.fresh === true;
       const spicy = explicit(ownerId);
-      const saved = source?.nextSteps;
+      const saved = surface === "viewer" ? source?.nextSteps : undefined;
       if (saved?.steps.length && !fresh && Boolean(saved.spicy) === spicy)
         return { suggestions: saved.steps };
       const { known, lines } = tasteContext(ownerId);
@@ -549,11 +563,21 @@ export function createSuggestions({
           return empty("The prompt assistant is not configured.");
         }
         if (!(await online())) return empty("The text model is offline.");
+        // Without the picture the steps still come from its prompt and caption.
+        const picture = source && (await image(source).catch(() => null));
+        if (source && surface === "viewer")
+          return stepsFor(model, ownerId, source, { image: picture });
         if (source)
-          return stepsFor(model, ownerId, source, {
-            // Without the picture the steps still come from its prompt and caption.
-            image: await image(source).catch(() => null),
-          });
+          return write(
+            model,
+            "animate",
+            "image",
+            [...lines, "", "The image:", describeItem(source)].join("\n"),
+            {
+              image: picture,
+              spicy,
+            },
+          );
         const context = [
           ...lines,
           ...(surface === "draft"
