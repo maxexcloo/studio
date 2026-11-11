@@ -82,7 +82,6 @@ export function useGenerateReferences(preferredProfileId?: string) {
       void client.invalidateQueries({ queryKey: charactersQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
-      void client.invalidateQueries({ queryKey: ["sessions"] });
     },
   });
 }

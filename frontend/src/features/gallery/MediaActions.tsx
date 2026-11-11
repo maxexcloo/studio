@@ -309,7 +309,7 @@ export function useMediaActions(
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
       void Promise.all(
-        [queueQuery.queryKey, ["gallery"], ["session"]].map((queryKey) =>
+        [queueQuery.queryKey, ["gallery"]].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),

@@ -49,7 +49,7 @@ export function DeleteMediaDialog({
       onDeleted([], selected);
     },
     onSettled: () => {
-      for (const key of ["gallery", "gallery-filters", "session"])
+      for (const key of ["gallery", "gallery-filters"])
         void cache.invalidateQueries({ queryKey: [key] });
     },
   });
