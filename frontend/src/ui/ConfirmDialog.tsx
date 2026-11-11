@@ -58,6 +58,18 @@ export function ConfirmDialog({
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}
       closeButtonProps={{ disabled: pending }}
+      // Where the action took its trigger away (Clear All empties its list), focus would fall to
+      // the page, out of reach of the dialog under it, which then ignores Escape; it goes there.
+      onExitTransitionEnd={() =>
+        // Once the dialog has gone and Mantine has tried to return focus.
+        setTimeout(() => {
+          if (document.activeElement && document.activeElement !== document.body) return;
+          const open = [...document.querySelectorAll<HTMLElement>(".mantine-Modal-content")].filter(
+            (dialog) => dialog.getClientRects().length,
+          );
+          open.at(-1)?.focus({ preventScroll: true });
+        })
+      }
     >
       <FocusTrap.InitialFocus />
       <Stack>
