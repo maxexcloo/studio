@@ -19,3 +19,42 @@
   touch-action: none;
   cursor: crosshair;
 }
+
+/* A fixed stage on desktop; the phone sheet gives it the room the toolbar leaves. */
+.viewport {
+  height: min(55dvh, 600px);
+}
+
+/* The stage's bottom-right corner, styled like the viewer's zoom controls. */
+.zoom {
+  position: absolute;
+  right: var(--mantine-spacing-xs);
+  bottom: var(--mantine-spacing-xs);
+  z-index: 3;
+  padding: 2px;
+  border: 1px solid var(--studio-glass-border);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--studio-glass-raised);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+}
+
+/* The phone sheet is a column: the stage takes the height between its heading and toolbar. */
+.sheet {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheetBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  padding-bottom: calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+}
+
+.sheet .viewport {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}

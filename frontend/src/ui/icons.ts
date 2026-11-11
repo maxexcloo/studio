@@ -26,6 +26,7 @@ import {
   Play,
   Plus,
   Puzzle,
+  Redo2,
   RefreshCw,
   RotateCw,
   Rows2,
@@ -95,6 +96,7 @@ export const icons = {
   prompt: SlidersHorizontal,
   /** Running an item again from its prompt with new seeds (Dream's Variations). */
   variations: WandSparkles,
+  redo: Redo2,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
   rename: TextCursorInput,
