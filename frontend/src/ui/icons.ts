@@ -7,6 +7,7 @@ import {
   Columns2,
   ContactRound,
   Copy,
+  CopyPlus,
   Download,
   Ellipsis,
   ExternalLink,
@@ -44,7 +45,6 @@ import {
   Trophy,
   Undo2,
   Upload,
-  Wand,
   WandSparkles,
   X,
   type LucideIcon,
@@ -86,7 +86,8 @@ export const icons = {
   more: Ellipsis,
   /** An outfit card (Library › Outfits). */
   outfit: Shirt,
-  moreLikeThis: Wand,
+  /** Asking Dream for more in an item's direction (More Like This). */
+  moreLikeThis: CopyPlus,
   /** Opening every result of a run in the viewer. */
   openAll: GalleryHorizontalEnd,
   paste: ClipboardPaste,

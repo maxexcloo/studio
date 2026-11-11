@@ -123,7 +123,9 @@ test("New Character saves a name, description and gallery images from the Refere
   await editor
     .getByRole("button", { name: "Add image: Portrait of a ranger", exact: true })
     .click();
-  await expect(editor.getByRole("img", { name: "Image 1", exact: true })).toBeVisible();
+  await expect(
+    editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
+  ).toBeVisible();
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(
@@ -170,7 +172,9 @@ test("Make Character starts a card from a gallery image in Library › Character
   await page.getByRole("menuitem", { name: /^Make Character/ }).click();
   await expect(page).toHaveURL(/\/library#characters$/);
   const editor = page.getByRole("dialog", { name: "New Character", exact: true });
-  await expect(editor.getByRole("img", { name: "Image 1", exact: true })).toBeVisible();
+  await expect(
+    editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
+  ).toBeVisible();
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
   await editor.getByRole("button", { name: "Describe Image", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
@@ -243,7 +247,9 @@ test("Generate References queues one view per shot on a shared seed with the car
   const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
   const generated = editor.getByRole("list", { name: "Generated References", exact: true });
   await generated.getByRole("button", { name: "Add generated reference 1", exact: true }).click();
-  await expect(editor.getByRole("img", { name: "Image 3", exact: true })).toBeVisible();
+  await expect(
+    editor.getByRole("button", { name: "Reference 3 · Images", exact: true }),
+  ).toBeVisible();
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(state.characters[0].referenceIds).toEqual([

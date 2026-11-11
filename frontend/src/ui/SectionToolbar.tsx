@@ -8,13 +8,13 @@ import {
   Menu,
   Popover,
   ScrollArea,
-  SegmentedControl,
   Stack,
   Text,
   Tooltip,
 } from "@mantine/core";
 import { Search, type LucideIcon } from "lucide-react";
 import { icons } from "./icons";
+import { ScrollingSegments } from "./ScrollingSegments";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
 import classes from "./SectionToolbar.module.css";
@@ -134,14 +134,13 @@ export function SectionToolbar({
   return (
     <Group className={classes.enter} gap="xs" mih={44} wrap="nowrap">
       {views && (
-        <SegmentedControl
+        <ScrollingSegments
           aria-label={`${label} View`}
           size={phone ? "xs" : "sm"}
           radius="xl"
           data={views}
           value={view}
           onChange={onViewChange}
-          className={classes.views}
         />
       )}
       {onQueryChange && searchOpen && (

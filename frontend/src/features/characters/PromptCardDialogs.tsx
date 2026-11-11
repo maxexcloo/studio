@@ -1,21 +1,12 @@
 import { useState } from "react";
-import {
-  ActionIcon,
-  Alert,
-  Button,
-  FocusTrap,
-  getDefaultZIndex,
-  Menu,
-  Modal,
-  Stack,
-  TextInput,
-} from "@mantine/core";
+import { ActionIcon, Alert, Button, getDefaultZIndex, Menu, TextInput } from "@mantine/core";
+import type { ReferenceAsset } from "../../types";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
 import { menuWidth } from "../../theme";
-import { maxCardDescription, maxCardName } from "../../../../shared/characters";
+import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
+import { CardDialog, CardForm, CardImages } from "./CardImages";
 import {
   useDeletePromptCard,
   useSavePromptCard,
@@ -49,7 +40,6 @@ export function usePromptCardDialogs(
   const [editing, setEditing] = useState<{ card?: PromptCard }>();
   const [deleting, setDeleting] = useState<PromptCard | null>(null);
   const deletion = useDeletePromptCard(kind);
-  const phone = usePhone();
   const closeEditor = () => {
     setEditing(undefined);
     onLayer(false);
@@ -70,15 +60,11 @@ export function usePromptCardDialogs(
     },
     dialogs: (
       <>
-        <Modal
+        <CardDialog
           opened={editing !== undefined}
           onClose={closeEditor}
           title={`${editing?.card ? "Edit" : "New"} ${noun}`}
-          fullScreen={phone}
-          // Above the desktop References popover, as Edit Character is.
-          zIndex={phone ? undefined : getDefaultZIndex("overlay")}
         >
-          <FocusTrap.InitialFocus />
           {editing && (
             <PromptCardForm
               key={editing.card?.id || "new"}
@@ -87,7 +73,7 @@ export function usePromptCardDialogs(
               onClose={closeEditor}
             />
           )}
-        </Modal>
+        </CardDialog>
         <ConfirmDialog
           opened={deleting !== null}
           title={`Delete ${noun}`}
@@ -117,52 +103,56 @@ function PromptCardForm({
   const { hint, placeholder } = promptCardText[kind];
   const [name, setName] = useState(card?.name || "");
   const [description, setDescription] = useState(card?.description || "");
+  const [images, setImages] = useState<ReferenceAsset[]>(card?.references || []);
   const save = useSavePromptCard(kind, card?.id);
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
+    <CardForm
+      onSubmit={() =>
         save.mutate(
           {
             name: name.trim(),
             description: description.trim(),
-            referenceIds: card?.references.map((asset) => asset.id) || [],
+            referenceIds: images.map((asset) => asset.id),
           },
           { onSuccess: onClose },
-        );
-      }}
+        )
+      }
     >
-      <Stack>
-        <TextInput
-          label="Name"
-          required
-          maxLength={maxCardName}
-          data-autofocus
-          value={name}
-          onChange={(event) => setName(event.currentTarget.value)}
-        />
-        <TextBox
-          label="Description"
-          description={hint}
-          placeholder={placeholder}
-          autosize
-          minRows={2}
-          maxLength={maxCardDescription}
-          value={description}
-          onChange={setDescription}
-        />
-        {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <DialogFooter pending={save.isPending} onCancel={onClose}>
-          <Button
-            type="submit"
-            loading={save.isPending}
-            disabled={!name.trim() || !description.trim()}
-          >
-            Save
-          </Button>
-        </DialogFooter>
-      </Stack>
-    </form>
+      <TextInput
+        label="Name"
+        required
+        maxLength={maxCardName}
+        data-autofocus
+        value={name}
+        onChange={(event) => setName(event.currentTarget.value)}
+      />
+      <TextBox
+        label="Description"
+        description={hint}
+        placeholder={placeholder}
+        autosize
+        minRows={2}
+        maxLength={maxCardDescription}
+        value={description}
+        onChange={setDescription}
+      />
+      <CardImages
+        max={cardKinds[kind].images.max}
+        note="Optional: one image to recognise it by."
+        value={images}
+        onChange={setImages}
+      />
+      {save.error && <Alert color="red">{save.error.message}</Alert>}
+      <DialogFooter pending={save.isPending} onCancel={onClose}>
+        <Button
+          type="submit"
+          loading={save.isPending}
+          disabled={!name.trim() || !description.trim()}
+        >
+          Save
+        </Button>
+      </DialogFooter>
+    </CardForm>
   );
 }
 
