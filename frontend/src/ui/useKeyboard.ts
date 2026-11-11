@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { usePhone } from "./usePhone";
 
 /**
@@ -31,6 +31,25 @@ export function useKeyboard(active: boolean, surface?: RefObject<HTMLElement | n
     };
   }, [active]);
   return keyboard;
+}
+
+/**
+ * Calls `onDrop` once the keyboard, having risen while `active`, drops again while its text keeps
+ * focus (Android's Back). It measures how much shorter the visible viewport is than the surface,
+ * which iOS's scrolling to the text does not change, so a scroll never reads as the keyboard
+ * dropping.
+ */
+export function useKeyboardDrop(
+  active: boolean,
+  keyboard: { top: number; inset: number },
+  onDrop: () => void,
+) {
+  const deepest = useRef(0);
+  const shortened = keyboard.top + keyboard.inset;
+  useEffect(() => {
+    deepest.current = active ? Math.max(deepest.current, shortened) : 0;
+    if (deepest.current - shortened > 120) onDrop();
+  }, [active, shortened]);
 }
 
 /** While `active`, whether a text field that `within` accepts has focus. */

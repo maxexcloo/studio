@@ -72,3 +72,14 @@
 :global([data-typing]) .editor[data-fill]:has(.fields:focus-within) .footer > [role="group"] {
   display: none;
 }
+
+/* The chips fade back in as typing ends, rather than snapping into place. */
+.editor[data-fill] .footer > [role="group"] {
+  animation: return var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+@keyframes return {
+  from {
+    opacity: 0;
+  }
+}

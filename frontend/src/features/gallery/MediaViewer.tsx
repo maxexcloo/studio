@@ -587,7 +587,10 @@ export function MediaViewer({
                   miw={0}
                   className={classes.setPosition}
                 >
-                  {setPosition(item, members)}
+                  {/* Phones show only the place; Details names the set. */}
+                  {phone
+                    ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
+                    : setPosition(item, members)}
                 </Badge>
               ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
