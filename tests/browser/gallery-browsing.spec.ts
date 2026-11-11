@@ -399,7 +399,10 @@ test("Runs fan a stacked run out in place and open it to flip through", async ({
 
 test("An MCP result set is one titled run whose viewer names each result's place and jumps along its strip", async ({
   page,
-}) => {
+}, testInfo) => {
+  // Phones show only the place; Details names the set.
+  const place = (title: string, index: number) =>
+    testInfo.project.use.isMobile ? `${index} / 3` : `Variety Test › ${title} (${index} of 3)`;
   const state = await fixtures(page);
   const set = { id: "set-a", title: "Variety Test", source: "LibreChat" };
   // Newest first, as the gallery lists them; the second prompt has no title of its own.
@@ -445,21 +448,19 @@ test("An MCP result set is one titled run whose viewer names each result's place
   await expect(async () => {
     if (!(await viewer.isVisible()))
       await run.getByRole("button", { name: "Open All", exact: true }).click();
-    await expect(
-      viewer.getByText("Variety Test › Fox Wizard (1 of 3)", { exact: true }),
-    ).toBeVisible({ timeout: 1000 });
+    await expect(viewer.getByText(place("Fox Wizard", 1), { exact: true })).toBeVisible({
+      timeout: 1000,
+    });
   }).toPass();
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
   await strip.getByRole("listitem", { name: "Show Bear Hug (3 of 3)", exact: true }).click();
-  await expect(viewer.getByText("Variety Test › Bear Hug (3 of 3)", { exact: true })).toBeVisible();
+  await expect(viewer.getByText(place("Bear Hug", 3), { exact: true })).toBeVisible();
   await expect(
     viewer.getByRole("img", { name: "Set prompt 2, detailed", exact: true }),
   ).toBeVisible();
   await strip.getByRole("listitem", { name: "Show Set prompt 1 (2 of 3)", exact: true }).click();
-  await expect(
-    viewer.getByText("Variety Test › Set prompt 1 (2 of 3)", { exact: true }),
-  ).toBeVisible();
+  await expect(viewer.getByText(place("Set prompt 1", 2), { exact: true })).toBeVisible();
 });
 
 test("Select Set picks a set's results to upscale together", async ({ page }) => {
