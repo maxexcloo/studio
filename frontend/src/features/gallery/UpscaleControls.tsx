@@ -122,8 +122,9 @@ export function useUpscaleMany(items: MediaItem[]) {
   );
   const cache = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      Promise.all(
+    // Each item on its own, so one that fails leaves the rest queued; it reports the ones that failed.
+    mutationFn: async () => {
+      const outcomes = await Promise.allSettled(
         items.map((item) =>
           post<UpscaleResponse>("/api/upscale", {
             galleryItemId: item.id,
@@ -132,7 +133,11 @@ export function useUpscaleMany(items: MediaItem[]) {
             faceDetail: settings.faceDetail,
           } satisfies UpscaleRequest),
         ),
-      ),
+      );
+      const failed = items.filter((_item, index) => outcomes[index].status === "rejected");
+      const rejected = outcomes.find((outcome) => outcome.status === "rejected");
+      return { failed: failed.map((item) => item.id), error: rejected?.reason as unknown };
+    },
     onSettled: () =>
       void Promise.all(
         ["gallery", "queue", "session", "sessions"].map((key) =>

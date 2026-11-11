@@ -1219,9 +1219,11 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await expect
     .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
     .toBeGreaterThan(0);
-  const box = (await picture.boundingBox())!;
-  const x = box.x + box.width * 0.3;
-  const y = box.y + box.height * 0.3;
+  let { x, y } = await aim();
+  async function aim() {
+    const box = (await picture.boundingBox())!;
+    return { x: box.x + box.width * 0.3, y: box.y + box.height * 0.3 };
+  }
   if (!testInfo.project.use.isMobile) {
     // A mouse double-click is two clicks, each cycling the zoom.
     await picture.dblclick();
@@ -1247,6 +1249,8 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await page.waitForTimeout(400);
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
   await expect(viewer).toBeVisible();
+  // It hid the chrome, so the picture has glided to the middle of the screen.
+  ({ x, y } = await aim());
   await tap();
   await page.waitForTimeout(100);
   await tap();
@@ -1274,10 +1278,10 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Only touch screens hide the chrome.");
   const state = await fixtures(page);
-  for (const [id, prompt, createdAt] of [
+  for (const [index, [id, prompt, createdAt]] of [
     ["tap-first", "A quiet harbour", stamp],
     ["tap-second", "A windy cliff", "2026-01-01T00:00:00.000Z"],
-  ])
+  ].entries())
     state.gallery.push({
       id,
       type: "image",
@@ -1288,6 +1292,7 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
       width: 1024,
       height: 1024,
       createdAt,
+      resultSet: { id: "tap-set", title: "Tap Set", index },
     });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
@@ -1296,6 +1301,9 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
   await expect(picture).toBeVisible();
   const close = viewer.getByRole("button", { name: "Close Generation", exact: true });
   const shown = () => close.evaluate((node) => node.checkVisibility({ opacityProperty: true }));
+  const strip = viewer.getByRole("list", { name: "Set: Tap Set", exact: true });
+  const stripShown = () =>
+    strip.evaluate((node) => node.checkVisibility({ opacityProperty: true }));
   const webkit = testInfo.project.use.browserName === "webkit";
   const touch = webkit ? undefined : await page.context().newCDPSession(page);
   async function centre() {
@@ -1308,8 +1316,18 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
+  await expect.poll(stripShown).toBe(true);
   await tap();
   await expect.poll(shown).toBe(false);
+  // Nothing else stays: the strip hides and the picture glides to the middle of the screen.
+  await expect.poll(stripShown).toBe(false);
+  const viewport = page.viewportSize()!;
+  await expect
+    .poll(async () => {
+      const { x, y } = await centre();
+      return Math.round(Math.abs(x - viewport.width / 2) + Math.abs(y - viewport.height / 2));
+    })
+    .toBeLessThan(2);
   await tap();
   await expect.poll(shown).toBe(true);
   await tap();

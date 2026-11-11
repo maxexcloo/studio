@@ -127,7 +127,7 @@ test("Caption Gallery in Settings › Generation starts a pass, shows its progre
   ]);
 });
 
-test("Unfinished Items in Settings › Generation retry and delete any account's stuck jobs", async ({
+test("Unfinished Items in Settings › Generation retry, stop and clear any account's stuck jobs", async ({
   page,
 }) => {
   await fixtures(page);
@@ -154,7 +154,7 @@ test("Unfinished Items in Settings › Generation retry and delete any account's
     if (action === "unfinished") return route.fulfill({ json: { jobs } });
     const body = route.request().postDataJSON();
     actions.push([action, body]);
-    jobs = jobs.filter((entry) => entry.id !== body.id);
+    jobs = body.jobs ? [] : jobs.filter((entry) => entry.id !== body.id);
     return route.fulfill({ json: { job: jobs[0] } });
   });
   await page.goto("/settings#generation");
@@ -169,13 +169,31 @@ test("Unfinished Items in Settings › Generation retry and delete any account's
   await page.getByRole("menuitem", { name: "Retry", exact: true }).click();
   await expect(dialog.getByRole("row", { name: "A lost lighthouse" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Actions for A slow tide", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  const confirm = page.getByRole("dialog", { name: "Delete Unfinished Item", exact: true });
-  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Clear", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Clear Unfinished Item", exact: true });
+  await confirm.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
+  // Every listed job at once: Stop All and Clear All confirm first.
+  jobs = [job("one", "member", "A first owl"), job("two", "admin", "A second owl")];
+  await page.reload();
+  await row.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(dialog.getByRole("row", { name: "A second owl" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Clear All", exact: true }).click();
+  const clearAll = page.getByRole("dialog", { name: "Clear All Unfinished Items", exact: true });
+  await clearAll.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
   expect(actions).toEqual([
     ["retry", { ownerId: "member", id: "stuck" }],
     ["delete", { ownerId: "admin", id: "slow" }],
+    [
+      "delete-all",
+      {
+        jobs: [
+          { ownerId: "member", id: "one" },
+          { ownerId: "admin", id: "two" },
+        ],
+      },
+    ],
   ]);
   // Escape closes only the topmost dialog, leaving Settings open under it.
   await page.keyboard.press("Escape");

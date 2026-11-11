@@ -19,7 +19,7 @@ export function useRecreateMany() {
       if (!profile) throw new Error("Choose an available model first.");
       const ready = items.filter((item) => item.status === "done" && item.suggestedPrompt);
       let queued = 0;
-      const failed: string[] = [];
+      const failed: { id: string; reason: string }[] = [];
       for (const item of ready) {
         try {
           const { sessionId, jobId } = await post<{ sessionId: string; jobId: string }>(
@@ -44,7 +44,10 @@ export function useRecreateMany() {
           });
           queued += 1;
         } catch (error) {
-          failed.push(error instanceof Error ? error.message : String(error));
+          failed.push({
+            id: item.id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
         }
       }
       return { queued, failed, waiting: items.length - ready.length };
@@ -58,7 +61,7 @@ export function useRecreateMany() {
             : "Nothing was queued.",
           waiting > 0 &&
             `${waiting} ${waiting === 1 ? "upload has" : "uploads have"} no suggested prompt yet.`,
-          failed.length > 0 && `${failed.length} failed: ${failed[0]}`,
+          failed.length > 0 && `${failed.length} failed: ${failed[0].reason}`,
         ]
           .filter(Boolean)
           .join(" "),
