@@ -150,9 +150,7 @@ export function StatusAction() {
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
             {/* The queue's actions have a row of their own, as the drawer is too narrow beside the title. */}
-            <Group justify="flex-end">
-              <QueueActions />
-            </Group>
+            <QueueActions />
             <div className={classes.list}>
               <Queue />
             </div>

@@ -221,6 +221,10 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
+  // The query the shown results answer: placeholder results still answer the previous one.
+  const [resultsKey, setResultsKey] = useState(() => JSON.stringify(galleryKey));
+  if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(galleryKey))
+    setResultsKey(JSON.stringify(galleryKey));
   const loadEveryMatch = useCallback(async () => {
     everyMatch.current = JSON.stringify(galleryKey);
     let result = gallery;
@@ -417,6 +421,7 @@ export function GalleryPage() {
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
           <View
             items={items}
+            results={resultsKey}
             versions={versions}
             // A similarity ranking isn't in time order.
             byDay={!similar}

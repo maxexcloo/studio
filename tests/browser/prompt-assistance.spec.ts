@@ -259,6 +259,8 @@ test("Improve Prompt lists its styles A–Z in the ⋯ menu with Custom… last,
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Improve Prompt", exact: true })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test("Custom… rewrites the draft's prompt in place, for Generate to run or Undo to restore, and suggests changes", async ({
