@@ -37,6 +37,7 @@ import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { Profile, QueueJob, ReferenceAsset } from "../../types";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useTryAgain } from "../gallery/useTryAgain";
 import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery, loraTitle } from "./LoraPicker";
@@ -131,12 +132,30 @@ export function useQueueAction(jobId?: string) {
       matching(value) ? undefined : action.mutateAsync(value),
   };
 }
+/**
+ * Retries failed jobs through the shared `useTryAgain`. A retried job joins its set again, so a
+ * set member's failed original leaves the queue.
+ */
+function useRetryJobs(jobs: QueueJob[]) {
+  const tryAgain = useTryAgain(jobs.flatMap((job) => job.items));
+  const action = useQueueAction();
+  return async (ids: string[]) => {
+    const accepted = await tryAgain(ids);
+    await Promise.allSettled(
+      jobs
+        .filter((job) => job.queueSet && accepted.has(job.id))
+        .map((job) => action.mutateAsync({ id: job.id, action: "clear" })),
+    );
+  };
+}
 export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {
   const action = useQueueAction(job.id);
+  const retryJobs = useRetryJobs([job]);
   if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
   const label = retry ? "Retry" : "Stop";
-  const onClick = () => action.mutate({ id: job.id, action: retry ? "retry" : "cancel" });
+  const onClick = () =>
+    retry ? void retryJobs([job.id]) : action.mutate({ id: job.id, action: "cancel" });
   return compact ? (
     <RowButton
       label={label}
@@ -507,16 +526,10 @@ function QueueSetRow({
     await Promise.allSettled(unfinished.map((id) => action.mutateAsync({ id, action: "cancel" })));
     setBusy(undefined);
   };
-  // A retried job joins the set again, so its failed original leaves the queue.
+  const retryJobs = useRetryJobs(members);
   const retry = async () => {
     setBusy("retry");
-    for (const id of failed)
-      try {
-        if (await action.mutateAsync({ id, action: "retry" }))
-          await action.mutateAsync({ id, action: "clear" });
-      } catch {
-        // Reported by the queue command's default notification.
-      }
+    await retryJobs(failed);
     setBusy(undefined);
   };
   const retryButton = (
@@ -664,7 +677,8 @@ export function QueueActions() {
     </Tooltip>
   );
   return (
-    <Group gap={4} wrap="nowrap">
+    // At the end of the row it shares, or of its own row in the phone drawer.
+    <Group gap={4} wrap="nowrap" justify="flex-end">
       {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
         pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
       )}

@@ -56,6 +56,7 @@ const fromLabel = (run: Run) =>
  */
 export function RunsView({
   items,
+  results,
   open,
   selection,
   focusItem,
@@ -114,7 +115,7 @@ export function RunsView({
       ),
     );
   }, [rows]);
-  useScrollAnchor(host, width ? places : null, `${columns}:${width}`);
+  useScrollAnchor(host, width ? places : null, `${columns}:${width}:${results}`);
   useLayoutEffect(() => {
     virtual.measure();
     // A zoom holds the row of the run under the fingers or pointer in place.
@@ -268,7 +269,7 @@ const RunsRow = memo(function RunsRow({
   renderActions,
   onSelectionMenu,
   onTryAgain,
-}: Omit<GalleryViewProps, "items" | "focusItem" | "versions"> & {
+}: Omit<GalleryViewProps, "items" | "results" | "focusItem" | "versions"> & {
   row: Row;
   columns: number;
   cell: number;

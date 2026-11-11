@@ -344,6 +344,14 @@ function AutomaticControlRows({
         method: "PUT",
         body: JSON.stringify({ ...settings, ...patch }),
       }),
+    // Controls follow the hand at once; the refetch afterwards settles them, a failure included.
+    onMutate: async (patch) => {
+      await client.cancelQueries({ queryKey: runtimeStatusQuery.queryKey });
+      client.setQueryData(
+        runtimeStatusQuery.queryKey,
+        (status) => status && { ...status, settings: { ...status.settings, ...patch } },
+      );
+    },
     onSettled: () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey }),
   });
   const minutes = [...new Set([0, 10, 15, 30, 60, settings.parkIdleMinutes])].sort((x, y) => x - y);
