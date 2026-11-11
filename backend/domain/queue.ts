@@ -23,6 +23,14 @@ export interface JobObservation {
 export const unreachableCancelReason =
   "Cancelled. Its worker wasn't reachable, so nothing was left running there.";
 
+/**
+ * A save failure meaning the outputs are gone from the provider for good (`saveOutputs` throws it):
+ * the job fails after `goneSaveTries` of them rather than retrying forever.
+ */
+export const goneOutputs = (message: string) => Object.assign(new Error(message), { gone: true });
+const goneSaveTries = 3;
+const stoppedSavingReason = "Stopped while saving; its outputs weren't saved.";
+
 /** A saved job completes unless saving failed it (an Extend that couldn't be joined onto its video). */
 const savedStatus = (saved: JobObservation | void) =>
   saved?.status === "failed" ? ("failed" as const) : ("completed" as const);
@@ -145,6 +153,8 @@ export class GenerationQueue {
   private submitting = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private acceptedIds = new Set<string>();
+  /** Saves of each job that found its outputs gone. */
+  private goneSaves = new Map<string, number>();
   /**
    * The job last started or finished on each resource: what its worker has loaded. Forgotten when
    * the worker stops, restarts or goes offline (`unload`).
@@ -355,7 +365,14 @@ export class GenerationQueue {
             };
             if (observed.status === "completed") {
               job = this.store.save({ ...job, status: "saving" });
-              const saved = await this.adapter.saveOutputs(job);
+              let saved;
+              try {
+                saved = await this.adapter.saveOutputs(job);
+              } catch (error) {
+                await this.saveFailed(job, error as Error & { gone?: boolean });
+                return;
+              }
+              this.goneSaves.delete(job.id);
               // A cancellation that raced saving cannot discard already saved results.
               const completed = this.store.save({ ...job, ...saved, status: savedStatus(saved) });
               this.loaded.set(completed.resource, completed);
@@ -593,9 +610,48 @@ export class GenerationQueue {
     }
   }
 
+  /**
+   * A failed save keeps the job saving, to try again, unless Stop asked to end it or its outputs
+   * are gone for good; either ends it with the reason.
+   */
+  private async saveFailed(job: OwnedJob, error: Error & { gone?: boolean }) {
+    const latest = this.store.job(job.ownerId, job.id)!;
+    const tries = error.gone ? (this.goneSaves.get(job.id) ?? 0) + 1 : 0;
+    if (!latest.cancelRequested && tries < goneSaveTries) {
+      if (tries) this.goneSaves.set(job.id, tries);
+      else this.goneSaves.delete(job.id);
+      this.store.save({
+        ...latest,
+        reason: `Waiting for the recorded generation: ${error.message}`,
+      });
+      return;
+    }
+    this.goneSaves.delete(job.id);
+    const ended = this.store.save({
+      ...latest,
+      status: latest.cancelRequested ? "cancelled" : "failed",
+      progress: undefined,
+      reason: latest.cancelRequested ? stoppedSavingReason : error.message,
+    });
+    await this.adapter.settled?.(ended);
+  }
+
   async cancel(ownerId: string, id: string): Promise<OwnedJob | undefined> {
     const job = this.store.job(ownerId, id);
     if (!job || terminalStatuses.has(job.status)) return job;
+    // Its provider is done with it: a save in progress finishes or ends at Stop's request, and
+    // between saves it ends now.
+    if (job.status === "saving") {
+      if (this.observing.has(job.id)) return this.store.save({ ...job, cancelRequested: true });
+      const cancelled = this.store.save({
+        ...job,
+        status: "cancelled",
+        progress: undefined,
+        reason: stoppedSavingReason,
+      });
+      await this.adapter.settled?.(cancelled);
+      return cancelled;
+    }
     if (!this.acceptedIds.has(job.id)) {
       this.writing.get(job.id)?.abort();
       const cancelled = this.store.save({

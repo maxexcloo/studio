@@ -232,6 +232,21 @@ export function saveIntoStudioFolder(graph, ownerId = "") {
   return graph;
 }
 
+/**
+ * Tags every save node's name with its run, so an exact repeat still saves a file of its own:
+ * ComfyUI answers an unchanged graph from its cache with the earlier run's file, which Studio has
+ * already moved into media. Only the save nodes rerun, not the sampling.
+ */
+export function nameSavesForRun(graph, runId) {
+  const tag = String(runId)
+    .replace(/[^\w-]/g, "")
+    .slice(0, 8);
+  for (const node of Object.values(graph || {}))
+    if (typeof node?.inputs?.filename_prefix === "string")
+      node.inputs.filename_prefix = `${node.inputs.filename_prefix}-${tag}`;
+  return graph;
+}
+
 export async function customWorkflowGraph(body) {
   const installed = getCustomWorkflow(body.workflow, body.profileBackend);
   const workflow = installed && selectImageMode(installed, body);

@@ -12,7 +12,7 @@ import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { describeFailure } from "./failures.js";
 import { withFixes } from "./failure-fixes.js";
 import { nextProgress } from "./progress-phase.js";
-import { customWorkflowGraph } from "./graphs.js";
+import { customWorkflowGraph, nameSavesForRun } from "./graphs.js";
 import { replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from "./gallery/store.js";
 import { generationSettings, outputsFrom } from "./gallery/records.js";
 import { forgetComfyRun } from "./comfy/traces.js";
@@ -526,6 +526,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const upscale = prepare ? await prepare(prompt) : null;
     const embed = upscale?.graph ? upscale : null;
     if (embed) prompt = embed.graph;
+    nameSavesForRun(prompt, id);
     const pairs = embed?.pairs || [];
     timing.timer = new RunTimer(prompt, { endNodes: pairs.map((pair) => pair.base) });
     if (embed) {

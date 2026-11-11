@@ -18,14 +18,23 @@ import { workflowRisks } from "./workflow-risk.js";
 let preferencesCache = null;
 let preferencesSaveTimer = null;
 
+/** Favourites and last use of profiles that still exist, so a removed profile's clear themselves. */
+function ofExistingProfiles({ favorites, lastUsed }) {
+  const ids = new Set(allCustomWorkflowRecords({ dedupe: false }).map((item) => item.profileId));
+  return {
+    favorites: favorites.filter((id) => ids.has(id)),
+    lastUsed: Object.fromEntries(Object.entries(lastUsed).filter(([id]) => ids.has(id))),
+  };
+}
+
 export function loadWorkflowPreferences() {
   if (preferencesCache) return preferencesCache;
   try {
     const raw = readRuntimeDocument(dataDir, "workflow-preferences");
-    preferencesCache = {
+    preferencesCache = ofExistingProfiles({
       favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
       lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
-    };
+    });
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
     preferencesCache = { favorites: [], lastUsed: {} };
@@ -48,7 +57,8 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
     clearTimeout(preferencesSaveTimer);
     preferencesSaveTimer = null;
   }
-  writeRuntimeDocument(dataDir, "workflow-preferences", preferences);
+  preferencesCache = ofExistingProfiles(preferences);
+  writeRuntimeDocument(dataDir, "workflow-preferences", preferencesCache);
 }
 
 /** Saves a change still in its debounce; Studio's exit calls it while the database is open. */

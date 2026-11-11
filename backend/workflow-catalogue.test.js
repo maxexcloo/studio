@@ -5,7 +5,14 @@ import path from "node:path";
 import test from "node:test";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-const { validateWorkflow } = await import("./workflow-catalogue.js");
+const {
+  flushWorkflowPreferences,
+  loadWorkflowPreferences,
+  markWorkflowUsed,
+  saveWorkflowPreferences,
+  validateWorkflow,
+} = await import("./workflow-catalogue.js");
+const { userWorkflowsDir } = await import("./custom-workflows.js");
 
 const save = { class_type: "SaveImage", inputs: { filename_prefix: "studio" } };
 
@@ -38,4 +45,25 @@ test("a Grok profile's single cloud node needs no Save Image", () => {
     graph: { 1: { class_type: "GrokMedia", inputs: { prompt: "", model: "grok" } } },
   });
   assert.deepEqual(warnings, []);
+});
+
+test("favourites and last use keep only profiles that still exist", () => {
+  fs.mkdirSync(userWorkflowsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(userWorkflowsDir, "kept.json"),
+    JSON.stringify({ studio: { id: "kept", name: "Kept", kind: "image" }, graph: { 9: save } }),
+  );
+  saveWorkflowPreferences(
+    {
+      favorites: ["custom:kept", "custom:gone"],
+      lastUsed: { "custom:kept": "2026-11-01", "custom:gone": "2026-10-01" },
+    },
+    { immediate: true },
+  );
+  markWorkflowUsed("custom:removed");
+  flushWorkflowPreferences();
+  assert.deepEqual(loadWorkflowPreferences(), {
+    favorites: ["custom:kept"],
+    lastUsed: { "custom:kept": "2026-11-01" },
+  });
 });
