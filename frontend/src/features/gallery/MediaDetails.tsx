@@ -517,6 +517,11 @@ export function MediaDetails({
       )}
       <Related title="From" items={related.source ? [related.source] : []} open={open} />
       <DetailsPrompt item={item} />
+      {item.resultSet && (
+        <DetailSection title="Set">
+          <Text size="sm">{item.resultSet.title}</Text>
+        </DetailSection>
+      )}
       {item.source && (
         <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">

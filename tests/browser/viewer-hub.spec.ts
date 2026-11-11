@@ -5,6 +5,7 @@ import {
   fixtures,
   image,
   profiles,
+  editorMenu,
   promptMenu,
   promptTool,
   serveProfiles,
@@ -207,7 +208,7 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
 
 test("Suggestions offers the image's next steps as changes, and picking one asks at once", async ({
   page,
-}) => {
+}, testInfo) => {
   const asked: any[] = [];
   const { viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -236,8 +237,12 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
       });
     }),
   );
-  const menu = await promptMenu(viewer, "Prompt");
+  const phone = testInfo.project.use.isMobile;
+  const menu = phone
+    ? await editorMenu(viewer, "Prompt", "Suggestions")
+    : await promptMenu(viewer, "Prompt");
   await menu.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  if (phone) await page.getByRole("button", { name: "Done", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
