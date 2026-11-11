@@ -2,7 +2,7 @@
 import { referenceImageSize } from "../generation-defaults.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
 import { keptTriggers } from "../lora/prompts.js";
-import { guidingRoles } from "../../shared/profiles.ts";
+import { guidingRoles, loraDefaultStrength } from "../../shared/profiles.ts";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
@@ -322,9 +322,10 @@ function loraDetail({ name, info, fit }, short) {
     ...(info?.title ? { title: clip(info.title, 120) } : {}),
     ...(info?.description ? { description: clip(info.description, 280) } : {}),
     ...(info?.triggers?.length ? { trigger_words: info.triggers.slice(0, 12) } : {}),
-    strength: range
-      ? { recommended: range.default ?? 0.7, min: range.min, max: range.max }
-      : { recommended: 0.7 },
+    strength: {
+      recommended: loraDefaultStrength(info, 0.7),
+      ...(range ? { min: range.min, max: range.max } : {}),
+    },
     ...(info?.base ? { trained_for: info.base } : {}),
     ...(info?.sourceUrl ? { source_url: info.sourceUrl } : {}),
     ...(info?.note ? { note: clip(info.note, 200) } : {}),
@@ -497,10 +498,9 @@ export function prepareLoras(profile, infos = {}, loras = []) {
       );
     }
     if (stack.some((item) => item.name === name)) continue;
-    const range = strengthRange(entry.info);
     stack.push({
       name,
-      strength: Number.isFinite(strength) ? strength : (range?.default ?? 0.7),
+      strength: Number.isFinite(strength) ? strength : loraDefaultStrength(entry.info, 0.7),
       // A reused run keeps its Trigger Words choice; MCP callers never set it themselves.
       ...keptTriggers(triggers),
     });

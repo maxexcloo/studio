@@ -17,7 +17,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { defaultProfile, useGeneration, type Draft } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { useLoraPicker } from "./LoraPicker";
-import { primaryReference, referenceDetails, usesNegative } from "./payload";
+import { primaryReference, profileForBackend, referenceDetails, usesNegative } from "./payload";
 import { usePromptIdeas } from "./PromptIdeas";
 import { PromptFields, useDraftChange } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
@@ -57,7 +57,7 @@ export function useSubmitState({
 /** Why a run can't be submitted yet, if it can't; Compare checks each variant with it. */
 export function submitBlockedReason({
   input,
-  profile,
+  profile: listedProfile,
   references,
   uploading,
   assisting,
@@ -68,6 +68,14 @@ export function submitBlockedReason({
   uploading: boolean;
   assisting: boolean;
 }) {
+  const profile = profileForBackend(listedProfile, input.profileBackend);
+  const referenceCount = references.length || input.referenceAssets.length;
+  const referenceMaximum = profile?.mediaInputs?.length
+    ? profile.mediaInputs.reduce((total, slot) => total + (slot.max ?? 1), 0)
+    : profile?.capabilities.startImage
+      ? 1
+      : 0;
+  const loraMaximum = profile?.maxLoras ?? 8;
   const requiredReference = profile?.mediaInputs?.some(
     (slot) =>
       slot.required &&
@@ -86,13 +94,17 @@ export function submitBlockedReason({
         : "This model isn’t ready."
       : !input.prompt.trim()
         ? "Describe what you want to create."
-        : requiredReference
-          ? "Add a reference image."
-          : uploading
-            ? "Wait for the reference upload to finish."
-            : assisting
-              ? "Wait for the prompt assistant to finish."
-              : undefined;
+        : referenceCount > referenceMaximum
+          ? `This backend takes at most ${referenceMaximum} reference images. Choose another backend or remove references.`
+          : input.loras.filter((lora) => lora.enabled !== false).length > loraMaximum
+            ? `This backend takes at most ${loraMaximum} enabled LoRAs. Disable or remove LoRAs, or choose another backend.`
+            : requiredReference
+              ? "Add a reference image."
+              : uploading
+                ? "Wait for the reference upload to finish."
+                : assisting
+                  ? "Wait for the prompt assistant to finish."
+                  : undefined;
 }
 
 /** Keeps a blocked Generate focusable so its tooltip and description still explain why. */
@@ -118,7 +130,7 @@ export function submitShortcut(event: React.KeyboardEvent<HTMLFormElement>, bloc
 export function GenerationEditor({
   input,
   references,
-  profile,
+  profile: listedProfile,
   onChange,
   onReferencesChange,
   onCharacterProfile,
@@ -174,6 +186,7 @@ export function GenerationEditor({
   /** Offers taste-led prompt ideas as a Suggestions chip while the prompt is empty. */
   ideas?: boolean;
 }) {
+  const profile = profileForBackend(listedProfile, input.profileBackend);
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
   const lastMask = useRef<{ assetId?: string; mask?: string }>(undefined);

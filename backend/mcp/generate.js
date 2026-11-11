@@ -626,16 +626,17 @@ export function registerGenerateTools({
       if (!profiles.some((profile) => profile.id === profile_id))
         profiles = localUnlessAsked(profiles, { name: profile_id });
       // Words that name several models ("klein", "flux") list them instead of choosing one.
-      const named = findProfile(profiles, profile_id);
+      const named = findProfile(profiles, named_id);
       const matches = named
         ? []
         : searchProfiles(wanted ? profilesNearTier(profiles, wanted) : profiles, profile_id);
       if (matches.length > 1) return mcpJson(listed(matches));
-      const { profile, note: tierNote } = named
+      const { profile: listedProfile, note: tierNote } = named
         ? named.id === profile_id
           ? { profile: named, note: "" }
           : withinFamily(profiles, named, wanted)
-        : namedInTier(profiles, profile_id, wanted);
+        : namedInTier(profiles, named_id, wanted);
+      const profile = media.profileForBackend(listedProfile, listedProfile.namedBackend);
       const infos =
         profile.options?.loras?.length && profile.capabilities?.lora !== false
           ? await media.loraInfos(owner)
@@ -1048,6 +1049,10 @@ export function registerGenerateTools({
         }
       }
     }
+    targets = targets.map((target) => ({
+      ...target,
+      profile: media.profileForBackend(target.profile, target.profile.namedBackend),
+    }));
     // The model a warning names when the chosen one can't hold a character's (or reference's) face.
     const keeper =
       (card?.referenceIds.length || named.length) && !views

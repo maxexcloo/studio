@@ -213,7 +213,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   );
   const stacked = (name: string) => base.input.loras.find((entry) => entry.name === name);
   const startStrength = (name: string) =>
-    stacked(name)?.strength ?? defaultStrength(metadata[name]?.strengthRange);
+    stacked(name)?.strength ?? defaultStrength(metadata[name]);
   const [strength, setStrength] = useState<number | null>(
     same ? (remembered.strength ?? null) : null,
   );

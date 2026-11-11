@@ -1,17 +1,38 @@
 import { loraCompatibility, strengthRange } from "./policy.js";
 
+/** Name-refined models share their parent family's adapter layout. */
+export function withFamilyRefinements(ids, families) {
+  const all = new Set(ids);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [id, spec] of Object.entries(families)) {
+      if (spec.refines && all.has(spec.refines.family) && !all.has(id)) {
+        all.add(id);
+        grew = true;
+      }
+    }
+  }
+  return [...all];
+}
+
 // Local catalogue entries describe installed files; they never become download records.
 export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata, families) {
   const entry = Object.hasOwn(catalogue || {}, name) ? catalogue[name] : null;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return info;
-  const requested = familiesFromMetadata({ base_model: String(entry.baseModel || "") });
+  const explicit = Array.isArray(entry.families);
+  const requested = explicit
+    ? entry.families
+    : familiesFromMetadata({ base_model: String(entry.baseModel || "") });
   const detected = info?.families || [];
   // Qwen-Image 2.1 LoRAs read as Qwen-Image from their weights alone; the catalogue says which.
   const compatible =
     !detected.length ||
     requested.some((id) => detected.includes(id)) ||
     (detected.includes("qwen_image") && requested.includes("qwen_image_21"));
-  const ids = requested.length && compatible ? requested : detected;
+  const ids = withFamilyRefinements(
+    explicit || (requested.length && compatible) ? requested : detected,
+    families,
+  );
   const title = typeof entry.title === "string" ? entry.title.trim().slice(0, 300) : "";
   return {
     ...info,
@@ -94,7 +115,10 @@ export function enrichLoraInfo(info, name, sources, familiesFromMetadata, famili
     !detected.length ||
     providerFamilies.some((id) => detected.includes(id)) ||
     (detected.includes("qwen_image") && providerFamilies.includes("qwen_image_21"));
-  const ids = providerFamilies.length && sameArchitecture ? providerFamilies : detected;
+  const ids = withFamilyRefinements(
+    providerFamilies.length && sameArchitecture ? providerFamilies : detected,
+    families,
+  );
   const triggers = cleanTriggers(source.trainedWords);
   return {
     ...info,
@@ -147,6 +171,9 @@ function loraPolicyMetadata(entry) {
         }
       : {}),
     ...(strengthRange(entry) ? { strengthRange: strengthRange(entry) } : {}),
+    ...(Number.isFinite(entry.recommendedStrength ?? entry.strengthRange?.default)
+      ? { recommendedStrength: entry.recommendedStrength ?? entry.strengthRange.default }
+      : {}),
   };
 }
 

@@ -128,19 +128,6 @@ async function applyMappedInputs(graph, workflow, body) {
       setMappedInput(graph, mediaInput.strength, reference.strength);
   }
   const stagedReference = (body.referenceAssets || []).find((item) => item?.comfyName)?.comfyName;
-  if (
-    String(workflow.family || "").replaceAll("-", "_") === "minimax_h3" &&
-    !mappedReference &&
-    !stagedReference &&
-    !body.startImage &&
-    !body.startImageId
-  ) {
-    if (workflow.capabilities?.startImageRequired)
-      throw new Error("This H3 reference preset requires an image.");
-    for (const node of Object.values(graph)) {
-      if (node.class_type === "MiniMaxH3ImageToVideo") delete node.inputs.first_frame;
-    }
-  }
   if (!mappedReference && controls.startImage) {
     const imageName =
       stagedReference ||
