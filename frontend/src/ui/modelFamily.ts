@@ -1,3 +1,5 @@
+import { loraFamilyId } from "../../../shared/profiles";
+
 // Names the catalogue doesn't define: quantisation formats and older family ids.
 const names: Record<string, string> = {
   flux: "Flux",
@@ -18,7 +20,8 @@ export function modelFamilyLabel(family = "", familyName?: string): string {
   const label = (familyName || family).trim();
   if (!label) return "Unclassified";
   // A family the catalogue knows has one name everywhere, whatever a profile spells it as.
-  if (catalogue[family]) return catalogue[family];
+  const known = catalogue[loraFamilyId(family)];
+  if (known) return known;
   const flux = /^flux[. _-]?(\d+)/i.exec(label);
   if (flux) return `Flux ${flux[1]}`;
   // A written family name (a profile's own, such as "Qwen-Image") is shown as written.
