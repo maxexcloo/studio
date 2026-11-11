@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
-import type { Profile, Session } from "../../types";
+import type { StudioSession } from "../../../../shared/queue";
+import type { Profile } from "../../types";
 import {
   characterProfiles,
   characterShots,
@@ -63,8 +64,7 @@ export function useGenerateReferences(preferredProfileId?: string) {
         seed: String(Math.floor(Math.random() * 2 ** 31)),
       };
       const shots = characterShots(card.description, references.length > 0);
-      const first = generationInput({ ...input, prompt: shots[0] }, profile, references);
-      const { session } = await post<{ session: Session }>("/api/sessions", { inputs: first });
+      const { session } = await post<{ session: StudioSession }>("/api/sessions");
       const jobIds: string[] = [];
       for (const prompt of shots)
         jobIds.push(

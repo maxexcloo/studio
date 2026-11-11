@@ -70,7 +70,7 @@ profiles.push({
 });
 
 export async function fixtures(page: Page) {
-  const sessions: any[] = [];
+  let sessions = 0;
   const jobs: any[] = [];
   const presets: any[] = [];
   const gallery: any[] = [];
@@ -481,24 +481,15 @@ export async function fixtures(page: Page) {
       return respond({ job });
     }
     if (path === "/api/sessions" && method === "POST") {
-      const session = {
-        id: `session-${sessions.length + 1}`,
-        title: body.title || "",
-        inputs: body.inputs,
-        createdAt: stamp,
-        updatedAt: stamp,
-      };
-      sessions.push(session);
-      return respond({ session });
+      sessions += 1;
+      return respond({
+        session: { id: `session-${sessions}`, title: "", createdAt: stamp, updatedAt: stamp },
+      });
     }
     if (path.match(/^\/api\/sessions\/[^/]+\/generations$/)) {
       const sessionId = path.split("/")[3];
       const job = recordGeneration(body, sessionId);
       return respond({ jobId: job.id, sessionId, status: "queued" });
-    }
-    if (path.match(/^\/api\/sessions\/[^/]+$/)) {
-      const session = sessions.find((s) => s.id === path.split("/")[3]);
-      return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
     // Compare Selected records chosen gallery images.
     if (path === "/api/comparisons" && method === "POST") {
@@ -786,7 +777,6 @@ export async function fixtures(page: Page) {
     return respond({ ok: true });
   });
   return {
-    sessions,
     jobs,
     presets,
     gallery,

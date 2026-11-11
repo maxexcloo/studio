@@ -88,10 +88,9 @@ export function createGenerationAdmission(options: AdmissionOptions) {
               ? options.store.mcpSession(
                   ownerId,
                   title,
-                  input,
                   (input.chat as { conversationId?: string } | undefined)?.conversationId,
                 )
-              : options.store.createSession(ownerId, title, input))
+              : options.store.createSession(ownerId, title))
           ).id;
         // A profile that can't batch makes Count separate runs of one request: seed, seed+1, …
         // or fresh random seeds, queued together as one set.

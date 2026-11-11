@@ -5,9 +5,10 @@ import type { MediaItem } from "../../types";
 import { useQueueAction } from "../generation/Queue";
 
 /**
- * Retries failed jobs once each through the shared queue command. An accepted retry's new
- * pending tiles replace the job's failed tiles; failures are reported by the queue command and
- * their tiles remain. Resolves to each accepted job's replacement job ID.
+ * Retries failed jobs once each through the shared queue command. An accepted retry's new job
+ * replaces the failed one in the queue and its pending tiles replace the failed tiles; failures are
+ * reported by the queue command and their tiles remain. Resolves to each accepted job's
+ * replacement job ID.
  */
 export function useTryAgain(items: MediaItem[]) {
   const retry = useQueueAction().mutateAsync;
@@ -26,7 +27,10 @@ export function useTryAgain(items: MediaItem[]) {
       const replaced = items
         .filter((item) => item.status === "failed" && accepted.has(item.jobId || ""))
         .map((item) => item.id);
-      if (replaced.length) await post("/api/gallery/delete", { ids: replaced }).catch(() => {});
+      await Promise.allSettled([
+        ...[...accepted.keys()].map((id) => retry({ id, action: "clear" })),
+        replaced.length && post("/api/gallery/delete", { ids: replaced }),
+      ]);
       if (accepted.size) await client.invalidateQueries({ queryKey: ["gallery"] });
       return accepted;
     },

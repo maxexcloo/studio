@@ -173,12 +173,12 @@ test("a request's jobs group as one set that moves and stops together", async ({
   ).toContainText("Studio stops your 1 unfinished generation.");
 });
 
-test("a set's Retry Failed goes through the shared retry, replacing its failed tiles", async ({
+test("Retry and a set's Retry Failed go through the shared retry, replacing the failed originals", async ({
   page,
 }) => {
   const state = await fixtures(page);
   const tile = { id: "failed-tile", jobId: "set-failed", status: "failed", url: image };
-  const job = (id: string, status: string, items: unknown[] = []) => ({
+  const job = (id: string, status: string, items: unknown[] = [], queueSet = "set") => ({
     id,
     jobId: id,
     sessionId: "s",
@@ -190,19 +190,27 @@ test("a set's Retry Failed goes through the shared retry, replacing its failed t
       kind: "image",
       resultSet: { id: "result-set", title: "Fox Studies", index: 0 },
     },
-    queueSet: "set",
+    queueSet,
     items,
     outputs: [],
     createdAt: stamp,
     updatedAt: stamp,
   });
-  state.jobs.push(job("set-done", "completed"), job("set-failed", "failed", [tile]));
+  state.jobs.push(
+    job("set-done", "completed"),
+    job("set-failed", "failed", [tile]),
+    job("lone-failed", "failed", [], ""),
+  );
   state.gallery.push(tile);
-  await page.route("**/api/queue/set-failed/retry", async (route) => {
-    const retried = job("set-retried", "queued");
-    state.jobs.push(retried);
-    await route.fulfill({ json: { job: retried } });
-  });
+  for (const [failed, retried, queueSet] of [
+    ["set-failed", "set-retried", "set"],
+    ["lone-failed", "lone-retried", ""],
+  ])
+    await page.route(`**/api/queue/${failed}/retry`, async (route) => {
+      const next = job(retried, "queued", [], queueSet);
+      state.jobs.push(next);
+      await route.fulfill({ json: { job: next } });
+    });
   await page.goto("/");
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
@@ -211,6 +219,10 @@ test("a set's Retry Failed goes through the shared retry, replacing its failed t
   await expect.poll(() => state.gallery.map((item) => item.id)).not.toContain("failed-tile");
   await expect.poll(() => state.jobs.find((item) => item.id === "set-failed")?.cleared).toBe(true);
   await expect(queue.getByRole("button", { name: /^Fox Studies/ })).toContainText("1 of 2 Done");
+
+  // A lone job's Retry clears its failed original from the queue too.
+  await queue.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect.poll(() => state.jobs.find((item) => item.id === "lone-failed")?.cleared).toBe(true);
 });
 
 test("work waiting on GPUs a text model holds offers a swap that asks first", async ({ page }) => {
