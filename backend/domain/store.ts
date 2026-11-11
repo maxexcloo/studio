@@ -89,6 +89,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS studio_queue_owner ON studio_queue(owner_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
+      CREATE INDEX IF NOT EXISTS studio_queue_set ON studio_queue(json_extract(record, '$.queueSet'));
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
@@ -374,20 +375,49 @@ export class Store {
 
   /**
    * What a scheduler tick weighs, in queue order: every unfinished job, and the finished ones it
-   * still counts, which are those created since the oldest unfinished job (overtakes) and those in
-   * an unfinished job's set (a started set keeps its place). Read through the status index.
+   * still counts. Those are, for each resource and tier with work queued or waiting, the newest
+   * `overtakes` that started since its oldest such job (enough to tell whether that job was
+   * overtaken so often), and those in an unfinished job's set (a started set keeps its place).
+   * Read through the status and set indexes, so a job left waiting does not make each tick read
+   * every job finished since.
    */
-  schedulable(): OwnedJob[] {
-    const open = `status IN (${placeholders(openStatuses)})`;
+  schedulable(overtakes: number): OwnedJob[] {
+    type Row = { rowid: unknown; created_at: unknown; record: unknown };
     const finished = `status IN (${placeholders(terminalStatuses)})`;
-    const rows = this.db
+    const rows = new Map<string, Row>();
+    const jobs = new Map<string, OwnedJob>();
+    const add = (row: Row) => {
+      const job = JSON.parse(row.record as string) as OwnedJob;
+      if (jobs.has(job.id)) return;
+      rows.set(job.id, row);
+      jobs.set(job.id, job);
+    };
+    for (const row of this.db
       .prepare(
-        `SELECT rowid, created_at, record FROM studio_queue WHERE ${open}
-        UNION SELECT rowid, created_at, record FROM studio_queue WHERE ${finished}
-          AND created_at >= (SELECT MIN(created_at) FROM studio_queue WHERE ${open})`,
+        `SELECT rowid, created_at, record FROM studio_queue WHERE status IN (${placeholders(openStatuses)})`,
       )
-      .all(...openStatuses, ...terminalStatuses, ...openStatuses);
-    const jobs = new Map(rows.map((row) => [row, JSON.parse(row.record as string) as OwnedJob]));
+      .all(...openStatuses) as Row[])
+      add(row);
+    const oldest = new Map<string, { resource: string; tier: number; since: string }>();
+    for (const job of jobs.values()) {
+      if (job.status !== "queued" && job.status !== "waiting") continue;
+      const tier = job.priority ?? queuePriority.manual;
+      const key = JSON.stringify([job.resource, tier]);
+      const since = String(rows.get(job.id)!.created_at);
+      if (!oldest.has(key) || since < oldest.get(key)!.since)
+        oldest.set(key, { resource: job.resource, tier, since });
+    }
+    // A cancelled job never started, so it overtook nothing.
+    const startedFinished = [...terminalStatuses].filter((status) => status !== "cancelled");
+    const later = this.db.prepare(
+      `SELECT rowid, created_at, record FROM studio_queue WHERE status IN (${placeholders(startedFinished)})
+        AND created_at >= ? AND json_extract(record, '$.resource') = ?
+        AND COALESCE(json_extract(record, '$.priority'), ${queuePriority.manual}) = ?
+        ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+    );
+    for (const { resource, tier, since } of oldest.values())
+      for (const row of later.all(...startedFinished, since, resource, tier, overtakes) as Row[])
+        add(row);
     const sets = [
       ...new Set(
         [...jobs.values()]
@@ -395,27 +425,23 @@ export class Store {
           .map((job) => job.queueSet!),
       ),
     ];
-    if (sets.length) {
-      const listed = new Set([...jobs.values()].map((job) => job.id));
+    if (sets.length)
       for (const row of this.db
         .prepare(
-          `SELECT rowid, created_at, record FROM studio_queue WHERE ${finished}
-          AND json_extract(record, '$.queueSet') IN (${placeholders(sets)})`,
+          `SELECT rowid, created_at, record FROM studio_queue
+          WHERE json_extract(record, '$.queueSet') IN (${placeholders(sets)}) AND ${finished}`,
         )
-        .all(...terminalStatuses, ...sets)) {
-        const job = JSON.parse(row.record as string) as OwnedJob;
-        if (!listed.has(job.id)) jobs.set(row, job);
-      }
-    }
-    return [...jobs]
-      .sort(([a], [b]) =>
-        a.created_at === b.created_at
-          ? Number(a.rowid) - Number(b.rowid)
-          : String(a.created_at) < String(b.created_at)
-            ? -1
-            : 1,
-      )
-      .map(([, job]) => job);
+        .all(...sets, ...terminalStatuses) as Row[])
+        add(row);
+    return [...jobs.values()].sort((left, right) => {
+      const a = rows.get(left.id)!;
+      const b = rows.get(right.id)!;
+      return a.created_at === b.created_at
+        ? Number(a.rowid) - Number(b.rowid)
+        : String(a.created_at) < String(b.created_at)
+          ? -1
+          : 1;
+    });
   }
 
   /** The owner's pending queue items that moves reorder: Dream's wait at their own tier. */

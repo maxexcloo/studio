@@ -575,10 +575,16 @@ test("a tick reads unfinished work and only the finished jobs it still weighs", 
     enqueue(1, "completed");
     const setDone = enqueue(2, "completed", mcp("a"));
     const open = enqueue(3, "queued", mcp("a"));
-    const later = enqueue(4, "failed");
+    const waiting = enqueue(4, "waiting");
+    // Started since the oldest waiting job of its tier, but older than the newest two of them.
+    enqueue(5, "completed");
+    enqueue(6, "cancelled");
+    const newer = enqueue(7, "failed");
+    const newest = enqueue(8, "completed");
+    const otherTier = enqueue(9, "completed", mcp("b"));
     assert.deepEqual(
-      store.schedulable().map((job) => job.id),
-      [setDone, open, later],
+      store.schedulable(2).map((job) => job.id),
+      [setDone, open, waiting, newer, newest, otherTier],
     );
   } finally {
     store.close();

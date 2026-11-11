@@ -145,21 +145,31 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   }
 
+  /**
+   * A worker's catalogue. Without `force`, a worker that has answered before serves its last answer
+   * at once and, once that is 30 seconds old, is asked again in the background: reading the
+   * catalogue never waits on a worker's node list, which a large remote ComfyUI takes seconds to send.
+   */
   async function backendModels(backend, force = false) {
     const extra = !isDefaultBackend(backend);
     if (extra && Date.now() < (workerUnreachableUntil.get(backend) || 0))
       throw new Error(`${workerById(backend)?.name || "That worker"} did not answer just now.`);
+    const forget = (error) => {
+      if (extra && backendUnreachable(error))
+        workerUnreachableUntil.set(backend, Date.now() + workerUnreachableForMs);
+      contextCaches.delete(backend);
+    };
     return withComfyBackend(backend, async () => {
       try {
-        const context = await loadComfyContext({ force });
+        const known = !force && contextFor(backend).info ? contextFor(backend) : null;
+        if (known && Date.now() - known.fetchedAt >= 30000) loadComfyContext().catch(forget);
+        const context = known || (await loadComfyContext({ force }));
         const models = inferred(context.info, context.stats);
         // What this worker has, so a job for one of its profiles goes to it (routeJob).
         noteWorkerProfiles(backend, models.profiles || []);
         return { ...context, models };
       } catch (error) {
-        if (extra && backendUnreachable(error))
-          workerUnreachableUntil.set(backend, Date.now() + workerUnreachableForMs);
-        contextCaches.delete(backend);
+        forget(error);
         throw error;
       }
     });

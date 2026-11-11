@@ -21,6 +21,7 @@ import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
+import { queuePriority } from "../domain/store.ts";
 import { adminRefusal } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 import { galleryStats } from "../stats.js";
@@ -163,8 +164,13 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });
-    // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every page.
-    const listed = ({ nextSteps: _steps, ...item }) => item;
+    // Next steps are asked for in the viewer (`/api/suggestions`) and the prompt's thinking (up to
+    // 20,000 characters) in Details (`/api/gallery/items/:id`), not carried in every page.
+    const listed = ({ nextSteps: _steps, ...item }) => {
+      if (!item.writing?.thinking) return item;
+      const { thinking: _thinking, ...writing } = item.writing;
+      return { ...item, writing };
+    };
     // Work the queue holds has no tiles until it starts; the first page leads with them, so all of
     // the account's unfinished work shows. Dream's stays in its own pool; an upscale has no tile.
     const queued =
@@ -174,7 +180,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
             .openJobs(account?.userId || "")
             .filter(
               (job) =>
-                !job.dream &&
+                job.priority !== queuePriority.dream &&
                 !job.cleared &&
                 job.operation !== "upscale" &&
                 !galleryJobItems(job.id).length,
@@ -198,9 +204,17 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
       status: 200,
       payload: {
         ...page,
-        items: [...queued, ...page.items.map(listed)],
+        items: [...queued, ...page.items].map(listed),
       },
     };
+  });
+
+  // One item in full, as Details shows it: the gallery's pages leave out its prompt's thinking.
+  directRoute(app, "GET", "/api/gallery/items/:id", (account, { params }) => {
+    const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean));
+    return item && recordBelongsToAccount(item, account)
+      ? { status: 200, payload: { item } }
+      : { status: 404, payload: { error: "That item is no longer in the gallery." } };
   });
 }
 

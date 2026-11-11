@@ -67,7 +67,10 @@ const item = (ownerId, jobId) => ({
 });
 
 test("gallery pages and exact job reads return only the signed-in account's records", async () => {
-  const first = item("account-a", "job-a");
+  const first = {
+    ...item("account-a", "job-a"),
+    writing: { kind: "request", model: "writer", thinking: "long thoughts" },
+  };
   const second = item("account-b", "job-b");
   galleryStore.setGallery([first, second]);
   const request = {
@@ -85,6 +88,11 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     page.items.map((record) => record.id),
     [first.id],
   );
+  // Pages leave the prompt's thinking to Details, which reads the item itself.
+  assert.deepEqual(page.items[0].writing, { kind: "request", model: "writer" });
+  const read = (id) => call(routes["/api/gallery/items/:id"], { ...request, params: { id } });
+  assert.equal((await read(first.id)).item.writing.thinking, "long thoughts");
+  assert.equal((await read(second.id)).item, undefined);
   assert.deepEqual(
     (await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } })).items,
     [],

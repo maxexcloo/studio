@@ -48,7 +48,7 @@ export function queueSchedule(queue, { now = Date.now(), ahead = () => true } = 
   );
   const tier = (job) => (job.status === "starting" ? -1 : (job.priority ?? 0));
   const waiting = queue.store
-    .schedulable()
+    .openJobs()
     .filter(
       (job) =>
         job.resource.startsWith("worker:") &&
