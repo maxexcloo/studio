@@ -1,10 +1,10 @@
 import type { MediaItem } from "../../types";
-import { displayEdge } from "../../../../shared/media";
 
 /**
  * Display and transfer the version selected on the saved gallery item. `displayUrl` is what screens
- * show: the server's display copy of a picture no larger than it, otherwise the original `url`,
- * which downloads, shares and edits always use.
+ * show: the server's display copy of a picture of known size (backend/thumbnails.js; ZoomImage
+ * loads the original once zoom passes it), otherwise the original `url`, which downloads, shares
+ * and edits always use.
  */
 export function mediaSource(item: MediaItem): {
   url: string;
@@ -19,14 +19,10 @@ export function mediaSource(item: MediaItem): {
   const thumbnailUrl = upscale?.thumbnailUrl || item.thumbnailUrl;
   const width = upscale?.width || item.width;
   const height = upscale?.height || item.height;
-  const longest = Math.max(width || 0, height || 0);
   return {
     url,
     displayUrl:
-      item.type === "image" &&
-      thumbnailUrl?.startsWith("/comfy/thumb?") &&
-      longest &&
-      longest <= displayEdge
+      item.type === "image" && thumbnailUrl?.startsWith("/comfy/thumb?") && width && height
         ? `${thumbnailUrl}&size=display`
         : url,
     thumbnailUrl,
