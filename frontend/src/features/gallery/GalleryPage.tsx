@@ -158,10 +158,18 @@ export function GalleryPage() {
       if (document.hidden) return;
       void galleryPage("")
         .then((first) =>
-          client.setQueryData<InfiniteData<Page>>(
-            galleryKey,
-            (data) => data && { ...data, pages: [first, ...data.pages.slice(1)] },
-          ),
+          client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
+            if (!data) return data;
+            // The fresh first page leads; what it pushed past its end stays, as the next page
+            // carries on from the old first page's cursor.
+            const fresh = new Set(first.items.map((item) => item.id));
+            const [old, ...rest] = data.pages;
+            const page = {
+              ...old,
+              items: [...first.items, ...old.items.filter((item) => !fresh.has(item.id))],
+            };
+            return { ...data, pages: [page, ...rest] };
+          }),
         )
         .catch(() => undefined);
     }, 3000);
