@@ -155,6 +155,8 @@ test("the assistant is for every account, and only for profiles the account may 
         "cinematic",
         "concise",
         "enhance",
+        "fix",
+        "guide",
         "illustration",
         "photographic",
         "portrait",
