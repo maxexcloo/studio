@@ -195,40 +195,59 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
 
-test("The viewer shows a server picture's display copy up to its size, and the original past it", async ({
+test("The viewer shows a server picture's display copy, and its original once zoom passes the copy", async ({
   page,
 }) => {
   const state = await fixtures(page);
-  for (const [id, width] of [
-    ["fits", 2048],
-    ["past", 4096],
-  ] as const)
-    state.gallery.push({
-      id,
-      jobId: `job-${id}`,
-      type: "image",
-      status: "done",
-      prompt: `A ${id} image`,
-      url: `/comfy/view?filename=${id}.png&subfolder=&type=output`,
-      thumbnailUrl: `/comfy/thumb?filename=${id}.png&subfolder=&type=output`,
-      width,
-      height: width,
-      createdAt: stamp,
-    });
-  await page.route("**/comfy/**", (route) =>
-    route.fulfill({ contentType: "image/png", body: original }),
+  state.gallery.push({
+    id: "large",
+    jobId: "job-large",
+    type: "image",
+    status: "done",
+    prompt: "A large image",
+    url: "/comfy/view?filename=large.png&subfolder=&type=output",
+    thumbnailUrl: "/comfy/thumb?filename=large.png&subfolder=&type=output",
+    width: 4096,
+    height: 4096,
+    createdAt: stamp,
+  });
+  const copy = await sharp({
+    create: { width: 1024, height: 1024, channels: 3, background: "#46a3ff" },
+  })
+    .webp()
+    .toBuffer();
+  const full = await sharp({
+    create: { width: 4096, height: 4096, channels: 3, background: "#46a3ff" },
+  })
+    .png()
+    .toBuffer();
+  const originals: string[] = [];
+  await page.route("**/comfy/thumb*", (route) =>
+    route.fulfill({ contentType: "image/webp", body: copy }),
   );
+  await page.route("**/comfy/view*", async (route) => {
+    // Details reads the original's file size from a one-byte range request.
+    if (!(await route.request().headerValue("range"))) originals.push(route.request().url());
+    return route.fulfill({ contentType: "image/png", body: full });
+  });
   await page.goto("/images");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await page.getByRole("button", { name: "Open image: A fits image", exact: true }).click();
-  await expect(viewer.getByRole("img", { name: "A fits image", exact: true })).toHaveAttribute(
+  await page.getByRole("button", { name: "Open image: A large image", exact: true }).click();
+  const image = viewer.getByRole("img", { name: "A large image", exact: true });
+  await expect(image).toHaveAttribute(
     "src",
-    "/comfy/thumb?filename=fits.png&subfolder=&type=output&size=display",
+    "/comfy/thumb?filename=large.png&subfolder=&type=output&size=display",
   );
-  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await page.getByRole("button", { name: "Open image: A past image", exact: true }).click();
-  await expect(viewer.getByRole("img", { name: "A past image", exact: true })).toHaveAttribute(
+  // The copy stands in at the original's size, so Actual Size is the original's pixels.
+  await expect(image).toHaveAttribute("width", "4096");
+  expect(originals).toEqual([]);
+  await viewer.getByRole("button", { name: "Change Image Zoom", exact: true }).click();
+  await viewer.getByRole("button", { name: "Change Image Zoom", exact: true }).click();
+  await expect(
+    viewer.getByRole("button", { name: "Zoom: Actual Size", exact: true }),
+  ).toBeVisible();
+  await expect(image).toHaveAttribute(
     "src",
-    "/comfy/view?filename=past.png&subfolder=&type=output",
+    "/comfy/view?filename=large.png&subfolder=&type=output",
   );
 });
