@@ -110,7 +110,7 @@ test("The viewer's AI menu loads Suggestions with Refresh Suggestions, then Cust
   release[0]();
   for (const label of [...steps.map((step) => step.label), "Refresh Suggestions", "Custom…"])
     await expect(menu.getByRole("menuitem", { name: label, exact: true })).toBeVisible();
-  await expect(menu.getByText("Review First", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Review First", exact: true })).toBeVisible();
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
   await expect(thinking).toBeVisible();
