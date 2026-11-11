@@ -214,15 +214,19 @@ test(
       });
       assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
       const sent = await queued;
-      await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
-      primary.drop(sent.id);
-      const texts = Object.values(sent.prompt)
-        .filter((node) => node.class_type === "CLIPTextEncode")
-        .map((node) => node.inputs.text);
-      const item = (await api("/api/gallery?limit=200")).body.items.find(
-        (entry) => entry.jobId === accepted.body.jobId,
-      );
-      return { texts, prompt: item.prompt, typed: item.settings?.typedPrompt };
+      try {
+        const texts = Object.values(sent.prompt)
+          .filter((node) => node.class_type === "CLIPTextEncode")
+          .map((node) => node.inputs.text);
+        const item = (await api("/api/gallery?limit=200")).body.items.find(
+          (entry) => entry.jobId === accepted.body.jobId,
+        );
+        assert.ok(item, "the submitted run is visible before cancellation");
+        return { texts, prompt: item.prompt, typed: item.settings?.typedPrompt };
+      } finally {
+        await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
+        primary.drop(sent.id);
+      }
     };
     const on = await run({});
     assert.equal(on.prompt, "privfx, a red ceramic teapot");
