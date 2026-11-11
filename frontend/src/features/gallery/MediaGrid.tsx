@@ -180,6 +180,31 @@ function relayOut(
 }
 
 /**
+ * The items to show: new work arriving at the start while the grid's top is scrolled out of view
+ * waits above it until the top is back in view, so nothing on screen moves under the person (a
+ * browser keeps scrolling past a scroll position set mid-gesture). Other changes show at once.
+ */
+function useHeldNewWork(items: MediaItem[], host: RefObject<HTMLDivElement | null>) {
+  const [atTop, setAtTop] = useState(true);
+  useEffect(() => {
+    const update = () => setAtTop((host.current?.getBoundingClientRect().top ?? 0) >= 0);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, [host]);
+  const first = useRef<string | undefined>(undefined);
+  const start = atTop
+    ? 0
+    : Math.max(
+        0,
+        items.findIndex((item) => item.id === first.current),
+      );
+  const shown = useMemo(() => (start ? items.slice(start) : items), [items, start]);
+  first.current = shown[0]?.id;
+  return shown;
+}
+
+/**
  * The part of the grid within a screen of the viewport, in grid coordinates, in steps so scrolling
  * renders only as tiles come and go. Tiles have known sizes, so nothing is measured.
  */
@@ -213,7 +238,7 @@ const gridTop = (host: HTMLElement) => host.getBoundingClientRect().top + window
  * gallery in time order) heads each day and adds the date scrubber.
  */
 export function MediaGrid({
-  items,
+  items: all,
   results,
   open,
   selection,
@@ -227,6 +252,7 @@ export function MediaGrid({
   byDay = false,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
+  const items = useHeldNewWork(all, host);
   // The version each tile shows while flipping, by the tile's original.
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
