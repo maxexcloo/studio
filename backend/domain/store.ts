@@ -358,24 +358,29 @@ export class Store {
       .map(([, job]) => job);
   }
 
-  /**
-   * Moves one of the owner's pending queue items to place `to` (from 0) among the owner's pending
-   * items (Dream's stay out: they wait at their own tier). The items trade their places in the queue
-   * order (`created_at, rowid`), so other accounts' work keeps its place. Returns false when the
-   * item is not one of the owner's pending items.
-   */
-  move(ownerId: string, id: string, to: number): boolean {
-    const pending = this.openJobs(ownerId).filter(
+  /** The owner's pending queue items that moves reorder: Dream's wait at their own tier. */
+  movable(ownerId: string): OwnedJob[] {
+    return this.openJobs(ownerId).filter(
       (job) => pendingStatuses.has(job.status) && job.priority !== queuePriority.dream,
     );
-    const from = pending.findIndex((job) => job.id === id);
-    if (from < 0) return false;
-    const target = Math.min(pending.length - 1, to);
-    if (target === from) return true;
+  }
+
+  /**
+   * Moves some of the owner's pending queue items (one, or a set's), together in their order, to
+   * place `to` (from 0) among the owner's other pending items. The items trade their places in the
+   * queue order (`created_at, rowid`), so other accounts' work keeps its place. Returns false when
+   * an item is not one of the owner's pending items.
+   */
+  move(ownerId: string, ids: string[], to: number): boolean {
+    const pending = this.movable(ownerId);
+    const moving = new Set(ids);
+    const block = pending.filter((job) => moving.has(job.id)).map((job) => job.id);
+    if (!block.length || block.length !== moving.size) return false;
+    const order = pending.map((job) => job.id).filter((id) => !moving.has(id));
+    order.splice(Math.min(order.length, to), 0, ...block);
+    if (order.every((id, index) => id === pending[index].id)) return true;
     const read = this.db.prepare("SELECT rowid, created_at FROM studio_queue WHERE id = ?");
     const places = pending.map((job) => read.get(job.id) as { rowid: number; created_at: string });
-    const order = pending.map((job) => job.id);
-    order.splice(target, 0, ...order.splice(from, 1));
     this.db.exec("BEGIN IMMEDIATE");
     try {
       // Rowids are unique, so negating them frees the places first.
@@ -539,7 +544,6 @@ export function publicJob({
   cancelRequested: _cancelRequested,
   cleared: _cleared,
   priority,
-  queueSet: _queueSet,
   dream: _dream,
   faceRedo: _faceRedo,
   ...job

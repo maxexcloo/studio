@@ -181,6 +181,32 @@ export function useGalleryLayout() {
   return { phone, columns, host, width, cell, gap, anchor };
 }
 
+/**
+ * Keeps the gallery's scroll position on the tiles in view while tiles arrive or leave above them
+ * (results landing, work queued): the first tile at or below the viewport's top stays where it was.
+ * Only someone at the very top sees new tiles slide in. `places` are each tile's top in grid
+ * coordinates; a new `key` (a zoom, a resize, a search) lays out afresh and holds nothing.
+ */
+export function useScrollAnchor(
+  host: React.RefObject<HTMLDivElement | null>,
+  places: Map<string, number> | null,
+  key: string,
+) {
+  const last = useRef<{ places: Map<string, number>; key: string } | null>(null);
+  useLayoutEffect(() => {
+    const before = last.current;
+    last.current = places && { places, key };
+    if (!places || !before || before.key !== key || !host.current || window.scrollY <= 0) return;
+    const offset = window.scrollY - (host.current.getBoundingClientRect().top + window.scrollY);
+    let anchor: string | undefined;
+    let top = Infinity;
+    for (const [id, place] of before.places)
+      if (place >= offset && place < top && places.has(id)) [anchor, top] = [id, place];
+    const moved = anchor === undefined ? 0 : places.get(anchor)! - top;
+    if (moved) window.scrollBy(0, moved);
+  }, [places, key, host]);
+}
+
 /** No click or mouse events follow a hold, so a menu it opened doesn't take them as outside presses. */
 export const endHold = (event: React.MouseEvent | React.TouchEvent) => event.preventDefault();
 

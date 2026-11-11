@@ -35,3 +35,12 @@
   min-height: 12rem;
   max-height: min(60dvh, 32rem);
 }
+/* An administrator's summary opens Settings › Workers. */
+.summary {
+  border-radius: var(--mantine-radius-sm);
+}
+@media (hover: hover) {
+  .summary:hover {
+    background: var(--mantine-color-default-hover);
+  }
+}
