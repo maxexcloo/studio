@@ -14,7 +14,10 @@ test("Mask zoom and Hand pan preserve painting history and saved masks", async (
     await upload
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
   await closeReferences(page);
-  await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Reference Role", exact: true })
+    .getByText("Paint", { exact: true })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Paint the Area to Edit", exact: true });
   const canvas = dialog.locator('canvas[aria-label="Mask Painting"]');
   const pixels = () =>
@@ -121,5 +124,15 @@ test("Mask zoom and Hand pan preserve painting history and saved masks", async (
     .toBe(true);
   await dialog.getByRole("button", { name: "Use Mask", exact: true }).click();
   await page.getByRole("button", { name: "Edit Mask", exact: true }).click();
+  await expect.poll(pixels).toEqual(painted);
+
+  // Escape closes only the painter, over the composer; Edit drops the mask and Paint brings it back.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+  const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
+  await role.getByText("Edit", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit Mask", exact: true })).toBeHidden();
+  await role.getByText("Paint", { exact: true }).click();
   await expect.poll(pixels).toEqual(painted);
 });

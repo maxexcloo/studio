@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, ComboboxPopover, Tooltip } from "@mantine/core";
+import { Button, ComboboxPopover, SegmentedControl, Tooltip } from "@mantine/core";
 import { Brush, ChevronDown } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
@@ -77,15 +77,16 @@ function lengthChoices(input: GenerationInput, profile?: Profile) {
 
 interface MaskControl {
   painted: boolean;
+  /** The painter is open, so Paint shows chosen while the mask is being painted. */
+  painting: boolean;
   disabled: boolean;
   onPaint: () => void;
-  onRemove: () => void;
 }
 
 /**
- * How the placed references are used, as one group of chips: Edit or Reference, then the mask
- * painted on the first one (a mask edits that image, so Reference is off while there is one).
- * Shown only once a reference is placed.
+ * How the placed references are used, choosing exactly one: Edit the image, use it as a
+ * Reference, or Paint a mask on the first one to edit only that area. Choosing Paint opens the
+ * painter; choosing Edit or Reference drops the mask. Shown only once a reference is placed.
  */
 function ReferenceRole({
   input,
@@ -96,41 +97,36 @@ function ReferenceRole({
   onChange: (patch: Partial<GenerationInput>) => void;
   mask?: MaskControl;
 }) {
-  const role = !input.inpaint && input.referenceRole === "reference" ? "reference" : "edit";
+  const role =
+    mask && (mask.painting || input.inpaint)
+      ? "paint"
+      : input.referenceRole === "reference"
+        ? "reference"
+        : "edit";
   return (
-    <Button.Group aria-label="Reference Role">
-      {(
-        [
-          ["edit", "Edit"],
-          ["reference", "Reference"],
-        ] as const
-      ).map(([value, label]) => (
-        <Button
-          key={value}
-          {...chipProps}
-          aria-pressed={role === value}
-          disabled={value === "reference" && Boolean(input.inpaint)}
-          onClick={() => onChange({ referenceRole: value })}
-        >
-          {label}
-        </Button>
-      ))}
-      {mask && (
-        <Button
-          {...chipProps}
-          leftSection={<Brush size={15} />}
-          disabled={mask.disabled}
-          onClick={mask.onPaint}
-        >
-          {mask.painted ? "Edit Mask" : "Paint Mask"}
-        </Button>
-      )}
+    <>
+      <SegmentedControl
+        aria-label="Reference Role"
+        radius="xl"
+        className={classes.roles}
+        value={role}
+        onChange={(value) =>
+          value === "paint" ? mask?.onPaint() : onChange({ referenceRole: value, inpaint: null })
+        }
+        data={[
+          { value: "edit", label: "Edit" },
+          { value: "reference", label: "Reference" },
+          ...(mask ? [{ value: "paint", label: "Paint", disabled: mask.disabled }] : []),
+        ]}
+      />
       {mask?.painted && (
-        <Button {...iconChipProps} aria-label="Remove Mask" onClick={mask.onRemove}>
-          <icons.clear size={14} />
-        </Button>
+        <Tooltip label="Edit Mask">
+          <Button {...iconChipProps} aria-label="Edit Mask" onClick={mask.onPaint}>
+            <Brush size={15} />
+          </Button>
+        </Tooltip>
       )}
-    </Button.Group>
+    </>
   );
 }
 
