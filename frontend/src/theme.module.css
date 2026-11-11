@@ -37,6 +37,32 @@
   max-height: 100% !important;
 }
 
+/* A phone's full-screen dialog keeps its footer (DialogFooter) at the bottom of the screen, in
+   sight while the body scrolls: everything holding the footer fills the body's height. */
+:where([data-phone]) .dialogContent[data-full-screen] .dialogBody:has([data-dialog-footer]) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+:where([data-phone]) .dialogContent[data-full-screen] .dialogBody :has([data-dialog-footer]) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+:where([data-phone]) .dialogContent[data-full-screen] [data-dialog-footer] {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: auto;
+  margin-inline: calc(-1 * var(--mb-padding, var(--mantine-spacing-md)));
+  padding: var(--mantine-spacing-sm) var(--mb-padding, var(--mantine-spacing-md))
+    calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--studio-glass-border);
+  background: var(--mantine-color-body);
+}
+
 /* Touch targets (44 px, the theme's touch bar size) for small controls on touch screens. A sort
    header's button fills its header cell's height. */
 .touchHeader > button {

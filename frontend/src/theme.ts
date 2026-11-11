@@ -293,7 +293,11 @@ export function studioTheme({
           radius: "lg",
           size: "lg",
         },
-        classNames: { inner: classes.dialogInner, content: classes.dialogContent },
+        classNames: {
+          inner: classes.dialogInner,
+          content: classes.dialogContent,
+          body: classes.dialogBody,
+        },
         // The body scrolls under a fixed title row, so a table's rows and sort header never pass
         // under the title, as they would with Mantine's sticky header over a scrolling content.
         styles: (_theme, props) => ({

@@ -11,8 +11,9 @@ export function DialogFooter({
   onCancel: () => void;
   children: ReactNode;
 }) {
+  // A phone's full-screen dialog pins it to the bottom, in sight while the body scrolls (theme).
   return (
-    <Group justify="flex-end">
+    <Group justify="flex-end" data-dialog-footer>
       <Button variant="default" disabled={pending} onClick={onCancel}>
         Cancel
       </Button>

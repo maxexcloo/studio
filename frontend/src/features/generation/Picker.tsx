@@ -74,7 +74,8 @@ export function PopupHeading({
  * actions. An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it
  * as a column beside everything else, divided to the top; phones under the content.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
- * between the header and the footer, pinned above the safe area, so a popover never opens a second
+ * between the header and the footer, pinned above the safe area, which holds the heading's actions
+ * (`headerEnd`, such as Clear and Save) at its end, so a popover never opens a second
  * level there, unless the popup is `floating`: a small form, such as Settings, stays a
  * popover fitted to the screen, as the rail's other dropdowns. Escape closes nested layers first.
  */
@@ -111,7 +112,8 @@ export function ChipPopup({
   floating?: boolean;
   /**
    * Actions under the content: `start` (such as Pin Current Prompt), with Clear and Save in the
-   * heading. `apply` adds Apply to the phone sheet, which closes it; choices apply as they are made.
+   * heading, or after `start` in the phone sheet's footer. `apply` adds Apply to the phone sheet,
+   * which closes it; choices apply as they are made.
    */
   footer?: { start?: ReactNode; apply?: boolean };
   aside?: ReactNode;
@@ -134,12 +136,21 @@ export function ChipPopup({
     },
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
-  const actions = footer && (
+  const actions = footer?.start && (
+    <Group gap="xs" wrap="nowrap">
+      {footer.start}
+    </Group>
+  );
+  // The phone sheet's footer: `start`, then the heading's actions and Apply at the end.
+  const sheetActions = (headerEnd || footer) && (
     <Group justify="space-between" gap="xs" wrap="nowrap">
-      <Group gap="xs" wrap="nowrap">
-        {footer.start}
+      <Group className={classes.footerStart} gap="xs" wrap="nowrap">
+        {footer?.start}
       </Group>
-      {phone && footer.apply && <Button onClick={close}>Apply</Button>}
+      <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
+        {headerEnd}
+        {footer?.apply && <Button onClick={close}>Apply</Button>}
+      </Group>
     </Group>
   );
   if (phone && !floating)
@@ -163,22 +174,14 @@ export function ChipPopup({
             {/* The sheet itself takes focus, so its search doesn't raise the keyboard. */}
             <FocusTrap.InitialFocus />
             <Modal.Header className={classes.sheetHeader}>
-              {/* The actions wrap under the title when they don't fit beside it; Close stays put. */}
-              <div className={classes.sheetHeading}>
-                <Modal.Title>{title}</Modal.Title>
-                {headerEnd && (
-                  <Group className={classes.actions} justify="flex-end" gap="xs" wrap="nowrap">
-                    {headerEnd}
-                  </Group>
-                )}
-              </div>
+              <Modal.Title>{title}</Modal.Title>
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
             <Modal.Body className={classes.sheetBody}>
               {children}
               {aside && <div className={classes.aside}>{aside}</div>}
             </Modal.Body>
-            {actions && <div className={classes.sheetFooter}>{actions}</div>}
+            {sheetActions && <div className={classes.sheetFooter}>{sheetActions}</div>}
           </Modal.Content>
         </Modal.Root>
       </>

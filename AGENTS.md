@@ -115,19 +115,20 @@ the primary component reference and verify APIs against the installed version.
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; compact choices may use a
-  fitted popover. Its heading (`PopupHeading`) holds the title, then its
-  actions at the end (beside Close on phones, wrapping under the title when they
-  don't fit): every popup's or sheet's Clear
-  and Save, such as Save Stack or Save Preset, sit there, not in its footer, as
-  compact subtle buttons with Clear first; naming what Save keeps (`SaveCurrent`)
-  turns the whole row into its field, any options, Save and Cancel. A side column, such as the LoRA
-  stack, has its own heading with its actions; desktop shows it beside the
-  content, divided to the top, and phones under it. The phone sheet's footer
-  (other actions, then Apply where choices apply as made) stays pinned
-  above the safe area while the content between scrolls, with one scroll owner
-  per form. On touch screens, tablets included, chip popups and option lists open
-  with the keyboard down: a popup's or option list's search (the Profile chip's)
-  waits for a tap.
+  fitted popover. On desktop its heading (`PopupHeading`) holds the title, then
+  its actions at the end: every popup's Clear and Save, such as Save Stack or
+  Save Preset, as compact subtle buttons with Clear first; naming what Save
+  keeps (`SaveCurrent`) turns the whole row into its field, any options, Save
+  and Cancel. A side column, such as the LoRA stack, has its own heading with
+  its actions; desktop shows it beside the content, divided to the top, and
+  phones under it. On phones, overlays keep their actions at the bottom and
+  always in sight: a sheet's header holds only the title and Close, and its
+  footer (other actions, then Clear, Save and Apply where choices apply as
+  made) stays pinned above the safe area while the content between scrolls,
+  with one scroll owner per form; a full-screen dialog pins its `DialogFooter`
+  the same way. On touch screens, tablets included, chip popups and option lists
+  open with the keyboard down: a popup's or option list's search (the Profile
+  chip's) waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
