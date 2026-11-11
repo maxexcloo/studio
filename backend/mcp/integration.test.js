@@ -923,7 +923,7 @@ test("media and administrator credentials discover only their own friendly tools
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
     cancel: "cancel",
-    cards: "character, outfit & scene cards",
+    cards: "manage cards",
     dream: "dream",
     gallery: "manage gallery",
     generate: "generate",
@@ -1026,8 +1026,9 @@ test("media and administrator credentials discover only their own friendly tools
     // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
     // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
-    // and to 17,200 for Cards (describe and rate a card's images).
-    JSON.stringify(tools).length + media.getInstructions().length < 17200,
+    // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
+    // description was tightened.
+    JSON.stringify(tools).length + media.getInstructions().length < 17100,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1566,6 +1567,34 @@ test("uploaded references belong to their uploader and map to declared profile s
   assert.deepEqual(f.submitted[0].loras, [
     { name: "fixture-effect.safetensors", strength: -0.5, enabled: true },
   ]);
+});
+
+test("cards updates a card named by name, keeping the fields and images left out that still exist", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client("alice");
+  f.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red-haired ranger",
+    referenceIds: ["kept", "deleted"],
+    references: [{ id: "kept" }],
+  });
+  const saved = [];
+  f.app.put("/api/characters/:id", (req, res) => {
+    saved.push([req.params.id, req.body]);
+    res.json({ character: { id: req.params.id, ...req.body, references: [{ id: "kept" }] } });
+  });
+  const args = { action: "update", kind: "characters", id: "mara", description: "ranger, cloak" };
+  assert.deepEqual(data(await call(client, "cards", args)).character, {
+    id: "chr-mara",
+    name: "Mara",
+    description: "ranger, cloak",
+    image_ids: ["kept"],
+  });
+  assert.deepEqual(saved, [
+    ["chr-mara", { name: "Mara", description: "ranger, cloak", referenceIds: ["kept"] }],
+  ]);
+  await failure(client, "cards", { ...args, id: "Ivo" });
 });
 
 test("models lists the account's characters, and generate applies one by name: its first image goes in and its lead starts each prompt", async (t) => {
