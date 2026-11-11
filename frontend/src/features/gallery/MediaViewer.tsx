@@ -287,14 +287,26 @@ export function MediaViewer({
   const toggleChrome = () => setChromeHidden((hidden) => !hidden);
   // Navigation replaces the media, and focus on it would fall out of the viewer beyond its keys.
   const stage = useRef<HTMLDivElement>(null);
-  // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's.
+  // Hidden chrome leaves the whole screen to the media: the stage moves its centre to the screen's,
+  // measured again as the stage resizes, the screen turning included.
   useLayoutEffect(() => {
     const view = stage.current;
     if (!chromeHidden || !view) return;
-    const box = view.getBoundingClientRect();
-    const x = window.innerWidth / 2 - (box.left + box.width / 2);
-    const y = window.innerHeight / 2 - (box.top + box.height / 2);
-    view.style.setProperty("--studio-viewer-centre", `${x}px ${y}px`);
+    const centre = () => {
+      // The box includes the stage's own translate as it stands, possibly mid-transition.
+      const [shiftX = 0, shiftY = 0] = getComputedStyle(view)
+        .translate.split(" ")
+        .map((value) => parseFloat(value) || 0);
+      const box = view.getBoundingClientRect();
+      const x = window.innerWidth / 2 - (box.left - shiftX + box.width / 2);
+      const y = window.innerHeight / 2 - (box.top - shiftY + box.height / 2);
+      view.style.setProperty("--studio-viewer-centre", `${x}px ${y}px`);
+    };
+    centre();
+    // The layout settles after the window's resize (a phone turned sideways moves the controls).
+    const observer = new ResizeObserver(centre);
+    observer.observe(view);
+    return () => observer.disconnect();
   }, [chromeHidden]);
   // An action that turns busy disables its button, so focus falls to the page (a menu's return to
   // it too); the stage takes focus back and the key that landed on the page.

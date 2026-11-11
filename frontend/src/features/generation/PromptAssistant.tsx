@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Group, Modal, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { api, failure, request } from "../../api";
 import { TextBox } from "../../ui/TextBox";
@@ -408,16 +409,20 @@ export function usePromptAssistant({
               event.currentTarget.form?.requestSubmit();
             }}
           />
-          <Group justify="flex-end">
-            {/* A suggestion fills the request and asks at once. */}
-            {change?.suggestions?.((request) => {
-              setInstruction(request);
-              ask(request);
-            })}
+          {/* A suggestion fills the request and asks at once. */}
+          {change?.suggestions && (
+            <Group>
+              {change.suggestions((request) => {
+                setInstruction(request);
+                ask(request);
+              })}
+            </Group>
+          )}
+          <DialogFooter onCancel={() => setAsking(false)}>
             <Button type="submit" disabled={!instruction.trim()}>
               Improve Prompt
             </Button>
-          </Group>
+          </DialogFooter>
         </Stack>
       </form>
     </Modal>
