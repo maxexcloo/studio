@@ -392,7 +392,8 @@ export function TextBox({
                         </ActionIcon>
                       </Tooltip>
                     )}
-                    {send}
+                    {/* The form's named sends stand in for its compact ones there. */}
+                    {!submit && send}
                     {/* Named, as the keyboard leaves room: the last send is primary, after an arrow. */}
                     {submit?.map((each, index) => {
                       const primary = index === submit.length - 1;
