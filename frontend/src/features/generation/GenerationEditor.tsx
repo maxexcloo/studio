@@ -176,6 +176,7 @@ export function GenerationEditor({
 }) {
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
+  const lastMask = useRef<{ assetId?: string; mask?: string }>(undefined);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const referenceBrowser = useReferenceBrowser();
@@ -242,15 +243,18 @@ export function GenerationEditor({
     />
   );
   const settings = { opened: settingsOpen, onOpenedChange: setSettingsOpen };
+  // Choosing Edit or Reference drops the mask; Paint on the same image brings it back to edit.
+  if (inpaint?.mask) lastMask.current = inpaint;
   const mask = profile?.capabilities?.inpaint
     ? {
         painted: !!input.inpaint,
-        // Paint Mask stays in place, disabled until there is a first reference to paint on.
+        painting: maskOpen,
+        // Paint stays in place, disabled until there is a first reference to paint on.
         disabled: !primary,
         onPaint: () => setMaskOpen(true),
-        onRemove: () => onChange({ inpaint: null }),
       }
     : undefined;
+  const editing = inpaint ?? lastMask.current;
   const inputs = (
     <GenerationInputControls
       loraPicker={loraPicker}
@@ -376,7 +380,7 @@ export function GenerationEditor({
               key={primary.id}
               asset={primary}
               initialMask={
-                !inpaint?.assetId || inpaint.assetId === primary.id ? inpaint?.mask : undefined
+                !editing?.assetId || editing.assetId === primary.id ? editing?.mask : undefined
               }
               close={() => setMaskOpen(false)}
               save={(mask) =>

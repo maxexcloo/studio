@@ -185,8 +185,8 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   ).toBeVisible();
   await size.click();
   await page
-    .getByRole("group", { name: "Reference Role", exact: true })
-    .getByRole("button", { name: "Reference", exact: true })
+    .getByRole("radiogroup", { name: "Reference Role", exact: true })
+    .getByText("Reference", { exact: true })
     .click();
   await expect(size).toHaveText("1280 × 768");
   await size.click();
@@ -318,7 +318,7 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ]);
 });
 
-test("Clear restores profile defaults and random seed; masked inputs keep Edit mode in both editors", async ({
+test("Clear restores profile defaults and random seed; masked inputs load as Paint in both editors", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -356,13 +356,9 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await loadSaved(page, "Preset", "Masked Study");
   await expect(page.getByRole("button", { name: "Clear Seed 117", exact: true })).toBeVisible();
-  // A mask edits the image it is painted on, so Reference is offered but disabled.
-  const role = page.getByRole("group", { name: "Reference Role", exact: true });
-  await expect(role.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(role.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
+  // A saved mask shows as Paint, whatever role the preset stored.
+  const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
+  await expect(role.getByRole("radio", { name: "Paint", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
@@ -606,7 +602,10 @@ test("References, masking, settings and runtime presets remain editable", async 
   await closeReferences(page);
   await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Reference Role", exact: true })
+    .getByText("Paint", { exact: true })
+    .click();
   await expect(page.getByRole("dialog", { name: "Paint the Area to Edit" })).toBeVisible();
   await page.locator("canvas").click({ position: { x: 40, y: 40 } });
   await page.getByRole("button", { name: "Use Mask", exact: true }).click();
