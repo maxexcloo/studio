@@ -14,7 +14,6 @@ import {
   ActionIcon,
   Button,
   FocusTrap,
-  Group,
   Loader,
   Menu,
   Modal,
@@ -30,7 +29,7 @@ import { ActionBarGroups, ActionMenuItems, type Action } from "../features/galle
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { copyText } from "./clipboard";
-import { useKeyboard } from "./useKeyboard";
+import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
 
@@ -98,16 +97,9 @@ export function TextBox({
   const more = useRef<HTMLButtonElement>(null);
   const [menuOpened, setMenuOpened] = useState(false);
   const keyboard = useKeyboard(editing, content);
-  const deepest = useRef(0);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
-  // How far the visible viewport is shorter than the editor, wherever iOS has scrolled it.
-  const shortened = keyboard.top + keyboard.inset;
-  useEffect(() => {
-    deepest.current = editing ? Math.max(deepest.current, shortened) : 0;
-    // Android hides the keyboard (Back) without blurring the field; the viewport grows back.
-    if (deepest.current - shortened > 120) setEditing(false);
-  }, [editing, shortened]);
+  useKeyboardDrop(editing, keyboard, () => setEditing(false));
   // Clear turns into Undo, which restores the text, until the text next changes.
   const [cleared, setCleared] = useState<string | null>(null);
   useEffect(() => {
@@ -263,12 +255,13 @@ export function TextBox({
   );
   return (
     <>
-      {menu || send ? (
+      {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
+      {(!phone && menu) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
             <div className={classes.tools}>
-              {menu}
+              {!phone && menu}
               {send}
             </div>
           )}
@@ -315,34 +308,9 @@ export function TextBox({
             <FocusTrap.InitialFocus />
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
-              <Group gap={4} wrap="nowrap">
-                {actions || send ? (
-                  <Group gap={4} wrap="nowrap" onMouseDown={keepFocus}>
-                    {actions && <ActionBarGroups groups={[actions]} menuPosition="bottom-end" />}
-                    {send}
-                  </Group>
-                ) : (
-                  rightSection
-                )}
-                <Button size="compact-sm" variant={submit ? "default" : undefined} onClick={close}>
-                  Done
-                </Button>
-                {submit && (
-                  <ActionIcon
-                    aria-label={submit.label}
-                    radius="xl"
-                    disabled={submit.disabled}
-                    // Sending before the keyboard drops keeps the text's blur from closing first.
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      close();
-                      submit.onSubmit();
-                    }}
-                  >
-                    <ArrowUp size={16} />
-                  </ActionIcon>
-                )}
-              </Group>
+              <Button size="compact-sm" variant="subtle" onClick={close}>
+                Done
+              </Button>
             </Modal.Header>
             <Modal.Body>
               <Textarea
@@ -360,6 +328,40 @@ export function TextBox({
               />
               {overlay && <div className={classes.overlay}>{overlay}</div>}
               {below && <div className={classes.below}>{below}</div>}
+              {/* The tools, then the send, sit just above the keyboard. */}
+              {(actions || send || submit || rightSection) && (
+                <div className={classes.toolbar} onMouseDown={keepFocus}>
+                  {actions ? (
+                    <ActionBarGroups
+                      groups={[actions]}
+                      labelled={actions.map((action) => action.id)}
+                      menuPosition="top-start"
+                    />
+                  ) : (
+                    !send && rightSection
+                  )}
+                  <div className={classes.sends}>
+                    {send}
+                    {submit && (
+                      <ActionIcon
+                        aria-label={submit.label}
+                        variant="filled"
+                        radius="xl"
+                        size="lg"
+                        disabled={submit.disabled}
+                        // Sending before the keyboard drops keeps the text's blur from closing first.
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          close();
+                          submit.onSubmit();
+                        }}
+                      >
+                        <ArrowUp size={18} />
+                      </ActionIcon>
+                    )}
+                  </div>
+                </div>
+              )}
             </Modal.Body>
           </Modal.Content>
         </Modal.Root>

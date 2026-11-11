@@ -138,9 +138,11 @@ the primary component reference and verify APIs against the installed version.
   where the page has no other, then Clear, which turns into Undo until the text
   next changes. The menu is one level deep: a tool's options (suggested changes,
   Improve Prompt's styles) are listed first under its name, never in a submenu.
-  The phone editor shows the tools as buttons, not a menu, and a box without
-  tools has no ⋯. The viewer's prompt rests on one line ending in an ellipsis
-  and shows the whole prompt while focused.
+  A box that opens the phone editor has no ⋯ beside it: the editor shows the
+  tools as named buttons in a bar above the keyboard, ending with the send, and
+  its header holds only the title and Done. A box without tools has no ⋯. The
+  viewer's prompt rests on one line ending in an ellipsis and shows the whole
+  prompt while focused.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

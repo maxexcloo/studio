@@ -9,7 +9,7 @@ import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
-import { useKeyboard, useTypingIn } from "../../ui/useKeyboard";
+import { useKeyboard, useKeyboardDrop, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
@@ -74,15 +74,12 @@ export function ComposerDock() {
   const controlsId = useId();
   const keyboard = useKeyboard(phone && opened);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
-  // keyboard after its animation; it ends as the text loses focus or the keyboard drops (Android's
-  // Back keeps focus). The bar's lift still follows the viewport.
-  const keyboardUp = keyboard.inset > 0;
-  const [tappedField, setTappedField] = useState(false);
+  // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
+  // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus). The
+  // bar's lift still follows the viewport.
+  const [typing, setTappedField] = useState(false);
   const tapping = useRef(false);
-  useEffect(() => {
-    if (!keyboardUp) setTappedField(false);
-  }, [keyboardUp]);
-  const typing = keyboardUp || tappedField;
+  useKeyboardDrop(typing, keyboard, () => setTappedField(false));
   const sheetField = (panel: HTMLElement, target: unknown) =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
@@ -311,6 +308,8 @@ export function ComposerDock() {
             body: classes.sheetBody,
           }}
           styles={{
+            // The page never shows around the sheet while the keyboard moves it either.
+            overlay: { background: "var(--mantine-color-body)", backdropFilter: "none" },
             // Opaque, like the phone text editor, so the page never shows through the prompt; it
             // follows the visible viewport, so the keyboard lifts its bottom bar.
             content: {
