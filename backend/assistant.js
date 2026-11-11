@@ -36,7 +36,7 @@ import {
   writerGuide,
 } from "./domain/writing-standard.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { maxCardDescription } from "../shared/characters.ts";
+import { cardKinds, maxCardDescription } from "../shared/characters.ts";
 
 const gatewayKeys = [
   "STUDIO_ASSISTANT_URL",
@@ -49,12 +49,30 @@ const titleInstructions =
 // A character card's description (Make Character), which leads a prompt with the card's images.
 // Clothing stays out: a card's character changes outfits, and a described one fights the prompt's.
 const characterInstructions = `Describe the main person or creature in the image so an image model can draw them again in other outfits and scenes: their lasting look (apparent age, build, hair, eyes, skin, distinguishing marks such as scars or tattoos). Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "red-haired woman in her thirties, freckles, slim build, scar over left eye". Leave out clothing, the setting, pose, expression, lighting and style, and never guess a name or identity. Reply with only the phrase.`;
+// The same for outfit and scene cards (shared/characters.ts cardKinds): only what the card adds.
+const cardInstructions = {
+  characters: characterInstructions,
+  outfits: `Describe the clothing the main person in the image wears so an image model can dress someone else in it: each garment, its colour, material and fit, accessories, and the footwear or bare feet. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "yellow raincoat, dark slim jeans, black rubber boots". Leave out the person's body, face and hair, the pose, the setting and the style. Reply with only the phrase.`,
+  scenes: `Describe the setting in the image so an image model can place someone else in it: the place and its notable details, the light and the time of day. Write one short phrase of comma-separated details under ${maxCardDescription} characters, such as "rainy city street at night, neon signs, wet asphalt reflections". Leave out any people, their clothing and poses, and the photographic style. Reply with only the phrase.`,
+};
+// What makes an image a good reference for each card kind, for rating a card's images.
+const cardRatings = {
+  characters:
+    "how well it shows one person's lasting look for an image model to keep: one clearly visible person, the face sharp and unobstructed, even light, little hiding hair or features",
+  outfits:
+    "how well it shows a whole outfit to copy: the clothing fully visible from head to toe, footwear included, unobstructed and evenly lit",
+  scenes:
+    "how well it shows a setting to reuse: the place clearly visible, not crowded by people, evenly lit",
+};
+const rateInstructions = (kind, count) =>
+  `Rate each of the ${count} images, in order, from 1 (unusable) to 5 (ideal) for ${cardRatings[kind]}. Reply with only JSON: {"ratings":[{"rating":4,"note":"a few words why"}]}, one entry per image.`;
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer or a
 // few words, and null (the model's default) where it writes prose.
 export const reasoningEfforts = {
   animate: null,
   caption: "none",
   character: "none",
+  rate: "none",
   describe: "none",
   dream: "none",
   guide: "none",
@@ -1063,15 +1081,21 @@ export function createAssistant(
     return { text, tags, model };
   }
 
-  /** A character card's description from its image; the caller checks the model reads images. */
-  async function character({ image, explicit = false, signal } = {}) {
+  /**
+   * A card's description from its image, for a character (the default), outfit or scene card; the
+   * caller checks the model reads images.
+   */
+  async function character({ kind = "characters", image, explicit = false, signal } = {}) {
     const model = await modelFor("character", explicit);
     const reply = await chat({
       call: "character",
       model,
       messages: [
-        { role: "system", content: `${characterInstructions} ${contentRule(explicit)}` },
-        { role: "user", content: userContent("Describe this character.", [image], true) },
+        { role: "system", content: `${cardInstructions[kind]} ${contentRule(explicit)}` },
+        {
+          role: "user",
+          content: userContent(`Describe this ${cardKinds[kind].name}.`, [image], true),
+        },
       ],
       temperature: 0.3,
       signal,
@@ -1079,6 +1103,37 @@ export function createAssistant(
     const description = one(reply.text, maxCardDescription).replace(/^["'“]+|["'”.\s]+$/g, "");
     if (!description) throw new AssistantError("unusable reply");
     return { description, model };
+  }
+
+  /**
+   * How well each image serves as a card's reference, from 1 to 5 with a few words why, in the
+   * images' order; the caller checks the model reads images.
+   */
+  async function rateCardImages({ kind, images, explicit = false, signal } = {}) {
+    const model = await modelFor("rate", explicit);
+    const reply = await chat({
+      call: "rate",
+      model,
+      messages: [
+        { role: "system", content: rateInstructions(kind, images.length) },
+        {
+          role: "user",
+          content: userContent(`Rate these ${cardKinds[kind].name} images.`, images, true),
+        },
+      ],
+      temperature: 0.2,
+      signal,
+    });
+    const ratings = replyJson(reply.text)?.ratings;
+    if (!Array.isArray(ratings) || ratings.length !== images.length)
+      throw new AssistantError("unusable reply");
+    return {
+      ratings: ratings.map((item) => ({
+        rating: Math.min(5, Math.max(1, Math.round(Number(item?.rating) || 1))),
+        note: one(String(item?.note || ""), 120),
+      })),
+      model,
+    };
   }
 
   /** A gallery item's title of a few words, summarised from its prompt; throws on an unusable reply. */
@@ -1208,6 +1263,7 @@ export function createAssistant(
     describe,
     caption,
     character,
+    rateCardImages,
     title,
     draftGuide,
     draftProfile,

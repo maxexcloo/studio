@@ -253,6 +253,75 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     },
   );
 
+  const cardNoun = { characters: "character", outfits: "outfit", scenes: "scene" };
+  const shownCard = (card) => ({
+    id: card.id,
+    name: card.name,
+    ...(card.description ? { description: card.description } : {}),
+    image_ids: card.referenceIds || [],
+  });
+  tool(
+    server,
+    "cards",
+    "character, outfit & scene cards",
+    "Character, outfit and scene cards (Characters feature), when asked. list; create, or update by id: name, description, image_ids (reference asset ids from upload or search uploads; a character 1 to 4, clearest first, an outfit or scene 0 or 1). describe writes a description from the first image; rate scores each 1 to 5 as a reference, with a note.",
+    {
+      action: z.enum(["list", "create", "update", "describe", "rate"]),
+      kind: z.enum(["characters", "outfits", "scenes"]),
+      id: z.string().trim().min(1).max(200).optional(),
+      name: z.string().trim().min(1).max(200).optional(),
+      description: z.string().trim().max(2000).optional(),
+      image_ids: z.array(z.string().trim().min(1).max(200)).max(4).optional(),
+    },
+    async ({ action, kind, id, name, description, image_ids }, signal) => {
+      if (action === "list") {
+        const listed = await api("GET", `/api/${kind}`, undefined, signal);
+        return mcpJson({ [kind]: (listed[kind] || []).map(shownCard) });
+      }
+      if (action === "describe" || action === "rate") {
+        if (!image_ids?.length) throw new Error(`Pass image_ids to ${action}.`);
+        if (action === "describe") {
+          const { description: written } = await api(
+            "POST",
+            "/api/assistant/cards/describe",
+            { kind, assetId: image_ids[0] },
+            signal,
+          );
+          return mcpJson({ description: written });
+        }
+        const { ratings = [] } = await api(
+          "POST",
+          "/api/assistant/cards/rate",
+          { kind, assetIds: image_ids },
+          signal,
+        );
+        return mcpJson({
+          ratings: ratings.map((item, index) => ({ image_id: image_ids[index], ...item })),
+        });
+      }
+      if (action === "update" && !id) throw new Error("Pass the card's id from list to update.");
+      const current =
+        action === "update"
+          ? ((await api("GET", `/api/${kind}`, undefined, signal))[kind] || []).find(
+              (card) => card.id === id,
+            )
+          : null;
+      if (action === "update" && !current) throw new Error(`No such ${cardNoun[kind]}.`);
+      const body = {
+        name: name ?? current?.name,
+        description: description ?? current?.description ?? "",
+        referenceIds: image_ids ?? current?.referenceIds ?? [],
+      };
+      const saved = await api(
+        action === "create" ? "POST" : "PUT",
+        action === "create" ? `/api/${kind}` : `/api/${kind}/${encodeURIComponent(id)}`,
+        body,
+        signal,
+      );
+      return mcpJson({ [cardNoun[kind]]: shownCard(saved[cardNoun[kind]]) });
+    },
+  );
+
   tool(
     server,
     "taste",

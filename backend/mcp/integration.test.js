@@ -905,6 +905,7 @@ test("media and administrator credentials discover only their own friendly tools
   const tools = (await media.listTools()).tools;
   assert.deepEqual(tools.map((tool) => tool.name).sort(), [
     "cancel",
+    "cards",
     "dream",
     "gallery",
     "generate",
@@ -923,6 +924,7 @@ test("media and administrator credentials discover only their own friendly tools
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
     cancel: "cancel",
+    cards: "character, outfit & scene cards",
     dream: "dream",
     gallery: "manage gallery",
     generate: "generate",
@@ -1024,8 +1026,9 @@ test("media and administrator credentials discover only their own friendly tools
     // for the rule to read live state from Models and its LoRA paging, and to 15,200 for Search's
     // gallery filters, to 15,500 for generate's set title and per-prompt titles, to 15,600 for
     // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
-    // writes a character's shots so the wording never drifts) and to 16,100 for reference_strengths.
-    JSON.stringify(tools).length + media.getInstructions().length < 16100,
+    // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
+    // and to 17,200 for Cards (describe and rate a card's images).
+    JSON.stringify(tools).length + media.getInstructions().length < 17200,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2455,7 +2458,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 15);
+    assert.equal((await client.listTools()).tools.length, 16);
     const [first] = data(await call(client, "models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];

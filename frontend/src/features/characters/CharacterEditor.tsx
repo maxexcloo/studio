@@ -8,8 +8,7 @@ import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { maxCardDescription, maxCharacterImages, maxCardName } from "../../../../shared/characters";
 import { PickerGrid, PickerTile } from "../generation/Picker";
-import { assistantQuery } from "../generation/PromptAssistant";
-import { CardDialog, CardForm, CardImages } from "./CardImages";
+import { CardDialog, CardForm, CardImages, DescribeImage } from "./CardImages";
 import { charactersQuery, useSaveCharacter, type CharacterCard } from "./queries";
 
 /** What a new card starts from, such as Use as Character's image. */
@@ -96,15 +95,7 @@ function CharacterForm({
       ).asset,
     onSuccess: (asset) => setImages((previous) => [...previous, asset]),
   });
-  // With a prompt assistant that reads images, the first image can be written up as the description.
-  const assistant = useQuery(assistantQuery);
-  const describe = useMutation({
-    mutationFn: (asset: ReferenceAsset) =>
-      post<{ description: string }>("/api/assistant/character", { assetId: asset.id }),
-    onSuccess: ({ description }) => setDescription(description),
-  });
-  const describable = assistant.data?.available && assistant.data.vision && images[0];
-  const error = save.error || fromGallery.error || describe.error;
+  const error = save.error || fromGallery.error;
   return (
     <CardForm
       onSubmit={() =>
@@ -136,23 +127,10 @@ function CharacterForm({
         maxLength={maxCardDescription}
         value={description}
         onChange={setDescription}
-        below={
-          describable && (
-            <Group>
-              <Button
-                variant="subtle"
-                size="compact-sm"
-                leftSection={<icons.assistant size={15} />}
-                loading={describe.isPending}
-                onClick={() => describe.mutate(images[0])}
-              >
-                Describe Image
-              </Button>
-            </Group>
-          )
-        }
+        below={<DescribeImage kind="characters" image={images[0]} onDescribed={setDescription} />}
       />
       <CardImages
+        kind="characters"
         max={maxCharacterImages}
         note={`1 to ${maxCharacterImages}. Picking the character gives a model the first, so make it the clearest view: a model draws one person in several images twice.`}
         value={images}
