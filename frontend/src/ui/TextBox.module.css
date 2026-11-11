@@ -44,15 +44,17 @@
   border-top: 1px solid var(--studio-glass-border);
 }
 
+/* The tools take the room the named sends leave, scrolling rather than running under them. */
 .toolbar > :first-child {
   flex: 1;
+  min-width: 0;
 }
 
 .sends {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 4px;
+  gap: var(--mantine-spacing-xs);
   margin-left: auto;
 }
 
