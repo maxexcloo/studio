@@ -235,10 +235,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     const parent = item.jobId && store.job(ownerId, item.jobId);
     const [queued] = store.enqueueAll(
       ownerId,
-      () =>
-        parent
-          ? parent.sessionId
-          : store.createSession(ownerId, "Upscale", { prompt: item.prompt || "" }).id,
+      () => (parent ? parent.sessionId : store.createSession(ownerId, "Upscale").id),
       [
         {
           input: {

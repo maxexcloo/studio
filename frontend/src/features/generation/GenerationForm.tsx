@@ -6,7 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
 import { usePhone } from "../../ui/usePhone";
-import type { QueueJob, ReferenceAsset, Session } from "../../types";
+import type { StudioSession } from "../../../../shared/queue";
+import type { QueueJob, ReferenceAsset } from "../../types";
 import {
   defaultProfile,
   draftForProfile,
@@ -47,7 +48,7 @@ function useDraftSubmit({
       };
       let sessionId = draft.sessionId;
       if (!sessionId) {
-        const result = await post<{ session: Session }>("/api/sessions", { inputs: payload });
+        const result = await post<{ session: StudioSession }>("/api/sessions");
         sessionId = result.session.id;
         setDraft((value) => ({ ...value, sessionId }));
       }

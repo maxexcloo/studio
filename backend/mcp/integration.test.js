@@ -2547,20 +2547,11 @@ test(
       return jobId(queued);
     };
     const turns = [await turn("A first turn"), await turn("A second turn")];
-    const api = async (route) => (await fetch(new URL(route, base))).json();
+    const { jobs } = await (await fetch(new URL("/api/queue", base))).json();
     const sessions = new Set(
-      (await api("/api/queue")).jobs
-        .filter((job) => turns.includes(job.id))
-        .map((job) => job.sessionId),
+      jobs.filter((job) => turns.includes(job.id)).map((job) => job.sessionId),
     );
     assert.equal(sessions.size, 1, "one conversation is one session");
-    const { session, jobs } = await api(`/api/sessions/${[...sessions][0]}`);
-    assert.deepEqual(
-      jobs.map((job) => job.id),
-      turns,
-    );
-    assert.deepEqual(session.mcp, { conversationId: "librechat-conversation" });
-    assert.equal(session.title, "A first turn");
   },
 );
 

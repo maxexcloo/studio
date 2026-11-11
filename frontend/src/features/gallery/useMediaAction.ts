@@ -2,7 +2,8 @@ import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@ta
 import { notifications } from "@mantine/notifications";
 import { useOpenComposer } from "../generation/openComposer";
 import { api, post } from "../../api";
-import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
+import type { StudioSession } from "../../../../shared/queue";
+import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { useRemembered } from "../auth/useRemembered";
 import {
   initialInput,
@@ -321,8 +322,7 @@ export function useIterate() {
       parentItemId: draft.parentItemId,
     };
     const session =
-      draft.sessionId ||
-      (await post<{ session: Session }>("/api/sessions", { inputs: payload })).session.id;
+      draft.sessionId || (await post<{ session: StudioSession }>("/api/sessions")).session.id;
     const result = await post<{ jobId: string; job?: QueueJob }>(
       `/api/sessions/${session}/generations`,
       payload,

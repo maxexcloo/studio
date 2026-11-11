@@ -1,4 +1,4 @@
-import type { QueueJob as SharedQueueJob, StudioSession } from "../../shared/queue";
+import type { QueueJob as SharedQueueJob } from "../../shared/queue";
 import type { Resolution } from "../../shared/resolution";
 import type { UpscaleQuality } from "../../shared/upscale";
 export type MediaKind = "image" | "video";
@@ -190,7 +190,6 @@ export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "pro
   /** Generation steps, or while the prompt is written its streamed thinking and prompt. */
   progress?: { value?: number; max?: number; phase?: string; thinking?: string; prompt?: string };
 };
-export type Session = Omit<StudioSession, "inputs"> & { inputs: Partial<GenerationInput> };
 export interface Account {
   id: string;
   username: string;

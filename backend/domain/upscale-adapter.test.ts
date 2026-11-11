@@ -14,9 +14,7 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-upscale-queue-"));
   const filename = path.join(directory, "studio.sqlite");
   let store = new Store(openDatabase(filename));
-  const session = store.createSession("alice", "Existing Session", {
-    prompt: "Keep these generation settings",
-  });
+  const session = store.createSession("alice", "Existing Session");
   const job = store.enqueue(
     "alice",
     session.id,
@@ -107,7 +105,7 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
 
 test("only the owner's accepted upscale is cancelled, and admission stays held until it is confirmed stopped", async () => {
   const store = new Store(openDatabase(":memory:"));
-  const session = store.createSession("alice", "Image", { prompt: "Original input" });
+  const session = store.createSession("alice", "Image");
   const job = store.enqueue(
     "alice",
     session.id,
@@ -116,7 +114,6 @@ test("only the owner's accepted upscale is cancelled, and admission stays held u
     undefined,
     "worker:gpu",
   );
-  assert.equal(store.session("alice", session.id)!.inputs.prompt, "Original input");
   let finish!: () => void;
   const finished = new Promise<void>((resolve) => {
     finish = resolve;

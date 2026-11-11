@@ -115,24 +115,14 @@ export function registerRewriteRoutes(
     });
     return preset ? res.json({ preset }) : missing(res);
   });
-  app.post("/api/sessions", (req, res) => {
-    if (req.body?.inputs !== undefined && !object(req.body.inputs))
-      return res.status(400).json({ error: "Inputs must be an object." });
-    return res.status(201).json({
+  app.post("/api/sessions", (req, res) =>
+    res.status(201).json({
       session: store.createSession(
         owner(req),
         typeof req.body?.title === "string" ? req.body.title : undefined,
-        req.body?.inputs as GenerationInput | undefined,
       ),
-    });
-  });
-  // A session's jobs, with their gallery records.
-  app.get("/api/sessions/:id", (req, res) => {
-    const session = store.session(owner(req), req.params.id);
-    return session
-      ? res.json({ session, jobs: shown(owner(req), store.jobs(owner(req), session.id)) })
-      : missing(res);
-  });
+    }),
+  );
   app.post("/api/sessions/:id/generations", async (req, res) => {
     if (!store.session(owner(req), req.params.id)) return missing(res);
     const { operation = "image", parentJobId, parentItemId, ...input } = req.body || {};

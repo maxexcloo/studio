@@ -42,9 +42,7 @@ export function registerVideoEditRoutes(app, { store }) {
     }
     const ownerId = item.ownerId || "";
     const parent = item.jobId ? store.job(ownerId, item.jobId) : undefined;
-    const session = parent
-      ? parent.sessionId
-      : store.createSession(ownerId, "Edit Video", { prompt: item.prompt || "" }).id;
+    const session = parent ? parent.sessionId : store.createSession(ownerId, "Edit Video").id;
     const urls = mediaUrls(name, media.subfolder);
     const job = store.recordFinished(
       ownerId,
