@@ -190,7 +190,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     server,
     "suggest_loras",
     "suggest loras",
-    "Suggest LoRAs from the profile’s library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to generate as loras; Studio adds their triggers.",
+    "Suggest LoRAs from the profile's library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to generate as loras; Studio adds their triggers.",
     {
       prompt,
       profile_id: profileId,
