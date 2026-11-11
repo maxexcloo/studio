@@ -103,7 +103,8 @@ test("Retry pending state holds while unrelated jobs remain cancellable", async 
     await expect.poll(() => state.jobs[1].status).toBe("cancelled");
     expect(calls).toBe(1);
     release();
-    await expect(retry).toBeEnabled();
+    // The accepted retry takes the failed original out of the queue.
+    await expect(retry).toHaveCount(0);
   } finally {
     release();
   }
