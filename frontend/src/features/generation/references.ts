@@ -16,6 +16,7 @@ import {
   referenceGroupAssets,
   referenceGroups,
   referencePatch,
+  type SlotLayout,
 } from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import { guidingRoles } from "../../../../shared/profiles";
@@ -24,7 +25,7 @@ export const galleryReferenceType = "application/x-studio-gallery-item";
 /** What an upload can be (backend/references.js): an image, or a video placed by its first frame. */
 export const uploadTypes = ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"];
 export const referenceKey = (asset: ReferenceAsset) => `${asset.slot}:${asset.id}`;
-export function referenceLabel(asset: ReferenceAsset, index: number, profile?: Profile) {
+export function referenceLabel(asset: ReferenceAsset, index: number, profile?: SlotLayout) {
   const role = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.label;
   return `Reference ${index + 1}${role ? ` · ${role}` : ""}`;
 }
@@ -36,7 +37,7 @@ export interface ReferenceTarget {
 }
 
 /** References in slot order, keeping the chosen order within each role. */
-export function orderedReferences(references: ReferenceAsset[], profile?: Profile) {
+export function orderedReferences(references: ReferenceAsset[], profile?: SlotLayout) {
   const groups = referenceGroups(profile);
   const rank = (asset: ReferenceAsset) => {
     const index = groups.findIndex((group) => group.some((slot) => slot.id === asset.slot));
@@ -52,7 +53,7 @@ export function orderedReferences(references: ReferenceAsset[], profile?: Profil
  * The numbered drop targets: each role's placed references, then one empty cell while it has room.
  * Numbers follow slot order, so an empty cell shows the number its reference will get.
  */
-export function referenceCells(references: ReferenceAsset[], profile?: Profile) {
+export function referenceCells(references: ReferenceAsset[], profile?: SlotLayout) {
   let number = 0;
   return referenceGroups(profile).map((group) => {
     const assets = referenceGroupAssets(references, group);
@@ -79,7 +80,7 @@ export function referenceCells(references: ReferenceAsset[], profile?: Profile) 
 /** A chosen target, else the first role with room, else the only single-image role (replaced). */
 export function nextReferenceTarget(
   references: ReferenceAsset[],
-  profile?: Profile,
+  profile?: SlotLayout,
   chosen?: ReferenceTarget | null,
 ): ReferenceTarget | null {
   const groups = referenceGroups(profile);
@@ -99,7 +100,7 @@ export function nextReferenceTarget(
 export function placeReference(
   references: ReferenceAsset[],
   asset: ReferenceAsset,
-  profile: Profile | undefined,
+  profile: SlotLayout | undefined,
   target: ReferenceTarget,
 ) {
   const index = target.replace
@@ -159,7 +160,12 @@ export function useReferenceList({
   }
   return { profile, get, set };
 }
-type ReferenceList = ReturnType<typeof useReferenceList>;
+/** A reference list's slots and value: an editor's or the draft's (useReferenceList), or a card's. */
+type ReferenceList = {
+  profile?: SlotLayout;
+  get: () => ReferenceAsset[];
+  set: (references: ReferenceAsset[]) => void;
+};
 
 type GalleryReference = Pick<MediaItem, "id" | "type"> & { frame?: number };
 

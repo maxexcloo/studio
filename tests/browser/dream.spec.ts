@@ -2,6 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { dreamItem, fixtures, serveDream } from "./fixtures";
 
 const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
+/** Clicks a secondary action in full screen's Dream bar, which phones keep under ⋯ More. */
+async function dreamAction(page: Page, phone: boolean, name: string) {
+  const actions = page.getByRole("group", { name: "Dream Actions" });
+  if (!phone) return actions.getByRole("button", { name, exact: true }).click();
+  await actions.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+}
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
@@ -153,15 +160,15 @@ test("Dream says why it can't run", async ({ page }) => {
   );
 });
 
-test("Animate keeps a Dream image and stages it in the Videos composer", async ({ page }) => {
+test("Animate keeps a Dream image and stages it in the Videos composer", async ({
+  page,
+  isMobile,
+}) => {
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
   await page.goto("/dream");
   await current(page).getByRole("button", { name: "View", exact: true }).click();
-  await page
-    .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Animate", exact: true })
-    .click();
+  await dreamAction(page, isMobile, "Animate");
   await expect(page).toHaveURL(/\/video/);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Dream prompt fox",
@@ -198,6 +205,7 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
 
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
   page,
+  isMobile,
 }) => {
   await fixtures(page);
   const side = (id: string, pair: string, index: 0 | 1, label: string) =>
@@ -247,10 +255,7 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await expect(page.getByRole("group", { name: "Which Steps?" })).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
   await current(page).getByRole("button", { name: "View", exact: true }).click();
-  await page
-    .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "More Like This", exact: true })
-    .click();
+  await dreamAction(page, isMobile, "More Like This");
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(
     dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`),
@@ -324,13 +329,13 @@ test("Full screen switches between a comparison's sides and judges from its bar"
     await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
   }
 
-  // Answering moves full screen on to the next card; a verdict on the last card closes it.
+  // An answer or a verdict returns to the deck, where the next card shows.
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
   await answers.getByRole("button", { name: "Neither", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await expect(current(page)).toContainText("Dream prompt solo");
+  await current(page).getByRole("button", { name: "View", exact: true }).click();
   const actions = viewer.getByRole("group", { name: "Dream Actions" });
-  await expect(actions).toBeVisible();
-  await expect(viewer.getByRole("img", { name: "Dream prompt solo" })).toBeVisible();
-  await expect(shown).toBeHidden();
   await actions.getByRole("button", { name: "Like", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();

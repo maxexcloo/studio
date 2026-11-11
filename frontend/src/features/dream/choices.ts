@@ -1,6 +1,6 @@
 import { X, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
-import type { ActionGroups } from "../gallery/ActionBar";
+import type { Action, ActionGroups } from "../gallery/ActionBar";
 import type { DeckCard } from "./deck";
 import type { PairAnswer } from "./queries";
 
@@ -16,6 +16,8 @@ export interface Choice {
   /** Its key on desktop. */
   hint?: string;
   tip?: string;
+  /** One of the bars' large choices: Pass and Like, or a comparison's A and B. */
+  main?: boolean;
   primary?: boolean;
 }
 
@@ -32,8 +34,24 @@ export function dreamChoices(card: DeckCard): Choice[][] {
     return [
       [
         { choice: "neither", id: "neither", label: "Neither", icon: X, hint: "↓" },
-        { choice: "a", id: "a", label: "A", icon: icons.winner, hint: "←", tip: tip(0, "A") },
-        { choice: "b", id: "b", label: "B", icon: icons.winner, hint: "→", tip: tip(1, "B") },
+        {
+          choice: "a",
+          id: "a",
+          label: "A",
+          icon: icons.winner,
+          hint: "←",
+          tip: tip(0, "A"),
+          main: true,
+        },
+        {
+          choice: "b",
+          id: "b",
+          label: "B",
+          icon: icons.winner,
+          hint: "→",
+          tip: tip(1, "B"),
+          main: true,
+        },
         { choice: "both", id: "both", label: "Both", icon: icons.keep, hint: "↑" },
       ],
     ];
@@ -41,7 +59,7 @@ export function dreamChoices(card: DeckCard): Choice[][] {
   const dreamImage = card.kind === "dream" && card.item.type === "image";
   const star: Choice = { choice: "star", id: "star", label: "Star", icon: icons.star };
   return [
-    [{ choice: "discard", id: "discard", label: "Pass", icon: X, hint: "←" }],
+    [{ choice: "discard", id: "discard", label: "Pass", icon: X, hint: "←", main: true }],
     ...(dreamImage
       ? [
           [
@@ -67,33 +85,53 @@ export function dreamChoices(card: DeckCard): Choice[][] {
           ] satisfies Choice[],
         ]
       : [[star]]),
-    [{ choice: "keep", id: "keep", label: "Like", icon: icons.keep, hint: "→", primary: true }],
+    [
+      {
+        choice: "keep",
+        id: "keep",
+        label: "Like",
+        icon: icons.keep,
+        hint: "→",
+        main: true,
+        primary: true,
+      },
+    ],
   ];
 }
 
 /**
- * The choices as the viewer's action groups: desktop names all but Star, and phones name only a
- * comparison's answers and Pass and Like.
+ * The choices as the viewer's action groups, on one row: Pass and Like named and large at the
+ * ends, the rest as icons between them; phones keep Star there and put the rest under ⋯ More.
+ * A comparison names all its answers, A and B large.
  */
 export function viewerChoices(
   card: DeckCard,
   act: (choice: Choice["choice"]) => void,
   phone: boolean,
 ) {
-  const groups: ActionGroups = dreamChoices(card).map((group) =>
+  let groups: ActionGroups = dreamChoices(card).map((group) =>
     group.map((choice) => ({
       id: choice.id,
       label: choice.label,
       icon: choice.icon,
+      emphasis: choice.primary ? "filled" : choice.main ? "default" : undefined,
       onClick: () => act(choice.choice),
     })),
   );
+  if (phone && card.kind !== "pair") {
+    const [pass, ...middle] = groups;
+    const like = middle.pop()!;
+    const star = middle.flat().filter((action) => action.id === "star");
+    const rest = middle
+      .map((group) => group.filter((action) => action.id !== "star"))
+      .filter((group) => group.length);
+    const more: Action = { id: "more", label: "More", icon: icons.more, menu: rest };
+    groups = [pass, [...star, ...(rest.length ? [more] : [])], like];
+  }
   const ids = groups.flat().map((action) => action.id);
   return {
     label: card.kind === "pair" ? "Comparison Answers" : "Dream Actions",
     groups,
-    labelled: ids.filter((id) =>
-      phone && card.kind !== "pair" ? ["discard", "keep"].includes(id) : id !== "star",
-    ),
+    labelled: card.kind === "pair" ? ids : ["discard", "keep"],
   };
 }

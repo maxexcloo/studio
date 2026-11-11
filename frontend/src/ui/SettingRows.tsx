@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Group, Stack, Text } from "@mantine/core";
+import { usePhone } from "./usePhone";
 import classes from "./SettingRows.module.css";
 
 /**
@@ -47,7 +48,11 @@ export function SettingGroup({
   );
 }
 
-/** One setting: its label and description, then its control or value, which wraps below on phones. */
+/**
+ * One setting: its label and description, then its control or value, which wraps below on phones.
+ * A `wide` row's control (a Select or a segmented choice) has one width on desktop and the full
+ * row on phones, so such rows line up.
+ */
 export function SettingRow({
   label,
   description,
@@ -56,10 +61,10 @@ export function SettingRow({
 }: {
   label: ReactNode;
   description?: ReactNode;
-  /** Inputs such as Selects take the full row on phones. */
   wide?: boolean;
   children?: ReactNode;
 }) {
+  const phone = usePhone();
   return (
     <Group className={classes.row} justify="space-between" gap="xs" py="sm">
       <Stack gap={2} miw={0} flex="1 1 14rem">
@@ -73,7 +78,12 @@ export function SettingRow({
         )}
       </Stack>
       {children && (
-        <Group gap="xs" wrap="nowrap" w={wide ? { base: "100%", sm: "auto" } : undefined}>
+        <Group
+          className={wide ? classes.wide : undefined}
+          gap="xs"
+          wrap="nowrap"
+          w={wide ? (phone ? "100%" : 240) : undefined}
+        >
           {children}
         </Group>
       )}
