@@ -152,6 +152,16 @@ export function TextBox({
   ];
   // The phone editor's tools, Clear standing beside the sends instead.
   const editorTools = actions?.filter((action) => action !== clear);
+  // What a tool is doing shows over the text with a spinner, where the person is looking, phone
+  // editor included; it stands in for the box's description meanwhile.
+  const description = busy ? (
+    <span className={classes.busy} role="status">
+      <Loader size={12} />
+      {busy}
+    </span>
+  ) : (
+    props.description
+  );
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
@@ -239,6 +249,7 @@ export function TextBox({
     <Textarea
       {...props}
       ref={ref}
+      description={description}
       // While the phone editor is open, it alone is the box.
       aria-hidden={editing || undefined}
       value={value}
@@ -338,7 +349,7 @@ export function TextBox({
             <Modal.Body>
               <Textarea
                 aria-label={title}
-                description={props.description}
+                description={description}
                 placeholder={props.placeholder}
                 maxLength={props.maxLength}
                 spellCheck={props.spellCheck}
