@@ -35,21 +35,25 @@ export function useKeyboard(active: boolean, surface?: RefObject<HTMLElement | n
 
 /**
  * Calls `onDrop` once the keyboard, having risen while `active`, drops again while its text keeps
- * focus (Android's Back). It measures how much shorter the visible viewport is than the surface,
- * which iOS's scrolling to the text does not change, so a scroll never reads as the keyboard
- * dropping.
+ * focus (Android's Back): the gap between the window and the visible viewport, which a keyboard
+ * opens by several hundred pixels, closes. A browser's toolbar folding away above the keyboard or
+ * iOS scrolling to the text changes the gap far less, so neither reads as the keyboard dropping.
  */
-export function useKeyboardDrop(
-  active: boolean,
-  keyboard: { top: number; inset: number },
-  onDrop: () => void,
-) {
-  const deepest = useRef(0);
-  const shortened = keyboard.top + keyboard.inset;
+export function useKeyboardDrop(active: boolean, onDrop: () => void) {
+  const drop = useRef(onDrop);
+  drop.current = onDrop;
   useEffect(() => {
-    deepest.current = active ? Math.max(deepest.current, shortened) : 0;
-    if (deepest.current - shortened > 120) onDrop();
-  }, [active, shortened]);
+    const viewport = window.visualViewport;
+    if (!active || !viewport) return;
+    let risen = false;
+    const resize = () => {
+      const gap = window.innerHeight - viewport.height;
+      if (gap > 200) risen = true;
+      else if (risen && gap < 100) drop.current();
+    };
+    viewport.addEventListener("resize", resize);
+    return () => viewport.removeEventListener("resize", resize);
+  }, [active]);
 }
 
 /** While `active`, whether a text field that `within` accepts has focus. */

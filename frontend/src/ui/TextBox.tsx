@@ -99,7 +99,7 @@ export function TextBox({
   const keyboard = useKeyboard(editing, content);
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
-  useKeyboardDrop(editing, keyboard, () => setEditing(false));
+  useKeyboardDrop(editing, () => setEditing(false));
   // Clear turns into Undo, which restores the text, until the text next changes.
   const [cleared, setCleared] = useState<string | null>(null);
   useEffect(() => {
