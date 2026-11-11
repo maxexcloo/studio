@@ -1482,23 +1482,20 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones keep the bar to one row, with the rest under More and Delete last.
+    // Phones fit every action on the bar's one row.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = ["Animate", "Edit", "Upscale", "Star", "More"].map((name) =>
-      bar.getByRole("button", { name, exact: true }),
+    const row = ["Animate", "Edit", "Upscale", "Copy", "Download", "Similar", "Star", "Delete"].map(
+      (name) =>
+        bar
+          .getByRole("button", { name, exact: true })
+          .or(bar.getByRole("link", { name, exact: true })),
     );
     const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
-    expect(new Set(tops).size).toBe(1);
-    await row[4].click();
-    await expect(page.getByRole("menuitem")).toHaveText(["Copy", "Download", "Similar", "Delete"]);
+    expect(new Set(tops.map(Math.round)).size).toBe(1);
   }
-  const download = (phone ? page : dialog).getByRole(phone ? "menuitem" : "link", {
-    name: "Download",
-    exact: true,
-  });
+  const download = dialog.getByRole("link", { name: "Download", exact: true });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
-  if (phone) await page.keyboard.press("Escape");
   // Phones swipe instead of showing the arrows.
   const next = dialog.getByRole("button", { name: "Next Generation", exact: true });
   if (phone) await expect(next).toHaveCount(0);
