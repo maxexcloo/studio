@@ -89,8 +89,8 @@ the primary component reference and verify APIs against the installed version.
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
 - Search clears only its query. Filters preserve it. Toolbars open search from
-  an icon. Controls opening a picker or menu show ▾, small beside an action bar's icon;
-  icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
+  an icon. Named controls opening a picker or menu show ▾ (Animate ▾, Copy ▾), small beside an
+  action bar's icon; ⋯ already means more, so it never carries one. Icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
   alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
   menu as segmented choices and checked options above its run, not in a separate dialog.
@@ -218,7 +218,9 @@ the primary component reference and verify APIs against the installed version.
   row rather than using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
   bar under the search and filters, which stay in place; its quick selects take
-  every match, not only loaded pages, and it confirms deletion.
+  every match, not only loaded pages, and it confirms deletion. The phone bar shows
+  every action while they fit and keeps ⋯ More for the rest. A finished action ends
+  the selection, keeping selected only the items it failed for; opening a menu does not.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds, with Expand on its last line; its tags always
   show. Prompt and Negative Prompt alone have a Copy beside their heading.
@@ -239,7 +241,8 @@ the primary component reference and verify APIs against the installed version.
   count; swipes still navigate and keep it hidden until the viewer closes. A tap on a video whose
   controls are hidden also shows them; taps while they show work them. Escape, a viewer key,
   Details, a tap beside the media and focus reaching hidden chrome bring it back. Open menus and
-  sheets, work in progress and loading actions stay in sight.
+  sheets and loading actions stay in sight; strips hide, even with results still loading. With
+  nothing else in sight the media glides to the middle of the screen at its fitted size.
 - Viewing and upscale comparison share `MediaZoom`. Mask zoom and pan preserve
   pixels and undo history. Display, thumbnails, sharing and downloads respect
   the saved original/upscale choice through `mediaSource`; video upscales stay
