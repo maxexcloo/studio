@@ -888,12 +888,12 @@ registerDreamRoutes(app, { dream });
 // doesn't count, so captions and finishing still run while Dream keeps one ready.
 const studioIdle = () =>
   !textBusy() &&
-  !store.db
-    .prepare(
-      `SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled')
-        AND NOT (status IN ('queued', 'waiting') AND json_extract(record, '$.priority') = ?) LIMIT 1`,
-    )
-    .get(queuePriority.dream);
+  !store
+    .openJobs()
+    .some(
+      (job) =>
+        !(["queued", "waiting"].includes(job.status) && job.priority === queuePriority.dream),
+    );
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
 // Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
