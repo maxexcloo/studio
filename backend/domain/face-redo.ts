@@ -31,7 +31,7 @@ export function createFaceRedo(options: {
   /** The owner's account to queue as; null once it is gone or disabled (undefined in single-user mode). */
   account(ownerId: string): GenerationAccount | null | undefined;
   job(ownerId: string, jobId: string): OwnedJob | undefined;
-  jobs(ownerId: string): OwnedJob[];
+  jobsSince(ownerId: string, since: string): OwnedJob[];
   admit(
     input: GenerationInput,
     account: GenerationAccount | undefined,
@@ -53,7 +53,12 @@ export function createFaceRedo(options: {
     const job = options.job(ownerId, item.jobId);
     if (!job || job.faceRedo || job.priority === queuePriority.dream || job.operation === "upscale")
       return;
-    if (options.jobs(ownerId).some((other) => other.faceRedo && other.parentItemId === item.id))
+    // A redo of the item is queued after it was made.
+    if (
+      options
+        .jobsSince(ownerId, item.createdAt!)
+        .some((other) => other.faceRedo && other.parentItemId === item.id)
+    )
       return;
     const account = options.account(ownerId);
     if (account === null) return;
