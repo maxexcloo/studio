@@ -100,14 +100,12 @@ export class Store {
   createSession(
     ownerId: string,
     title = "",
-    inputs: GenerationInput = {},
     marks: Pick<StudioSession, "mcp"> = {},
   ): StudioSession {
     const stamp = now();
     const session: StudioSession = {
       id: randomUUID(),
       title,
-      inputs,
       createdAt: stamp,
       updatedAt: stamp,
       ...marks,
@@ -119,13 +117,8 @@ export class Store {
   }
 
   /** The session of an MCP client's conversation, made on its first generation; without one, a new session. */
-  mcpSession(
-    ownerId: string,
-    title: string,
-    inputs: GenerationInput,
-    conversationId = "",
-  ): StudioSession {
-    if (!conversationId) return this.createSession(ownerId, title, inputs);
+  mcpSession(ownerId: string, title: string, conversationId = ""): StudioSession {
+    if (!conversationId) return this.createSession(ownerId, title);
     const row = this.db
       .prepare(
         "SELECT record FROM studio_sessions WHERE owner_id = ? AND json_extract(record, '$.mcp.conversationId') = ?",
@@ -139,7 +132,7 @@ export class Store {
       )
       .get(ownerId, conversationId);
     const earlier = first && this.session(ownerId, first.session_id as string);
-    if (!earlier) return this.createSession(ownerId, title, inputs, { mcp: { conversationId } });
+    if (!earlier) return this.createSession(ownerId, title, { mcp: { conversationId } });
     const session = { ...earlier, mcp: { conversationId } };
     this.db
       .prepare("UPDATE studio_sessions SET record = ? WHERE id = ? AND owner_id = ?")

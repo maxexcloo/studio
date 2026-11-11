@@ -23,7 +23,7 @@ export function registerRecreateRoute(app, { store }) {
       (upload && store.session(ownerId, upload.sessionId) && upload) ||
       store.recordFinished(
         ownerId,
-        store.createSession(ownerId, "Recreate", { prompt: item.suggestedPrompt || "" }).id,
+        store.createSession(ownerId, "Recreate").id,
         { prompt: item.suggestedPrompt || "", kind: item.type },
         {
           operation: item.type === "video" ? "animate" : "image",

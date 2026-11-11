@@ -40,13 +40,6 @@ async function openViewer(page: Page) {
     createdAt: stamp,
     settings,
   };
-  state.sessions.push({
-    id: "session-hub",
-    title: "Hub",
-    inputs: {},
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
   state.jobs.push({
     id: "job-hub",
     jobId: "job-hub",

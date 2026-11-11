@@ -82,13 +82,13 @@ test("an MCP conversation goes on in the first of the sessions its earlier jobs 
       store.enqueue("alice", split.id, { prompt, chat }, "image");
       return split;
     });
-    const joined = store.mcpSession("alice", "A third turn", {}, chat.conversationId);
+    const joined = store.mcpSession("alice", "A third turn", chat.conversationId);
     assert.equal(joined.id, first.id);
     assert.deepEqual(store.session("alice", first.id)?.mcp, chat);
-    assert.equal(store.mcpSession("alice", "A fourth turn", {}, chat.conversationId).id, first.id);
+    assert.equal(store.mcpSession("alice", "A fourth turn", chat.conversationId).id, first.id);
     assert.equal(store.session("alice", second.id)?.mcp, undefined);
     // Another account's conversation of the same name is its own session.
-    assert.notEqual(store.mcpSession("bob", "A turn", {}, chat.conversationId).id, first.id);
+    assert.notEqual(store.mcpSession("bob", "A turn", chat.conversationId).id, first.id);
   } finally {
     store.close();
   }

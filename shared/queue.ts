@@ -51,7 +51,6 @@ export interface StudioSession {
   title: string;
   /** An MCP client's session; the conversation the client names (X-Studio-Conversation-Id) has one. */
   mcp?: { conversationId?: string };
-  inputs: GenerationInput;
   createdAt: string;
   updatedAt: string;
 }
