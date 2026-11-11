@@ -144,3 +144,9 @@
   color: var(--mantine-color-text);
   pointer-events: none;
 }
+
+.busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
