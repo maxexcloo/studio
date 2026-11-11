@@ -10,6 +10,7 @@ import {
   pageGallery,
   galleryRevisionValue,
   galleryItem,
+  visibleGallery,
 } from "./store.js";
 import fs from "node:fs";
 import { galleryFilter, outputFileCandidates, setGalleryFavorites } from "./store.js";
@@ -84,7 +85,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
 
   app.get("/api/gallery/filters", (req, res) => {
     const type = String(req.query.type || "");
-    const items = filterVisibleGallery(recordsForRequest(gallery, req)).filter(
+    const items = recordsForRequest(visibleGallery(), req).filter(
       (item) => !type || item.type === type,
     );
     const unique = (values) =>
@@ -92,9 +93,11 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
         (a, b) => a.localeCompare(b),
       );
     res.json({
-      models: unique(
-        items.flatMap((item) => [canonicalProfileId(item.model), item.settings?.modelName]),
-      ),
+      // Each recorded model resolves once: resolving reads the alias file's state.
+      models: unique([
+        ...[...new Set(items.map((item) => item.model))].map(canonicalProfileId),
+        ...items.map((item) => item.settings?.modelName),
+      ]),
       loras: unique(
         items.flatMap((item) =>
           (Array.isArray(item.settings?.loras) ? item.settings.loras : []).map(
@@ -115,7 +118,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
   // The newest finished image the account made with each LoRA, shown as its picker preview.
   app.get("/api/loras/previews", (req, res) => {
     const newest = {};
-    for (const item of filterVisibleGallery(recordsForRequest(gallery, req))) {
+    for (const item of recordsForRequest(visibleGallery(), req)) {
       if (item.status !== "done" || !item.thumbnailUrl) continue;
       const time = Date.parse(item.createdAt || "") || 0;
       for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
@@ -275,7 +278,7 @@ function deleteRequested(req, ids) {
 /** The visible gallery items each account owns, by owner ID. */
 function ownedGalleries() {
   const owned = new Map();
-  for (const item of filterVisibleGallery(gallery)) {
+  for (const item of visibleGallery()) {
     if (!item.ownerId) continue;
     if (!owned.has(item.ownerId)) owned.set(item.ownerId, []);
     owned.get(item.ownerId).push(item);

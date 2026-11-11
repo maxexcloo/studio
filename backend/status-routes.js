@@ -40,9 +40,14 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       .filter(Boolean);
     const administrator = !req.studioAccount || canAdmin(req);
     // The kind of job each worker runs now, which everyone's status summary counts.
-    const jobs = new Map(queue.store.schedulable().map((job) => [job.id, job]));
+    const loads = [...queue.loads()];
+    const jobs = new Map(
+      queue.store
+        .jobsById(loads.map(([, load]) => load.current).filter(Boolean))
+        .map((job) => [job.id, job]),
+    );
     const running = new Map(
-      [...queue.loads()].flatMap(([resource, load]) => {
+      loads.flatMap(([resource, load]) => {
         const job = load.current && jobs.get(load.current);
         return resource.startsWith("worker:") && job
           ? [[resource.slice("worker:".length), job.input.kind === "video" ? "video" : "image"]]

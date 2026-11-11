@@ -12,7 +12,7 @@ import {
   unreachableCancelReason,
 } from "./queue.ts";
 import { pausedReason } from "../../shared/queue.ts";
-import { everyone, type OwnedJob, queuePriority, Store } from "./store.ts";
+import { everyone, listedFinishedJobs, type OwnedJob, queuePriority, Store } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -1008,4 +1008,29 @@ test("a running job whose worker refuses connections cancels at once; one that t
   } finally {
     store.close();
   }
+});
+
+test("The queue lists unfinished and failed work and only the latest finished jobs, keeping every record", () => {
+  const store = new Store(openDatabase(":memory:"));
+  const session = store.createSession("alice");
+  const failed = store.save({
+    ...store.enqueue("alice", session.id, {}, "image"),
+    status: "failed",
+  });
+  const cleared = store.save({
+    ...store.enqueue("alice", session.id, {}, "image"),
+    status: "failed",
+    cleared: true,
+  });
+  const finished = Array.from({ length: listedFinishedJobs + 5 }, () =>
+    store.save({ ...store.enqueue("alice", session.id, {}, "image"), status: "completed" }),
+  );
+  const open = store.enqueue("alice", session.id, {}, "image");
+  const listed = store.queueJobs("alice").map((job) => job.id);
+  assert.equal(listed.length, listedFinishedJobs + 2);
+  assert.deepEqual(listed.slice(0, 1), [failed.id]);
+  assert.equal(listed.at(-1), open.id);
+  assert.ok(!listed.includes(finished[0].id) && !listed.includes(cleared.id));
+  assert.ok(listed.includes(finished.at(-1)!.id));
+  assert.equal(store.job("alice", finished[0].id)?.id, finished[0].id);
 });

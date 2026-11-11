@@ -58,6 +58,9 @@ export const everyone = "*";
 export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued", "waiting"]);
 /** Not yet done: pending, or handed to a provider. */
 const openStatuses = [...pendingStatuses, "starting", "running", "saving"];
+/** How many of an account's finished jobs its queue lists, newest first; older ones are read one at a time (`job`). */
+export const listedFinishedJobs = 200;
+const placeholders = (values: Iterable<unknown>) => [...values].map(() => "?").join(", ");
 
 export class Store {
   readonly db: DatabaseSync;
@@ -85,6 +88,7 @@ export class Store {
       );
       CREATE INDEX IF NOT EXISTS studio_queue_owner ON studio_queue(owner_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
+      CREATE INDEX IF NOT EXISTS studio_queue_session ON studio_queue(session_id, created_at);
       CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
@@ -286,10 +290,66 @@ export class Store {
   openJobs(ownerId?: string): OwnedJob[] {
     return this.db
       .prepare(
-        `SELECT record FROM studio_queue WHERE status IN (${openStatuses.map(() => "?").join(", ")})${ownerId === undefined ? "" : " AND owner_id = ?"} ORDER BY created_at, rowid`,
+        `SELECT record FROM studio_queue WHERE status IN (${placeholders(openStatuses)})${ownerId === undefined ? "" : " AND owner_id = ?"} ORDER BY created_at, rowid`,
       )
       .all(...openStatuses, ...(ownerId === undefined ? [] : [ownerId]))
       .map((row) => JSON.parse(row.record as string));
+  }
+
+  /**
+   * The owner's queue as it lists, in queue order: every unfinished job, every failed one not
+   * cleared, and the newest `listedFinishedJobs` of the rest. Nothing is deleted: an older job
+   * stays readable by its ID.
+   */
+  queueJobs(ownerId: string): OwnedJob[] {
+    return this.db
+      .prepare(
+        `SELECT record FROM studio_queue WHERE owner_id = ? AND (
+          status IN (${placeholders(openStatuses)})
+          OR (status = 'failed' AND json_extract(record, '$.cleared') IS NULL)
+          OR rowid IN (SELECT rowid FROM studio_queue WHERE owner_id = ? AND status IN (${placeholders(terminalStatuses)})
+            ORDER BY created_at DESC, rowid DESC LIMIT ?)
+        ) ORDER BY created_at, rowid`,
+      )
+      .all(ownerId, ...openStatuses, ownerId, ...terminalStatuses, listedFinishedJobs)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  /** Jobs by ID, whoever owns them: for what the server itself already knows by ID. */
+  jobsById(ids: string[]): OwnedJob[] {
+    if (!ids.length) return [];
+    return this.db
+      .prepare(`SELECT record FROM studio_queue WHERE id IN (${placeholders(ids)})`)
+      .all(...ids)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  /** The finished job holding an upload, as Recreate made it (gallery/recreate.js). */
+  uploadJob(ownerId: string, itemId: string): OwnedJob | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT record FROM studio_queue WHERE owner_id = ? AND json_extract(record, '$.resource') = 'studio'
+          AND json_extract(record, '$.parentJobId') IS NULL AND json_extract(record, '$.outputs[0].id') = ?
+          ORDER BY created_at, rowid LIMIT 1`,
+      )
+      .get(ownerId, itemId);
+    return row ? JSON.parse(row.record as string) : undefined;
+  }
+
+  /**
+   * How many of the owner's jobs ran each profile (by `input.profileId`) since an ISO time, with
+   * every profile they ever ran at 0 or more. Cancelled jobs tried nothing and are left out.
+   */
+  profileRuns(ownerId: string, since: string): Map<string, number> {
+    return new Map(
+      this.db
+        .prepare(
+          `SELECT COALESCE(json_extract(record, '$.input.profileId'), '') AS profile, SUM(created_at >= ?) AS recent
+          FROM studio_queue WHERE owner_id = ? AND status != 'cancelled' GROUP BY profile`,
+        )
+        .all(since, ownerId)
+        .map((row) => [String(row.profile), Number(row.recent)]),
+    );
   }
 
   /** The owner's jobs created at or after an ISO time, in queue order: read through the owner index. */
@@ -318,8 +378,8 @@ export class Store {
    * an unfinished job's set (a started set keeps its place). Read through the status index.
    */
   schedulable(): OwnedJob[] {
-    const open = `status IN (${openStatuses.map(() => "?").join(", ")})`;
-    const finished = `status IN (${[...terminalStatuses].map(() => "?").join(", ")})`;
+    const open = `status IN (${placeholders(openStatuses)})`;
+    const finished = `status IN (${placeholders(terminalStatuses)})`;
     const rows = this.db
       .prepare(
         `SELECT rowid, created_at, record FROM studio_queue WHERE ${open}
@@ -340,7 +400,7 @@ export class Store {
       for (const row of this.db
         .prepare(
           `SELECT rowid, created_at, record FROM studio_queue WHERE ${finished}
-          AND json_extract(record, '$.queueSet') IN (${sets.map(() => "?").join(", ")})`,
+          AND json_extract(record, '$.queueSet') IN (${placeholders(sets)})`,
         )
         .all(...terminalStatuses, ...sets)) {
         const job = JSON.parse(row.record as string) as OwnedJob;
