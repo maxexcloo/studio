@@ -39,16 +39,24 @@ export function backendUrl() {
  * (pickWorker) reads these; nothing here makes a request.
  */
 const reachable = new Map();
+// A worker that failed to answer is tried again after this long: nothing else is routed to it, so
+// waiting for its next answer would leave it out for good.
+const retryUnreachableMs = 60_000;
 const inventories = new Map();
 const offlineListeners = new Set();
-export const noteWorkerReachable = (id, up) => {
+/** `at` is when it answered or failed to (tests give a time). */
+export const noteWorkerReachable = (id, up, at = Date.now()) => {
   if (!id) return;
-  reachable.set(id, Boolean(up));
+  reachable.set(id, { up: Boolean(up), at });
   if (!up) for (const listener of offlineListeners) listener(id);
 };
 /** Hears the id of each worker found offline. */
 export const onWorkerOffline = (listener) => offlineListeners.add(listener);
-const workerReachable = (id) => (reachable.has(id) ? reachable.get(id) : null);
+const workerReachable = (id, now = Date.now()) => {
+  const last = reachable.get(id);
+  if (!last) return null;
+  return last.up || now - last.at < retryUnreachableMs ? last.up : null;
+};
 /** How a worker's inventory names a profile on one backend of a combined profile. */
 export const profileOnBackendKey = (profileId, backend = "") =>
   backend ? `${profileId}@${backend}` : profileId;
