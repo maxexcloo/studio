@@ -15,8 +15,9 @@ import classes from "./GenerationInputControls.module.css";
 
 /**
  * A rail chip that opens its option list: the composer's Profile and prompt ideas. `swatch`
- * is a readiness colour beside the name; `target` adds attributes to the chip itself. Touch screens
- * list the options without a search, which Mantine would focus on opening and so raise the keyboard.
+ * is a readiness colour beside the name; `target` adds attributes to the chip itself. On touch
+ * screens the search waits for a tap: Mantine focuses it on opening, which would raise the keyboard,
+ * so it is let go again straight after.
  */
 export function ChipSelect({
   name,
@@ -25,6 +26,7 @@ export function ChipSelect({
   title,
   target,
   searchable,
+  onDropdownOpen,
   ...props
 }: Omit<ComboboxPopoverProps, "children"> & {
   name: string;
@@ -36,7 +38,22 @@ export function ChipSelect({
   const touch = useTouch();
   return (
     <ComboboxPopover
-      searchable={searchable && !touch}
+      searchable={searchable}
+      onDropdownOpen={() => {
+        onDropdownOpen?.();
+        // After Mantine's own deferred focus.
+        if (touch && searchable)
+          setTimeout(() =>
+            setTimeout(() => {
+              const field = document.activeElement;
+              if (
+                field instanceof HTMLInputElement &&
+                field.closest(".mantine-ComboboxPopover-dropdown")
+              )
+                field.blur();
+            }),
+          );
+      }}
       allowDeselect={false}
       withCheckIcon={false}
       maxDropdownHeight={320}

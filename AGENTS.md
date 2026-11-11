@@ -126,8 +126,8 @@ the primary component reference and verify APIs against the installed version.
   (other actions, then Apply where choices apply as made) stays pinned
   above the safe area while the content between scrolls, with one scroll owner
   per form. On touch screens, tablets included, chip popups and option lists open
-  with the keyboard down: a popup's search waits for a tap, and chip option lists
-  have none.
+  with the keyboard down: a popup's or option list's search (the Profile chip's)
+  waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
