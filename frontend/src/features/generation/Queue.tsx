@@ -502,6 +502,10 @@ function QueueSetRow({
     .filter((job) => !terminalStatuses.has(job.status))
     .map((job) => job.id);
   const Kind = kindIcon(members[0], !unfinished.length && failed.length > 0);
+  // The set's state as its leading unfinished job's: one running, else the first waiting.
+  const lead =
+    members.find((job) => ["starting", "running", "saving"].includes(job.status)) ??
+    members.find((job) => !terminalStatuses.has(job.status));
   const stop = async () => {
     setBusy("stop");
     await Promise.allSettled(unfinished.map((id) => action.mutateAsync({ id, action: "cancel" })));
@@ -545,7 +549,11 @@ function QueueSetRow({
                 {title}
               </Text>
               <Text size="xs" c="dimmed" lineClamp={1}>
-                {[`${done} of ${total} Done`, failed.length && `${failed.length} Failed`]
+                {[
+                  lead && shortStatus(lead),
+                  `${done} of ${total} Done`,
+                  failed.length && `${failed.length} Failed`,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </Text>
