@@ -22,22 +22,6 @@ import { lineDiff } from "../line-diff.js";
 import { imageMimes } from "../reference-names.js";
 import { redditPostPath } from "../gallery/reddit.js";
 
-export const adminToolNames = Object.freeze([
-  "library",
-  "lookup",
-  "import",
-  "imports",
-  "downloads",
-  "updates",
-  "catalogue_edit",
-  "profiles",
-  "profile_edit",
-  "combine_backends",
-  "export",
-  "placement",
-  "accounts",
-  "maintenance",
-]);
 export const adminInstructions =
   "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with library, profiles, accounts or maintenance before stating or changing it. Nothing downloads unless asked (downloads start), edits are new versions with base_hash from profiles get, removals (catalogue_edit remove, profile_edit remove, combine_backends apply) run only when asked and back up or keep versions first, and no tool touches GPUs.";
 
@@ -233,7 +217,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "library",
     "library",
-    "Search or read Studio’s LoRAs and models with provenance (source, origin, version, triggers, strength, links). view installed (default), catalogue (catalogued, installed or not) or updates (available updates). get with key returns one entry in full. Read-only.",
+    "Search or read Studio's LoRAs and models with provenance (source, origin, version, triggers, strength, links). view installed (default), catalogue (catalogued, installed or not) or updates (available updates). get with key returns one entry in full.",
     {
       action: z.enum(["search", "get"]).default("search"),
       query: z.string().trim().max(200).optional(),
@@ -285,7 +269,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "lookup",
     "look up a model",
-    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url import takes. Read-only.',
+    'Look up a Civitai model or Hugging Face link without importing it: its versions and files with availability (paid, early access and restricted files never download), licence, whether each file is installed and which profiles fit its base model. query searches Civitai by name instead, narrowed by type (lora or checkpoint) and base_model (Civitai\'s name, such as "Flux.1 D" or "SDXL 1.0"); each version\'s links.civitaiCom is the url import takes.',
     {
       url: z.string().trim().url().max(2000).optional(),
       query: z.string().trim().min(2).max(120).optional(),
@@ -310,7 +294,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "import",
     "import to library",
-    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from upload (upload_id) or a result (job_id). Returns the import’s grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
+    "Import into the Library, as Library › Import does, when the user asks: a Civitai image or model link or a Hugging Face link (url), an image from upload (upload_id) or a result (job_id). Returns the import's grade (exact, close, partial) with reasons and its missing files; it appears in Library › Import as from chat. install: true also queues its missing files, as Downloads start does, when the user asks to install or download it; otherwise nothing downloads. describe has the vision model describe an image without settings. A Reddit post link saves the post's images as the user's uploads instead.",
     {
       url: z.string().trim().url().max(2000).optional(),
       upload_id: id.optional(),
@@ -453,7 +437,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "downloads",
     "model downloads",
-    "Model downloads through the worker model API, only when asked. start with import_id queues the import’s missing files (indices picks files); start or retry with source queues a download id from lookup, imports or status. status lists running, queued and recent downloads (import_id narrows to its files). cancel stops one download; its partial file stays and start resumes it. Paid, early-access and restricted files never download.",
+    "Model downloads through the worker model API, only when asked. start with import_id queues the import's missing files (indices picks files); start or retry with source queues a download id from lookup, imports or status. status lists running, queued and recent downloads (import_id narrows to its files). cancel stops one download; its partial file stays and start resumes it. Paid, early-access and restricted files never download.",
     {
       action: z.enum(["start", "status", "retry", "cancel"]),
       import_id: id.optional(),
@@ -610,7 +594,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "catalogue_edit",
     "edit catalogue entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile uses it, taking a LoRA out of every account's stacks first, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field's edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile uses it, taking a LoRA out of every account's stacks first, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
     {
       key,
       patch: z
@@ -691,7 +675,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "profiles",
     "profiles & guides",
-    "Read Studio’s model profiles and prompting guides. list lists them with name, version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to profile_edit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id. Read-only.",
+    "Read Studio's model profiles and prompting guides. list lists them with name, version, origin and AI-Drafted state; get returns one's text, hash (pass it as base_hash to profile_edit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: the family map (families.<family>.<kind>: the pack every profile of that family gets by default), which pack, variant and mode a profile (custom:<id>) uses instead, the variants and each profile's negatives, one document without an id.",
     {
       action: z.enum(["list", "get", "diff"]).default("list"),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -852,7 +836,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "combine_backends",
     "combine backends",
-    "Combine a model’s Radiance and ComfyUI profiles into one, as Library › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
+    "Combine a model's Radiance and ComfyUI profiles into one, as Library › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
     {
       action: z.enum(["preview", "apply"]).default("preview"),
       hash: z.string().trim().min(1).max(200).optional(),
@@ -901,7 +885,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "placement",
     "model placement",
-    "Where model files live: the worker’s inventory per folder, free space and whether it is writable (or the local folders); with key, where that one file sits. Read-only.",
+    "Where model files live: the worker's inventory per folder, free space and whether it is writable (or the local folders); with key, where that one file sits.",
     {
       key: key.optional(),
     },
