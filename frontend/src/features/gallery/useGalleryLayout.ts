@@ -184,7 +184,8 @@ export function useGalleryLayout() {
 /**
  * Keeps the gallery's scroll position on the tiles in view while tiles arrive or leave above them
  * (results landing, work queued): the first tile at or below the viewport's top stays where it was.
- * Only someone at the very top sees new tiles slide in. `places` are each tile's top in grid
+ * Only someone with the grid's top in view sees new tiles slide in; new work at the start waits
+ * above until then (MediaGrid's useHeldNewWork). `places` are each tile's top in grid
  * coordinates; a new `key` (a zoom, a resize, a search) lays out afresh and holds nothing.
  */
 export function useScrollAnchor(
@@ -196,8 +197,10 @@ export function useScrollAnchor(
   useLayoutEffect(() => {
     const before = last.current;
     last.current = places && { places, key };
-    if (!places || !before || before.key !== key || !host.current || window.scrollY <= 0) return;
-    const offset = window.scrollY - (host.current.getBoundingClientRect().top + window.scrollY);
+    if (!places || !before || before.key !== key || !host.current) return;
+    // How far the grid's top is scrolled above the viewport; with it in view, nothing is held.
+    const offset = -host.current.getBoundingClientRect().top;
+    if (offset <= 0) return;
     let anchor: string | undefined;
     let top = Infinity;
     for (const [id, place] of before.places)
