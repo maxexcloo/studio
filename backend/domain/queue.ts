@@ -300,7 +300,7 @@ export class GenerationQueue {
   private async run() {
     const held = this.held();
     // Read once until the observations below are awaited; this tick's saves update the list.
-    const jobs = new Map(this.store.schedulable().map((job) => [job.id, job]));
+    const jobs = new Map(this.store.openJobs().map((job) => [job.id, job]));
     const save = (job: OwnedJob) => {
       const saved = this.store.save(job);
       jobs.set(saved.id, saved);
@@ -376,7 +376,7 @@ export class GenerationQueue {
         }),
     );
     // Read again: jobs were added, observed or cancelled while the observations were awaited.
-    const all = this.store.schedulable();
+    const all = this.store.schedulable(reuseBypassLimit);
     const occupied = new Set(
       all
         .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
@@ -515,7 +515,7 @@ export class GenerationQueue {
   /** Whether another local video job has started and not yet finished and saved. */
   private videoRunning(id: string) {
     return this.store
-      .schedulable()
+      .openJobs()
       .some(
         (job) =>
           job.id !== id &&
