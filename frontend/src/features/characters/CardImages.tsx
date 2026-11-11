@@ -15,6 +15,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
+import type { Action } from "../gallery/ActionBar";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import type { CardKind } from "../../../../shared/characters";
@@ -98,41 +99,32 @@ function useCardAssistant() {
   return Boolean(assistant.data?.available && assistant.data.vision);
 }
 
-/** Describe Image: writes the card's description from its first image, for any kind of card. */
-export function DescribeImage({
-  kind,
-  image,
-  onDescribed,
-}: {
-  kind: CardKind;
-  image?: ReferenceAsset;
-  onDescribed: (description: string) => void;
-}) {
+/**
+ * Describe Image: writes the card's description from its first image, for any kind of card, as a
+ * tool of the Description box (`tools`, with `busy` while it writes).
+ */
+export function useDescribeImage(
+  kind: CardKind,
+  image: ReferenceAsset | undefined,
+  onDescribed: (description: string) => void,
+) {
   const available = useCardAssistant();
   const describe = useMutation({
     mutationFn: (asset: ReferenceAsset) =>
       post<{ description: string }>("/api/assistant/cards/describe", { kind, assetId: asset.id }),
     onSuccess: ({ description }) => onDescribed(description),
   });
-  if (!available || !image) return null;
-  return (
-    <Group>
-      <Button
-        variant="subtle"
-        size="compact-sm"
-        leftSection={<icons.assistant size={15} />}
-        loading={describe.isPending}
-        onClick={() => describe.mutate(image)}
-      >
-        Describe Image
-      </Button>
-      {describe.error && (
-        <Text size="xs" c="red">
-          {describe.error.message}
-        </Text>
-      )}
-    </Group>
-  );
+  const tool: Action = {
+    id: "describe",
+    label: "Describe Image",
+    icon: icons.assistant,
+    disabled: describe.isPending,
+    onClick: () => image && describe.mutate(image),
+  };
+  return {
+    tools: available && image ? [tool] : undefined,
+    busy: describe.isPending ? "Describing Image…" : undefined,
+  };
 }
 
 type Rating = { rating: number; note: string };
