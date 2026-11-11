@@ -208,6 +208,8 @@ export function TextBox({
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+    // A tool's menu, portalled outside the editor, closes on its own Escape first.
+    if (!content.current?.contains(event.target as Node)) return;
     event.preventDefault();
     event.stopPropagation();
     close();
