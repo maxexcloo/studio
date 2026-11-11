@@ -66,6 +66,10 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/accounts\/status$/],
   ["GET", /^\/api\/models$/],
   ["GET", /^\/api\/loras\/info$/],
+  // generate's character, shots' outfit and scene cards and models' card lists; character_views
+  // records its jobs on the character.
+  ["GET", /^\/api\/(?:characters|outfits|scenes)$/],
+  ["POST", /^\/api\/characters\/[\w-]+\/generated$/],
   // The account's LoRA thumbs up and down, which order every LoRA list MCP shows.
   ["GET", /^\/api\/loras\/library$/],
   ["POST", /^\/api\/generate$/],

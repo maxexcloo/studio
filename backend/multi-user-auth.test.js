@@ -341,6 +341,10 @@ test("gateway identities map to accounts only through administrator links, and S
     mcpAccount(artist.id, { internal: true }, method, routePath);
   assert.equal(internal("POST", "/api/generate").userId, artist.id);
   assert.equal(internal("POST", "/api/jobs/job-1/cancel").userId, artist.id);
+  // generate's character and shots read the account's cards.
+  assert.equal(internal("GET", "/api/characters").userId, artist.id);
+  assert.equal(internal("GET", "/api/outfits").userId, artist.id);
+  assert.equal(internal("DELETE", "/api/characters/chr-1"), null);
   assert.equal(internal("GET", "/api/accounts/admin"), null);
   assert.equal(mcpAccount(artist.id, undefined, "POST", "/api/generate"), null);
 
