@@ -375,6 +375,8 @@ export function MediaViewer({
   }, [replacement, items, navigate]);
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
+    // A phone's prompt editor runs and returns to the gallery; desktop keeps the run in the strip.
+    if (phone && next.kind === "prompt") close();
     void iteration.mutateAsync(next).then(
       (job) => setQueued((runs) => [...runs, { job, from: item.id }]),
       () => {},
