@@ -70,11 +70,10 @@ test(
       );
       return result;
     }
-    async function completed(sessionId: string, jobId: string): Promise<QueueJob> {
+    async function completed(jobId: string): Promise<QueueJob> {
       const deadline = Date.now() + 10_000;
       while (Date.now() < deadline) {
-        const { jobs } = await api(`/api/sessions/${sessionId}`);
-        const job = (jobs as QueueJob[]).find((entry) => entry.id === jobId)!;
+        const { job } = (await api(`/api/queue/${jobId}`)) as { job: QueueJob };
         if (["completed", "failed", "cancelled"].includes(job.status)) {
           assert.equal(job.status, "completed", job.reason);
           return job;
@@ -99,14 +98,15 @@ test(
           height: 256,
           ...(parentJobId ? { parentJobId, parentItemId } : {}),
         });
-        const job = await completed(session.id, ack.jobId);
-        assert.equal(job.outputs.length, 1);
+        const job = await completed(ack.jobId);
+        // The queue lists a finished job's results as its gallery records.
+        assert.equal(job.items.length, 1);
         assert.equal(job.parentJobId, parentJobId);
         // The version link names the parent's result; the gallery groups versions by it.
         assert.equal(job.parentItemId, parentItemId);
         assert.equal(job.input.parentItemId, undefined);
         parentJobId = job.id;
-        parentItemId = String(job.outputs[0].id);
+        parentItemId = String(job.items[0].id);
         ids.push(job.id);
       }
       const legacy = await api("/api/generate", "POST", {
@@ -119,17 +119,15 @@ test(
       });
       assert.equal(legacy.jobId, "legacy-http-fixture");
       assert.equal(legacy.items.length, 1);
-      await completed(legacy.sessionId, legacy.jobId);
+      await completed(legacy.jobId);
       await stop();
       await start();
-      const reopened = await api(`/api/sessions/${session.id}`);
-      assert.deepEqual(
-        (reopened.jobs as QueueJob[]).map((job) => job.id),
-        ids,
+      const reopened = await Promise.all(
+        ids.map(async (id) => ((await api(`/api/queue/${id}`)) as { job: QueueJob }).job),
       );
-      assert.equal(
-        reopened.jobs.every((job: QueueJob) => job.status === "completed"),
-        true,
+      assert.deepEqual(
+        reopened.map((job) => [job.id, job.sessionId, job.status]),
+        ids.map((id) => [id, session.id, "completed"]),
       );
       const gallery = await api("/api/gallery");
       assert.equal(
