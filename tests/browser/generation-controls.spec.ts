@@ -1013,3 +1013,31 @@ test("A tablet keeps the open composer's prompt above the keyboard and the heade
     )
     .toBe(true);
 });
+
+test("A model with its own resolutions offers them with its aspects in the size chip", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const presets = [
+    ["1:1", 1, 1],
+    ["16:9", 16, 9],
+    ["9:16", 9, 16],
+  ].map(([label, w, h]) => {
+    const s = Math.round(Math.sqrt(1048576 / ((w as number) * (h as number))));
+    return { label, value: "", w: (w as number) * s, h: (h as number) * s };
+  });
+  await serveProfiles(page, [
+    {
+      ...profiles[0],
+      options: { ...profiles[0].options, resolutions: ["1k", "2k"] },
+      aspectPresets: presets,
+    },
+    ...profiles.slice(1),
+  ]);
+  await create(page);
+  await page.getByRole("button", { name: "Aspect", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "Resolution", exact: true })).toBeVisible();
+  await page.getByText("2K", { exact: true }).click();
+  await page.getByRole("button", { name: "16:9", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Aspect", exact: true })).toHaveText("16:9 · 2K");
+});

@@ -12,6 +12,17 @@ const resolutions: Record<string, string[]> = {
   "grok-imagine-video": ["480p", "720p"],
   "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
 };
+// The aspect ratios offered where the provider takes a ratio and its own resolution, rather than a
+// size: Grok Imagine Image 2.0 and the video models.
+const nativeAspects = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
+/** Presets of the exact ratios, about a megapixel, as the size chip lists them. */
+function aspectPresets() {
+  return nativeAspects.map((label) => {
+    const [w, h] = label.split(":").map(Number);
+    const scale = Math.round(Math.sqrt((1024 * 1024) / (w * h)));
+    return { label, value: `${w * scale}x${h * scale}`, w: w * scale, h: h * scale };
+  });
+}
 // Longest reference edge sent to the provider, which works at 1080p or 2k at most.
 const referenceEdge = 2048;
 interface ProfileOptions {
@@ -72,9 +83,13 @@ export function studioCloudProfiles(options: ProfileOptions) {
               baseModel: model,
               workflow: workflow.profileId,
               defaults,
-              aspects: [],
+              aspects: resolutions[model]?.length ? aspectPresets() : [],
               capabilities: { ...workflow.capabilities, inpaint: false, lora: false },
-              options: workflow.options,
+              // The model's own resolutions, which the size chip offers beside its aspects.
+              options: {
+                ...workflow.options,
+                ...(resolutions[model]?.length ? { resolutions: resolutions[model] } : {}),
+              },
               imageModes: workflow.imageModes,
             }),
             provider: "cliproxyapi",

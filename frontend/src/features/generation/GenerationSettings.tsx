@@ -22,7 +22,6 @@ const selections = [
   { options: "samplers", field: "sampler", label: "Sampler" },
   { options: "schedulers", field: "scheduler", label: "Scheduler" },
   { options: "vaes", field: "vae", label: "VAE" },
-  { options: "resolutions", field: "resolution", label: "Resolution" },
 ] as const;
 // Nested pickers stay inside the popover so choosing an option keeps it open.
 const nested = { withinPortal: false } as const;

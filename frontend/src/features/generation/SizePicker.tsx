@@ -55,6 +55,14 @@ export function SizePicker({
     const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier, profile);
     return { w: width, h: height };
   };
+  // A model with its own resolutions (Grok's 1K or 2K, 480p to 1080p) takes the shape from the
+  // aspect and the size from its resolution, so no pixel sizes show.
+  const native = profile?.options?.resolutions || [];
+  const nativeResolution = String(
+    input.resolution ||
+      profile?.defaults?.resolution ||
+      (input.kind === "video" ? "720p" : Math.max(input.width, input.height) > 1024 ? "2k" : "1k"),
+  );
   const current = { w: input.width, h: input.height };
   const shown = tiered ? at(current) : current;
   // A preset of the current shape is the active one; the exact size is in the title.
@@ -62,7 +70,7 @@ export function SizePicker({
   const label = framed
     ? `Reference · ${aspect}`
     : active
-      ? `${active.label}${tiered ? ` · ${tier}` : ""}`
+      ? `${active.label}${tiered ? ` · ${tier}` : native.length ? ` · ${nativeResolution.toUpperCase()}` : ""}`
       : `${shown.w} × ${shown.h}`;
   return (
     <Popover position="top-start" width={300} trapFocus {...fittedPopup}>
@@ -112,6 +120,15 @@ export function SizePicker({
                 )}
               </Stack>
             )}
+            {!!native.length && (
+              <SegmentedControl
+                aria-label="Resolution"
+                fullWidth
+                value={nativeResolution}
+                onChange={(value) => onChange({ resolution: value })}
+                data={native.map((value) => ({ value, label: value.toUpperCase() }))}
+              />
+            )}
             {!!presets.length && (
               <Stack gap={4} role="group" aria-label="Aspect Presets">
                 {presets.map((preset) => {
@@ -126,9 +143,11 @@ export function SizePicker({
                       color={selected ? undefined : "gray"}
                       aria-pressed={selected}
                       rightSection={
-                        <Text component="span" size="xs" c="dimmed">
-                          {size.w} × {size.h}
-                        </Text>
+                        !native.length && (
+                          <Text component="span" size="xs" c="dimmed">
+                            {size.w} × {size.h}
+                          </Text>
+                        )
                       }
                       onClick={() => onChange({ width: preset.w, height: preset.h })}
                     >
@@ -138,7 +157,7 @@ export function SizePicker({
                 })}
               </Stack>
             )}
-            {!tiered && (
+            {!tiered && !(native.length && presets.length) && (
               <SimpleGrid cols={2} spacing="xs">
                 {(["width", "height"] as const).map((key) => (
                   <NumberInput
