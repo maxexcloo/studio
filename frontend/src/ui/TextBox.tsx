@@ -29,6 +29,7 @@ import { ActionBarGroups, ActionMenuItems, type Action } from "../features/galle
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { copyText } from "./clipboard";
+import { popupLayer } from "./popupClicks";
 import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
@@ -325,8 +326,11 @@ export function TextBox({
                 classNames={{ root: classes.field, wrapper: classes.field, input: classes.input }}
                 value={value}
                 onChange={(event) => onChange(event.currentTarget.value)}
-                // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page.
-                onBlur={close}
+                // Dismissing the keyboard (iOS Done or hide) blurs the text and returns to the page;
+                // a tool's menu taking focus keeps the editor.
+                onBlur={(event) => {
+                  if (!(event.relatedTarget as Element | null)?.closest(popupLayer)) close();
+                }}
               />
               {overlay && <div className={classes.overlay}>{overlay}</div>}
               {below && <div className={classes.below}>{below}</div>}

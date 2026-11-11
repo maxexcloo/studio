@@ -168,6 +168,14 @@ test("No ideas or suggestions show when Studio has none", async ({ page }, testI
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
   if (phone) {
+    // With the keyboard up, a tool's menu takes focus from the text without closing the editor.
+    const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+    await editor.getByRole("textbox", { name: "Prompt", exact: true }).click();
+    await editor.getByRole("button", { name: "Suggestions", exact: true }).click();
+    await expect(menu.getByRole("menuitem", { name: "No Suggestions", exact: true })).toBeVisible();
+    await expect(editor).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
     // Escape closes the editor first, then the viewer.
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog", { name: "Prompt", exact: true })).toBeHidden();
