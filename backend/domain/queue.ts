@@ -29,7 +29,6 @@ export const unreachableCancelReason =
  */
 export const goneOutputs = (message: string) => Object.assign(new Error(message), { gone: true });
 const goneSaveTries = 3;
-const stoppedSavingReason = "Stopped while saving; its outputs weren't saved.";
 
 /** A saved job completes unless saving failed it (an Extend that couldn't be joined onto its video). */
 const savedStatus = (saved: JobObservation | void) =>
@@ -611,13 +610,13 @@ export class GenerationQueue {
   }
 
   /**
-   * A failed save keeps the job saving, to try again, unless Stop asked to end it or its outputs
-   * are gone for good; either ends it with the reason.
+   * A failed save keeps the job saving, to try again, unless its outputs are gone for good: then it
+   * fails with the reason. Stop leaves accepted work to finish saving (AGENTS.md).
    */
   private async saveFailed(job: OwnedJob, error: Error & { gone?: boolean }) {
     const latest = this.store.job(job.ownerId, job.id)!;
     const tries = error.gone ? (this.goneSaves.get(job.id) ?? 0) + 1 : 0;
-    if (!latest.cancelRequested && tries < goneSaveTries) {
+    if (tries < goneSaveTries) {
       if (tries) this.goneSaves.set(job.id, tries);
       else this.goneSaves.delete(job.id);
       this.store.save({
@@ -629,9 +628,9 @@ export class GenerationQueue {
     this.goneSaves.delete(job.id);
     const ended = this.store.save({
       ...latest,
-      status: latest.cancelRequested ? "cancelled" : "failed",
+      status: "failed",
       progress: undefined,
-      reason: latest.cancelRequested ? stoppedSavingReason : error.message,
+      reason: error.message,
     });
     await this.adapter.settled?.(ended);
   }
@@ -639,19 +638,6 @@ export class GenerationQueue {
   async cancel(ownerId: string, id: string): Promise<OwnedJob | undefined> {
     const job = this.store.job(ownerId, id);
     if (!job || terminalStatuses.has(job.status)) return job;
-    // Its provider is done with it: a save in progress finishes or ends at Stop's request, and
-    // between saves it ends now.
-    if (job.status === "saving") {
-      if (this.observing.has(job.id)) return this.store.save({ ...job, cancelRequested: true });
-      const cancelled = this.store.save({
-        ...job,
-        status: "cancelled",
-        progress: undefined,
-        reason: stoppedSavingReason,
-      });
-      await this.adapter.settled?.(cancelled);
-      return cancelled;
-    }
     if (!this.acceptedIds.has(job.id)) {
       this.writing.get(job.id)?.abort();
       const cancelled = this.store.save({
