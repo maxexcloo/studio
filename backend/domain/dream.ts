@@ -380,6 +380,8 @@ export function createDream(options: {
   online(kind: Kind): Promise<{ text: Reach; media: Reach }>;
   /** Whether admitted local text work is running now. */
   textBusy(): boolean;
+  /** How many Dream jobs an account may have at once: one per media worker, so every idle GPU dreams. */
+  slots(): number;
   writer: DreamWriter | null;
   guide(profile: DreamProfile): unknown;
   /** Every gallery record the owner has, Dream's pool included, newest first. */
@@ -438,6 +440,9 @@ export function createDream(options: {
 
   const live = () => store.openJobs();
   const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job)) || options.textBusy();
+  /** The account's Dream jobs not yet finished. */
+  const held = (ownerId: string) =>
+    live().filter((job) => dreamJob(job) && job.ownerId === ownerId).length;
   function today(ownerId: string) {
     const counts = { images: 0, videos: 0 };
     const current = day(now());
@@ -493,13 +498,16 @@ export function createDream(options: {
     const { settings } = record;
     if (!settings.enabled) return { status: "off" as const };
     if (settings.paused) return { status: "paused" as const };
-    if (live().some((job) => dreamJob(job) && job.ownerId === ownerId))
-      return { status: "generating" as const };
-    if (unseenCount(ownerId) >= settings.buffer)
-      return {
-        status: "waiting" as const,
-        reason: "Dream waits until you have looked at what it made.",
-      };
+    const running = held(ownerId);
+    if (running >= options.slots()) return { status: "generating" as const };
+    // Work still running counts toward the buffer, so parallel jobs never overfill it.
+    if (unseenCount(ownerId) + running >= settings.buffer)
+      return running
+        ? { status: "generating" as const }
+        : {
+            status: "waiting" as const,
+            reason: "Dream waits until you have looked at what it made.",
+          };
     if (!kinds(settings, today(ownerId)).length)
       return { status: "capped" as const, reason: "Dream has made today’s share." };
     return null;
@@ -1368,8 +1376,8 @@ export function createDream(options: {
       for (let step = 0; step < owners.length; step++) {
         const index = (next + step) % owners.length;
         const ownerId = owners[index];
-        // An account already holding a Dream job waits its turn; the others may still get theirs.
-        if (live().some((job) => dreamJob(job) && job.ownerId === ownerId)) continue;
+        // An account holding a Dream job for every worker waits its turn; the others may still get theirs.
+        if (held(ownerId) >= options.slots()) continue;
         let state: { status: DreamStatus; reason?: string };
         try {
           state = await consider(ownerId);
