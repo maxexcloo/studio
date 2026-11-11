@@ -206,6 +206,9 @@ test(
         profile.capabilities?.lora && profile.kind === "image" && profile.ready !== false,
     );
     assert.ok(sdxl);
+    // The run's tile shows in the gallery while it is in progress only with that preference.
+    const shown = await api("/api/preferences", { galleryWork: "running" }, "PATCH");
+    assert.equal(shown.status, 200, JSON.stringify(shown.body));
     const run = async (lora) => {
       const queued = primary.nextPrompt();
       const accepted = await api("/api/generate", {
