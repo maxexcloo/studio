@@ -1176,7 +1176,7 @@ export const families = {
   // BFL recommend 2K. "Do not use the model without a prompt upsampler", so every run goes
   // through theirs first, as their code runs it.
   flux3: {
-    label: "FLUX.3 Klein",
+    label: "Flux.3 Klein",
     kind: "image",
     native: draws4k,
     sources: ["unet", "checkpoint"],

@@ -1,7 +1,7 @@
 {
   "studio": {
     "id": "z-image-turbo-2k-refine",
-    "name": "Z-Image Turbo 2K Refine",
+    "name": "Z-Image Turbo 2K Refine · Fast · 5 Steps · 1 Reference",
     "description": "Doubles a picture with RealESRGAN, then lets Z-Image Turbo redraw its fine detail. From Comfy-Org's Z-Image Turbo 2K upscaler template.",
     "kind": "image",
     "family": "zimage",
