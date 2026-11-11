@@ -12,7 +12,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { CardDialog, CardForm, CardImages } from "./CardImages";
 import { charactersQuery, useSaveCharacter, type CharacterCard } from "./queries";
 
-/** What a new card starts from, such as Make Character's image. */
+/** What a new card starts from, such as Use as Character's image. */
 export interface CharacterStart {
   references: ReferenceAsset[];
 }

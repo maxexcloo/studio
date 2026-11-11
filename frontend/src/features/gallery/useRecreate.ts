@@ -46,7 +46,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
   });
   return {
     id: "prompt-composer",
-    label: "Recreate",
+    label: "Recreate in Composer",
     description: "Open its suggested prompt in the composer",
     icon: icons.prompt,
     disabled: !item.suggestedPrompt || recreate.isPending,
