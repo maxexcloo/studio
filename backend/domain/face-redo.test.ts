@@ -55,7 +55,7 @@ test("a drifted character result is redone once, and neither its redo nor a plai
     enabled: () => true,
     account: () => ({ userId: "artist", role: "user", authenticated: true }),
     job: (ownerId, id) => jobs.find((each) => each.ownerId === ownerId && each.id === id),
-    jobsSince: () => jobs,
+    sessionJobs: () => jobs,
     admit: async (input, _account, scope, origin) => {
       admitted.push([input, scope, origin]);
       const queued = job(`queued-${admitted.length}`, {
@@ -148,7 +148,7 @@ test("no redo for a gone account, an old result or with the switch off", async (
       enabled: () => options.enabled ?? true,
       account: () => (options.gone ? null : { userId: "artist", role: "user" }),
       job: () => job("first"),
-      jobsSince: () => [],
+      sessionJobs: () => [],
       admit: async () => {
         queued += 1;
         return { status: 200, payload: { jobId: "queued" } };

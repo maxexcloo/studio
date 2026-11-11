@@ -727,9 +727,20 @@ test("A queue item streams its prompt's thinking; the result keeps it collapsed 
   page,
 }, testInfo) => {
   const thinking = "The bird is perched, so a gentle take-off reads best.";
-  const { state, viewer } = await seed(page, {
-    writing: { kind: "animate", model: "local/text", thinking },
-  });
+  const writing = { kind: "animate", model: "local/text" };
+  // Gallery pages leave out the thinking; Details reads the item for it.
+  const { state, viewer } = await seed(page, { writing }, (page, state) =>
+    page.route("**/api/gallery/items/hub", (route) =>
+      route.fulfill({
+        json: {
+          item: {
+            ...state.gallery.find((item) => item.id === "hub"),
+            writing: { ...writing, thinking },
+          },
+        },
+      }),
+    ),
+  );
   state.jobs.push({
     id: "job-writing",
     jobId: "job-writing",

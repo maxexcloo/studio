@@ -12,9 +12,10 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 import { Link } from "react-router";
+import { api } from "../../api";
 import type { MediaItem, Profile } from "../../types";
 import { useCopy } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
@@ -389,14 +390,27 @@ function Caption({ item }: { item: MediaItem }) {
   );
 }
 
+/** One gallery item in full: gallery pages leave out its prompt's thinking, which Details reads here. */
+export const galleryItemQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["gallery-item", id],
+    queryFn: () => api<{ item: MediaItem }>(`/api/gallery/items/${encodeURIComponent(id)}`),
+    retry: false,
+  });
+
 /** Details › Prompt with the prompt's thinking, then any Negative Prompt as its own section. */
 function DetailsPrompt({ item }: { item: MediaItem }) {
+  // A pending tile has no gallery record to read yet.
+  const full = useQuery({
+    ...galleryItemQuery(item.id),
+    enabled: Boolean(item.writing && !item.writing.thinking && item.status !== "pending"),
+  });
   return (
     <>
       <DetailSection
         title="Prompt"
         copy={item.prompt || ""}
-        after={<WritingThinking writing={item.writing} />}
+        after={<WritingThinking writing={full.data?.item.writing ?? item.writing} />}
       >
         <DetailText>{item.prompt || "No prompt recorded."}</DetailText>
       </DetailSection>
