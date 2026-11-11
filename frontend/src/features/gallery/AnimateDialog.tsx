@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { Alert, Button, Modal, Stack, Text } from "@mantine/core";
 import type { MediaItem } from "../../types";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
@@ -79,11 +80,11 @@ export function AnimateDialog({
               value={instruction}
               onChange={setInstruction}
             />
-            <Group justify="flex-end">
+            <DialogFooter onCancel={onClose}>
               <Button type="submit" disabled={!instruction.trim()}>
                 {review ? "Write Prompt" : "Animate"}
               </Button>
-            </Group>
+            </DialogFooter>
           </Stack>
         </form>
       ) : writer.isPending ? (
@@ -125,10 +126,7 @@ export function AnimateDialog({
                 </Text>
               </>
             )}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={onClose}>
-                Cancel
-              </Button>
+            <DialogFooter onCancel={onClose}>
               {written ? (
                 <Button type="submit" disabled={!prompt.trim()}>
                   Run
@@ -136,7 +134,7 @@ export function AnimateDialog({
               ) : (
                 <Button onClick={write}>Retry</Button>
               )}
-            </Group>
+            </DialogFooter>
           </Stack>
         </form>
       )}
