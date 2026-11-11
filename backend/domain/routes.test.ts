@@ -271,6 +271,27 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
       "the retry is queued afresh",
     );
     assert.equal(store.job("bob", done.id)?.status, "completed");
+
+    // Every listed job at once, each once however often it is named.
+    const bulk = (action: string, jobs: { ownerId: string; id: string }[]) =>
+      fetch(`${base}/${action}-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobs: jobs.map(({ ownerId, id }) => ({ ownerId, id })) }),
+      });
+    const retried = store.openJobs()[0];
+    const response = await bulk("retry", [retried, retried]);
+    assert.equal(response.status, 202);
+    assert.deepEqual(await response.json(), { retried: 1 });
+    assert.equal(store.openJobs().length, 1, "one retry for a job named twice");
+    const hare = store.enqueue("bob", bob.id, { prompt: "a hare" }, "image");
+    assert.equal((await bulk("cancel", store.openJobs())).status, 200);
+    assert.equal(store.job("bob", hare.id)?.status, "cancelled");
+    const owl = store.enqueue("bob", bob.id, { prompt: "an owl" }, "image");
+    assert.equal((await bulk("delete", [owl])).status, 200);
+    assert.equal(store.job("bob", owl.id)?.cleared, true);
+    admin = false;
+    assert.equal((await bulk("retry", [owl])).status, 403);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
