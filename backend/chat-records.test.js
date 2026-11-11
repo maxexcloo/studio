@@ -36,7 +36,7 @@ test("chatRecords plans Studio Chat's records, then deletes them and keeps what 
   record(chat, { titleSource: "generated", archived: true });
   record(store.createSession("a", "Dream"), { hidden: true });
   record(store.createSession("a"), { mcp: {} });
-  const conversation = store.mcpSession("a", "Teapots", {}, "conversation-1");
+  const conversation = store.mcpSession("a", "Teapots", "conversation-1");
   db.prepare("INSERT INTO studio_chat_messages VALUES (?, ?, ?, ?)").run(
     "message-1",
     "a",
@@ -68,7 +68,7 @@ test("chatRecords plans Studio Chat's records, then deletes them and keeps what 
   );
   assert.deepEqual(store.session("a", chat.id), { ...chat, title: "Fox Ideas" });
   assert.deepEqual(store.session("a", conversation.id).mcp, { conversationId: "conversation-1" });
-  assert.equal(store.mcpSession("a", "", {}, "conversation-1").id, conversation.id);
+  assert.equal(store.mcpSession("a", "", "conversation-1").id, conversation.id);
   assert.deepEqual(readRuntimeDocument(dataDir, "preferences:a"), { images: "local" });
   const accounts = readRuntimeDocument(dataDir, "accounts");
   assert.deepEqual(accounts.profiles.user.features, { dream: true });

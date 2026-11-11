@@ -43,13 +43,6 @@ async function galleryFixture(page: Page) {
     settings: input,
   };
   state.gallery.push(item);
-  state.sessions.push({
-    id: "owned-session",
-    title: "Copper Study",
-    inputs: input,
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
   state.jobs.push({
     id: "owned-job",
     jobId: "owned-job",

@@ -34,13 +34,6 @@ async function seed(
     settings,
     ...extra,
   };
-  state.sessions.push({
-    id: "session-hub",
-    title: "Hub",
-    inputs: {},
-    createdAt: stamp,
-    updatedAt: stamp,
-  });
   state.jobs.push({
     id: "job-hub",
     jobId: "job-hub",
@@ -538,13 +531,6 @@ test("An Animate run stays with the image it started on while the viewer moves b
       createdAt,
       settings: { profileId: "image:test" },
     };
-    state.sessions.push({
-      id: `session-${id}`,
-      title: prompt,
-      inputs: {},
-      createdAt,
-      updatedAt: createdAt,
-    });
     state.jobs.push({
       id: item.jobId,
       jobId: item.jobId,
