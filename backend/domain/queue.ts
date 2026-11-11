@@ -408,12 +408,16 @@ export class GenerationQueue {
       (job.priority ?? queuePriority.manual) -
       (job.queueSet && startedSets.has(job.queueSet) ? 0.5 : 0);
     this.rebalance(all, occupied, rank, held);
+    const waitingNow = (item: OwnedJob) =>
+      ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id) && !held(item);
+    // Dream starts only while no one's own work waits, on any worker: a free worker otherwise
+    // keeps for the work routed to another.
+    const ownWaiting = all.some(
+      (item) => waitingNow(item) && (item.priority ?? queuePriority.manual) < queuePriority.dream,
+    );
     const groups = new Map<string, OwnedJob[]>();
     for (const job of all.filter(
-      (item) =>
-        ["queued", "waiting"].includes(item.status) &&
-        !this.acceptedIds.has(item.id) &&
-        !held(item),
+      (item) => waitingNow(item) && !(ownWaiting && item.priority === queuePriority.dream),
     )) {
       if (occupied.has(job.resource)) {
         this.store.save({
@@ -569,12 +573,20 @@ export class GenerationQueue {
       );
     };
     const taken = new Set<string>();
+    // A job whose own worker can't take it now (not reachable, or stopped) moves as from a busy one.
+    const stranded = (job: OwnedJob) => {
+      if (!job.resource.startsWith("worker:")) return false;
+      const ready = this.adapter.alternatives!(job);
+      return ready.length > 0 && !ready.includes(job.resource);
+    };
     const movable = all
       .map((job, index) => ({ job, index }))
       .filter(
         ({ job }) =>
           pending(job) &&
-          (occupied.has(job.resource) || (modelOf(job.input) && !hasModel(job.resource, job))) &&
+          (occupied.has(job.resource) ||
+            stranded(job) ||
+            (modelOf(job.input) && !hasModel(job.resource, job))) &&
           !this.scheduling.has(job.resource),
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
@@ -593,7 +605,7 @@ export class GenerationQueue {
         );
       const target =
         targets.find((resource) => hasModel(resource, job)) ??
-        (!occupied.has(job.resource)
+        (!occupied.has(job.resource) && !stranded(job)
           ? undefined
           : tier(job) === queuePriority.manual
             ? targets[0]
