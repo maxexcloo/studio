@@ -59,6 +59,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     ) as Record<string, DreamAccess | null>,
     online: { text: true, image: true, video: true } as Record<string, boolean | "parked">,
     textBusy: false,
+    slots: 1,
     prompts: 0,
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
@@ -93,6 +94,7 @@ function fixture(t: TestContext, catalogue = profiles) {
       return { text: reach(state.online.text), media: reach(state.online[kind]) };
     },
     textBusy: () => state.textBusy,
+    slots: () => state.slots,
     writer: {
       model: async () => "writer",
       chat: async ({ model, messages }) => {
@@ -329,6 +331,19 @@ test("Dream is off until turned on, queues one hidden job per account only while
       .filter((job) => job.priority !== queuePriority.dream)
       .every((job) => job.status === "cancelled"),
   );
+});
+
+test("Dream keeps one job per worker going, so every idle GPU takes part, within the buffer", async (t) => {
+  const { dream, state, dreamJobs } = fixture(t);
+  state.slots = 2;
+  await dream.save("alice", { enabled: true, buffer: 3 });
+  await dream.tick();
+  await dream.tick();
+  assert.equal(dreamJobs("alice").length, 2);
+  // A third waits for a worker.
+  await dream.tick();
+  assert.equal(dreamJobs("alice").length, 2);
+  assert.equal(dream.status("alice").status, "generating");
 });
 
 test("Dream stops at the unseen buffer and today's cap per kind, and animates kept or starred images", async (t) => {

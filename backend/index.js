@@ -810,6 +810,9 @@ const dream = createDream({
     };
   },
   textBusy,
+  // One Dream job per image worker, so idle GPUs all take part; background work routes to the free one.
+  slots: () =>
+    Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
   writer: assistantEngine,
   guide: assistant.guide,
   gallery: (ownerId) =>
