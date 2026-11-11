@@ -5,6 +5,7 @@ import { useTryAgain } from "./useTryAgain";
 import { progressPercent, QueueJobAction, statusLabels, useQueue } from "../generation/Queue";
 import { WritingStream } from "../generation/PromptWriting";
 import { terminalStatuses } from "../../../../shared/queue";
+import { icons } from "../../ui/icons";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({
@@ -95,6 +96,8 @@ export function MediaJobStatus({
             <Button
               variant="default"
               size="sm"
+              radius="xl"
+              leftSection={<icons.retry size={16} />}
               loading={retrying}
               onClick={async () => {
                 setRetrying(true);
