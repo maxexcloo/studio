@@ -311,17 +311,24 @@
 }
 
 /* A touch tap on the media fades the chrome out and back. Hidden chrome stays in the accessibility
-   tree, and focus reaching it brings it back; work in progress and loading actions stay in sight. */
+   tree, and focus reaching it brings it back; loading actions stay in sight, strips do not. With
+   nothing left in sight the media glides to the middle of the screen (MediaViewer.tsx measures the
+   distance), keeping its fitted size. */
 .topBar,
 .navigation,
 .dock > * {
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
-.layout[data-chrome-hidden]
-  :is(.topBar, .navigation, .aside, .dock > :not([data-running], :has([data-loading]))) {
+.stage {
+  transition: translate var(--studio-motion-duration) var(--studio-ease-enter);
+}
+.layout[data-chrome-hidden] :is(.topBar, .navigation, .aside, .dock > :not(:has([data-loading]))) {
   opacity: 0;
 }
 .layout[data-chrome-hidden]
-  :is(.topBar > *, .navigation button, .aside, .dock > :not([data-running], :has([data-loading]))) {
+  :is(.topBar > *, .navigation button, .aside, .dock > :not(:has([data-loading]))) {
   pointer-events: none;
+}
+.layout[data-chrome-hidden]:not(:has(.dock [data-loading])) .stage {
+  translate: var(--studio-viewer-centre, none);
 }

@@ -110,7 +110,7 @@ test("Select All takes every match across pages, and the search and Starred stay
   const unstar = page.waitForRequest("**/api/gallery/favorite");
   await selectionAction(page, "Unstar").click();
   expect((await unstar).postDataJSON().ids).toHaveLength(65);
-  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  // A finished action ends the selection.
   await expect(select).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
     "Browse",
@@ -271,7 +271,7 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery[1].favorite).toBe(true);
   expect(state.gallery[0].favorite).not.toBe(true);
-  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  await expect(selection).toHaveCount(0);
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
@@ -337,7 +337,8 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await retry.dispatchEvent("click");
     expect(attempts).toEqual(["batch-a"]);
     release();
-    await expect(selection.getByRole("status")).toHaveText("2 Selected");
+    // Only the item whose retry failed stays selected.
+    await expect(selection.getByRole("status")).toHaveText("1 Selected");
     expect(attempts).toEqual(["batch-a", "batch-b"]);
     await expect(
       page.getByRole("checkbox", { name: "Select Failed third", exact: true }),
@@ -348,11 +349,9 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     ).toHaveCount(0);
     failSecond = false;
     await retry.click();
-    await expect(selection.getByRole("status")).toHaveText("1 Selected");
+    // Once every retry is accepted the selection ends.
+    await expect(selection).toHaveCount(0);
     expect(attempts).toEqual(["batch-a", "batch-b", "batch-b"]);
-    await selectionAction(page, "Star").click();
-    await expect.poll(() => state.gallery.find((item) => item.id === "ready")?.favorite).toBe(true);
-    expect(state.gallery.filter((item) => item.favorite)).toHaveLength(1);
   } finally {
     release();
   }
@@ -596,6 +595,8 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await expect(status).toHaveText("1 Selected");
   await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
+  await expect(status).toHaveCount(0);
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
   await page.getByRole("button", { name: "Select Failed", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
   await page
@@ -714,8 +715,9 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("1 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  // Animate and Upscale, which run on every selected image, wait under a phone's More.
-  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
+  // A phone bar shows every action while they fit, Animate and Upscale included.
+  await expect(selectionAction(page, "Animate")).toBeVisible();
+  await expect(selectionAction(page, "More")).toHaveCount(0);
   // The selects sit beside the count; phones name them by what they select.
   await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveText(
     phone ? "All" : "Select All",
@@ -723,7 +725,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.getByRole("button", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(selectionAction(page, "Edit")).toHaveCount(0);
-  await expect(selectionAction(page, "More")).toHaveCount(phone ? 1 : 0);
+  await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
@@ -734,13 +736,17 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
     );
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
+  // Each finished action ends the selection.
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
   await selectionAction(page, "Delete").click();
   await page
     .getByRole("dialog", { name: "Delete Selected Items", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect.poll(() => state.gallery.map((item) => item.id)).toEqual(["selection-2"]);
-  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 

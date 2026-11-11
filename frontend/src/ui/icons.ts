@@ -2,6 +2,7 @@ import {
   Blend,
   CirclePause,
   CirclePlay,
+  CircleStop,
   ClipboardPaste,
   Columns2,
   ContactRound,
@@ -37,7 +38,6 @@ import {
   Share,
   SlidersHorizontal,
   Sparkles,
-  Square,
   Star,
   TextCursorInput,
   Trash2,
@@ -111,7 +111,8 @@ export const icons = {
   /** Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
   star: Star,
-  stop: Square,
+  /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
+  stop: CircleStop,
   /** Short changes offered for an image or draft. */
   suggestions: Lightbulb,
   undo: Undo2,
