@@ -1,5 +1,4 @@
 import { withResolution } from "../shared/resolution.ts";
-import { terminalStatuses } from "../shared/queue.ts";
 import { accountAccessForId } from "./account-store.js";
 import {
   onWorkerOffline,
@@ -172,11 +171,9 @@ export function createGenerationQueue({
   });
   // Reconstruct leases synchronously before the HTTP listener accepts work.
   for (const job of store
-    .jobs()
+    .openJobs()
     .filter(
-      (item) =>
-        !terminalStatuses.has(item.status) &&
-        (["starting", "running", "saving"].includes(item.status) || item.providerJobId),
+      (item) => ["starting", "running", "saving"].includes(item.status) || item.providerJobId,
     )) {
     const workloads = managedWorkloads(job);
     if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));

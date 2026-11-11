@@ -585,6 +585,43 @@ test("a tick reads unfinished work and only the finished jobs it still weighs", 
   }
 });
 
+test("narrow reads: unfinished jobs, jobs since a time and the capped queue listing", () => {
+  const store = new Store(openDatabase(":memory:"));
+  try {
+    const sessions = { alice: store.createSession("alice").id, bob: store.createSession("bob").id };
+    const enqueue = (owner: "alice" | "bob", minute: number, status: string, cleared = false) => {
+      const job = store.enqueue(owner, sessions[owner], {}, "image");
+      store.save({ ...job, status: status as OwnedJob["status"], ...(cleared ? { cleared } : {}) });
+      store.db
+        .prepare("UPDATE studio_queue SET created_at = ? WHERE id = ?")
+        .run(`2026-11-04T10:0${minute}:00.000Z`, job.id);
+      return job.id;
+    };
+    const old = enqueue("alice", 1, "completed");
+    const waiting = enqueue("alice", 2, "waiting");
+    const failed = enqueue("alice", 3, "failed");
+    const cleared = enqueue("alice", 4, "failed", true);
+    const running = enqueue("alice", 5, "running");
+    const recent = enqueue("alice", 6, "cancelled");
+    const bobs = enqueue("bob", 7, "queued");
+    enqueue("bob", 8, "completed");
+    const ids = (jobs: OwnedJob[]) => jobs.map((job) => job.id);
+    assert.deepEqual(ids(store.openJobs()), [waiting, running, bobs]);
+    assert.deepEqual(ids(store.openJobs("alice")), [waiting, running]);
+    assert.deepEqual(ids(store.jobsSince("alice", "2026-11-04T10:04:00.000Z")), [
+      cleared,
+      running,
+      recent,
+    ]);
+    // Unfinished work always shows; of the finished, only the most recent uncleared ones.
+    assert.deepEqual(ids(store.queued("alice", 2)), [waiting, failed, running, recent]);
+    assert.deepEqual(ids(store.queued("alice", 1)), [waiting, running, recent]);
+    assert.deepEqual(ids(store.queued("alice", 10)), [old, waiting, failed, running, recent]);
+  } finally {
+    store.close();
+  }
+});
+
 test("reuse overtakes an older job at most three times, also across a restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");

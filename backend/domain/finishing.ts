@@ -97,7 +97,7 @@ export function createFinishing(options: {
     );
   const pending = (ownerId: string, record = read(ownerId)) =>
     record.waiting.filter((id) => finishable(options.item(ownerId, id)));
-  const live = () => store.jobs().filter((job) => finishingJob(job) && waiting(job));
+  const live = () => store.openJobs().filter((job) => finishingJob(job) && waiting(job));
 
   let noted = "";
   function note(reason: string) {
