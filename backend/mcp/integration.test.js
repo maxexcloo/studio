@@ -6119,6 +6119,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     server: {},
     media: {
       profiles: async () => [imageProfile],
+      profileForBackend: (profile) => profile,
       queue: async () => ({
         status: "queued",
         jobs: [
