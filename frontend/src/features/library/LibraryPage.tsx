@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { Alert } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { LoadingState } from "../../ui/LoadingState";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
@@ -96,18 +95,15 @@ export function LibraryPage() {
     ]),
   ].sort();
   const catalogueSection = (section: "models" | "loras") => (heading: ReactNode) =>
-    catalogue.isPending || catalogue.error ? (
+    catalogue.error ? (
       <>
         {heading}
-        {catalogue.error ? (
-          <Alert color="red">{catalogue.error.message}</Alert>
-        ) : (
-          <LoadingState label={`Loading ${librarySections[section].label}`} fill />
-        )}
+        <Alert color="red">{catalogue.error.message}</Alert>
       </>
     ) : (
       <LibraryCatalogueTable
         heading={heading}
+        loading={catalogue.isPending}
         label={librarySections[section].label as "Models" | "LoRAs"}
         items={items.filter((item) =>
           section === "loras"
@@ -145,7 +141,9 @@ export function LibraryPage() {
           models: catalogueSection("models"),
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           unused: (heading) => <LibraryUnused heading={heading} />,
-          downloads: <LibraryDownloads active={activeSection === "downloads"} />,
+          downloads: (heading) => (
+            <LibraryDownloads heading={heading} active={activeSection === "downloads"} />
+          ),
         }}
       />
       {editing && (

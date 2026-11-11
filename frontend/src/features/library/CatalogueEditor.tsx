@@ -225,13 +225,18 @@ function CatalogueForm({
           >
             Undo Last Catalogue Change
           </Button>
-          <Button
-            type="submit"
-            disabled={!form.isDirty() || undo.isPending}
-            loading={save.isPending}
-          >
-            Save Catalogue Entry
-          </Button>
+          <Group gap="xs">
+            <Button variant="default" disabled={save.isPending} onClick={close}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!form.isDirty() || undo.isPending}
+              loading={save.isPending}
+            >
+              Save Catalogue Entry
+            </Button>
+          </Group>
         </Group>
       </Stack>
     </form>

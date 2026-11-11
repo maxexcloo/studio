@@ -12,23 +12,18 @@ import {
   section,
 } from "./fixtures";
 
-test("The Library groups what you have and getting more, A–Z, and opens on Models", async ({
+test("The Library groups its sections under headings, A–Z, and opens on Models", async ({
   page,
 }) => {
   await fixtures(page);
   await page.goto("/library");
-  const order = [
-    "Characters",
-    "Guides",
-    "LoRAs",
-    "Models",
-    "Outfits",
-    "Profiles",
-    "Scenes",
-    "Unused",
-    "Downloads",
-    "Imports",
-  ];
+  const groups = {
+    Cards: ["Characters", "Outfits", "Scenes"],
+    Catalogue: ["LoRAs", "Models", "Unused"],
+    Generation: ["Guides", "Profiles"],
+    "Getting More": ["Downloads", "Imports"],
+  };
+  const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {
     const select = page.getByRole("combobox", { name: "Library Section", exact: true });
     await expect(select).toHaveValue("Models");
@@ -40,10 +35,10 @@ test("The Library groups what you have and getting more, A–Z, and opens on Mod
       "aria-current",
       "page",
     );
-    await expect(nav.getByRole("link")).toHaveText(order);
-    await expect(
-      nav.getByRole("group", { name: "Getting More", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(8));
+    for (const [group, links] of Object.entries(groups))
+      await expect(
+        nav.getByRole("group", { name: group, exact: true }).getByRole("link"),
+      ).toHaveText(links);
   }
 });
 

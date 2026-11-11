@@ -117,6 +117,7 @@ const views = [
 export function LibraryCatalogueTable({
   heading,
   items,
+  loading = false,
   label,
   onUpdate,
   onCheckUpdates,
@@ -129,6 +130,8 @@ export function LibraryCatalogueTable({
 }: {
   heading: ReactNode;
   items: LibraryItem[];
+  /** The catalogue is still loading: the toolbar shows, the table its loading state. */
+  loading?: boolean;
   label: "Models" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
   onCheckUpdates?: () => void;
@@ -266,6 +269,7 @@ export function LibraryCatalogueTable({
         rows={rows}
         rowKey={(item) => item.key}
         rowName={resourceName}
+        loading={loading && `Loading ${label}`}
         query={query}
         searchText={(item) => [
           resourceName(item),
