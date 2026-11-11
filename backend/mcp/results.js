@@ -32,7 +32,7 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "status",
     "check status",
-    "A job\u2019s status and finished output links, only when the user asks.",
+    "A job's status and finished output links, only when the user asks.",
     { ...job, wait_seconds: wait },
     async ({ job_id, wait_seconds }, signal) => {
       const id = resolve(job_id);
@@ -56,7 +56,7 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "result",
     "show result",
-    'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for this chat\u2019s). A running job returns its link: share it and stop; never poll, repeat or background this.',
+    'Show results as markdown to reply with, only when the user asks ("show result 3"; job_id "all" for this chat\'s). A running job returns its link: share it and stop; never poll, repeat or background this.',
     {
       job_id: z.string().min(1).max(200),
       wait_seconds: wait,

@@ -38,6 +38,7 @@ import {
   workerState,
 } from "./tiers.js";
 import { animateThemes } from "../prompt-animate.js";
+import { findCard } from "./manage.js";
 import { output, shortPrompt } from "./results.js";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
@@ -859,10 +860,7 @@ export function registerGenerateTools({
     const { characters = [] } = await media.request("GET", "/api/characters", undefined, owner, {
       signal,
     });
-    const wanted = value.trim().toLowerCase();
-    const card =
-      characters.find((item) => item.id === value.trim()) ||
-      characters.find((item) => item.name.toLowerCase() === wanted);
+    const card = findCard(characters, value);
     if (!card) throw new Error(`No character "${value}". Call models to list them.`);
     const referenceIds = card.references.map((asset) => asset.id);
     if (!referenceIds.length && !views)
@@ -910,15 +908,12 @@ export function registerGenerateTools({
     if (shots && (args.prompts || views)) throw new Error("Pass shots or prompts, not both.");
     const lists = {};
     const cardNamed = async (kind, value) => {
-      const wanted = value?.trim();
-      if (!wanted) return undefined;
+      if (!value?.trim()) return undefined;
       lists[kind] ??=
         (
           await media.request("GET", `/api/${kind}`, undefined, owner, { signal }).catch(() => ({}))
         )[kind] ?? [];
-      return lists[kind].find(
-        (item) => item.id === wanted || item.name.toLowerCase() === wanted.toLowerCase(),
-      );
+      return findCard(lists[kind], value);
     };
     const parts = shots
       ? await Promise.all(

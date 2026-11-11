@@ -1,13 +1,20 @@
 /**
- * MCP's tools for an account's own Studio, beside generation (mcp.js): its gallery, queue, Dream
- * and taste. Each action calls the route the UI calls with the account's own credential, so the
- * route's owner scoping and group features (Dream, LoRAs) apply exactly as in the app. Results are
- * named by refs or job ids this MCP owner already holds (from generate, search or queue list).
+ * MCP's tools for an account's own Studio, beside generation (mcp.js): its gallery, queue, Dream,
+ * cards and taste. Each action calls the route the UI calls with the account's own credential,
+ * so the route's owner scoping and group features (Dream, Characters, LoRAs) apply exactly as in
+ * the app. Results are named by refs or job ids this MCP owner already holds (from generate,
+ * search or queue list).
  */
 import { z } from "zod";
 import { terminalStatuses } from "../../shared/queue.ts";
 import { maxAvoid, maxAvoids } from "../../shared/taste.ts";
 import { mcpJson } from "./media.js";
+import {
+  cardKinds,
+  maxCardDescription,
+  maxCardName,
+  maxCharacterImages,
+} from "../../shared/characters.ts";
 
 const maxResults = 50;
 const maxListed = 25;
@@ -19,8 +26,17 @@ const short = (value, max = 120) => {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
+/** The card named by `value`: its id, or its name in any case. */
+export const findCard = (cards, value) => {
+  const wanted = value.trim();
+  return (
+    cards.find((card) => card.id === wanted) ||
+    cards.find((card) => card.name.toLowerCase() === wanted.toLowerCase())
+  );
+};
+
 /**
- * Registers gallery, queue, dream and taste. `tool` is mcp.js's helper, `media` its McpMedia,
+ * Registers gallery, queue, dream, cards and taste. `tool` is mcp.js's helper, `media` its McpMedia,
  * `refs` the conversation's result scope and `resolve(value)` turns a ref into its job id.
  */
 export function registerManageTools({ tool, server, media, owner, refs, resolve }) {
@@ -253,31 +269,31 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     },
   );
 
-  const cardNoun = { characters: "character", outfits: "outfit", scenes: "scene" };
+  /** A card's images that still exist, as the route lists them. */
+  const imageIds = (card) => (card.references || []).map((asset) => asset.id);
   const shownCard = (card) => ({
     id: card.id,
     name: card.name,
     ...(card.description ? { description: card.description } : {}),
-    image_ids: card.referenceIds || [],
+    image_ids: imageIds(card),
   });
   tool(
     server,
     "cards",
-    "character, outfit & scene cards",
-    "Character, outfit and scene cards (Characters feature), when asked. list; create, or update by id: name, description, image_ids (reference asset ids from upload or search uploads; a character 1 to 4, clearest first, an outfit or scene 0 or 1). describe writes a description from the first image; rate scores each 1 to 5 as a reference, with a note.",
+    "manage cards",
+    "The user's character, outfit and scene cards (needs the Characters feature), when asked. list; create, or update by id or name: name, description, image_ids (reference_asset_ids; a character 1–4, clearest first, an outfit or scene 0–1). describe writes a description from the first image; rate scores each 1–5 as a reference.",
     {
       action: z.enum(["list", "create", "update", "describe", "rate"]),
-      kind: z.enum(["characters", "outfits", "scenes"]),
+      kind: z.enum(Object.keys(cardKinds)),
       id: z.string().trim().min(1).max(200).optional(),
-      name: z.string().trim().min(1).max(200).optional(),
-      description: z.string().trim().max(2000).optional(),
-      image_ids: z.array(z.string().trim().min(1).max(200)).max(4).optional(),
+      name: z.string().trim().min(1).max(maxCardName).optional(),
+      description: z.string().trim().max(maxCardDescription).optional(),
+      image_ids: z.array(z.string().trim().min(1).max(200)).max(maxCharacterImages).optional(),
     },
     async ({ action, kind, id, name, description, image_ids }, signal) => {
-      if (action === "list") {
-        const listed = await api("GET", `/api/${kind}`, undefined, signal);
-        return mcpJson({ [kind]: (listed[kind] || []).map(shownCard) });
-      }
+      const noun = cardKinds[kind].name;
+      const list = async () => (await api("GET", `/api/${kind}`, undefined, signal))[kind] || [];
+      if (action === "list") return mcpJson({ [kind]: (await list()).map(shownCard) });
       if (action === "describe" || action === "rate") {
         if (!image_ids?.length) throw new Error(`Pass image_ids to ${action}.`);
         if (action === "describe") {
@@ -299,26 +315,23 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
           ratings: ratings.map((item, index) => ({ image_id: image_ids[index], ...item })),
         });
       }
-      if (action === "update" && !id) throw new Error("Pass the card's id from list to update.");
-      const current =
-        action === "update"
-          ? ((await api("GET", `/api/${kind}`, undefined, signal))[kind] || []).find(
-              (card) => card.id === id,
-            )
-          : null;
-      if (action === "update" && !current) throw new Error(`No such ${cardNoun[kind]}.`);
-      const body = {
-        name: name ?? current?.name,
-        description: description ?? current?.description ?? "",
-        referenceIds: image_ids ?? current?.referenceIds ?? [],
-      };
+      let current = null;
+      if (action === "update") {
+        if (!id) throw new Error(`Pass id: the ${noun}'s id or name from list.`);
+        current = findCard(await list(), id);
+        if (!current) throw new Error(`No ${noun} "${id}". Call cards list to see them.`);
+      }
       const saved = await api(
-        action === "create" ? "POST" : "PUT",
-        action === "create" ? `/api/${kind}` : `/api/${kind}/${encodeURIComponent(id)}`,
-        body,
+        current ? "PUT" : "POST",
+        current ? `/api/${kind}/${encodeURIComponent(current.id)}` : `/api/${kind}`,
+        {
+          name: name ?? current?.name,
+          description: description ?? current?.description ?? "",
+          referenceIds: image_ids ?? (current ? imageIds(current) : []),
+        },
         signal,
       );
-      return mcpJson({ [cardNoun[kind]]: shownCard(saved[cardNoun[kind]]) });
+      return mcpJson({ [noun]: shownCard(saved[noun]) });
     },
   );
 
