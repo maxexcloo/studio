@@ -16,7 +16,8 @@ const { canonicalProfileId, guideStore, profileAliasBackend, profileStore } =
 const { getCustomWorkflow, metadataFromJson, userWorkflowsDir } =
   await import("../custom-workflows.js");
 const { inferModels } = await import("../model/models.js");
-const { mergeWorkerModels, noteWorkerProfiles, routeJob } = await import("../comfy/backends.js");
+const { mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob } =
+  await import("../comfy/backends.js");
 const { readEditableProfile, saveEditableProfile, validateProfileText } =
   await import("./editor.js");
 const { generationSettings } = await import("../gallery/records.js");
@@ -234,6 +235,11 @@ test("readiness follows the selected backend, with the reason, and never falls b
       "primary",
       "both workers can run ComfyUI; the first wins",
     );
+    // A worker that just failed to answer is passed over, and tried again a minute later.
+    noteWorkerReachable("primary", false);
+    assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
+    noteWorkerReachable("primary", false, Date.now() - 61_000);
+    assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "primary");
     noteWorkerProfiles("primary", []);
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
     // Two workers' catalogues: the one where the selected backend is ready wins.
