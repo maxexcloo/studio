@@ -5,9 +5,6 @@ import {
   fixtures,
   image,
   profiles,
-  editorMenu,
-  promptMenu,
-  promptTool,
   serveProfiles,
   stamp,
   viewerAction,
@@ -169,11 +166,13 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     : viewer.getByRole("group", { name: "Generation Actions", exact: true });
   if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // The editor asks from a send beside Generate; elsewhere it is a tool in the prompt's ⋯.
-  const askForChange = () =>
-    phone
-      ? surface.getByRole("button", { name: "Ask for a Change", exact: true }).click()
-      : promptTool(surface, "Prompt", "Ask for a Change…");
+  // The editor asks from a send beside Generate; elsewhere AI's Custom… asks for what was typed.
+  const askForChange = async () => {
+    if (phone)
+      return surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+    await viewerAction(page, "AI");
+    await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  };
   await field.fill("make it night");
   await askForChange();
   // The proposal replaces the text in place under the chosen action; Undo restores the request.
@@ -203,9 +202,9 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
   await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
-test("Suggestions offers the image's next steps as changes, and picking one asks at once", async ({
+test("AI offers the image's next steps as changes, and picking one asks at once", async ({
   page,
-}, testInfo) => {
+}) => {
   const asked: any[] = [];
   const { viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -234,12 +233,8 @@ test("Suggestions offers the image's next steps as changes, and picking one asks
       });
     }),
   );
-  const phone = testInfo.project.use.isMobile;
-  const menu = phone
-    ? await editorMenu(viewer, "Prompt", "Suggestions")
-    : await promptMenu(viewer, "Prompt");
-  await menu.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
-  if (phone) await page.getByRole("button", { name: "Done", exact: true }).click();
+  await viewerAction(page, "AI");
+  await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");

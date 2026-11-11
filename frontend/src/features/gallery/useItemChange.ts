@@ -43,13 +43,14 @@ export function useItemChange<T>(
     show,
     restore,
   });
-  function run(prompt: string) {
-    const action = ask.proposal?.action;
+  /** Runs `proposal` (the one showing, unless given) with its prompt as `prompt`. */
+  function run(prompt: string, proposal = ask.proposal) {
+    const action = proposal?.action;
     if (action === "upscale") upscale()?.onClick?.();
     // An image's animation, as proposed, has Animate's writer word the request for the video
     // model; a prompt the person edited runs as they wrote it.
-    else if (action === "animate" && !video && prompt.trim() === ask.proposal!.prompt.trim())
-      iterate({ kind: "animate", theme: "custom", instruction: ask.proposal!.request });
+    else if (action === "animate" && !video && prompt.trim() === proposal!.prompt.trim())
+      iterate({ kind: "animate", theme: "custom", instruction: proposal!.request });
     else if (action)
       iterate({
         kind: "prompt",

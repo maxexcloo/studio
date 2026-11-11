@@ -1,8 +1,13 @@
 import { useRef, useState, type KeyboardEvent } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { notifications } from "@mantine/notifications";
+import type { Change } from "../../../../shared/suggestions";
+import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { icons } from "../../ui/icons";
+import { useRemembered } from "../auth/useRemembered";
 import {
   ProposalLabel,
   proposalText,
@@ -11,6 +16,7 @@ import {
   UndoButton,
   useChangeSuggestions,
 } from "../generation/AskChange";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import type { Action, ActionGroups } from "./ActionBar";
 import { typedPrompt, type Iteration } from "./useMediaAction";
@@ -18,36 +24,140 @@ import { useItemChange } from "./useItemChange";
 import classes from "./MediaViewer.module.css";
 
 /**
- * The viewer's prompt field, at the top of its action bar. It holds the item's prompt: editing it
- * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
- * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
- * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its tools are the text box's: Suggestions, with Refresh Suggestions in its menu, and Ask for a
- * Change…, which phones' editor offers as a send beside Generate instead. Reset returns to the
- * item's prompt; the bar has Copy. At rest it is one line; focused, it shows the whole prompt.
+ * The viewer's prompt and its assistance, shared by the prompt field and the bar's AI menu. The
+ * field holds the item's prompt: editing it and pressing Enter or Generate runs it with the item's
+ * settings as a new version, and Improve Prompt rewrites it in one of the assistant's styles. AI
+ * (`ai`) offers the image's next steps, Refresh Suggestions and Custom…, which asks for the text
+ * typed over the prompt as a change in plain words (`useItemChange`). Under Review First, the
+ * remembered default, a change's proposal fills the field until Run runs it or Undo restores what
+ * was typed; without it, the proposal runs at once.
  */
-export function ViewerPrompt({
-  item,
-  groups,
-  iterate,
-  pending,
-}: {
-  item: MediaItem;
-  /** The item's actions, whose Upscale a change may run. */
-  groups: ActionGroups;
-  iterate: (iteration: Iteration) => void;
-  pending?: Iteration;
-}) {
+export function useViewerPrompt(
+  item: MediaItem,
+  { groups, iterate }: { groups: ActionGroups; iterate: (iteration: Iteration) => void },
+) {
   const phone = usePhone();
   const original = typedPrompt(item);
   const [prompt, setPrompt] = useState(original);
   const field = useRef<HTMLTextAreaElement>(null);
+  const [review, setReview] = useRemembered("viewer-review-first", true);
+  const runNow = useRef<(proposal: Change) => void>(() => {});
   const ask = useItemChange<string>(item, {
     groups: () => groups,
     iterate,
-    show: (proposal) => setPrompt(proposalText(proposal)),
+    show: (proposal) => (review ? setPrompt(proposalText(proposal)) : runNow.current(proposal)),
     restore: setPrompt,
   });
+  // Another item starts from its own prompt, without the last one's proposal.
+  const [shownItem, setShownItem] = useState(item.id);
+  if (shownItem !== item.id) {
+    setShownItem(item.id);
+    setPrompt(original);
+    ask.done();
+  }
+  runNow.current = (proposal) => {
+    ask.run(proposal.prompt, proposal);
+    setPrompt(original);
+  };
+  // Next steps are written for images; they load as the image opens.
+  const offered = ask.available && item.type === "image";
+  const suggestions = useChangeSuggestions({
+    query: nextStepsQuery(item.jobId ?? ""),
+    fresh: () => askNextSteps(item.jobId!, true),
+    enabled: offered && Boolean(item.jobId),
+    disabled: ask.pending,
+    // Under review the field shows the request while it is asked for.
+    onPick: (request) => {
+      if (review) setPrompt(request);
+      ask.send(request, review ? request : prompt);
+    },
+  });
+  const assistant = useQuery(assistantQuery).data;
+  const profileId = String(item.settings?.profileId || "");
+  const improve = useMutation({
+    mutationFn: (preset: string) =>
+      api<{ prompt?: string; source?: string; reason?: string }>("/api/assistant/rewrite", {
+        method: "POST",
+        body: JSON.stringify({ profileId, prompt, preset, stream: false }),
+      }),
+    onSuccess: (result) => {
+      if (result.source === "fallback" || !result.prompt)
+        return void notifications.show({
+          message: `The prompt assistant is unavailable (${result.reason || "no reply"}).`,
+        });
+      setPrompt(result.prompt);
+    },
+  });
+  // Text typed over the prompt is the change Custom… asks for; otherwise it selects the prompt for
+  // one typed over it, and phones open the editor.
+  const typed = Boolean(prompt.trim()) && prompt !== original;
+  const custom = () => {
+    if (typed) return ask.send(prompt, prompt.trim());
+    if (phone) return field.current?.click();
+    field.current?.focus();
+    field.current?.select();
+  };
+  const ai: Action | null =
+    ask.available && item.jobId
+      ? {
+          id: "ai",
+          label: "AI",
+          icon: icons.assistant,
+          loading: ask.pending,
+          menu: [
+            ...(offered ? suggestions.action.menu! : []),
+            [{ id: "custom", label: "Custom…", disabled: ask.pending, onClick: custom }],
+            [
+              {
+                id: "review-first",
+                label: "Review First",
+                description: "Show a change in the prompt before it runs.",
+                checked: review,
+                keepOpen: true,
+                onClick: () => setReview(!review),
+              },
+            ],
+          ],
+        }
+      : null;
+  // Improve Prompt's styles, but Custom, whose place AI's Custom… takes.
+  const styles =
+    assistant?.available && profileId
+      ? assistant.presets.filter((style) => style.id !== "custom")
+      : [];
+  const improveTool: Action | null = styles.length
+    ? {
+        id: "improve",
+        label: "Improve Prompt",
+        icon: icons.assistant,
+        disabled: improve.isPending || ask.pending || !prompt.trim(),
+        menu: [
+          styles.map((style) => ({
+            id: `improve:${style.id}`,
+            label: style.label,
+            description: style.description,
+            onClick: () => improve.mutate(style.id),
+          })),
+        ],
+      }
+    : null;
+  return { item, original, prompt, setPrompt, field, ask, typed, ai, improveTool, improve };
+}
+
+export type ViewerPromptState = ReturnType<typeof useViewerPrompt>;
+
+/** The prompt field, at the top of the viewer's action bar. At rest it is one line; focused, all. */
+export function ViewerPrompt({
+  state,
+  iterate,
+  pending,
+}: {
+  state: ViewerPromptState;
+  iterate: (iteration: Iteration) => void;
+  pending?: Iteration;
+}) {
+  const phone = usePhone();
+  const { item, original, prompt, setPrompt, field, ask, typed, improveTool, improve } = state;
   const change = ask.proposal;
   const video = item.type === "video";
   const running = pending?.kind === "prompt";
@@ -76,38 +186,6 @@ export function ViewerPrompt({
       ask.undo();
     }
   }
-  // Next steps, which Suggestions offers, are written for images; they load as the image opens.
-  const offered = ask.available && item.type === "image";
-  const suggestions = useChangeSuggestions({
-    query: nextStepsQuery(item.jobId ?? ""),
-    fresh: () => askNextSteps(item.jobId!, true),
-    enabled: offered && Boolean(item.jobId),
-    disabled: ask.pending,
-    // The field is the request: a suggestion fills it and asks at once.
-    onPick: (request) => {
-      setPrompt(request);
-      ask.send(request, request);
-    },
-  });
-  // Text typed over the prompt is the change to ask for; otherwise Ask for a Change… selects the
-  // prompt for one typed over it.
-  const typed = Boolean(prompt.trim()) && prompt !== original;
-  const tools = [
-    offered && suggestions.action,
-    ask.available &&
-      !change &&
-      !phone && {
-        id: "ask",
-        label: "Ask for a Change…",
-        icon: icons.assistant,
-        disabled: ask.pending,
-        onClick: () => {
-          if (typed) return ask.send(prompt, prompt.trim());
-          field.current?.focus();
-          field.current?.select();
-        },
-      },
-  ].filter((tool): tool is Action => Boolean(tool));
   // Phones ask or generate from the editor's sends; a proposal's Run stays in the field.
   const sends = [
     ...(ask.available && phone
@@ -153,11 +231,17 @@ export function ViewerPrompt({
       readOnly={change?.action === "upscale"}
       onChange={setPrompt}
       onKeyDown={keys}
-      tools={tools}
+      tools={improveTool ? [improveTool] : []}
       copy={false}
       reset={original}
       send={send}
-      busy={ask.pending ? "Asking for a Change…" : undefined}
+      busy={
+        ask.pending
+          ? "Asking for a Change…"
+          : improve.isPending
+            ? "Improving the prompt…"
+            : undefined
+      }
       submit={change ? undefined : sends}
     />
   );

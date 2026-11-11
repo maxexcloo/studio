@@ -143,10 +143,13 @@ the primary component reference and verify APIs against the installed version.
   tools as named buttons in a bar above the keyboard, then Clear as an icon
   beside the sends, as in the composer, and its header holds only the title and
   Done. A box without tools has no ⋯. Suggestions holds Refresh Suggestions
-  under its options. The viewer's prompt resets to the item's prompt rather
-  than clearing, and its phone editor sends Ask for a Change beside Generate.
-  It rests on one line ending in an ellipsis and shows the whole prompt while
-  focused.
+  under its options. The viewer's prompt has Improve Prompt (every style but
+  Custom), resets to the item's prompt rather than clearing, and its phone
+  editor sends Ask for a Change beside Generate. It rests on one line ending in
+  an ellipsis and shows the whole prompt while focused. Its other assistance is
+  the viewer bar's AI, after Edit: the image's Suggestions and Refresh
+  Suggestions, then Custom… (a change typed over the prompt), then the
+  remembered Review First.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -191,7 +194,7 @@ the primary component reference and verify APIs against the installed version.
   fallback or notice. Studio's own calls keep their automatic route.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
-  the proposed action runs. Suggestions never move layout or act on their own.
+  the proposed action runs, unless the viewer's Review First is off. Suggestions never move layout or act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own. Custom Animation's
