@@ -24,6 +24,18 @@
   background: var(--mantine-color-default);
 }
 
+/* A hold on a touch screen selects or opens the tile's menu: no image preview, text selection or
+   drag lift of the system's may take it first. */
+@media (pointer: coarse) {
+  .button,
+  .button * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+}
+
 .button:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 3px;

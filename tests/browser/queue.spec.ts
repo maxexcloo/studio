@@ -44,7 +44,11 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   const order = () => queue.getByText(/^(running-job|first|second|third)$/).allTextContents();
   await expect.poll(order).toEqual(["running-job", "first", "second", "third"]);
-  await expect(queue.getByText("Image Quality · Generating", { exact: true })).toBeVisible();
+  // Phones keep the row to its title and a short status; the model shows in its details.
+  const phone = test.info().project.use.isMobile;
+  await expect(
+    queue.getByText(phone ? "Generating" : "Image Quality · Generating", { exact: true }),
+  ).toBeVisible();
 
   // An administrator's one Pause holds every account's work.
   await queue.getByRole("button", { name: "Pause Queue", exact: true }).click();
@@ -98,6 +102,75 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   await row.click();
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await expect(queue.getByText("Negative: blurry", { exact: true })).toBeHidden();
+});
+
+test("a request's jobs group as one set that moves and stops together", async ({ page }) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const job = (id: string, status: string, queueSet?: string) => ({
+    id,
+    jobId: id,
+    sessionId: "s",
+    operation: "image",
+    status,
+    reason: "",
+    input: {
+      prompt: id,
+      kind: "image",
+      ...(queueSet && { resultSet: { id: "result-set", title: "Fox Studies", index: 0 } }),
+    },
+    ...(queueSet && { queueSet }),
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.jobs.push(
+    job("set-done", "completed", "set"),
+    job("single", "queued"),
+    job("set-first", "queued", "set"),
+    job("set-second", "queued", "set"),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  // The set is one row: its title and progress, its jobs under it once opened.
+  const set = queue.getByRole("button", { name: /^Fox Studies/ });
+  await expect(set).toContainText("1 of 3 Done");
+  // Dragging has loaded once the handles work, so the rows stay mounted.
+  const handles = queue.getByRole("button", { name: "Drag to Reorder", exact: true });
+  await expect(handles.first()).toBeEnabled();
+  await expect(queue.getByText("set-first", { exact: true })).toBeHidden();
+  await set.click();
+  await expect(queue.getByText("set-first", { exact: true })).toBeVisible();
+  await expect(queue.getByText("set-second", { exact: true })).toBeVisible();
+  await set.click();
+
+  // Its handle moves its waiting work together, in its order, ahead of the single job.
+  await expect(handles).toHaveCount(2);
+  await handles.nth(1).focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() => state.jobs.filter((item) => item.status === "queued").map((item) => item.id))
+    .toEqual(["set-first", "set-second", "single"]);
+
+  // Stop Set stops only the set's unfinished work; Stop All names what it stops.
+  await queue.getByRole("button", { name: "Stop Set", exact: true }).click();
+  await expect
+    .poll(() => state.jobs.map((item) => [item.id, item.status]))
+    .toEqual([
+      ["set-done", "completed"],
+      ["set-first", "cancelled"],
+      ["set-second", "cancelled"],
+      ["single", "queued"],
+    ]);
+  await expect(set).toBeHidden();
+  await queue.getByRole("button", { name: "Stop All", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Stop All Generations", exact: true }),
+  ).toContainText("Studio stops your 1 unfinished generation.");
 });
 
 test("work waiting on GPUs a text model holds offers a swap that asks first", async ({ page }) => {
@@ -155,4 +228,8 @@ test("work waiting on GPUs a text model holds offers a swap that asks first", as
   await confirm.getByRole("button", { name: "Swap", exact: true }).click();
   await expect(confirm).toBeHidden();
   expect(swaps).toEqual([{}, { signature: "fixture" }]);
+  // An administrator opens Settings › Workers from the summary under the queue.
+  await queue.getByRole("link", { name: "Open Workers", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings#workers$/);
+  await expect(queue).toBeHidden();
 });

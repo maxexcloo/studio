@@ -8,10 +8,13 @@ import {
   Popover,
   Text,
   Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
+import { Link, useLocation } from "react-router";
+import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { SwapNotice } from "../runtime/JobSwap";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
@@ -72,7 +75,23 @@ export function StatusAction() {
     </ActionIcon>
   );
   const tooltip = generating ? "Generating" : summary.label;
-  const status = <ServiceHealthSummary />;
+  // Administrators open Settings › Workers from the summary; it stays read-only for others.
+  const admin = useIsAdmin();
+  const location = useLocation();
+  const status = admin ? (
+    <UnstyledButton
+      component={Link}
+      to="/settings#workers"
+      state={{ backgroundLocation: location }}
+      aria-label="Open Workers"
+      className={classes.summary}
+      onClick={close}
+    >
+      <ServiceHealthSummary />
+    </UnstyledButton>
+  ) : (
+    <ServiceHealthSummary />
+  );
   const notice = <SwapNotice jobs={queue.data?.jobs} />;
   if (!phone)
     return (
@@ -126,13 +145,14 @@ export function StatusAction() {
         <Drawer.Content {...swipe}>
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
-            <Group gap="xs" wrap="nowrap">
-              <QueueActions />
-              <Drawer.CloseButton aria-label={`Close ${title}`} />
-            </Group>
+            <Drawer.CloseButton aria-label={`Close ${title}`} />
           </Drawer.Header>
           <Drawer.Body className={classes.body}>
             <FocusTrap.InitialFocus />
+            {/* The queue's actions have a row of their own, as the drawer is too narrow beside the title. */}
+            <Group justify="flex-end">
+              <QueueActions />
+            </Group>
             <div className={classes.list}>
               <Queue />
             </div>

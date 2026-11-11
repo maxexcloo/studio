@@ -190,9 +190,23 @@ export function registerRewriteRoutes(
     if (typeof to !== "number" || !Number.isInteger(to) || to < 0)
       return { status: 400, payload: { error: "Move to a place in the queue." } };
     if (!store.job(ownerOf(account), params.id)) return notFound;
-    return store.move(ownerOf(account), params.id, to)
+    return store.move(ownerOf(account), [params.id], to)
       ? { status: 200, payload: { ok: true } }
       : { status: 409, payload: { error: "Only waiting generations can be moved." } };
+  });
+  // A set's waiting items move together, keeping their order; its started ones stay.
+  directRoute(app, "POST", "/api/queue/sets/:set/move", (account, { params, body }) => {
+    const to = body?.to;
+    if (typeof to !== "number" || !Number.isInteger(to) || to < 0)
+      return { status: 400, payload: { error: "Move to a place in the queue." } };
+    const ids = store
+      .movable(ownerOf(account))
+      .filter((job) => job.queueSet === params.set)
+      .map((job) => job.id);
+    if (!ids.length)
+      return { status: 409, payload: { error: "Only waiting generations can be moved." } };
+    store.move(ownerOf(account), ids, to);
+    return { status: 200, payload: { ok: true } };
   });
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
