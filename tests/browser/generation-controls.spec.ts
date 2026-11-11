@@ -1019,13 +1019,10 @@ test("A model with its own resolutions offers them with its aspects in the size 
 }) => {
   await fixtures(page);
   const presets = [
-    ["1:1", 1, 1],
-    ["16:9", 16, 9],
-    ["9:16", 9, 16],
-  ].map(([label, w, h]) => {
-    const s = Math.round(Math.sqrt(1048576 / ((w as number) * (h as number))));
-    return { label, value: "", w: (w as number) * s, h: (h as number) * s };
-  });
+    { label: "1:1", w: 1024, h: 1024 },
+    { label: "16:9", w: 1360, h: 765 },
+    { label: "9:16", w: 765, h: 1360 },
+  ];
   await serveProfiles(page, [
     {
       ...profiles[0],
