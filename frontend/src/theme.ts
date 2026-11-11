@@ -362,19 +362,21 @@ export function studioTheme({
       SegmentedControl: SegmentedControl.extend({
         classNames: { root: classes.segmented },
         defaultProps: {
-          size: "sm",
+          // On touch screens, the form controls' text size and height.
+          size: touch ? "md" : "sm",
           withItemsBorders: false,
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,
         },
-        // Each choice is a touch target too.
+        // Each choice is a touch target too, the whole control as tall as a touch screen's other
+        // controls: its choices sit inside its 4 px padding.
         styles: touch
           ? {
               label: {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minHeight: rem(bar),
+                minHeight: rem(bar - 8),
               },
             }
           : {},

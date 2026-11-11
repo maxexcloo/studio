@@ -273,8 +273,10 @@ function DetailSection({
         <Title order={6}>{title}</Title>
         {copy !== undefined && (
           <Tooltip label={copier.copied ? "Copied" : `Copy ${title}`}>
+            {/* Hung over the heading's line, so it adds no height to the section. */}
             <ActionIcon
               size="sm"
+              my={-6}
               variant="subtle"
               color="gray"
               aria-label={`Copy ${title}`}
@@ -313,8 +315,8 @@ function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRed
 }
 
 /**
- * A caption folds to five lines when longer, ending in an ellipsis and Expand on its last line;
- * expanded, Collapse follows its last word.
+ * A caption folds to five lines when longer, ending in an ellipsis with Expand under it (WebKit
+ * drops a clamped text's lines around a floated control); expanded, Collapse follows its last word.
  */
 function CaptionText({ text }: { text: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -348,10 +350,10 @@ function CaptionText({ text }: { text: string }) {
         size="sm"
         className={expanded ? classes.captionText : `${classes.captionText} ${classes.folded}`}
       >
-        {long && !expanded && toggle}
         {text}
         {expanded && <> {toggle}</>}
       </Text>
+      {long && !expanded && <div className={classes.unfold}>{toggle}</div>}
     </div>
   );
 }

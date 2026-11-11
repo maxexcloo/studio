@@ -59,18 +59,10 @@ for (const kind of ["image", "video"] as const) {
       kind === "image"
         ? viewer.getByRole("img", { name: prompt, exact: true })
         : viewer.locator("video");
-    // Phones list Download under the bar's More.
-    const phone = page.viewportSize()!.width < 768;
     const expectDownload = async (href: string, extension?: string) => {
-      if (phone) await viewer.getByRole("button", { name: "More", exact: true }).click();
-      const download = phone
-        ? page.getByRole("menuitem", { name: "Download", exact: true })
-        : viewer.getByRole("link", { name: "Download", exact: true });
+      const download = viewer.getByRole("link", { name: "Download", exact: true });
       await expect(download).toHaveAttribute("href", href);
       if (extension) await expect(download).toHaveAttribute("download", `source.${extension}`);
-      if (!phone) return;
-      await page.keyboard.press("Escape");
-      await expect(page.getByRole("menu", { name: "More", exact: true })).toBeHidden();
     };
     await expect(media).toHaveAttribute("src", originalUrl);
     await expectDownload(originalUrl, originalExtension);

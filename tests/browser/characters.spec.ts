@@ -140,7 +140,7 @@ test("New Character saves a name, description and gallery images from the Refere
   ).toBeVisible();
 });
 
-test("Make Character starts a card from a gallery image in Library › Characters, described by the assistant", async ({
+test("Use as Character starts a card from a gallery image in Library › Characters, described by the assistant", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -169,7 +169,7 @@ test("Make Character starts a card from a gallery image in Library › Character
     .getByRole("button", { name: "Open image: A ranger in a green cloak", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
-  await page.getByRole("menuitem", { name: /^Make Character/ }).click();
+  await page.getByRole("menuitem", { name: /^Use as Character/ }).click();
   await expect(page).toHaveURL(/\/library#characters$/);
   const editor = page.getByRole("dialog", { name: "New Character", exact: true });
   await expect(

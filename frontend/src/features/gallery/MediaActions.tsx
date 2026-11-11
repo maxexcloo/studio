@@ -186,7 +186,7 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 }
 
 /**
- * Edit › Make Character: opens Library › Characters with a new card started from the image, where
+ * Edit › Use as Character: opens Library › Characters with a new card started from the image, where
  * the prompt assistant can describe it.
  */
 function useCharacterAction(item: MediaItem, onApplied: () => void): Action | null {
@@ -196,7 +196,7 @@ function useCharacterAction(item: MediaItem, onApplied: () => void): Action | nu
   if (!characters || item.type !== "image") return null;
   return {
     id: "make-character",
-    label: "Make Character",
+    label: "Use as Character",
     icon: icons.character,
     onClick: () => {
       onApplied();
@@ -261,6 +261,16 @@ export function useMediaActions(
   const reference = useReferenceAction(item, onApplied);
   const character = useCharacterAction(item, onApplied);
   const recreate = useRecreateAction(item, onApplied);
+  // An upload has only its suggested prompt to recreate.
+  const recreateAction = item.uploaded
+    ? recreate
+    : {
+        id: "prompt-composer",
+        label: "Recreate in Composer",
+        icon: icons.prompt,
+        disabled: action.isPending,
+        onClick: () => action.mutate("image"),
+      };
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
   // A video edit's menu stays open while it saves, then its item says so for a moment.
@@ -439,7 +449,9 @@ export function useMediaActions(
                       disabled: action.isPending,
                       onClick: () => action.mutate("refine"),
                     },
+                    recreateAction,
                   ],
+                  [...(character ? [character] : []), ...(reference ? [reference] : [])],
                 ]
               : // A video's edits each save a new version; the original stays.
                 [
@@ -453,20 +465,8 @@ export function useMediaActions(
                     editAction("slow-motion", "Slow Motion", Snail, "slow"),
                     editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
                   ],
+                  [recreateAction],
                 ]),
-            [
-              item.uploaded
-                ? recreate
-                : {
-                    id: "prompt-composer",
-                    label: "Recreate",
-                    icon: icons.prompt,
-                    disabled: action.isPending,
-                    onClick: () => action.mutate("image"),
-                  },
-              ...(image && reference ? [reference] : []),
-              ...(image && character ? [character] : []),
-            ],
             item.uploaded
               ? []
               : [

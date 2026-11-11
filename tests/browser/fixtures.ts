@@ -933,27 +933,9 @@ export async function editorMenu(scope: Page | Locator, box: string, tool: strin
   return page.getByRole("menu");
 }
 
-// The phone viewer bar's own actions; the rest sit under its ⋯ More.
-const phoneBar = [
-  "Retry",
-  "Stop",
-  "Stop Upscale",
-  "Animate",
-  "Extend",
-  "Edit",
-  "Upscale",
-  "Star",
-  "Unstar",
-];
-
-/** Runs a viewer bar action: on the bar, or an item of the phone bar's More. */
+/** Runs a viewer bar action, which every bar, the phone's included, shows. */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  if ((page.viewportSize()?.width || 1440) < 768 && !phoneBar.includes(label)) {
-    await viewer.getByRole("button", { name: "More", exact: true }).click();
-    await page.getByRole("menuitem", { name: label, exact: true }).click();
-    return;
-  }
   await viewer
     .getByRole("button", { name: label, exact: true })
     .or(viewer.getByRole("link", { name: label, exact: true }))

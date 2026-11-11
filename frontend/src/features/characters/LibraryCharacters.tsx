@@ -21,7 +21,7 @@ function generatedNote({ jobIds, results }: NonNullable<CharacterCard["generated
 }
 
 /**
- * Library › Characters: every card the account keeps, to search, edit and delete. Make Character
+ * Library › Characters: every card the account keeps, to search, edit and delete. Use as Character
  * opens here with `characterFrom` (a gallery image's ID) in the route state, starting a new card
  * from that image.
  */

@@ -46,6 +46,30 @@
     color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
+/* Every action across the row at a smaller size, spread evenly. */
+.actions[data-compact] {
+  width: 100%;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.actions[data-compact] .action {
+  --ai-size: 30px;
+  --button-height: 30px;
+}
+
+.actions[data-compact] .options {
+  padding-inline: 5px 3px;
+}
+
+.actions[data-compact] .chevron {
+  margin-inline-start: 0;
+}
+
+.actions[data-compact] .divider {
+  margin-inline: 1px;
+}
+
 /* An icon with options: its ▾ close beside it. */
 .options {
   padding-inline: 8px 6px;

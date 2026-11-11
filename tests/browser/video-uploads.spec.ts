@@ -72,7 +72,7 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   await page.locator('[data-media-id="clip"]').click();
   // An upload video's Edit › Recreate opens its suggested prompt.
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect.poll(() => recreated).toEqual([{ galleryItemId: "clip" }]);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("A lighthouse at dusk, waves breaking");

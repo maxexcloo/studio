@@ -2,7 +2,7 @@ import { useState, type Ref, type RefObject } from "react";
 import type { MediaItem } from "../../types";
 import { Box } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { ActionBarGroups, ActionBarSurface, withMore, type ActionGroups } from "./ActionBar";
+import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
@@ -14,7 +14,6 @@ import classes from "./MediaViewer.module.css";
 // Desktop names Animate, Edit, Upscale, Copy, Download and Similar beside their icons. Phones show
 // icons on one row: these, then ⋯ More holding the rest.
 const labelled = ["animate", "edit", "upscale", "copy", "download", "similar"];
-const phoneBar = ["retry", "stop", "animate", "edit", "upscale", "star"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -104,7 +103,7 @@ export function MediaViewerActions({
         </Box>
       )}
       {phone ? (
-        <ActionBarGroups groups={withMore(groups, phoneBar)} />
+        <ActionBarGroups groups={groups} compact />
       ) : (
         <ViewerActionGroups groups={groups} labelled={labelled} />
       )}

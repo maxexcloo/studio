@@ -1,6 +1,6 @@
-/* A flex item, so the folded text has a definite height for its spacer. */
 .caption {
   display: flex;
+  flex-direction: column;
 }
 
 .captionText {
@@ -8,7 +8,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Five lines; a spacer floats Expand to the end of the last one, so the ellipsis stops before it. */
+/* Five lines, ending in an ellipsis. */
 .folded {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -16,14 +16,11 @@
   overflow: hidden;
 }
 
-.folded::before {
-  content: "";
-  float: right;
-  height: 100%;
-  margin-bottom: -1lh;
+.unfold {
+  align-self: flex-end;
 }
 
-.folded .fold {
+.fold {
   float: right;
   clear: both;
   margin-inline-start: 0.5ch;

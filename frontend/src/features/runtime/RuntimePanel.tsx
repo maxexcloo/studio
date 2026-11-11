@@ -206,10 +206,12 @@ export function RuntimePanel() {
         </Text>
       )}
       {runtime.configured && (
-        <SettingGroup title="Services & Control">
-          <AutomaticControl />
+        <>
+          <SettingGroup title="Services & Control">
+            <AutomaticControl />
+          </SettingGroup>
           <RuntimeHistory />
-        </SettingGroup>
+        </>
       )}
     </Stack>
   );

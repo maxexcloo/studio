@@ -308,7 +308,7 @@ test("Viewer runs queue into the strip and Edit › Recreate opens the composer"
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -411,7 +411,7 @@ test("Run Again and Recreate draw a new seed; only Run Again, Same Seed keeps it
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -470,7 +470,7 @@ test("Run Again, Same Seed and Recreate keep the backend a combined profile ran 
     seed: 1234567,
   });
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one. Focus,
   // not a tap: tapping the prompt on a phone switches to the typing layout, which hides the chips.
@@ -1608,7 +1608,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
   await viewerAction(page, "Edit");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");

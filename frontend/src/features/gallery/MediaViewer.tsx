@@ -833,18 +833,17 @@ export function MediaViewer({
             closeButtonProps={{ "aria-label": "Close Details" }}
             // The title scrolls away with the details instead of staying pinned.
             styles={{
-              header: { position: "static" },
+              // The subtitle sits close under the title, as on desktop.
+              header: { position: "static", paddingBottom: 0 },
               inner: { bottom: barOffset },
               overlay: { bottom: barOffset },
             }}
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Stack gap={2} mt={-8}>
-                <Text size="xs" c="dimmed">
-                  {subtitle}
-                </Text>
-              </Stack>
+              <Text size="xs" c="dimmed" mt={2}>
+                {subtitle}
+              </Text>
               <MediaDetails
                 item={displayed}
                 related={related}
