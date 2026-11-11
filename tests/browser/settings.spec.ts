@@ -201,7 +201,8 @@ test("Unfinished Items in Settings › Generation retry, stop and clear any acco
       },
     ],
   ]);
-  // Escape closes only the topmost dialog, leaving Settings open under it.
+  // Once the confirmation has gone, Escape closes only the topmost dialog, leaving Settings open.
+  await expect(clearAll).toBeHidden();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("dialog", { name: /^Settings/ })).toBeVisible();
