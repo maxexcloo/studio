@@ -1,5 +1,10 @@
 import type { QueueMedia } from "../../shared/queue.ts";
-import { unreachableCancelReason, type JobObservation, type QueueAdapter } from "./queue.ts";
+import {
+  goneOutputs,
+  unreachableCancelReason,
+  type JobObservation,
+  type QueueAdapter,
+} from "./queue.ts";
 import type { OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
@@ -94,7 +99,16 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
       // An unknown provider outcome stays recorded until recovery confirms cancellation.
     },
     async saveOutputs(job) {
-      await options.durableSave?.(job);
+      try {
+        await options.durableSave?.(job);
+      } catch (error) {
+        // The worker no longer has an output its run recorded, such as one Studio already moved away.
+        if ((error as { status?: number }).status === 404)
+          throw goneOutputs(
+            "Its outputs are no longer on its worker, so they couldn't be saved. Retry runs it again.",
+          );
+        throw error;
+      }
       await options.flushGallery();
       return observation(job);
     },
