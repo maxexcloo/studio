@@ -547,22 +547,16 @@ export function createDream(options: {
   ) {
     const others = profiles.filter((profile) => kindOf(profile) === kind && profile !== chosen);
     if (!others.length) return null;
-    const since = now() - recentDays * 86_400_000;
-    const runs = new Map<string, number>();
-    const ever = new Set<string>();
-    // A job cancelled before it ran (Dream paused, or its worker went away) tried nothing.
-    for (const job of store.jobs(ownerId)) {
-      if (job.status === "cancelled") continue;
-      const id = String(job.input.profileId || "");
-      ever.add(id);
-      if (Date.parse(job.createdAt) >= since) runs.set(id, (runs.get(id) || 0) + 1);
-    }
+    const runs = store.profileRuns(
+      ownerId,
+      new Date(now() - recentDays * 86_400_000).toISOString(),
+    );
     const fewest = Math.min(...others.map((profile) => runs.get(profile.id) || 0));
     const profile = pick(others.filter((entry) => (runs.get(entry.id) || 0) === fewest));
     const label = profile.label || profile.id;
     return {
       profile,
-      note: ever.has(profile.id) ? `Exploring ${label}` : `Trying ${label} for the first time`,
+      note: runs.has(profile.id) ? `Exploring ${label}` : `Trying ${label} for the first time`,
     };
   }
   /** A kept or starred image from the visible gallery, for a video's first frame. */

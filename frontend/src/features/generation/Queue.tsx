@@ -54,6 +54,12 @@ export const queueQuery = queryOptions({
   refetchInterval: (query) =>
     query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 15_000,
 });
+/** One of the account's jobs, however old: the queue lists only its latest finished ones. */
+export const queueJobQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["queue", id],
+    queryFn: () => api<{ job: QueueJob }>(`/api/queue/${encodeURIComponent(id)}`),
+  });
 export function useQueue() {
   return useQuery(queueQuery);
 }

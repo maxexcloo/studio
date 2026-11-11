@@ -5,6 +5,7 @@ import {
   detectWorkflowFormat,
   detectWorkflowMetadata,
   graphFromJson,
+  usesGrokMedia,
   validateGraph,
   workflowMissingFiles,
   workflowOptionIssues,
@@ -82,7 +83,8 @@ function controlsList(controls = {}) {
   return Object.keys(controls).filter((key) => controls[key]?.node && controls[key]?.input);
 }
 
-function validateWorkflow(workflow, info = {}, profile = null) {
+/** A custom workflow's issues and warnings, with what it lacks on the worker (`info`). */
+export function validateWorkflow(workflow, info = {}, profile = null) {
   // Without ComfyUI's node list we can't tell a missing node from an offline server,
   // so node checks are skipped and the result is marked unverified instead.
   const online = Object.keys(info || {}).length > 0;
@@ -104,20 +106,26 @@ function validateWorkflow(workflow, info = {}, profile = null) {
     else if (expected && node.class_type !== expected)
       issues.push(`Configured LoRA node must be ${expected}: ${workflow.loraStack.node}`);
   }
+  // References may be read only by a mode's graph (`imageModes`, such as Reference's).
+  const graphs = [
+    workflow.graph,
+    ...Object.values(workflow.imageModes || {}).map((mode) => mode?.graph),
+  ];
+  const graphNode = (id) => graphs.map((graph) => graph?.[id]).find(Boolean);
   for (const mediaInput of workflow.mediaInputs || []) {
     if (mediaInput.min > mediaInput.max)
       issues.push(
         `Reference input ${mediaInput.label || mediaInput.id} requires ${mediaInput.min} images but its mapping accepts one filename.`,
       );
     const mapping = mediaInput.control;
-    const node = mapping?.node ? workflow.graph?.[mapping.node] : null;
+    const node = mapping?.node ? graphNode(mapping.node) : null;
     if (!mapping?.node || !mapping?.input)
       issues.push(`Media input ${mediaInput.id} does not have a graph mapping.`);
     else if (!node) issues.push(`Mapped media input node is missing: ${mapping.node}`);
     else if (!(mapping.input in (node.inputs || {})))
       issues.push(`Mapped media input is missing: ${mapping.node}.${mapping.input}`);
     const strength = mediaInput.strength;
-    if (strength && !(strength.input in (workflow.graph?.[strength.node]?.inputs || {})))
+    if (strength && !(strength.input in (graphNode(strength.node)?.inputs || {})))
       issues.push(`Mapped reference strength is missing: ${strength.node}.${strength.input}`);
   }
   if (online) {
@@ -139,9 +147,11 @@ function validateWorkflow(workflow, info = {}, profile = null) {
   }
   if (workflow.kind !== "image" && workflow.kind !== "video")
     issues.push(`Unsupported workflow kind: ${workflow.kind}`);
+  // A Grok profile runs at its provider (providers/profiles.ts): it has no ComfyUI output to save.
   if (
     workflow.graph &&
     Object.keys(workflow.graph).length &&
+    !usesGrokMedia(workflow) &&
     !Object.values(workflow.graph).some((node) =>
       /Save|Preview|Video/i.test(node?.class_type || ""),
     )

@@ -243,7 +243,7 @@ function visibleItems({
   let entry = lists.get(listKey);
   if (!entry) {
     // The gallery is kept sorted, so this sort only confirms the order (linear on sorted input).
-    const items = sortGallery(filterVisibleGallery(gallery)).filter((item) => {
+    const items = sortGallery(visibleGallery()).filter((item) => {
       if (type && item.type !== type) return false;
       if (Boolean(item.uploaded) !== uploads) return false;
       if (!includeFailed && item.status === "failed") return false;
@@ -601,8 +601,13 @@ function folderListing(dir) {
   } catch {
     names = null;
   }
-  if (!cached || !sameNames(cached.names, names)) listingGeneration += 1;
-  if (folderListings.size > 500) folderListings.clear();
+  // A folder's first listing changes no list built before it, since none of them looked in it.
+  if (cached && !sameNames(cached.names, names)) listingGeneration += 1;
+  if (folderListings.size > 500) {
+    folderListings.clear();
+    // Listings read again after this are first reads, which would not notice a change.
+    listingGeneration += 1;
+  }
   folderListings.set(dir, { statAt: now, readAt: now, mtimeMs: stat.mtimeMs, names });
   return names;
 }
@@ -624,17 +629,32 @@ function markFreshOutputs(items) {
     for (const [key, at] of freshOutputs) if (now - at > freshOutputMs) freshOutputs.delete(key);
 }
 
-export function hasExistingOutputFile(item) {
-  const media = mediaParams(item?.url);
-  if (media) {
-    const file = mediaPath(media.filename, media.subfolder);
-    if (!file) return false;
-    if (folderListing(path.dirname(file))?.has(listedName(path.basename(file)))) return true;
-    const freshAt = freshOutputs.get(galleryKey(item));
-    return Boolean(freshAt && Date.now() - freshAt < freshOutputMs && fs.existsSync(file));
+// Where each item's media file is, worked out once per item: items are replaced, never changed in
+// place, and parsing and resolving every URL made each rebuild of the page list cost most of it.
+const outputFiles = new WeakMap();
+function outputFileOf(item) {
+  let found = outputFiles.get(item);
+  if (found === undefined) {
+    const media = mediaParams(item.url);
+    const file = media && mediaPath(media.filename, media.subfolder);
+    // Anything but a media URL is ComfyUI's to serve; Studio cannot see it.
+    found = !media
+      ? true
+      : file
+        ? { file, dir: path.dirname(file), name: listedName(path.basename(file)) }
+        : false;
+    outputFiles.set(item, found);
   }
-  // Anything else is ComfyUI's to serve; Studio cannot see it.
-  return true;
+  return found;
+}
+
+export function hasExistingOutputFile(item) {
+  if (!item || typeof item !== "object") return true;
+  const found = outputFileOf(item);
+  if (typeof found === "boolean") return found;
+  if (folderListing(found.dir)?.has(found.name)) return true;
+  const freshAt = freshOutputs.get(galleryKey(item));
+  return Boolean(freshAt && Date.now() - freshAt < freshOutputMs && fs.existsSync(found.file));
 }
 
 /**
