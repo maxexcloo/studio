@@ -1327,12 +1327,19 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
   // Nothing else stays: the strip hides and the picture glides to the middle of the screen.
   await expect.poll(stripShown).toBe(false);
   const viewport = page.viewportSize()!;
-  await expect
-    .poll(async () => {
-      const { x, y } = await centre();
-      return Math.round(Math.abs(x - viewport.width / 2) + Math.abs(y - viewport.height / 2));
-    })
-    .toBeLessThan(2);
+  const centred = (width: number, height: number) =>
+    expect
+      .poll(async () => {
+        const { x, y } = await centre();
+        return Math.round(Math.abs(x - width / 2) + Math.abs(y - height / 2));
+      })
+      .toBeLessThan(2);
+  await centred(viewport.width, viewport.height);
+  // Turning the phone keeps it in the middle.
+  await page.setViewportSize({ width: viewport.height, height: viewport.width });
+  await centred(viewport.height, viewport.width);
+  await page.setViewportSize(viewport);
+  await centred(viewport.width, viewport.height);
   await tap();
   await expect.poll(shown).toBe(true);
   await tap();
