@@ -365,7 +365,6 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
       client.setQueryData(["comparison", comparison.id], comparison);
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["gallery"] });
-      void client.invalidateQueries({ queryKey: ["sessions"] });
       onClose();
       navigate(`/compare/${comparison.id}`);
     },

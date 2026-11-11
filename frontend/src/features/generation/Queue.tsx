@@ -107,7 +107,6 @@ export function useQueueAction(jobId?: string) {
     onSuccess: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
-        client.invalidateQueries({ queryKey: ["session"] }),
         client.invalidateQueries({ queryKey: ["gallery"] }),
       ]),
   });

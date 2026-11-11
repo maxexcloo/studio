@@ -34,7 +34,7 @@ export function useStopUpscale(item: MediaItem) {
     mutationFn: (jobId: string) => post(`/api/queue/${encodeURIComponent(jobId)}/cancel`),
     onSuccess: () =>
       void Promise.all(
-        ["queue", "session", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
+        ["queue", "gallery"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
       ),
   });
   const jobId = upscaling(item) ? item.upscale?.jobId : undefined;
@@ -62,9 +62,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       } satisfies UpscaleRequest),
     onSuccess: () =>
       void Promise.all(
-        ["gallery", "queue", "session", "sessions"].map((key) =>
-          cache.invalidateQueries({ queryKey: [key] }),
-        ),
+        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
       ),
   });
   const detector = status.data?.faceDetail;
@@ -140,9 +138,7 @@ export function useUpscaleMany(items: MediaItem[]) {
     },
     onSettled: () =>
       void Promise.all(
-        ["gallery", "queue", "session", "sessions"].map((key) =>
-          cache.invalidateQueries({ queryKey: [key] }),
-        ),
+        ["gallery", "queue"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
       ),
   });
 }
@@ -174,7 +170,6 @@ export function useUpscaleAction(
     onSuccess: (result) => {
       onVersionChange?.(item.id, result.upscaleActive);
       void cache.invalidateQueries({ queryKey: ["gallery"] });
-      void cache.invalidateQueries({ queryKey: ["session"] });
     },
   });
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);

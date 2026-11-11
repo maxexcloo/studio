@@ -3,7 +3,7 @@ import { post } from "../../api";
 import type { MediaItem } from "../../types";
 
 /** Caches that hold media records: gallery pages (the reference picker's too) and the queue. */
-const mediaCaches = new Set(["gallery", "session", "queue"]);
+const mediaCaches = new Set(["gallery", "queue"]);
 const holdsMedia = (query: Query) => mediaCaches.has(String(query.queryKey[0]));
 const favoritesKey = ["favorites"];
 /** Lists filtered to starred items (key position 3), which a change alters. */
