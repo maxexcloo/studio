@@ -120,9 +120,14 @@ test("New Character saves a name, description and gallery images from the Refere
   await description.fill("red-haired ranger");
   const done = page.getByRole("button", { name: "Done", exact: true });
   if (await done.isVisible()) await done.click();
-  await editor
+  // Add Images opens the gallery choices in a popup of their own.
+  await editor.getByRole("button", { name: "Add Images", exact: true }).click();
+  const picker = page.getByRole("dialog", { name: "Add Images", exact: true });
+  await picker
     .getByRole("button", { name: "Add image: Portrait of a ranger", exact: true })
     .click();
+  await picker.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(picker).toBeHidden();
   await expect(
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
@@ -160,9 +165,14 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     route.fulfill({ json: { available: true, vision: true, presets: [] } }),
   );
   const described: unknown[] = [];
-  await page.route("**/api/assistant/character", (route) => {
+  await page.route("**/api/assistant/cards/describe", (route) => {
     described.push(route.request().postDataJSON());
     return route.fulfill({ json: { ok: true, description: "red-haired ranger, green cloak" } });
+  });
+  const rated: unknown[] = [];
+  await page.route("**/api/assistant/cards/rate", (route) => {
+    rated.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true, ratings: [{ rating: 4, note: "Clear face" }] } });
   });
   await page.goto("/images");
   await page
@@ -180,7 +190,11 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
   );
-  expect(described).toEqual([{ assetId: "asset-ranger" }]);
+  expect(described).toEqual([{ kind: "characters", assetId: "asset-ranger" }]);
+  // Rate Images scores each image as the card's reference.
+  await editor.getByRole("button", { name: "Rate Images", exact: true }).click();
+  await expect(editor.getByLabel("Image Ratings")).toContainText("1 · 4/5Clear face");
+  expect(rated).toEqual([{ kind: "characters", assetIds: ["asset-ranger"] }]);
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
   const cards = page.getByRole("list", { name: "Characters", exact: true });
