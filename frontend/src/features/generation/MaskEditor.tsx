@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import {
+  ActionIcon,
   Alert,
   Box,
   Button,
@@ -12,12 +13,17 @@ import {
   Slider,
   Stack,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
+import { Minus, Plus } from "lucide-react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import type { ReferenceAsset } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import { DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
+import { usePhone } from "../../ui/usePhone";
 import classes from "./MaskEditor.module.css";
 
 type Snapshot = { pixels: ImageData; error: string | null };
@@ -39,6 +45,7 @@ export default function MaskEditor({
   const pinching = useRef(false);
   const [spaceHand, setSpaceHand] = useState(false);
   const duration = useMotionDuration();
+  const phone = usePhone();
   const [brush, setBrush] = useState(50);
   const [tool, setTool] = useState("paint");
   const [loading, setLoading] = useState(Boolean(initialMask));
@@ -188,6 +195,72 @@ export default function MaskEditor({
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   }
+  const zoomBy = (direction: -1 | 1) =>
+    void (direction < 0
+      ? transform.current?.zoomOut(0.2, duration)
+      : transform.current?.zoomIn(0.2, duration));
+  const tools = (
+    <SegmentedControl
+      aria-label="Mask Tool"
+      value={tool}
+      onChange={setTool}
+      disabled={loading}
+      fullWidth={phone}
+      data={[
+        { label: "Paint", value: "paint" },
+        { label: "Erase", value: "erase" },
+        { label: "Hand", value: "hand" },
+      ]}
+    />
+  );
+  const brushSize = (
+    <Group gap="xs" wrap="nowrap" flex={1} miw={0}>
+      <Text size="sm" c="dimmed" id="mask-brush-label">
+        Brush
+      </Text>
+      <Slider
+        flex={1}
+        aria-labelledby="mask-brush-label"
+        thumbLabel="Brush Size"
+        min={10}
+        max={150}
+        value={brush}
+        onChange={setBrush}
+        disabled={loading}
+      />
+    </Group>
+  );
+  const edits = (
+    <Group gap={4} wrap="nowrap">
+      {(
+        [
+          ["Undo", icons.undo, !history.undo, undo],
+          ["Redo", icons.redo, !history.redo, redo],
+          [
+            "Clear Mask",
+            icons.clear,
+            false,
+            () => {
+              remember();
+              context().clearRect(0, 0, width, height);
+              setError(null);
+            },
+          ],
+        ] as const
+      ).map(([label, Icon, unavailable, action]) => (
+        <Tooltip key={label} label={label}>
+          <ActionIcon
+            variant="default"
+            aria-label={label}
+            disabled={loading || unavailable}
+            onClick={action}
+          >
+            <Icon size={18} />
+          </ActionIcon>
+        </Tooltip>
+      ))}
+    </Group>
+  );
   return (
     <Modal
       opened
@@ -195,10 +268,12 @@ export default function MaskEditor({
       title="Paint the Area to Edit"
       closeButtonProps={{ "aria-label": "Close Mask Editor" }}
       size="xl"
+      fullScreen={phone}
+      classNames={phone ? { content: classes.sheet, body: classes.sheetBody } : undefined}
       removeScrollProps={{ allowPinchZoom: true }}
     >
       <FocusTrap.InitialFocus />
-      <Stack>
+      <Stack gap="sm" flex={1} mih={0}>
         <Text size="sm" c="dimmed">
           Paint over what should change; the rest stays.
         </Text>
@@ -207,7 +282,7 @@ export default function MaskEditor({
             {error}
           </Alert>
         )}
-        <Box pos="relative" h="min(55dvh, 600px)" w="100%" aria-label="Mask Viewport">
+        <Box pos="relative" className={classes.viewport} w="100%" aria-label="Mask Viewport">
           <LoadingOverlay visible={loading} />
           <TransformWrapper
             ref={transform}
@@ -293,84 +368,58 @@ export default function MaskEditor({
               </Box>
             </TransformComponent>
           </TransformWrapper>
-        </Box>
-        <Group justify="center" gap="xs" aria-label="Mask Zoom">
-          <Button
-            variant="default"
-            size="compact-sm"
-            aria-label="Zoom Mask Out"
-            disabled={loading}
-            onClick={() => void transform.current?.zoomOut(0.2, duration)}
-          >
-            −
-          </Button>
-          <Button
-            variant="default"
-            size="compact-sm"
-            aria-label="Fit Mask"
-            disabled={loading}
-            onClick={() => {
-              if (canvas.current)
-                void transform.current?.zoomToElement(canvas.current, undefined, duration);
-            }}
-          >
-            Fit · <span ref={percentage}>100%</span>
-          </Button>
-          <Button
-            variant="default"
-            size="compact-sm"
-            aria-label="Zoom Mask In"
-            disabled={loading}
-            onClick={() => void transform.current?.zoomIn(0.2, duration)}
-          >
-            +
-          </Button>
-        </Group>
-        <Group justify="space-between">
-          <SegmentedControl
-            aria-label="Mask Tool"
-            value={tool}
-            onChange={setTool}
-            disabled={loading}
-            data={[
-              { label: "Paint", value: "paint" },
-              { label: "Erase", value: "erase" },
-              { label: "Hand", value: "hand" },
-            ]}
-          />
-          <Group gap="xs">
-            <Button variant="default" disabled={loading || !history.undo} onClick={undo}>
-              Undo
+          <Group className={classes.zoom} gap={2} wrap="nowrap" role="group" aria-label="Mask Zoom">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label="Zoom Mask Out"
+              disabled={loading}
+              onClick={() => zoomBy(-1)}
+            >
+              <Minus size={14} />
+            </ActionIcon>
+            <Button
+              size="compact-xs"
+              variant="subtle"
+              color="gray"
+              aria-label="Fit Mask"
+              disabled={loading}
+              onClick={() => {
+                if (canvas.current)
+                  void transform.current?.zoomToElement(canvas.current, undefined, duration);
+              }}
+            >
+              <span ref={percentage}>100%</span>
             </Button>
-            <Button variant="default" disabled={loading || !history.redo} onClick={redo}>
-              Redo
-            </Button>
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label="Zoom Mask In"
+              disabled={loading}
+              onClick={() => zoomBy(1)}
+            >
+              <Plus size={14} />
+            </ActionIcon>
           </Group>
-        </Group>
-        <Text size="sm" id="mask-brush-label">
-          Brush Size
-        </Text>
-        <Slider
-          aria-labelledby="mask-brush-label"
-          thumbLabel="Brush Size"
-          min={10}
-          max={150}
-          value={brush}
-          onChange={setBrush}
-          disabled={loading}
-        />
-        <Group justify="space-between">
-          <Button
-            variant="default"
-            disabled={loading}
-            onClick={() => {
-              remember();
-              context().clearRect(0, 0, width, height);
-              setError(null);
-            }}
-          >
-            Clear Mask
-          </Button>
+        </Box>
+        {phone ? (
+          <Stack gap="sm" role="toolbar" aria-label="Mask Tools">
+            {tools}
+            <Group gap="sm" wrap="nowrap">
+              {brushSize}
+              {edits}
+            </Group>
+          </Stack>
+        ) : (
+          <Group gap="md" wrap="nowrap" role="toolbar" aria-label="Mask Tools">
+            {tools}
+            {brushSize}
+            {edits}
+          </Group>
+        )}
+        <DialogFooter onCancel={close}>
           <Button
             disabled={loading || Boolean(error)}
             onClick={() => {
@@ -387,7 +436,7 @@ export default function MaskEditor({
           >
             Use Mask
           </Button>
-        </Group>
+        </DialogFooter>
       </Stack>
     </Modal>
   );
