@@ -114,6 +114,7 @@ export function ViewerPrompt({
       ? [
           {
             label: "Ask for a Change",
+            text: "Ask",
             icon: icons.assistant,
             disabled: !typed || ask.pending,
             keepOpen: true,

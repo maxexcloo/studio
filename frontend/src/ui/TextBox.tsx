@@ -99,6 +99,8 @@ export function TextBox({
    */
   submit?: {
     label: string;
+    /** A shorter name to show, where the label is long (Ask for a Change shows Ask). */
+    text?: string;
     icon?: LucideIcon;
     disabled: boolean;
     keepOpen?: boolean;
@@ -380,16 +382,19 @@ export function TextBox({
                       </Tooltip>
                     )}
                     {send}
+                    {/* Named, as the keyboard leaves room: the last send is primary, after an arrow. */}
                     {submit?.map((each, index) => {
                       const primary = index === submit.length - 1;
                       const Glyph = each.icon ?? ArrowUp;
                       return (
-                        <ActionIcon
+                        <Button
                           key={each.label}
                           aria-label={each.label}
                           variant={primary ? "filled" : "light"}
                           radius="xl"
-                          size="lg"
+                          size="sm"
+                          leftSection={primary ? undefined : <Glyph size={16} />}
+                          rightSection={primary ? <Glyph size={16} /> : undefined}
                           disabled={each.disabled}
                           // Sending before the keyboard drops keeps the text's blur from closing first.
                           onPointerDown={(event) => event.preventDefault()}
@@ -398,8 +403,8 @@ export function TextBox({
                             each.onSubmit();
                           }}
                         >
-                          <Glyph size={18} />
-                        </ActionIcon>
+                          {each.text ?? each.label}
+                        </Button>
                       );
                     })}
                   </div>
