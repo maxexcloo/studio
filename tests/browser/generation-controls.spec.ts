@@ -934,11 +934,32 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   // The keyboard shortens the visual viewport and lifts the bar with Generate above it.
   await page.evaluate(() => {
     const height = window.innerHeight - 300;
-    Object.defineProperty(window.visualViewport, "height", { get: () => height });
+    Object.defineProperty(window.visualViewport, "height", {
+      get: () => height,
+      configurable: true,
+    });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
   await expect.poll(generateBottom).toBeLessThanOrEqual(932 - 300);
   await expect.poll(scrolls).toBe(false);
+  // Typing keeps the whole screen while a browser's toolbar folds away above the keyboard; only
+  // the keyboard dropping (Android's Back keeps focus) ends it.
+  const typing = sheet.locator("[data-typing]");
+  const visible = async (lower: number) =>
+    page.evaluate((lower) => {
+      const height = window.innerHeight - lower;
+      Object.defineProperty(window.visualViewport, "height", {
+        get: () => height,
+        configurable: true,
+      });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    }, lower);
+  await expect(typing).toHaveCount(1);
+  await visible(170);
+  await expect(typing).toHaveCount(1);
+  await visible(0);
+  await expect(typing).toHaveCount(0);
+  await visible(300);
   await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.prompt).toContain("A copper fox");
@@ -975,7 +996,10 @@ test("A tablet keeps the open composer's prompt above the keyboard and the heade
   await expect(prompt).toBeFocused();
   await page.evaluate(() => {
     const height = window.innerHeight - 450;
-    Object.defineProperty(window.visualViewport, "height", { get: () => height });
+    Object.defineProperty(window.visualViewport, "height", {
+      get: () => height,
+      configurable: true,
+    });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
   // The prompt sits in the room above the keyboard, drawn over the header it reaches.
