@@ -8,7 +8,7 @@ import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { maxCardDescription, maxCharacterImages, maxCardName } from "../../../../shared/characters";
 import { PickerGrid, PickerTile } from "../generation/Picker";
-import { CardDialog, CardForm, CardImages, useDescribeImage } from "./CardImages";
+import { CardDialog, CardForm, CardImages, DescribeImage } from "./CardImages";
 import { charactersQuery, useSaveCharacter, type CharacterCard } from "./queries";
 
 /** What a new card starts from, such as Use as Character's image. */
@@ -74,7 +74,6 @@ function CharacterForm({
   const [images, setImages] = useState<ReferenceAsset[]>(
     character?.references || start?.references || [],
   );
-  const describe = useDescribeImage("characters", images[0], setDescription);
   const save = useSaveCharacter(character?.id);
   const full = images.length >= maxCharacterImages;
   // The card as it stands now, for Generate References' results as they finish.
@@ -128,7 +127,7 @@ function CharacterForm({
         maxLength={maxCardDescription}
         value={description}
         onChange={setDescription}
-        {...describe}
+        below={<DescribeImage kind="characters" image={images[0]} onDescribed={setDescription} />}
       />
       <CardImages
         kind="characters"
