@@ -248,6 +248,41 @@ test("readiness follows the selected backend, with the reason, and never falls b
   }
 });
 
+test("backend choices include their own reference slots, controls and defaults", () => {
+  const raw = combinedRaw();
+  for (const [backend, count] of [
+    ["comfyui", 10],
+    ["radiance", 4],
+  ]) {
+    const own = raw.studio.backends[backend];
+    own.graph[3] = { class_type: "LoadImage", inputs: { image: "" } };
+    own.mediaInputs = Array.from({ length: count }, (_, index) => ({
+      id: index ? `reference-${index + 1}` : "reference",
+      kind: "image",
+      control: { node: "3", input: "image" },
+    }));
+  }
+  raw.studio.backends.radiance.loraStack = { adapter: "radiance-tags-v1", node: "1", max: 4 };
+  write("combined", JSON.stringify(raw));
+  try {
+    const selected = inferModels(allNodes).profiles.find(
+      (profile) => profile.id === "custom:combined",
+    );
+    const backend = Object.fromEntries(
+      selected.backendOptions.map((option) => [option.id, option.profile]),
+    );
+    assert.equal(backend.radiance.mediaInputs.length, 4);
+    assert.equal(backend.comfyui.mediaInputs.length, 10);
+    assert.equal(backend.radiance.defaults.width, 1536);
+    assert.equal(backend.comfyui.defaults.width, 2048);
+    assert.equal(backend.radiance.maxLoras, 4);
+    assert.equal(backend.comfyui.maxLoras, 8);
+    assert.equal(backend.radiance.backendOptions.length, 0);
+  } finally {
+    fs.rmSync(path.join(userWorkflowsDir, "combined.json"));
+  }
+});
+
 test("the preview pairs one model's Radiance and ComfyUI profiles and says what differs", () => {
   const preview = backendCandidates();
   assert.equal(preview.pairs.length, 1);
@@ -450,10 +485,26 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
                 backend: "comfyui",
                 backendOptions: [
                   { id: "comfyui", label: "ComfyUI", ready: true },
-                  { id: "radiance", label: "Radiance", ready: true },
+                  {
+                    id: "radiance",
+                    label: "Radiance",
+                    ready: true,
+                    profile: {
+                      id: `custom:${combinedId}`,
+                      kind: "image",
+                      label: "Krea 2 Turbo · Fast",
+                      family: "krea2",
+                      model: `custom:${combinedId}`,
+                      workflow: `custom:${combinedId}`,
+                      backend: "radiance",
+                      defaults: { width: 1536, height: 1536 },
+                      capabilities: { steps: true },
+                      mediaInputs: [],
+                    },
+                  },
                 ],
                 defaults: { width: 1024, height: 1024 },
-                capabilities: {},
+                capabilities: { steps: false },
                 mediaInputs: [],
               },
             ],
@@ -465,14 +516,36 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
     },
   });
   const old = { type: "image", prompt: "a fox", settings: { profileId: `custom:${radianceId}` } };
+  const current = (await media.profiles("image", "owner"))[0];
+  const alternate = media.profileForBackend(
+    {
+      ...current,
+      recipe: { conditioning: "Ref2VA" },
+      editReferences: true,
+      keepsCharacters: true,
+      loraNote: "Previous backend only",
+      imageModes: { reference: { defaults: { cfg: 4 } } },
+      namedBackend: "radiance",
+      aliases: ["legacy"],
+    },
+    "radiance",
+  );
+  for (const field of ["recipe", "editReferences", "keepsCharacters", "loraNote", "imageModes"])
+    assert.equal(Object.hasOwn(alternate, field), false, field);
+  assert.deepEqual(alternate.aliases, ["legacy"]);
+  assert.equal(alternate.namedBackend, "radiance");
   const plan = await media.rerun("owner", old);
   assert.equal(plan.args.profile_id, `custom:${combinedId}`);
   assert.equal(plan.args.profile_backend, "radiance");
   await media.queue("owner", plan.args);
   assert.equal(sent.at(-1).profileBackend, "radiance");
+  assert.equal(sent.at(-1).width, 1536);
+  const tuned = await media.rerun("owner", { ...old, settings: { ...old.settings, steps: 28 } });
+  assert.equal(tuned.args.steps, 28);
   // Without one named, the profile's current backend; one it no longer has, the current one too.
   await media.queue("owner", { ...plan.args, profile_backend: undefined });
   assert.equal(sent.at(-1).profileBackend, "comfyui");
+  assert.equal(sent.at(-1).width, 1024);
   await media.queue("owner", { ...plan.args, profile_backend: "cloud" });
   assert.equal(sent.at(-1).profileBackend, "comfyui");
 });

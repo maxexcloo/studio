@@ -113,8 +113,10 @@ function rawFromEdit(edit = {}) {
   ])
     if (edit[key] !== undefined) raw[key] = edit[key];
   if (edit.triggers !== undefined) raw.triggers = edit.triggers;
+  if (edit.families !== undefined) raw.families = edit.families;
   if (edit.tags !== undefined) raw.tags = edit.tags;
   if (edit.compatibility !== undefined) raw.compatibility = edit.compatibility;
+  if (Number.isFinite(edit.strength?.default)) raw.recommendedStrength = edit.strength.default;
   if (
     isObject(edit.strength) &&
     Number.isFinite(edit.strength.min) &&
@@ -651,10 +653,10 @@ export function createCatalogueStore({
     ])) {
       const { folder, file: name } = splitCatalogueKey(key);
       if (folder !== "loras") continue;
-      catalogue[name] = {
-        ...rawFromEdit(current.layers.definitions[key]),
-        ...rawFromEdit(current.edits[key]?.fields),
-      };
+      catalogue[name] = rawFromEdit({
+        ...current.layers.definitions[key],
+        ...current.edits[key]?.fields,
+      });
     }
     return { sources: current.layers.provider, catalogue };
   }

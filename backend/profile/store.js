@@ -394,7 +394,19 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(checked, JSON.stringify(config));
     try {
-      loadMcpPrompting(checked);
+      const prompting = loadMcpPrompting(checked);
+      const workflowsDir = path.join(dataDir, "workflows");
+      if (fs.existsSync(workflowsDir))
+        for (const name of fs.readdirSync(workflowsDir)) {
+          if (!name.endsWith(".json") || name.startsWith(".")) continue;
+          const meta = readObject(path.join(workflowsDir, name), null, false)?.studio;
+          if (!meta) continue;
+          prompting({
+            id: `custom:${meta.id || name.slice(0, -5)}`,
+            family: meta.family || "custom",
+            kind: meta.kind === "video" ? "video" : "image",
+          });
+        }
     } finally {
       fs.rmSync(checked, { force: true });
     }

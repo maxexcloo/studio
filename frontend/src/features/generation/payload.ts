@@ -13,6 +13,32 @@ export const usesNegative = (profile?: Profile) =>
 /** A combined profile's backend by name ("Radiance"). */
 export const backendLabel = (id: string) => profileBackendLabels[id] || id;
 
+/** A run's backend supplies its own settings, controls and reference slots. */
+export function profileForBackend(profile: Profile | undefined, backend = profile?.backend) {
+  const option = profile?.backendOptions?.find((option) => option.id === backend);
+  return profile && option?.profile
+    ? {
+        ...option.profile,
+        aliases: profile.aliases,
+        aliasBackends: profile.aliasBackends,
+        backendOptions: profile.backendOptions,
+        failing: profile.failing,
+        workerIds: profile.workerIds,
+        ready: option.ready,
+        readyReason: option.reason,
+      }
+    : profile;
+}
+
+/** Backend defaults follow the switch; settings the person changed remain their own. */
+export function backendInputPatch(input: GenerationInput, profile: Profile, backend: string) {
+  const next = profileForBackend(profile, backend)!;
+  const patch: Partial<GenerationInput> = { profileBackend: backend };
+  for (const [key, value] of Object.entries(next.defaults))
+    if (input[key] === undefined || input[key] === profile.defaults[key]) patch[key] = value;
+  return patch;
+}
+
 /** A profile name as lists show it, without a backend segment such as "· ComfyUI". */
 export const shownProfileName = (name: string) => profileNameParts(name).join(" · ") || name;
 export const profileName = (profile: Pick<Profile, "displayName" | "label">) =>
@@ -103,9 +129,10 @@ export function addReference(
 
 export function generationInput(
   input: GenerationInput,
-  profile: Profile | undefined,
+  listedProfile: Profile | undefined,
   references: ReferenceAsset[],
 ) {
+  const profile = profileForBackend(listedProfile, input.profileBackend);
   const details = referenceDetails(references, input, profile);
   // The size tier sets the size here as on the server, so the pending tile has the run's shape.
   const sized = withResolution(

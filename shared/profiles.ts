@@ -30,6 +30,23 @@ export const loraFamilyId = (family: unknown) => {
   return id === "flux3_klein" ? "flux3" : id;
 };
 
+/** A recommendation does not require complete publisher bounds for the strength control. */
+export const loraDefaultStrength = (
+  info:
+    | {
+        recommendedStrength?: number;
+        strengthRange?: { default?: number; min?: number; max?: number };
+      }
+    | undefined,
+  fallback: number,
+) =>
+  info?.recommendedStrength ??
+  info?.strengthRange?.default ??
+  Math.min(
+    Math.max(fallback, info?.strengthRange?.min ?? fallback),
+    info?.strengthRange?.max ?? fallback,
+  );
+
 /**
  * A provider-backed cloud profile (Grok): it runs at the provider, not on a worker. Access
  * profiles grant these through their Cloud Models feature rather than one by one. Studio picks one

@@ -39,6 +39,14 @@ test("custom H3 duration selections reach their mapped graph input with the fixe
         kind: "video",
         family,
         defaults: { fps: 24, steps: 8 },
+        mediaInputs: [
+          {
+            id: "reference",
+            kind: "image",
+            role: "start",
+            control: { node: "frame", input: "image" },
+          },
+        ],
         controls: {
           prompt: { node: "h3", input: "prompt" },
           frames: { node: "h3", input: "length" },

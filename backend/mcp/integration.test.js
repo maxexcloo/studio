@@ -1187,6 +1187,54 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   );
 });
 
+test("Models and Generate keep an old per-backend id's controls after the default changes", async (t) => {
+  const f = await fixture(t);
+  const previous = process.env.STUDIO_DATA_DIR;
+  process.env.STUDIO_DATA_DIR = f.dataDir;
+  t.after(() => {
+    if (previous === undefined) delete process.env.STUDIO_DATA_DIR;
+    else process.env.STUDIO_DATA_DIR = previous;
+  });
+  const workflows = path.join(f.dataDir, "workflows");
+  fs.mkdirSync(workflows, { recursive: true });
+  fs.writeFileSync(
+    path.join(workflows, ".studio-aliases.json"),
+    JSON.stringify({
+      "old-comfy": { to: "combined", backend: "comfyui" },
+    }),
+  );
+  const comfy = {
+    ...imageProfile,
+    id: "custom:combined",
+    backend: "comfyui",
+    maxLoras: 8,
+    defaults: { ...imageProfile.defaults, width: 2048, height: 2048 },
+    mediaInputs: Array.from({ length: 10 }, (_, i) => ({ id: `reference-${i + 1}` })),
+  };
+  await f.profiles([
+    {
+      ...comfy,
+      backend: "radiance",
+      maxLoras: 4,
+      defaults: { ...comfy.defaults, width: 1536, height: 1536 },
+      mediaInputs: comfy.mediaInputs.slice(0, 4),
+      backendOptions: [
+        { id: "radiance", label: "Radiance", ready: true },
+        { id: "comfyui", label: "ComfyUI", ready: true, profile: comfy },
+      ],
+    },
+  ]);
+  const client = await f.client();
+  const detail = data(await call(client, "models", { profile_id: "custom:old-comfy" }));
+  assert.equal(detail.backend, "comfyui");
+  assert.equal(detail.references.max, 10);
+  assert.equal(detail.controls.loras.max, 8);
+  assert.equal(detail.defaults.width, 2048);
+  await call(client, "generate", { profile_id: "custom:old-comfy", prompts: ["A fox"] });
+  assert.equal(f.submitted[0].profileBackend, "comfyui");
+  assert.equal(f.submitted[0].width, 2048);
+});
+
 test("Generate attaches a compact guide once per account unless it read the selected profile, not discovery or another profile", async (t) => {
   const f = await fixture(t);
   await f.profiles([
@@ -6071,6 +6119,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     server: {},
     media: {
       profiles: async () => [imageProfile],
+      profileForBackend: (profile) => profile,
       queue: async () => ({
         status: "queued",
         jobs: [

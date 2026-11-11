@@ -75,7 +75,7 @@ export function compatibleLoras(loras, infos, profile) {
   return { loras: kept, dropped: droppedNames.length, droppedNames };
 }
 
-/** Only explicit full publisher bounds replace existing controls; recommendations stay prose. */
+/** Only explicit full publisher bounds replace existing controls. */
 export function strengthRange(info) {
   const range = info?.strengthRange;
   if (

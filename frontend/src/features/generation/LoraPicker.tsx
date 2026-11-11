@@ -24,9 +24,9 @@ import { api, post } from "../../api";
 import { useRemembered } from "../auth/useRemembered";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Profile } from "../../types";
-import { isProfile } from "./payload";
+import { isProfile, profileForBackend } from "./payload";
 import { StrengthControl } from "./StrengthControl";
-import { loraFamilyId } from "../../../../shared/profiles";
+import { loraDefaultStrength, loraFamilyId } from "../../../../shared/profiles";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
 import {
@@ -53,6 +53,7 @@ export interface LoraInfo {
   role?: string;
   triggers?: string[];
   strengthRange?: { min: number; max: number; step: number; default?: number };
+  recommendedStrength?: number;
 }
 type Lora = GenerationInput["loras"][number];
 export const loraInfoQuery = queryOptions({
@@ -83,8 +84,7 @@ const loraTabs = [
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
-export const defaultStrength = (range: LoraInfo["strengthRange"]) =>
-  range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1);
+export const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
 export const loraTitle = (info: LoraInfo | undefined, file: string) =>
   info?.title || file.replace(/\.[^.]+$/, "");
 /** Whether a LoRA lists the profile's family, however the profile spells it. */
@@ -249,9 +249,12 @@ export function LoraThumbs({ file, title }: { file: string; title: string }) {
 function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   const context = useGeneration();
   const input = value || context.input;
-  const profile = value
-    ? context.profiles.find((profile) => isProfile(profile, value.profileId))
-    : context.profile;
+  const profile = profileForBackend(
+    value
+      ? context.profiles.find((profile) => isProfile(profile, value.profileId))
+      : context.profile,
+    input.profileBackend,
+  );
   const update = (loras: Lora[]) =>
     onChange ? onChange({ ...input, loras }) : context.update({ loras });
   const info = useQuery(loraInfoQuery);
@@ -317,7 +320,7 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
             ...input.loras,
             {
               name: file,
-              strength: defaultStrength(metadata[file]?.strengthRange),
+              strength: defaultStrength(metadata[file]),
               enabled: true,
               triggers: true,
             },
@@ -580,7 +583,7 @@ function StackEntry({
           min={min}
           max={max}
           step={step}
-          mark={range?.default}
+          mark={info?.recommendedStrength ?? range?.default}
           onChange={(strength) => onChange({ strength })}
         />
         {range && (

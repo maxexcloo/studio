@@ -282,25 +282,7 @@ export function inferModels(
       ? `missing ${missing.join(", ")} on this worker`
       : workflowOptionIssues(workflow, info).join(" ");
   };
-  for (const listed of loadCustomWorkflows()) {
-    const workflow = workflowOnBackend(listed, profileBackends[listed.profileId]);
-    if (usesGrokMedia(workflow)) continue;
-    // A combined profile lists while any of its backends could run here; its own backend not being
-    // ready shows as Needs Setup with the reason, never as a quiet switch to the other one.
-    const backendOptions = (workflow.backendIds || []).map((id) => {
-      const own = workflowOnBackend(listed, id);
-      const reason = configuredOnly ? "" : unready(own);
-      return {
-        id,
-        label: profileBackendLabels[id] || id,
-        // Each backend's graph may take a different number of references.
-        references: own.mediaInputs?.length || 0,
-        ...(configuredOnly ? {} : { ready: !reason }),
-        ...(reason ? { reason } : {}),
-      };
-    });
-    const reason = configuredOnly ? "" : unready(workflow);
-    if (reason && !backendOptions.some((option) => option.ready)) continue;
+  const profileForWorkflow = (workflow) => {
     const defaults = workflow.defaults || {};
     const controls = workflow.controls || {};
     const familyStep = workflowFamilyStep(workflow);
@@ -379,109 +361,134 @@ export function inferModels(
       });
       Object.assign(fpsRange, { default: 24, min: 24, max: 24, step: 1 });
     }
-    profiles.push(
-      buildProfile({
-        id: workflow.profileId,
-        kind: workflow.kind,
-        label: workflow.name,
-        displayName: workflow.name,
-        description: workflow.description,
-        prompting: workflow.prompting,
-        model: workflow.profileId,
-        baseModel: modelBasename(defaults.model || ""),
-        workflow: workflow.profileId,
-        family: workflow.family,
-        uncensored: workflow.uncensored,
-        aiDrafted: workflow.aiDrafted,
-        recipe: workflow.recipe,
-        defaults: {
-          count: detectedDefault(countRange, Number(defaults.count || 1)),
+    const profile = buildProfile({
+      id: workflow.profileId,
+      kind: workflow.kind,
+      label: workflow.name,
+      displayName: workflow.name,
+      description: workflow.description,
+      prompting: workflow.prompting,
+      model: workflow.profileId,
+      baseModel: modelBasename(defaults.model || ""),
+      workflow: workflow.profileId,
+      family: workflow.family,
+      uncensored: workflow.uncensored,
+      aiDrafted: workflow.aiDrafted,
+      recipe: workflow.recipe,
+      defaults: {
+        count: detectedDefault(countRange, Number(defaults.count || 1)),
+        width: detectedDefault(widthRange, Number(defaults.width || 1024)),
+        height: detectedDefault(heightRange, Number(defaults.height || 1024)),
+        steps: Number(
+          defaults.steps ||
+            detectedDefault(samplerRange.steps, workflow.kind === "video" ? 12 : 20),
+        ),
+        cfg: Number(
+          defaults.cfg || detectedDefault(samplerRange.cfg, workflow.kind === "video" ? 5 : 7),
+        ),
+        sampler: defaults.sampler || samplers[0] || "",
+        scheduler: defaults.scheduler || schedulers[0] || "",
+        textEncoder: defaults.textEncoder || "",
+        vae: defaults.vae || "",
+        clipType: defaults.clipType || "",
+        weightDtype: defaults.weightDtype || "default",
+        frames: detectedDefault(frameRange, Number(defaults.frames || 33)),
+        fps: detectedDefault(fpsRange, Number(defaults.fps || 16)),
+        duration: detectedDefault(durationRange, Number(defaults.duration || 6)),
+        resolution: resolutions.includes(defaults.resolution)
+          ? defaults.resolution
+          : resolutions[0] || "",
+        denoise: Number(defaults.denoise || 1),
+      },
+      aspects: customAspectSet(
+        {
           width: detectedDefault(widthRange, Number(defaults.width || 1024)),
           height: detectedDefault(heightRange, Number(defaults.height || 1024)),
-          steps: Number(
-            defaults.steps ||
-              detectedDefault(samplerRange.steps, workflow.kind === "video" ? 12 : 20),
-          ),
-          cfg: Number(
-            defaults.cfg || detectedDefault(samplerRange.cfg, workflow.kind === "video" ? 5 : 7),
-          ),
-          sampler: defaults.sampler || samplers[0] || "",
-          scheduler: defaults.scheduler || schedulers[0] || "",
-          textEncoder: defaults.textEncoder || "",
-          vae: defaults.vae || "",
-          clipType: defaults.clipType || "",
-          weightDtype: defaults.weightDtype || "default",
-          frames: detectedDefault(frameRange, Number(defaults.frames || 33)),
-          fps: detectedDefault(fpsRange, Number(defaults.fps || 16)),
-          duration: detectedDefault(durationRange, Number(defaults.duration || 6)),
-          resolution: resolutions.includes(defaults.resolution)
-            ? defaults.resolution
-            : resolutions[0] || "",
-          denoise: Number(defaults.denoise || 1),
         },
-        aspects: customAspectSet(
-          {
-            width: detectedDefault(widthRange, Number(defaults.width || 1024)),
-            height: detectedDefault(heightRange, Number(defaults.height || 1024)),
-          },
-          workflow.aspectRatios,
-          { width: widthRange, height: heightRange },
-        ),
-        aspectDefault: families[loraFamilyId(workflow.family)]?.aspectDefault || "",
-        // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
-        native: workflowFamilyValue(workflow, "native"),
-        // Whether the family edits with its references, rather than starting from one (img2img).
-        editReferences: Boolean(workflowFamilyValue(workflow, "references")),
-        keepsCharacters: Boolean(workflowFamilyValue(workflow, "keepsCharacters")),
-        options: {
-          textEncoders: clips,
-          vaes,
-          clipTypes,
-          weightDtypes,
-          samplers,
-          schedulers,
-          resolutions,
-          loras: workflow.capabilities.lora ? loras : [],
-        },
-        constraints: {
-          prompt: textMeta,
-          negative: textMeta,
-          width: widthRange,
-          height: heightRange,
-          count: countRange,
-          frames: frameRange,
-          fps: fpsRange,
-          duration: durationRange,
-          ...samplerRange,
-        },
-        imageModes: workflow.imageModes,
-        capabilities: {
-          ...workflow.capabilities,
-          // A mask needs an image the graph takes in, a saved image to stitch into and the stitch's
-          // core nodes (checked once a worker answers).
-          inpaint:
-            workflow.kind === "image" &&
-            workflow.capabilities.inpaint !== false &&
-            Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
-            imageSaves(workflow.graph).length > 0 &&
-            (configuredOnly || !missingNodes(info, inpaintNodes).length),
-        },
-        mediaInputs: workflow.mediaInputs || [],
-        aspectPolicy: workflow.aspectPolicy,
-        maxLoras: workflow.loraStack?.max,
-        backend: workflow.backend,
-        backendOptions,
-        // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
-        ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
-          ? { loraNote: "Up to rank 64 in total" }
-          : {}),
-      }),
-    );
+        workflow.aspectRatios,
+        { width: widthRange, height: heightRange },
+      ),
+      aspectDefault: families[loraFamilyId(workflow.family)]?.aspectDefault || "",
+      // Whether the model family draws 2K/4K itself, so MCP's size applies to imported workflows too.
+      native: workflowFamilyValue(workflow, "native"),
+      // Whether the family edits with its references, rather than starting from one (img2img).
+      editReferences: Boolean(workflowFamilyValue(workflow, "references")),
+      keepsCharacters: Boolean(workflowFamilyValue(workflow, "keepsCharacters")),
+      options: {
+        textEncoders: clips,
+        vaes,
+        clipTypes,
+        weightDtypes,
+        samplers,
+        schedulers,
+        resolutions,
+        loras: workflow.capabilities.lora ? loras : [],
+      },
+      constraints: {
+        prompt: textMeta,
+        negative: textMeta,
+        width: widthRange,
+        height: heightRange,
+        count: countRange,
+        frames: frameRange,
+        fps: fpsRange,
+        duration: durationRange,
+        ...samplerRange,
+      },
+      imageModes: workflow.imageModes,
+      capabilities: {
+        ...workflow.capabilities,
+        // A mask needs an image the graph takes in, a saved image to stitch into and the stitch's
+        // core nodes (checked once a worker answers).
+        inpaint:
+          workflow.kind === "image" &&
+          workflow.capabilities.inpaint !== false &&
+          Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
+          imageSaves(workflow.graph).length > 0 &&
+          (configuredOnly || !missingNodes(info, inpaintNodes).length),
+      },
+      mediaInputs: workflow.mediaInputs || [],
+      aspectPolicy: workflow.aspectPolicy,
+      maxLoras: workflow.loraStack?.max,
+      backend: workflow.backend,
+      // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
+      ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
+        ? { loraNote: "Up to rank 64 in total" }
+        : {}),
+    });
+    const reason = configuredOnly ? "" : unready(workflow);
     if (reason)
-      Object.assign(profiles.at(-1), {
+      Object.assign(profile, {
         ready: false,
         readyReason: `${profileBackendLabels[workflow.backend] || workflow.backend} isn’t ready: ${reason}`,
       });
+    return profile;
+  };
+
+  for (const listed of loadCustomWorkflows()) {
+    if (usesGrokMedia(listed)) continue;
+    const variants = new Map(
+      (listed.backendIds || []).map((id) => [
+        id,
+        profileForWorkflow(workflowOnBackend(listed, id)),
+      ]),
+    );
+    const workflow = workflowOnBackend(listed, profileBackends[listed.profileId]);
+    const profile = variants.get(workflow.backend) || profileForWorkflow(workflow);
+    const backendOptions = [...variants].map(([id, own]) => {
+      const reason = configuredOnly ? "" : unready(workflowOnBackend(listed, id));
+      return {
+        id,
+        label: profileBackendLabels[id] || id,
+        references: own.mediaInputs?.length || 0,
+        ...(configuredOnly ? {} : { ready: own.ready !== false }),
+        ...(reason ? { reason } : {}),
+        profile: own,
+      };
+    });
+    // Keep the chosen backend explicit; its alternatives carry their own controls and limits.
+    if (profile.ready === false && !backendOptions.some((option) => option.ready)) continue;
+    profiles.push({ ...profile, ...(profile.backend ? { backendOptions } : {}) });
   }
 
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");

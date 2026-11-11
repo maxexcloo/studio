@@ -14,7 +14,7 @@ import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from
 import { api } from "../../api";
 import { useRememberedKey } from "../auth/useRemembered";
 import { setFamilyLabels } from "../../ui/modelFamily";
-import { isProfile, referencePatch } from "./payload";
+import { isProfile, profileForBackend, referencePatch } from "./payload";
 
 export const modelsQuery = queryOptions({
   queryKey: ["models"],
@@ -155,9 +155,13 @@ function useGenerationState() {
   );
   const models = useQuery({ ...modelsQuery, refetchInterval: 15000 });
   const profiles = models.data?.profiles ?? emptyProfiles;
-  const profile = draft.input.profileId
+  const selectedProfile = draft.input.profileId
     ? profiles.find((profile) => isProfile(profile, draft.input.profileId))
     : defaultProfile(models.data, draft.input.kind);
+  const profile = useMemo(
+    () => profileForBackend(selectedProfile, draft.input.profileBackend),
+    [selectedProfile, draft.input.profileBackend],
+  );
   function update(patch: Partial<GenerationInput>) {
     setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));
   }
