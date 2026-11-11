@@ -29,8 +29,12 @@ interface Router {
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
 const ownerOf = (account: RouteAccount) => account?.userId || "";
-/** The person's queue, Dream's background jobs included, without failed jobs the person cleared. */
-const listed = (store: Store, ownerId: string) => store.jobs(ownerId).filter((job) => !job.cleared);
+/**
+ * The person's queue, Dream's background jobs included, without failed jobs the person cleared:
+ * its unfinished and failed work and its latest finished jobs (`Store.queueJobs`).
+ */
+const listed = (store: Store, ownerId: string) =>
+  store.queueJobs(ownerId).filter((job) => !job.cleared);
 /** What Stop All and Cancel Pending act on: the person's own unfinished work, as Dream's pause stops Dream's. */
 const ownWork = (store: Store, ownerId: string) =>
   store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
@@ -75,6 +79,10 @@ export function registerRewriteRoutes(
       const items = media?.(ownerId, job.id);
       return publicJob(items?.length ? { ...job, items } : job);
     });
+  // Polled while work runs: a job with gallery records drops the adapter's copies of them, which
+  // every reader passes over for the records.
+  const queued = (ownerId: string, jobs: OwnedJob[]) =>
+    shown(ownerId, jobs).map((job) => (job.items.length ? { ...job, outputs: [] } : job));
   app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
   app.post("/api/user-presets", (req, res) => {
     if (typeof req.body?.title !== "string" || !req.body.title.trim() || !object(req.body.input))
@@ -130,10 +138,8 @@ export function registerRewriteRoutes(
     const { operation = "image", parentJobId, parentItemId, ...input } = req.body || {};
     if (!["image", "refine", "animate"].includes(String(operation)))
       return res.status(400).json({ error: "Unknown generation operation." });
-    const parent =
-      typeof parentJobId === "string"
-        ? store.jobs(owner(req), req.params.id).find((job) => job.id === parentJobId)
-        : undefined;
+    const found = typeof parentJobId === "string" ? store.job(owner(req), parentJobId) : undefined;
+    const parent = found?.sessionId === req.params.id ? found : undefined;
     if (parentJobId !== undefined && !parent)
       return res.status(400).json({ error: "Parent generation must belong to this session." });
     // The result a run is made from is the owner's: one of the parent's results or a gallery item.
@@ -166,14 +172,15 @@ export function registerRewriteRoutes(
     return {
       status: 200,
       payload: {
-        // Polled while work runs: a job with gallery records drops the adapter's copies of them,
-        // which every reader passes over for the records.
-        jobs: shown(ownerId, listed(store, ownerId)).map((job) =>
-          job.items.length ? { ...job, outputs: [] } : job,
-        ),
+        jobs: queued(ownerId, listed(store, ownerId)),
         paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
       } satisfies QueueResponse,
     };
+  });
+  // One of the person's jobs, however old: the queue lists only the latest finished ones.
+  directRoute(app, "GET", "/api/queue/:id", (account, { params }) => {
+    const job = store.job(ownerOf(account), params.id);
+    return job ? { status: 200, payload: { job: queued(ownerOf(account), [job])[0] } } : notFound;
   });
   // The account's own pause: nothing new of its work starts; started work finishes.
   for (const [action, paused] of [

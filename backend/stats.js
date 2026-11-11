@@ -37,11 +37,16 @@ const dayMs = 86_400_000;
  */
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
+  // Each recorded id resolves once: resolving reads the alias file's state.
+  const canonical = new Map();
   for (const item of items) {
-    const profile = canonicalProfileId(item?.settings?.profileId);
-    const at = Date.parse(item?.createdAt || "");
-    if (!profile || !(now - at < 30 * dayMs)) continue;
-    if (item.status !== "done" && item.status !== "failed") continue;
+    if (item?.status !== "done" && item?.status !== "failed") continue;
+    const at = Date.parse(item.createdAt || "");
+    if (!(now - at < 30 * dayMs)) continue;
+    const id = item.settings?.profileId;
+    if (!canonical.has(id)) canonical.set(id, canonicalProfileId(id));
+    const profile = canonical.get(id);
+    if (!profile) continue;
     const entry = stats.get(profile) || {
       runs: 0,
       failed: 0,

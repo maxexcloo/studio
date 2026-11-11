@@ -10,7 +10,7 @@ import {
   useGenerationActions,
 } from "../generation/GenerationProvider";
 import { backendLabel, generationInput, isProfile, profileName } from "../generation/payload";
-import { queueQuery } from "../generation/Queue";
+import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { isCloudProfile } from "../../../../shared/profiles";
 import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
 import { useItemMutation } from "./useItemMutation";
@@ -89,7 +89,14 @@ export async function mediaDraft(
         : `No ${targetKind} model takes a reference.`,
     );
   const queue = await client.fetchQuery(queueQuery);
-  const source = queue.jobs.find((job) => job.id === item.jobId);
+  const source =
+    queue.jobs.find((job) => job.id === item.jobId) ||
+    (item.jobId
+      ? await client.fetchQuery(queueJobQuery(item.jobId)).then(
+          ({ job }) => job,
+          () => undefined,
+        )
+      : undefined);
   const sourceSession = source?.sessionId || "";
   let asset: ReferenceAsset | undefined;
   if (operation !== "image")
