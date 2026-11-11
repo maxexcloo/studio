@@ -47,11 +47,11 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
   await page.mouse.up();
   await expect(current(page)).toContainText("Dream prompt five");
 
-  // The deck's bar offers Pass and Like; Star and the rest are in the viewer.
+  // Super Like keeps and stars it, from the deck's bar or the viewer's.
   await current(page).getByRole("button", { name: "View", exact: true }).click();
   await page
     .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Star", exact: true })
+    .getByRole("button", { name: "Super Like", exact: true })
     .click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual([

@@ -395,7 +395,11 @@ export function DreamDeck({
     { choice, label, icon: Icon, hint, tip, primary }: Choice,
     props?: ButtonProps,
   ) => (
-    <Tooltip key={choice} label={`${tip || label} (${hint})`} disabled={phone}>
+    <Tooltip
+      key={choice}
+      label={hint ? `${tip || label} (${hint})` : tip || label}
+      disabled={phone}
+    >
       <Button
         variant={primary ? "filled" : "default"}
         radius="xl"
@@ -491,9 +495,9 @@ export function DreamDeck({
       {/* A comparison's sides stand out from Neither and Both, filling the width on phones held
           upright; held sideways, one row leaves the card more height. */}
       {top.kind !== "pair" ? (
-        <Group className={classes.actions} justify="center" wrap="nowrap">
-          {[choice("discard"), choice("keep")].map((option) =>
-            button(option, { size: "lg", miw: "9rem" }),
+        <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap" grow={phone}>
+          {[choice("discard"), choice("star"), choice("keep")].map((option) =>
+            button(option, phone ? { size: "md", px: "xs" } : { size: "lg", miw: "9rem" }),
           )}
         </Group>
       ) : phone && !sideways ? (
