@@ -20,6 +20,7 @@ import {
   Layers,
   Lightbulb,
   ListFilter,
+  ListX,
   MapPinned,
   MessageCircle,
   Moon,
@@ -33,9 +34,9 @@ import {
   Rows2,
   ScanSearch,
   ScrollText,
-  Shirt,
   Settings,
   Share,
+  Shirt,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -62,6 +63,8 @@ export const icons = {
   /** The chat site (LibreChat) the navigation links to. */
   chat: MessageCircle,
   clear: X,
+  /** Clear Failed: failed generations leave the queue. */
+  clearFailed: ListX,
   /** Comparing variants: Compare runs and the composer's Compare. */
   compare: Blend,
   /** Two versions side by side (Compare Upscale). */

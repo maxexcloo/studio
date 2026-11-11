@@ -925,9 +925,9 @@ test("moves reorder only the owner's pending items, within their tiers and other
     const a2 = enqueue("alice", alice.id);
     const aMcp = enqueue("alice", alice.id, mcp("set"));
     const b2 = enqueue("bob", bob.id);
-    assert.equal(store.move("alice", aMcp, 0), true);
-    assert.equal(store.move("alice", a1, 2), true);
-    assert.equal(store.move("bob", a2, 0), false);
+    assert.equal(store.move("alice", [aMcp], 0), true);
+    assert.equal(store.move("alice", [a1], 2), true);
+    assert.equal(store.move("bob", [a2], 0), false);
     // Alice's items trade places among themselves; Bob's keep theirs.
     assert.deepEqual(
       store.jobs().map((job) => job.id),
@@ -936,6 +936,29 @@ test("moves reorder only the owner's pending items, within their tiers and other
     // Moved to the top, MCP work still runs after every account's manual work.
     await drain(queue);
     assert.deepEqual(queue.submitted, [b1, a2, a1, b2, aMcp]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a set's items move together in their order among the owner's other pending items", () => {
+  const { store } = fixture();
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (origin = {}) =>
+      store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, origin).id;
+    const [a, s1, b, s2] = [enqueue(), enqueue(mcp("s")), enqueue(), enqueue(mcp("s"))];
+    assert.equal(store.move("alice", [s1, s2], 0), true);
+    assert.deepEqual(
+      store.jobs().map((job) => job.id),
+      [s1, s2, a, b],
+    );
+    assert.equal(store.move("alice", [s2, s1], 1), true);
+    assert.deepEqual(
+      store.jobs().map((job) => job.id),
+      [a, s1, s2, b],
+    );
+    assert.equal(store.move("alice", [s1, "missing"], 0), false);
   } finally {
     store.close();
   }

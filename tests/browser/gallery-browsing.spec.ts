@@ -258,6 +258,8 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await page.goto("/images");
   const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
   const second = page.getByRole("button", { name: "Open image: Browse Result 1", exact: true });
+  // A touch screen's hold is Studio's: no native drag lift takes it first.
+  await expect(first).toHaveAttribute("draggable", "false");
   await touch(first, "touchstart");
   await touch(first, "touchmove", 140);
   await touch(first, "touchend", 140);

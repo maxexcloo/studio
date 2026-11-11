@@ -14,6 +14,7 @@ import {
 import fs from "node:fs";
 import { galleryFilter, outputFileCandidates, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
+import { makePendingItems } from "./records.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
@@ -161,11 +162,40 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
     });
     // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every page.
     const listed = ({ nextSteps: _steps, ...item }) => item;
+    // Work the queue holds has no tiles until it starts; the first page leads with them, so all of
+    // the account's unfinished work shows. Dream's stays in its own pool; an upscale has no tile.
+    const queued =
+      cursor || similarTo || query.uploads === "1"
+        ? []
+        : store
+            .openJobs(account?.userId || "")
+            .filter(
+              (job) =>
+                !job.dream &&
+                !job.cleared &&
+                job.operation !== "upscale" &&
+                !galleryJobItems(job.id).length,
+            )
+            .reverse()
+            .flatMap((job) =>
+              makePendingItems(job.id, {
+                ...job.input,
+                ownerId: account?.userId || "",
+                createdAt: job.createdAt,
+              }),
+            )
+            .filter(
+              (item) =>
+                (!type || item.type === type) &&
+                recordBelongsToAccount(item, account) &&
+                (!query.set || item.resultSet?.id === query.set) &&
+                (!search || search(item)),
+            );
     return {
       status: 200,
       payload: {
         ...page,
-        items: page.items.map(listed),
+        items: [...queued, ...page.items.map(listed)],
       },
     };
   });

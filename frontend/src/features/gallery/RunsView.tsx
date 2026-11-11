@@ -12,7 +12,7 @@ import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import { inRunOrder, runKey } from "./resultSets";
 import { MediaTile } from "./MediaTile";
-import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
+import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 import classes from "./RunsView.module.css";
 
 interface Run {
@@ -100,6 +100,21 @@ export function RunsView({
     // As in Grid: scrolling renders in React's own time, not inside each scroll event.
     useFlushSync: false,
   });
+  // Each run's row start, as rows change; measuring rows later is the virtualiser's own to hold.
+  const places = useMemo(() => {
+    virtual.getTotalSize();
+    const starts = virtual.measurementsCache;
+    return new Map(
+      rows.flatMap((row, index) =>
+        "runs" in row && starts[index]
+          ? row.runs.map(
+              (run) => [run.key, starts[index].start - virtual.options.scrollMargin] as const,
+            )
+          : [],
+      ),
+    );
+  }, [rows]);
+  useScrollAnchor(host, width ? places : null, `${columns}:${width}`);
   useLayoutEffect(() => {
     virtual.measure();
     // A zoom holds the row of the run under the fingers or pointer in place.

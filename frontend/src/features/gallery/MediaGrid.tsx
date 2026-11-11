@@ -19,7 +19,7 @@ import classes from "./MediaGrid.module.css";
 import { MediaTile } from "./MediaTile";
 import type { VersionGroup } from "./versions";
 import type { GallerySelection } from "./useGallerySelection";
-import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
+import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
 
 export interface GalleryViewProps {
   items: MediaItem[];
@@ -158,6 +158,11 @@ export function MediaGrid({
     [items, columns, cell, gap, byDay, width],
   );
   const span = useWindowSpan(host, layout?.height || 0);
+  const places = useMemo(
+    () => layout && new Map(layout.tiles.map((tile, index) => [items[index].id, tile.top])),
+    [layout],
+  );
+  useScrollAnchor(host, places, `${columns}:${width}:${byDay}`);
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
     (index: number) => {

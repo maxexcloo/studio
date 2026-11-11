@@ -24,6 +24,7 @@ const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
 const routes = {};
 // Image search (domain/image-search.ts): a test per search, or null.
 let near = () => null;
+const queue = new Store(openDatabase(":memory:"));
 registerGalleryReadRoutes(
   {
     get: (route, handler) => {
@@ -32,7 +33,7 @@ registerGalleryReadRoutes(
   },
   {
     near: async (q) => near(q),
-    store: new Store(openDatabase(":memory:")),
+    store: queue,
   },
 );
 
@@ -94,6 +95,34 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     ).items.map((record) => record.jobId),
     ["job-a"],
   );
+});
+
+test("the first gallery page leads with the account's queued work that has no tiles yet", async () => {
+  const done = item("account-a", "job-done");
+  galleryStore.setGallery([done]);
+  const session = queue.createSession("account-a");
+  const waiting = queue.enqueue(
+    "account-a",
+    session.id,
+    { prompt: "a fox", kind: "image" },
+    "image",
+  );
+  queue.enqueue("account-b", queue.createSession("account-b").id, { kind: "image" }, "image");
+  const request = {
+    studioAccount: { userId: "account-a", role: "user", authenticated: true, features: {} },
+    query: {},
+  };
+  const page = await call(routes["/api/gallery"], request);
+  assert.deepEqual(
+    page.items.map((record) => [record.id, record.status]),
+    [
+      [`${waiting.id}-0`, "pending"],
+      [done.id, "done"],
+    ],
+  );
+  const videos = await call(routes["/api/gallery"], { ...request, query: { type: "video" } });
+  assert.deepEqual(videos.items, []);
+  queue.save({ ...queue.job("account-a", waiting.id), status: "cancelled" });
 });
 
 test("Clear Failed takes the account's own failed items; administrators may name an owner or all", async () => {
