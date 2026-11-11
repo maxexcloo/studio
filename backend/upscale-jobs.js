@@ -7,7 +7,7 @@ import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
-import { saveIntoStudioFolder } from "./graphs.js";
+import { nameSavesForRun, saveIntoStudioFolder } from "./graphs.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 
@@ -110,7 +110,9 @@ export async function runUpscaleJob(
       ? { graph: null, plan: recorded.plan }
       : upscaleGraph(body, info);
     // An account's upscale is saved beside its other outputs, in the owner's folder.
-    const graph = built && body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built;
+    const graph =
+      built &&
+      nameSavesForRun(body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built, jobId);
     target.patch({
       status: "running",
       jobId,

@@ -8,6 +8,7 @@ import { userWorkflowsDir } from "./custom-workflows.js";
 import {
   composeWorkflowPrompt,
   customWorkflowGraph,
+  nameSavesForRun,
   saveIntoStudioFolder,
   uploadReferenceImage,
 } from "./graphs.js";
@@ -226,4 +227,16 @@ test("a guiding reference's strength reaches its mapped input; without one the g
   });
   assert.equal(graph["1"].inputs.image, "staged.png");
   assert.equal(graph["3"].inputs.strength, 1.25);
+});
+
+test("each run names its saves, so ComfyUI reruns them for an exact repeat", () => {
+  const graph = () => ({
+    1: { class_type: "SaveImage", inputs: { filename_prefix: "studio/image" } },
+    2: { class_type: "VHS_VideoCombine", inputs: { filename_prefix: ["9", 0] } },
+  });
+  const first = nameSavesForRun(graph(), "893c2b7b-0000-4000-8000-000000000000");
+  const repeat = nameSavesForRun(graph(), "a0a95ab6-0000-4000-8000-000000000000");
+  assert.equal(first["1"].inputs.filename_prefix, "studio/image-893c2b7b");
+  assert.equal(repeat["1"].inputs.filename_prefix, "studio/image-a0a95ab6");
+  assert.deepEqual(first["2"].inputs.filename_prefix, ["9", 0]);
 });
