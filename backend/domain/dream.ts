@@ -2,7 +2,6 @@ import { randomInt, randomUUID } from "node:crypto";
 import {
   awaitsWriting,
   maxPromptCharacters,
-  terminalStatuses,
   type GenerationInput,
   type QueueMedia,
 } from "../../shared/queue.ts";
@@ -437,12 +436,17 @@ export function createDream(options: {
   // The server's local day.
   const day = (time: number) => new Date(time).toDateString();
 
-  const live = () => store.jobs().filter((job) => !terminalStatuses.has(job.status));
+  const live = () => store.openJobs();
   const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job)) || options.textBusy();
   function today(ownerId: string) {
     const counts = { images: 0, videos: 0 };
     const current = day(now());
-    for (const job of store.jobs(ownerId))
+    // A Dream job's mark is stamped just before it queues, so today's were created since the
+    // day's start; a day's slack covers a clock running ahead of the store's.
+    const start = new Date(now());
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 1);
+    for (const job of store.jobsSince(ownerId, start.toISOString()))
       // An idea the text model never finished writing made nothing.
       if (
         dreamJob(job) &&
@@ -459,7 +463,7 @@ export function createDream(options: {
    * never reach Dream, so it shows and learns only from what the account made here.
    */
   function generations(ownerId: string) {
-    const jobs = new Set(store.jobs(ownerId).map((job) => job.id));
+    const jobs = store.jobIds(ownerId);
     return options
       .visible(options.gallery(ownerId))
       .filter((item) => (item.ownerId || "") === ownerId && item.jobId && jobs.has(item.jobId));

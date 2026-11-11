@@ -1,5 +1,4 @@
 import {
-  terminalStatuses,
   type GenerationInput,
   type QueueCancelAllResponse,
   type QueueMedia,
@@ -32,9 +31,9 @@ const owner = (req: Request) => req.studioAccount?.userId || "";
 const ownerOf = (account: RouteAccount) => account?.userId || "";
 /** The person's queue, Dream's background jobs included, without failed jobs the person cleared. */
 const listed = (store: Store, ownerId: string) => store.jobs(ownerId).filter((job) => !job.cleared);
-/** What Stop All and Cancel Pending act on: the person's own work, as Dream's pause stops Dream's. */
+/** What Stop All and Cancel Pending act on: the person's own unfinished work, as Dream's pause stops Dream's. */
 const ownWork = (store: Store, ownerId: string) =>
-  listed(store, ownerId).filter((job) => job.priority !== queuePriority.dream);
+  store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const notFound = { status: 404, payload: { error: "Not found." } };
@@ -207,22 +206,20 @@ export function registerRewriteRoutes(
   directRoute(app, "POST", "/api/queue/cancel-all", async (account) => {
     const ownerId = ownerOf(account);
     const outcomes = await Promise.all(
-      ownWork(store, ownerId)
-        .filter((job) => !terminalStatuses.has(job.status))
-        .map(async (initial) => {
-          let error: string | undefined;
-          try {
-            await queue.cancel(ownerId, initial.id);
-          } catch {
-            error = unconfirmedCancel;
-          }
-          const job = store.job(ownerId, initial.id)!;
-          return {
-            job: publicJob(job),
-            cancelRequested: job.cancelRequested === true,
-            ...(error ? { error } : {}),
-          };
-        }),
+      ownWork(store, ownerId).map(async (initial) => {
+        let error: string | undefined;
+        try {
+          await queue.cancel(ownerId, initial.id);
+        } catch {
+          error = unconfirmedCancel;
+        }
+        const job = store.job(ownerId, initial.id)!;
+        return {
+          job: publicJob(job),
+          cancelRequested: job.cancelRequested === true,
+          ...(error ? { error } : {}),
+        };
+      }),
     );
     return { status: 200, payload: { outcomes } satisfies QueueCancelAllResponse };
   });
@@ -296,8 +293,8 @@ export function registerMaintenanceRoutes(
     const refusal = adminRefusal(account);
     if (refusal) return refusal;
     const jobs: UnfinishedJob[] = store
-      .jobs()
-      .filter((job) => !terminalStatuses.has(job.status) && !job.cleared)
+      .openJobs()
+      .filter((job) => !job.cleared)
       .map((job) => ({ ...publicJob(job), ownerId: job.ownerId }));
     return { status: 200, payload: { jobs } };
   });

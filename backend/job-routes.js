@@ -1,7 +1,7 @@
 import { ownerIdForRequest } from "./account-ownership.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { unconfirmedCancel } from "./domain/routes.ts";
-import { pausedReason, terminalStatuses } from "../shared/queue.ts";
+import { pausedReason } from "../shared/queue.ts";
 import { queueSchedule } from "./queue-eta.js";
 
 /**
@@ -67,12 +67,7 @@ export function registerJobRoutes(app, { store, queue }) {
   app.post("/api/queue/cancel", async (req, res) => {
     const ownerId = ownerIdForRequest(req);
     // A cancel the worker can't confirm yet stays recorded; recovery finishes it.
-    await Promise.allSettled(
-      store
-        .jobs(ownerId)
-        .filter((job) => !terminalStatuses.has(job.status))
-        .map((job) => queue.cancel(ownerId, job.id)),
-    );
+    await Promise.allSettled(store.openJobs(ownerId).map((job) => queue.cancel(ownerId, job.id)));
     res.json({ ok: true });
   });
 }
