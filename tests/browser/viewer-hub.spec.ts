@@ -165,10 +165,10 @@ test("Ask turns a change in plain words into the chosen action's prompt in place
     : viewer.getByRole("group", { name: "Generation Actions", exact: true });
   if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // The editor shows the tools as buttons; elsewhere they are in the prompt's ⋯.
+  // The editor asks from a send beside Generate; elsewhere it is a tool in the prompt's ⋯.
   const askForChange = () =>
     phone
-      ? surface.getByRole("button", { name: "Ask for a Change…", exact: true }).click()
+      ? surface.getByRole("button", { name: "Ask for a Change", exact: true }).click()
       : promptTool(surface, "Prompt", "Ask for a Change…");
   await field.fill("make it night");
   await askForChange();

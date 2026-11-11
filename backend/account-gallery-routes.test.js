@@ -16,6 +16,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const { openDatabase } = await import("./persistence/runtime.ts");
 const { Store } = await import("./domain/store.ts");
+const { saveAccountPreferences } = await import("./account-preferences.js");
 const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
   import("./gallery/routes.js"),
   import("./gallery/store.js"),
@@ -105,10 +106,22 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   );
 });
 
-test("the first gallery page leads with the account's queued work that has no tiles yet", async () => {
+test("unfinished work shows as the account chooses: none, in progress, or queued work first", async () => {
   const done = item("account-a", "job-done");
-  galleryStore.setGallery([done]);
   const session = queue.createSession("account-a");
+  // Started work has its tiles; waiting work has none yet.
+  const started = queue.enqueue(
+    "account-a",
+    session.id,
+    { prompt: "a hare", kind: "image" },
+    "image",
+  );
+  const running = {
+    ...item("account-a", started.id),
+    status: "pending",
+    createdAt: "2026-10-20T00:00:00.000Z",
+  };
+  galleryStore.setGallery([running, done]);
   const waiting = queue.enqueue(
     "account-a",
     session.id,
@@ -120,17 +133,17 @@ test("the first gallery page leads with the account's queued work that has no ti
     studioAccount: { userId: "account-a", role: "user", authenticated: true, features: {} },
     query: {},
   };
-  const page = await call(routes["/api/gallery"], request);
-  assert.deepEqual(
-    page.items.map((record) => [record.id, record.status]),
-    [
-      [`${waiting.id}-0`, "pending"],
-      [done.id, "done"],
-    ],
-  );
+  const shown = async () =>
+    (await call(routes["/api/gallery"], request)).items.map((record) => record.id);
+  assert.deepEqual(await shown(), [done.id]);
+  saveAccountPreferences("account-a", { galleryWork: "running" });
+  assert.deepEqual(await shown(), [running.id, done.id]);
+  saveAccountPreferences("account-a", { galleryWork: "queued" });
+  assert.deepEqual(await shown(), [`${waiting.id}-0`, running.id, done.id]);
   const videos = await call(routes["/api/gallery"], { ...request, query: { type: "video" } });
   assert.deepEqual(videos.items, []);
-  queue.save({ ...queue.job("account-a", waiting.id), status: "cancelled" });
+  for (const job of [started, waiting])
+    queue.save({ ...queue.job("account-a", job.id), status: "cancelled" });
 });
 
 test("Clear Failed takes the account's own failed items; administrators may name an owner or all", async () => {

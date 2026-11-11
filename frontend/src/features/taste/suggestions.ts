@@ -26,6 +26,18 @@ export const nextStepsQuery = (jobId: string) =>
     ...cached,
   });
 
+/** What could happen when a finished image is animated; `fresh` asks for different ideas. */
+export const askMotionIdeas = (jobId: string, fresh = false) =>
+  post<Suggestions<NextStep>>("/api/suggestions", { surface: "animate", jobId, fresh });
+
+/** A finished image's motion ideas, which Animate's Custom Animation offers. */
+export const motionIdeasQuery = (jobId: string) =>
+  queryOptions({
+    queryKey: ["suggestions", "animate", jobId],
+    queryFn: () => askMotionIdeas(jobId),
+    ...cached,
+  });
+
 /** Short changes for the composer's draft prompt; `fresh` asks for different ones. */
 export const askDraftSteps = (kind: MediaKind, prompt: string, fresh = false) =>
   post<Suggestions<NextStep>>("/api/suggestions", { surface: "draft", kind, prompt, fresh });

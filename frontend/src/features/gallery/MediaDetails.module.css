@@ -1,6 +1,5 @@
 .caption {
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
 .captionText {
@@ -8,7 +7,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Five lines, ending in an ellipsis. */
+/* Five lines, the last fading out under Expand, which sits at its end. */
 .folded {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -16,8 +15,18 @@
   overflow: hidden;
 }
 
+.folded[data-long] {
+  mask:
+    linear-gradient(#000 0 0) top / 100% calc(100% - 1lh) no-repeat,
+    linear-gradient(to left, transparent 4.5em, #000 7em) bottom / 100% 1lh no-repeat;
+}
+
 .unfold {
-  align-self: flex-end;
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
 }
 
 .fold {

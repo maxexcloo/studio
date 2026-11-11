@@ -7,35 +7,26 @@
   touch-action: none;
 }
 
-.sheetHeading {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  min-width: 0;
-}
-
-/* A field in the heading, such as a name being saved, gives way before its buttons. */
+/* A field in the heading or phone footer, such as a name being saved, gives way before its
+   buttons. */
 .heading button,
-.sheetHeading button {
+.sheetFooter button {
   flex-shrink: 0;
 }
 
-/* A heading's actions sit at its end; a name being saved takes the rest of the row, the title and
-   any detail stepping aside. */
+/* A heading's or phone footer's actions sit at its end; a name being saved takes the rest of the
+   row, the title and any detail (or the footer's start) stepping aside. */
 .actions {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.heading:has([data-naming]),
-.sheetHeading:has([data-naming]) {
+.heading:has([data-naming]) {
   flex-wrap: nowrap;
 }
 
 .heading:has([data-naming]) > :first-child,
-.sheetHeading:has([data-naming]) > :first-child {
+.sheetFooter:has([data-naming]) .footerStart {
   display: none;
 }
 

@@ -431,42 +431,15 @@ export function useMediaActions(
           [...(reference ? [reference] : []), saveFrame],
         ],
       }),
-    // Edit changes the item itself first, then reuses its prompt and settings: in the composer, or
-    // run again from here. An upload has only its suggested prompt; unfinished work opens its prompt.
+    // Edit runs the item again from here first, then reuses it elsewhere, then changes the item
+    // itself or recreates it in the composer. An upload has only its suggested prompt; unfinished
+    // work opens its prompt.
     itemAction("edit", {
       disabled: !ready && action.isPending,
       loading: videoEdit.isPending || running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
       menu: ready
         ? [
-            ...(image
-              ? [
-                  [
-                    {
-                      id: "edit-image",
-                      label: "Edit Image",
-                      icon: icons.edit,
-                      disabled: action.isPending,
-                      onClick: () => action.mutate("refine"),
-                    },
-                    recreateAction,
-                  ],
-                  [...(character ? [character] : []), ...(reference ? [reference] : [])],
-                ]
-              : // A video's edits each save a new version; the original stays.
-                [
-                  [
-                    { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-                    editAction("reverse", "Reverse", Rewind, "reverse"),
-                    editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
-                  ],
-                  // Interpolated edits, the slowest to make.
-                  [
-                    editAction("slow-motion", "Slow Motion", Snail, "slow"),
-                    editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
-                  ],
-                  [recreateAction],
-                ]),
             item.uploaded
               ? []
               : [
@@ -494,6 +467,34 @@ export function useMediaActions(
                       ]
                     : []),
                 ],
+            ...(image
+              ? [
+                  [...(character ? [character] : []), ...(reference ? [reference] : [])],
+                  [
+                    {
+                      id: "edit-image",
+                      label: "Edit Image",
+                      icon: icons.edit,
+                      disabled: action.isPending,
+                      onClick: () => action.mutate("refine"),
+                    },
+                    recreateAction,
+                  ],
+                ]
+              : // A video's edits each save a new version; the original stays.
+                [
+                  [
+                    { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
+                    editAction("reverse", "Reverse", Rewind, "reverse"),
+                    editAction("back-and-forth", "Back & Forth", ArrowLeftRight, "loop"),
+                  ],
+                  // Interpolated edits, the slowest to make.
+                  [
+                    editAction("slow-motion", "Slow Motion", Snail, "slow"),
+                    editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
+                  ],
+                  [recreateAction],
+                ]),
           ]
         : undefined,
     }),

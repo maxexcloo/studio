@@ -14,7 +14,9 @@ import {
  * do (Cloud, or the local Fast or Quality tier); unsaved, each is local. The side that can't run
  * gives way to the other, saying so; a model the person picks always wins (model/catalogue.js,
  * animate-profile.js). `writingModel` is the text model prompt writing asks for (assistant.js
- * `writerModel`). Keys Studio no longer knows are dropped as the document is read.
+ * `writerModel`). `galleryWork` is which unfinished work the gallery shows: none (unsaved), work
+ * in progress, or queued work too (gallery/routes.js). Keys Studio no longer knows are dropped as
+ * the document is read.
  */
 export const preferenceDefaults = Object.freeze({
   cloudModels: true,
@@ -25,6 +27,7 @@ export const preferenceDefaults = Object.freeze({
 });
 /** Preferences that take one of a few values rather than on or off; they have no default. */
 const preferenceChoices = Object.freeze({
+  galleryWork: ["none", "running", "queued"],
   images: ["cloud", "local"],
   videos: ["cloud", "fast", "quality"],
 });
