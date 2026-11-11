@@ -16,16 +16,16 @@ export interface Choice {
   /** Its key on desktop. */
   hint?: string;
   tip?: string;
-  /** One of the bars' large choices: Pass and Like, or a comparison's A and B. */
+  /** One of the bars' large choices: Pass, Super Like and Like, or a comparison's A and B. */
   main?: boolean;
   primary?: boolean;
 }
 
 /**
  * The top card's choices, in groups: a comparison's Neither, A, B and Both (the picks in the
- * middle); a single card's Pass, then Edit and Animate, Star, Variations and More Like This, then
- * Like. Edit, Animate, Variations and More Like This need a Dream image; a gallery image is passed,
- * liked or starred.
+ * middle); a single card's Pass, then Edit and Animate, Super Like, Variations and More Like This,
+ * then Like. Edit, Animate, Variations and More Like This need a Dream image; a gallery image is
+ * passed, liked or super liked.
  */
 export function dreamChoices(card: DeckCard): Choice[][] {
   if (card.kind === "pair") {
@@ -57,7 +57,15 @@ export function dreamChoices(card: DeckCard): Choice[][] {
     ];
   }
   const dreamImage = card.kind === "dream" && card.item.type === "image";
-  const star: Choice = { choice: "star", id: "star", label: "Star", icon: icons.star };
+  // Super Like keeps a really good one and stars it: the strongest thing taste learns.
+  const star: Choice = {
+    choice: "star",
+    id: "star",
+    label: "Super Like",
+    tip: "Super Like: keep and star it",
+    icon: icons.star,
+    main: true,
+  };
   return [
     [{ choice: "discard", id: "discard", label: "Pass", icon: X, hint: "←", main: true }],
     ...(dreamImage
