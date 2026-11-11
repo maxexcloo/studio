@@ -725,15 +725,13 @@ registerCompareRoutes(app, {
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
   pendingItems: makePendingItems,
-  voted: (ownerId, jobId, others) => {
-    const values = (id) => {
-      const item = gallery.find((entry) => entry.jobId === id && (entry.ownerId || "") === ownerId);
-      return item ? itemValues(item) : store.job(ownerId, id)?.input;
-    };
-    const winner = { jobId, values: values(jobId) };
+  voted: (ownerId, image, others) => {
+    const winner = { jobId: image.jobId, values: itemValues(image) };
     taste.record(ownerId, [
-      tasteSignal("compare", jobId, winner.values),
-      ...others.map((id) => preferenceSignal(winner, { jobId: id, values: values(id) })),
+      tasteSignal("compare", image.jobId, winner.values),
+      ...others.map((item) =>
+        preferenceSignal(winner, { jobId: item.jobId, values: itemValues(item) }),
+      ),
     ]);
   },
 });
@@ -1067,7 +1065,14 @@ const upscale = registerUpscaleRoutes(app, {
 
 registerJobRoutes(app, { store, queue: generationQueue });
 // MCP calls Studio's routes in process (mcp/studio-requests.js).
-const mcpDomainRequest = createMcpDomainRequest({ app, admit: admitGeneration });
+const mcpDomainRequest = createMcpDomainRequest({
+  app,
+  admit: admitGeneration,
+  ownsItem: (ownerId, id) => {
+    const item = galleryItem(id);
+    return Boolean(item && (item.ownerId || "") === ownerId && !isGalleryHidden(item));
+  },
+});
 registerGalleryErrorRoutes(app);
 
 registerGalleryDeleteRoute(app);

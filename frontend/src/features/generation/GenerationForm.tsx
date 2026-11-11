@@ -239,6 +239,8 @@ export function GenerationForm({
           input,
           references: draft.references,
           sessionId: draft.sessionId || undefined,
+          parentJobId: draft.parentJobId,
+          parentItemId: draft.parentItemId,
         })
       }
       autoFocusPrompt={autoFocusPrompt}

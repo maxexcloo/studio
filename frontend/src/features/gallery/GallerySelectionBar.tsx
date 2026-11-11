@@ -95,17 +95,13 @@ export function GallerySelectionBar({
       settle(failed);
     },
   });
-  // Compare shows for 2–4 finished images and takes them when each is from its own run, since a
-  // comparison votes per run.
+  // Compare takes 2–4 finished images, including different outputs of the same batch.
   const navigate = useNavigate();
   const images =
     selected.length >= 2 &&
     selected.length <= compareLimit &&
     selected.every((item) => item.type === "image" && item.status === "done");
-  const comparable =
-    images &&
-    selected.every((item) => item.jobId) &&
-    new Set(selected.map((item) => item.jobId)).size === selected.length;
+  const comparable = images && selected.every((item) => item.jobId);
   const compare = useMutation({
     mutationFn: () =>
       post<{ id: string }>("/api/comparisons", {
