@@ -79,7 +79,7 @@ export function ComposerDock() {
   // bar's lift still follows the viewport.
   const [typing, setTappedField] = useState(false);
   const tapping = useRef(false);
-  useKeyboardDrop(typing, keyboard, () => setTappedField(false));
+  useKeyboardDrop(typing, () => setTappedField(false));
   const sheetField = (panel: HTMLElement, target: unknown) =>
     target instanceof HTMLTextAreaElement && panel.contains(target);
   // Phones type in the Generate sheet instead, so the dock stays put there. On other touch screens
