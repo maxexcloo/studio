@@ -92,11 +92,15 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
     parentItemId: "hub",
     input: { prompt: "An amber bird at dusk", count: 2, steps: 28 },
   });
-  await expect(
-    viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
-  ).toHaveCount(2);
+  // Desktop shows the run in the strip; a phone's editor returns to the gallery.
+  if (page.viewportSize()!.width >= 768)
+    await expect(
+      viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
+    ).toHaveCount(2);
   // The bar stays in reach while phone details are open, without its prompt field.
-  if (page.viewportSize()!.width < 768) {
+  else {
+    await expect(viewer).toBeHidden();
+    await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
     await expect(field).toBeHidden();
