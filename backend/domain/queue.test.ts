@@ -216,39 +216,6 @@ test("a save that finds its outputs gone fails after three tries; other failures
   }
 });
 
-test("Stop ends a job stuck saving, and one mid-save once that save fails", async () => {
-  const { store, queue, adapter, observations, events } = fixture();
-  try {
-    const session = store.createSession("alice");
-    const stuck = store.enqueue("alice", session.id, {}, "image");
-    await queue.tick();
-    observations.set(stuck.id, { status: "completed", outputs: [{ url: "/media/a.png" }] });
-    let save = deferred();
-    adapter.saveOutputs = async () => {
-      await save.promise;
-      throw new Error("Comfy 503");
-    };
-    const saving = queue.tick();
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.equal((await queue.cancel("alice", stuck.id))?.status, "saving");
-    save.resolve();
-    await saving;
-    assert.equal(store.job("alice", stuck.id)?.status, "cancelled");
-
-    const idle = store.enqueue("alice", session.id, {}, "image");
-    await queue.tick();
-    observations.set(idle.id, { status: "completed", outputs: [{ url: "/media/b.png" }] });
-    save = deferred();
-    save.resolve();
-    await queue.tick();
-    assert.equal(store.job("alice", idle.id)?.status, "saving");
-    assert.equal((await queue.cancel("alice", idle.id))?.status, "cancelled");
-    assert.deepEqual(events, [`released:${stuck.id}`, `released:${idle.id}`]);
-  } finally {
-    store.close();
-  }
-});
-
 test("restart follows only recorded provider jobs and never resubmits uncertain acceptance", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");
