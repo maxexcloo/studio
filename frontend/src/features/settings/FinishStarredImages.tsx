@@ -69,7 +69,6 @@ export function FinishStarredImages() {
           >
             <Select
               aria-label="Finishing Quality"
-              w={{ base: "100%", sm: 240 }}
               data={qualities}
               value={settings.quality}
               allowDeselect={false}

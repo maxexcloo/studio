@@ -62,6 +62,8 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
+/** Full screen's choices that return to the deck: a verdict or answer, not Star, Edit and the like. */
+const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]);
 // Calibration joins in once Dream has fewer unseen results than this.
 const few = 6;
 
@@ -263,8 +265,8 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * Swipe or press ← to pass, → to like (keep), ↑ to like and queue variations; the bar offers Pass
  * and Like. A comparison asks about two results alike but for one thing: ← or a left swipe answers
  * A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action) opens it in the viewer over
- * the deck, with all the card's choices (Edit, Animate, Star and More Like This too) in its bar; a
- * choice there moves on to the next card in the viewer.
+ * the deck, with all the card's choices (Edit, Animate, Star and More Like This too) in its bar;
+ * Pass, Like or an answer there returns to the deck, and the others move on in the viewer.
  * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
  * judging them changes nothing in the gallery beyond an optional Star. `empty` shows once the
  * deck is through, told whether calibration images are available.
@@ -374,7 +376,14 @@ export function DreamDeck({
       items={shown}
       navigate={(item) => setViewing(item.id)}
       close={() => setViewing(null)}
-      actions={viewerChoices(top, (choice) => void act(choice), phone)}
+      actions={viewerChoices(
+        top,
+        (choice) => {
+          if (closing.has(choice)) setViewing(null);
+          void act(choice);
+        },
+        phone,
+      )}
       itemLabel={top.kind === "pair" ? pairLabel : undefined}
       sideBySide={top.kind === "pair"}
     />

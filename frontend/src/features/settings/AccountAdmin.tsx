@@ -804,7 +804,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             data={groups}
             value={data.defaultAccessProfileId}
             allowDeselect={false}
-            w={{ base: "100%", sm: 240 }}
             onChange={(value) => value && policy.mutate(value)}
           />
         </SettingRow>

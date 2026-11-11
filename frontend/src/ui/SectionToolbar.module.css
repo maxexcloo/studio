@@ -6,10 +6,6 @@
   align-self: stretch;
   margin: 4px 2px;
 }
-.views {
-  min-width: 0;
-  overflow-x: auto;
-}
 /*
  * A section's heading with its toolbar at the end of the same row (the heading grows to push it
  * there), wrapping below it, from the start, when narrow.

@@ -11,6 +11,7 @@ import {
   type ReferenceTarget,
 } from "./references";
 import { dragPicture } from "./Picker";
+import type { SlotLayout } from "./payload";
 import { StrengthControl } from "./StrengthControl";
 import classes from "./ReferencePicker.module.css";
 
@@ -28,7 +29,7 @@ export function ReferenceSlots({
   onDrop,
 }: {
   references: ReferenceAsset[];
-  profile?: Profile;
+  profile?: SlotLayout;
   target: ReferenceTarget | null;
   onChoose: (target: ReferenceTarget) => void;
   onChange: (references: ReferenceAsset[]) => void;
