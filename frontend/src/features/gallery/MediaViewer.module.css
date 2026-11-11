@@ -179,9 +179,10 @@
   max-width: none;
 }
 
-/* The prompt and its tools span the bar. */
+/* The prompt and its tools span the bar, the text inset like the icons under it. */
 .promptRow {
   align-self: stretch;
+  padding-inline: var(--mantine-spacing-xs) 4px;
 }
 
 /* The padding sits outside the text, so a phone summary clips at a whole line. */

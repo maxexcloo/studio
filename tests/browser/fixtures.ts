@@ -911,6 +911,17 @@ export async function promptMenu(scope: Page | Locator, box: string) {
   return page.getByRole("menu");
 }
 
+/** Opens a tool's options in a box's phone editor, which shows its tools as buttons. */
+export async function editorMenu(scope: Page | Locator, box: string, tool: string) {
+  await scope.getByRole("textbox", { name: box, exact: true }).click();
+  const page = "page" in scope ? scope.page() : scope;
+  await page
+    .getByRole("dialog", { name: box, exact: true })
+    .getByRole("button", { name: tool, exact: true })
+    .click();
+  return page.getByRole("menu");
+}
+
 // The phone viewer bar's own actions; the rest sit under its ⋯ More.
 const phoneBar = [
   "Retry",
