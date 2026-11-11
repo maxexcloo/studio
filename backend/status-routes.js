@@ -34,7 +34,7 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
   app.get("/api/services/status", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const waitingWorkers = queue.store
-      .jobs(ownerIdForRequest(req))
+      .openJobs(ownerIdForRequest(req))
       .filter((job) => ["waiting", "starting"].includes(job.status))
       .map((job) => job.backend)
       .filter(Boolean);

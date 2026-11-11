@@ -1010,7 +1010,7 @@ const faceRedo = createFaceRedo({
     return account?.authenticated ? account : null;
   },
   job: (ownerId, jobId) => store.job(ownerId, jobId),
-  jobs: (ownerId) => store.jobs(ownerId),
+  jobsSince: (ownerId, since) => store.jobsSince(ownerId, since),
   admit: admitGeneration,
 });
 onGalleryFilesDeleted((items) => imageSearch.forget(items));
