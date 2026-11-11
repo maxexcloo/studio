@@ -23,6 +23,8 @@ import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGallery
 
 export interface GalleryViewProps {
   items: MediaItem[];
+  /** The search, filters and mode the items answer: new results lay out afresh. */
+  results: string;
   /** Opens an item in the viewer; `run`, a job id, keeps its flipping to that run's results. */
   open: (item: MediaItem, run?: string) => void;
   selection: GallerySelection;
@@ -135,6 +137,7 @@ const gridTop = (host: HTMLElement) => host.getBoundingClientRect().top + window
  */
 export function MediaGrid({
   items,
+  results,
   open,
   selection,
   focusItem,
@@ -162,7 +165,7 @@ export function MediaGrid({
     () => layout && new Map(layout.tiles.map((tile, index) => [items[index].id, tile.top])),
     [layout],
   );
-  useScrollAnchor(host, places, `${columns}:${width}:${byDay}`);
+  useScrollAnchor(host, places, `${columns}:${width}:${byDay}:${results}`);
   /** Scrolls a tile into view only as far as it must, as a focus move does. */
   const scrollToTile = useCallback(
     (index: number) => {
