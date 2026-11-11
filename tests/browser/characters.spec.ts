@@ -6,7 +6,6 @@ import {
   fixtures,
   image,
   profiles,
-  promptTool,
   serveProfiles,
   signIn,
   stamp,
@@ -193,16 +192,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     editor.getByRole("button", { name: "Reference 1 · Images", exact: true }),
   ).toBeVisible();
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Mara");
-  // Describe Image is a tool of the Description box: in its ⋯, or the phone editor's bar.
-  if (test.info().project.use.isMobile) {
-    await editor.getByRole("textbox", { name: "Description", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Description", exact: true });
-    await sheet.getByRole("button", { name: "Describe Image", exact: true }).click();
-    await expect(sheet.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
-      "red-haired ranger, green cloak",
-    );
-    await sheet.getByRole("button", { name: "Done", exact: true }).click();
-  } else await promptTool(editor, "Description", "Describe Image");
+  await editor.getByRole("button", { name: "Describe Image", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Description", exact: true })).toHaveValue(
     "red-haired ranger, green cloak",
   );

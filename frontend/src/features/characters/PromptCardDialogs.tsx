@@ -6,7 +6,7 @@ import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { menuWidth } from "../../theme";
 import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
-import { CardDialog, CardForm, CardImages, useDescribeImage } from "./CardImages";
+import { CardDialog, CardForm, CardImages, DescribeImage } from "./CardImages";
 import {
   useDeletePromptCard,
   useSavePromptCard,
@@ -104,7 +104,6 @@ function PromptCardForm({
   const [name, setName] = useState(card?.name || "");
   const [description, setDescription] = useState(card?.description || "");
   const [images, setImages] = useState<ReferenceAsset[]>(card?.references || []);
-  const describe = useDescribeImage(kind, images[0], setDescription);
   const save = useSavePromptCard(kind, card?.id);
   return (
     <CardForm
@@ -136,7 +135,7 @@ function PromptCardForm({
         maxLength={maxCardDescription}
         value={description}
         onChange={setDescription}
-        {...describe}
+        below={<DescribeImage kind={kind} image={images[0]} onDescribed={setDescription} />}
       />
       <CardImages
         kind={kind}
