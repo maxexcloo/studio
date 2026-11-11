@@ -49,7 +49,9 @@ export function useKeyboardDrop(active: boolean, onDrop: () => void) {
     const resize = () => {
       const gap = window.innerHeight - viewport.height;
       if (gap > 200) risen = true;
-      else if (risen && gap < 100) drop.current();
+      // A keyboard dropping because its text lost focus, such as to a tool's menu, is not Back.
+      else if (risen && gap < 100 && document.activeElement?.matches("input, textarea"))
+        drop.current();
     };
     viewport.addEventListener("resize", resize);
     return () => viewport.removeEventListener("resize", resize);

@@ -9,6 +9,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { useAccount } from "../auth/AccountGate";
 import { statusLabels } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
@@ -92,7 +93,13 @@ export function UnfinishedItems() {
       >
         Review
       </Button>
-      <Modal opened={opened} onClose={() => setOpened(false)} title="Unfinished Items" size="xl">
+      <Modal
+        id="unfinished"
+        opened={opened}
+        onClose={closeWhenTop("unfinished", () => setOpened(false))}
+        title="Unfinished Items"
+        size="xl"
+      >
         {jobs.length > 0 && (
           <SectionToolbar
             label="Unfinished Items"

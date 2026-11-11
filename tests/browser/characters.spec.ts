@@ -123,6 +123,12 @@ test("New Character saves a name, description and gallery images from the Refere
   // Add Images opens the gallery choices in a popup of their own.
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
   const picker = page.getByRole("dialog", { name: "Add Images", exact: true });
+  // Escape closes only the popup, leaving the card under it.
+  await expect(picker).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeHidden();
+  await expect(editor).toBeVisible();
+  await editor.getByRole("button", { name: "Add Images", exact: true }).click();
   await picker
     .getByRole("button", { name: "Add image: Portrait of a ranger", exact: true })
     .click();

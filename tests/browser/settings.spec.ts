@@ -180,6 +180,12 @@ test("Unfinished Items in Settings › Generation retry, stop and clear any acco
   await expect(dialog.getByRole("row", { name: "A second owl" })).toBeVisible();
   await dialog.getByRole("button", { name: "Clear All", exact: true }).click();
   const clearAll = page.getByRole("dialog", { name: "Clear All Unfinished Items", exact: true });
+  // Escape closes only the confirmation, leaving the list under it.
+  await expect(clearAll).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(clearAll).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Clear All", exact: true }).click();
   await clearAll.getByRole("button", { name: "Clear All", exact: true }).click();
   await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
   expect(actions).toEqual([
