@@ -19,6 +19,8 @@ export const queuePriority = { manual: 0, mcp: 1, finishing: 2, dream: 3 } as co
 export interface QueueOrigin {
   priority?: number;
   queueSet?: string;
+  /** The owner's exact source result, checked by the admitting caller. */
+  parentItemId?: string;
   dream?: DreamOrigin;
   faceRedo?: true;
 }
@@ -40,7 +42,7 @@ export interface QueuedCopy {
   parentJobId?: string;
   resource?: string;
   requestedId?: string;
-  origin?: QueueOrigin & { parentItemId?: string };
+  origin?: QueueOrigin;
 }
 interface UserPreset {
   id: string;

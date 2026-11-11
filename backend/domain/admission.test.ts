@@ -3,7 +3,7 @@ import test from "node:test";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import type { GenerationQueue } from "./queue.ts";
-import { Store } from "./store.ts";
+import { queuePriority, Store } from "./store.ts";
 
 test("a profile that can't batch queues Count as separate seeded runs in one set", async () => {
   const store = new Store(openDatabase(":memory:"));
@@ -73,4 +73,47 @@ test("a Count whose derived ID is taken queues nothing, then and on retry", asyn
     store.jobs("alice").map((job) => job.id),
     ["other", "other-2", "other-3"],
   );
+});
+
+test("an MCP revision keeps its exact source while remaining in the chat's session", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const admit = createGenerationAdmission({
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    validate: async () => ({ status: 200, payload: {} }),
+    resourceFor: async () => "local-media",
+    pendingItems: () => [],
+    revision: () => 0,
+  });
+  const account = { userId: "alice", role: "user" };
+  try {
+    const source = await admit({ prompt: "Original", clientJobId: "source" } as never, account);
+    const first = await admit(
+      {
+        prompt: "A chat request",
+        clientJobId: "chat-first",
+        chat: { conversationId: "chat-1" },
+      } as never,
+      account,
+      undefined,
+      { priority: queuePriority.mcp },
+    );
+    const revised = await admit(
+      {
+        prompt: "Revise its second output",
+        clientJobId: "chat-revision",
+        chat: { conversationId: "chat-1" },
+      } as never,
+      account,
+      undefined,
+      { priority: queuePriority.mcp, parentItemId: "source-2" },
+    );
+    assert.equal(revised.status, 200);
+    assert.equal(revised.payload.sessionId, first.payload.sessionId);
+    assert.notEqual(revised.payload.sessionId, source.payload.sessionId);
+    assert.equal(store.job("alice", "chat-revision")?.parentItemId, "source-2");
+    assert.equal(store.job("alice", "chat-revision")?.parentJobId, undefined);
+  } finally {
+    store.close();
+  }
 });

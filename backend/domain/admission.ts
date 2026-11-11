@@ -108,7 +108,10 @@ export function createGenerationAdmission(options: AdmissionOptions) {
               ...origin,
               ...(queueSet ? { queueSet } : {}),
               // Otherwise a run in its parent's session is made from its parent's result only when it uses it as its reference.
-              parentItemId: scope?.parentItemId ?? (parent && referencedResult(input, parent)),
+              parentItemId:
+                scope?.parentItemId ??
+                origin?.parentItemId ??
+                (parent && referencedResult(input, parent)),
             },
           });
         let jobs: OwnedJob[];

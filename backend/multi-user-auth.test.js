@@ -669,7 +669,15 @@ test("MCP's in-process calls meet the gate a request with the same credential me
       status: 200,
       payload: { owner: account.userId, params, query: { ...query }, body },
     }));
-  const call = createMcpDomainRequest({ app });
+  const generated = [];
+  const call = createMcpDomainRequest({
+    app,
+    admit: async (input, account, scope, origin) => {
+      generated.push({ input, owner: account.userId, scope, origin });
+      return { status: 200, payload: {} };
+    },
+    ownsItem: (owner, id) => owner === artist.id && id === "artist-result-2",
+  });
   assert.deepEqual(
     await call("POST", "/api/queue/job-1/move?at=1", { to: 0 }, artist.id, { token }),
     {
@@ -687,4 +695,44 @@ test("MCP's in-process calls meet the gate a request with the same credential me
     401,
   );
   assert.equal((await call("POST", "/api/queue/job-1/move", {}, artist.id)).status, 401);
+  assert.equal(
+    (
+      await call(
+        "POST",
+        "/api/generate",
+        {
+          prompt: "An owned revision",
+          parentItemId: "artist-result-2",
+          queueSet: "chat-set",
+        },
+        artist.id,
+        { token },
+      )
+    ).status,
+    200,
+  );
+  assert.deepEqual(generated, [
+    {
+      input: { prompt: "An owned revision" },
+      owner: artist.id,
+      scope: undefined,
+      origin: { priority: 1, queueSet: "chat-set", parentItemId: "artist-result-2" },
+    },
+  ]);
+  assert.equal(
+    (
+      await call(
+        "POST",
+        "/api/generate",
+        {
+          prompt: "A foreign revision",
+          parentItemId: "another-account-result",
+        },
+        artist.id,
+        { token },
+      )
+    ).status,
+    404,
+  );
+  assert.equal(generated.length, 1);
 });
