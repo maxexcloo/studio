@@ -34,6 +34,20 @@ export const assistantPresets = Object.freeze([
       "Enhance: keep the prompt’s own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
   {
+    id: "fix",
+    label: "Fix Issues",
+    description: "Prevents glitches: anatomy, text and muddled scenes.",
+    instruction:
+      "Fix Issues: rewrite it so the model makes it cleanly, without changing what is asked for. Resolve contradictions and vague or overloaded phrases, give every person and object one clear place and count, describe hands, faces and bodies plainly and naturally, keep any rendered text short and quoted, and drop crowded details that compete for the same space. Keep the subject, style and framing.",
+  },
+  {
+    id: "guide",
+    label: "Follow Guide",
+    description: "Rewritten to the model’s prompting guide.",
+    instruction:
+      "Follow Guide: rewrite it strictly in the format, order, length and wording the prompting guide sets for this model, keeping every subject, detail and style the prompt asks for and adding nothing new.",
+  },
+  {
     id: "illustration",
     label: "Illustration",
     description: "Artwork in one specific medium and style.",
