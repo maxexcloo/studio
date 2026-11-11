@@ -72,7 +72,7 @@ export function createCloudQueueAdapter({
   saveGallery,
   now = Date.now,
 }: CloudAdapterOptions): QueueAdapter {
-  const controllers = new Map<string, AbortController>();
+  const submitting = new Set<string>();
   // When each running video is next polled; in memory, so a restart polls at once.
   const polls = new Map<
     string,
@@ -113,6 +113,7 @@ export function createCloudQueueAdapter({
     const reason = refusal(message);
     if (
       soften &&
+      !cancelled(job) &&
       state.softenable &&
       !state.retried &&
       !state.outputs.length &&
@@ -169,12 +170,11 @@ export function createCloudQueueAdapter({
     initial: ProviderRecord,
   ): Promise<JobObservation> {
     let state = initial;
-    const controller = new AbortController();
-    controllers.set(job.id, controller);
+    submitting.add(job.id);
     try {
       if (cancelled(job))
         return { status: "cancelled" as const, reason: "Cancelled before provider submission." };
-      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(300_000)]);
+      const signal = AbortSignal.timeout(300_000);
       if (input.kind === "video") {
         const providerId = await provider.video(input, signal);
         state = save(job, { ...state, state: "running", providerId });
@@ -185,7 +185,6 @@ export function createCloudQueueAdapter({
       for (let index = 0; index < input.count; index++) {
         if (cancelled(job)) break;
         const images = await provider.image(input, signal);
-        if (cancelled(job)) break;
         const image = images[0];
         if (!image)
           throw new Error("CLIProxyAPI returned no image; inspect provider before retrying.");
@@ -204,21 +203,12 @@ export function createCloudQueueAdapter({
         state: state.outputs.length ? "saved" : "cancelled",
         ...(cancelled(job)
           ? {
-              reason:
-                "Cancelled; already saved images were kept. Provider work may still finish or be billed.",
+              reason: "Stopped before submitting further images; accepted results were saved.",
             }
           : {}),
       });
       return result(state);
     } catch (error) {
-      if (cancelled(job))
-        return result(
-          save(job, {
-            ...state,
-            state: state.outputs.length ? "saved" : "cancelled",
-            reason: "Local waiting cancelled. Provider work may still finish or be billed.",
-          }),
-        );
       if ((error as ProviderError).providerRejected) {
         if (state.outputs.length)
           return result(save(job, { ...state, state: "saved", reason: (error as Error).message }));
@@ -226,7 +216,7 @@ export function createCloudQueueAdapter({
       }
       throw error;
     } finally {
-      controllers.delete(job.id);
+      submitting.delete(job.id);
     }
   }
 
@@ -276,13 +266,17 @@ export function createCloudQueueAdapter({
         `CLIProxyAPI video generation ${polled.status}${detail ? `: ${detail}` : "."}`,
       );
     }
+    if (["cancelled", "canceled"].includes(polled.status)) {
+      polls.delete(job.id);
+      return result(
+        save(job, { ...state, state: "cancelled", reason: "The provider cancelled this video." }),
+      );
+    }
     if (!["completed", "done"].includes(polled.status)) return result(state);
     polls.delete(job.id);
     const url = polled.video?.url || polled.video_url || polled.output_url;
     if (!url) throw new Error("CLIProxyAPI completed the video without an output URL.");
     const bytes = await provider.download(url);
-    if (cancelled(job))
-      return { status: "cancelled", reason: "Cancelled before saving the provider video." };
     return result(
       save(job, {
         ...state,
@@ -322,19 +316,11 @@ export function createCloudQueueAdapter({
       );
     },
     async observe(job) {
-      let state = record(job);
+      const state = record(job);
       if (!state) return undefined;
-      if (cancelled(job) && !state.outputs.length) {
-        polls.delete(job.id);
-        state = save(job, {
-          ...state,
-          state: "cancelled",
-          reason: "Local waiting cancelled. Provider work may still finish or be billed.",
-        });
-      }
       if (["saved", "failed", "cancelled"].includes(state.state)) return result(state);
       if (state.providerId) return poll(job, state);
-      if (state.outputs.length && !controllers.has(job.id))
+      if (state.outputs.length && !submitting.has(job.id))
         return result(
           save(job, {
             ...state,
@@ -349,9 +335,8 @@ export function createCloudQueueAdapter({
           "The synchronous provider response is not confirmed. This request will not be submitted again automatically.",
       };
     },
-    async cancel(job) {
-      controllers.get(job.id)?.abort();
-    },
+    // This provider has no cancellation API; accepted work stays recorded until it finishes.
+    async cancel() {},
     async saveOutputs(job) {
       const state = record(job);
       if (!state?.outputs.length) throw new Error("Provider outputs are not yet safely saved.");

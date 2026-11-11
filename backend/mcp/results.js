@@ -2,6 +2,7 @@
 import { z } from "zod";
 import {
   mcpJson,
+  comparisonContext,
   maxUploadBase64,
   maxUploadMegabytes,
   mcpOutputPath,
@@ -32,17 +33,19 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "status",
     "check status",
-    "A job's status and finished output links, only when the user asks.",
+    "Status, output links and chosen comparison winner, ready for reuse.",
     { ...job, wait_seconds: wait },
     async ({ job_id, wait_seconds }, signal) => {
       const id = resolve(job_id);
       const status = await media.job(owner, id, wait_seconds, { signal });
       const ref = media.refOf(owner, refs, id);
+      const comparisons = await media.comparisons(owner, [id], { scope: refs, signal });
       return mcpJson({
         job_id: id,
         ...(ref ? { ref } : {}),
         link: media.pageUrl(owner, id),
         ...media.summary(status),
+        ...(comparisons.length ? { comparisons } : {}),
         outputs: (status.outputs || []).flatMap((item, index) =>
           mcpOutputPath(item.url)
             ? [{ output_index: index, url: media.url(owner, id, index) }]
@@ -116,6 +119,14 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
           structuredContent: { results },
         };
       }
+      const comparisons = await media.comparisons(
+        owner,
+        hits.map((item) => item.jobId),
+        {
+          scope: refs,
+          signal,
+        },
+      );
       const results = hits.map((item) => ({
         ref: media.refOf(owner, refs, item.jobId),
         job_id: item.jobId,
@@ -151,10 +162,15 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
         content: [
           {
             type: "text",
-            text: `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to reuse, review or result.\n\n${lines.join("\n")}${picture}`,
+            text: [
+              `${hits.length === 1 ? "One match" : `${hits.length} matches`}, newest first. Pass a ref (and output_index for a later output) to reuse, review or result.\n\n${lines.join("\n")}${picture}`,
+              comparisonContext(comparisons),
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
           },
         ],
-        structuredContent: { results },
+        structuredContent: { results, ...(comparisons.length ? { comparisons } : {}) },
       };
     },
     { readOnlyHint: true },
@@ -179,6 +195,14 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
         ({ jobId, number, job }) =>
           `- Result ${number}: job_id ${jobId} (${job.status}) — ${media.pageUrl(owner, jobId)}`,
       );
+      const comparisons = await media.comparisons(
+        owner,
+        jobs.map(({ jobId }) => jobId),
+        {
+          scope: refs,
+          signal,
+        },
+      );
       const handover = [
         "Continue this Studio task.",
         "",
@@ -186,6 +210,12 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
         "",
         "Studio Results",
         ...results,
+        ...comparisons
+          .filter(({ winner }) => winner)
+          .map(
+            ({ link, winner }) =>
+              `- Comparison winner: job_id ${winner.job_id}, output_index ${winner.output_index} — ${link}`,
+          ),
         "",
         "Use the job_id values above in the new chat; result numbers are local to the old chat. Do not regenerate or poll unless asked.",
       ].join("\n");
@@ -197,17 +227,18 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "review",
     "review image",
-    "Inspect an image only when asked to judge, compare or improve it: a small preview with prompt and settings; compare_to sets another result beside it.",
+    "Inspect images only when asked to judge, compare or improve; compare_to chooses another result.",
     {
       ...output,
       compare_to: z.string().min(1).max(200).optional(),
+      compare_to_output_index: z.number().int().min(0).max(999).default(0),
     },
-    ({ job_id, output_index, compare_to }, signal) =>
+    ({ job_id, output_index, compare_to, compare_to_output_index }, signal) =>
       media.review(
         owner,
         [
           { jobId: resolve(job_id), index: output_index },
-          ...(compare_to ? [{ jobId: resolve(compare_to), index: 0 }] : []),
+          ...(compare_to ? [{ jobId: resolve(compare_to), index: compare_to_output_index }] : []),
         ],
         { scope: refs, signal, waitSeconds: imageWaitSeconds },
       ),

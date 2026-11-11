@@ -44,10 +44,10 @@ export function ComparePage() {
   const tryAgain = useTryAgain(items);
   const star = useMutation({
     mutationFn: async (item: MediaItem) => {
-      const winner = comparison.data?.vote === item.jobId;
+      const winner = comparison.data?.winnerItemId === item.id;
       const result = await api<Comparison>(`/api/comparisons/${encodeURIComponent(id)}/vote`, {
         method: "PUT",
-        body: JSON.stringify({ jobId: winner ? null : item.jobId }),
+        body: JSON.stringify({ itemId: winner ? null : item.id }),
       });
       if (!winner) {
         if (!item.favorite) await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
@@ -91,8 +91,8 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, vote, seed, prompt, negative } = comparison.data;
-  const winner = items.find((item) => item.jobId === vote);
+  const { variants, seed, prompt, negative } = comparison.data;
+  const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   const sized = items.find((item) => item.width && item.height);
   const aspect = sized ? sized.width! / sized.height! : 1;
   return (
@@ -134,9 +134,14 @@ export function ComparePage() {
       )}
       <Variants count={variants.length} aspect={aspect}>
         {variants.map(({ jobId, label, item }) => {
-          const won = vote === jobId;
+          const won = comparison.data.winnerItemId === item?.id;
           return (
-            <Stack key={jobId} gap={6} className={classes.variant} data-winner={won || undefined}>
+            <Stack
+              key={item?.id || jobId}
+              gap={6}
+              className={classes.variant}
+              data-winner={won || undefined}
+            >
               <Text size="sm" fw={600} truncate title={label}>
                 {label}
               </Text>

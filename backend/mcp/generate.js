@@ -839,19 +839,40 @@ export function registerGenerateTools({
       face_detail: z.boolean().optional(),
     },
     (input, signal) => {
-      // A chat that sends the same generate again within two minutes (a retry after a transport error, a doubled tool call) gets the first call's
-      // jobs and reply, so one request is one set of images; asking again later, or for anything different, queues anew.
+      // Identical calls share pending work and its reply for two minutes after it settles.
+      // A transport retry cannot queue another set; later or different requests queue anew.
       const now = Date.now();
       for (const [key, entry] of recentGenerates)
-        if (now - entry.at > generateDedupeMs) recentGenerates.delete(key);
+        if (entry.at !== null && now - entry.at > generateDedupeMs) recentGenerates.delete(key);
       const key = `${refs || owner}\n${stableJson(input)}`;
       const earlier = generateDedupeMs > 0 ? recentGenerates.get(key) : null;
       if (earlier) return earlier.reply;
-      const reply = generateOnce(input, signal);
-      recentGenerates.set(key, { at: now, reply });
-      reply.catch(() => {
-        if (recentGenerates.get(key)?.reply === reply) recentGenerates.delete(key);
+      const accepted = [];
+      const reply = generateOnce(input, signal, accepted).catch((error) => {
+        if (!accepted.length) throw error;
+        // Delivery can fail after admission (an aborted ETA probe, or a later model's refusal).
+        // Keep the accepted jobs as the deduplicated reply so a retry cannot queue them again.
+        const jobs = accepted.flatMap(({ queued }) => queued.jobs);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `These jobs were accepted before the reply was interrupted: ${error.message} Share their links and end your turn; never resubmit.\n\n${jobs.map(({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`).join(" · ")}`,
+            },
+          ],
+          structuredContent: { status: "queued", jobs },
+        };
       });
+      const entry = { at: null, reply };
+      recentGenerates.set(key, entry);
+      reply.then(
+        () => {
+          entry.at = Date.now();
+        },
+        () => {
+          if (recentGenerates.get(key) === entry) recentGenerates.delete(key);
+        },
+      );
       return reply;
     },
   );
@@ -868,7 +889,7 @@ export function registerGenerateTools({
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
   };
-  const generateOnce = async (input, signal) => {
+  const generateOnce = async (input, signal, accepted) => {
     const {
       kind,
       tier: wanted,
@@ -1221,8 +1242,8 @@ export function registerGenerateTools({
       // Every set shares one seed, so image N of each model is a like-for-like comparison.
       const seed = args.seed ?? crypto.randomInt(2 ** 31);
       const sets = [];
-      for (const item of plans)
-        sets.push({
+      for (const item of plans) {
+        const set = {
           profile: item.profile,
           note: item.note,
           queued: (
@@ -1230,7 +1251,10 @@ export function registerGenerateTools({
               guide: false,
             })
           ).queued,
-        });
+        };
+        sets.push(set);
+        if (set.queued.jobs.length) accepted.push(set);
+      }
       return respondSets(sets, "", signal, await comparisonOf(sets));
     }
     const [{ profile, note: tierNote, plan, source }] = plans;
@@ -1248,6 +1272,7 @@ export function registerGenerateTools({
       plan.face_detail = true;
     }
     const submission = await submit(profile, plan, recordOf({ plan }));
+    if (submission.queued.jobs.length) accepted.push({ profile, queued: submission.queued });
     let viewsNote = "";
     if (views) {
       await media.request(
@@ -1470,6 +1495,7 @@ export function registerGenerateTools({
       // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
       const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
       const submission = await submit(plan.profile, plan.args, {
+        parentItemId: item.id,
         ...((request || !prompt) && (request || recorded?.request)
           ? { request: request || recorded.request }
           : {}),

@@ -256,8 +256,106 @@ test("lost synchronous response is recovered without resubmit and only its owner
     assert.equal(await restarted.cancel("bob", job.id), undefined);
     await restarted.cancel("alice", job.id);
     await restarted.tick();
+    assert.equal(store.job("alice", job.id)?.status, "running");
+    assert.equal(store.job("alice", job.id)?.cancelRequested, true);
+    await restarted.abandon("alice", job.id);
     assert.equal(store.job("alice", job.id)?.status, "cancelled");
   } finally {
+    store.close();
+  }
+});
+
+test("Stop keeps an accepted cloud video visible until its result is saved", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const remote = fixture();
+  const saved: string[] = [];
+  const published: string[] = [];
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue(
+      "alice",
+      session.id,
+      {},
+      "animate",
+      undefined,
+      "provider:cliproxyapi",
+    );
+    const queue = new GenerationQueue(
+      store,
+      createCloudQueueAdapter({
+        store,
+        provider: remote.provider,
+        resolve: async () => ({ ...input, kind: "video", model: "grok-imagine-video-1.5" }),
+        saveMedia: async (_job, _index, bytes) => {
+          assert.deepEqual(bytes, new Uint8Array([1, 2, 3, 4]));
+          saved.push(job.id);
+          return { url: "/fixture-video" };
+        },
+        saveGallery: async (_job, outputs) => {
+          published.push(String(outputs[0].url));
+        },
+      }),
+    );
+    await queue.tick();
+    await queue.cancel("alice", job.id);
+    assert.equal(store.job("alice", job.id)?.status, "running");
+    remote.complete();
+    await queue.tick();
+    assert.equal(store.job("alice", job.id)?.status, "completed");
+    assert.deepEqual(saved, [job.id]);
+    assert.deepEqual(published, ["/fixture-video"]);
+    assert.equal(remote.calls.filter((call) => call.path === "/v1/videos/generations").length, 1);
+  } finally {
+    store.close();
+  }
+});
+
+test("Stop saves an in-flight cloud image and skips further unsubmitted images", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  let requested!: () => void;
+  let respond!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const response = new Promise<void>((resolve) => {
+    respond = resolve;
+  });
+  let calls = 0;
+  let published = 0;
+  const provider = new CliProxyMedia("https://proxy.test", "fixture-value", async (_url, init) => {
+    if (init?.method !== "POST") return Response.json({ data: [{ id: input.model }] });
+    calls++;
+    requested();
+    await response;
+    assert.equal(init.signal?.aborted, false);
+    return Response.json({ data: [{ b64_json: image.toString("base64") }] });
+  });
+  try {
+    const session = store.createSession("alice");
+    const job = store.enqueue("alice", session.id, {}, "image", undefined, "provider:cliproxyapi");
+    const queue = new GenerationQueue(
+      store,
+      createCloudQueueAdapter({
+        store,
+        provider,
+        resolve: async () => ({ ...input, count: 2 }),
+        saveMedia: async () => ({ url: "/fixture-image" }),
+        saveGallery: async () => {
+          published++;
+        },
+      }),
+    );
+    const submission = queue.tick();
+    await started;
+    await queue.cancel("alice", job.id);
+    respond();
+    await submission;
+    assert.equal(store.job("alice", job.id)?.status, "completed");
+    assert.equal(store.job("alice", job.id)?.outputs.length, 1);
+    assert.equal(calls, 1);
+    assert.equal(published, 1);
+  } finally {
+    respond();
     store.close();
   }
 });
