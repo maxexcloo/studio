@@ -1,52 +1,52 @@
 import { DragDropProvider } from "@dnd-kit/react";
 import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import type { ReactNode, Ref } from "react";
-import type { QueueJob } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { feedbackAt } from "../../ui/SortableOrderedItems";
+import type { QueueEntry } from "./Queue";
 
 export type QueueRowDrag = {
   elementRef: Ref<HTMLDivElement>;
   handleRef: Ref<HTMLButtonElement>;
   isDragging: boolean;
 };
-type Row = (job: QueueJob, drag?: QueueRowDrag) => ReactNode;
+type Row = (entry: QueueEntry, drag?: QueueRowDrag) => ReactNode;
 
 function SortableRow({
-  job,
+  entry,
   index,
   duration,
   row,
 }: {
-  job: QueueJob;
+  entry: QueueEntry;
   index: number;
   duration: number;
   row: Row;
 }) {
   const { ref, handleRef, isDragging } = useSortable({
-    id: job.id,
+    id: entry.id,
     index,
     type: "queue",
     accept: "queue",
     transition: { duration },
   });
-  return row(job, { elementRef: ref, handleRef, isDragging });
+  return row(entry, { elementRef: ref, handleRef, isDragging });
 }
 
 /**
- * The queue's rows, its waiting ones dragged by their handles (pointer, touch or keyboard) to a new
- * place among the waiting ones.
+ * The queue's rows (a job, or a set's group), its waiting ones dragged by their handles (pointer,
+ * touch or keyboard) to a new place among the waiting ones.
  */
 export default function SortableQueue({
-  jobs,
+  entries,
   movable,
   row,
   onMove,
 }: {
-  jobs: QueueJob[];
-  movable: QueueJob[];
+  entries: QueueEntry[];
+  movable: QueueEntry[];
   row: Row;
-  onMove: (job: QueueJob, to: number) => void;
+  onMove: (entry: QueueEntry, to: number) => void;
 }) {
   const duration = useMotionDuration();
   return (
@@ -60,12 +60,12 @@ export default function SortableQueue({
           onMove(movable[source.initialIndex], source.index);
       }}
     >
-      {jobs.map((job) => {
-        const index = movable.indexOf(job);
+      {entries.map((entry) => {
+        const index = movable.indexOf(entry);
         return index < 0 ? (
-          row(job)
+          row(entry)
         ) : (
-          <SortableRow key={job.id} job={job} index={index} duration={duration} row={row} />
+          <SortableRow key={entry.id} entry={entry} index={index} duration={duration} row={row} />
         );
       })}
     </DragDropProvider>

@@ -6,8 +6,6 @@ import {
   Collapse,
   Group,
   Image as Thumbnail,
-  Loader,
-  RingProgress,
   Stack,
   Text,
   Tooltip,
@@ -21,12 +19,20 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { arrayMove } from "@dnd-kit/helpers";
-import { lazy, Suspense, useEffect, useId, useState } from "react";
-import { CircleAlert, GripVertical, Image, Video, type LucideIcon } from "lucide-react";
+import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from "react";
+import {
+  ChevronDown,
+  CircleAlert,
+  GripVertical,
+  Image,
+  Video,
+  type LucideIcon,
+} from "lucide-react";
 import { icons } from "../../ui/icons";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { usePhone } from "../../ui/usePhone";
 import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { Profile, QueueJob, ReferenceAsset } from "../../types";
@@ -38,7 +44,7 @@ import { isProfile, profileName, shownProfileName } from "./payload";
 import { referenceLabel } from "./references";
 import { WritingStream } from "./PromptWriting";
 import type { QueueRowDrag } from "./SortableQueue";
-import { terminalStatuses, type QueuePause } from "../../../../shared/queue";
+import { pausedReason, terminalStatuses, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
@@ -52,9 +58,13 @@ export function useQueue() {
   return useQuery(queueQuery);
 }
 const queueActionKey = ["queue-action"];
-/** An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`, `pause` and the like). */
+/**
+ * An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`, `pause` and the like), or
+ * with `set` on that set's waiting work (`move`).
+ */
 type QueueAction = {
   id: string;
+  set?: string;
   action:
     | "cancel"
     | "clear"
@@ -78,9 +88,13 @@ export function useQueueAction(jobId?: string) {
   });
   const action = useMutation({
     mutationKey: queueActionKey,
-    mutationFn: ({ id, action, to }: QueueAction) =>
+    mutationFn: ({ id, set, action, to }: QueueAction) =>
       post<{ job?: QueueJob }>(
-        id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`,
+        set
+          ? `/api/queue/sets/${encodeURIComponent(set)}/${action}`
+          : id
+            ? `/api/queue/${encodeURIComponent(id)}/${action}`
+            : `/api/queue/${action}`,
         to === undefined ? undefined : { to },
       ),
     onSuccess: () =>
@@ -95,7 +109,9 @@ export function useQueueAction(jobId?: string) {
       mutationKey: queueActionKey,
       predicate: (mutation) => {
         const pending = mutation.state.variables as QueueAction;
-        return pending?.id === value.id && pending.action === value.action;
+        return (
+          pending?.id === value.id && pending.set === value.set && pending.action === value.action
+        );
       },
     });
   }
@@ -116,18 +132,13 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
   const label = retry ? "Retry" : "Stop";
   const onClick = () => action.mutate({ id: job.id, action: retry ? "retry" : "cancel" });
   return compact ? (
-    <Tooltip label={label}>
-      <ActionIcon
-        aria-label={label}
-        variant="subtle"
-        color="gray"
-        loading={action.isPending}
-        disabled={action.isPending}
-        onClick={onClick}
-      >
-        {retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
-      </ActionIcon>
-    </Tooltip>
+    <RowButton
+      label={label}
+      icon={retry ? icons.retry : icons.stop}
+      stop={!retry}
+      pending={action.isPending}
+      onClick={onClick}
+    />
   ) : (
     // The viewer's status, styled as a tile's Stop and Retry.
     <Button
@@ -137,6 +148,41 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
       leftSection={retry ? <icons.retry size={16} /> : <icons.stop size={16} />}
       loading={action.isPending}
       disabled={action.isPending}
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+/**
+ * A queue row's or set's action, named in words beside its icon so Stop never reads as a checkbox;
+ * `name` is a fuller accessible name that starts with the label.
+ */
+function RowButton({
+  label,
+  name,
+  icon: Icon,
+  stop = false,
+  pending,
+  onClick,
+}: {
+  label: string;
+  name?: string;
+  icon: LucideIcon;
+  stop?: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="compact-sm"
+      variant="light"
+      color={stop ? "red" : "gray"}
+      miw="max-content"
+      leftSection={<Icon size={14} aria-hidden />}
+      aria-label={name}
+      loading={pending}
+      disabled={pending}
       onClick={onClick}
     >
       {label}
@@ -194,7 +240,16 @@ export function settingChips(
 }
 
 /** What a queue item runs with, shown under its row once opened. */
-function QueueJobDetails({ job, profile }: { job: QueueJob; profile?: Profile }) {
+function QueueJobDetails({
+  job,
+  profile,
+  reason,
+}: {
+  job: QueueJob;
+  profile?: Profile;
+  /** Why it waits, when the row's status leaves it out. */
+  reason?: string;
+}) {
   const { input } = job;
   const info = useQuery(loraInfoQuery);
   const references = Array.isArray(input.referenceDetails)
@@ -204,6 +259,11 @@ function QueueJobDetails({ job, profile }: { job: QueueJob; profile?: Profile })
   const negative = String(input.negative || "").trim();
   return (
     <Stack gap={6} pb="xs" className={classes.details}>
+      {reason && (
+        <Text size="xs" c="dimmed">
+          {reason}
+        </Text>
+      )}
       {prompt && (
         <Text size="sm" className={classes.text}>
           {prompt}
@@ -237,6 +297,40 @@ function QueueJobDetails({ job, profile }: { job: QueueJob; profile?: Profile })
   );
 }
 
+/** A job's state in short: Upscaling for a running upscale, then its progress or phase. */
+function shortStatus(job: QueueJob) {
+  const percent = progressPercent(job.progress);
+  return [
+    job.operation === "upscale" && job.status === "running"
+      ? "Upscaling"
+      : statusLabels[job.status],
+    percent ? `${Math.round(percent)}%` : job.progress?.phase,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The leading drag handle, apart from the row's Stop at the other end. */
+function DragHandle({ drag }: { drag?: QueueRowDrag }) {
+  return (
+    <Tooltip label="Drag to Reorder">
+      <ActionIcon
+        ref={drag?.handleRef}
+        disabled={!drag}
+        aria-label="Drag to Reorder"
+        variant="subtle"
+        color="gray"
+        style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
+      >
+        <GripVertical size={16} />
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
+const kindIcon = (job: QueueJob, failed: boolean) =>
+  failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
+
 function QueueRow({
   job,
   sortable,
@@ -252,17 +346,21 @@ function QueueRow({
 }) {
   const [opened, setOpened] = useState(false);
   const detailsId = useId();
+  const phone = usePhone();
   const failed = job.status === "failed";
-  const { progress } = job;
-  const percent = progressPercent(progress);
-  const Kind = failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
+  const Kind = kindIcon(job, failed);
   // The profile it runs on, by its short name.
   const profile = useGenerationActions().profiles.find((entry) =>
     isProfile(entry, job.input?.profileId),
   );
+  // Phones keep the title and a short status (and Paused); the model and reason are in the details.
+  const status = phone
+    ? [shortStatus(job), job.reason === pausedReason && pausedReason].filter(Boolean).join(" · ")
+    : [profile && profileName(profile), shortStatus(job), job.reason].filter(Boolean).join(" · ");
   return (
     <div ref={drag?.elementRef} className={classes.row}>
       <Group wrap="nowrap" gap="sm" py="xs">
+        {sortable && <DragHandle drag={drag} />}
         {/* Opens the inputs below; only the handle drags, so a tap here never moves the row. */}
         <UnstyledButton
           className={classes.toggle}
@@ -288,17 +386,8 @@ function QueueRow({
                   </Badge>
                 )}
               </Group>
-              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
-                {[
-                  profile && profileName(profile),
-                  job.operation === "upscale" && job.status === "running"
-                    ? "Upscaling"
-                    : statusLabels[job.status],
-                  progress?.phase,
-                  job.reason,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={phone ? 1 : 2}>
+                {status}
               </Text>
             </Stack>
           </Group>
@@ -308,44 +397,189 @@ function QueueRow({
             Swap to {job.input?.kind === "video" ? "Videos" : "Images"}
           </Button>
         )}
-        {/* Trailing, so waiting rows' text lines up with the others' and Stop keeps its column. */}
-        {sortable && (
-          <Tooltip label="Drag to Reorder">
-            <ActionIcon
-              ref={drag?.handleRef}
-              disabled={!drag}
-              aria-label="Drag to Reorder"
-              variant="subtle"
-              color="gray"
-              style={{ cursor: drag?.isDragging ? "grabbing" : "grab", touchAction: "none" }}
-            >
-              <GripVertical size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-        {!terminalStatuses.has(job.status) &&
-          (percent ? (
-            <RingProgress
-              size={28}
-              thickness={3}
-              roundCaps
-              rootColor="var(--mantine-color-default-border)"
-              sections={[{ value: percent, color: "var(--mantine-color-dimmed)" }]}
-              aria-label={`${Math.round(percent)}% Complete`}
-            />
-          ) : (
-            <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
-          ))}
-        <QueueJobAction job={job} compact />
         {failed && <ClearJob job={job} />}
+        <QueueJobAction job={job} compact />
       </Group>
       {job.status === "writing" && (
         <div className={classes.details}>
-          <WritingStream progress={progress} />
+          <WritingStream progress={job.progress} />
         </div>
       )}
       <Collapse id={detailsId} expanded={opened} keepMounted={false}>
-        <QueueJobDetails job={job} profile={profile} />
+        <QueueJobDetails
+          job={job}
+          profile={profile}
+          reason={phone && job.reason !== pausedReason ? job.reason : ""}
+        />
+      </Collapse>
+    </div>
+  );
+}
+
+/**
+ * A queue row: one job, or a set of several that one request queued together (an MCP `generate`
+ * call of several, a split run), whose `members` are all its jobs, finished ones included.
+ */
+export type QueueEntry = {
+  /** The job's ID, or the set's prefixed `set:`. */
+  id: string;
+  /** The rows it shows: unfinished and failed work. */
+  jobs: QueueJob[];
+  set?: { id: string; title: string; members: QueueJob[] };
+};
+
+/**
+ * The queue's rows in order: each set of several jobs one group, where its first shown job is,
+ * Dream's jobs each their own row.
+ */
+function queueEntries(all: QueueJob[]): QueueEntry[] {
+  const members = new Map<string, QueueJob[]>();
+  for (const job of all)
+    if (job.queueSet && !job.dream)
+      members.set(job.queueSet, [...(members.get(job.queueSet) || []), job]);
+  const sets = new Map<string, QueueEntry>();
+  const entries: QueueEntry[] = [];
+  for (const job of shownJobs(all)) {
+    const set = job.dream ? undefined : job.queueSet;
+    const group = set ? members.get(set) : undefined;
+    if (!set || !group || group.length < 2) {
+      entries.push({ id: job.id, jobs: [job] });
+      continue;
+    }
+    const entry = sets.get(set);
+    if (entry) {
+      entry.jobs.push(job);
+      continue;
+    }
+    const first = group[0].input;
+    const resultSet = first?.resultSet as { title?: string } | undefined;
+    const created = {
+      id: `set:${set}`,
+      jobs: [job],
+      set: {
+        id: set,
+        title: String(resultSet?.title || first?.prompt || "Generations"),
+        members: group,
+      },
+    };
+    sets.set(set, created);
+    entries.push(created);
+  }
+  return entries;
+}
+
+/**
+ * A set's group row: its title and progress, Stop for its unfinished work (or Retry Failed once
+ * only failures remain), its handle moving its waiting work together, and its jobs below once
+ * opened.
+ */
+function QueueSetRow({
+  entry,
+  sortable,
+  drag,
+  row,
+}: {
+  entry: QueueEntry;
+  sortable: boolean;
+  drag?: QueueRowDrag;
+  row: (job: QueueJob) => ReactNode;
+}) {
+  const [opened, setOpened] = useState(false);
+  const jobsId = useId();
+  const action = useQueueAction();
+  const [busy, setBusy] = useState<"stop" | "retry">();
+  const { title, members } = entry.set!;
+  const done = members.filter((job) => job.status === "completed").length;
+  const total = members.filter((job) => job.status !== "cancelled").length;
+  const failed = members.filter((job) => job.status === "failed").map((job) => job.id);
+  const unfinished = members
+    .filter((job) => !terminalStatuses.has(job.status))
+    .map((job) => job.id);
+  const Kind = kindIcon(members[0], !unfinished.length && failed.length > 0);
+  const stop = async () => {
+    setBusy("stop");
+    await Promise.allSettled(unfinished.map((id) => action.mutateAsync({ id, action: "cancel" })));
+    setBusy(undefined);
+  };
+  // A retried job joins the set again, so its failed original leaves the queue.
+  const retry = async () => {
+    setBusy("retry");
+    for (const id of failed)
+      try {
+        if (await action.mutateAsync({ id, action: "retry" }))
+          await action.mutateAsync({ id, action: "clear" });
+      } catch {
+        // Reported by the queue command's default notification.
+      }
+    setBusy(undefined);
+  };
+  const retryButton = (
+    <RowButton
+      label="Retry Failed"
+      icon={icons.retry}
+      pending={busy === "retry"}
+      onClick={() => void retry()}
+    />
+  );
+  return (
+    <div ref={drag?.elementRef} className={classes.row}>
+      <Group wrap="nowrap" gap="sm" py="xs">
+        {sortable && <DragHandle drag={drag} />}
+        <UnstyledButton
+          className={classes.toggle}
+          aria-expanded={opened}
+          aria-controls={jobsId}
+          onClick={() => setOpened((open) => !open)}
+        >
+          <Group wrap="nowrap" gap="sm">
+            <Kind
+              size={18}
+              aria-hidden
+              color={
+                Kind === CircleAlert ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"
+              }
+              style={{ flexShrink: 0 }}
+            />
+            <Stack gap={2} flex={1} miw={0}>
+              <Text size="sm" lineClamp={1}>
+                {title}
+              </Text>
+              <Text size="xs" c="dimmed" lineClamp={1}>
+                {[`${done} of ${total} Done`, failed.length && `${failed.length} Failed`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </Stack>
+            <ChevronDown
+              size={16}
+              aria-hidden
+              className={classes.chevron}
+              data-opened={opened || undefined}
+            />
+          </Group>
+        </UnstyledButton>
+        {unfinished.length ? (
+          <RowButton
+            label="Stop"
+            name="Stop Set"
+            icon={icons.stop}
+            stop
+            pending={busy === "stop"}
+            onClick={() => void stop()}
+          />
+        ) : (
+          failed.length > 0 && retryButton
+        )}
+      </Group>
+      <Collapse id={jobsId} expanded={opened} keepMounted={false}>
+        <div className={classes.set}>
+          {entry.jobs.map(row)}
+          {unfinished.length > 0 && failed.length > 0 && (
+            <Group justify="end" py="xs">
+              {retryButton}
+            </Group>
+          )}
+        </div>
       </Collapse>
     </div>
   );
@@ -370,18 +604,16 @@ function ClearJob({ job }: { job: QueueJob }) {
 const bulk = {
   "cancel-all": {
     label: "Stop All",
-    icon: icons.stop,
     title: "Stop All Generations",
-    text: "Studio stops every active generation. Results already saving are kept.",
   },
   "clear-failed": {
     label: "Clear Failed",
-    icon: icons.clear,
+    icon: icons.clearFailed,
     title: "Clear Failed Generations",
     text: "Failed generations leave the queue. Their records stay in the gallery and can still be retried.",
   },
 } as const;
-/** The queue's own actions, as icons like each row's, on its heading's row. */
+/** The queue's own actions on its heading's row: Pause and Clear Failed as icons, Stop All named. */
 export function QueueActions() {
   const queue = useQueue();
   const action = useQueueAction();
@@ -392,14 +624,20 @@ export function QueueActions() {
   // An empty queue offers its Resume in the empty state instead.
   if (!jobs.length) return null;
   const pause = pauseControl(queue.data.paused, everyone);
-  const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
-    jobs.some((job) =>
-      // Stop All leaves Dream's work to Dream's own pause.
-      key === "cancel-all"
-        ? !job.dream && !terminalStatuses.has(job.status)
-        : job.status === "failed",
-    ),
-  );
+  // Stop All leaves Dream's work to Dream's own pause.
+  const stopping = jobs.filter((job) => !job.dream && !terminalStatuses.has(job.status)).length;
+  const dreaming = jobs.some((job) => job.dream && !terminalStatuses.has(job.status));
+  const text = {
+    "cancel-all": [
+      `Studio stops your ${stopping} unfinished ${stopping === 1 ? "generation" : "generations"}.`,
+      "Results already saving are kept.",
+      dreaming ? "Dream's work waits for Dream's own pause." : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+    "clear-failed": bulk["clear-failed"].text,
+  };
+  const clearing = jobs.some((job) => job.status === "failed");
   const queueAction = (label: string, Icon: LucideIcon, onClick: () => void) => (
     <Tooltip key={label} label={label}>
       <ActionIcon
@@ -418,8 +656,19 @@ export function QueueActions() {
       {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
         pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
       )}
-      {available.map((key) =>
-        queueAction(bulk[key].label, bulk[key].icon, () => setConfirming(key)),
+      {clearing &&
+        queueAction(bulk["clear-failed"].label, bulk["clear-failed"].icon, () =>
+          setConfirming("clear-failed"),
+        )}
+      {/* Named in words, apart from the icons, so it never reads as a checkbox. */}
+      {stopping > 0 && (
+        <RowButton
+          label="Stop All"
+          icon={icons.stop}
+          stop
+          pending={action.isPending}
+          onClick={() => setConfirming("cancel-all")}
+        />
       )}
       <ConfirmDialog
         opened={confirming !== undefined}
@@ -435,7 +684,7 @@ export function QueueActions() {
             .catch(() => undefined)
         }
       >
-        {confirming && bulk[confirming].text}
+        {confirming && text[confirming]}
       </ConfirmDialog>
     </Group>
   );
@@ -494,31 +743,55 @@ export function Queue() {
       </EmptyState>
     );
   }
-  const movable = jobs.filter(movableJob);
+  const entries = queueEntries(queue.data.jobs);
+  const waiting = (entry: QueueEntry) => entry.jobs.filter(movableJob);
+  const movable = entries.filter((entry) => waiting(entry).length > 0);
   const sortable = movable.length > 1;
-  const row = (job: QueueJob, drag?: QueueRowDrag) => (
+  const jobRow = (job: QueueJob, drag?: QueueRowDrag, handle = false) => (
     <QueueRow
       key={job.id}
       job={job}
-      sortable={sortable && movableJob(job)}
+      sortable={handle}
       drag={drag}
       onSwap={swap.swappable(job) ? () => swap.offer(job) : undefined}
     />
   );
-  // The new order shows at once; the refetch after the move settles it, a failed one included.
-  function move(job: QueueJob, to: number) {
+  const row = (entry: QueueEntry, drag?: QueueRowDrag) =>
+    entry.set ? (
+      <QueueSetRow
+        key={entry.id}
+        entry={entry}
+        sortable={sortable && movable.includes(entry)}
+        drag={drag}
+        row={(job) => jobRow(job)}
+      />
+    ) : (
+      jobRow(entry.jobs[0], drag, sortable && movable.includes(entry))
+    );
+  // A set's waiting work moves as one, in its order, to `to` among the waiting entries. The new
+  // order shows at once; the refetch after the move settles it, a failed one included.
+  function move(entry: QueueEntry, to: number) {
+    const order = arrayMove(movable, movable.indexOf(entry), to).flatMap(waiting);
+    const at = order.indexOf(waiting(entry)[0]);
+    const ids = order.map((job) => job.id);
     client.setQueryData(queueQuery.queryKey, (data) => {
       if (!data) return data;
       const pending = data.jobs.filter(movableJob);
-      const slots = pending.map((item) => data.jobs.indexOf(item));
+      const byId = new Map(pending.map((job) => [job.id, job]));
+      const next = ids.map((id) => byId.get(id)).filter((job) => job !== undefined);
+      if (next.length !== pending.length) return data;
       const jobs = [...data.jobs];
-      arrayMove(pending, pending.indexOf(job), to).forEach((item, index) => {
-        jobs[slots[index]] = item;
+      pending.forEach((job, index) => {
+        jobs[data.jobs.indexOf(job)] = next[index];
       });
       return { ...data, jobs };
     });
     void action
-      .mutateAsync({ id: job.id, action: "move", to })
+      .mutateAsync(
+        entry.set
+          ? { id: "", set: entry.set.id, action: "move", to: at }
+          : { id: entry.id, action: "move", to: at },
+      )
       .catch(() => client.invalidateQueries({ queryKey: queueQuery.queryKey }));
   }
   return (
@@ -529,11 +802,11 @@ export function Queue() {
         </Text>
       )}
       {sortable ? (
-        <Suspense fallback={jobs.map((job) => row(job))}>
-          <SortableQueue jobs={jobs} movable={movable} row={row} onMove={move} />
+        <Suspense fallback={entries.map((entry) => row(entry))}>
+          <SortableQueue entries={entries} movable={movable} row={row} onMove={move} />
         </Suspense>
       ) : (
-        jobs.map((job) => row(job))
+        entries.map((entry) => row(entry))
       )}
       {swap.dialog}
     </Stack>

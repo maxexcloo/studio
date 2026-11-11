@@ -660,7 +660,7 @@ export class GenerationQueue {
     return this.requeue(job);
   }
 
-  /** Queues the job's input again as a new job. */
+  /** Queues the job's input again as a new job, in the job's set. */
   requeue(job: OwnedJob): OwnedJob {
     return this.store.enqueue(
       job.ownerId,
@@ -670,7 +670,7 @@ export class GenerationQueue {
       job.parentJobId,
       job.resource,
       undefined,
-      { parentItemId: job.parentItemId },
+      { parentItemId: job.parentItemId, queueSet: job.queueSet },
     );
   }
 }

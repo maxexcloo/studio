@@ -441,6 +441,17 @@ export async function fixtures(page: Page) {
       slots.forEach((slot, index) => (jobs[slot] = waiting[index]));
       return respond({ ok: true });
     }
+    const setMove = /^\/api\/queue\/sets\/([^/]+)\/move$/.exec(path);
+    if (setMove) {
+      // The set's waiting items move together, in their order, among the account's others.
+      const waiting = jobs.filter((job) => ["writing", "queued", "waiting"].includes(job.status));
+      const slots = waiting.map((item) => jobs.indexOf(item));
+      const block = waiting.filter((job) => job.queueSet === setMove[1]);
+      const order = waiting.filter((job) => !block.includes(job));
+      order.splice(Math.min(order.length, body.to), 0, ...block);
+      slots.forEach((slot, index) => (jobs[slot] = order[index]));
+      return respond({ ok: true });
+    }
     if (path === "/api/queue/clear-failed") {
       const failed = jobs.filter((job) => job.status === "failed" && !job.cleared);
       failed.forEach((job) => (job.cleared = true));

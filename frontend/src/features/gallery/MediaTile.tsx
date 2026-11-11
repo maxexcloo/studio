@@ -5,6 +5,7 @@ import { CircleAlert } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import { useTouch } from "../../ui/usePhone";
 import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
@@ -237,6 +238,8 @@ export function MediaTile({
   onVersion?: (index?: number) => void;
 }) {
   const selecting = Boolean(selection?.selecting);
+  // Dragging a result into the composer is the pointer's; on touch screens a hold selects instead.
+  const touch = useTouch();
   // Its Stop takes the caption's place at the foot of the tile.
   const upscaleShown = item.status === "done" && upscaling(item) && !selecting;
   const count = group.filter((entry) => selection?.selected.has(entry.id)).length;
@@ -326,7 +329,7 @@ export function MediaTile({
         }
         aria-pressed={selecting ? selected : undefined}
         aria-expanded={selecting ? undefined : expanded}
-        draggable={item.status === "done"}
+        draggable={item.status === "done" && !touch}
         onKeyDown={(event) => {
           if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
             const rect = event.currentTarget.getBoundingClientRect();

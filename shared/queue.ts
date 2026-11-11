@@ -75,6 +75,8 @@ export interface QueueJob {
   progress?: Record<string, unknown>;
   providerJobId?: string;
   backend?: string;
+  /** The set of jobs one request queued together (an MCP `generate` call of several, a split run). */
+  queueSet?: string;
   /** Dream's background work, queued below every account's own work. */
   dream?: true;
   createdAt: string;

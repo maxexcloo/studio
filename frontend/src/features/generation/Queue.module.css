@@ -17,3 +17,22 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--mantine-color-dimmed);
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.chevron[data-opened] {
+  transform: rotate(180deg);
+}
+
+/* A set's jobs sit under its title, past its kind icon. */
+.set {
+  padding-left: calc(18px + var(--mantine-spacing-sm));
+}
+
+.set > .row {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
