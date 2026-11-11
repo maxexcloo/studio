@@ -65,6 +65,8 @@ interface CompareBase {
   input: GenerationInput;
   references: ReferenceAsset[];
   sessionId?: string;
+  parentJobId?: string;
+  parentItemId?: string;
   /** Opens on a strength sweep of this LoRA (Library › Test LoRA) instead of the last choices. */
   sweep?: string;
 }
@@ -344,6 +346,8 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
     mutationFn: () =>
       post<Comparison>("/api/comparisons/run", {
         ...(base.sessionId ? { sessionId: base.sessionId } : {}),
+        ...(base.parentJobId ? { parentJobId: base.parentJobId } : {}),
+        ...(base.parentItemId ? { parentItemId: base.parentItemId } : {}),
         variants: variants.map((input, index) => {
           const profile = profileOf(input);
           return {
@@ -585,6 +589,13 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
           {!!run.error && <Alert color="red">{run.error.message}</Alert>}
           <Group justify="space-between" wrap="nowrap" gap="sm">
             <Text size="sm" c="dimmed">
+              {dimension === "profile"
+                ? "Prompt and references stay fixed; each profile uses its supported settings. "
+                : dimension === "prompt"
+                  ? "Only the prompts change; settings and references stay fixed. "
+                  : dimension === "loras"
+                    ? "Only the selected LoRAs change; prompt, settings and references stay fixed. "
+                    : "Only steps and guidance change; prompt and references stay fixed. "}
               {base.input.seed !== ""
                 ? `Every variant uses seed ${base.input.seed}.`
                 : "Every variant uses the same new seed."}{" "}
@@ -726,6 +737,8 @@ export function CompareProvider({ children }: { children: ReactNode }) {
           input: { ...draft.input, seed: seed ?? "" },
           references: draft.references,
           sessionId: draft.sessionId || undefined,
+          parentJobId: draft.parentJobId,
+          parentItemId: draft.parentItemId,
         });
       },
       testLora: async (name: string, prompt: string) => {

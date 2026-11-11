@@ -95,6 +95,7 @@ export async function fixtures(page: Page) {
     id: comparison.id,
     seed: comparison.seed,
     vote: comparison.vote,
+    winnerItemId: comparison.winnerItemId || null,
     ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),
@@ -516,7 +517,16 @@ export async function fixtures(page: Page) {
         requests: body.variants,
         jobIds: body.variants.map(
           (variant: any) =>
-            recordGeneration({ ...variant.input, seed, operation: "image" }, sessionId).id,
+            recordGeneration(
+              {
+                ...variant.input,
+                seed,
+                operation: "image",
+                parentJobId: body.parentJobId,
+                parentItemId: body.parentItemId,
+              },
+              sessionId,
+            ).id,
         ),
         labels: body.variants.map((variant: any) => variant.label),
         vote: null,
@@ -526,7 +536,9 @@ export async function fixtures(page: Page) {
     }
     const comparison = comparisons.find((entry) => entry.id === path.split("/")[3]);
     if (comparison && path.endsWith("/vote") && method === "PUT") {
-      comparison.vote = body.jobId;
+      const winner = gallery.find((item) => item.id === body.itemId);
+      comparison.vote = winner?.jobId || null;
+      comparison.winnerItemId = winner?.id || null;
       return respond(showComparison(comparison));
     }
     if (comparison && method === "GET") return respond(showComparison(comparison));

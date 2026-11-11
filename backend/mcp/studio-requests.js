@@ -64,7 +64,7 @@ export async function resolveSignedMcpResult(owner, jobId, index) {
  * (multi-user-auth.js mcpAccount). Generation is admitted with MCP's own queue priority; `admit` is
  * domain/admission.ts's.
  */
-export function createMcpDomainRequest({ app, admit }) {
+export function createMcpDomainRequest({ app, admit, ownsItem }) {
   return async (method, route, input, owner, credential, signal) => {
     const url = new URL(route, "http://localhost");
     const routePath = url.pathname;
@@ -94,8 +94,14 @@ export function createMcpDomainRequest({ app, admit }) {
     }
   };
 
-  function generate({ queueSet, ...body }, account) {
+  function generate({ queueSet, parentItemId, ...body }, account) {
+    if (parentItemId && !ownsItem(account?.userId || "", parentItemId))
+      return { status: 404, payload: { error: "Source result not found." } };
     // External chat work queues after manual Studio requests; its set keeps it together once started.
-    return admit(body, account, undefined, { priority: queuePriority.mcp, queueSet });
+    return admit(body, account, undefined, {
+      priority: queuePriority.mcp,
+      queueSet,
+      ...(parentItemId ? { parentItemId } : {}),
+    });
   }
 }

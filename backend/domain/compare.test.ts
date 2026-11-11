@@ -6,6 +6,7 @@ import express from "express";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerCompareRoutes, type ComparisonRecord } from "./compare.ts";
+import { findDirectRoute } from "./direct-route.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { Store } from "./store.ts";
 
@@ -58,7 +59,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
-    voted: (ownerId, jobId, others) => votes.push([ownerId, jobId, ...others]),
+    voted: (ownerId, winner, others) =>
+      votes.push([ownerId, winner.id!, ...others.map((item) => item.id!)]),
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -144,7 +146,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
   // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.
-  assert.deepEqual(votes, [["alice", winner.jobId, other.jobId]]);
+  assert.deepEqual(votes, [["alice", "w-0", "o-0"]]);
 
   // Existing jobs, such as an MCP fan-out run, form a set; foreign jobs are refused.
   const created = await request("", {
@@ -159,7 +161,14 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.equal((await request("", { jobIds: [jobs[0].id, "old-a"] }, "POST", "bob")).status, 404);
 
   // Compare Selected names each job's chosen image, which shows and wins in place of its first.
-  gallery.push({ id: "w-1", jobId: winner.jobId, ownerId: "alice", type: "image", status: "done" });
+  gallery.push({
+    id: "w-1",
+    jobId: winner.jobId,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    settings: { seed: "8" },
+  });
   const selected = await request("", {
     jobIds: [winner.jobId, other.jobId],
     itemIds: ["w-1", "o-0"],
@@ -189,5 +198,74 @@ test("compare runs queue one seeded set, read back per owner and record the star
       ["Variant A", true],
       ["Variant B", false],
     ],
+  );
+
+  // Two outputs of the same job stay distinct, including their winner and taste signal.
+  const batch = await request("", {
+    jobIds: [winner.jobId, winner.jobId],
+    itemIds: ["w-0", "w-1"],
+  });
+  assert.equal(batch.status, 201);
+  assert.equal(batch.body.seed, "", "different output seeds are not labelled as a shared seed");
+  assert.deepEqual(
+    batch.body.variants.map((entry: { item: { id: string } }) => entry.item.id),
+    ["w-0", "w-1"],
+  );
+  const batchVote = await request(`/${batch.body.id}/vote`, { itemId: "w-1" }, "PUT");
+  assert.equal(batchVote.body.vote, winner.jobId);
+  assert.equal(batchVote.body.winnerItemId, "w-1");
+  assert.deepEqual(votes.at(-1), ["alice", "w-1", "w-0"]);
+  const changedVote = await request(`/${batch.body.id}/vote`, { itemId: "w-0" }, "PUT");
+  assert.equal(changedVote.body.winnerItemId, "w-0");
+  const clearedVote = await request(`/${batch.body.id}/vote`, { itemId: null }, "PUT");
+  assert.equal(clearedVote.body.vote, null);
+  assert.equal(clearedVote.body.winnerItemId, null);
+  assert.equal(
+    (await request("", { jobIds: [winner.jobId, winner.jobId], itemIds: ["w-0", "w-0"] })).status,
+    400,
+  );
+  const filtered = await request(`?jobIds=${encodeURIComponent(other.jobId)}`);
+  assert.ok(filtered.body.comparisons.length > 0);
+  assert.ok(
+    filtered.body.comparisons.every((entry: { variants: { jobId: string }[] }) =>
+      entry.variants.some((variant) => variant.jobId === other.jobId),
+    ),
+  );
+  const direct = findDirectRoute(app, "GET", "/api/comparisons")!;
+  assert.ok(direct, "MCP can dispatch comparison reads without HTTP");
+  const directRead = await direct.run(
+    { userId: "alice", role: "user" },
+    { params: {}, query: { jobIds: other.jobId } },
+  );
+  assert.ok("payload" in directRead);
+  assert.deepEqual(directRead.payload, filtered.body);
+  const foreignRead = await direct.run(
+    { userId: "bob", role: "user" },
+    { params: {}, query: { jobIds: other.jobId } },
+  );
+  assert.ok("payload" in foreignRead);
+  assert.deepEqual(foreignRead.payload, { comparisons: [] });
+
+  // Comparison iterations retain their exact source, without grouping unrelated session work.
+  const iteration = await request("/run", {
+    sessionId: jobs[0].sessionId,
+    parentJobId: winner.jobId,
+    parentItemId: "w-1",
+    variants: [variant("Steps 30", { steps: 30 }), variant("Steps 50", { steps: 50 })],
+  });
+  assert.equal(iteration.status, 201);
+  for (const entry of iteration.body.variants) {
+    const job = store.job("alice", entry.jobId)!;
+    assert.equal(job.parentJobId, winner.jobId);
+    assert.equal(job.parentItemId, "w-1");
+  }
+  assert.equal(
+    (
+      await request("/run", {
+        parentItemId: "someone-elses-result",
+        variants: [variant("A"), variant("B")],
+      })
+    ).status,
+    404,
   );
 });
