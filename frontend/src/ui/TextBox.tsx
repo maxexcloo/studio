@@ -24,7 +24,7 @@ import {
   useProps,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, type LucideIcon } from "lucide-react";
 import { ActionBarGroups, ActionMenuItems, type Action } from "../features/gallery/ActionBar";
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
@@ -40,13 +40,14 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * Every multi-line text box. Beside the text stand only `send` and, with `tools`, a ⋯ menu of the
- * box's own tools, then Copy (unless `copy` is off, where the page offers it) and Clear, which
- * turns into Undo until the text next changes. The menu is one level deep: a tool with options
- * lists them under its name, first, rather than in a submenu. On phones the box is a summary of
- * its text: tapping it opens it full screen with those tools as buttons, since menus are awkward
- * over the keyboard, then Done, and `below` under the text; Done, Escape or dismissing the
- * keyboard returns to the page. `submit` adds its send arrow there too, so typing and sending take
- * one tap. An `inline` box edits in place on phones too, as on desktop.
+ * box's own tools, then Copy (unless `copy` is off, where the page offers it) and Clear (Reset
+ * where `reset` holds the text to return to), which turns into Undo until the text next changes.
+ * The menu is one level deep: a tool with options lists them under its name, first, rather than in
+ * a submenu. On phones the box is a summary of its text: tapping it opens it full screen with
+ * those tools as buttons, since menus are awkward over the keyboard, then Done, and `below` under
+ * the text; Done, Escape or dismissing the keyboard returns to the page. There Clear stands beside
+ * the sends, as in the composer, and `submit` adds its sends, the last one primary, so typing and
+ * sending take one tap. An `inline` box edits in place on phones too, as on desktop.
  */
 export function TextBox({
   value,
@@ -57,6 +58,7 @@ export function TextBox({
   busy,
   popups,
   hideTools = false,
+  reset,
   overlay,
   below,
   inline = false,
@@ -89,8 +91,19 @@ export function TextBox({
   inline?: boolean;
   /** Rests on one line, ending in an ellipsis, and shows its whole text while focused. */
   oneLine?: boolean;
-  /** The form's send action, offered in the phone editor beside Done. */
-  submit?: { label: string; disabled: boolean; onSubmit: () => void };
+  /** The text Clear returns to, as Reset, where the box starts from a text of its own. */
+  reset?: string;
+  /**
+   * The form's sends, offered in the phone editor above the keyboard; the last is primary. Each
+   * returns to the page unless `keepOpen`, as for a proposal to review in place.
+   */
+  submit?: {
+    label: string;
+    icon?: LucideIcon;
+    disabled: boolean;
+    keepOpen?: boolean;
+    onSubmit: () => void;
+  }[];
 }) {
   const phone = usePhone() && !inline;
   const [editing, setEditing] = useState(false);
@@ -102,10 +115,24 @@ export function TextBox({
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useKeyboardDrop(editing, () => setEditing(false));
   // Clear turns into Undo, which restores the text, until the text next changes.
+  const start = reset ?? "";
   const [cleared, setCleared] = useState<string | null>(null);
   useEffect(() => {
-    if (value) setCleared(null);
-  }, [value]);
+    if (value !== start) setCleared(null);
+  }, [value, start]);
+  const clear: Action =
+    cleared !== null && value === start
+      ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared) }
+      : {
+          id: "clear",
+          label: `${reset === undefined ? "Clear" : "Reset"} ${title}`,
+          icon: reset === undefined ? icons.clear : icons.reset,
+          disabled: value === start || props.readOnly,
+          onClick: () => {
+            setCleared(value);
+            onChange(start);
+          },
+        };
   const actions: Action[] | undefined = tools && [
     ...tools,
     ...(copy
@@ -119,19 +146,10 @@ export function TextBox({
           },
         ]
       : []),
-    cleared !== null && !value
-      ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared) }
-      : {
-          id: "clear",
-          label: `Clear ${title}`,
-          icon: icons.clear,
-          disabled: !value || props.readOnly,
-          onClick: () => {
-            setCleared(value);
-            onChange("");
-          },
-        },
+    clear,
   ];
+  // The phone editor's tools, Clear standing beside the sends instead.
+  const editorTools = actions?.filter((action) => action !== clear);
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
@@ -339,32 +357,51 @@ export function TextBox({
                 <div className={classes.toolbar} onMouseDown={keepFocus}>
                   {actions ? (
                     <ActionBarGroups
-                      groups={[actions]}
-                      labelled={actions.map((action) => action.id)}
+                      groups={[editorTools!]}
+                      labelled={editorTools!.map((action) => action.id)}
                       menuPosition="top-start"
                     />
                   ) : (
                     !send && rightSection
                   )}
                   <div className={classes.sends}>
-                    {send}
-                    {submit && (
-                      <ActionIcon
-                        aria-label={submit.label}
-                        variant="filled"
-                        radius="xl"
-                        size="lg"
-                        disabled={submit.disabled}
-                        // Sending before the keyboard drops keeps the text's blur from closing first.
-                        onPointerDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          close();
-                          submit.onSubmit();
-                        }}
-                      >
-                        <ArrowUp size={18} />
-                      </ActionIcon>
+                    {actions && (
+                      <Tooltip label={clear.label}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          size="lg"
+                          aria-label={clear.label}
+                          disabled={clear.disabled}
+                          onClick={clear.onClick}
+                        >
+                          {clear.icon && <clear.icon size={18} />}
+                        </ActionIcon>
+                      </Tooltip>
                     )}
+                    {send}
+                    {submit?.map((each, index) => {
+                      const primary = index === submit.length - 1;
+                      const Glyph = each.icon ?? ArrowUp;
+                      return (
+                        <ActionIcon
+                          key={each.label}
+                          aria-label={each.label}
+                          variant={primary ? "filled" : "light"}
+                          radius="xl"
+                          size="lg"
+                          disabled={each.disabled}
+                          // Sending before the keyboard drops keeps the text's blur from closing first.
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            if (!each.keepOpen) close();
+                            each.onSubmit();
+                          }}
+                        >
+                          <Glyph size={18} />
+                        </ActionIcon>
+                      );
+                    })}
                   </div>
                 </div>
               )}

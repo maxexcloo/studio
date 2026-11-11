@@ -143,13 +143,15 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
   await expect(token).not.toHaveValue(/browser-fixture/);
   await page.getByRole("button", { name: "Show", exact: true }).click();
   await expect(token).toHaveValue("browser-fixture-token-1");
-  await page.getByRole("button", { name: "Rotate Token", exact: true }).click();
-  await expect(token).toHaveValue("browser-fixture-token-2");
-  // Revoking sits in the Danger Zone and confirms first.
+  // Rotating and revoking sit in the Danger Zone and confirm first.
+  const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
+  await danger.getByRole("button", { name: "Rotate Token", exact: true }).click();
   await page
-    .getByRole("region", { name: "Danger Zone", exact: true })
-    .getByRole("button", { name: "Revoke Token", exact: true })
+    .getByRole("dialog", { name: "Rotate Token", exact: true })
+    .getByRole("button", { name: "Rotate", exact: true })
     .click();
+  await expect(token).toHaveValue("browser-fixture-token-2");
+  await danger.getByRole("button", { name: "Revoke Token", exact: true }).click();
   await page
     .getByRole("dialog", { name: "Revoke Token", exact: true })
     .getByRole("button", { name: "Revoke", exact: true })
@@ -168,7 +170,7 @@ test("Personal MCP credentials can be issued, viewed again hidden until Show, ro
   // A token from before tokens were kept can't be shown: Rotate to view.
   status.viewable = false;
   await page.reload();
-  await expect(page.getByText(/^Rotate to view\./)).toBeVisible();
+  await expect(page.getByText(/^Rotate it in the Danger Zone to view\./)).toBeVisible();
   await expect(token).toHaveCount(0);
 });
 

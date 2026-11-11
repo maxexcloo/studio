@@ -22,8 +22,9 @@ import classes from "./MediaViewer.module.css";
  * and pressing Enter or Generate runs it with the item's settings as a new version. Ask sends the
  * text as a change in plain words instead (`useItemChange`), and Suggestions offers the image's
  * next steps as changes to ask for, until Run runs the proposal or Undo restores what was typed.
- * Its tools are the text box's: Suggestions, Ask for a Change… and Refresh Suggestions. The bar has
- * Copy. At rest it is one line; focused, it shows the whole prompt.
+ * Its tools are the text box's: Suggestions, with Refresh Suggestions in its menu, and Ask for a
+ * Change…, which phones' editor offers as a send beside Generate instead. Reset returns to the
+ * item's prompt; the bar has Copy. At rest it is one line; focused, it shows the whole prompt.
  */
 export function ViewerPrompt({
   item,
@@ -89,26 +90,39 @@ export function ViewerPrompt({
     },
   });
   // Text typed over the prompt is the change to ask for; otherwise Ask for a Change… selects the
-  // prompt for one typed over it, and phones open the editor.
+  // prompt for one typed over it.
   const typed = Boolean(prompt.trim()) && prompt !== original;
   const tools = [
     offered && suggestions.action,
     ask.available &&
-      !change && {
+      !change &&
+      !phone && {
         id: "ask",
         label: "Ask for a Change…",
         icon: icons.assistant,
         disabled: ask.pending,
         onClick: () => {
           if (typed) return ask.send(prompt, prompt.trim());
-          if (phone) return field.current?.click();
           field.current?.focus();
           field.current?.select();
         },
       },
-    offered && suggestions.refresh,
   ].filter((tool): tool is Action => Boolean(tool));
-  // Phones generate from the editor's send arrow; a proposal's Run stays in the field.
+  // Phones ask or generate from the editor's sends; a proposal's Run stays in the field.
+  const sends = [
+    ...(ask.available && phone
+      ? [
+          {
+            label: "Ask for a Change",
+            icon: icons.assistant,
+            disabled: !typed || ask.pending,
+            keepOpen: true,
+            onSubmit: () => ask.send(prompt, prompt.trim()),
+          },
+        ]
+      : []),
+    submit,
+  ];
   const send = (
     <>
       {change && <UndoButton onClick={ask.undo} />}
@@ -140,9 +154,10 @@ export function ViewerPrompt({
       onKeyDown={keys}
       tools={tools}
       copy={false}
+      reset={original}
       send={send}
       busy={ask.pending ? "Asking for a Change…" : undefined}
-      submit={change ? undefined : submit}
+      submit={change ? undefined : sends}
     />
   );
 }

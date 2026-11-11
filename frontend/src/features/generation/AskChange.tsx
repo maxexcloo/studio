@@ -138,7 +138,7 @@ export function SendButton({
 
 /**
  * Suggestions: short changes that fit the image or draft (`query`), asked for as soon as one is
- * picked, as an action whose options are the changes, with Refresh Suggestions beside it to ask for
+ * picked, as an action whose options are the changes, then Refresh Suggestions to ask for
  * different ones (`fresh`) in their place. They load once `enabled` and stay cached per item or
  * prompt. While they load, or with none, a dimmed line stands in for them.
  */
@@ -163,6 +163,15 @@ export function useChangeSuggestions<K extends QueryKey>({
   });
   const list = steps.data?.suggestions ?? [];
   const loading = refresh.isPending || (steps.isFetching && !list.length);
+  const again: Action = {
+    id: "refresh",
+    label: "Refresh Suggestions",
+    icon: icons.refresh,
+    // Never disabled while it works: a disabled item drops focus out of the open menu.
+    disabled,
+    keepOpen: true,
+    onClick: () => refresh.mutate(),
+  };
   const action: Action = {
     id: "suggestions",
     label: "Suggestions",
@@ -178,18 +187,10 @@ export function useChangeSuggestions<K extends QueryKey>({
               onClick: () => onPick(step.request),
             }))
           : [{ id: "none", label: "No Suggestions", disabled: true }],
+      [again],
     ],
   };
-  const again: Action = {
-    id: "refresh",
-    label: "Refresh Suggestions",
-    icon: icons.refresh,
-    // Never disabled while it works: a disabled item drops focus out of the open menu.
-    disabled,
-    keepOpen: true,
-    onClick: () => refresh.mutate(),
-  };
-  return { action, refresh: again, loading };
+  return { action, loading };
 }
 
 /** Suggestions as their own menu button, beside a field outside a text box's tools. */
@@ -198,7 +199,7 @@ export function ChangeSuggestions<K extends QueryKey>({
   ...props
 }: Omit<Parameters<typeof useChangeSuggestions<K>>[0], "enabled">) {
   const [opened, setOpened] = useState(false);
-  const { action, refresh, loading } = useChangeSuggestions({
+  const { action, loading } = useChangeSuggestions({
     ...props,
     disabled,
     enabled: opened,
@@ -220,7 +221,7 @@ export function ChangeSuggestions<K extends QueryKey>({
       </Tooltip>
       <Menu.Dropdown data-composer-layer aria-busy={loading || undefined}>
         <Menu.Label>Suggestions</Menu.Label>
-        <ActionMenuItems groups={[...action.menu!, [refresh]]} />
+        <ActionMenuItems groups={action.menu!} />
       </Menu.Dropdown>
     </Menu>
   );

@@ -72,34 +72,111 @@ interface GridLayout {
 const headingHeight = 36;
 const sectionSpace = 12;
 
+/** A layout being built, with each lane's next free top. */
+type Building = GridLayout & { lanes: number[] };
+
 /**
- * A masonry of `columns` lanes: each tile joins the shortest lane. With `byDay`, each day starts
- * below the last one's longest lane, under its heading.
+ * Adds `items` to a masonry of `columns` lanes: each tile joins the shortest lane. With `byDay`,
+ * each day starts below the last one's longest lane, under its heading.
  */
-function layOut(
+function place(
+  layout: Building,
   items: MediaItem[],
   columns: number,
   cell: number,
   gap: number,
   byDay: boolean,
-): GridLayout {
-  const tiles: GridLayout["tiles"] = [];
-  const sections: GridLayout["sections"] = [];
-  let lanes: number[] = [];
-  items.forEach((item, index) => {
+) {
+  for (const item of items) {
+    const index = layout.tiles.length;
     const day = byDay ? mediaDay(item) : "";
     // An undated item stays in the day before it.
-    if (!index || (day && day !== sections.at(-1)!.day)) {
-      const top = index ? Math.max(...lanes) - gap + sectionSpace : 0;
-      sections.push({ day, first: index, top });
-      lanes = Array(columns).fill(top + (day ? headingHeight : 0));
+    if (!index || (day && day !== layout.sections.at(-1)!.day)) {
+      const top = index ? Math.max(...layout.lanes) - gap + sectionSpace : 0;
+      layout.sections.push({ day, first: index, top });
+      layout.lanes = Array(columns).fill(top + (day ? headingHeight : 0));
     }
-    const lane = lanes.indexOf(Math.min(...lanes));
+    const lane = layout.lanes.indexOf(Math.min(...layout.lanes));
     const height = (cell * (item.height || 1024)) / (item.width || 1024);
-    tiles.push({ top: lanes[lane], left: lane * (cell + gap), height });
-    lanes[lane] += height + gap;
+    layout.tiles.push({ top: layout.lanes[lane], left: lane * (cell + gap), height });
+    layout.lanes[lane] += height + gap;
+  }
+  layout.height = layout.tiles.length ? Math.max(...layout.lanes) - gap : 0;
+  return layout;
+}
+
+const layOut = (
+  items: MediaItem[],
+  columns: number,
+  cell: number,
+  gap: number,
+  byDay: boolean,
+): Building =>
+  place({ tiles: [], sections: [], height: 0, lanes: [] }, items, columns, cell, gap, byDay);
+
+/**
+ * The layout after `items` changed from `before`'s, keeping every tile still in place where it
+ * was: new work at the start lays out as a block above them, which moves them all down alike (the
+ * scroll anchor keeps them on screen), and anything after them continues their lanes. A tile only
+ * moves within its lane when something before it changed. Null to lay out afresh.
+ */
+function relayOut(
+  before: { items: MediaItem[]; layout: Building },
+  items: MediaItem[],
+  columns: number,
+  cell: number,
+  gap: number,
+  byDay: boolean,
+): Building | null {
+  const same = (a: MediaItem | undefined, b: MediaItem) =>
+    a?.id === b.id &&
+    a.width === b.width &&
+    a.height === b.height &&
+    (!byDay || mediaDay(a) === mediaDay(b));
+  const start = items.findIndex((item) => item.id === before.items[0]?.id);
+  let kept = 0;
+  while (kept < before.items.length && same(items[start + kept], before.items[kept])) kept++;
+  if (start < 0 || !kept) return null;
+  const head = layOut(items.slice(0, start), columns, cell, gap, byDay);
+  const [first] = before.layout.sections;
+  // The kept tiles join the new work's last day, or start a day of their own under it.
+  const day = byDay ? mediaDay(items[start]) : "";
+  const joined = start > 0 && !(day && day !== head.sections.at(-1)!.day);
+  const shift = !start
+    ? 0
+    : joined
+      ? head.height + gap - (first.day ? headingHeight : 0)
+      : head.height + sectionSpace;
+  const tiles = before.layout.tiles
+    .slice(0, kept)
+    .map((tile) => ({ ...tile, top: tile.top + shift }));
+  const sections = before.layout.sections
+    .filter((section, index) => section.first < kept && !(joined && !index))
+    .map((section) => ({ ...section, first: section.first + start, top: section.top + shift }));
+  // Each lane's next free top after the kept tiles, from their last day's start.
+  const last = before.layout.sections.filter((section) => section.first < kept).at(-1)!;
+  const lanes = Array<number>(columns).fill(
+    joined && last === first
+      ? head.height + gap
+      : last.top + shift + (last.day ? headingHeight : 0),
+  );
+  tiles.slice(last.first).forEach((tile) => {
+    const lane = Math.round(tile.left / (cell + gap));
+    lanes[lane] = Math.max(lanes[lane], tile.top + tile.height + gap);
   });
-  return { tiles, sections, height: items.length ? Math.max(...lanes) - gap : 0 };
+  return place(
+    {
+      tiles: [...head.tiles, ...tiles],
+      sections: [...head.sections, ...sections],
+      height: 0,
+      lanes,
+    },
+    items.slice(start + kept),
+    columns,
+    cell,
+    gap,
+    byDay,
+  );
 }
 
 /**
@@ -156,10 +233,19 @@ export function MediaGrid({
   const [menuItem, setMenuItem] = useState<string | null>(null);
   // Without captions, phone tiles hide their menu button and open the menu by holding.
   const hold = useHoldToSelect(items, selection, caption === "none" ? setMenuItem : undefined);
-  const layout = useMemo(
-    () => (width ? layOut(items, columns, cell, gap, byDay) : null),
-    [items, columns, cell, gap, byDay, width],
-  );
+  // The last layout, kept while its columns, sizes and results stay the same, so new work and
+  // later pages never reshuffle the tiles already on screen (`relayOut`).
+  const last = useRef<{ key: string; items: MediaItem[]; layout: Building } | null>(null);
+  const layout = useMemo(() => {
+    if (!width) return null;
+    const key = `${columns}:${cell}:${gap}:${byDay}:${results}`;
+    const before = last.current?.key === key ? last.current : null;
+    const next =
+      (before && relayOut(before, items, columns, cell, gap, byDay)) ||
+      layOut(items, columns, cell, gap, byDay);
+    last.current = { key, items, layout: next };
+    return next;
+  }, [items, columns, cell, gap, byDay, width, results]);
   const span = useWindowSpan(host, layout?.height || 0);
   const places = useMemo(
     () => layout && new Map(layout.tiles.map((tile, index) => [items[index].id, tile.top])),

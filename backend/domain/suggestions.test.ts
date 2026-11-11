@@ -199,6 +199,23 @@ test("viewer next steps read the image itself where the text model can", async (
   assert.match(calls[0][0].content, /what the attached image shows/);
 });
 
+test("Animate's motion ideas come from the image, each its own instruction, and aren't kept with it", async () => {
+  const { calls, suggestions } = fixture({ image: true });
+  const result = await suggestions.suggest("alice", { surface: "animate", jobId: "job-a" });
+  assert.deepEqual(result.suggestions[1], {
+    label: "Closer Crop",
+    request: "crop closer",
+    prompt: "crop closer",
+  });
+  assert.match(calls[0][0].content, /becomes a short video/);
+  assert.match(calls[0][1].content, /Prompt: A harbour at dawn/);
+  assert.equal(calls[0][1].images, 1);
+  // The viewer's next steps are still their own.
+  await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
+  assert.equal(calls.length, 2);
+  assert.match(calls[1][0].content, /next steps/);
+});
+
 test("an image's next steps are kept with it, and More asks for different ones", async () => {
   const { calls, suggestions, advance } = fixture();
   const ask = (fresh?: boolean) =>

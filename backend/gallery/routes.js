@@ -18,6 +18,7 @@ import { galleryTime } from "./order.js";
 import { makePendingItems } from "./records.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
+import { accountPreferences } from "../account-preferences.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
@@ -145,6 +146,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
     const similarTo = query.similar
       ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
       : null;
+    // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
+    // work in progress, or queued work too; unsaved, none.
+    const work = accountPreferences(account?.userId || "").galleryWork || "none";
     const page = pageGallery({
       rank: similarTo,
       type,
@@ -155,12 +159,14 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
       // The account and every parameter but the page's own name the filter's list.
       filterKey: JSON.stringify([
         account?.userId ?? "",
+        work,
         Object.entries(query).filter(([key]) => key !== "cursor" && key !== "limit"),
       ]),
       filter: (item) =>
         recordBelongsToAccount(item, account) &&
         // `set` keeps one MCP result set's results.
         (!query.set || item.resultSet?.id === query.set) &&
+        (work !== "none" || item.status !== "pending") &&
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });
@@ -171,10 +177,10 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
       const { thinking: _thinking, ...writing } = item.writing;
       return { ...item, writing };
     };
-    // Work the queue holds has no tiles until it starts; the first page leads with them, so all of
-    // the account's unfinished work shows. Dream's stays in its own pool; an upscale has no tile.
+    // Work the queue holds has no tiles until it starts; with queued work shown, the first page
+    // leads with them. Dream's stays in its own pool; an upscale has no tile.
     const queued =
-      cursor || similarTo || query.uploads === "1"
+      work !== "queued" || cursor || similarTo || query.uploads === "1"
         ? []
         : store
             .openJobs(account?.userId || "")

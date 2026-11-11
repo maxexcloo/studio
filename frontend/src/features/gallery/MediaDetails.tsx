@@ -316,7 +316,7 @@ function FaceCheck({ identity, faceRedo }: Pick<MediaItem, "identity" | "faceRed
 }
 
 /**
- * A caption folds to five lines when longer, ending in an ellipsis with Expand under it (WebKit
+ * A caption folds to five lines when longer, its last line fading out under Expand at its end (WebKit
  * drops a clamped text's lines around a floated control); expanded, Collapse follows its last word.
  */
 function CaptionText({ text }: { text: string }) {
@@ -350,11 +350,12 @@ function CaptionText({ text }: { text: string }) {
         ref={ref}
         size="sm"
         className={expanded ? classes.captionText : `${classes.captionText} ${classes.folded}`}
+        data-long={(long && !expanded) || undefined}
       >
         {text}
         {expanded && <> {toggle}</>}
       </Text>
-      {long && !expanded && <div className={classes.unfold}>{toggle}</div>}
+      {long && !expanded && <span className={classes.unfold}>{toggle}</span>}
     </div>
   );
 }
