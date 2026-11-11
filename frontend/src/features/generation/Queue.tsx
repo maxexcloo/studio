@@ -677,7 +677,8 @@ export function QueueActions() {
     </Tooltip>
   );
   return (
-    <Group gap={4} wrap="nowrap">
+    // At the end of the row it shares, or of its own row in the phone drawer.
+    <Group gap={4} wrap="nowrap" justify="flex-end">
       {queueAction(pause.label, pause.held ? icons.resume : icons.pause, () =>
         pause.actions.forEach((key) => action.mutate({ id: "", action: key })),
       )}
