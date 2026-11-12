@@ -268,10 +268,15 @@ export function MediaGrid({
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
       pendingFocus.current = null;
   });
+  // The tile the viewer closed on comes into view once, not again whenever the layout changes
+  // (new work, a refresh), which would pull the page back to it.
+  const shownFocus = useRef<string | null>(null);
   useLayoutEffect(() => {
-    if (!focusItem || !layout) return;
+    if (!focusItem) return void (shownFocus.current = null);
+    if (!layout || shownFocus.current === focusItem) return;
     const index = items.findIndex((item) => item.id === focusItem);
     if (index < 0) return;
+    shownFocus.current = focusItem;
     pendingFocus.current = focusItem;
     scrollToTile(index);
     if (focusTile(host.current, focusItem)) pendingFocus.current = null;

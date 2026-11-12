@@ -131,14 +131,18 @@ export function RunsView({
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
       pendingFocus.current = null;
   });
+  // The tile the viewer closed on comes into view once, not whenever the rows change.
+  const shownFocus = useRef<string | null>(null);
   useLayoutEffect(() => {
-    if (!focusItem || !width) return;
+    if (!focusItem) return void (shownFocus.current = null);
+    if (!width || shownFocus.current === focusItem) return;
     const index = rows.findIndex((row) =>
       "panel" in row
         ? row.panel.items.some((item) => item.id === focusItem)
         : row.runs.some((run) => run.items.some((item) => item.id === focusItem)),
     );
     if (index < 0) return;
+    shownFocus.current = focusItem;
     pendingFocus.current = focusItem;
     virtual.scrollToIndex(index, { align: "auto" });
     if (focusTile(host.current, focusItem)) pendingFocus.current = null;
