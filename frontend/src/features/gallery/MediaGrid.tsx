@@ -12,7 +12,8 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { Title } from "@mantine/core";
+import { Button, Title } from "@mantine/core";
+import { ArrowUp } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { dayHeading, mediaDay } from "./mediaLabels";
 import classes from "./MediaGrid.module.css";
@@ -115,20 +116,33 @@ const layOut = (
   place({ tiles: [], sections: [], height: 0, lanes: [] }, items, columns, cell, gap, byDay);
 
 /**
- * The items to show: new work arriving at the start while the grid's top is scrolled out of view
- * waits above it until the top is back in view, so nothing on screen moves under the person (a
- * browser keeps scrolling past a scroll position set mid-gesture). Other changes show at once.
+ * The items to show: new work arriving at the start waits above the grid while its top is out of
+ * view or the page is being scrolled, so nothing moves under the person (a browser keeps scrolling
+ * past a position set mid-gesture), and shows once the top is in view and scrolling has stopped, or
+ * at once from `release` (the "N New" button). Other changes show at once.
  */
 function useHeldNewWork(items: MediaItem[], host: RefObject<HTMLDivElement | null>) {
-  const [atTop, setAtTop] = useState(true);
+  const [settled, setSettled] = useState(true);
+  const [releasing, setReleasing] = useState(false);
   useEffect(() => {
-    const update = () => setAtTop((host.current?.getBoundingClientRect().top ?? 0) >= 0);
-    update();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const atTop = () => (host.current?.getBoundingClientRect().top ?? 0) >= 0;
+    const update = () => {
+      setSettled(false);
+      clearTimeout(timer);
+      // Settled: the grid's top in view and no scrolling for a moment.
+      timer = setTimeout(() => setSettled(atTop()), 600);
+    };
+    setSettled(atTop());
     window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", update);
+    };
   }, [host]);
   const first = useRef<string | undefined>(undefined);
-  const start = atTop
+  const open = settled || releasing;
+  const start = open
     ? 0
     : Math.max(
         0,
@@ -136,7 +150,15 @@ function useHeldNewWork(items: MediaItem[], host: RefObject<HTMLDivElement | nul
       );
   const shown = useMemo(() => (start ? items.slice(start) : items), [items, start]);
   first.current = shown[0]?.id;
-  return shown;
+  if (releasing && !start) setReleasing(false);
+  return {
+    items: shown,
+    held: start,
+    release: () => {
+      window.scrollTo({ top: 0 });
+      setReleasing(true);
+    },
+  };
 }
 
 /**
@@ -187,7 +209,7 @@ export function MediaGrid({
   byDay = false,
 }: GalleryViewProps) {
   const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
-  const items = useHeldNewWork(all, host);
+  const { items, held, release } = useHeldNewWork(all, host);
   // The version each tile shows while flipping, by the tile's original.
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
@@ -257,6 +279,18 @@ export function MediaGrid({
   const within = (top: number, height: number) => top < span.bottom && top + height > span.top;
   return (
     <>
+      {held > 0 && (
+        <div className={classes.held}>
+          <Button
+            size="compact-sm"
+            radius="xl"
+            leftSection={<ArrowUp size={14} />}
+            onClick={release}
+          >
+            {held} New
+          </Button>
+        </div>
+      )}
       <div
         ref={host}
         data-gallery-view
