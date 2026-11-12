@@ -564,8 +564,8 @@ test("The chip composer offers supported sizes and settings, follows the output 
     referenceAssets: [],
   });
   expect(state.jobs[0].input.parentJobId).toBeUndefined();
-  // Generation reports through its pending tile, never a notification.
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  // The gallery holds back unfinished work by default, so queuing says so instead of a tile.
+  await expect(page.getByRole("alert").filter({ hasText: "Queued." })).toBeVisible();
   await expandComposer(page);
   await page
     .getByRole("radiogroup", { name: "Generation Output", exact: true })
