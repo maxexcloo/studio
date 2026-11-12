@@ -60,3 +60,12 @@
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* New work waiting above the grid: a button under the header that shows it, taking no room. */
+.held {
+  position: fixed;
+  z-index: 3;
+  top: calc(var(--app-shell-header-height) + var(--mantine-spacing-xs));
+  left: 50%;
+  translate: -50% 0;
+}
