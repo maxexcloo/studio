@@ -436,7 +436,7 @@ export type QueueEntry = {
 
 /**
  * The queue's rows in order: each set of several jobs one group, where its first shown job is,
- * Dream's jobs each their own row.
+ * Dream's jobs each their own row, after everyone else's.
  */
 function queueEntries(all: QueueJob[]): QueueEntry[] {
   const members = new Map<string, QueueJob[]>();
@@ -471,7 +471,11 @@ function queueEntries(all: QueueJob[]): QueueEntry[] {
     sets.set(set, created);
     entries.push(created);
   }
-  return entries;
+  // Dream's work waits below everyone's own, so it lists last too.
+  return [
+    ...entries.filter((entry) => !entry.jobs[0].dream),
+    ...entries.filter((entry) => entry.jobs[0].dream),
+  ];
 }
 
 /**
