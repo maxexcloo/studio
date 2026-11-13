@@ -40,7 +40,7 @@ import classes from "./MediaViewer.module.css";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily, type QueuedRun } from "./MediaViewerDock";
 import { mediaSource, playbackUrl } from "./mediaSource";
-import { ActionBarSurface, findAction, usualAction, type ActionGroups } from "./ActionBar";
+import { ActionBarSurface, findAction, usualAction, type ActionGroups } from "../../ui/ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";

@@ -38,7 +38,7 @@ import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
+import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
 import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";

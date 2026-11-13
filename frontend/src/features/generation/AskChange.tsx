@@ -11,7 +11,7 @@ import {
 import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
-import { ActionMenuItems, type Action } from "../gallery/ActionBar";
+import { ActionMenuItems, type Action } from "../../ui/ActionBar";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
 

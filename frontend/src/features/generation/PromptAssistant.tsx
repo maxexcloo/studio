@@ -8,7 +8,7 @@ import { api, failure, request } from "../../api";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import type { Action as ToolAction } from "../gallery/ActionBar";
+import type { Action as ToolAction } from "../../ui/ActionBar";
 
 interface AssistantStatus {
   available: boolean;

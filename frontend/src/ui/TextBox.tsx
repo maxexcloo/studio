@@ -25,7 +25,7 @@ import {
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp, type LucideIcon } from "lucide-react";
-import { ActionBarGroups, ActionMenuItems, type Action } from "../features/gallery/ActionBar";
+import { ActionBarGroups, ActionMenuItems, type Action } from "./ActionBar";
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { copyText } from "./clipboard";

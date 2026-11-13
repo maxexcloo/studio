@@ -8,7 +8,7 @@ import { failure, post } from "../../api";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, withMore } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, withMore } from "../../ui/ActionBar";
 import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { itemAction, itemActionGroups } from "./itemActions";
