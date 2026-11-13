@@ -36,7 +36,75 @@ export interface Card {
 export interface Character extends Card {
   /** Generate References' queued jobs, until the card is next saved with the ones to keep. */
   generated?: { jobIds: string[]; at: string };
+  /** Make Sheet's job, then its panels once backend/character-sheets.js has split them. */
+  sheet?: CharacterSheet;
 }
+
+/**
+ * Make Sheet: a character design sheet, the card's first image redrawn as a neutral face, front,
+ * side and back views and any gear (backend/character-sheets.js). Each panel is kept as an image of
+ * the card by its role, and `sheet` is the whole sheet.
+ */
+export const sheetRoles = ["face", "front", "side", "back", "gear", "sheet"] as const;
+export type SheetRole = (typeof sheetRoles)[number];
+export interface CharacterSheet {
+  jobId: string;
+  at: string;
+  /** Account-owned reference asset IDs by role, once the sheet is split. */
+  panels?: { role: SheetRole; referenceId: string }[];
+  error?: string;
+}
+
+/**
+ * The sheet view a prompt asks for, if it names one: a back view, a side view, a close-up of the
+ * face or a full-body front view.
+ */
+export function sheetView(prompt: string): SheetRole | undefined {
+  const text = prompt.toLowerCase();
+  if (/\b(from behind|back view|rear view|facing away|seen from the back)\b/.test(text))
+    return "back";
+  if (/\b(side view|in profile|profile view|from the side|side-on)\b/.test(text)) return "side";
+  if (/\b(close-up|closeup|headshot|head-and-shoulders|head and shoulders)\b/.test(text))
+    return "face";
+  if (/\b(full-body|full body|front view|from head to toe)\b/.test(text)) return "front";
+}
+
+/**
+ * The image of a character a prompt is drawn from: the sheet's panel for the view the prompt
+ * names (sheetView), else the card's first image.
+ */
+export function characterImage(
+  card: Pick<Character, "referenceIds" | "sheet">,
+  prompt: string,
+): string | undefined {
+  const view = sheetView(prompt);
+  return (
+    card.sheet?.panels?.find((panel) => panel.role === view)?.referenceId || card.referenceIds[0]
+  );
+}
+
+/**
+ * The images of a character Studio sends to a model, its first and its sheet's: any of them in a
+ * run means the character.
+ */
+export const characterImageIds = (card: Pick<Character, "referenceIds" | "sheet">) => [
+  ...card.referenceIds.slice(0, characterImages),
+  ...(card.sheet?.panels || []).map((panel) => panel.referenceId),
+];
+
+/**
+ * Whether a video profile animates subjects from its references rather than from a first frame,
+ * such as MiniMax H3's Reference profiles: a character's sheet goes there whole.
+ */
+export const takesSubjects = (profile: {
+  kind?: string;
+  editReferences?: boolean;
+  mediaInputs?: { id: string; role?: string }[];
+}) =>
+  profile.kind === "video" &&
+  profile.editReferences === true &&
+  Boolean(profile.mediaInputs?.length) &&
+  !profile.mediaInputs!.some((slot) => slot.role === "start" || slot.role === "end");
 
 /**
  * Whether a profile keeps a character's identity in new scenes: it edits with its references (a

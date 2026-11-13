@@ -363,6 +363,10 @@ async function fixture(
     characters.find((card) => card.id === req.params.id).generated = req.body;
     res.json({ ok: true });
   });
+  app.post("/api/characters/:id/sheet", (req, res) => {
+    characters.find((card) => card.id === req.params.id).sheet = { status: "making" };
+    res.json({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
+  });
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -1042,9 +1046,9 @@ test("media and administrator credentials discover only their own friendly tools
     // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
-    // description was tightened, then raised to 17,150 for generate's 18+ floor and to 18,050 for
-    // project.
-    JSON.stringify(tools).length + media.getInstructions().length < 18050,
+    // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
+    // project and to 18,120 for its character_sheet.
+    JSON.stringify(tools).length + media.getInstructions().length < 18120,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -1753,6 +1757,19 @@ test("models lists the account's characters, and generate applies one by name: i
   assert.match(alone.reply.content[0].text, /from Mara's description alone/);
   assert.equal(f.characters[0].generated.jobIds.length, 4);
   assert.match(alone.reply.content[0].text, /once they finish, the user picks which to keep/);
+  // Make Sheet queues in Studio, which writes its prompt; the reply links its one result.
+  const before = f.submitted.length;
+  const sheet = await call(client, "generate", { character: "Mara", character_sheet: true });
+  assert.notEqual(sheet.isError, true, sheet.content?.[0]?.text);
+  assert.equal(f.submitted.length, before);
+  assert.equal(f.characters[0].sheet.status, "making");
+  assert.equal(data(sheet).jobs[0].job_id, "sheet-job");
+  assert.match(sheet.content[0].text, /^Queued Mara's character sheet on Qwen-Image 2\.1/);
+  await failure(client, "generate", {
+    character: "Mara",
+    character_sheet: true,
+    prompts: ["A tree"],
+  });
   // Models that edit with references take the card's image for the views and new scenes, a family
   // that keeps characters before any other.
   const editor = (id, extra) => ({
@@ -1779,12 +1796,12 @@ test("models lists the account's characters, and generate applies one by name: i
   );
   // Without a named model a scene goes to it with only the card's first image: a second view of
   // one person is drawn as a second person.
-  const before = f.submitted.length;
+  const scene = f.submitted.length;
   await call(client, "generate", { prompts: ["At the harbour"], character: "Mara" });
-  assert.equal(f.submitted[before].profileId, "keeper");
-  assert.deepEqual(f.submitted[before].referenceAssets, [{ slot: "reference", assetId }]);
+  assert.equal(f.submitted[scene].profileId, "keeper");
+  assert.deepEqual(f.submitted[scene].referenceAssets, [{ slot: "reference", assetId }]);
   assert.equal(
-    f.submitted[before].prompt,
+    f.submitted[scene].prompt,
     withCharacter("At the harbour", "red-haired ranger, green cloak"),
   );
   // Shots: Studio writes each prompt itself, an outfit card by name giving its own description and
