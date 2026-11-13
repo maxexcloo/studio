@@ -20,16 +20,22 @@ export interface PreviewImage {
  * and `element` renders it.
  */
 export function useImagePreview() {
-  const [shown, setShown] = useState<{ images: PreviewImage[]; index: number } | null>(null);
+  // The last images stay while the preview fades out.
+  const [shown, setShown] = useState<{ images: PreviewImage[]; index: number; opened: boolean }>({
+    images: [],
+    index: 0,
+    opened: false,
+  });
   return {
-    open: (images: PreviewImage[], index = 0) => setShown({ images, index }),
-    opened: Boolean(shown),
+    open: (images: PreviewImage[], index = 0) => setShown({ images, index, opened: true }),
+    opened: shown.opened,
     element: (
       <ImagePreview
-        images={shown?.images || []}
-        index={shown ? shown.index : null}
-        onIndex={(index) => setShown((current) => current && { ...current, index })}
-        onClose={() => setShown(null)}
+        images={shown.images}
+        index={shown.index}
+        opened={shown.opened}
+        onIndex={(index) => setShown((current) => ({ ...current, index }))}
+        onClose={() => setShown((current) => ({ ...current, opened: false }))}
       />
     ),
   };
@@ -39,26 +45,26 @@ export function useImagePreview() {
 function ImagePreview({
   images,
   index,
+  opened,
   onIndex,
   onClose,
 }: {
   images: PreviewImage[];
-  /** The image shown, or null while closed. */
-  index: number | null;
+  index: number;
+  opened: boolean;
   onIndex: (index: number) => void;
   onClose: () => void;
 }) {
   const id = useId();
-  const image = index === null ? undefined : images[index];
+  const image = images[index];
   const step = (by: number) => {
-    if (index === null) return;
     const next = index + by;
     if (next >= 0 && next < images.length) onIndex(next);
   };
   return (
     <Modal
       id={id}
-      opened={Boolean(image)}
+      opened={opened && Boolean(image)}
       onClose={closeWhenTop(id, onClose)}
       fullScreen
       title={
@@ -67,7 +73,7 @@ function ImagePreview({
             {image.alt}
             {images.length > 1 && (
               <Text span c="dimmed" inherit>
-                {` · ${index! + 1} of ${images.length}`}
+                {` · ${index + 1} of ${images.length}`}
               </Text>
             )}
           </Text>
@@ -115,7 +121,7 @@ function ImagePreview({
                     size="lg"
                     radius="xl"
                     aria-label={label}
-                    disabled={index! + by < 0 || index! + by >= images.length}
+                    disabled={index + by < 0 || index + by >= images.length}
                     style={{ pointerEvents: "auto" }}
                     onClick={() => step(by)}
                   >
