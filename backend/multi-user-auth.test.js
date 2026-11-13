@@ -563,6 +563,11 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
     "mcp-token",
     "an upload's pixels, for its owner",
   );
+  assert.equal(
+    accountForRequest(bearer(adminToken, "POST", "/api/gallery/import")).credential,
+    "mcp-token",
+    "a scripted import into the account's own uploads",
+  );
   const artistToken = rotateAccountMcpToken(artist.id).token;
   assert.equal(accountForRequest(bearer(artistToken, "POST", "/api/library/imports")), null);
   // The account's own gallery, queue, Dream and taste take any account's token, never as an administrator.

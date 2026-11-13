@@ -79,6 +79,9 @@ const mcpBearerRoutes = [
   // The search tool: the account's own gallery search.
   ["GET", /^\/api\/gallery$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
+  // A picture made elsewhere into the account's own uploads (gallery/import.js), for scripted imports;
+  // the multi-user gate keeps it to administrators.
+  ["POST", /^\/api\/gallery\/import$/],
   // The reuse tool's extend: a video result's last frame as the next video's first.
   ["POST", /^\/api\/reference-assets\/from-gallery$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
