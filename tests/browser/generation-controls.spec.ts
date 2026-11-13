@@ -942,6 +942,20 @@ test("The phone Generate sheet fits the screen and keeps Generate above the keyb
   });
   await expect.poll(generateBottom).toBeLessThanOrEqual(932 - 300);
   await expect.poll(scrolls).toBe(false);
+  // iOS also scrolls the page to the text: the sheet moves down with the visible viewport and the
+  // bar still ends at its bottom, neither behind the keyboard nor short of it.
+  const scrollTo = (offset: number) =>
+    page.evaluate((offset) => {
+      Object.defineProperty(window.visualViewport, "offsetTop", {
+        get: () => offset,
+        configurable: true,
+      });
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+    }, offset);
+  await scrollTo(100);
+  await expect.poll(generateBottom).toBeLessThanOrEqual(100 + 932 - 300);
+  await expect.poll(generateBottom).toBeGreaterThan(100 + 932 - 300 - 60);
+  await scrollTo(0);
   // Typing keeps the whole screen while a browser's toolbar folds away above the keyboard; only
   // the keyboard dropping (Android's Back keeps focus) ends it.
   const typing = sheet.locator("[data-typing]");
