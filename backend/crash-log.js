@@ -5,8 +5,8 @@
  * - A crash (an uncaught exception) is logged with its stack before the process exits.
  * - A promise rejection nobody handled is logged and the server keeps going:
  *   Node would otherwise stop the whole studio for one failed side task.
- * - ComfyUI going away and coming back is logged, so it can be told apart from
- *   Studio itself going down.
+ * - A worker going away and coming back is logged (comfy/backends.js), so it can
+ *   be told apart from Studio itself going down.
  *
  * Nothing about prompts, images or file names goes in: only what happened.
  */
@@ -47,23 +47,4 @@ export function logCrash(error) {
 
 export function logRejection(reason) {
   write("error", "Unhandled promise rejection (kept running)", describe(reason));
-}
-
-let comfyDown = false;
-let comfyDownSince = 0;
-/**
- * Called whenever a request to ComfyUI succeeds or fails: only changes are logged. `since` is when it
- * really stopped answering (a silent ComfyUI counts from its first unanswered check, not the grace's end).
- */
-export function noteComfyState(reachable, error, since = Date.now()) {
-  if (!reachable && !comfyDown) {
-    comfyDown = true;
-    comfyDownSince = since;
-    write("warn", "ComfyUI stopped answering", describe(error));
-  } else if (reachable && comfyDown) {
-    comfyDown = false;
-    write("warn", "ComfyUI answering again", {
-      downForS: Math.round((Date.now() - comfyDownSince) / 1000),
-    });
-  }
 }
