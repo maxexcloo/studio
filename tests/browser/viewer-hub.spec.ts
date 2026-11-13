@@ -708,8 +708,8 @@ test("Review Prompt writes the motion prompt for editing, and Run queues exactly
     },
   });
   // The choice is remembered; Cancel queues nothing.
+  // The viewer opens again from the URL.
   await page.reload();
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(review).toHaveAttribute("aria-checked", "true");
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
