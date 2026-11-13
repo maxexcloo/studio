@@ -9,12 +9,10 @@ import {
   signIn,
 } from "./fixtures";
 
-/** Desktop shows the Profiles actions as icons; phones list them under More. */
+/** The Profiles toolbar's secondary actions, under More. */
 async function profileAction(page: Page, name: string) {
-  if ((page.viewportSize()?.width || 1440) < 768) {
-    await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
-    await page.getByRole("menuitem", { name, exact: true }).click();
-  } else await page.getByRole("button", { name, exact: true }).click();
+  await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
 }
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
@@ -308,7 +306,7 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Profiles");
-  await profileAction(page, "Merge Duplicate Profiles");
+  await profileAction(page, "Merge Duplicate Profiles…");
   const dialog = page.getByRole("dialog", { name: "Merge Duplicate Profiles", exact: true });
   await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
   await expect(dialog).toContainText("a, b differ in graph");
@@ -418,7 +416,7 @@ test("Combine Backends previews pairs with their differences and combines the pi
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Profiles");
-  await profileAction(page, "Combine Backends");
+  await profileAction(page, "Combine Backends…");
   const dialog = page.getByRole("dialog", { name: "Combine Backends", exact: true });
   await expect(
     dialog.getByRole("table", { name: `Differences for ${pair.name}`, exact: true }),
@@ -446,31 +444,41 @@ test("Combine Backends previews pairs with their differences and combines the pi
   await expect(dialog).not.toContainText(pair.radiance.id);
 });
 
-test("The Profiles toolbar groups search and filter, the other actions A–Z, then creating", async ({
-  page,
-}) => {
+test("The Profiles toolbar groups search and filter, then More and importing", async ({ page }) => {
   await fixtures(page);
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Profiles");
   const toolbar = page
-    .getByRole("button", { name: "Search Profiles", exact: true })
+    .getByRole("button", { name: "Filter Profiles", exact: true })
     .locator("xpath=..");
   const items = await toolbar.evaluate((group) =>
     [...group.children].map((item) =>
       item.getAttribute("role") === "separator"
         ? "|"
-        : item.getAttribute("aria-label") || item.textContent?.trim(),
+        : item.getAttribute("aria-label") ||
+          item.querySelector("input")?.getAttribute("aria-label") ||
+          item.textContent?.trim(),
     ),
   );
-  const middle =
-    (page.viewportSize()?.width || 1440) < 768
-      ? ["More Profiles Actions"]
-      : ["Combine Backends", "Download All", "Merge Duplicate Profiles"];
-  expect(items).toEqual(["Search Profiles", "Filter Profiles", "|", ...middle, "|", "New Profile"]);
+  expect(items).toEqual([
+    "Search Profiles",
+    "Filter Profiles",
+    "|",
+    "More Profiles Actions",
+    "Import Workflow",
+  ]);
+  await page.getByRole("button", { name: "More Profiles Actions", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Download All",
+    "Combine Backends…",
+    "Merge Duplicate Profiles…",
+  ]);
 });
 
-test("New Profile imports a workflow or duplicates a profile under a new ID", async ({ page }) => {
+test("Import Workflow opens a workflow, and a row's Duplicate copies its profile under a new ID", async ({
+  page,
+}) => {
   await fixtures(page);
   const original = {
     studio: { id: "owned", name: "Owned Profile", kind: "image", family: "flux2" },
@@ -497,13 +505,9 @@ test("New Profile imports a workflow or duplicates a profile under a new ID", as
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Profiles");
-  const newProfile = async (item: string) => {
-    await page.getByRole("button", { name: "New Profile", exact: true }).click();
-    await page.getByRole("menuitem", { name: item, exact: true }).click();
-  };
   const editor = page.getByRole("dialog", { name: "Create Profile", exact: true });
   const chooser = page.waitForEvent("filechooser");
-  await newProfile("Import Workflow…");
+  await page.getByRole("button", { name: "Import Workflow", exact: true }).click();
   await (
     await chooser
   ).setFiles({
@@ -514,11 +518,8 @@ test("New Profile imports a workflow or duplicates a profile under a new ID", as
   await expect(editor.getByRole("textbox", { name: "Definition ID", exact: true })).toHaveValue("");
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).toBeHidden();
-  await newProfile("Duplicate Profile…");
-  const dialog = page.getByRole("dialog", { name: "Duplicate Profile", exact: true });
-  await dialog.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await page.getByRole("option", { name: "Owned Profile", exact: true }).click();
-  await dialog.getByRole("button", { name: "Duplicate Profile", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Owned Profile", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Duplicate Profile…", exact: true }).click();
   await expect(editor.getByRole("textbox", { name: "Definition ID", exact: true })).toHaveValue(
     "owned-copy",
   );

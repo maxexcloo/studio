@@ -1,24 +1,11 @@
 import { useState, type ReactNode } from "react";
-import {
-  Alert,
-  Badge,
-  Button,
-  FocusTrap,
-  Group,
-  Menu,
-  Modal,
-  Popover,
-  Select,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Alert, Badge, Button, Group, Menu, Popover, Select, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Combine, Merge, Plus, Zap } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
-import { DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { usePhone, useTouch } from "../../ui/usePhone";
@@ -107,63 +94,6 @@ function Version({ version, aiDrafted }: { version: number; aiDrafted?: boolean 
   );
 }
 
-/**
- * New Profile › Duplicate Profile…: a copy of a profile's file under `<id>-copy` (or the next free
- * `<id>-copy-<n>`), named "… Copy", opened in the editor to create.
- */
-function DuplicateProfile({
-  profiles,
-  duplicated,
-  onCancel,
-}: {
-  profiles: ProfileRow[];
-  duplicated: (id: string, creating: LoadedDefinition) => void;
-  onCancel: () => void;
-}) {
-  const [source, setSource] = useState<string | null>(null);
-  const copy = useMutation({
-    meta: { inlineError: true },
-    mutationFn: async (id: string) => {
-      const { text } = await api<{ text: string }>(definitionPath("profile", id));
-      const raw = JSON.parse(text);
-      const taken = new Set(profiles.map((entry) => entry.id));
-      let copied = `${id}-copy`;
-      for (let n = 2; taken.has(copied); n++) copied = `${id}-copy-${n}`;
-      const studio = { ...raw.studio, id: copied, name: `${raw.studio?.name || id} Copy` };
-      return { id: copied, text: `${JSON.stringify({ ...raw, studio }, null, 2)}\n` };
-    },
-    onSuccess: ({ id, text }) => duplicated(id, { text, hash: "" }),
-  });
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (source) copy.mutate(source);
-      }}
-    >
-      <Stack>
-        <Select
-          label="Profile"
-          placeholder="Choose a Profile"
-          data={profiles
-            .map((entry) => ({ value: entry.id, label: entry.name || entry.id }))
-            .sort((a, b) => a.label.localeCompare(b.label))}
-          value={source}
-          onChange={setSource}
-          searchable
-          required
-        />
-        {copy.error && <Alert color="red">{copy.error.message}</Alert>}
-        <DialogFooter pending={copy.isPending} onCancel={onCancel}>
-          <Button type="submit" loading={copy.isPending} disabled={!source}>
-            Duplicate Profile
-          </Button>
-        </DialogFooter>
-      </Stack>
-    </form>
-  );
-}
-
 /** The definition editor that is open: an existing ID, or "" with `creating` for a new one. */
 interface Editing {
   kind: DefinitionKind;
@@ -210,13 +140,24 @@ function useDefinitions() {
   return { profileList, guideList, profiles, guides, guideOf, users };
 }
 
-/** A profile's or guide's row menu: edit, copy its ID or download it as JSON. */
-function rowMenu(edit: (editing: Editing) => void, kind: DefinitionKind, noun: string, id: string) {
+/** A profile's or guide's row menu: edit, duplicate, copy its ID or download it as JSON. */
+function rowMenu(
+  edit: (editing: Editing) => void,
+  kind: DefinitionKind,
+  noun: string,
+  id: string,
+  duplicate?: () => void,
+) {
   return (
     <>
       <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit({ kind, id })}>
         Edit {noun}
       </Menu.Item>
+      {duplicate && (
+        <Menu.Item leftSection={<icons.duplicate size={16} />} onClick={duplicate}>
+          Duplicate {noun}…
+        </Menu.Item>
+      )}
       <Menu.Item
         leftSection={<icons.copy size={16} />}
         onClick={() => void copyText(id, `${noun} ID`)}
@@ -244,7 +185,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [merging, setMerging] = useState(false);
   const [combining, setCombining] = useState(false);
   const [converting, setConverting] = useState<ProfileRow | null>(null);
-  const [duplicating, setDuplicating] = useState(false);
   const { profileList, profiles, guideOf } = useDefinitions();
   const stats = useQuery({
     queryKey: ["profile-stats"],
@@ -256,6 +196,21 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const profileRows = family ? profiles.filter((entry) => entry.family === family) : profiles;
   // Runs record the runtime id, `custom:` plus the definition's id.
   const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];
+  // A copy of the profile's file under `<id>-copy` (or the next free `<id>-copy-<n>`), named
+  // "… Copy", opened in the editor to create.
+  const duplicating = useMutation({
+    meta: { inlineError: true },
+    mutationFn: async (id: string) => {
+      const { text } = await api<{ text: string }>(definitionPath("profile", id));
+      const raw = JSON.parse(text);
+      const taken = new Set(profiles.map((entry) => entry.id));
+      let copied = `${id}-copy`;
+      for (let n = 2; taken.has(copied); n++) copied = `${id}-copy-${n}`;
+      const studio = { ...raw.studio, id: copied, name: `${raw.studio?.name || id} Copy` };
+      return { id: copied, text: `${JSON.stringify({ ...raw, studio }, null, 2)}\n` };
+    },
+    onSuccess: ({ id, text }) => setEditing({ kind: "profile", id, creating: { text, hash: "" } }),
+  });
   const importing = useMutation({
     meta: { inlineError: true },
     mutationFn: async (file: File) => {
@@ -315,38 +270,24 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           filterCount={Number(!!family)}
           onClearFilters={() => setFamily(null)}
           more={[
-            { label: "Combine Backends", icon: Combine, onClick: () => setCombining(true) },
             // Every profile and guide, in one archive.
             { label: "Download All", icon: icons.download, href: "/api/profiles/export" },
-            { label: "Merge Duplicate Profiles", icon: Merge, onClick: () => setMerging(true) },
+            { label: "Combine Backends…", icon: Combine, onClick: () => setCombining(true) },
+            { label: "Merge Duplicate Profiles…", icon: Merge, onClick: () => setMerging(true) },
           ]}
           actions={
-            <Menu position="bottom-end">
-              <Menu.Target>
-                <ToolbarAction
-                  label="New Profile"
-                  icon={<Plus size={18} />}
-                  rightSection={<ChevronDown size={14} />}
-                  loading={importing.isPending}
-                />
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item
-                  leftSection={<icons.copy size={16} />}
-                  onClick={() => setDuplicating(true)}
-                >
-                  Duplicate Profile…
-                </Menu.Item>
-                <Menu.Item leftSection={<icons.upload size={16} />} onClick={workflowFile.open}>
-                  Import Workflow…
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
+            <ToolbarAction
+              label="Import Workflow"
+              icon={<icons.upload size={18} />}
+              loading={importing.isPending}
+              onClick={workflowFile.open}
+            />
           }
         />
       </SectionHeader>
       <Stack gap="xs">
         {importing.error && <Alert color="red">{importing.error.message}</Alert>}
+        {duplicating.error && <Alert color="red">{duplicating.error.message}</Alert>}
         {profileList.error ? (
           <Alert color="red">{profileList.error.message}</Alert>
         ) : (
@@ -420,7 +361,9 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
             ]}
             rowActions={(entry) => (
               <>
-                {rowMenu(setEditing, "profile", "Profile", entry.id)}
+                {rowMenu(setEditing, "profile", "Profile", entry.id, () =>
+                  duplicating.mutate(entry.id),
+                )}
                 {/* A Krea 2 profile on ComfyUI alone can take a converted Radiance backend. */}
                 {entry.family === "krea2" && entry.kind === "image" && !entry.backend && (
                   <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
@@ -432,19 +375,6 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           />
         )}
       </Stack>
-      <Modal opened={duplicating} onClose={() => setDuplicating(false)} title="Duplicate Profile">
-        <FocusTrap.InitialFocus />
-        {duplicating && (
-          <DuplicateProfile
-            profiles={profiles}
-            onCancel={() => setDuplicating(false)}
-            duplicated={(id, creating) => {
-              setDuplicating(false);
-              setEditing({ kind: "profile", id, creating });
-            }}
-          />
-        )}
-      </Modal>
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       <CombineBackends opened={combining} onClose={() => setCombining(false)} />
       <ConvertToRadiance profile={converting} onClose={() => setConverting(null)} />
