@@ -19,6 +19,8 @@ export function useOpenComposer() {
     const pathname = kind === "video" ? "/video" : "/images";
     const here = location.pathname === pathname;
     const search = new URLSearchParams(here ? location.search : "");
+    // The gallery viewer closes for the composer.
+    search.delete("item");
     search.set("compose", "1");
     navigate(
       { pathname, search: `?${search}` },
