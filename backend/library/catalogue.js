@@ -338,7 +338,8 @@ export function createCatalogueStore({
       )
         continue;
       const { folder, file: name } = splitCatalogueKey(entry.path.slice(prefix.length));
-      const key = safeKey(folder, name);
+      // ComfyUI reads unet/ as diffusion_models/.
+      const key = safeKey(folder === "unet" ? "diffusion_models" : folder, name);
       if (key)
         layer[key] = {
           path: entry.path,
