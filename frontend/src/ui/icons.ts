@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Files,
   GalleryHorizontalEnd,
   Heart,
   ImageUp,
@@ -82,6 +83,8 @@ export const icons = {
   delete: Trash2,
   details: Info,
   download: Download,
+  /** Duplicating a record into a new one, such as Duplicate Profile…. */
+  duplicate: Files,
   dream: Moon,
   edit: Pencil,
   /** A link that opens another site in a new tab. */
