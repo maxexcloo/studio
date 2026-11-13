@@ -27,6 +27,8 @@ export function ReferenceSlots({
   onChoose,
   onChange,
   onDrop,
+  onView,
+  caption = true,
 }: {
   references: ReferenceAsset[];
   profile?: SlotLayout;
@@ -34,6 +36,10 @@ export function ReferenceSlots({
   onChoose: (target: ReferenceTarget) => void;
   onChange: (references: ReferenceAsset[]) => void;
   onDrop: (data: DataTransfer, target: ReferenceTarget) => void;
+  /** Preview, first in a placed reference's menu: shows it full size. */
+  onView?: (asset: ReferenceAsset) => void;
+  /** Names each group under its slots and counts them; off where the form's label already does. */
+  caption?: boolean;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const dropProps = (key: string, cellTarget: ReferenceTarget) => ({
@@ -132,6 +138,14 @@ export function ReferenceSlots({
                     </UnstyledButton>
                   </Menu.Target>
                   <Menu.Dropdown aria-label={label}>
+                    {onView && (
+                      <Menu.Item
+                        leftSection={<icons.preview size={16} />}
+                        onClick={() => onView(asset)}
+                      >
+                        Preview
+                      </Menu.Item>
+                    )}
                     <Menu.Item
                       leftSection={<Replace size={16} />}
                       onClick={() => onChoose(cellTarget)}
@@ -169,16 +183,18 @@ export function ReferenceSlots({
               );
             })}
           </div>
-          <Text size="xs" c="dimmed" className={classes.caption}>
-            {group.label}
-            {group.guides && group.guides !== group.label && ` · ${group.guides}`}
-            {group.capacity > 1 && ` · ${group.assets.length}/${group.capacity}`}
-            {group.required && (
-              <Text span c={group.assets.length ? undefined : "yellow"} inherit>
-                {" · Required"}
-              </Text>
-            )}
-          </Text>
+          {caption && (
+            <Text size="xs" c="dimmed" className={classes.caption}>
+              {group.label}
+              {group.guides && group.guides !== group.label && ` · ${group.guides}`}
+              {group.capacity > 1 && ` · ${group.assets.length}/${group.capacity}`}
+              {group.required && (
+                <Text span c={group.assets.length ? undefined : "yellow"} inherit>
+                  {" · Required"}
+                </Text>
+              )}
+            </Text>
+          )}
         </div>
       ))}
     </div>

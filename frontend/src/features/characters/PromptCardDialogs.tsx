@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { ActionIcon, Alert, Button, getDefaultZIndex, Menu, TextInput } from "@mantine/core";
+import { ActionIcon, Alert, Button, getDefaultZIndex, Menu } from "@mantine/core";
 import type { ReferenceAsset } from "../../types";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
-import { TextBox } from "../../ui/TextBox";
 import { menuWidth } from "../../theme";
-import { cardKinds, maxCardDescription, maxCardName } from "../../../../shared/characters";
-import { CardDialog, CardForm, CardImages, useDescribeImage } from "./CardImages";
+import { cardKinds } from "../../../../shared/characters";
+import { CardDialog, CardFields, CardForm } from "./CardImages";
 import {
   useDeletePromptCard,
   useSavePromptCard,
@@ -18,12 +17,12 @@ import {
 export const promptCardText = {
   outfits: {
     noun: "Outfit",
-    hint: "What the person wears, footwear included, or the reference image's shoes or bare feet carry over.",
+    hint: "Clothes and footwear. Without footwear, the image's shoes or bare feet carry over.",
     placeholder: "A yellow raincoat, dark jeans and black rubber boots",
   },
   scenes: {
     noun: "Scene",
-    hint: "The place, light and time. It replaces a character image's own background.",
+    hint: "Place, light and time. Replaces a character image's own background.",
     placeholder: "A rainy city street at night under neon signs",
   },
 } as const;
@@ -104,7 +103,6 @@ function PromptCardForm({
   const [name, setName] = useState(card?.name || "");
   const [description, setDescription] = useState(card?.description || "");
   const [images, setImages] = useState<ReferenceAsset[]>(card?.references || []);
-  const describe = useDescribeImage(kind, images[0], setDescription);
   const save = useSavePromptCard(kind, card?.id);
   return (
     <CardForm
@@ -119,31 +117,18 @@ function PromptCardForm({
         )
       }
     >
-      <TextInput
-        label="Name"
-        required
-        maxLength={maxCardName}
-        data-autofocus
-        value={name}
-        onChange={(event) => setName(event.currentTarget.value)}
-      />
-      <TextBox
-        label="Description"
-        description={hint}
-        placeholder={placeholder}
-        autosize
-        minRows={2}
-        maxLength={maxCardDescription}
-        value={description}
-        onChange={setDescription}
-        {...describe}
-      />
-      <CardImages
+      <CardFields
         kind={kind}
+        name={name}
+        onName={setName}
+        description={description}
+        onDescription={setDescription}
+        hint={hint}
+        placeholder={placeholder}
         max={cardKinds[kind].images.max}
-        note="Optional: one image to recognise it by."
-        value={images}
-        onChange={setImages}
+        note="Optional, to recognise it by."
+        images={images}
+        onImages={setImages}
       />
       {save.error && <Alert color="red">{save.error.message}</Alert>}
       <DialogFooter pending={save.isPending} onCancel={onClose}>
