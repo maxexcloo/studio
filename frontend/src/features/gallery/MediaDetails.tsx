@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Anchor,
@@ -23,7 +23,8 @@ import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { mediaTitle } from "./mediaLabels";
-import { useDerivations } from "./versions";
+import { derivations } from "./versions";
+import { queueQuery } from "../generation/Queue";
 import { WritingThinking } from "../generation/PromptWriting";
 import { mediaSource } from "./mediaSource";
 import { formatBytes } from "../../ui/bytes";
@@ -522,7 +523,8 @@ export function MediaDetails({
   related?: MediaItem[];
   open?: (item: MediaItem) => void;
 }) {
-  const related = useDerivations(item, loaded);
+  const jobs = useQuery(queueQuery).data?.jobs;
+  const related = useMemo(() => derivations(item, loaded || [], jobs || []), [item, loaded, jobs]);
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);

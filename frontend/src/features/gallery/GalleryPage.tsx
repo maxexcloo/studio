@@ -36,7 +36,7 @@ import { GallerySelectionBar } from "./GallerySelectionBar";
 import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
-import { useVersionGroups } from "./versions";
+import { versionGroups } from "./versions";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
 import { galleryItemQuery } from "./MediaDetails";
 import { inRunOrder, runKey } from "./resultSets";
@@ -232,7 +232,8 @@ export function GalleryPage() {
   lastShown.current = selected;
   // Every generation shows by default; turning All Versions off collapses each version chain into
   // one Grid tile showing its original. Runs always shows all.
-  const groups = useVersionGroups(loaded);
+  const queue = useQuery(queueQuery).data?.jobs;
+  const groups = useMemo(() => versionGroups(loaded, queue || []), [loaded, queue]);
   const grouped = view === "grid" && !allVersions;
   const versions = useMemo(
     () => (grouped ? new Map(groups.map((group) => [group[0].id, group])) : undefined),
