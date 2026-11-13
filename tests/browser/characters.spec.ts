@@ -335,7 +335,8 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await preview.getByRole("button", { name: "Next Image", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Mara Side · 3 of 5", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(page.getByRole("dialog", { name: "Library", exact: true })).toBeVisible();
   // The editor shows the sheet too, and makes it again.
   await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit Character", exact: true }).click();
