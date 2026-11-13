@@ -1,4 +1,5 @@
-/* Desktop keeps the choices at a fixed height, so filtering never resizes the popover. */
+/* Desktop keeps the choices at a fixed height, so filtering never resizes the popover; the phone
+   sheet's choices fill it, so the list scrolls inside itself under the search. */
 .choices {
   display: flex;
   flex-direction: column;
@@ -9,6 +10,10 @@
 
 :where(:root:not([data-phone])) .choices {
   height: min(30rem, 60dvh);
+}
+
+:where(:root[data-phone]) .choices {
+  flex: 1;
 }
 
 .stack {

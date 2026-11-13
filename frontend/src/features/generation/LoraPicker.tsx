@@ -144,6 +144,8 @@ interface LoraPickerProps {
 export function LoraPicker({ value, onChange, picker, position = "top-end" }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
+  const phone = usePhone();
+  const [adding, setAdding] = useState(false);
   // The picker's data loads with the chip, so its first frame is final.
   const info = useQuery(loraInfoQuery);
   useQuery(loraLibraryQuery);
@@ -175,6 +177,48 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
       />
     </Button>
   );
+  const choices = <LoraChoices value={value} onChange={onChange} picker={picker} />;
+  const stack = <LoraStack value={value} onChange={onChange} picker={picker} />;
+  // Phones open the stack, with Add LoRAs opening the choices in a sheet over it.
+  if (phone)
+    return (
+      <ChipPopup
+        title="LoRAs"
+        width="100%"
+        opened={picker.opened}
+        onOpenedChange={(opened) => {
+          picker.setOpened(opened);
+          if (!opened) setAdding(false);
+        }}
+        target={trigger}
+        headerEnd={<StackActions value={value} onChange={onChange} />}
+        footer={{
+          apply: true,
+          start: (
+            <ChipPopup
+              title="Add LoRAs"
+              width="100%"
+              opened={adding}
+              onOpenedChange={setAdding}
+              target={
+                <Button
+                  variant="default"
+                  leftSection={<icons.add size={16} />}
+                  onClick={() => setAdding(true)}
+                >
+                  Add LoRAs
+                </Button>
+              }
+              footer={{ apply: true }}
+            >
+              {choices}
+            </ChipPopup>
+          ),
+        }}
+      >
+        {stack}
+      </ChipPopup>
+    );
   return (
     <ChipPopup
       title="LoRAs"
@@ -183,10 +227,9 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
       opened={picker.opened}
       onOpenedChange={picker.setOpened}
       target={trigger}
-      footer={{ apply: true }}
-      aside={<LoraStack value={value} onChange={onChange} picker={picker} />}
+      aside={stack}
     >
-      <LoraChoices value={value} onChange={onChange} picker={picker} />
+      {choices}
     </ChipPopup>
   );
 }
@@ -273,7 +316,6 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
 
 /** The LoRAs to choose from: tabs, search, sort and filter over the list. */
 function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
-  const phone = usePhone();
   const { input, profile, update, info, metadata, title, compatible } = useLoraDraft({
     value,
     onChange,
@@ -401,25 +443,46 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
       }
     />
   );
-  // Phones list the choices in a fixed-height pane above the stack, so adding one never moves them.
   return (
     <div className={classes.choices}>
       {header}
       {state ? (
-        <Stack h={phone ? "45dvh" : undefined} flex={1} mih={0}>
+        <Stack flex={1} mih={0}>
           {state}
         </Stack>
       ) : (
-        <ScrollArea h={phone ? "45dvh" : undefined} flex={1}>
-          {choices}
-        </ScrollArea>
+        <ScrollArea flex={1}>{choices}</ScrollArea>
       )}
     </div>
   );
 }
 
-/** The chosen LoRAs in order, with Clear and Save Stack beside their heading, then saved stacks. */
+/** The stack's Clear and Save Stack: beside its heading, or in the phone sheet's footer. */
+function StackActions({ value, onChange }: Omit<LoraPickerProps, "picker">) {
+  const { input, profile, update } = useLoraDraft({ value, onChange });
+  const stacks = useLoraStacks(profile?.family || "");
+  return (
+    <SaveCurrent
+      noun="Stack"
+      disabled={!input.loras.length || !stacks.ready}
+      onSave={(name) => stacks.save(name, input.loras)}
+    >
+      <Button
+        size="compact-sm"
+        variant="subtle"
+        aria-label="Clear LoRAs"
+        disabled={!input.loras.length}
+        onClick={() => update([])}
+      >
+        Clear
+      </Button>
+    </SaveCurrent>
+  );
+}
+
+/** The chosen LoRAs in order under their heading, then saved stacks. */
 function LoraStack({ value, onChange, picker }: LoraPickerProps) {
+  const phone = usePhone();
   const { input, profile, update, metadata, title, compatible } = useLoraDraft({
     value,
     onChange,
@@ -437,23 +500,7 @@ function LoraStack({ value, onChange, picker }: LoraPickerProps) {
             </Text>
           )
         }
-        actions={
-          <SaveCurrent
-            noun="Stack"
-            disabled={!input.loras.length || !stacks.ready}
-            onSave={(name) => stacks.save(name, input.loras)}
-          >
-            <Button
-              size="compact-sm"
-              variant="subtle"
-              aria-label="Clear LoRAs"
-              disabled={!input.loras.length}
-              onClick={() => update([])}
-            >
-              Clear
-            </Button>
-          </SaveCurrent>
-        }
+        actions={!phone && <StackActions value={value} onChange={onChange} />}
       />
       {/* With nothing chosen or saved, the empty state centres in the pane. */}
       {!input.loras.length && !stacks.records.length ? (

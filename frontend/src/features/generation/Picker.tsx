@@ -72,7 +72,7 @@ export function PopupHeading({
 /**
  * A chip's popup: a `PopupHeading` with the title and its actions, the content, then any `footer`
  * actions. An `aside`, such as the LoRA stack, starts with its own `PopupHeading`: desktop shows it
- * as a column beside everything else, divided to the top; phones under the content.
+ * as a column beside everything else, divided to the top; phones leave it out.
  * Desktop anchors a Popover to the chip; phones open a full-screen sheet whose content scrolls
  * between the header and the footer, pinned above the safe area, which holds the heading's actions
  * (`headerEnd`, such as Clear and Save) at its end, so a popover never opens a second
@@ -177,10 +177,7 @@ export function ChipPopup({
               <Modal.Title>{title}</Modal.Title>
               <Modal.CloseButton aria-label={`Close ${title}`} />
             </Modal.Header>
-            <Modal.Body className={classes.sheetBody}>
-              {children}
-              {aside && <div className={classes.aside}>{aside}</div>}
-            </Modal.Body>
+            <Modal.Body className={classes.sheetBody}>{children}</Modal.Body>
             {sheetActions && <div className={classes.sheetFooter}>{sheetActions}</div>}
           </Modal.Content>
         </Modal.Root>

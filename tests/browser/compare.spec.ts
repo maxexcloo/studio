@@ -5,6 +5,7 @@ import {
   fixtures,
   image,
   openNav,
+  openLoraChoices,
   profiles,
   selectionMenuItem,
   section,
@@ -45,7 +46,7 @@ test("Compare from the composer queues one seeded variant per chosen local profi
     await expect(page.getByRole("dialog", { name: "Compare", exact: true })).toBeHidden();
     await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();
   }
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page
     .getByRole("list", { name: "LoRA Choices", exact: true })
     .getByRole("button", { name: "Detail Slider", exact: true })
