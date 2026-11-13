@@ -16,15 +16,13 @@ export const job = {
 };
 export const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
 
-// The prompt a result ran, as the chat shows it; the result page has the full text.
-const maxShownPromptCharacters = 200;
-export const shortPrompt = (prompt) => {
+// The prompt a result ran, as the chat shows it; status and reuse replies give the full text.
+export const shortPrompt = (prompt, max = 200) => {
   const flat = String(prompt).replace(/\s+/g, " ").trim();
-  return (
-    flat.length > maxShownPromptCharacters
-      ? `${flat.slice(0, maxShownPromptCharacters - 1)}…`
-      : flat
-  ).replace(/[\\`*_[\]<>#|]/g, "\\$&");
+  return (flat.length > max ? `${flat.slice(0, max - 1)}…` : flat).replace(
+    /[\\`*_[\]<>#|]/g,
+    "\\$&",
+  );
 };
 
 export function registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds }) {
@@ -33,18 +31,20 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     server,
     "status",
     "check status",
-    "Status, output links and chosen comparison winner, ready for reuse.",
+    "Status, full prompt, outputs and comparison winner, for reuse.",
     { ...job, wait_seconds: wait },
     async ({ job_id, wait_seconds }, signal) => {
       const id = resolve(job_id);
       const status = await media.job(owner, id, wait_seconds, { signal });
       const ref = media.refOf(owner, refs, id);
       const comparisons = await media.comparisons(owner, [id], { scope: refs, signal });
+      const prompt = media.promptRecord(id)?.prompt || status.prompt;
       return mcpJson({
         job_id: id,
         ...(ref ? { ref } : {}),
         link: media.pageUrl(owner, id),
         ...media.summary(status),
+        ...(prompt ? { prompt } : {}),
         ...(comparisons.length ? { comparisons } : {}),
         outputs: (status.outputs || []).flatMap((item, index) =>
           mcpOutputPath(item.url)

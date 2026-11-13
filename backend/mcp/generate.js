@@ -111,8 +111,12 @@ const promptListText = z.string().transform((text) => {
     return [text];
   }
 });
-// The models tool shows a guide's gist; a model's first generate sends the whole guide for the chat to write to.
+// The models tool shows a guide's gist; generate sends the whole guide for the chat to write to.
 const maxShownGuideCharacters = 500;
+// LibreChat summarises long chats, dropping a guide sent early, so generate sends it again after this many
+// generates or minutes on the same model; a compact guide costs about as much context as one reply.
+const guideResendGenerates = 8;
+const guideResendMs = 30 * 60_000;
 const maxListedLoras = 30;
 /**
  * A profile guide as one paragraph: the family's summary, rules, pitfalls and example, then its
@@ -156,14 +160,19 @@ export function registerGenerateTools({
   chatAssistant,
 }) {
   const { owner, refs, conversation } = actor;
-  // A guide goes to each conversation once (each MCP session without a conversation header, else the account).
+  // A guide goes to each conversation (each MCP session without a conversation header, else the account).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
-  /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
+  /** Counts a use of a guide and reports whether it is due; synchronous, so concurrent calls attach it once. */
   const review = (refs, profileId) => {
     const key = guideKey(refs, profileId);
-    if (reviewedGuides.has(key)) return false;
+    const sent = reviewedGuides.get(key);
+    if (sent && sent.uses < guideResendGenerates && Date.now() - sent.at < guideResendMs) {
+      sent.uses++;
+      return false;
+    }
+    reviewedGuides.delete(key);
     if (reviewedGuides.size >= 4096) reviewedGuides.delete(reviewedGuides.keys().next().value);
-    reviewedGuides.set(key, Date.now());
+    reviewedGuides.set(key, { at: Date.now(), uses: 1 });
     return true;
   };
   /** What to say about a queued profile whose worker isn't running; Cloud only as a suggestion the account can take. */
@@ -179,10 +188,11 @@ export function registerGenerateTools({
     guide = "",
     promptSource = "exact",
     note = "",
+    promptLength = 200,
   ) => {
     const label = profile.label || profile.id;
     // Iterations that rebuild a whole generate call drift from the result; reuse keeps its settings.
-    const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt.`;
+    const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and its full prompt revised (status shows it).`;
     // A set Studio expects to finish within the wait comes back finished, so the agent needs no result call;
     // anything longer, or with no trusted estimate, hands back its links at once.
     const [endsAt] = await media.finishTimes(owner, [submission], {
@@ -211,18 +221,18 @@ export function registerGenerateTools({
         ...(status ? { status } : {}),
       })),
     };
-    // The prompt each result ran, shortened; one line when every job shares it.
+    // The prompt each result ran, shortened unless reuse is revising it; one line when every job shares it.
     const prompted = submission.jobs.filter(({ prompt }) => prompt);
     const distinct = new Set(prompted.map(({ prompt }) => prompt));
     const prompts = !prompted.length
       ? ""
-      : `\n\n${distinct.size === 1 ? `Prompt: ${shortPrompt([...distinct][0])}` : prompted.map(({ ref, prompt }) => `${ref[0].toUpperCase()}${ref.slice(1)} prompt: ${shortPrompt(prompt)}`).join("\n")}`;
+      : `\n\n${distinct.size === 1 ? `Prompt: ${shortPrompt([...distinct][0], promptLength)}` : prompted.map(({ ref, prompt }) => `${ref[0].toUpperCase()}${ref.slice(1)} prompt: ${shortPrompt(prompt, promptLength)}`).join("\n")}`;
     // The profile's guide follows its first use in a conversation, so the agent applies it to later prompts.
     const extra = guide
       ? [
           {
             type: "text",
-            text: `Prompting guide for ${label} (sent once); apply it to later prompts: ${guide}`,
+            text: `Prompting guide for ${label}; apply it to later prompts: ${guide}`,
           },
         ]
       : [];
@@ -308,7 +318,7 @@ export function registerGenerateTools({
       content: [
         {
           type: "text",
-          text: `Queued ${sets.length} sets, one per model. ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+          text: `Queued ${sets.length} sets, one per model. ${note}${waits}Share the links below, not images (none exist yet), and end your turn; do not call result now or in the background. Never poll or resubmit. To change or animate one later, call reuse with its ref (such as "${first}") and its full prompt revised (status shows it).${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
         },
       ],
       structuredContent: {
@@ -1211,7 +1221,7 @@ export function registerGenerateTools({
       previews.set(previewKey, { at: Date.now(), plans });
       const lines = plans.map(
         ({ profile, plan }) =>
-          `${profile.label || profile.id}: ${[...new Set(plan.prompts)].map(shortPrompt).join(" | ")}`,
+          `${profile.label || profile.id}: ${[...new Set(plan.prompts)].map((prompt) => shortPrompt(prompt)).join(" | ")}`,
       );
       return {
         content: [
@@ -1424,7 +1434,7 @@ export function registerGenerateTools({
       // Studio never rewrites a prompt: the chat writes the change into it; request is the user's words.
       if (request && !prompt && !theme)
         throw new Error(
-          "Studio runs prompts exactly as given. Write the revised prompt yourself from the result's prompt and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call reuse again.",
+          "Studio runs prompts exactly as given. Revise the result's full prompt yourself (status shows it) and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call reuse again.",
         );
       const item = await media.source(owner, id, output_index);
       if (mode === "extend" && item.type !== "video")
@@ -1516,6 +1526,7 @@ export function registerGenerateTools({
         submission.guide,
         source,
         `${plan.tierNote || ""}${dropped}`,
+        Infinity,
       );
     },
   );
