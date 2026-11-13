@@ -44,7 +44,8 @@ export function draftVariants(draft: Draft): Variant[] {
 export function showVariant(draft: Draft, variants: Variant[], index: number): Draft {
   return {
     ...draft,
-    ...variants[index],
+    input: variants[index].input,
+    references: variants[index].references,
     compare: variants.length > 1 ? { variants, active: index } : undefined,
   };
 }
@@ -82,8 +83,20 @@ export function variantLabels(
     (name) => new Set(variants.map(({ input }) => strength(input, name))).size > 1,
   );
   const prompts = variants.map(({ input }) => JSON.stringify([input.prompt, input.negative]));
-  const facets: ((variant: Variant, index: number) => string)[] = [
-    ({ input }) => names.profile(input),
+  type Facet = (variant: Variant, index: number) => string;
+  const differs = (facet: Facet) =>
+    new Set(variants.map((variant, index) => facet(variant, index))).size > 1;
+  const profile: Facet = ({ input }) => names.profile(input);
+  // Another profile brings its own settings, so they name a variant only on the same profile.
+  const settings: Facet[] = differs(profile)
+    ? []
+    : [
+        ({ input }) => `${input.steps} Steps`,
+        ({ input }) => `Guidance ${input.cfg}`,
+        ({ input }) => `${input.width}×${input.height}`,
+      ];
+  const facets: Facet[] = [
+    profile,
     (_, index) => `Prompt ${letter(prompts.indexOf(prompts[index]))}`,
     ({ input }) =>
       changedLoras
@@ -92,14 +105,10 @@ export function variantLabels(
           return `${names.lora(name)} ${value === undefined ? "Off" : value}`;
         })
         .join(", "),
-    ({ input }) => `${input.steps} Steps`,
-    ({ input }) => `Guidance ${input.cfg}`,
-    ({ input }) => `${input.width}×${input.height}`,
+    ...settings,
     ({ references }) => `${references.length} References`,
   ];
-  const differing = facets.filter(
-    (facet) => new Set(variants.map((variant, index) => facet(variant, index))).size > 1,
-  );
+  const differing = facets.filter(differs);
   return variants.map(
     (variant, index) =>
       differing
@@ -215,7 +224,8 @@ export function useStageComparison() {
     fromItem: async (item: MediaItem) => open(addVariant(await exactDraft(item, profiles, client))),
     again: async (items: MediaItem[]) => {
       const drafts = await Promise.all(items.map((item) => exactDraft(item, profiles, client)));
-      open(showVariant(drafts[0], drafts, 0));
+      const variants = drafts.map(({ input, references }) => ({ input, references }));
+      open(showVariant(drafts[0], variants, 0));
     },
     useThis: async (item: MediaItem) => open(await exactDraft(item, profiles, client)),
     testLora: async (name: string, prompt: string) => {
