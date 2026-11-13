@@ -30,12 +30,6 @@
 }
 
 .fold {
-  float: right;
-  clear: both;
-  margin-inline-start: 0.5ch;
-}
-
-.fold {
   position: relative;
   vertical-align: baseline;
   line-height: inherit;
