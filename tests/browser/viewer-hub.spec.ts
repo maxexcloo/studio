@@ -299,8 +299,11 @@ test("Viewer runs queue into the strip and Edit › Recreate opens the composer"
   });
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
-  await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
+  // Newest first: the new version leads.
+  await strip.getByRole("listitem").first().click();
+  await expect(
+    strip.getByRole("listitem", { name: "Show Version 2", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
   await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -336,9 +339,9 @@ test("The strip holds the item's versions, not the other results of its run", as
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
-  await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
 });
 
 test("A version keeps its strip once the runs have left the queue, and runs from it record it", async ({
@@ -358,19 +361,19 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   });
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird at night",
   );
-  await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
   // Its source's run is gone, so a run from it starts a session and still records where it came from.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
 });
 
-test("Edit › More Like This Set asks for new variations of a result's set", async ({ page }) => {
+test("Similar › More Like This Set asks for new variations of a result's set", async ({ page }) => {
   const asked: unknown[] = [];
   await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
     page.route("**/api/result-sets/more", (route) => {
