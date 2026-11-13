@@ -186,6 +186,32 @@ test("profile-owned prompting metadata preserves structured guidance and only ex
   assert.equal(raw.studio.prompting.rules[0], "Keep the subject");
 });
 
+test("a mode on the profile's controls keeps its hidden settings", () => {
+  const control = (input) => ({ node: "1", input });
+  const workflow = metadataFromJson({
+    graph: { 1: { class_type: "RadianceImageGenerate", inputs: { cfg: 1, steps: 4 } } },
+    studio: {
+      id: "lightning",
+      controls: {
+        cfg: control("cfg"),
+        negative: control("negative_prompt"),
+        steps: control("steps"),
+      },
+      capabilities: { cfg: false, negativePrompt: false, startImage: true, steps: false },
+      imageModes: {
+        generate: { mediaInputs: [] },
+        own: { controls: { cfg: control("cfg") } },
+      },
+    },
+  });
+  const { generate, own } = workflow.imageModes;
+  assert.equal(generate.capabilities.cfg, false);
+  assert.equal(generate.capabilities.negativePrompt, false);
+  assert.equal(generate.capabilities.steps, false);
+  assert.equal(generate.capabilities.startImage, false);
+  assert.equal(own.capabilities.cfg, true);
+});
+
 test("a synced profile's numbered reference slots chain into one stack", async () => {
   // A real FLUX.3 [klein] Base profile: ten "Reference Image" slots, none saying they belong together.
   const { readFile } = await import("node:fs/promises");
