@@ -4,9 +4,11 @@ import {
   closePopup,
   create,
   fixtures,
+  openLoraChoices,
   pickerTab,
   profiles,
   serveProfiles,
+  showLoraStack,
 } from "./fixtures";
 
 test("LoRA ratings persist and order the list, tabs and search narrow the choices, and Trigger Words reach the generation", async ({
@@ -30,18 +32,18 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   const controls = page.getByRole("dialog", { name: "LoRAs", exact: true });
   // Choices apply at once; the popup closes like any other.
   await expect(page.getByRole("button", { name: "Use LoRAs", exact: true })).toHaveCount(0);
-  const up = controls.getByRole("button", { name: "Thumbs Up Soft Style", exact: true });
+  const up = page.getByRole("button", { name: "Thumbs Up Soft Style", exact: true });
   await up.click();
   await expect(up).toHaveAttribute("aria-pressed", "true");
-  await controls.getByRole("button", { name: "Thumbs Down Detail Slider", exact: true }).click();
+  await page.getByRole("button", { name: "Thumbs Down Detail Slider", exact: true }).click();
   await expect
     .poll(() => state.loraLibrary.ratings)
     .toEqual({ "soft-style.safetensors": "up", "detail.safetensors": "down" });
-  const choices = controls.getByRole("list", { name: "LoRA Choices", exact: true });
+  const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
   // Thumbs up lead and thumbs down trail, whatever the alphabet says.
   await expect
     .poll(() =>
@@ -51,8 +53,8 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
     )
     .toEqual(["Soft Style", "Detail Slider"]);
   // Sorting by name sets the ratings aside.
-  await controls.getByRole("button", { name: "Sort", exact: true }).click();
-  await controls.getByRole("menuitem", { name: "Name A–Z", exact: true }).click();
+  await page.getByRole("button", { name: "Sort", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Name A–Z", exact: true }).click();
   await expect
     .poll(() =>
       choices
@@ -64,11 +66,12 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
-  await controls.getByRole("textbox", { name: "Search LoRAs", exact: true }).fill("inkbird");
+  await page.getByRole("textbox", { name: "Search LoRAs", exact: true }).fill("inkbird");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
   const detail = choices.getByRole("button", { name: "Detail Slider", exact: true });
   await detail.click();
   await expect(detail).toHaveAttribute("aria-pressed", "true");
+  await showLoraStack(page);
   await expect(
     controls.getByText("Suggested 0.4 to 1.2, default 0.8", { exact: true }),
   ).toBeVisible();
@@ -90,7 +93,7 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
     { name: "detail.safetensors", strength: 0.8, enabled: true, triggers: ["fine detail"] },
   ]);
   await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await expect(up).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -156,7 +159,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await page
     .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
@@ -165,17 +168,19 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await closePopup(page, "Filters");
   await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await showLoraStack(page);
   await expect(
     page.getByRole("textbox", { name: "Soft Style Strength", exact: true }),
   ).toBeVisible();
   await closeLoras(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: /^Other Quality\b/ }).click();
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
   await closePopup(page, "Filters");
   await page.getByRole("button", { name: "Other Detail", exact: true }).click();
+  await showLoraStack(page);
   await expect(
     page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
   ).toBeChecked();
@@ -186,9 +191,10 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An ordered adapter study");
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await showLoraStack(page);
   await expect(page.getByRole("button", { name: "Drag Soft Style", exact: true })).toBeEnabled();
   const earlier = page.getByRole("button", { name: "Move Soft Style Earlier", exact: true });
   await earlier.focus();
@@ -233,7 +239,7 @@ test("Recommended lists the family's LoRAs; All adds the rest, filtered by type"
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
@@ -253,7 +259,49 @@ test("Recommended lists the family's LoRAs; All adds the rest, filtered by type"
   await choices.getByRole("button", { name: "Thumbs Up Detail Slider", exact: true }).click();
   await expect(row).toHaveAttribute("aria-pressed", "true");
   // Without a published default, a new LoRA starts at 1 kept within its range.
+  await showLoraStack(page);
   await expect(
     page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
   ).toHaveValue("0.8");
+});
+
+test("Phones open the stack first and add LoRAs from a list that scrolls under its search", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Desktop shows the choices beside the stack");
+  const files = Array.from({ length: 30 }, (_, index) => `extra-${index}.safetensors`);
+  await fixtures(page);
+  await serveProfiles(page, [
+    {
+      ...profiles[0],
+      options: { ...profiles[0].options, loras: ["detail.safetensors", ...files] },
+    },
+  ]);
+  await create(page);
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
+  await expect(stack.getByText("Choose LoRAs or a saved stack.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
+  await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
+  const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
+  // The search waits for a tap, so the keyboard stays down.
+  const search = adding.getByRole("textbox", { name: "Search LoRAs", exact: true });
+  await expect(search).toBeVisible();
+  await expect(search).not.toBeFocused();
+  await pickerTab(page, "LoRAs", "All");
+  // The list scrolls inside itself, keeping the search and the footer in sight.
+  await adding.getByRole("button", { name: "extra-9", exact: true }).scrollIntoViewIfNeeded();
+  await expect(search).toBeInViewport();
+  await expect(adding.getByRole("button", { name: "Apply", exact: true })).toBeInViewport();
+  await adding.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await showLoraStack(page);
+  // The stack keeps its controls under the sheet's Add LoRAs.
+  await expect(
+    stack.getByRole("switch", { name: "Enable Detail Slider", exact: true }),
+  ).toBeChecked();
+  await expect(
+    stack.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
+  ).toBeVisible();
+  await closeLoras(page);
 });

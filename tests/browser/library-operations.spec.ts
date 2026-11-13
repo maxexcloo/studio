@@ -7,6 +7,7 @@ import {
   fixtures,
   loadSaved,
   openNav,
+  openLoraChoices,
   openPresets,
   profiles,
   section,
@@ -553,7 +554,7 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await closeLoras(page);
   // An inspiration whose LoRA is missing gives only its prompt.
