@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { Shuffle } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -22,6 +22,7 @@ import type { GallerySelection } from "./useGallerySelection";
 import type { MediaItem } from "../../types";
 import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
+import { showQueued } from "../settings/accountPreferences";
 
 const shareLimit = 20;
 // Compare Selected sets out up to four images side by side, one per number key.
@@ -82,6 +83,7 @@ export function GallerySelectionBar({
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
+  const client = useQueryClient();
   const animate = useMutation({
     mutationFn: async (theme: AnimateTheme) => {
       const failed: string[] = [];
@@ -92,6 +94,7 @@ export function GallerySelectionBar({
           error ??= reason;
         });
       if (error) failure(error);
+      if (failed.length < finishedImages.length) showQueued(client);
       settle(failed);
     },
   });

@@ -24,10 +24,12 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
+import { showQueued } from "../settings/accountPreferences";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -364,6 +366,7 @@ export function MediaViewer({
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
   const iteration = useMediaIteration(item);
+  const client = useQueryClient();
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
   const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
@@ -376,9 +379,13 @@ export function MediaViewer({
   // The run belongs to the item it started on, even once the viewer has moved on.
   function iterate(next: Iteration) {
     // A phone's prompt editor runs and returns to the gallery; desktop keeps the run in the strip.
-    if (phone && next.kind === "prompt") close();
+    const closing = phone && next.kind === "prompt";
+    if (closing) close();
     void iteration.mutateAsync(next).then(
-      (job) => setQueued((runs) => [...runs, { job, from: item.id }]),
+      (job) => {
+        setQueued((runs) => [...runs, { job, from: item.id }]);
+        if (closing) showQueued(client);
+      },
       () => {},
     );
   }

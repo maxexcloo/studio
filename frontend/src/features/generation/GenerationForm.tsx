@@ -18,7 +18,7 @@ import {
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
 import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
-import { preferencesQuery } from "../settings/accountPreferences";
+import { showQueued } from "../settings/accountPreferences";
 import { generationInput, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
 import { useCompare } from "../compare/CompareDialog";
@@ -73,15 +73,7 @@ function useDraftSubmit({
         draft.defaultedProfileId === profile.id &&
         models.data?.defaultNotes?.[profile.kind];
       if (note) notifications.show({ message: note });
-      // Where the gallery holds back queued work (Unfinished Work), the queuing says so here.
-      const work = client.getQueryData(preferencesQuery.queryKey)?.preferences.galleryWork;
-      if (work !== "queued")
-        notifications.show({
-          message:
-            work === "running"
-              ? "Queued. It shows in the gallery once it starts."
-              : "Queued. It shows in the gallery once it’s done.",
-        });
+      showQueued(client);
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       onSubmitted?.(jobId);

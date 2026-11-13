@@ -97,6 +97,8 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   // The bar stays in reach while phone details are open, without its prompt field.
   else {
     await expect(viewer).toBeHidden();
+    // The gallery holds back unfinished work by default, so queuing says so instead.
+    await expect(page.getByRole("alert").filter({ hasText: "Queued." })).toBeVisible();
     await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();

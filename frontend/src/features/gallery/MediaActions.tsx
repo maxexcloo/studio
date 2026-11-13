@@ -57,7 +57,11 @@ import {
 import { useItemMutation } from "./useItemMutation";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
-import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
+import {
+  showQueued,
+  useVideosPreference,
+  type VideosPreference,
+} from "../settings/accountPreferences";
 import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
@@ -249,7 +253,11 @@ export function useMediaActions(
 ): ActionGroups {
   const action = useMediaAction(item, onApplied);
   const iteration = useMediaIteration(item);
-  const run = iterate ?? ((next: Iteration) => iteration.mutate(next));
+  const client = useQueryClient();
+  // Outside the viewer, whose strip shows the run, nothing else may.
+  const run =
+    iterate ??
+    ((next: Iteration) => iteration.mutate(next, { onSuccess: () => showQueued(client) }));
   // Runs from the item, also the viewer's own, share its pending state.
   const running = iteration.variables?.kind;
   const compareVariants = useCompare();
@@ -304,7 +312,6 @@ export function useMediaActions(
   const stopUpscale = useStopUpscale(item);
   const assistant = useQuery(assistantQuery);
   // The assistant writes new variations into the item's MCP result set, in the queue.
-  const client = useQueryClient();
   const moreLikeSet = useItemMutation(item.id, "more-like-set", {
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
