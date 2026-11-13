@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Badge,
@@ -601,6 +601,11 @@ export function DefinitionEditor({
     refetchOnReconnect: false,
   });
   const data = creating || loaded.data;
+  const client = useQueryClient();
+  // A list opened before the definition was removed still shows it; refresh it so the row goes.
+  useEffect(() => {
+    if (loaded.error) void client.invalidateQueries({ queryKey: ["definition-list"] });
+  }, [loaded.error, client]);
   return (
     <Modal
       opened
@@ -612,7 +617,15 @@ export function DefinitionEditor({
       <FocusTrap.InitialFocus />
       {!data ? (
         loaded.error ? (
-          <Alert color="red">{loaded.error.message}</Alert>
+          <Stack>
+            <Alert color="red">
+              {loaded.error.message} It may have just been removed; the list now shows what is
+              saved.
+            </Alert>
+            <Group justify="flex-end">
+              <Button onClick={close}>Close</Button>
+            </Group>
+          </Stack>
         ) : (
           <LoadingState label="Loading Definition" />
         )
