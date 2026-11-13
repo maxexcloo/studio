@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   closeLoras,
   create,
@@ -6,78 +6,54 @@ import {
   image,
   openNav,
   openLoraChoices,
-  profiles,
-  selectionMenuItem,
   section,
-  serveProfiles,
+  selectionMenuItem,
   stamp,
+  viewerAction,
 } from "./fixtures";
 
-const compareBy = (dialog: Locator, label: string) =>
-  dialog
-    .getByRole("radiogroup", { name: "Compare By", exact: true })
-    .getByText(label, { exact: true })
-    .click();
+const compareMenu = async (page: Page, item: string) => {
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  await page.getByRole("menuitem", { name: item, exact: true }).click();
+};
+const variants = (page: Page) => page.getByRole("radiogroup", { name: "Variant", exact: true });
+const prompt = (page: Page) => page.getByRole("textbox", { name: "Prompt", exact: true });
 
-test("Compare from the composer queues one seeded variant per chosen local profile and starring the winner loads it", async ({
+test("The composer compares variants that each change one thing, as one labelled set", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
-  // Another family that ignores negatives, and a cloud profile Compare leaves out.
-  await serveProfiles(page, [
-    ...profiles,
-    {
-      ...profiles[0],
-      id: "image:other",
-      label: "Other Image",
-      family: "other",
-      familyName: "Other Images",
-      capabilities: { cfg: true, lora: true, negativePrompt: false },
-    },
-    { ...profiles[0], id: "grok-image", label: "Grok Image", family: "grok" },
-  ]);
   await create(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
-  if (testInfo.project.name === "desktop") {
-    // A click outside Compare closes only Compare; the composer under it stays open.
-    await page.getByRole("button", { name: "Compare", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Compare", exact: true })).toBeVisible();
-    await page.mouse.click(20, 500);
-    await expect(page.getByRole("dialog", { name: "Compare", exact: true })).toBeHidden();
-    await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();
-  }
+  await prompt(page).fill("A copper fox");
   await openLoraChoices(page);
   await page
     .getByRole("list", { name: "LoRA Choices", exact: true })
     .getByRole("button", { name: "Detail Slider", exact: true })
     .click();
   await closeLoras(page);
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
-  await expect(dialog.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "A copper fox",
+
+  // Variant B copies A, then runs on another profile.
+  await compareMenu(page, "Add Variant");
+  await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
+  await expect(prompt(page)).toHaveValue("A copper fox");
+  await expect(page.getByRole("button", { name: "Compare 2", exact: true })).toHaveAttribute(
+    "aria-disabled",
+    "true",
   );
-  if (testInfo.project.name === "desktop") {
-    // The LoRAs popup opens under its chip, high in the dialog, without covering it.
-    const chip = dialog.getByRole("button", { name: "Choose LoRAs", exact: true });
-    await chip.click();
-    const loras = page.getByRole("dialog", { name: "LoRAs", exact: true });
-    await expect(loras).toBeVisible();
-    const chipBottom = await chip.evaluate((element) => element.getBoundingClientRect().bottom);
-    await expect
-      .poll(() => loras.evaluate((element) => element.getBoundingClientRect().top))
-      .toBeGreaterThanOrEqual(chipBottom);
-    await closeLoras(page);
-    await expect(dialog).toBeVisible();
-  }
-  await dialog.getByRole("textbox", { name: "Negative Prompt", exact: true }).fill("blurry");
-  const chosen = dialog.getByRole("combobox", { name: "Profiles", exact: true });
-  await chosen.click();
-  await expect(page.getByRole("option", { name: "Grok Image", exact: true })).toHaveCount(0);
-  await page.getByRole("option", { name: "Other Image", exact: true }).click();
-  await chosen.press("Escape");
-  await expect(dialog).toContainText("LoRAs that don’t suit a profile’s family are left out");
-  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await page.getByRole("option", { name: /^Image Fast\b/ }).click();
+  await expect(page.getByText("Image Fast", { exact: true }).first()).toBeVisible();
+  // Variant C copies B with another prompt; A keeps its own settings.
+  await compareMenu(page, "Add Variant");
+  await prompt(page).fill("A silver fox");
+  await variants(page).getByText("A", { exact: true }).click();
+  await expect(prompt(page)).toHaveValue("A copper fox");
+  await expect(page.getByText("Image Quality · Prompt A", { exact: true })).toBeVisible();
+
+  // The draft keeps its variants across a reload.
+  await page.reload();
+  await expect(variants(page).getByRole("radio")).toHaveCount(3);
+  await page.getByRole("button", { name: "Compare 3", exact: true }).click();
 
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const [run] = state.comparisons;
@@ -85,80 +61,37 @@ test("Compare from the composer queues one seeded variant per chosen local profi
     run.requests.map((variant: any) => [
       variant.label,
       variant.input.profileId,
-      variant.input.negative,
+      variant.input.prompt,
       variant.input.loras.map((lora: any) => lora.name),
       variant.input.count,
     ]),
   ).toEqual([
-    ["Image Quality", "image:test", "blurry", ["detail.safetensors"], 1],
-    ["Image Fast", "image:fast", "blurry", ["detail.safetensors"], 1],
-    ["Other Image", "image:other", "", [], 1],
+    ["Image Quality · Prompt A", "image:test", "A copper fox", ["detail.safetensors"], 1],
+    ["Image Fast · Prompt A", "image:fast", "A copper fox", ["detail.safetensors"], 1],
+    ["Image Fast · Prompt C", "image:fast", "A silver fox", ["detail.safetensors"], 1],
   ]);
   await expect(page.getByRole("heading", { name: "Compare", exact: true })).toBeVisible();
-  await expect(page.getByText("Prompt: A copper fox", { exact: true })).toBeVisible();
 
-  const star = page.getByRole("button", { name: "Star Image Fast as Winner", exact: true });
-  await star.click();
+  // Starring keeps the winner without touching the composer; Use This takes one there.
+  await page
+    .getByRole("button", { name: "Star Image Fast · Prompt A as Winner", exact: true })
+    .click();
   await expect(
-    page.getByRole("button", { name: "Clear Winner Image Fast", exact: true }),
+    page.getByRole("button", { name: "Clear Winner Image Fast · Prompt A", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   expect(run.vote).toBe(run.jobIds[1]);
   expect(state.gallery.find((item) => item.jobId === run.jobIds[1]).favorite).toBe(true);
-
-  await page.getByRole("link", { name: "Open Composer", exact: true }).click();
+  await page.getByRole("button", { name: "Use Image Fast · Prompt C", exact: true }).click();
+  await expect(page).toHaveURL(/\/images\?compose=1/);
+  await expect(prompt(page)).toHaveValue("A silver fox");
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
     "Image Fast",
   );
   await expect(page.getByRole("button", { name: "Clear Seed 4242", exact: true })).toBeVisible();
+  await expect(variants(page)).toHaveCount(0);
 });
 
-test("Compare runs LoRAs on and off, side by side and as a strength sweep with one prompt and seed", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
-  await create(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
-  await compareBy(dialog, "LoRAs");
-  const variants = dialog.getByRole("list", { name: "Variants", exact: true });
-  await expect(variants.getByRole("listitem")).toHaveText([
-    "A · Detail Slider Off",
-    "B · Detail Slider 0.8",
-  ]);
-  const mode = dialog.getByRole("radiogroup", { name: "LoRA Comparison", exact: true });
-  await mode.getByText("Different LoRAs", { exact: true }).click();
-  await expect(variants.getByRole("listitem")).toHaveText([
-    "A · Detail Slider 0.8",
-    "B · Soft Style 1",
-  ]);
-  await mode.getByText("Strengths", { exact: true }).click();
-  await expect(variants.getByRole("listitem")).toHaveText([
-    "A · Detail Slider 0.4",
-    "B · Detail Slider 0.7",
-    "C · Detail Slider 1",
-  ]);
-  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
-
-  await expect(page).toHaveURL(/\/compare\//);
-  const [run] = state.comparisons;
-  expect(
-    run.requests.map((variant: any) => [
-      variant.input.prompt,
-      variant.input.loras.map((lora: any) => [lora.name, lora.strength, lora.enabled]),
-    ]),
-  ).toEqual([
-    ["A copper fox", [["detail.safetensors", 0.4, true]]],
-    ["A copper fox", [["detail.safetensors", 0.7, true]]],
-    ["A copper fox", [["detail.safetensors", 1, true]]],
-  ]);
-  for (const label of ["Detail Slider 0.4", "Detail Slider 0.7", "Detail Slider 1"])
-    await expect(page.getByText(label, { exact: true })).toBeVisible();
-});
-
-test("Test LoRA in the Library sweeps a LoRA's strength on its import's sample prompt", async ({
-  page,
-}) => {
+test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async ({ page }) => {
   const state = await fixtures(page);
   await page.route("**/api/library/items", (route) =>
     route.fulfill({
@@ -202,35 +135,27 @@ test("Test LoRA in the Library sweeps a LoRA's strength on its import's sample p
   await section(page, "Library", "LoRAs");
   await page.getByRole("button", { name: "Actions for Detail Slider", exact: true }).click();
   await page.getByRole("menuitem", { name: "Test LoRA", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
-  await expect(
-    dialog.getByRole("list", { name: "Variants", exact: true }).getByRole("listitem"),
-  ).toHaveText([
-    "A · Detail Slider Off",
-    "B · Detail Slider 0.6",
-    "C · Detail Slider 0.8",
-    "D · Detail Slider 1",
-  ]);
-  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(prompt(page)).toHaveValue("A fox in fine detail");
+  await expect(page.getByText("Detail Slider Off", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Compare 4", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\//);
   expect(
     state.comparisons[0].requests.map((variant: any) => [
-      variant.input.prompt,
+      variant.label,
       variant.input.loras.map((lora: any) => [lora.name, lora.strength]),
     ]),
   ).toEqual([
-    ["A fox in fine detail", []],
-    ["A fox in fine detail", [["detail.safetensors", 0.6]]],
-    ["A fox in fine detail", [["detail.safetensors", 0.8]]],
-    ["A fox in fine detail", [["detail.safetensors", 1]]],
+    ["Detail Slider Off", []],
+    ["Detail Slider 0.6", [["detail.safetensors", 0.6]]],
+    ["Detail Slider 0.8", [["detail.safetensors", 0.8]]],
+    ["Detail Slider 1", [["detail.safetensors", 1]]],
   ]);
 });
 
-test("Compare from the tile menu keeps the result's seed, compares prompts with their negatives and opens variants in the viewer", async ({
+test("Compare from a result keeps its seed, and Compare Again brings every variant back from the winner", async ({
   page,
 }) => {
   const state = await fixtures(page);
-  const settings = { profileId: "image:test", seed: 1234567, steps: 28, cfg: 5 };
   state.gallery.push({
     id: "source",
     jobId: "job-source",
@@ -242,75 +167,63 @@ test("Compare from the tile menu keeps the result's seed, compares prompts with 
     width: 1024,
     height: 1024,
     createdAt: stamp,
-    settings,
+    settings: { profileId: "image:test", seed: 1234567, steps: 28, cfg: 5 },
   });
   await page.goto("/images");
   await page
     .getByRole("button", { name: "Open image: An amber bird", exact: true })
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "Compare", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
-  await expect(dialog).toContainText("Every variant uses seed 1234567.");
-  await compareBy(dialog, "Prompts");
-  const second = dialog.getByRole("group", { name: "Variant B", exact: true });
-  await second.getByRole("textbox", { name: "Prompt", exact: true }).fill("A jade bird");
-  await second.getByRole("textbox", { name: "Negative Prompt", exact: true }).fill("feathers");
-  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(variants(page).getByRole("radio", { name: "B", exact: true })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Clear Seed 1234567", exact: true })).toBeVisible();
+  await prompt(page).fill("A jade bird");
+  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/compare\//);
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const [run] = state.comparisons;
-  expect(
-    run.requests.map((variant: any) => [
-      variant.input.seed,
-      variant.input.prompt,
-      variant.input.negative,
-    ]),
-  ).toEqual([
-    [1234567, "An amber bird", ""],
-    [1234567, "A jade bird", "feathers"],
+  expect(run.requests.map((variant: any) => [variant.input.seed, variant.input.prompt])).toEqual([
+    [1234567, "An amber bird"],
+    [1234567, "A jade bird"],
   ]);
-  await expect(page.getByText("Seed 1234567", { exact: false })).toBeVisible();
   expect(state.jobs.every((job: any) => job.parentItemId === "source")).toBe(true);
   await page.getByRole("button", { name: "Open Prompt B", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.keyboard.press("2");
-  await expect(page.getByRole("button", { name: "Compare Again", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Clear Winner Prompt B", exact: true }),
+  ).toBeAttached();
   await page.getByRole("button", { name: "Compare Again", exact: true }).click();
-  await dialog
-    .getByRole("group", { name: "Variant B", exact: true })
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("A jade bird in flight");
-  await dialog.getByRole("button", { name: "Compare", exact: true }).click();
+  await expect(prompt(page)).toHaveValue("A jade bird");
+  await variants(page).getByText("B", { exact: true }).click();
+  await prompt(page).fill("A jade bird in flight");
+  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
-  expect(state.jobs.slice(2).map((job: any) => job.parentItemId)).toEqual([
-    `${run.jobIds[1]}:0`,
-    `${run.jobIds[1]}:0`,
+  expect(state.comparisons[1].requests.map((variant: any) => variant.input.prompt)).toEqual([
+    "A jade bird",
+    "A jade bird in flight",
   ]);
-  expect(state.jobs.slice(2).map((job: any) => job.parentJobId)).toEqual([
-    run.jobIds[1],
-    run.jobIds[1],
+  expect(state.jobs.slice(2).map((job: any) => [job.parentJobId, job.parentItemId])).toEqual([
+    [run.jobIds[1], `${run.jobIds[1]}:0`],
+    [run.jobIds[1], `${run.jobIds[1]}:0`],
   ]);
+
+  // The run is a set in the gallery that links back to its comparison.
+  await page.getByRole("link", { name: "Show in Gallery", exact: true }).click();
+  await expect(page).toHaveURL(/\/images\?set=compare-2/);
+  await page
+    .getByRole("button", { name: "Open image: A jade bird in flight", exact: true })
+    .click();
+  await expect(page.getByTitle("Open Comparison", { exact: true })).toHaveAttribute(
+    "href",
+    "/compare/compare-2",
+  );
+  await viewerAction(page, "Similar");
+  await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });
 
-test("Compare remembers its mode and variants across a reload", async ({ page }) => {
-  await fixtures(page);
-  await create(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
-  await compareBy(dialog, "Prompts");
-  const promptB = dialog
-    .getByRole("group", { name: "Variant B", exact: true })
-    .getByRole("textbox", { name: "Prompt", exact: true });
-  await promptB.fill("A silver fox");
-  await page.reload();
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
-  await expect(dialog.getByRole("radio", { name: "Prompts", exact: true })).toBeChecked();
-  await expect(promptB).toHaveValue("A silver fox");
-});
-
-test("Compare Selected sets chosen images side by side, and number keys star the winner", async ({
+test("Compare Selected sets chosen images side by side, number keys star the winner and the gallery finds it", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -352,9 +265,6 @@ test("Compare Selected sets chosen images side by side, and number keys star the
   ).toBeAttached();
   expect(state.comparisons[0].vote).toBe("job-batch");
   expect(state.comparisons[0].winnerItemId).toBe("batch-1");
-  await expect(
-    page.getByRole("button", { name: "Star Variant A as Winner", exact: true }),
-  ).toHaveAttribute("aria-pressed", "false");
   await page.keyboard.press("1");
   await expect(
     page.getByRole("button", { name: "Clear Winner Variant A", exact: true }),
@@ -365,4 +275,15 @@ test("Compare Selected sets chosen images side by side, and number keys star the
     page.getByRole("button", { name: "Star Variant A as Winner", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
   expect(state.comparisons[0].winnerItemId).toBeNull();
+
+  // The Comparisons filter keeps only compared results.
+  await page.getByRole("link", { name: "Back to Images", exact: true }).click();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("switch", { name: "Comparisons", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open image: A felt owl", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Open image: A tin owl", exact: true }),
+  ).toBeVisible();
 });

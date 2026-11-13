@@ -158,7 +158,7 @@ export function GenerationInputControls({
   ideas,
   loraPicker,
   settings,
-  onCompare,
+  compare,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -174,8 +174,8 @@ export function GenerationInputControls({
   ideas?: ReactNode;
   loraPicker: LoraPickerState;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
-  /** Opens Compare from this draft; the gallery composer passes it. */
-  onCompare?: () => void;
+  /** The gallery composer's Compare ▾ (`CompareMenu`). */
+  compare?: ReactNode;
 }) {
   const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
@@ -235,13 +235,7 @@ export function GenerationInputControls({
         />
       )}
       <GenerationSettings input={input} profile={profile} onChange={onChange} {...settings} />
-      {onCompare && input.kind === "image" && (
-        <Tooltip label="Compare">
-          <Button {...iconChipProps} aria-label="Compare" onClick={onCompare}>
-            <icons.compare size={16} />
-          </Button>
-        </Tooltip>
-      )}
+      {input.kind === "image" && compare}
       {presets}
     </ChipRail>
   );

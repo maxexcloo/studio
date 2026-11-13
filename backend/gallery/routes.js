@@ -53,9 +53,10 @@ export function galleryJobResponse(store, account, id, settings = false) {
 
 /**
  * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item)` scores items
- * by how alike they look to it, or is null when it can't.
+ * by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
+ * is in one of the owner's comparisons.
  */
-export function registerGalleryReadRoutes(app, { near, similar, store }) {
+export function registerGalleryReadRoutes(app, { near, similar, store, compared }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`,
    * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
@@ -146,6 +147,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
     const similarTo = query.similar
       ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
       : null;
+    // `comparisons` keeps results that are in one of the account's comparisons.
+    const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
     // work in progress, or queued work too; unsaved, none.
     const work = accountPreferences(account?.userId || "").galleryWork || "none";
@@ -166,6 +169,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
         recordBelongsToAccount(item, account) &&
         // `set` keeps one MCP result set's results.
         (!query.set || item.resultSet?.id === query.set) &&
+        (!inComparison || inComparison(item)) &&
         (work !== "none" || item.status !== "pending") &&
         (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
@@ -204,6 +208,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store }) {
                 (!type || item.type === type) &&
                 recordBelongsToAccount(item, account) &&
                 (!query.set || item.resultSet?.id === query.set) &&
+                (!inComparison || inComparison(item)) &&
                 (!search || search(item)),
             );
     return {

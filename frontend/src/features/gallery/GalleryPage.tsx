@@ -397,13 +397,24 @@ export function GalleryPage() {
           />
         }
         toggles={
-          view === "grid" && (
-            <Switch
-              label="All Versions"
-              checked={allVersions}
-              onChange={(event) => setAllVersions(event.currentTarget.checked)}
-            />
-          )
+          <>
+            {view === "grid" && (
+              <Switch
+                label="All Versions"
+                checked={allVersions}
+                onChange={(event) => setAllVersions(event.currentTarget.checked)}
+              />
+            )}
+            {kind === "image" && (
+              <Switch
+                label="Comparisons"
+                checked={filters.comparisons}
+                onChange={(event) =>
+                  setFilters({ ...filters, comparisons: event.currentTarget.checked })
+                }
+              />
+            )}
+          </>
         }
         actions={
           <>

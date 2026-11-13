@@ -81,6 +81,16 @@ export interface Draft {
    * picked: the draft then follows the default as the account's preferences or workers change.
    */
   defaultedProfileId?: string;
+  /**
+   * A comparison being set up (features/compare/variants.ts): every variant's settings, the one at
+   * `active` being edited as `input` and `references`, whose stored copy is stale meanwhile.
+   */
+  compare?: { variants: Variant[]; active: number };
+}
+/** One compared variant's settings. */
+export interface Variant {
+  input: GenerationInput;
+  references: ReferenceAsset[];
 }
 /**
  * The draft moved to `profile` for a picked character (CharacterChoices): the profile's settings,

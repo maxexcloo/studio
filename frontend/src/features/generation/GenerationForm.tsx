@@ -21,7 +21,8 @@ import { queueQuery } from "./Queue";
 import { showQueued } from "../settings/accountPreferences";
 import { generationInput, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
-import { useCompare } from "../compare/CompareDialog";
+import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
+import { useCompareRun, useDraftComparison } from "../compare/variants";
 import classes from "./ComposerDock.module.css";
 
 /**
@@ -97,7 +98,6 @@ export function GenerationForm({
   const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
   const navigate = useNavigate();
   const location = useLocation();
-  const compare = useCompare();
   const phone = usePhone();
   // A draft without a picked profile runs on the account's default, following it as it changes.
   const preferred = defaultProfile(models.data, input.kind);
@@ -105,13 +105,21 @@ export function GenerationForm({
   useEffect(() => {
     if (defaulted && preferred && preferred.id !== input.profileId) selectProfile(preferred, true);
   }, [defaulted, preferred, input.profileId]);
-  const submit = useDraftSubmit({ onSubmitted });
-  const { label, blockedReason } = useSubmitState({
+  // A draft with variants queues them as one comparison instead.
+  const comparison = useDraftComparison();
+  const compareRun = useCompareRun(() => onSubmitted?.(""));
+  const single = useDraftSubmit({ onSubmitted });
+  const submit = draft.compare ? compareRun : single;
+  const submitLabel = draft.compare ? `Compare ${comparison.variants.length}` : undefined;
+  const submitState = useSubmitState({
     input,
     profile,
     references: draft.references,
     operation: draft.operation,
+    blockedReason: draft.compare ? comparison.blockedReason : undefined,
   });
+  const label = submitLabel ?? submitState.label;
+  const { blockedReason } = submitState;
   const supportsReferences = Boolean(
     profile?.mediaInputs?.length ||
     profile?.capabilities?.img2img ||
@@ -123,7 +131,7 @@ export function GenerationForm({
         onKeyDown={(event) => submitShortcut(event, !!blockedReason || submit.isPending)}
         onSubmit={(event) => {
           event.preventDefault();
-          if (!blockedReason && !submit.isPending) submit.mutate();
+          if (!blockedReason && !submit.isPending) submit.mutate(undefined);
         }}
       >
         {/* Bottom aligned, so the actions stay at the bottom as the prompt grows. */}
@@ -203,11 +211,13 @@ export function GenerationForm({
           },
         }))
       }
-      onSubmit={() => submit.mutate()}
+      onSubmit={() => submit.mutate(undefined)}
       operation={draft.operation}
       onOperationChange={(operation) => setDraft((value) => ({ ...value, operation }))}
       pending={submit.isPending}
       error={submit.error}
+      blockedReason={draft.compare ? comparison.blockedReason : undefined}
+      submitLabel={submitLabel}
       assistantScope={JSON.stringify([
         input.kind,
         draft.sessionId,
@@ -237,15 +247,8 @@ export function GenerationForm({
           }}
         />
       }
-      onCompare={() =>
-        compare.open({
-          input,
-          references: draft.references,
-          sessionId: draft.sessionId || undefined,
-          parentJobId: draft.parentJobId,
-          parentItemId: draft.parentItemId,
-        })
-      }
+      compare={<CompareMenu />}
+      variants={draft.compare && <VariantStrip />}
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}

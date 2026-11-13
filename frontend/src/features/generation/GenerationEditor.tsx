@@ -144,7 +144,9 @@ export function GenerationEditor({
   error,
   assistantScope,
   presets,
-  onCompare,
+  compare,
+  variants,
+  submitLabel,
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
@@ -173,7 +175,12 @@ export function GenerationEditor({
   assistantScope: string;
   /** The Presets chip (`PresetPicker`). */
   presets?: ReactNode;
-  onCompare?: () => void;
+  /** The gallery composer's Compare ▾ chip. */
+  compare?: ReactNode;
+  /** Which compared variant is being edited (`VariantStrip`), over the prompt. */
+  variants?: ReactNode;
+  /** Names the submit in place of Generate, as a comparison's does. */
+  submitLabel?: string;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount. */
@@ -196,13 +203,15 @@ export function GenerationEditor({
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const phone = usePhone();
-  const { label, blockedReason } = useSubmitState({
+  const submitState = useSubmitState({
     input,
     profile,
     references,
     operation,
     blockedReason: callerReason,
   });
+  const label = submitLabel ?? submitState.label;
+  const { blockedReason } = submitState;
   const ask = useDraftChange({
     input,
     references,
@@ -280,7 +289,7 @@ export function GenerationEditor({
       presets={presets}
       ideas={offerIdeas && ideas.chip}
       settings={settings}
-      onCompare={onCompare}
+      compare={compare}
     />
   );
   return (
@@ -304,6 +313,7 @@ export function GenerationEditor({
             </Alert>
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
+          {variants}
           <PromptFields
             textareaRef={prompt}
             input={input}

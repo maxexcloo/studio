@@ -47,12 +47,17 @@ const dates: { value: GalleryDate; label: string; chip: string; days: number }[]
   { value: "year", label: "Year", chip: "Past Year", days: 365 },
 ];
 
-/** Every gallery filter: the facets (any value matches), a date range, Starred and Uploads. */
+/**
+ * Every gallery filter: the facets (any value matches), a date range, Starred, Uploads and
+ * Comparisons.
+ */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
   starred: boolean;
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
+  /** Only results in one of the account's comparisons. */
+  comparisons: boolean;
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
   model: [],
@@ -63,6 +68,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   date: "",
   starred: false,
   uploads: false,
+  comparisons: false,
 };
 
 /** The gallery request's filter parameters. */
@@ -70,6 +76,7 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
   for (const key of facets) for (const value of filters[key]) params.append(key, value);
   params.set("favorites", filters.starred ? "1" : "0");
   params.set("uploads", filters.uploads ? "1" : "0");
+  if (filters.comparisons) params.set("comparisons", "1");
   const date = dates.find((option) => option.value === filters.date);
   if (date?.value) {
     const since = new Date();
@@ -195,6 +202,15 @@ export function useActiveFilters(
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
     ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
+    ...(value.comparisons
+      ? [
+          {
+            key: "comparisons",
+            label: "Comparisons",
+            remove: () => onChange({ ...value, comparisons: false }),
+          },
+        ]
+      : []),
     ...extra,
     ...facets.flatMap((facet) => {
       const chosen = options[facet].filter((option) =>

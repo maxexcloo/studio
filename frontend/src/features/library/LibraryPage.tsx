@@ -11,7 +11,7 @@ import {
   libraryItemCategory,
   type LibraryItem,
 } from "./LibraryCatalogueTable";
-import { useCompare } from "../compare/CompareDialog";
+import { useStageComparison } from "../compare/variants";
 import { LibraryUnused } from "./LibraryUnused";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
@@ -47,9 +47,9 @@ export function LibraryPage() {
         ? 2000
         : false,
   });
-  const compare = useCompare();
-  // Test LoRA runs on the sample prompt of an import that brought the LoRA, else its title;
-  // Compare adds its trigger words when it runs.
+  const compare = useStageComparison();
+  // Test LoRA compares the LoRA's strengths on the sample prompt of an import that brought it,
+  // else its title; its trigger words are added when it runs.
   const testLora = useMutation({
     mutationFn: async (item: LibraryItem) => {
       const file = item.file || "";

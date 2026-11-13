@@ -21,21 +21,21 @@ import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
-import { mediaDraft } from "../gallery/useMediaAction";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
-import { useGenerationActions } from "../generation/GenerationProvider";
-import { useCompare } from "./CompareDialog";
 import { comparisonQuery, type Comparison } from "./queries";
+import { useStageComparison } from "./variants";
 import classes from "./ComparePage.module.css";
 
-/** A compare set side by side; starring the winner loads its settings, and Compare Again starts from it. */
+/**
+ * A compare set side by side, labelled by what sets each variant apart: star the winner, take one
+ * into the composer (Use This), or bring them all back to change one (Compare Again).
+ */
 export function ComparePage() {
   const id = useParams().id!;
   const comparison = useQuery(comparisonQuery(id));
   const client = useQueryClient();
-  const { profiles, setDraft } = useGenerationActions();
-  const compare = useCompare();
+  const stage = useStageComparison();
   const [open, setOpen] = useState<MediaItem | null>(null);
   const items = (comparison.data?.variants || []).flatMap((variant) =>
     variant.item ? [variant.item] : [],
@@ -49,12 +49,8 @@ export function ComparePage() {
         method: "PUT",
         body: JSON.stringify({ itemId: winner ? null : item.id }),
       });
-      if (!winner) {
-        if (!item.favorite) await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
-        // The winner's exact settings, seed included, so the next run starts from it.
-        const { draft, seed } = await mediaDraft(item, "image", profiles, client);
-        setDraft({ ...draft, input: { ...draft.input, seed: seed ?? "" } });
-      }
+      if (!winner && !item.favorite)
+        await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
       return result;
     },
     onSuccess: (result) => client.setQueryData(comparisonQuery(id).queryKey, result),
@@ -65,6 +61,8 @@ export function ComparePage() {
         ),
       ),
   });
+  const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
+  const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
   // 1–4 star that variant as the winner (again to clear it), unless typing or a layer is above.
   const pick = useRef<(index: number) => void>(undefined);
   pick.current = (index) => {
@@ -91,21 +89,25 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, seed, prompt, negative } = comparison.data;
+  const { variants, seed, prompt, negative, set } = comparison.data;
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
+  // Compare Again brings back every finished variant, the winner first.
+  const again = items
+    .filter((item) => item.status === "done")
+    .sort((a, b) => Number(b === winner) - Number(a === winner));
   const sized = items.find((item) => item.width && item.height);
   const aspect = sized ? sized.width! / sized.height! : 1;
   return (
     <Stack gap="md" className={classes.page}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Group gap="xs" wrap="nowrap" miw={0}>
-          <Tooltip label="Back to Images">
+          <Tooltip label={set ? "Show in Gallery" : "Back to Images"}>
             <ActionIcon
               component={Link}
-              to="/images"
+              to={set ? `/images?${new URLSearchParams({ set })}` : "/images"}
               variant="subtle"
               color="gray"
-              aria-label="Back to Images"
+              aria-label={set ? "Show in Gallery" : "Back to Images"}
             >
               <ArrowLeft size={18} />
             </ActionIcon>
@@ -179,6 +181,17 @@ export function ComparePage() {
                   Image Unavailable
                 </Text>
               )}
+              {item?.status === "done" && (
+                <Button
+                  variant="default"
+                  size="xs"
+                  aria-label={`Use ${label}`}
+                  loading={use.isPending && use.variables?.id === item.id}
+                  onClick={() => use.mutate(item)}
+                >
+                  Use This
+                </Button>
+              )}
               {!prompt && item?.prompt && (
                 <Text size="xs" c="dimmed" lineClamp={3}>
                   Prompt: {item.prompt}
@@ -193,21 +206,11 @@ export function ComparePage() {
           );
         })}
       </Variants>
-      {winner && (
-        <Group justify="center" gap="sm" className={classes.applied}>
-          {star.isSuccess && (
-            <Text size="sm" c="dimmed">
-              The winner’s settings are in the composer.
-            </Text>
-          )}
-          <Button variant="default" onClick={() => void compare.openItem(winner)}>
+      {again.length > 1 && (
+        <Group justify="center" className={classes.applied}>
+          <Button loading={compareAgain.isPending} onClick={() => compareAgain.mutate()}>
             Compare Again
           </Button>
-          {star.isSuccess && (
-            <Button component={Link} to="/images?compose=1">
-              Open Composer
-            </Button>
-          )}
         </Group>
       )}
       {open && (
