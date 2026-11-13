@@ -328,14 +328,19 @@ function ActionControl({
   const options = hasOptions(action);
   // ⋯ already says it holds more, so it carries no ▾.
   const chevron = options && Icon !== icons.more;
+  // A disabled control that says why stays hoverable and focusable (Mantine's `data-disabled`) so
+  // its tooltip can show.
+  const reason = disabled && action.description;
   const props = {
     className: classes.action,
     variant: "subtle",
     color: color || (pressed ? undefined : "gray"),
     "aria-pressed": pressed,
     loading,
-    disabled,
-    ...(options
+    ...(reason
+      ? { "data-disabled": true, "aria-disabled": true, "aria-description": reason }
+      : { disabled }),
+    ...(options || reason
       ? {}
       : link
         ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
@@ -371,7 +376,20 @@ function ActionControl({
     </ActionIcon>
   );
   const tip = (opened: boolean, target: ReactNode) => (
-    <Tooltip label={label} disabled={labelled || opened}>
+    <Tooltip
+      label={
+        reason ? (
+          <>
+            {label}
+            <br />
+            {reason}
+          </>
+        ) : (
+          label
+        )
+      }
+      disabled={(labelled && !reason) || opened}
+    >
       {target}
     </Tooltip>
   );
