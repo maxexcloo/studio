@@ -1,10 +1,12 @@
 import {
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   ActionIcon,
@@ -342,14 +344,25 @@ export function dragPicture(data: DataTransfer, picture: HTMLImageElement) {
 export function PickerGrid({
   label,
   rows = false,
+  ref,
+  style,
   children,
 }: {
   label: string;
   rows?: boolean;
+  ref?: Ref<HTMLDivElement>;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
-    <div className={classes.grid} data-rows={rows || undefined} role="list" aria-label={label}>
+    <div
+      ref={ref}
+      className={classes.grid}
+      data-rows={rows || undefined}
+      role="list"
+      aria-label={label}
+      style={style}
+    >
       {children}
     </div>
   );
@@ -357,7 +370,8 @@ export function PickerGrid({
 
 /**
  * One choice. A selected tile fades with a check and clicking it again removes it. Dragging
- * shows only the picture, without the tile's border and corners.
+ * shows only the picture, without the tile's border and corners. A `preview`, named by its label,
+ * opens from a corner button or Space.
  */
 export function PickerTile({
   label,
@@ -371,6 +385,7 @@ export function PickerTile({
   detail,
   action,
   drag,
+  preview,
   row = false,
 }: {
   label: string;
@@ -386,6 +401,7 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
+  preview?: { label: string; open: () => void };
   row?: boolean;
 }) {
   const [state, setState] = useState<"loaded" | "failed">();
@@ -411,6 +427,13 @@ export function PickerTile({
         onClick={onToggle}
         draggable={!!drag}
         onDragStart={dragStart}
+        onKeyDown={(event) => {
+          if (event.key !== " " || !preview) return;
+          event.preventDefault();
+          if (!event.repeat) preview.open();
+        }}
+        // Space previews rather than toggling, which a button does as the key comes up.
+        onKeyUp={(event) => preview && event.key === " " && event.preventDefault()}
       >
         <div className={classes.media} style={{ aspectRatio: aspect }}>
           {Placeholder && <Placeholder size={row ? 18 : 22} aria-hidden />}
@@ -445,7 +468,18 @@ export function PickerTile({
           </div>
         )}
       </UnstyledButton>
-      {action && <div className={classes.action}>{action}</div>}
+      {(action || preview) && (
+        <Group className={classes.action} gap={4} wrap="nowrap">
+          {preview && (
+            <Tooltip label={preview.label}>
+              <ActionIcon variant="default" aria-label={preview.label} onClick={preview.open}>
+                <icons.preview size={14} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+          {action}
+        </Group>
+      )}
     </div>
   );
 }

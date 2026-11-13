@@ -167,6 +167,7 @@ export function CardImages({
   const browser = useReferenceBrowser();
   const [chosen, setChosen] = useState<ReferenceTarget | null>(null);
   const [picking, setPicking] = useState(false);
+  const pickerId = useId();
   const target = nextReferenceTarget(images, layout, chosen);
   const assistant = useCardAssistant();
   // Each image's rating, by its asset id, from the last Rate Images.
@@ -294,11 +295,12 @@ export function CardImages({
       )}
       {children}
       <Modal
+        id={pickerId}
         opened={picking}
-        onClose={() => {
+        onClose={closeWhenTop(pickerId, () => {
           setPicking(false);
           setChosen(null);
-        }}
+        })}
         title="Add Images"
         size="xl"
         fullScreen={phone}

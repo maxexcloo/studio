@@ -130,6 +130,13 @@ test("New Character saves a name, description and gallery images from the Refere
   await expect(picker).toBeHidden();
   await expect(editor).toBeVisible();
   await editor.getByRole("button", { name: "Add Images", exact: true }).click();
+  // Preview opens above the popup, and Escape closes only the preview.
+  await picker.getByRole("button", { name: "Preview Portrait of a ranger", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: /^Portrait of a ranger/ });
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(preview).toBeHidden();
+  await expect(picker).toBeVisible();
   await picker
     .getByRole("button", { name: "Add image: Portrait of a ranger", exact: true })
     .click();

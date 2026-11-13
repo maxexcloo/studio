@@ -164,28 +164,36 @@ function useHeldNewWork(items: MediaItem[], host: RefObject<HTMLDivElement | nul
 }
 
 /**
- * The part of the grid within a screen of the viewport, in grid coordinates, in steps so scrolling
- * renders only as tiles come and go. Tiles have known sizes, so nothing is measured.
+ * The part of the grid within a screen of the viewport, or of the `root` it scrolls in, in grid
+ * coordinates, in steps so scrolling renders only as tiles come and go. Tiles have known sizes, so
+ * nothing is measured.
  */
-function useWindowSpan(host: RefObject<HTMLDivElement | null>, height: number) {
+export function useWindowSpan(
+  host: RefObject<HTMLDivElement | null>,
+  height: number,
+  root: HTMLElement | null = null,
+) {
   const [span, setSpan] = useState({ top: 0, bottom: 0 });
   useLayoutEffect(() => {
     const step = 200;
+    const scroller = root || window;
     const update = () => {
       if (!host.current) return;
-      const offset = -host.current.getBoundingClientRect().top;
-      const top = Math.floor((offset - window.innerHeight) / step) * step;
-      const bottom = Math.ceil((offset + 2 * window.innerHeight) / step) * step;
+      const view = root ? root.clientHeight : window.innerHeight;
+      const offset =
+        (root?.getBoundingClientRect().top ?? 0) - host.current.getBoundingClientRect().top;
+      const top = Math.floor((offset - view) / step) * step;
+      const bottom = Math.ceil((offset + 2 * view) / step) * step;
       setSpan((last) => (last.top === top && last.bottom === bottom ? last : { top, bottom }));
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
+    scroller.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update);
     return () => {
-      window.removeEventListener("scroll", update);
+      scroller.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [host, height]);
+  }, [host, height, root]);
   return span;
 }
 
