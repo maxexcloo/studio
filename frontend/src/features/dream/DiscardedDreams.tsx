@@ -20,14 +20,14 @@ import { mediaSource } from "../gallery/mediaSource";
 import { discardedQuery, dreamItemPath, dreamQuery, type DreamItem } from "./queries";
 import classes from "./DreamPage.module.css";
 
-function Thumbnail({ item }: { item: DreamItem }) {
+export function Thumbnail({ item }: { item: DreamItem }) {
   const source = mediaSource(item);
   const [failed, setFailed] = useState(false);
   return failed ? null : (
     <img
       className={classes.thumb}
       src={source.thumbnailUrl || source.url}
-      alt={item.prompt || "Discarded Dream"}
+      alt={item.prompt || "Dream Result"}
       loading="lazy"
       onError={() => setFailed(true)}
     />

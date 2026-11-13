@@ -37,6 +37,7 @@ import {
 } from "./domain/taste.ts";
 import { queuePriority, Store } from "./domain/store.ts";
 import { createCaptioner } from "./domain/captions.ts";
+import { createReview } from "./domain/review.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createTitler } from "./domain/titles.ts";
@@ -589,6 +590,7 @@ const jobAdmitted = (job) => {
   if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
   finishing.admitted(job);
   captioner.interrupt();
+  dreamReview.interrupt();
   imageSearch.interrupt();
   titler.interrupt();
   suggester.interrupt();
@@ -791,10 +793,12 @@ registerSuggestionRoutes(app, {
 });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
 // It only queues work; it never places GPU workloads, and cloud profiles never take part.
+const projects = createProjects({ dataDir });
 const dream = createDream({
   dataDir,
   store,
   taste,
+  projects: (ownerId) => projects.list(ownerId),
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
@@ -897,7 +901,7 @@ const dream = createDream({
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
-registerDreamRoutes(app, { dream, projects: createProjects({ dataDir }) });
+registerDreamRoutes(app, { dream, projects });
 // Dream's idle rule (domain/dream.ts): no live job and no text work. A Dream job waiting for a worker
 // doesn't count, so captions and finishing still run while Dream keeps one ready.
 const studioIdle = () =>
@@ -976,6 +980,18 @@ const captioner = createCaptioner({
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
+// Dream review (domain/review.ts): each project's unseen results scored against its brief.
+const dreamReview = createReview({
+  writer: assistantEngine,
+  idle: galleryIdle,
+  allowed: (ownerId) => Boolean(dream.access(ownerId)),
+  items: () => gallery,
+  visible: hasGalleryMedia,
+  projects: (ownerId) => projects.list(ownerId),
+  explicit: (ownerId) => Boolean(dream.access(ownerId)?.uncensored),
+  image: smallImage,
+  save: (item, review) => updateGalleryJob(galleryKey(item), { review }),
+});
 // Image search (domain/image-search.ts): SigLIP 2 on the CPU, so search finds what images show.
 const imageSearch = createImageSearch({
   // Demo images are placeholders, and demo test runs must not download the model.
@@ -1070,6 +1086,7 @@ generationQueue.start();
 dream.start();
 finishing.start();
 captioner.start();
+dreamReview.start();
 imageSearch.start();
 faceCheck.start();
 titler.start();
