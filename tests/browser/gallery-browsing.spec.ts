@@ -107,6 +107,13 @@ test("Select All takes every match across pages, and the search and Starred stay
   // The rest loaded in one larger page, within the same search and filter.
   const rest = requests.find((query) => query.get("limit") === "500");
   expect([rest?.get("q"), rest?.get("favorites")]).toEqual(["Browse", "1"]);
+  // With everything selected, Select None takes Select All's place.
+  await expect(page.getByRole("button", { name: "Select All", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Select None", exact: true }).click();
+  await expect(status).toHaveText("0 Selected");
+  await expect(page.getByRole("button", { name: "Select None", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  await expect(status).toHaveText("65 Selected");
   const unstar = page.waitForRequest("**/api/gallery/favorite");
   await selectionAction(page, "Unstar").click();
   expect((await unstar).postDataJSON().ids).toHaveLength(65);
@@ -270,6 +277,12 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await touch(selected, "touchend");
   await selected.dispatchEvent("click");
   await expect(selected).toHaveAttribute("aria-pressed", "true");
+  // While selecting, a tap toggles a tile.
+  const other = page.getByRole("button", { name: "Select image: Browse Result 0", exact: true });
+  await other.click();
+  await expect(selection.getByRole("status")).toHaveText("2 Selected");
+  await other.click();
+  await expect(selection.getByRole("status")).toHaveText("1 Selected");
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery[1].favorite).toBe(true);
   expect(state.gallery[0].favorite).not.toBe(true);
@@ -596,6 +609,11 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await expect(status).toHaveText("3 Selected");
   await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
+  // A disabled action says why.
+  await expect(selectionAction(page, "Delete")).toHaveAttribute("aria-disabled", "true");
+  await expect(selectionAction(page, "Delete")).toHaveAccessibleDescription(
+    "Stop work in progress before deleting it.",
+  );
   await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await expect(status).toHaveCount(0);
@@ -615,6 +633,46 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await expect
     .poll(() => state.gallery.map((item) => item.id))
     .toEqual(["live", "browse-0", "browse-1", "browse-2"]);
+});
+
+test("Tiles select as in a file manager: Ctrl toggles, Shift selects a range, Escape ends", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Click modifiers need a keyboard");
+  const state = await fixtures(page);
+  state.gallery.push(...results(6));
+  await page.goto("/images");
+  const tile = (index: number) =>
+    page.getByRole("button", { name: new RegExp(`image: Browse Result ${index}$`) });
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  // Ctrl or Cmd starts selecting from the gallery without opening the tile.
+  await tile(1).click({ modifiers: ["ControlOrMeta"] });
+  await expect(status).toHaveText("1 Selected");
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toHaveCount(0);
+  await expect(tile(1)).toHaveAttribute("aria-pressed", "true");
+  await tile(3).click({ modifiers: ["Shift"] });
+  await expect(status).toHaveText("3 Selected");
+  await tile(5).click({ modifiers: ["ControlOrMeta"] });
+  await expect(status).toHaveText("4 Selected");
+  // Shift alone replaces the selection with the range from the last clicked tile.
+  await tile(4).click({ modifiers: ["Shift"] });
+  await expect(status).toHaveText("2 Selected");
+  await expect(tile(1)).toHaveAttribute("aria-pressed", "false");
+  await tile(0).click({ modifiers: ["ControlOrMeta"] });
+  // Shift with Ctrl or Cmd adds the range.
+  await tile(1).click({ modifiers: ["Shift", "ControlOrMeta"] });
+  await expect(status).toHaveText("4 Selected");
+  // A plain click toggles while selecting.
+  await tile(4).click();
+  await expect(status).toHaveText("3 Selected");
+  await page.keyboard.press("Escape");
+  await expect(status).toHaveCount(0);
+  await tile(2).focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await expect(status).toHaveText("6 Selected");
+  await page.keyboard.press("Escape");
+  await tile(2).click();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 
 test("Offline views report the API error and support retry", async ({ page }) => {
