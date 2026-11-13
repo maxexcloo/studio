@@ -72,7 +72,8 @@ export function ComposerDock() {
     }
   }
   const controlsId = useId();
-  const keyboard = useKeyboard(phone && opened);
+  const sheet = useRef<HTMLElement | null>(null);
+  const keyboard = useKeyboard(phone && opened, sheet);
   // Tapping a text box flips the sheet's typing layout at once, rather than once iOS reports the
   // keyboard after its animation, and holds it while the keyboard animates and iOS scrolls to the
   // text; it ends as the text loses focus or the keyboard drops (Android's Back keeps focus). The
@@ -335,6 +336,9 @@ export function ComposerDock() {
           {/* Initial focus lands here rather than on Close or the prompt, so the keyboard waits for a tap. */}
           <FocusTrap.InitialFocus />
           <div
+            ref={(panel) => {
+              sheet.current = panel?.closest<HTMLElement>(".mantine-Drawer-content") ?? null;
+            }}
             className={classes.panel}
             data-generate-drawer
             data-typing={typing || undefined}
