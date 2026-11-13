@@ -320,10 +320,10 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
     height: 1024,
     createdAt: stamp,
   }));
-  let failures = 0;
+  let recovered = false;
   await page.route("**/api/gallery?**", async (route) => {
     const start = Number(new URL(route.request().url()).searchParams.get("cursor") || 0);
-    if (start === 120 && !failures++)
+    if (start === 120 && !recovered)
       return route.fulfill({ status: 503, json: { error: "Fixture next page is offline" } });
     const end = start + 60;
     await route.fulfill({
@@ -347,8 +347,10 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   const retry = picker.getByRole("button", { name: "Retry", exact: true });
   await expect(async () => {
     await toEnd();
-    await expect(retry).toBeVisible({ timeout: 1000 });
+    // The query retries a failed page itself before it gives up.
+    await expect(retry).toBeVisible({ timeout: 10000 });
   }).toPass();
+  recovered = true;
   await retry.click();
   await expect(async () => {
     await toEnd();
