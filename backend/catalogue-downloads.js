@@ -651,7 +651,7 @@ export const modelDownloads = {
     {
       file: "flux-2-klein-4b-fp8.safetensors",
       fp8: true,
-      label: "Flux.2 Klein 4B",
+      label: "FLUX.2 [klein] 4B",
       url: hf("black-forest-labs/FLUX.2-klein-4b-fp8", "flux-2-klein-4b-fp8.safetensors"),
       bytes: 4_070_624_520,
       sha256: "97ed34fe0567e436200f2faee3939b88f2b5d99f8af2a4dc16532c4245c0ccb6",
@@ -660,7 +660,7 @@ export const modelDownloads = {
   flux2_klein_4b: [
     {
       file: "flux-2-klein-4b.safetensors",
-      label: "Flux.2 Klein 4B",
+      label: "FLUX.2 [klein] 4B",
       url: hf(
         "Comfy-Org/vae-text-encorder-for-flux-klein-4b",
         "split_files/diffusion_models/flux-2-klein-4b.safetensors",
@@ -687,7 +687,7 @@ export const modelDownloads = {
     {
       file: "flux2_dev_fp8mixed.safetensors",
       fp8: true,
-      label: "Flux.2 Dev",
+      label: "FLUX.2 [dev]",
       url: hf("Comfy-Org/flux2-dev", "split_files/diffusion_models/flux2_dev_fp8mixed.safetensors"),
       bytes: 35_455_599_592,
       sha256: "863a82e4ff950a42a6b0e80bea824828f129eb1a8fbbdbd9e8cb29859127b486",
