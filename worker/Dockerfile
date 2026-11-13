@@ -47,7 +47,8 @@ RUN test -x /opt/radiance/runtime/ld-linux-x86-64.so.2 \
     && test -x /opt/radiance/bin/radiance \
     && test -s /opt/studio/LICENSE \
     && test -s /opt/studio/NOTICE
-# Avoid a ROCm profiler-registration thread spinning while GPU contexts are idle.
+# Stops a ROCm profiler-registration thread spinning a CPU core while GPU contexts are idle; set
+# it to 0 when profiling with ROCm tools.
 ENV HSA_TOOLS_DISABLE_REGISTER=1
 WORKDIR /root/ComfyUI
 EXPOSE 8188
