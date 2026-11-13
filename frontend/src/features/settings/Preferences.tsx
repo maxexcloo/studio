@@ -257,7 +257,22 @@ export function Preferences() {
   const loaded = useQuery(preferencesQuery).isSuccess;
   return (
     <Stack gap="lg">
+      {/* Settings run A–Z, then Export. */}
       <SettingGroup title="Gallery">
+        <FinishStarredImages />
+        <SettingRow
+          label="Tile Captions"
+          description="Show each tile’s title and details on phones. Desktop shows them on hover."
+        >
+          <Switch
+            key={loaded ? "loaded" : "loading"}
+            aria-label="Tile Captions"
+            checked={tileCaptions}
+            disabled={!loaded}
+            onChange={(event) => setTileCaptions(event.currentTarget.checked)}
+          />
+        </SettingRow>
+        <GalleryWork />
         <SettingRow
           label="Export Gallery"
           description="Download every finished image and video as one ZIP."
@@ -272,20 +287,6 @@ export function Preferences() {
           >
             Export
           </Button>
-        </SettingRow>
-        <FinishStarredImages />
-        <GalleryWork />
-        <SettingRow
-          label="Tile Captions"
-          description="Show each tile’s title and details on phones. Desktop shows them on hover."
-        >
-          <Switch
-            key={loaded ? "loaded" : "loading"}
-            aria-label="Tile Captions"
-            checked={tileCaptions}
-            disabled={!loaded}
-            onChange={(event) => setTileCaptions(event.currentTarget.checked)}
-          />
         </SettingRow>
       </SettingGroup>
       <ModelChoices />

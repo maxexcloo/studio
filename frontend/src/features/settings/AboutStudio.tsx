@@ -154,14 +154,14 @@ export function AboutStudio() {
             </Text>
           )}
         </SettingRow>
-        <SettingRow label="Releases" description="What changed in each release.">
-          {link(`${repository}/releases`, "Releases")}
-        </SettingRow>
         <SettingRow
           label="Licence"
           description="AGPL-3.0, keeping the HEISS UI, J-AI Studio and MantineHub MIT notices."
         >
           {link(`${repository}/blob/main/LICENSE`, "Licence")}
+        </SettingRow>
+        <SettingRow label="Releases" description="What changed in each release.">
+          {link(`${repository}/releases`, "Releases")}
         </SettingRow>
         <SettingRow label="Source" description="Studio’s code on GitHub.">
           {link(repository, "GitHub")}
