@@ -159,6 +159,7 @@ import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { listCards, registerCardRoutes } from "./cards.js";
+import { createCharacterSheets } from "./character-sheets.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerGalleryImportRoute } from "./gallery/import.js";
@@ -199,6 +200,7 @@ import {
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
+import { characterImageIds } from "../shared/characters.ts";
 import { isCloudProfile } from "../shared/profiles.ts";
 
 let drainServer = async () => {};
@@ -644,6 +646,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkl
       void titler.completed(items);
       void imageSearch.completed(items);
       void faceCheck.completed(items);
+      void characterSheets.completed(items);
     },
     directCloud,
     generationRoutes,
@@ -674,6 +677,12 @@ const admitGeneration = createGenerationAdmission({
   },
   admitted: jobAdmitted,
 });
+// Make Sheet (character-sheets.js): a character's design sheet, cut into its views once made.
+const characterSheets = createCharacterSheets({
+  admit: admitGeneration,
+  profiles: (account) => assistant.profiles({ studioAccount: account }),
+});
+characterSheets.register(app);
 app.post("/api/generate", async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
@@ -994,7 +1003,11 @@ const faceCheck = createFaceCheck({
   idle: galleryIdle,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
-  characters: (ownerId) => listCards("characters", ownerId),
+  characters: (ownerId) =>
+    listCards("characters", ownerId).map((card) => ({
+      id: card.id,
+      referenceIds: characterImageIds(card),
+    })),
   image: galleryStill,
   reference: (ownerId, assetId) =>
     bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId),

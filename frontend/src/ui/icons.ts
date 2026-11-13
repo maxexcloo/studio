@@ -18,6 +18,7 @@ import {
   ImageUp,
   ImageUpscale,
   Info,
+  LayoutDashboard,
   Layers,
   Lightbulb,
   ListFilter,
@@ -113,6 +114,8 @@ export const icons = {
   scene: MapPinned,
   settings: Settings,
   share: Share,
+  /** A character's design sheet (Make Sheet). */
+  sheet: LayoutDashboard,
   /** Revealing a hidden secret, such as the MCP token. */
   show: Eye,
   /** Similar: the gallery ranked by likeness to an image. */

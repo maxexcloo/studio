@@ -49,7 +49,7 @@ const ordinaryRoutes = [
   // Character, outfit and scene cards are the requester's own, behind the Characters feature (cards.js).
   ["GET", /^\/api\/(characters|outfits|scenes)$/],
   ["POST", /^\/api\/(characters|outfits|scenes)$/],
-  ["POST", /^\/api\/characters\/[\w-]+\/generated$/],
+  ["POST", /^\/api\/characters\/[\w-]+\/(generated|sheet)$/],
   ["PUT", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.

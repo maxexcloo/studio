@@ -28,7 +28,9 @@ test("results made with a character are scored against its image, and drift or a
     shot("other", ["mara-front", "a-hat"]),
     shot("twice", ["mara-front"]),
     shot("back-view", ["mara-front"]),
-    // Not the card's first image, no references, or another account: not a character result.
+    // A sheet view counts too; another of the card's images, no references, or another account
+    // are not a character result.
+    shot("side-view", ["mara-side-view"]),
     shot("side-only", ["mara-side"]),
     shot("plain", []),
     shot("theirs", ["mara-front"], "someone"),
@@ -53,7 +55,9 @@ test("results made with a character are scored against its image, and drift or a
     items: () => items,
     visible: () => true,
     characters: (ownerId) =>
-      ownerId === "artist" ? [{ id: "chr-mara", referenceIds: ["mara-front", "mara-side"] }] : [],
+      ownerId === "artist"
+        ? [{ id: "chr-mara", referenceIds: ["mara-front", "mara-side-view"] }]
+        : [],
     image: async (item) => new TextEncoder().encode(item.id),
     reference: async (_ownerId, assetId) => new TextEncoder().encode(assetId),
     save: (item, identity) => {
@@ -84,6 +88,7 @@ test("results made with a character are scored against its image, and drift or a
       ],
       twice: ["chr-mara", Math.round(Math.cos(0.3) * 1000) / 1000, 2, true],
       "back-view": ["chr-mara", null, 0, false],
+      "side-view": ["chr-mara", null, 0, false],
     },
   );
 });

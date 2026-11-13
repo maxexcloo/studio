@@ -80,6 +80,7 @@ export const reasoningEfforts = {
   negative: null,
   profile: "none",
   rewrite: null,
+  sheet: null,
   suggestions: "none",
   taste: "none",
   title: "none",

@@ -289,6 +289,37 @@ test("Generate References queues one view per shot on a shared seed with the car
   ]);
 });
 
+test("Make Sheet follows the card's sheet until its views show on the card", async ({ page }) => {
+  const state = await fixtures(page);
+  state.characters.push(structuredClone(mara));
+  await page.goto("/library#characters");
+  const card = page
+    .getByRole("list", { name: "Characters", exact: true })
+    .getByRole("listitem", { name: "Mara", exact: true });
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Make Sheet", exact: true }).click();
+  await expect(card).toContainText("2 images · Making Sheet");
+  expect(state.characters[0].sheet.jobId).toBe("sheet-job");
+  // A sheet in the making can't be made again.
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Make Sheet", exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  state.characters[0].sheet = {
+    ...state.characters[0].sheet,
+    status: "done",
+    panels: ["face", "front", "side", "back", "gear", "sheet"].map((role) => ({
+      ...mara.references[0],
+      id: `asset-${role}`,
+      role,
+    })),
+  };
+  await page.reload();
+  await expect(card).toContainText("2 images · Sheet");
+  const views = card.getByRole("group", { name: "Mara's Sheet", exact: true });
+  for (const role of ["face", "front", "side", "back", "gear"])
+    await expect(views.getByRole("img", { name: `Mara ${role}`, exact: true })).toBeVisible();
+});
+
 test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
   page,
 }) => {
