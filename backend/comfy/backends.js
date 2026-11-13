@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { logWarning } from "../crash-log.js";
 import { families } from "../family-catalogue.js";
 import {
   capabilityForProfile,
@@ -44,10 +45,24 @@ const reachable = new Map();
 const retryUnreachableMs = 60_000;
 const inventories = new Map();
 const offlineListeners = new Set();
-/** `at` is when it answered or failed to (tests give a time). */
-export const noteWorkerReachable = (id, up, at = Date.now()) => {
+/**
+ * `error` says why it failed to answer and `at` when it answered or failed to (tests give a time).
+ * Only changes are logged, so a worker can be told apart from Studio going down.
+ */
+export const noteWorkerReachable = (id, up, error, at = Date.now()) => {
   if (!id) return;
-  reachable.set(id, { up: Boolean(up), at });
+  const last = reachable.get(id);
+  if (!up && last?.up !== false)
+    logWarning("Worker stopped answering", {
+      worker: id,
+      reason: error?.cause?.code || error?.code || error?.message || String(error ?? ""),
+    });
+  else if (up && last?.up === false)
+    logWarning("Worker answering again", {
+      worker: id,
+      downForS: Math.round((at - last.since) / 1000),
+    });
+  reachable.set(id, { up: Boolean(up), at, since: up || last?.up !== false ? at : last.since });
   if (!up) for (const listener of offlineListeners) listener(id);
 };
 /** Hears the id of each worker found offline. */

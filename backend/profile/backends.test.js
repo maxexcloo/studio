@@ -238,7 +238,7 @@ test("readiness follows the selected backend, with the reason, and never falls b
     // A worker that just failed to answer is passed over, and tried again a minute later.
     noteWorkerReachable("primary", false);
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
-    noteWorkerReachable("primary", false, Date.now() - 61_000);
+    noteWorkerReachable("primary", false, undefined, Date.now() - 61_000);
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "primary");
     noteWorkerProfiles("primary", []);
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");

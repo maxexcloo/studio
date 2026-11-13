@@ -2,13 +2,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   backendUrl,
   currentComfyBackend,
-  isDefaultBackend,
   noteWorkerReachable,
   workerReachable,
 } from "./backends.js";
 import { defaultWorker, onWorkersChanged } from "../workers.js";
 import { listensBeyondThisComputer } from "../client-trust.js";
-import { noteComfyState } from "../crash-log.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mediaFile, mediaType } from "../media-paths.js";
@@ -56,7 +54,6 @@ export const demoMode = process.env.STUDIO_DEMO === "1";
 
 export function noteComfyReachable() {
   noteWorkerReachable(currentComfyBackend(), true);
-  if (isDefaultBackend()) noteComfyState(true);
 }
 
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
@@ -68,8 +65,8 @@ export function isComfyTimeout(error) {
  * one reads as busy: a busy ComfyUI takes the connection and answers late while its runs carry on.
  */
 export function noteComfyFetchError(error) {
-  if (error?.name === "AbortError") return;
-  if (!isComfyTimeout(error)) noteComfyState(false, error);
+  if (!isComfyTimeout(error) && !error?.noWorker)
+    noteWorkerReachable(currentComfyBackend(), false, error);
 }
 
 /**
@@ -118,15 +115,13 @@ export async function comfy(pathname, options = {}) {
       response = await fetch(`${activeComfyUrl()}${pathname}`, init);
     }
   } catch (error) {
-    // A busy worker that is slow to answer still counts as there; only a refusal marks it offline for routing.
-    if (!isComfyTimeout(error) && !error?.noWorker)
-      noteWorkerReachable(currentComfyBackend(), false);
-    if (isDefaultBackend()) noteComfyFetchError(error);
+    noteComfyFetchError(error);
     throw error;
   }
-  noteComfyReachable();
   // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
-  if ([502, 503, 504].includes(response.status)) noteWorkerReachable(currentComfyBackend(), false);
+  if ([502, 503, 504].includes(response.status))
+    noteWorkerReachable(currentComfyBackend(), false, new Error(`HTTP ${response.status}`));
+  else noteComfyReachable();
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;
