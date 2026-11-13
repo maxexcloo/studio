@@ -9,8 +9,8 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { comfyUrl } from "../comfy/comfy.js";
 // Every catalogue request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
-import { hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
-import { civitaiFetch } from "../civitai/access.js";
+import { hfAccessNote, hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
+import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
 
 /**
  * Streams catalogue files and verified provider files into the worker's model
@@ -359,7 +359,7 @@ async function fetchIntoWorker(entry, signal) {
   if (response.status === 200) offset = 0;
   if (!response.ok || !response.body || (offset && response.status !== 206)) {
     await response.body?.cancel().catch(() => {});
-    const error = new Error(`The model provider answered HTTP ${response.status}.`);
+    const error = new Error(refusal(entry.url, response.status));
     error.status = response.status;
     error.final = [401, 403, 404, 410].includes(response.status);
     throw error;
@@ -405,6 +405,19 @@ async function fetchIntoWorker(entry, signal) {
   });
   entry.receivedBytes = result.size;
   entry.totalBytes = result.size;
+}
+
+/** What a provider's refusal asks of the administrator, rather than a bare status. */
+function refusal(url, status) {
+  const hub = hubFile(url);
+  if (hub && [401, 403].includes(status)) return hfAccessNote(hub.repo);
+  if (new URL(url).hostname === "civitai.com" && [401, 403].includes(status))
+    return !civitaiTokenStatus().set
+      ? "Civitai needs a token for this download: add CIVITAI_API_TOKEN to the deployment."
+      : status === 401
+        ? "Civitai rejected the deployment’s token: replace CIVITAI_API_TOKEN."
+        : "Civitai refused this download: the version may be in early access or paid. Check it on Civitai.";
+  return `The model provider answered HTTP ${status}.`;
 }
 
 /** The repo, revision and path of a pinned huggingface.co/<owner>/<repo>/resolve/<revision>/<path> address. */

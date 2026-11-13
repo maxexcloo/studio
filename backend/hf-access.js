@@ -27,6 +27,14 @@ function hfToken(env = process.env) {
   return { token: "", source: "", key: "" };
 }
 
+/** What a refusal from a Hugging Face repository asks of the administrator. */
+export function hfAccessNote(repo, env = process.env) {
+  const page = `https://huggingface.co/${repo}`;
+  return hfToken(env).token
+    ? `Hugging Face needs access to this gated repository: accept its terms at ${page} with the account the deployment's token belongs to.`
+    : `Hugging Face needs a token for this repository: add HF_TOKEN to the deployment and accept its terms at ${page}.`;
+}
+
 /** The credential for the worker's own Hugging Face download, or "". */
 export function hfTokenValue(env = process.env) {
   return hfToken(env).token;

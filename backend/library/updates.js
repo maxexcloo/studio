@@ -23,31 +23,57 @@ import { civitaiAvailability } from "./availability.js";
 import { splitCatalogueKey } from "./catalogue.js";
 import { limitedBody } from "../civitai/access.js";
 import { shareFamily } from "./offers.js";
+import { hfAccessNote } from "../hf-access.js";
 
 export const dailyMs = 24 * 60 * 60 * 1000;
 const checkLimit = 300;
 const iso = (at) => new Date(at).toISOString();
 
-/** The newest same-family Civitai version above the installed one, from the model's versions. */
+// Precision and format words in version names: creators often publish "V6 BF16" and "V6 INT8"
+// as separate versions of one release.
+const variantWord =
+  /^(bf16|fp16|fp32|fp8|e4m3fn|e5m2|fp8e4m3fn|fp8e5m2|int8|int4|nf4|nvfp4|mxfp4|fp4|gguf|safetensors?|pruned|full|q\d+(k)?(s|m|l|\d)?)$/;
+const releaseOf = (version) =>
+  String(version.name || "")
+    .toLowerCase()
+    .split(/[^a-z0-9.]+/)
+    .filter((word) => word && !variantWord.test(word.replaceAll("_", "")))
+    .join(" ");
+const precisionOf = (file) => String(file.metadata?.fp || "").toLowerCase();
+const variantOf = (file) => `${precisionOf(file)}|${path.extname(file.name).toLowerCase()}`;
+const publishedAt = (version) => Date.parse(version.publishedAt || version.createdAt || "");
+
+/**
+ * The newest same-family Civitai release above the installed one, in the installed file's precision
+ * and format. Versions of the installed release (another precision of it) are variants, not updates.
+ */
 export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.now() } = {}) {
   const versions = Array.isArray(model?.modelVersions) ? model.modelVersions : [];
   const at = versions.findIndex((item) => item.id === entry.source?.versionId);
   if (at < 0)
     return { state: "error", note: "The installed version is no longer listed on Civitai." };
-  const families = familiesOf(entry.baseModel || versions[at].baseModel || "");
+  const installed = versions[at];
+  const families = familiesOf(entry.baseModel || installed.baseModel || "");
   const shell = { name: model.name, type: model.type, mode: model.mode, nsfw: model.nsfw };
-  const newer = versions
-    .slice(0, at)
-    .filter(
-      (item) =>
-        shareFamily(families, familiesOf(item.baseModel || "")) &&
-        (families.length || !item.baseModel || item.baseModel === versions[at].baseModel),
-    );
-  const describe = (version) => {
+  const filesOf = (version) => civitaiModelFiles({ ...version, model: shell });
+  const installedFiles = filesOf(installed);
+  const mine =
+    installedFiles.find((file) => file.hashes?.SHA256?.toLowerCase() === entry.sha256) ||
+    installedFiles.find((file) => file.primary) ||
+    installedFiles[0];
+  const variant = mine && precisionOf(mine) ? variantOf(mine) : "";
+  const release = releaseOf(installed);
+  const newer = versions.filter(
+    (item, index) =>
+      releaseOf(item) !== release &&
+      (publishedAt(item) && publishedAt(installed)
+        ? publishedAt(item) > publishedAt(installed)
+        : index < at) &&
+      shareFamily(families, familiesOf(item.baseModel || "")) &&
+      (families.length || !item.baseModel || item.baseModel === installed.baseModel),
+  );
+  const describe = (version, file) => {
     const full = { ...version, modelId: model.id, model: shell };
-    const files = civitaiModelFiles(full);
-    const file = files.find((item) => item.primary) || files[0];
-    if (!file) return null;
     const access = civitaiAvailability(full, file, { now });
     const spec = civitaiFileSpec(full, file, { now });
     return {
@@ -69,9 +95,47 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
           }),
     };
   };
-  const candidates = newer.map(describe).filter(Boolean);
-  if (!candidates.length) return { state: "current", note: "" };
-  const [latest] = candidates;
+  const matching = (version) => {
+    const files = filesOf(version);
+    return variant
+      ? files.find((file) => variantOf(file) === variant)
+      : files.find((file) => file.primary) || files[0];
+  };
+  const newest = newer.find((version) => filesOf(version).length);
+  if (!newest) return { state: "current", note: "" };
+  const offers = newer
+    .map((version) => ({ version, file: matching(version) }))
+    .filter((offer) => offer.file);
+  const candidates = offers.map((offer) => describe(offer.version, offer.file));
+  const latest =
+    candidates[offers.findIndex((offer) => releaseOf(offer.version) === releaseOf(newest))];
+  const installedName = installed.name || "the installed version";
+  if (!latest) {
+    const precisions =
+      [
+        ...new Set(
+          newer
+            .filter((version) => releaseOf(version) === releaseOf(newest))
+            .flatMap((version) => filesOf(version).map(precisionOf))
+            .filter(Boolean),
+        ),
+      ]
+        .join(", ")
+        .toUpperCase() || "other precisions";
+    const own = precisionOf(mine).toUpperCase();
+    const free = candidates.find((item) => item.spec);
+    const primary = filesOf(newest).find((file) => file.primary) || filesOf(newest)[0];
+    return {
+      state: "available",
+      latest: {
+        ...describe(newest, primary),
+        spec: undefined,
+        unavailable: { reason: "precision", note: `${newest.name} comes only in ${precisions}.` },
+      },
+      ...(free ? { freeAlternative: free } : {}),
+      note: `${newest.name} is newer than ${installedName} but comes only in ${precisions}${free ? `; ${free.name} is in ${own}` : ""}.`,
+    };
+  }
   const free = latest.unavailable ? candidates.find((item) => item.spec) : null;
   return {
     state: "available",
@@ -79,7 +143,7 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
     ...(free ? { freeAlternative: free } : {}),
     note: latest.unavailable
       ? `${latest.name} ${latest.unavailable.reason === "paid" ? "is paid" : latest.unavailable.reason === "early-access" ? "is in early access" : "can’t be downloaded"}${free ? `; ${free.name} is free` : ""}.`
-      : `${latest.name} is newer than ${versions[at].name || "the installed version"}.`,
+      : `${latest.name} is newer than ${installedName}.`,
   };
 }
 
@@ -224,13 +288,14 @@ export function createUpdateChecker({
       for (const [key, entry] of entries) {
         // An update on its way, or done with the old file kept for what still uses it, isn't offered again.
         if (["downloading", "kept"].includes(current.applied[key]?.state)) continue;
+        // A new check replaces a failed update's outcome.
+        if (current.applied[key]?.state === "failed") delete current.applied[key];
         try {
           const result = await latestFor(key, entry);
           if (result) current.byEntry[key] = { ...result, checkedAt: iso(now()) };
         } catch (error) {
           current.byEntry[key] = {
-            ...(current.byEntry[key] || {}),
-            state: current.byEntry[key]?.state === "available" ? "available" : "error",
+            state: "error",
             note: `The check failed: ${error.message}`,
             checkedAt: iso(now()),
           };
@@ -484,7 +549,11 @@ export async function hfRepositoryMetadata(repo, { request }) {
   );
   if (!response.ok) {
     await response.body?.cancel();
-    throw new Error(`Hugging Face answered HTTP ${response.status}`);
+    throw new Error(
+      [401, 403].includes(response.status)
+        ? hfAccessNote(repo)
+        : `Hugging Face answered HTTP ${response.status}.`,
+    );
   }
   return JSON.parse((await limitedBody(response, 8 * 1024 * 1024)).toString());
 }
