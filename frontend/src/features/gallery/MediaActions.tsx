@@ -10,10 +10,8 @@ import {
   ListChecks,
   MessagesSquare,
   Loader,
-  PenLine,
   Repeat,
   Rewind,
-  ScanText,
   Scissors,
   Shuffle,
   Snail,
@@ -87,7 +85,7 @@ const themeIcons: Record<AnimateTheme, typeof Camera> = {
   action: Zap,
   dialogue: MessagesSquare,
   spicy: Flame,
-  custom: PenLine,
+  custom: icons.custom,
 };
 
 /** A failed item's Retry; the new pending tile replaces it (`onRetried` gets the new job). */
@@ -393,7 +391,7 @@ export function useMediaActions(
         {
           id: "animate-review",
           label: "Review Prompt",
-          icon: ScanText,
+          icon: icons.review,
           checked: review,
           keepOpen: true,
           onClick: () => setReview(!review),
