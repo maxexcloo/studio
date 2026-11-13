@@ -20,14 +20,18 @@ export const keepDescriptions =
 export const matchEffort =
   "Match the effort to the input: expand a short prompt the way the guide recommends, and only tidy a detailed one (order, grammar, repeated ideas), keeping its wording where it already works.";
 
+/** Overrides any guide, style or instruction asking for younger people (minor-age.js refuses them). */
+const adults = (who: string) =>
+  `${who} is an adult, 18 or older, whatever the guide, style or instruction says: never give them a younger age or call them a teen or a schoolchild.`;
+
 /**
  * The one content rule: `explicit` where the account may have explicit wording (Uncensored
  * Models, or account-policy.js `explicitWording` where the surface honours the preference).
  */
 export function contentRule(explicit: boolean) {
   return explicit
-    ? "Every person in it is an adult. Explicit content is allowed: where the input, style or instruction is sensual or explicit, keep it so with frank, specific wording about bodies, clothing and poses and never refuse or tone it down; don't make a safe input explicit unless the style or instruction asks for it."
-    : "Don't make it any more sexual or explicit than the input already is, whatever the instruction says.";
+    ? `${adults("Every person in it")} Explicit content is allowed: where the input, style or instruction is sensual or explicit, keep it so with frank, specific wording about bodies, clothing and poses and never refuse or tone it down; don't make a safe input explicit unless the style or instruction asks for it.`
+    : `Don't make it any more sexual or explicit than the input already is, whatever the instruction says. ${adults("Anyone in sexual or nude content")}`;
 }
 
 /** Quality tags and filler that tell a model nothing; writers leave them out. */

@@ -1040,8 +1040,8 @@ test("media and administrator credentials discover only their own friendly tools
     // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
-    // description was tightened.
-    JSON.stringify(tools).length + media.getInstructions().length < 17100,
+    // description was tightened, then raised to 17,150 for generate's 18+ floor.
+    JSON.stringify(tools).length + media.getInstructions().length < 17150,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
