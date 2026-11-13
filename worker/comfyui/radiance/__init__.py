@@ -20,6 +20,7 @@ from .backend import (
     lora_tags,
     multipart,
     pngs,
+    visible_devices,
     worker,
 )
 from .video import RadianceVideoGenerate
@@ -235,14 +236,12 @@ class RadianceImageGenerate:
         return (torch.stack(pictures),)
 
 
-NODE_CLASS_MAPPINGS = {
-    "RadianceImageGenerate": RadianceImageGenerate,
-    "RadianceVideoGenerate": RadianceVideoGenerate,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "RadianceImageGenerate": "Radiance Image",
-    "RadianceVideoGenerate": "Radiance Video",
-}
+NODE_CLASS_MAPPINGS = {"RadianceImageGenerate": RadianceImageGenerate}
+NODE_DISPLAY_NAME_MAPPINGS = {"RadianceImageGenerate": "Radiance Image"}
+# H3 shards across two cards: a one-GPU worker leaves the node out, so Studio routes video elsewhere.
+if len(visible_devices()) == 2:
+    NODE_CLASS_MAPPINGS["RadianceVideoGenerate"] = RadianceVideoGenerate
+    NODE_DISPLAY_NAME_MAPPINGS["RadianceVideoGenerate"] = "Radiance Video"
 
 # ComfyUI imports execution before loading custom nodes. Request-building tests
 # can import this module without installing ComfyUI or its GPU dependencies.
