@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { animateProfile } from "./animate-profile.js";
+import { animateProfile, startFrameSize } from "./animate-profile.js";
 
 const slot = (label) => [{ id: "reference", kind: "image", label }];
 const video = (id, label, extra = {}) => ({
@@ -111,4 +111,28 @@ test("Animate refuses clearly when neither local video nor Grok is available", (
     () => choose({ localRunning: true }, [profiles[0]]),
     /No video profile that takes a starting image/,
   );
+});
+
+test("A video framed by its start frame draws at the frame's proportions unless the frame only guides", () => {
+  const framed = video("fl-fast", "H3 FL · Fast", {
+    aspectPolicy: "reference",
+    mediaInputs: [
+      { id: "reference", kind: "image", role: "start" },
+      { id: "end", kind: "image", role: "end" },
+    ],
+  });
+  const run = (extra) => ({
+    kind: "video",
+    width: 1344,
+    height: 768,
+    referenceAssets: [{ slot: "reference", width: 683, height: 1024 }],
+    ...extra,
+  });
+  assert.deepEqual(startFrameSize(framed, run()), { width: 832, height: 1248 });
+  assert.equal(startFrameSize(framed, run({ referenceRole: "reference" })), null);
+  assert.equal(
+    startFrameSize(framed, run({ referenceAssets: [{ slot: "end", width: 683, height: 1024 }] })),
+    null,
+  );
+  assert.equal(startFrameSize({ ...framed, aspectPolicy: "manual" }, run()), null);
 });
