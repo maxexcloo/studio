@@ -174,15 +174,13 @@ test("A run from an item records it as its source, only when the item is the own
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
-  const run = (parentItemId: string) =>
-    fetch(
-      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${session.id}/generations`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: "Again", parentItemId }),
-      },
-    );
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+  const run = (parentItemId: string, input: Record<string, unknown> = { prompt: "Again" }) =>
+    fetch(`${base}/sessions/${session.id}/generations`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...input, parentItemId }),
+    });
   try {
     // Made outside the item's session, so with no parent run: the item alone is its source.
     const response = await run("/media/alice.png");
@@ -192,6 +190,14 @@ test("A run from an item records it as its source, only when the item is the own
     assert.equal(store.job("alice", jobId)?.parentJobId, undefined);
     assert.equal((await run("/media/bob.png")).status, 400);
     assert.equal(store.jobs("alice").length, 1);
+    // The viewer reruns with the recorded input and a new prompt: that queues a new run.
+    const { job } = (await (await fetch(`${base}/queue/${jobId}`)).json()) as {
+      job: { input: Record<string, unknown> };
+    };
+    const rerun = await run("/media/alice.png", { ...job.input, prompt: "Warm low sunlight" });
+    const { jobId: rerunId } = (await rerun.json()) as { jobId: string };
+    assert.notEqual(rerunId, jobId);
+    assert.equal(store.job("alice", rerunId)?.input.prompt, "Warm low sunlight");
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

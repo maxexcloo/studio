@@ -627,7 +627,9 @@ export function publicJob({
   priority,
   dream: _dream,
   faceRedo: _faceRedo,
+  input: { clientJobId: _clientJobId, ...input },
   ...job
 }: OwnedJob): QueueJob {
-  return priority === queuePriority.dream ? { ...job, dream: true } : job;
+  // Its idempotency key would make a run reusing this input return this job instead of queuing.
+  return { ...job, input, ...(priority === queuePriority.dream ? { dream: true } : {}) };
 }
