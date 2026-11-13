@@ -2,7 +2,6 @@
 data/
 dist/
 node_modules/
-/playwright-report/
 # Internal docs, design notes and anything else not meant for the public repo.
 /private/
 /test-results/
