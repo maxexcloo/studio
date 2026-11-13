@@ -115,7 +115,7 @@ export function buildProfile({
       },
     ]),
   );
-  return {
+  const profile = {
     id,
     kind,
     label,
@@ -171,8 +171,6 @@ export function buildProfile({
     ...(editReferences === true ? { editReferences: true } : {}),
     // Characters go to it first: it keeps a face across new scenes (family catalogue).
     ...(editReferences === true && keepsCharacters === true ? { keepsCharacters: true } : {}),
-    // How many LoRAs the workflow's loader accepts (rgthree stacks take 4).
-    maxLoras: Math.max(1, Math.min(8, Number(maxLoras) || 8)),
     capabilities: {
       prompt: true,
       negativePrompt: kind === "image",
@@ -194,6 +192,10 @@ export function buildProfile({
       ...imageModes.generate?.capabilities,
     },
   };
+  // How many LoRAs the workflow's loader accepts (rgthree stacks take 4).
+  if (profile.capabilities.lora !== false)
+    profile.maxLoras = Math.max(1, Math.min(8, Number(maxLoras) || 8));
+  return profile;
 }
 
 /**
