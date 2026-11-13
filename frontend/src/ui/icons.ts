@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Layers,
   Lightbulb,
+  Maximize2,
   ListFilter,
   ListX,
   MapPinned,
@@ -102,6 +103,8 @@ export const icons = {
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
+  /** Seeing a choice full screen before choosing it. */
+  preview: Maximize2,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
   /** Running an item again from its prompt with new seeds (Dream's Variations). */

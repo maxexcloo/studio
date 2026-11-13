@@ -303,3 +303,77 @@ test("On touch screens, Paste reads a copied photo from the clipboard into the n
   ).toBeVisible();
   expect(state.gallery.find((item) => item.id === "upload")?.uploaded).toBe(true);
 });
+
+test("The reference grid pages and virtualises as it scrolls, and a tile previews above it", async ({
+  page,
+}) => {
+  await setup(page);
+  const items = Array.from({ length: 150 }, (_, index) => ({
+    id: `result-${index}`,
+    jobId: `job-${index}`,
+    type: "image",
+    status: "done",
+    prompt: `Result ${index}`,
+    url: image,
+    thumbnailUrl: image,
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  }));
+  let failures = 0;
+  await page.route("**/api/gallery?**", async (route) => {
+    const start = Number(new URL(route.request().url()).searchParams.get("cursor") || 0);
+    if (start === 120 && !failures++)
+      return route.fulfill({ status: 503, json: { error: "Fixture next page is offline" } });
+    const end = start + 60;
+    await route.fulfill({
+      json: {
+        items: items.slice(start, end),
+        nextCursor: String(end),
+        hasMore: end < items.length,
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  const grid = picker.getByRole("list", { name: "References Choices", exact: true });
+  await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toBeVisible();
+  const toEnd = () =>
+    grid.evaluate((element) => {
+      const viewport = element.closest<HTMLElement>(".mantine-ScrollArea-viewport")!;
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+  // Scrolling to the end loads the next page, until one fails and offers Retry.
+  const retry = picker.getByRole("button", { name: "Retry", exact: true });
+  await expect(async () => {
+    await toEnd();
+    await expect(retry).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await retry.click();
+  await expect(async () => {
+    await toEnd();
+    await expect(grid.getByRole("button", { name: "Use reference: Result 149" })).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass();
+  // Only the tiles near the view render.
+  await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toHaveCount(0);
+  expect(await grid.getByRole("listitem").count()).toBeLessThan(150);
+  // Choosing stays a tap; Preview, or Space on a tile, opens the image above the picker.
+  const tile = grid.getByRole("button", { name: "Use reference: Result 148", exact: true });
+  await tile.click();
+  const chosen = grid.getByRole("button", { name: "Remove reference: Result 148", exact: true });
+  await expect(chosen).toHaveAttribute("aria-pressed", "true");
+  await grid.getByRole("button", { name: "Preview Result 147", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: /^Result 147/ });
+  await expect(preview).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(preview).toBeHidden();
+  await expect(picker).toBeVisible();
+  await chosen.focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("dialog", { name: /^Result 148/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeVisible();
+  await expect(chosen).toHaveAttribute("aria-pressed", "true");
+});

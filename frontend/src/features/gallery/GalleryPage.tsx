@@ -3,11 +3,9 @@ import {
   Alert,
   Button,
   Center,
-  Loader,
   SegmentedControl,
   Stack,
   Switch,
-  Text,
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
@@ -25,6 +23,7 @@ import { queueQuery } from "../generation/Queue";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { MediaGrid } from "./MediaGrid";
+import { MorePages } from "./MorePages";
 import { RunsView } from "./RunsView";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
@@ -71,9 +70,7 @@ export function GalleryPage() {
   const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
   const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
-  const [pagingFailed, setPagingFailed] = useState(false);
   const [focusItem, setFocusItem] = useState<string | null>(null);
-  const loadTrigger = useRef<HTMLDivElement>(null);
   // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
   // flips through the whole gallery.
   const [run, setRun] = useState<string>();
@@ -96,7 +93,6 @@ export function GalleryPage() {
       }),
     [setParams],
   );
-  useEffect(() => setPagingFailed(false), [search, kind, filters, similar]);
   useEffect(() => {
     if (similar) window.scrollTo(0, 0);
   }, [similar]);
@@ -183,38 +179,6 @@ export function GalleryPage() {
     seenJobs.current = jobs?.key;
     void client.invalidateQueries({ queryKey: ["gallery"] });
   }, [jobs?.key, client]);
-  useEffect(() => {
-    const trigger = loadTrigger.current;
-    if (
-      !trigger ||
-      !gallery.hasNextPage ||
-      gallery.isFetching ||
-      pagingFailed ||
-      gallery.isFetchNextPageError ||
-      itemId
-    )
-      return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          observer.disconnect();
-          void gallery
-            .fetchNextPage()
-            .then((result) => setPagingFailed(result.isFetchNextPageError));
-        }
-      },
-      { rootMargin: "800px" },
-    );
-    observer.observe(trigger);
-    return () => observer.disconnect();
-  }, [
-    gallery.hasNextPage,
-    gallery.isFetching,
-    gallery.isFetchNextPageError,
-    pagingFailed,
-    gallery.fetchNextPage,
-    itemId,
-  ]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
@@ -518,34 +482,7 @@ export function GalleryPage() {
                 : "No Images"}
         </EmptyState>
       )}
-      {gallery.hasNextPage && (
-        <Center mih={44}>
-          <div ref={loadTrigger} aria-hidden="true" />
-          {pagingFailed ? (
-            <Stack gap={4} align="center">
-              <Text size="sm" c="dimmed">
-                More results couldn’t be loaded.
-              </Text>
-              <Button
-                variant="default"
-                radius="xl"
-                loading={gallery.isFetchingNextPage}
-                onClick={() =>
-                  void gallery
-                    .fetchNextPage()
-                    .then((result) => setPagingFailed(result.isFetchNextPageError))
-                }
-              >
-                Retry
-              </Button>
-            </Stack>
-          ) : (
-            gallery.isFetchingNextPage && (
-              <Loader size="sm" color="gray" aria-label="Loading More" />
-            )
-          )}
-        </Center>
-      )}
+      <MorePages listing={gallery} results={JSON.stringify(galleryKey)} paused={!!itemId} />
       {!selection.selecting && <ComposerDock />}
       {selected && (
         <MediaViewer
