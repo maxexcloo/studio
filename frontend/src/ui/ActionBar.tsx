@@ -457,6 +457,7 @@ export function ActionBarGroups({
     <div
       ref={row}
       className={classes.actions}
+      data-fit={fit || undefined}
       data-wrap={wrap || undefined}
       data-compact={compact || undefined}
     >
