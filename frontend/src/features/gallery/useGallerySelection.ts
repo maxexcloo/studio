@@ -3,7 +3,8 @@ import type { MediaItem } from "../../types";
 
 /**
  * Selection acts on loaded records, including across virtualised rows. A group (a run in Runs)
- * toggles together; Shift extends from the last toggled item to the group in loaded order. The
+ * toggles together. As in a file manager, Shift selects from the last clicked item to the group in
+ * loaded order, replacing the selection, and Shift with Ctrl or Cmd adds the range to it. The
  * result stays the same object until the selection or the items change, so tiles skip renders.
  * `selectMatching` (Select All and the like) covers every match of the search and filters: while
  * `more.complete` is false it has `more.load` load the rest first. A new search or filter empties
@@ -57,6 +58,8 @@ export function useGallerySelection(
       selecting: selected !== null,
       selected: selected || new Set<string>(),
       selectedItems: selected ? items.filter((item) => selected.has(item.id)) : [],
+      /** Whether every match of the search and filters is selected. */
+      all: more.complete && items.length > 0 && items.every((item) => selected?.has(item.id)),
       items,
       /** Whether a quick select is waiting for the rest of the matches to load. */
       loading: pending !== null,
@@ -67,6 +70,12 @@ export function useGallerySelection(
         anchor.current = null;
       },
       toggle,
+      /** Select None: empties the selection without ending it. */
+      clear: () => {
+        setSelected(new Set());
+        setPending(null);
+        anchor.current = null;
+      },
       select: (match: (item: MediaItem) => boolean) =>
         setSelected(new Set(items.filter(match).map((item) => item.id))),
       selectMatching: (match: (item: MediaItem) => boolean) => {
@@ -90,13 +99,12 @@ export function useGallerySelection(
         const indexes = group.map((item) => items.indexOf(item));
         const start = Math.min(from, ...indexes),
           end = Math.max(from, ...indexes);
-        setSelected(
-          (current) =>
-            new Set([...(current || []), ...items.slice(start, end + 1).map((entry) => entry.id)]),
-        );
+        const range = items.slice(start, end + 1).map((entry) => entry.id);
+        const adding = event.ctrlKey || event.metaKey;
+        setSelected((current) => new Set([...(adding ? current || [] : []), ...range]));
         return true;
       },
     };
-  }, [selected, items, pending]);
+  }, [selected, items, pending, more.complete]);
 }
 export type GallerySelection = ReturnType<typeof useGallerySelection>;
