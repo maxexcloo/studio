@@ -49,7 +49,3 @@ PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studi
 # Signs agent-browser in to live Studio and LibreChat as the Git user, through kubectl exec.
 [tasks."browser-sign-in"]
 run = "node backend/commands/browser-sign-in.mjs"
-
-# Offline runtime migration is a dry run unless --apply is supplied.
-[tasks."migrate:runtime"]
-run = "node backend/commands/migrate-runtime.mjs"
