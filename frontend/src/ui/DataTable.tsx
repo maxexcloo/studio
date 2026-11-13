@@ -6,6 +6,7 @@ import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
 import { LoadingState } from "./LoadingState";
 import { usePhone } from "./usePhone";
+import classes from "./DataTable.module.css";
 
 interface DataColumn<T> {
   key: string;
@@ -103,7 +104,12 @@ export function DataTable<T>({
         })
       : matching;
   const table = (
-    <Table aria-label={label} verticalSpacing="xs" highlightOnHover>
+    <Table
+      aria-label={label}
+      verticalSpacing="xs"
+      highlightOnHover
+      classNames={{ th: classes.cell, td: classes.cell }}
+    >
       <Table.Thead>
         <Table.Tr>
           {shown.map((column) => {
@@ -145,7 +151,7 @@ export function DataTable<T>({
             );
           })}
           {rowActions && (
-            <Table.Th w={44}>
+            <Table.Th w={44} ta="end">
               <VisuallyHidden>Actions</VisuallyHidden>
             </Table.Th>
           )}
@@ -174,7 +180,7 @@ export function DataTable<T>({
                 </Table.Td>
               ))}
               {rowActions && (
-                <Table.Td>
+                <Table.Td ta="end">
                   {actions && (
                     <Menu position="bottom-end" width={menuWidth}>
                       <Menu.Target>
