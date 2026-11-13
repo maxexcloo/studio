@@ -28,6 +28,9 @@
  *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile/merge.js)
  *   GET  /api/profiles/backends                     Radiance and ComfyUI profiles Combine Backends could make one
  *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile/backends.js)
+ *   POST /api/profiles/editable/:id/radiance        {url, name}: converts a Krea 2 fine-tune to Radiance for the profile (profile/radiance.js)
+ *   GET  /api/profiles/radiance                     the latest conversion and its progress
+ *   POST /api/profiles/radiance/cancel              stops the running conversion
  *
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp/admin.js) call these
  * same routes in process: their versions record chat as the origin, and a chat draft stays AI-Drafted.
@@ -47,6 +50,7 @@ import { writeExport } from "./export.js";
 import { backendCandidates, combineBackends } from "./backends.js";
 import { duplicateProfiles, mergeDuplicateProfiles } from "./merge.js";
 import { removeProfile } from "./remove.js";
+import { addRadianceBackend, radianceConversions } from "./radiance.js";
 
 /**
  * `profiles()` and `guides()` give the profile/store.js stores; `objectInfo(kind)` ComfyUI's
@@ -288,6 +292,22 @@ export function registerProfileRoutes(
     for (const { from } of result.merged) await onSaved(from);
     return result;
   });
+
+  const conversions = radianceConversions({
+    apply: async (id, model, by) => {
+      addRadianceBackend(id, model, by);
+      await onSaved(id);
+    },
+  });
+  route("GET", "/api/profiles/radiance", () => conversions.state());
+  route("POST", "/api/profiles/radiance/cancel", () => conversions.cancel());
+  route("POST", "/api/profiles/editable/:id/radiance", (account, { params, body }) =>
+    conversions.start(params.id, {
+      url: body?.url,
+      name: body?.name,
+      by: accountName(account),
+    }),
+  );
 
   route("GET", "/api/profiles/backends", () => backendCandidates());
   route("POST", "/api/profiles/backends/combine", async (account, { body }) => {

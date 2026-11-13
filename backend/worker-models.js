@@ -72,6 +72,15 @@ export async function workerModelFile(spec, action = "stat", extra = {}) {
   );
 }
 
+/** The model library worker's Radiance conversion (studio_worker/convert.py): start, status, cancel or clear. */
+export async function workerRadiance(body) {
+  return request("/radiance", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function uploadWorkerModel(spec, response, { offset, total, note, signal, progress }) {
   const query = new URLSearchParams({
     folder: spec.folder,

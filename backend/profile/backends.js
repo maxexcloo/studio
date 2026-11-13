@@ -42,7 +42,7 @@ const invalid = (message) => Object.assign(new Error(message), { status: 400 });
 const pairKey = (radiance, comfyui) => `${radiance}+${comfyui}`;
 
 /** The backend a single-graph profile runs on, from its graph's nodes; "" for a provider (Grok) or an empty graph. */
-function graphBackend(raw) {
+export function graphBackend(raw) {
   const classes = Object.values(graphFromJson(raw) || {}).map((node) => String(node?.class_type));
   if (!classes.length || classes.includes("GrokMedia")) return "";
   return classes.some((name) => name.startsWith("Radiance")) ? "radiance" : "comfyui";
@@ -141,7 +141,7 @@ export function backendCandidates() {
 }
 
 /** The combined profile's text: the shared fields, `backend` and each backend's own block with its graph. */
-function combinedText(id, name, backend, members) {
+export function combinedText(id, name, backend, members) {
   const blocks = Object.fromEntries(
     Object.entries(members).map(([key, raw]) => [
       key,

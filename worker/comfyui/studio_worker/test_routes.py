@@ -79,6 +79,7 @@ class ModelRouteTests(unittest.TestCase):
                 for route in [
                     ("GET", "/studio/worker/models"),
                     ("POST", "/studio/worker/models/file"),
+                    ("POST", "/studio/worker/models/radiance"),
                     ("PUT", "/studio/worker/models/upload"),
                 ]:
                     for supplied in [None, "", "wrong-test-fixture"]:

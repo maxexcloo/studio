@@ -9,7 +9,7 @@ import asyncio
 import json
 import os
 
-from . import models
+from . import convert, models
 from .files import delete_files, token_matches
 from .qwen import StudioTextEncodeQwenImage21
 
@@ -151,6 +151,43 @@ if PromptServer is not None and getattr(PromptServer, "instance", None) is not N
         except OSError:
             return web.json_response(
                 {"ok": False, "error": "The worker model operation failed."}, status=400
+            )
+
+    @routes.post("/studio/worker/models/radiance")
+    async def studio_radiance_conversion(request):
+        if not model_authorised(request):
+            return web.json_response(
+                {"ok": False, "error": "A valid Studio worker token is required."},
+                status=403,
+            )
+        try:
+            body = await request.json()
+            action = body.get("action", "status")
+            if action == "start":
+                tokens = (
+                    body.get("tokens") if isinstance(body.get("tokens"), dict) else {}
+                )
+                result = convert.start(
+                    body.get("name"),
+                    body.get("url"),
+                    body.get("size"),
+                    body.get("sha256"),
+                    {kind: str(tokens.get(kind) or "") for kind in ["civitai", "hf"]},
+                    body.get("note") if isinstance(body.get("note"), dict) else {},
+                )
+            elif action == "cancel":
+                result = convert.cancel()
+            elif action == "clear":
+                result = convert.clear(body.get("name"))
+            elif action == "status":
+                result = convert.status()
+            else:
+                raise ValueError("Unknown conversion operation.")
+            return web.json_response({"ok": True, **result})
+        except (ValueError, TypeError, AttributeError, OSError) as error:
+            return web.json_response(
+                {"ok": False, "error": str(error) or "Invalid conversion request."},
+                status=400,
             )
 
     @routes.put("/studio/worker/models/upload")
