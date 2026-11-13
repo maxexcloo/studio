@@ -24,6 +24,7 @@
 - Retain browser interaction tests in CI.
 - Keep runtime data out of Git and test output.
 - Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
+- To use live Studio or LibreChat in agent-browser as the user, run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser).
 
 ## UI Patterns
 
