@@ -18,9 +18,8 @@ import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
-import { mediaSource, playbackUrl } from "../gallery/mediaSource";
+import { mediaSource } from "../gallery/mediaSource";
 import { queueQuery } from "../generation/Queue";
-import { LoraThumbs, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 import { dreamChoices, viewerChoices, type Choice, type Verdict } from "./choices";
 import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
 import { PairContent, sideNames } from "./PairCard";
@@ -37,14 +36,11 @@ import { layerAbove } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
 type SingleCard = Exclude<DeckCard, PairDeckCard>;
-const directions: Record<Verdict, Direction> = {
+/** A gallery image's verdicts: Pass, Like and Super Like. */
+const directions: Partial<Record<Verdict, Direction>> = {
   discard: "left",
   keep: "right",
-  variations: "up",
   star: "right",
-  animate: "right",
-  refine: "right",
-  more: "right",
 };
 /** A pair is answered by its direction: A left, B right, Both up and Neither down. */
 const answers: Record<Direction, PairAnswer> = {
@@ -67,27 +63,14 @@ const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]
 // Calibration joins in once Dream has fewer unseen results than this.
 const few = 6;
 
-/** The card's media: the top card plays a video; cards beneath show its still. */
-function Media({ item, playing }: { item: MediaItem; playing: boolean }) {
-  const source = mediaSource(item);
+/** A gallery image's card media (calibration offers images only). */
+function Media({ item }: { item: MediaItem }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
-  if (item.type === "video" && playing)
-    return (
-      <video
-        src={playbackUrl(source.url)}
-        poster={source.thumbnailUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        aria-label={item.prompt || "Dream video"}
-      />
-    );
   return (
     <img
-      src={item.type === "video" ? source.thumbnailUrl || source.url : source.displayUrl}
-      alt={item.prompt || "Dream image"}
+      src={mediaSource(item).displayUrl}
+      alt={item.prompt || "Gallery image"}
       draggable={false}
       decoding="async"
       onError={() => setFailed(true)}
@@ -129,12 +112,12 @@ function useCalibration(wanted: boolean, decided: Set<string>) {
   return remaining;
 }
 
-type Judgement =
+export type Judgement =
   | { card: SingleCard; verdict: Verdict }
   | { card: PairDeckCard; verdict: PairAnswer };
 
 /** Sends a verdict: Dream results move to the gallery or discards; gallery images only teach. */
-function useJudge(onFailed: (card: DeckCard) => void) {
+export function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const { profiles, setDraft } = useGenerationActions();
@@ -194,40 +177,8 @@ function useJudge(onFailed: (card: DeckCard) => void) {
 
 const ids = (card: DeckCard) =>
   card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
-/** How many Dream results a card holds; calibration cards hold none. */
-const dreamed = (card: DeckCard) =>
-  card.kind === "dream" ? 1 : card.kind === "pair" && card.pairId ? 2 : 0;
-
-function Caption({ item }: { item: DreamItem }) {
-  const info = useQuery(loraInfoQuery);
-  // The LoRAs Dream tried, each rated here so a new one joins (or leaves) the account's Starred LoRAs.
-  const loras = (Array.isArray(item.settings?.loras) ? item.settings.loras : [])
-    .filter((lora) => lora?.name && lora.enabled !== false)
-    .map((lora) => String(lora.name));
-  return (
-    <div className={classes.caption}>
-      {item.dream?.why && (
-        <Text size="sm" fw={500} lineClamp={1}>
-          {item.dream.why}
-        </Text>
-      )}
-      <Text size="xs" c="dimmed" lineClamp={2}>
-        {item.prompt || item.dream?.prompt}
-      </Text>
-      {loras.map((file) => {
-        const title = loraTitle(info.data?.loras[file], file);
-        return (
-          <Group key={file} gap="xs" wrap="nowrap" justify="space-between">
-            <Text size="xs" truncate>
-              LoRA: {title}
-            </Text>
-            <LoraThumbs file={file} title={title} />
-          </Group>
-        );
-      })}
-    </div>
-  );
-}
+/** How many Dream results a card holds: a comparison two, calibration cards none. */
+const dreamed = (card: DeckCard) => (card.kind === "pair" && card.pairId ? 2 : 0);
 
 /** The current batch as a strip: judged results filled, the current one marked, the rest to come. */
 function BatchStrip({ done, total }: { done: number; total: number }) {
@@ -258,17 +209,16 @@ const cardLabel = (card: DeckCard, top: boolean) =>
     ? top
       ? card.question
       : "Next Comparison"
-    : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : "Gallery Image"}`;
+    : `${top ? "Current" : "Next"} Gallery Image`;
 
 /**
- * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
- * Swipe or press ← to pass, → to like (keep), ↑ to like and queue variations; the bar offers Pass
- * and Like. A comparison asks about two results alike but for one thing: ← or a left swipe answers
- * A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action) opens it in the viewer over
- * the deck, with all the card's choices (Edit, Animate, Star and More Like This too) in its bar;
- * Pass, Like or an answer there returns to the deck, and the others move on in the viewer.
- * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
- * judging them changes nothing in the gallery beyond an optional Star. `empty` shows once the
+ * The Dream deck: Dream's comparisons (`items`, both sides of each), the oldest on top, the next
+ * beneath it, the batch's progress above. A comparison asks about two results alike but for one
+ * thing: ← or a left swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action)
+ * opens it in the viewer over the deck with the card's choices in its bar; an answer there returns
+ * to the deck. With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste
+ * profile: swipe or press ← to pass and → to like; judging them changes nothing in the gallery
+ * beyond an optional Super Like (Star). `empty` shows once the
  * deck is through, told whether calibration images are available.
  */
 export function DreamDeck({
@@ -301,9 +251,6 @@ export function DreamDeck({
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
   const busy = useRef(false);
-  const single = top?.kind === "pair" ? undefined : top;
-  const image = single?.item.type === "image";
-  const dream = single?.kind === "dream";
 
   function commit(judgement: Judgement) {
     const card = judgement.card;
@@ -328,9 +275,9 @@ export function DreamDeck({
         await fly.current?.(answerDirections[choice as PairAnswer]);
         return commit({ card: top, verdict: choice as PairAnswer });
       }
-      if (!(choice in directions)) return;
-      if (["variations", "animate", "refine", "more"].includes(choice) && !(image && dream)) return;
-      await fly.current?.(directions[choice as Verdict]);
+      const direction = directions[choice as Verdict];
+      if (!direction) return;
+      await fly.current?.(direction);
       commit({ card: top, verdict: choice as Verdict });
     } finally {
       busy.current = false;
@@ -340,7 +287,7 @@ export function DreamDeck({
   const intent = (direction: Direction): Verdict | PairAnswer | null =>
     top?.kind === "pair"
       ? answers[direction]
-      : ({ left: "discard", right: "keep", up: "variations", down: null } as const)[direction];
+      : ({ left: "discard", right: "keep", up: null, down: null } as const)[direction];
   const keyRef = useRef(intent);
   keyRef.current = intent;
   const actRef = useRef(act);
@@ -441,13 +388,7 @@ export function DreamDeck({
                 hints={
                   card.kind === "pair"
                     ? { left: "A", right: "B", up: "Both", down: "Neither" }
-                    : {
-                        left: "Pass",
-                        right: "Like",
-                        ...(card.kind === "dream" && card.item.type === "image"
-                          ? { up: "Variations" }
-                          : {}),
-                      }
+                    : { left: "Pass", right: "Like" }
                 }
                 onTap={(target) => {
                   if (card.kind !== "pair") return setViewing(card.item.id);
@@ -469,23 +410,17 @@ export function DreamDeck({
                 ) : (
                   <>
                     <div className={classes.media}>
-                      <Media item={card.item} playing={card === top} />
-                      {card.kind === "calibration" && (
-                        <Badge className={classes.label} variant="default">
-                          From Your Gallery
-                        </Badge>
-                      )}
+                      <Media item={card.item} />
+                      <Badge className={classes.label} variant="default">
+                        From Your Gallery
+                      </Badge>
                       {card === top && view(card.item)}
                     </div>
-                    {card.kind === "dream" ? (
-                      <Caption item={card.item} />
-                    ) : (
-                      <div className={classes.caption}>
-                        <Text size="xs" c="dimmed" lineClamp={2}>
-                          {card.item.prompt}
-                        </Text>
-                      </div>
-                    )}
+                    <div className={classes.caption}>
+                      <Text size="xs" c="dimmed" lineClamp={2}>
+                        {card.item.prompt}
+                      </Text>
+                    </div>
                   </>
                 )}
               </SwipeCard>
@@ -522,9 +457,7 @@ export function DreamDeck({
       {/* Touch screens swipe and tap, so the keyboard hint shows only with a mouse. */}
       {!phone && !touch && (
         <Text size="xs" c="dimmed" ta="center">
-          {top.kind === "pair"
-            ? "← A · → B · ↑ Both · ↓ Neither"
-            : `← Pass · → Like${image && dream ? " · ↑ Like & Variations" : ""}`}
+          {top.kind === "pair" ? "← A · → B · ↑ Both · ↓ Neither" : "← Pass · → Like"}
         </Text>
       )}
       {viewer}

@@ -1190,6 +1190,8 @@ export async function serveDream(
     taste?: Record<string, unknown>;
     /** Dream's projects, which create, edit, Undo and Delete change. */
     projects?: any[];
+    /** When the visit before this one ended. */
+    since?: string;
   } = {},
 ) {
   const state = {
@@ -1209,9 +1211,30 @@ export async function serveDream(
     projects: options.projects ?? [],
     requests: [] as { method: string; path: string; body: any }[],
   };
+  // As the backend, without ranking: single results by project in the order given, misses apart.
+  const digest = () =>
+    [...state.projects, { id: null, name: "Other" }]
+      .map(({ id, name }) => {
+        const own = state.unseen.filter(
+          (item) =>
+            !item.dream?.pair &&
+            (id === null
+              ? !state.projects.some((project) => project.id === item.dream?.projectId)
+              : item.dream?.projectId === id),
+        );
+        return {
+          projectId: id,
+          name,
+          items: own.filter((item) => !item.review?.miss),
+          misses: own.filter((item) => item.review?.miss),
+        };
+      })
+      .filter((group) => group.items.length + group.misses.length);
   const show = () => ({
     settings: state.settings,
     unseen: state.unseen,
+    digest: digest(),
+    since: options.since ?? null,
     today: { images: 12, videos: 1 },
     spicyAvailable: state.spicyAvailable,
     status: !state.settings.enabled
@@ -1254,6 +1277,8 @@ export async function serveDream(
     try {
       body = request.postDataJSON() || {};
     } catch {}
+    if (path === "/api/dream/visit")
+      return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
     if (path === "/api/dream") return route.fulfill({ json: show() });
     if (path === "/api/dream/settings") {

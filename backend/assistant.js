@@ -25,6 +25,7 @@ import { cleanTriggers } from "./lora/catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { replyTitle } from "../shared/titles.ts";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
+import { reviewInstructions, reviewReply } from "./domain/review.ts";
 import { userContent } from "./domain/model-content.ts";
 import {
   avoidFiller,
@@ -79,6 +80,7 @@ export const reasoningEfforts = {
   loras: "none",
   negative: null,
   profile: "none",
+  review: "none",
   rewrite: null,
   sheet: null,
   suggestions: "none",
@@ -1083,6 +1085,27 @@ export function createAssistant(
   }
 
   /**
+   * How a Dream result fits its project's brief (domain/review.ts); the caller checks the model
+   * reads images. Throws AssistantError on a reply without a score.
+   */
+  async function review({ image, brief, explicit = false, signal } = {}) {
+    const model = await modelFor("review", explicit);
+    const reply = await chat({
+      call: "review",
+      model,
+      messages: [
+        { role: "system", content: reviewInstructions },
+        { role: "user", content: userContent(`Brief:\n${brief}`, [image], true) },
+      ],
+      temperature: 0.2,
+      signal,
+    });
+    const review = reviewReply(replyJson(reply.text) || {});
+    if (!review) throw new AssistantError("unusable reply");
+    return { ...review, model };
+  }
+
+  /**
    * A card's description from its image, for a character (the default), outfit or scene card; the
    * caller checks the model reads images.
    */
@@ -1263,6 +1286,7 @@ export function createAssistant(
     matchLoras,
     describe,
     caption,
+    review,
     character,
     rateCardImages,
     title,

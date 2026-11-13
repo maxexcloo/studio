@@ -1,6 +1,7 @@
 import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 import { projectPatch, type Projects } from "./projects.ts";
+import { digest } from "./review.ts";
 
 // What Dream's settings route accepts: the ranges of its numbers and its on/off switches.
 const limits = { dailyImages: [0, 500], dailyVideos: [0, 100] } as const;
@@ -20,11 +21,26 @@ export function registerDreamRoutes(
     const { status = 500, message } = error as Error & { status?: number };
     return { status, payload: { ok: false, error: message } };
   };
+  // Single results, and a comparison's side whose other failed, show in While You Were Away;
+  // comparisons stay in the deck.
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
+    const record = dream.read(ownerId);
+    const unseen = dream.unseen(ownerId);
     return {
-      settings: dream.read(ownerId).settings,
-      unseen: dream.unseen(ownerId),
+      settings: record.settings,
+      unseen,
+      digest: digest(
+        unseen.filter(
+          (item) =>
+            !unseen.some(
+              (other) =>
+                other !== item && other.dream?.pair && other.dream.pair.id === item.dream?.pair?.id,
+            ),
+        ),
+        projects.list(ownerId),
+      ),
+      since: record.visit?.since || null,
       today: dream.today(ownerId),
       spicyAvailable: Boolean(access?.uncensored),
       ...dream.status(ownerId),
@@ -36,6 +52,10 @@ export function registerDreamRoutes(
       dream.access(owner(account)) ? run(account, input) : refused,
     );
   route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
+  route("POST", "/api/dream/visit", (account) => ({
+    status: 200,
+    payload: { since: dream.visit(owner(account)) },
+  }));
   route("PUT", "/api/dream/settings", async (account, { body = {} }) => {
     const patch: Partial<DreamSettings> = {};
     for (const key of switches) {
