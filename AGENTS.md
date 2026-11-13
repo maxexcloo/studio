@@ -147,9 +147,9 @@ the primary component reference and verify APIs against the installed version.
   Custom), resets to the item's prompt rather than clearing, and its phone
   editor sends Ask for a Change beside Generate. It rests on one line ending in
   an ellipsis and shows the whole prompt while focused. Its other assistance is
-  the viewer bar's AI, after Edit: the image's Suggestions and Refresh
-  Suggestions, then Custom… (a change typed over the prompt), then the
-  remembered Review First.
+  the viewer bar's AI, after Edit, laid out as Animate's menu: the remembered
+  Review Prompt, then the image's Suggestions and Custom… (a change typed over
+  the prompt), then Refresh Suggestions.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating
@@ -194,7 +194,7 @@ the primary component reference and verify APIs against the installed version.
   fallback or notice. Studio's own calls keep their automatic route.
 - Replacing a draft with a preset or stack asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
-  the proposed action runs, unless the viewer's Review First is off. Suggestions never move layout or act on their own.
+  the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never move layout or act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the
   box's chip row, after References (`usePromptIdeas`); nothing floats over the
   text and ideas never show as a row of their own. Custom Animation's

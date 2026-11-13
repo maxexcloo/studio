@@ -84,7 +84,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("The viewer's AI menu loads Suggestions with Refresh Suggestions, then Custom… and Review First", async ({
+test("The viewer's AI menu offers Review Prompt, then Suggestions and Custom…, then Refresh Suggestions", async ({
   page,
 }, testInfo) => {
   const phone = testInfo.project.use.isMobile;
@@ -108,9 +108,12 @@ test("The viewer's AI menu loads Suggestions with Refresh Suggestions, then Cust
   const thinking = menu.getByRole("menuitem", { name: "Thinking of Changes" });
   await expect(thinking).toBeDisabled();
   release[0]();
-  for (const label of [...steps.map((step) => step.label), "Refresh Suggestions", "Custom…"])
-    await expect(menu.getByRole("menuitem", { name: label, exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Review First", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    "Review Prompt",
+    ...steps.map((step) => step.label),
+    "Custom…",
+    "Refresh Suggestions",
+  ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
   await expect(thinking).toBeVisible();

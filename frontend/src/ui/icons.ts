@@ -27,6 +27,7 @@ import {
   MessageCircle,
   Moon,
   Pencil,
+  PenLine,
   Play,
   Plus,
   Puzzle,
@@ -36,6 +37,7 @@ import {
   RotateCw,
   Rows2,
   ScanSearch,
+  ScanText,
   ScrollText,
   Settings,
   Share,
@@ -74,6 +76,8 @@ export const icons = {
   /** Two versions one above the other (Compare Upscale on phones). */
   compareStacked: Rows2,
   copy: Copy,
+  /** Custom…: asking in one's own words, such as Custom Animation. */
+  custom: PenLine,
   delete: Trash2,
   details: Info,
   download: Download,
@@ -110,6 +114,8 @@ export const icons = {
   reset: RotateCcw,
   resume: CirclePlay,
   retry: RotateCw,
+  /** Showing a written prompt for editing before it runs (Review Prompt). */
+  review: ScanText,
   /** A scene card (Library › Scenes). */
   scene: MapPinned,
   settings: Settings,
