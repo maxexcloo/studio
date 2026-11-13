@@ -1,4 +1,13 @@
-import { Fragment, useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   ActionIcon,
   Button,
@@ -336,7 +345,7 @@ function ActionControl({
   const emphasis = action.emphasis && { variant: action.emphasis, color: undefined, radius: "xl" };
   const control = labelled ? (
     <Button
-      size={emphasis ? undefined : "sm"}
+      size={emphasis ? undefined : "compact-sm"}
       leftSection={icon}
       rightSection={chevron ? <ChevronDown size={14} /> : undefined}
       {...props}
@@ -378,7 +387,8 @@ function ActionControl({
 
 /**
  * The action bar shared by the viewer and gallery selection: icon controls in divided groups; the
- * `labelled` ones show their names. Controls that overflow scroll sideways, or `wrap` onto another
+ * `labelled` ones show their names. Controls that overflow scroll sideways, or with `fit` stay on
+ * one row by showing the last labelled ones as icons alone, and only past that wrap onto another
  * row a whole group at a time, spaced apart rather than divided so no divider ends a row. Menus
  * open above it unless `menuPosition` says otherwise.
  */
@@ -386,18 +396,48 @@ export function ActionBarGroups({
   groups,
   labelled = [],
   menuPosition = "top",
-  wrap = false,
+  fit = false,
   compact = false,
 }: {
   groups: ActionGroups;
   labelled?: string[];
   menuPosition?: FloatingPosition;
-  wrap?: boolean;
+  fit?: boolean;
   /** Fits every action across the row at a smaller size (the phone viewer's bar). */
   compact?: boolean;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  const actions = shown(groups).flat();
+  const named = actions.filter((action) => labelled.includes(action.id));
+  // How many labels, from the last, drop to fit; it starts again for other actions or more room.
+  const key = actions.map((action) => `${action.id}:${action.label}`).join();
+  const [fitted, setFitted] = useState({ key, dropped: 0 });
+  const dropped = fitted.key === key ? fitted.dropped : 0;
+  const wrap = fit && dropped > named.length;
+  const names = new Set(named.slice(0, named.length - dropped).map((action) => action.id));
+  useLayoutEffect(() => {
+    const bar = row.current!;
+    if (fit && !wrap && bar.scrollWidth > bar.clientWidth) setFitted({ key, dropped: dropped + 1 });
+  });
+  useEffect(() => {
+    const room = row.current!.parentElement!;
+    if (!fit) return;
+    let width = room.clientWidth;
+    const again = () => setFitted((last) => ({ ...last, dropped: 0 }));
+    const observer = new ResizeObserver(() => {
+      if (room.clientWidth > width) again();
+      width = room.clientWidth;
+    });
+    observer.observe(room);
+    window.addEventListener("resize", again);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", again);
+    };
+  }, [fit]);
   return (
     <div
+      ref={row}
       className={classes.actions}
       data-wrap={wrap || undefined}
       data-compact={compact || undefined}
@@ -407,7 +447,7 @@ export function ActionBarGroups({
           <ActionControl
             key={action.id}
             action={action}
-            labelled={labelled.includes(action.id)}
+            labelled={names.has(action.id)}
             menuPosition={menuPosition}
           />
         ));
