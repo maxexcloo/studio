@@ -25,11 +25,11 @@ export interface ViewerActions {
 }
 
 /**
- * The bar's controls in groups. Every one stays in sight, wrapping onto another row rather than
- * scrolling where they outgrow the bar (touch screens and narrow windows with Details open).
+ * The bar's controls in groups on one row. Every one stays in sight: where they outgrow the bar
+ * the last named ones show as icons alone, and only then do they wrap onto another row.
  */
 export function ViewerActionGroups({ groups, labelled }: Omit<ViewerActions, "label">) {
-  return <ActionBarGroups groups={groups} labelled={labelled} wrap />;
+  return <ActionBarGroups groups={groups} labelled={labelled} fit />;
 }
 
 /** The viewer's action bar: the prompt field above the shared item actions. */

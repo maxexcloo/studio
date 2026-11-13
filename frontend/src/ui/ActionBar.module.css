@@ -24,7 +24,7 @@
 .actions[data-wrap] {
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px var(--mantine-spacing-sm);
+  gap: 4px var(--mantine-spacing-xs);
   overflow-x: visible;
 }
 

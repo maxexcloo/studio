@@ -1802,3 +1802,16 @@ test("Face Check marks a result that shows someone else than its character, and 
     details.getByText("Redone automatically after the face drifted.", { exact: true }),
   ).toBeVisible();
 });
+
+test("The desktop viewer bar keeps its actions on one row in a narrow window", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.use.isMobile === true, "phones fit a compact bar");
+  await page.setViewportSize({ width: 840, height: 1000 });
+  const { viewer } = await seed(page);
+  const middle = async (name: string) => {
+    const box = (await viewer.getByRole("button", { name, exact: true }).boundingBox())!;
+    return Math.round(box.y + box.height / 2);
+  };
+  await expect.poll(() => middle("Delete")).toBe(await middle("Animate"));
+});
