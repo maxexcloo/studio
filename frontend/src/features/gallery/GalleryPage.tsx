@@ -19,7 +19,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
 import { api } from "../../api";
@@ -38,7 +38,6 @@ import { useTileCaptions } from "../settings/accountPreferences";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
-import { galleryItemQuery } from "./MediaDetails";
 import { inRunOrder, runKey } from "./resultSets";
 import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
@@ -59,9 +58,7 @@ interface Page {
 export function GalleryPage() {
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query, 250);
-  const location = useLocation();
-  const routerNavigate = useNavigate();
-  const kind = location.pathname === "/video" ? "video" : "image";
+  const kind = useLocation().pathname === "/video" ? "video" : "image";
   const { changeKind, profiles } = useGenerationActions();
   useEffect(() => {
     changeKind(kind);
@@ -74,15 +71,13 @@ export function GalleryPage() {
   const [pagingFailed, setPagingFailed] = useState(false);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
+  const [selected, setSelected] = useState<MediaItem | null>(null);
   // The run (a job or result set, `runKey`) whose results the viewer flips through; unset, it
   // flips through the whole gallery.
   const [run, setRun] = useState<string>();
   // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
   const [params, setParams] = useSearchParams();
   const linkedQuery = params.get("q");
-  // The viewer's item (?item=<id>): opening one adds a history entry, so Back closes it, and
-  // flipping through items replaces it.
-  const itemId = params.get("item") || "";
   // A set link (?set=<id>) shows that MCP result set alone until its chip is removed.
   const setId = params.get("set") || "";
   // Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
@@ -98,11 +93,14 @@ export function GalleryPage() {
   );
   useEffect(() => setPagingFailed(false), [search, kind, filters, similar]);
   useEffect(() => {
-    if (similar) window.scrollTo(0, 0);
+    if (!similar) return;
+    setSelected(null);
+    window.scrollTo(0, 0);
   }, [similar]);
   useEffect(() => {
     if (linkedQuery === null) return;
     setQuery(linkedQuery);
+    setSelected(null);
     setParams(
       (next) => {
         next.delete("q");
@@ -191,7 +189,7 @@ export function GalleryPage() {
       gallery.isFetching ||
       pagingFailed ||
       gallery.isFetchNextPageError ||
-      itemId
+      selected
     )
       return;
     const observer = new IntersectionObserver(
@@ -213,23 +211,12 @@ export function GalleryPage() {
     gallery.isFetchNextPageError,
     pagingFailed,
     gallery.fetchNextPage,
-    itemId,
+    selected,
   ]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
   );
-  // A linked item not on a loaded page is read on its own; one that leaves the gallery while
-  // shown stays until the viewer moves on.
-  const listed = itemId ? loaded.find((candidate) => candidate.id === itemId) : undefined;
-  const linked = useQuery({
-    ...galleryItemQuery(itemId),
-    enabled: Boolean(itemId && !listed && !gallery.isPending),
-  }).data?.item;
-  const lastShown = useRef<MediaItem | null>(null);
-  const selected =
-    listed || linked || (itemId && lastShown.current?.id === itemId ? lastShown.current : null);
-  lastShown.current = selected;
   // Every generation shows by default; turning All Versions off collapses each version chain into
   // one Grid tile showing its original. Runs always shows all.
   const groups = useVersionGroups(loaded);
@@ -268,52 +255,11 @@ export function GalleryPage() {
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
   // Stable, so the views' memoised tiles render only when their own item changes.
-  const openItem = useCallback(
-    (item: MediaItem, run?: string) => {
-      setFocusItem(null);
-      setRun(run);
-      setParams(
-        (next) => {
-          next.set("item", item.id);
-          return next;
-        },
-        { state: { viewer: true } },
-      );
-    },
-    [setParams],
-  );
-  const showItem = useCallback(
-    (item: MediaItem) => {
-      // Moving to another set's results flips through that set.
-      if (run && runKey(item) !== run) setRun(runKey(item));
-      setParams(
-        (next) => {
-          next.set("item", item.id);
-          return next;
-        },
-        { replace: true, state: location.state },
-      );
-    },
-    [run, setParams, location.state],
-  );
-  const closeViewer = useCallback(() => {
-    if (location.state?.viewer) {
-      // Closing goes back to the entry the viewer opened from, unless the action that closed it
-      // has already gone elsewhere (Similar, Use as Character, Recreate in Composer).
-      const entry = window.history.state?.key;
-      setTimeout(() => {
-        if (window.history.state?.key === entry) void routerNavigate(-1);
-      });
-      return;
-    }
-    setParams(
-      (next) => {
-        next.delete("item");
-        return next;
-      },
-      { replace: true, state: location.state },
-    );
-  }, [location.state, routerNavigate, setParams]);
+  const openItem = useCallback((item: MediaItem, run?: string) => {
+    setFocusItem(null);
+    setRun(run);
+    setSelected(item);
+  }, []);
   // Phones leave out the time, keeping a pinned caption to two lines.
   const detail = useCallback(
     (item: MediaItem) => mediaDetail(item, profiles, !phone),
@@ -559,9 +505,9 @@ export function GalleryPage() {
                 : items
           }
           related={loaded}
-          navigate={showItem}
+          navigate={setSelected}
           onReturnFocus={(item) => setFocusItem(item.id)}
-          close={closeViewer}
+          close={() => setSelected(null)}
         />
       )}
     </Stack>
