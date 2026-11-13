@@ -246,6 +246,9 @@ export function MediaTile({
   const selected = selecting && count === group.length;
   const media = mediaSource(item);
   const source = media.thumbnailUrl || item.preview || media.url;
+  // A failed load (Studio restarting, say) tries again a few times, waiting longer each time.
+  const [retry, setRetry] = useState({ source, count: 0 });
+  const attempt = retry.source === source ? retry.count : 0;
   const title = mediaTitle(item);
   const [entering] = useState(
     () => !finished(item) && Date.now() - Date.parse(item.createdAt || "") < 10_000,
@@ -371,7 +374,7 @@ export function MediaTile({
           />
         ) : source ? (
           <img
-            key={source}
+            key={`${source}#${attempt}`}
             ref={(element) => {
               // Cached images are complete before paint, so they never fade in again.
               if (element?.complete && element.naturalWidth) element.dataset.loaded = "";
@@ -388,7 +391,9 @@ export function MediaTile({
               event.currentTarget.dataset.loaded = "";
             }}
             onError={(event) => {
-              event.currentTarget.dataset.failed = "";
+              if (attempt < 5)
+                setTimeout(() => setRetry({ source, count: attempt + 1 }), 1000 * 2 ** attempt);
+              else event.currentTarget.dataset.failed = "";
             }}
           />
         ) : null}
