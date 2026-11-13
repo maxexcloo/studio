@@ -56,12 +56,11 @@ test("a version whose source is not loaded starts its own tree", () => {
   );
 });
 
-test("sources recorded in a loop still make a tree", () => {
-  const first = result("first", 0, "second");
-  const second = result("second", 1, "first");
-  const groups = versionGroups([second, first], []);
+test("a result without an ID yet is an original of its own", () => {
+  const pending = { ...result("pending", 5), id: undefined } as unknown as MediaItem;
+  const groups = versionGroups([pending, ...items], []);
   assert.deepEqual(
     groups.map((group) => group.map(({ id }) => id)),
-    [["first", "second"]],
+    [[undefined], ["original", "other", "edit", "again", "latest"]],
   );
 });
