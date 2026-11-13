@@ -1609,6 +1609,8 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Viewer Study", exact: true });
     await expect(sheet.getByText("Prompt", { exact: true })).toBeVisible();
+    // The sheet counts as visible before it slides up; a press then would miss Close as it moves.
+    await expect(sheet).toBeInViewport({ ratio: 1 });
     await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
     await expect(sheet).toBeHidden();
   } else
