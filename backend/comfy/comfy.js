@@ -4,6 +4,7 @@ import {
   currentComfyBackend,
   isDefaultBackend,
   noteWorkerReachable,
+  workerReachable,
 } from "./backends.js";
 import { defaultWorker, onWorkersChanged } from "../workers.js";
 import { listensBeyondThisComputer } from "../client-trust.js";
@@ -89,9 +90,6 @@ function comfyTimeoutFor(pathname = "") {
  */
 export const activeComfyUrl = () => backendUrl();
 
-// Whether ComfyUI's last answer came through (a dropped read is retried only then).
-let comfyAnswering = false;
-
 export async function comfy(pathname, options = {}) {
   const { timeout, ...init } = options;
   const limit = AbortSignal.timeout(
@@ -105,10 +103,10 @@ export async function comfy(pathname, options = {}) {
     } catch (error) {
       // A dropped connection ("fetch failed") on a read is tried once more before ComfyUI counts as gone:
       // the link to a remote worker blips, and one lost GET shouldn't fail a run or a chat's request.
-      // Only while it was answering: a ComfyUI already down fails at once, as before.
+      // Only while this worker was answering: one already down fails at once.
       const method = String(init.method || "GET").toUpperCase();
       if (
-        !comfyAnswering ||
+        workerReachable(currentComfyBackend()) !== true ||
         method !== "GET" ||
         init.signal.aborted ||
         isComfyTimeout(error) ||
@@ -120,14 +118,12 @@ export async function comfy(pathname, options = {}) {
       response = await fetch(`${activeComfyUrl()}${pathname}`, init);
     }
   } catch (error) {
-    comfyAnswering = false;
     // A busy worker that is slow to answer still counts as there; only a refusal marks it offline for routing.
     if (!isComfyTimeout(error) && !error?.noWorker)
       noteWorkerReachable(currentComfyBackend(), false);
     if (isDefaultBackend()) noteComfyFetchError(error);
     throw error;
   }
-  comfyAnswering = true;
   noteComfyReachable();
   // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
   if ([502, 503, 504].includes(response.status)) noteWorkerReachable(currentComfyBackend(), false);
