@@ -10,6 +10,7 @@ import {
 import { demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
+import { logWarning } from "./crash-log.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
@@ -276,6 +277,12 @@ export function createGenerationQueue({
           : [];
       },
       settled: async (job) => {
+        if (job.status === "failed")
+          logWarning("Job failed", {
+            job: job.id,
+            worker: job.backend,
+            reason: String(job.reason || "").slice(0, 200),
+          });
         await generationAdapter.settled(job);
         if (job.status !== "completed") return;
         // Its results keep the result it was made from, once the run has left the queue too, and

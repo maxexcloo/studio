@@ -612,6 +612,7 @@ export class GenerationQueue {
             : targets.at(-1));
       if (!target) continue;
       taken.add(target);
+      console.log(`[Studio] Moved job ${job.id} from ${job.resource} to ${target}`);
       all[index] = this.store.save({
         ...job,
         resource: target,
