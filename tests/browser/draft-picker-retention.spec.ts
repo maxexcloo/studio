@@ -40,7 +40,7 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   const references = page.getByRole("region", { name: "References", exact: true });
   const listing = references.locator(".mantine-ScrollArea-viewport");
   await expect(
-    references.getByRole("button", { name: "Use reference: Study 29", exact: true }),
+    references.getByRole("button", { name: "Use reference: Study 0", exact: true }),
   ).toBeVisible();
   await listing.evaluate((element) => element.scrollTo({ top: 120 }));
   await finishReferences(page);
