@@ -7,6 +7,7 @@ import "./storage-check.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
+import { listenForAgentSignIn } from "./agent-sign-in.js";
 import {
   registerGalleryReadRoutes,
   registerGalleryHistoryRoutes,
@@ -1120,6 +1121,7 @@ server.once("error", (error) => {
   );
   process.exit(1);
 });
+if (multiUserEnabled) listenForAgentSignIn();
 server.listen(Number(port), host, () => {
   const listening = server.address().port;
   // Phone links in Settings use the bound address.
