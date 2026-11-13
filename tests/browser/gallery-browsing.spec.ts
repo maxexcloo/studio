@@ -1032,3 +1032,30 @@ test("The viewer's strip moves to the sets either side of its own", async ({ pag
   await other.getByRole("listitem", { name: "Next Set: Set A", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
 });
+
+test("The open item is in the URL: Back closes the viewer and a link opens it", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(2));
+  // An item not on a loaded page is read on its own.
+  const unlisted = { ...results(1)[0], id: "unlisted", prompt: "Unlisted Result" };
+  await page.route("**/api/gallery/items/unlisted", (route) =>
+    route.fulfill({ json: { item: unlisted } }),
+  );
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(page).toHaveURL(/\/images\?item=browse-0$/);
+  await expect(viewer.getByRole("img", { name: "Browse Result 0", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/\/images\?item=browse-1$/);
+  await page.goBack();
+  await expect(viewer).toBeHidden();
+  await expect(page).toHaveURL(/\/images$/);
+  await page.goto("/images?item=unlisted");
+  await expect(viewer.getByRole("img", { name: "Unlisted Result", exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  await expect(page).toHaveURL(/\/images$/);
+});
