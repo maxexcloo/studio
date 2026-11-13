@@ -11,6 +11,7 @@ import {
 } from "./workers.js";
 import crypto from "node:crypto";
 import { demoMode } from "./comfy/comfy.js";
+import { startFrameSize } from "./animate-profile.js";
 import { families } from "./family-catalogue.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
@@ -407,6 +408,17 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       body.requestedSize = { width: body.width, height: body.height };
       body.width = startSize.width;
       body.height = startSize.height;
+    }
+    // A video framed by its first frame draws at the frame's proportions, whatever size the draft had.
+    if (!isMockJob && body.kind === "video" && body.referenceAssets?.length) {
+      const profile = (await mediaModels().catch(() => null))?.models?.profiles?.find(
+        (item) => item.id === body.profileId,
+      );
+      const framed = startFrameSize(profile, body);
+      if (framed) {
+        body.requestedSize = { width: body.width, height: body.height };
+        Object.assign(body, framed);
+      }
     }
     if (
       body.autoUpscale &&
