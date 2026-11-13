@@ -10,9 +10,10 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { icons } from "../../ui/icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fingerprint } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
@@ -20,6 +21,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
+import { DreamDigest } from "./DreamDigest";
 import { DreamProjects } from "./DreamProjects";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
 import { dreamQuery, dreamWhen, type Dream } from "./queries";
@@ -78,10 +80,19 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   );
 }
 
-/** Dream: the deck with its pause and settings, the discards, projects or the taste profile. */
+/**
+ * Dream: While You Were Away, then the deck for comparisons and calibration, with its pause and
+ * settings; the discards, projects or the taste profile. Opening it counts as a visit.
+ */
 export function DreamPage() {
   const phone = usePhone();
+  const client = useQueryClient();
   const dream = useQuery(dreamQuery);
+  useEffect(() => {
+    void post("/api/dream/visit")
+      .then(() => client.invalidateQueries({ queryKey: dreamQuery.queryKey, exact: true }))
+      .catch(() => undefined);
+  }, [client]);
   const save = useDreamSettings();
   // Dream always opens on the deck; Taste is its own control beside Settings.
   const [view, setView] = useState<"deck" | "discarded" | "projects" | "taste">("deck");
@@ -166,9 +177,11 @@ export function DreamPage() {
         <Alert color="red" title="Couldn’t Load Dream">
           {dream.error.message}
         </Alert>
+      ) : data!.digest.length ? (
+        <DreamDigest groups={data!.digest} since={data!.since} />
       ) : (
         <DreamDeck
-          items={data!.unseen}
+          items={data!.unseen.filter((item) => item.dream?.pair)}
           calibrate={tuning || data!.settings.enabled}
           empty={(calibration) => (
             <Empty dream={data!} onTune={calibration ? () => setTuning(true) : undefined} />

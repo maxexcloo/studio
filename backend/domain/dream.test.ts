@@ -49,6 +49,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
   const taste = createTaste({ dataDir, writer: () => null });
+  const projects = createProjects({ dataDir });
   const state = {
     clock: Date.now(),
     items: [] as DreamItem[],
@@ -83,6 +84,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dataDir,
     store,
     taste,
+    projects: (ownerId) => projects.list(ownerId),
     owners: () => ["alice", "bob"],
     access: (ownerId) => state.access[ownerId] ?? null,
     catalogue: async () => ({
@@ -209,6 +211,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dreamOnce,
     dataDir,
     generated,
+    projects,
   };
 }
 
@@ -515,19 +518,17 @@ test("Dream skips unavailable accounts and offline services, logging each reason
 });
 
 /** Serves the Dream routes; `request` answers as the user named in its last argument. */
-async function serve(t: TestContext, dream: ReturnType<typeof createDream>) {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-projects-"));
-  t.after(() => {
-    closeRuntimeDatabase(dataDir);
-    fs.rmSync(dataDir, { recursive: true, force: true });
-  });
+async function serve(
+  t: TestContext,
+  { dream, projects }: Pick<ReturnType<typeof fixture>, "dream" | "projects">,
+) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream, projects: createProjects({ dataDir }) });
+  registerDreamRoutes(app as never, { dream, projects });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -548,12 +549,13 @@ async function serve(t: TestContext, dream: ReturnType<typeof createDream>) {
 }
 
 test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
-  const { dream, store, state, taste, dreamOnce } = fixture(t);
+  const fx = fixture(t);
+  const { dream, store, state, taste, dreamOnce } = fx;
   await dream.save("alice", { enabled: true });
   const job = (await dreamOnce())!;
   await dreamOnce();
   await dreamOnce();
-  const request = await serve(t, dream);
+  const request = await serve(t, fx);
   const shown = (await request("")).body;
   assert.equal(shown.settings.enabled, true);
   assert.deepEqual(shown.today, { images: 3, videos: 0 });
@@ -609,6 +611,59 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
+test("Dream's ideas take the account's projects in turn and While You Were Away groups them", async (t) => {
+  const fx = fixture(t);
+  const { dream, state, projects, dreamOnce } = fx;
+  await dream.save("alice", { enabled: true });
+  const beach = projects.create("alice", {
+    name: "Beach",
+    brief: { subjects: "the sea", avoid: "people" },
+  });
+  const city = projects.create("alice", { name: "City" });
+  for (let index = 0; index < 3; index++) await dreamOnce();
+  assert.deepEqual(
+    state.items.map((item) => item.dream?.projectId),
+    [beach.id, city.id, beach.id],
+  );
+  // The brief steers the writer; a project without one adds nothing.
+  assert.match(
+    state.calls[0].user,
+    /Project brief \(Beach\):\n- Subjects: the sea\n- Avoid: people/,
+  );
+  assert.match(state.calls[0].system, /keep to its brief/);
+  assert.doesNotMatch(state.calls[1].user, /Project brief/);
+
+  const [last, , first] = state.items;
+  last.review = { score: 9, miss: "", model: "m", at: "" };
+  first.review = { score: 2, miss: "people", model: "m", at: "" };
+  const request = await serve(t, fx);
+  const shown = (await request("")).body;
+  assert.deepEqual(
+    shown.digest.map((group: { name: string; items: DreamItem[]; misses: DreamItem[] }) => [
+      group.name,
+      group.items.map((item) => item.prompt),
+      group.misses.map((item) => item.prompt),
+    ]),
+    [
+      ["Beach", ["dream 3"], ["dream 1"]],
+      ["City", ["dream 2"], []],
+    ],
+  );
+
+  // A visit answers when the one before it ended; views within half an hour are one visit.
+  assert.equal(shown.since, null);
+  assert.equal((await request("/visit", {})).body.since, null);
+  const firstVisit = new Date(state.clock).toISOString();
+  state.clock += 10 * 60_000;
+  assert.equal((await request("/visit", {})).body.since, null);
+  state.clock += 31 * 60_000;
+  assert.equal(
+    (await request("/visit", {})).body.since,
+    new Date(Date.parse(firstVisit) + 10 * 60_000).toISOString(),
+  );
+  assert.equal((await request("")).body.since, (await request("/visit", {})).body.since);
+});
+
 test("starring an unseen, finished Dream result keeps it", (t) => {
   const { dream, state, taste } = fixture(t);
   const mark = { prompt: "p", why: "", at: new Date(state.clock).toISOString() };
@@ -637,7 +692,8 @@ test("starring an unseen, finished Dream result keeps it", (t) => {
 });
 
 test("Dream deletes discards after 30 days, and Delete All deletes an account's others", async (t) => {
-  const { dream, state } = fixture(t);
+  const fx = fixture(t);
+  const { dream, state } = fx;
   const daysAgo = (days: number) => new Date(state.clock - days * 86_400_000).toISOString();
   const item = (id: string, ownerId: string, days: number, mark: "discarded" | "kept") => ({
     id,
@@ -661,13 +717,14 @@ test("Dream deletes discards after 30 days, and Delete All deletes an account's 
     dream.discarded("alice").map((entry) => entry.id),
     ["older", "recent"],
   );
-  const request = await serve(t, dream);
+  const request = await serve(t, fx);
   assert.deepEqual((await request("/discarded", {}, "DELETE")).body, { deleted: 2 });
   assert.deepEqual(ids(), ["kept", "bob-recent"]);
 });
 
 test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
-  const { dream, state, taste, generated } = fixture(t);
+  const fx = fixture(t);
+  const { state, taste, generated } = fx;
   const old = new Date(state.clock - 2 * 86_400_000).toISOString();
   const image = (id: string, extra: Partial<DreamItem> = {}): DreamItem => ({
     id,
@@ -695,7 +752,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
     image("upload", { jobId: "imported" }),
     image("borrowed", { jobId: "job-bobs" }),
   );
-  const request = await serve(t, dream);
+  const request = await serve(t, fx);
   const offered = async () =>
     (await request("/calibration?limit=10")).body.items.map((item: DreamItem) => item.id).sort();
   assert.deepEqual(await offered(), ["a", "b", "c"]);
@@ -826,7 +883,8 @@ test("Dream compares steps only on a profile with a steps control, and what tast
 });
 
 test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
-  const { dream, state, store, taste, finish, live, dreamOnce } = fixture(t);
+  const fx = fixture(t);
+  const { dream, state, store, taste, finish, live, dreamOnce } = fx;
   // A kept image alice generated with FLUX: the comparison's starting point.
   const session = store.createSession("alice", "Gallery").id;
   const base = store.enqueue(
@@ -887,7 +945,7 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   finish("alice", b.id);
   assert.equal(dream.unseen("alice").filter((item) => item.dream?.pair).length, 2);
 
-  const request = await serve(t, dream);
+  const request = await serve(t, fx);
   const pair = a.dream!.pair!.id;
   assert.equal((await request(`/pairs/${pair}/answer`, { answer: "maybe" })).status, 400);
   assert.equal(

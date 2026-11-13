@@ -129,12 +129,12 @@ function useCalibration(wanted: boolean, decided: Set<string>) {
   return remaining;
 }
 
-type Judgement =
+export type Judgement =
   | { card: SingleCard; verdict: Verdict }
   | { card: PairDeckCard; verdict: PairAnswer };
 
 /** Sends a verdict: Dream results move to the gallery or discards; gallery images only teach. */
-function useJudge(onFailed: (card: DeckCard) => void) {
+export function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const { profiles, setDraft } = useGenerationActions();
