@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { usePhone } from "./usePhone";
 
 /**
- * While `active`, follows the visual viewport for a full-screen phone surface being typed into
- * (`surface`, else the layout viewport): how far the visible viewport sits from its top (iOS
- * scrolls the page to the focused text) and how much of its bottom the keyboard covers. The page
- * returns where it was afterwards.
+ * While `active`, follows the visual viewport: how far it sits from the layout viewport's top (iOS
+ * scrolls the page to the focused text) and how much of the layout viewport's bottom lies below it,
+ * behind the keyboard. A full-screen phone `surface` being typed into moves down by `top` instead,
+ * so `inset` is how much of the moved surface lies below it, even before the surface mounts. The
+ * page returns where it was afterwards.
  */
 export function useKeyboard(active: boolean, surface?: RefObject<HTMLElement | null>) {
   const [keyboard, setKeyboard] = useState({ top: 0, inset: 0 });
@@ -14,11 +15,10 @@ export function useKeyboard(active: boolean, surface?: RefObject<HTMLElement | n
     if (!active || !viewport) return;
     const scrolled = window.scrollY;
     const resize = () => {
-      const full = surface?.current?.clientHeight || window.innerHeight;
-      setKeyboard({
-        top: viewport.offsetTop,
-        inset: Math.max(0, full - viewport.height - viewport.offsetTop),
-      });
+      const below = surface
+        ? (surface.current?.clientHeight || window.innerHeight) - viewport.height
+        : window.innerHeight - viewport.height - viewport.offsetTop;
+      setKeyboard({ top: viewport.offsetTop, inset: Math.max(0, below) });
     };
     resize();
     viewport.addEventListener("resize", resize);
