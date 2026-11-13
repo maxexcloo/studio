@@ -11,6 +11,7 @@ import {
   openPresets,
   profiles,
   section,
+  toolbarSearch,
 } from "./fixtures";
 
 test("The Library groups its sections under headings, A–Z, and opens on Models", async ({
@@ -502,15 +503,14 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(3);
   await page.getByRole("button", { name: "Filter Models", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Filter Models", exact: true })).toBeHidden();
-  await page.getByRole("button", { name: "Search Models", exact: true }).click();
-  await page.getByRole("textbox", { name: "Search Models", exact: true }).fill("flux");
+  await (await toolbarSearch(page, "Models")).fill("flux");
   await expect(table.getByRole("row")).toHaveCount(2);
+  // Escape leaves search, keeping the query and the Library open.
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Search Models", exact: true })).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Search Models", exact: true })).not.toBeFocused();
   await expect(table).toContainText("Flux Base");
   await expect(table).not.toContainText("XL Base");
-  await page.getByRole("button", { name: "Search Models", exact: true }).click();
-  await page.getByRole("textbox", { name: "Search Models", exact: true }).fill("nothing");
+  await (await toolbarSearch(page, "Models")).fill("nothing");
   await expect(page.getByText("No Matches", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear Search", exact: true }).click();
   await page.keyboard.press("Escape");

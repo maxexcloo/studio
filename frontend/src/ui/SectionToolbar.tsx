@@ -30,8 +30,8 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
 }
 
 /**
- * A section's create or primary action, labelled; its other actions are icons with tooltips. It
- * passes other props on, so it can be a menu's target.
+ * A section's create or primary action: filled and labelled, at the end of its toolbar. It passes
+ * other props on, so it can be a menu's target.
  */
 export function ToolbarAction({
   label,
@@ -42,7 +42,7 @@ export function ToolbarAction({
   "children"
 >) {
   return (
-    <Button variant="subtle" size="compact-sm" leftSection={icon} {...props}>
+    <Button size="compact-sm" leftSection={icon} {...props}>
       {label}
     </Button>
   );
@@ -53,7 +53,7 @@ function ToolbarDivider() {
   return <Divider orientation="vertical" className={classes.divider} />;
 }
 
-/** A toolbar action shown as an icon with a tooltip, or by name under More on phones. */
+/** A section's secondary action, listed by name under its toolbar's More menu. */
 interface ToolbarMoreAction {
   label: string;
   icon: LucideIcon;
@@ -65,12 +65,11 @@ interface ToolbarMoreAction {
 const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
 
 /**
- * Library and Settings lists share one toolbar: segmented views on the left, then an expanding
- * search, one filter popover and the section's own actions, each group behind a divider: `more` as
- * icons with tooltips (phones, which show no tooltips, list them by name under More), then
- * `actions`, ending with the labelled create action. Escape closes search, keeping the query, or the
- * filters; `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
- * `searchOpen` keeps the search field open at the start of the row instead.
+ * Library and Settings lists share one toolbar: segmented views on the left, then search (a field,
+ * or on phones an icon that expands into one), one filter popover, then behind a divider the
+ * section's own actions: `more` by name under ⋯, then `actions`, ending with the filled create
+ * action. Escape leaves search, keeping the query, or closes the filters;
+ * `data-mantine-stop-propagation` keeps that Escape from also closing the modal.
  */
 export function SectionToolbar({
   label,
@@ -84,7 +83,6 @@ export function SectionToolbar({
   onClearFilters,
   more = [],
   actions,
-  searchOpen = false,
 }: {
   label: string;
   views?: { value: string; label: string }[];
@@ -97,7 +95,6 @@ export function SectionToolbar({
   onClearFilters?: () => void;
   more?: ToolbarMoreAction[];
   actions?: ReactNode;
-  searchOpen?: boolean;
 }) {
   const phone = usePhone();
   const [searching, setSearching] = useState(false);
@@ -110,25 +107,31 @@ export function SectionToolbar({
     setSearching(false);
     requestAnimationFrame(() => trigger.current?.focus());
   };
-  if (searching && onQueryChange)
+  const search = (expanded: boolean) =>
+    onQueryChange && (
+      <SearchInput
+        ref={input}
+        aria-label={`Search ${label}`}
+        value={query}
+        onChange={(event) => onQueryChange(event.currentTarget.value)}
+        onClear={() => onQueryChange("")}
+        onClose={expanded ? close : undefined}
+        data-mantine-stop-propagation
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (expanded) close();
+          else event.currentTarget.blur();
+        }}
+        w={expanded ? "100%" : "13rem"}
+        miw={expanded ? undefined : "8rem"}
+      />
+    );
+  if (searching && phone && onQueryChange)
     return (
       <Group className={classes.enter} mih={44} wrap="nowrap">
-        <SearchInput
-          ref={input}
-          aria-label={`Search ${label}`}
-          value={query}
-          onChange={(event) => onQueryChange(event.currentTarget.value)}
-          onClear={() => onQueryChange("")}
-          onClose={close}
-          data-mantine-stop-propagation
-          onKeyDown={(event) => {
-            if (event.key !== "Escape") return;
-            event.preventDefault();
-            event.stopPropagation();
-            close();
-          }}
-          w="100%"
-        />
+        {search(true)}
       </Group>
     );
   return (
@@ -143,29 +146,23 @@ export function SectionToolbar({
           onChange={onViewChange}
         />
       )}
-      {onQueryChange && searchOpen && (
-        <SearchInput
-          aria-label={`Search ${label}`}
-          value={query}
-          onChange={(event) => onQueryChange(event.currentTarget.value)}
-          onClear={() => onQueryChange("")}
-          flex={1}
-        />
-      )}
-      <Group gap={4} ml="auto" wrap="nowrap">
-        {onQueryChange && !searchOpen && (
-          <Tooltip label={`Search ${label}`}>
-            <ActionIcon
-              ref={trigger}
-              aria-label={`Search ${label}`}
-              variant={query ? "light" : "subtle"}
-              color={query ? undefined : "gray"}
-              onClick={() => setSearching(true)}
-            >
-              <Search size={18} />
-            </ActionIcon>
-          </Tooltip>
-        )}
+      <Group gap={4} ml="auto" wrap="nowrap" miw={0}>
+        {onQueryChange &&
+          (phone ? (
+            <Tooltip label={`Search ${label}`}>
+              <ActionIcon
+                ref={trigger}
+                aria-label={`Search ${label}`}
+                variant={query ? "light" : "subtle"}
+                color={query ? undefined : "gray"}
+                onClick={() => setSearching(true)}
+              >
+                <Search size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            search(false)
+          ))}
         {filters && (
           <Popover position="bottom-end" width={300} trapFocus>
             {/* The Tooltip wraps the target, so the button itself carries aria-expanded. */}
@@ -216,46 +213,30 @@ export function SectionToolbar({
             </Popover.Dropdown>
           </Popover>
         )}
-        {((onQueryChange && !searchOpen) || filters) && (more.length > 0 || actions) && (
-          <ToolbarDivider />
-        )}
-        {more.length > 0 &&
-          (phone ? (
-            <Menu position="bottom-end">
+        {(onQueryChange || filters) && (more.length > 0 || actions) && <ToolbarDivider />}
+        {more.length > 0 && (
+          <Menu position="bottom-end">
+            <Tooltip label={`More ${label} Actions`}>
               <Menu.Target>
                 <ActionIcon variant="subtle" color="gray" aria-label={`More ${label} Actions`}>
                   <icons.more size={18} />
                 </ActionIcon>
               </Menu.Target>
-              <Menu.Dropdown>
-                {more.map((action) => (
-                  <Menu.Item
-                    key={action.label}
-                    leftSection={<action.icon size={16} />}
-                    onClick={action.onClick}
-                    {...link(action.href)}
-                  >
-                    {action.label}
-                  </Menu.Item>
-                ))}
-              </Menu.Dropdown>
-            </Menu>
-          ) : (
-            more.map((action) => (
-              <Tooltip key={action.label} label={action.label}>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label={action.label}
+            </Tooltip>
+            <Menu.Dropdown>
+              {more.map((action) => (
+                <Menu.Item
+                  key={action.label}
+                  leftSection={<action.icon size={16} />}
                   onClick={action.onClick}
                   {...link(action.href)}
                 >
-                  <action.icon size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ))
-          ))}
-        {more.length > 0 && actions && <ToolbarDivider />}
+                  {action.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        )}
         {actions}
       </Group>
     </Group>

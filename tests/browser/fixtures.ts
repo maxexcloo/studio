@@ -895,10 +895,10 @@ export async function openTheme(page: Page) {
   }
 }
 
-/** The gallery search box: in the toolbar on desktop, opened from its icon on phones. */
-export async function gallerySearch(scope: Page | Locator) {
-  const open = scope.getByRole("button", { name: "Search Gallery", exact: true });
-  const box = scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+/** A toolbar's search box: in the toolbar on desktop, opened from its icon on phones. */
+export async function toolbarSearch(scope: Page | Locator, label = "Gallery") {
+  const open = scope.getByRole("button", { name: `Search ${label}`, exact: true });
+  const box = scope.getByRole("textbox", { name: `Search ${label}`, exact: true });
   // Phones show a button that opens the box; wait until the page shows either.
   await expect(open.or(box).first()).toBeVisible();
   if (await open.isVisible()) await open.click();
