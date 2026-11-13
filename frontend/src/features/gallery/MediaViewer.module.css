@@ -234,6 +234,17 @@
   opacity: 0.7;
 }
 
+/* A dot for each generation from the original, up to three. */
+.variationDepth {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(var(--depth) * 6px - 2px);
+  height: 4px;
+  background: radial-gradient(circle, white 2px, transparent 2px) 0 0 / 6px 4px repeat-x;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
+}
+
 .variationBadge {
   position: absolute;
   right: 4px;

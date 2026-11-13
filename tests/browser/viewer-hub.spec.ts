@@ -373,6 +373,46 @@ test("A version keeps its strip once the runs have left the queue, and runs from
   expect(state.jobs[0]).toMatchObject({ parentItemId: "hub-night", parentJobId: undefined });
 });
 
+test("The strip shows iterations of iterations as a tree, newest first and the original last", async ({
+  page,
+}) => {
+  const { viewer } = await seed(page, {}, async (_page, state) => {
+    const version = (id: string, minute: number, parentItemId: string, prompt: string) => ({
+      ...state.gallery[0],
+      id,
+      jobId: `job-${id}`,
+      prompt,
+      createdAt: `2026-10-23T00:0${minute}:00.000Z`,
+      parentItemId,
+    });
+    // Two edits of the original, then two runs of the first edit.
+    state.gallery.unshift(
+      version("hub-snow-2", 4, "hub-snow", "An amber bird in deep snow"),
+      version("hub-snow-1", 3, "hub-snow", "An amber bird in light snow"),
+      version("hub-rain", 2, "hub", "An amber bird in rain"),
+      version("hub-snow", 1, "hub", "An amber bird in snow"),
+    );
+  });
+  const strip = viewer.getByRole("list", { name: "Versions", exact: true });
+  // Each branch stays together; a version away from its source names it.
+  await expect(strip).toMatchAriaSnapshot(`
+    - list "Versions":
+      - listitem "Show Version 5, from Version 3"
+      - listitem "Show Version 4"
+      - listitem "Show Version 3, from Version 1"
+      - listitem "Show Version 2"
+      - listitem "Show Version 1"
+  `);
+  await expect(strip.getByRole("listitem").last()).toHaveAttribute("aria-current", "true");
+  await strip
+    .getByRole("listitem", { name: "Show Version 5, from Version 3", exact: true })
+    .click();
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird in deep snow",
+  );
+  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+});
+
 test("Similar › More Like This Set asks for new variations of a result's set", async ({ page }) => {
   const asked: unknown[] = [];
   await seed(page, { resultSet: { id: "set-a", title: "Variety Test", index: 0 } }, (page) =>
