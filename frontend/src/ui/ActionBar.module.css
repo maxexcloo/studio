@@ -20,6 +20,12 @@
   scrollbar-width: none;
 }
 
+/* Fitted actions span the bar, so they overflow only when they don't fit rather than by rounding. */
+.actions[data-fit] {
+  width: 100%;
+  justify-content: safe center;
+}
+
 /* The viewer's actions take further centred rows, a whole group at a time, instead of scrolling. */
 .actions[data-wrap] {
   flex-wrap: wrap;
