@@ -1183,6 +1183,8 @@ export async function serveDream(
     reason?: string;
     /** The taste profile `/api/taste` serves; `PUT` replaces its avoids. */
     taste?: Record<string, unknown>;
+    /** Dream's projects, which create, edit, Undo and Delete change. */
+    projects?: any[];
   } = {},
 ) {
   const state = {
@@ -1199,6 +1201,7 @@ export async function serveDream(
     spicyAvailable: options.spicyAvailable ?? false,
     calibration: options.calibration ?? [],
     judged: new Set<string>(),
+    projects: options.projects ?? [],
     requests: [] as { method: string; path: string; body: any }[],
   };
   const show = () => ({
@@ -1274,6 +1277,27 @@ export async function serveDream(
           nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
         },
       });
+    }
+    if (path === "/api/dream/projects") {
+      if (method === "GET") return route.fulfill({ json: { projects: state.projects } });
+      const project = { ...body, id: `project-${state.projects.length + 1}` };
+      state.projects.push(project);
+      return route.fulfill({ json: { project } });
+    }
+    const projectRoute = /^\/api\/dream\/projects\/([^/]+)(\/undo)?$/.exec(path);
+    if (projectRoute) {
+      const project = state.projects.find((entry) => entry.id === projectRoute[1]);
+      if (method === "DELETE") {
+        state.projects = state.projects.filter((entry) => entry !== project);
+        return route.fulfill({ json: { ok: true } });
+      }
+      const { id, previous, ...content } = project;
+      if (projectRoute[2]) {
+        const { by: _by, ...restored } = previous;
+        Object.assign(project, restored);
+        delete project.previous;
+      } else Object.assign(project, body, { previous: { ...content, by: "studio" } });
+      return route.fulfill({ json: { project } });
     }
     const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);
     if (answered) {

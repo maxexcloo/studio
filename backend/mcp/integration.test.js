@@ -923,6 +923,7 @@ test("media and administrator credentials discover only their own friendly tools
     "generate",
     "handover",
     "models",
+    "project",
     "queue",
     "result",
     "reuse",
@@ -942,6 +943,7 @@ test("media and administrator credentials discover only their own friendly tools
     generate: "generate",
     handover: "copy chat summary",
     models: "find models",
+    project: "project",
     queue: "manage queue",
     result: "show result",
     reuse: "reuse result",
@@ -1040,8 +1042,9 @@ test("media and administrator credentials discover only their own friendly tools
     // generate's character, to 15,700 for its character_views, to 16,000 for its shots (Studio
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
-    // description was tightened, then raised to 17,150 for generate's 18+ floor.
-    JSON.stringify(tools).length + media.getInstructions().length < 17150,
+    // description was tightened, then raised to 17,150 for generate's 18+ floor and to 18,050 for
+    // project.
+    JSON.stringify(tools).length + media.getInstructions().length < 18050,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2557,7 +2560,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 16);
+    assert.equal((await client.listTools()).tools.length, 17);
     const [first] = data(await call(client, "models", { kind: "image" })).image;
     assert.ok(first);
     const profileId = first.split(" — ")[0];
@@ -2957,6 +2960,45 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"))).status, 404);
   f.jobs.get(secondJob.job_id).gallery = [];
   assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
+});
+
+test("a conversation keeps its LoRAs off and count where a later generate leaves them out", async (t) => {
+  const f = await fixture(t);
+  const conversation = async (id) => {
+    const client = new Client({ name: "studio-choices-fixture", version: "1.0.0" });
+    t.after(() => client.close());
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), {
+        requestInit: {
+          headers: {
+            Authorization: `Bearer ${mediaKey}`,
+            "x-ai-user-id": "alice",
+            "x-studio-conversation-id": id,
+          },
+        },
+      }),
+    );
+    return client;
+  };
+  const first = await conversation("conversation-a");
+  const ask = (client, args) =>
+    call(client, "generate", {
+      profile_id: imageProfile.id,
+      prompts: ["A lake", "A pier"],
+      ...args,
+    });
+  await ask(first, { count: 2, loras: [] });
+  const later = await ask(first, {});
+  assert.match(texts(later), /Kept from earlier: no LoRAs, 2 each\./);
+  assert.deepEqual(
+    f.submitted.slice(-2).map((body) => [body.count, body.loras?.length || 0]),
+    [
+      [2, 0],
+      [2, 0],
+    ],
+  );
+  await ask(await conversation("conversation-b"), {});
+  assert.equal(f.submitted.at(-1).count, 1);
 });
 
 test("a client without a conversation header gets its MCP session's own result numbers; the header still wins", async (t) => {
@@ -6165,6 +6207,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
     reviewedGuides: new Map(),
     recentGenerates: new Map(),
     previews: new Map(),
+    chatChoices: { read: () => ({}), remember: () => {} },
   });
   const args = { profile_id: imageProfile.id, prompts: ["A lighthouse"], count: 1 };
   const first = generate(args);

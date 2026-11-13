@@ -19,6 +19,7 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream } from "./domain/dream.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
+import { createProjects } from "./domain/projects.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { fullBodyPerson } from "./mcp/prompt-checks.js";
 import {
@@ -887,7 +888,7 @@ const dream = createDream({
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
-registerDreamRoutes(app, { dream });
+registerDreamRoutes(app, { dream, projects: createProjects({ dataDir }) });
 // Dream's idle rule (domain/dream.ts): no live job and no text work. A Dream job waiting for a worker
 // doesn't count, so captions and finishing still run while Dream keeps one ready.
 const studioIdle = () =>
