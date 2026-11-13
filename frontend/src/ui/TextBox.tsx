@@ -14,6 +14,7 @@ import {
   ActionIcon,
   Button,
   FocusTrap,
+  getDefaultZIndex,
   Loader,
   Menu,
   Modal,
@@ -193,6 +194,8 @@ export function TextBox({
     <Menu
       position="top-end"
       width={menuWidth}
+      // Above any dialog holding the box: a card's sits over the popovers it opens from.
+      zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
       onChange={setMenuOpened}
       // An item that moves focus itself (Ask for a Change… selects the text) keeps it; otherwise it
