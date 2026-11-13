@@ -427,31 +427,28 @@ export function ActionBarGroups({
   const row = useRef<HTMLDivElement>(null);
   const actions = shown(groups).flat();
   const named = actions.filter((action) => labelled.includes(action.id));
-  // How many labels, from the last, drop to fit; it starts again for other actions or more room.
+  // How many labels, from the last, drop to fit the room (the bar's width, which doesn't follow
+  // them); it starts again for other actions or another room.
   const key = actions.map((action) => `${action.id}:${action.label}`).join();
-  const [fitted, setFitted] = useState({ key, dropped: 0 });
+  const [fitted, setFitted] = useState({ key, room: 0, dropped: 0 });
   const dropped = fitted.key === key ? fitted.dropped : 0;
   const wrap = fit && dropped > named.length;
-  const names = new Set(named.slice(0, named.length - dropped).map((action) => action.id));
+  const names = new Set(
+    named.slice(0, Math.max(0, named.length - dropped)).map((action) => action.id),
+  );
   useLayoutEffect(() => {
+    if (!fit) return;
     const bar = row.current!;
-    if (fit && !wrap && bar.scrollWidth > bar.clientWidth) setFitted({ key, dropped: dropped + 1 });
+    const room = bar.parentElement!.clientWidth;
+    if (fitted.key !== key || fitted.room !== room) setFitted({ key, room, dropped: 0 });
+    else if (!wrap && bar.scrollWidth > bar.clientWidth)
+      setFitted({ key, room, dropped: dropped + 1 });
   });
   useEffect(() => {
-    const room = row.current!.parentElement!;
     if (!fit) return;
-    let width = room.clientWidth;
-    const again = () => setFitted((last) => ({ ...last, dropped: 0 }));
-    const observer = new ResizeObserver(() => {
-      if (room.clientWidth > width) again();
-      width = room.clientWidth;
-    });
-    observer.observe(room);
-    window.addEventListener("resize", again);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", again);
-    };
+    const observer = new ResizeObserver(() => setFitted((last) => ({ ...last })));
+    observer.observe(row.current!.parentElement!);
+    return () => observer.disconnect();
   }, [fit]);
   return (
     <div
