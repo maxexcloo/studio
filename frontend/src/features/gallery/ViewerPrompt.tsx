@@ -27,10 +27,10 @@ import classes from "./MediaViewer.module.css";
  * The viewer's prompt and its assistance, shared by the prompt field and the bar's AI menu. The
  * field holds the item's prompt: editing it and pressing Enter or Generate runs it with the item's
  * settings as a new version, and Improve Prompt rewrites it in one of the assistant's styles. AI
- * (`ai`) offers the image's next steps, Refresh Suggestions and Custom…, which asks for the text
- * typed over the prompt as a change in plain words (`useItemChange`). Under Review First, the
- * remembered default, a change's proposal fills the field until Run runs it or Undo restores what
- * was typed; without it, the proposal runs at once.
+ * (`ai`) offers Review Prompt, the image's next steps, Custom…, which asks for the text typed
+ * over the prompt as a change in plain words (`useItemChange`), and Refresh Suggestions. Under
+ * Review Prompt, the remembered default, a change's proposal fills the field until Run runs it or
+ * Undo restores what was typed; without it, the proposal runs at once.
  */
 export function useViewerPrompt(
   item: MediaItem,
@@ -105,18 +105,29 @@ export function useViewerPrompt(
           icon: icons.assistant,
           loading: ask.pending,
           menu: [
-            ...(offered ? suggestions.action.menu! : []),
-            [{ id: "custom", label: "Custom…", disabled: ask.pending, onClick: custom }],
             [
               {
-                id: "review-first",
-                label: "Review First",
-                description: "Show a change in the prompt before it runs.",
+                id: "review",
+                label: "Review Prompt",
+                icon: icons.review,
                 checked: review,
                 keepOpen: true,
                 onClick: () => setReview(!review),
               },
             ],
+            [
+              ...(offered
+                ? suggestions.action.menu![0].map((step) => ({ ...step, icon: icons.suggestions }))
+                : []),
+              {
+                id: "custom",
+                label: "Custom…",
+                icon: icons.custom,
+                disabled: ask.pending,
+                onClick: custom,
+              },
+            ],
+            ...(offered ? suggestions.action.menu!.slice(1) : []),
           ],
         }
       : null;
