@@ -25,7 +25,7 @@ import { api, post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
-import type { Action } from "../gallery/ActionBar";
+import type { Action } from "../../ui/ActionBar";
 import { ChipPopup } from "./Picker";
 
 type PromptKind = "positive" | "negative";

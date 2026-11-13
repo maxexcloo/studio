@@ -2,7 +2,7 @@ import { useState, type Ref, type RefObject } from "react";
 import type { MediaItem } from "../../types";
 import { Box } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
+import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";

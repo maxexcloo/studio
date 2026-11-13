@@ -13,7 +13,7 @@ import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
-import type { Action } from "./ActionBar";
+import type { Action } from "../../ui/ActionBar";
 import { itemAction } from "./itemActions";
 import { useItemMutation } from "./useItemMutation";
 
