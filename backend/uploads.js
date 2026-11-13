@@ -15,7 +15,9 @@ export function uploadedGalleryItem(upload) {
     type: String(upload.mime).startsWith("video/") ? "video" : "image",
     status: "done",
     uploaded: true,
-    prompt: "",
+    // An imported picture's own prompt and model (gallery/import.js).
+    prompt: upload.prompt || "",
+    ...(upload.model ? { model: upload.model } : {}),
     filename: upload.name,
     outputName: upload.filename,
     mime: upload.mime,
@@ -24,7 +26,7 @@ export function uploadedGalleryItem(upload) {
     ...(upload.durationMs ? { durationMs: upload.durationMs } : {}),
     size: upload.size,
     hash: upload.hash,
-    // Where an imported upload came from: its post's link and title (gallery/reddit.js).
+    // Where an imported upload came from: its post's link and title (gallery/reddit.js, gallery/import.js).
     ...(upload.source ? { source: upload.source } : {}),
     createdAt: upload.createdAt,
   };

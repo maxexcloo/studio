@@ -115,6 +115,7 @@ export async function readMultipartUpload(req) {
     let name = "reference-image";
     let mime = "";
     let size = 0;
+    const fields = {};
     let written = Promise.resolve();
     let parser;
     try {
@@ -151,6 +152,9 @@ export async function readMultipartUpload(req) {
       written = pipeline(file, fs.createWriteStream(temporary, { mode: 0o600 }));
       written.catch(fail);
     });
+    parser.on("field", (field, value) => {
+      fields[field] = value;
+    });
     parser.on("error", fail);
     parser.on("finish", async () => {
       if (settled) return;
@@ -164,7 +168,7 @@ export async function readMultipartUpload(req) {
       }
       if (settled) return;
       settled = true;
-      resolve({ file: temporary, name, mime, size });
+      resolve({ file: temporary, name, mime, size, fields });
     });
     req.pipe(parser);
   });
@@ -248,7 +252,7 @@ export async function saveUpload(upload, ownerId = "") {
 }
 
 async function saveUploadContent(
-  { buffer, file: temporary, name, mime: declaredMime = "", source },
+  { buffer, file: temporary, name, mime: declaredMime = "", source, prompt, model, createdAt },
   ownerId,
 ) {
   const size = temporary ? (await fs.promises.stat(temporary)).size : buffer?.length || 0;
@@ -274,7 +278,7 @@ async function saveUploadContent(
     (item) =>
       item.uploaded && item.hash === hash && (item.ownerId || "") === ownerId && stored(item),
   );
-  if (existing) return { item: existing, asset: uploadAsset(existing) };
+  if (existing) return { item: existing, asset: uploadAsset(existing), added: false };
   const id = crypto.randomUUID();
   const subfolder = mediaSubfolder(ownerId);
   const filename = `${id}.${mimeExtension(inspected.mime)}`;
@@ -304,13 +308,15 @@ async function saveUploadContent(
     ...inspected,
     size,
     hash,
-    createdAt: new Date().toISOString(),
+    createdAt: createdAt || new Date().toISOString(),
     filename,
     subfolder,
     source,
+    prompt,
+    model,
   });
   addGalleryItems([item]);
-  return { item, asset: uploadAsset(item) };
+  return { item, asset: uploadAsset(item), added: true };
 }
 
 /** An upload as a reference: a video by its first frame, as reference slots take images. */
