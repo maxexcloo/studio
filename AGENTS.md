@@ -88,8 +88,8 @@ the primary component reference and verify APIs against the installed version.
 - Empty views use `EmptyState`: one short, subdued line and at most the action
   that fills the view. `LoadingState` centres within the content while the
   shell stays mounted. Empty, loading and failure remain distinct states.
-- Search clears only its query. Filters preserve it. Toolbars open search from
-  an icon. Named controls opening a picker or menu show ▾ (Animate ▾, Copy ▾), small beside an
+- Search clears only its query. Filters preserve it. Toolbars show search as a field;
+  phones open it from an icon. Named controls opening a picker or menu show ▾ (Animate ▾, Copy ▾), small beside an
   action bar's icon; ⋯ already means more, so it never carries one. Icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
   alone is ambiguous carries a one-line `description` under it. An action's settings sit in its

@@ -110,6 +110,7 @@ export function UnfinishedItems() {
                   key={key}
                   label={bulk[key].label}
                   icon={<Icon size={16} />}
+                  variant="subtle"
                   color={key === "delete-all" ? "red" : "gray"}
                   loading={key === "retry-all" && actAll.isPending}
                   disabled={actAll.isPending}

@@ -227,14 +227,6 @@ export function LibraryCatalogueTable({
           }}
           actions={
             <>
-              {onUpdateAll && (
-                <ToolbarAction
-                  label="Update All"
-                  icon={<icons.download size={16} />}
-                  disabled={updatePending}
-                  onClick={onUpdateAll}
-                />
-              )}
               {onCheckUpdates && (
                 <Tooltip label="Check Updates">
                   <ActionIcon
@@ -248,6 +240,14 @@ export function LibraryCatalogueTable({
                     <icons.refresh size={18} />
                   </ActionIcon>
                 </Tooltip>
+              )}
+              {onUpdateAll && (
+                <ToolbarAction
+                  label="Update All"
+                  icon={<icons.download size={16} />}
+                  disabled={updatePending}
+                  onClick={onUpdateAll}
+                />
               )}
             </>
           }
