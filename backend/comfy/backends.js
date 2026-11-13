@@ -39,8 +39,8 @@ export function backendUrl() {
  * (pickWorker) reads these; nothing here makes a request.
  */
 const reachable = new Map();
-// A worker that failed to answer is tried again after this long: nothing else is routed to it, so
-// waiting for its next answer would leave it out for good.
+// A worker that failed to answer is passed over (routing, catalogue reads) and tried again after
+// this long: nothing else is sent to it, so waiting for its next answer would leave it out for good.
 const retryUnreachableMs = 60_000;
 const inventories = new Map();
 const offlineListeners = new Set();
@@ -52,7 +52,8 @@ export const noteWorkerReachable = (id, up, at = Date.now()) => {
 };
 /** Hears the id of each worker found offline. */
 export const onWorkerOffline = (listener) => offlineListeners.add(listener);
-const workerReachable = (id, now = Date.now()) => {
+/** True once it answered, false while it recently failed to, null when not known (or due a retry). */
+export const workerReachable = (id, now = Date.now()) => {
   const last = reachable.get(id);
   if (!last) return null;
   return last.up || now - last.at < retryUnreachableMs ? last.up : null;
