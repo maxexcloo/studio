@@ -160,6 +160,7 @@ import { registerReferenceRoutes } from "./reference-routes.js";
 import { listCards, registerCardRoutes } from "./cards.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
+import { registerGalleryImportRoute } from "./gallery/import.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
 
 import { loadLoraLibrary } from "./lora/stacks.js";
@@ -602,6 +603,7 @@ registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([i
 registerCardRoutes(app);
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
+registerGalleryImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
