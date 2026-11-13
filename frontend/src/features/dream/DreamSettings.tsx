@@ -40,7 +40,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
     </SettingRow>
   );
   const number = (
-    key: "buffer" | "dailyImages" | "dailyVideos",
+    key: "dailyImages" | "dailyVideos",
     label: string,
     max: number,
     description: string,
@@ -49,7 +49,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
       <NumberSetting
         label={label}
         value={settings[key]}
-        min={key === "buffer" ? 1 : 0}
+        min={0}
         max={max}
         disabled={key === "dailyVideos" && !settings.videos}
         onSave={(value) => save.mutate({ [key]: value })}
@@ -66,7 +66,6 @@ function SettingsForm({ dream }: { dream: Dream }) {
         {/* Spicy sits under the main switch; the rest run A–Z. */}
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
         {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
-        {number("buffer", "Unseen Buffer", 50, "Dream waits once this many are unseen.")}
         {toggle("videos", "Videos", "Animate kept or starred images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
       </div>
