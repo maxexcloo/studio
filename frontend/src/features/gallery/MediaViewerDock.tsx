@@ -21,8 +21,8 @@ export interface QueuedRun {
 }
 
 /**
- * The item's versions, oldest first: its version group (`versionGroups`, as the grid groups them)
- * among the owner's jobs' results and the `related` items loaded with it, and the runs this viewer
+ * The item's versions, newest first as the gallery lists them: its version group
+ * (`versionGroups`, as the grid groups them) among the owner's jobs' results and the `related` items loaded with it, and the runs this viewer
  * queued from one of them or that made one of them. Work still queued from one of them shows as
  * placeholders.
  */
@@ -73,7 +73,10 @@ export function useRunFamily(item: MediaItem, runs: QueuedRun[], related: MediaI
           key: `${job.id}:${index}`,
         })),
       );
-    return [...versions.map((version) => ({ key: version.id, item: version })), ...waiting];
+    return [
+      ...versions.map((version) => ({ key: version.id, item: version })),
+      ...waiting,
+    ].reverse();
   }, [jobs, item, runs, related]);
 }
 
@@ -93,7 +96,7 @@ export function MediaViewerDock({
   actions: React.ReactNode;
 }) {
   // Only variations that arrive while this family is shown animate in, not those present on open.
-  const root = family[0]?.key;
+  const root = family.at(-1)?.key;
   const [shown, setShown] = useState(() => ({ root, keys: new Set(family.map(({ key }) => key)) }));
   if (shown.root !== root) setShown({ root, keys: new Set(family.map(({ key }) => key)) });
   return (
@@ -112,7 +115,10 @@ export function MediaViewerDock({
           label="Versions"
           entries={family}
           current={item}
-          name={(result, position) => (result ? `Show Version ${position}` : "Version in Progress")}
+          // Versions count from the original, at the end.
+          name={(result, position) =>
+            result ? `Show Version ${family.length + 1 - position}` : "Version in Progress"
+          }
           entering={(key) => shown.root === root && !shown.keys.has(key)}
           choose={choose}
         />
