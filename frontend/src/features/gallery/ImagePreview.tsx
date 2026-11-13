@@ -16,12 +16,14 @@ export interface PreviewImage {
 
 /**
  * Images full screen, zoomable as in the viewer, for those with no gallery item to open there (a
- * card's uploads): `open(images, index)` shows them over any dialog, and `element` renders it.
+ * card's uploads): `open(images, index)` shows them over any dialog, `opened` says while it shows
+ * and `element` renders it.
  */
 export function useImagePreview() {
   const [shown, setShown] = useState<{ images: PreviewImage[]; index: number } | null>(null);
   return {
     open: (images: PreviewImage[], index = 0) => setShown({ images, index }),
+    opened: Boolean(shown),
     element: (
       <ImagePreview
         images={shown?.images || []}
