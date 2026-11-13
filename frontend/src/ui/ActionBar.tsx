@@ -14,9 +14,9 @@ import {
   type PaperProps,
 } from "@mantine/core";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
-import { menuWidth } from "../../theme";
-import { icons } from "../../ui/icons";
-import { usePhone, useTouch } from "../../ui/usePhone";
+import { menuWidth } from "../theme";
+import { icons } from "./icons";
+import { usePhone, useTouch } from "./usePhone";
 import classes from "./ActionBar.module.css";
 
 /** One media or selection action, shown as a menu item or an action bar control. */

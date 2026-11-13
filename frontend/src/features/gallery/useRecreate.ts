@@ -4,7 +4,7 @@ import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { icons } from "../../ui/icons";
-import type { Action } from "./ActionBar";
+import type { Action } from "../../ui/ActionBar";
 import { useItemMutation } from "./useItemMutation";
 
 /**

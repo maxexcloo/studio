@@ -18,7 +18,7 @@ import {
 } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import type { Action, ActionGroups } from "./ActionBar";
+import type { Action, ActionGroups } from "../../ui/ActionBar";
 import { typedPrompt, type Iteration } from "./useMediaAction";
 import { useItemChange } from "./useItemChange";
 import classes from "./MediaViewer.module.css";
