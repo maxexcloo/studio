@@ -1,9 +1,11 @@
+import importlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import radiance
 from radiance import image_request
 
 
@@ -138,3 +140,14 @@ class ImageRequestTests(unittest.TestCase):
             image_request(
                 dict(self.values, model="flux-3-klein-fp8.rad", width=1536, height=1536)
             )
+
+
+class NodeTests(unittest.TestCase):
+    def test_video_node_needs_two_gpus(self):
+        for devices, listed in [("1", False), ("", False), ("0,1", True)]:
+            with (
+                self.subTest(devices=devices),
+                patch.dict("os.environ", HIP_VISIBLE_DEVICES=devices),
+            ):
+                nodes = importlib.reload(radiance).NODE_CLASS_MAPPINGS
+                self.assertEqual("RadianceVideoGenerate" in nodes, listed)
