@@ -79,6 +79,7 @@ function fixture(t) {
       url: "https://huggingface.co/org/repo/resolve/abc/ae.safetensors",
     },
     { path: "models/comfyui/checkpoints/base.safetensors", sha256: hex("e"), size: 9 },
+    { path: "models/comfyui/unet/transformer.safetensors", sha256: hex("c"), size: 5 },
     { path: "models/comfyui/SEEDVR2/upscaler.safetensors", sha256: hex("f"), size: 9 },
   ]);
   const environment = { STUDIO_MODEL_MANIFEST_PREFIX: "models/comfyui/" };
@@ -115,11 +116,12 @@ test("the catalogue merges every layer by folder/file with provenance, the more 
     Object.keys(entries),
     [
       "checkpoints/base.safetensors",
+      "diffusion_models/transformer.safetensors",
       "loras/seed-only.safetensors",
       "loras/style.safetensors",
       "vae/ae.safetensors",
     ],
-    "only model folders; SEEDVR2 stays in the manifest; lora-catalogue.json is ignored",
+    "only model folders, unet/ as diffusion_models/; SEEDVR2 stays in the manifest; lora-catalogue.json is ignored",
   );
   const style = entries["loras/style.safetensors"];
   assert.deepEqual(
