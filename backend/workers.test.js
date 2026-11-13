@@ -188,7 +188,7 @@ test("routing: only capable workers, an online one with the model first, then li
   assert.equal(pickWorker("image", { workers: list, online: () => false }).id, "a");
 });
 
-test("routing by load: the profile, then free, then the same model, then fewest queued, then list order", () => {
+test("routing by load: the profile, then the least work, then the same model, then list order", () => {
   const list = ["a", "b", "c"].map((id) => ({ id, capabilities: ["image"] }));
   const pick = (loads, options = {}) =>
     pickWorker("image", { workers: list, load: (id) => loads[id] || null, ...options }).id;
@@ -209,6 +209,17 @@ test("routing by load: the profile, then free, then the same model, then fewest 
   assert.equal(pick({ a: busy(2), b: busy(1), c: busy(1) }, { last: true }), "c");
   // A worker known to have the profile still comes first.
   assert.equal(pick({ a: busy(3), b: idle }, { hasModel: (id) => id === "a" }), "a");
+  // A same-model batch spreads across free workers instead of queuing behind the one that ran it.
+  const two = { a: idle, b: { ...idle, model: "flux" } };
+  const picked = Array.from({ length: 16 }, () => {
+    const id = pick(two, { model: "flux", workers: list.slice(0, 2) });
+    two[id] = { ...two[id], queued: two[id].queued + 1 };
+    return id;
+  });
+  assert.deepEqual(
+    [picked.filter((id) => id === "a").length, picked.filter((id) => id === "b").length],
+    [8, 8],
+  );
 });
 
 test("names, ids and capabilities are tidied", () => {

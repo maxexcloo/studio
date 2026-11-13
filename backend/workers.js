@@ -242,8 +242,8 @@ export function capabilityForProfile(profile) {
 
 /**
  * Which worker runs a job that needs `capability`. With several, an online one
- * wins, then one that already has the profile, then a free one, then one that
- * last ran the job's `model`, then the one with the fewest queued jobs, then
+ * wins, then one that already has the profile, then the one with the least work
+ * (its running job and queue), then one that last ran the job's `model`, then
  * one with the `prefers` capabilities (Smart upscale), then list order: the
  * first, or the last for background work (`last`), keeping the first free for
  * manual work. With none online, the first capable one (its own error then
@@ -273,9 +273,8 @@ export function pickWorker(
     return [
       up === false ? 0 : up === true ? 2 : 1,
       hasModel(worker.id) === true ? 1 : 0,
-      work?.busy ? 0 : 1,
+      -((work?.busy ? 1 : 0) + (work?.queued ?? 0)),
       model && work?.model === model ? 1 : 0,
-      -(work?.queued ?? 0),
       prefers.filter((item) => worker.capabilities.includes(item)).length,
     ];
   };
