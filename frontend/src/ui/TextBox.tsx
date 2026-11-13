@@ -41,7 +41,7 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * Every multi-line text box. Beside the text stand only `send` and, with `tools`, a ⋯ menu of the
- * box's own tools, then Copy (unless `copy` is off, where the page offers it) and Clear (Reset
+ * box's own tools (inside the text's corner for a labelled box), then Copy (unless `copy` is off, where the page offers it) and Clear (Reset
  * where `reset` holds the text to return to), which turns into Undo until the text next changes.
  * The menu is one level deep: a tool with options lists them under its name, first, rather than in
  * a submenu. On phones the box is a summary of its text: tapping it opens it full screen with
@@ -239,6 +239,8 @@ export function TextBox({
       </Menu.Dropdown>
     </Menu>
   );
+  // A labelled box keeps its ⋯ inside the text's corner, sharing its edge with the form's fields.
+  const inside = Boolean(!phone && !send && !hideTools && props.label && menu);
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -266,7 +268,11 @@ export function TextBox({
         if (phone && !props.readOnly && !props.disabled) setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
-      rightSection={editing ? undefined : rightSection}
+      rightSection={editing ? undefined : inside ? menu : rightSection}
+      {...(inside && {
+        rightSectionPointerEvents: "all" as const,
+        rightSectionProps: { style: { alignItems: "flex-start", paddingTop: 4 } },
+      })}
       {...(oneLine && {
         maxRows: resting ? 1 : props.maxRows,
         onFocus: (event) => {
@@ -293,7 +299,7 @@ export function TextBox({
   return (
     <>
       {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
-      {(!phone && menu) || send ? (
+      {(!phone && menu && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (

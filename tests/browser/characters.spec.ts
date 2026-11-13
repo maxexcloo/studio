@@ -216,7 +216,10 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   expect(described).toEqual([{ kind: "characters", assetId: "asset-ranger" }]);
   // Rate Images scores each image as the card's reference.
   await editor.getByRole("button", { name: "Rate Images", exact: true }).click();
-  await expect(editor.getByLabel("Image Ratings")).toContainText("1 · 4/5Clear face");
+  const ratings = editor.getByLabel("Image Ratings");
+  await expect(ratings).toContainText("Image 1");
+  await expect(ratings).toContainText("4/5");
+  await expect(ratings).toContainText("Clear face");
   expect(rated).toEqual([{ kind: "characters", assetIds: ["asset-ranger"] }]);
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   await expect(editor).toBeHidden();
@@ -323,8 +326,26 @@ test("Make Sheet follows the card's sheet until its views show on the card", asy
   await page.reload();
   await expect(card).toContainText("2 images · Sheet");
   const views = card.getByRole("group", { name: "Mara's Sheet", exact: true });
-  for (const role of ["face", "front", "side", "back", "gear"])
+  for (const role of ["Face", "Front", "Side", "Back", "Gear"])
     await expect(views.getByRole("img", { name: `Mara ${role}`, exact: true })).toBeVisible();
+  // A view opens full size over the page, and Escape closes only it.
+  await views.getByRole("button", { name: "Preview Mara Front", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: "Mara Front · 2 of 5", exact: true });
+  await expect(preview).toBeVisible();
+  await preview.getByRole("button", { name: "Next Image", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Mara Side · 3 of 5", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  // The editor shows the sheet too, and makes it again.
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Character", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Edit Character", exact: true });
+  const sheet = editor.getByRole("region", { name: "Sheet", exact: true });
+  await expect(
+    sheet.getByRole("group", { name: "Mara's Sheet", exact: true }).getByRole("img"),
+  ).toHaveCount(5);
+  await sheet.getByRole("button", { name: "Make Sheet Again", exact: true }).click();
+  await expect(sheet.getByRole("status")).toHaveText("Making Sheet…");
 });
 
 test("Outfits and scenes go into the prompt in order from the References sheet, and are made in the Library", async ({
