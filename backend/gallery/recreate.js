@@ -6,7 +6,7 @@ import { gallery } from "./store.js";
  * Recreate's start: the session and job a run made from a finished item joins, so the run is one of
  * its versions. An item without a run of its own (an upload) gets a finished job holding it
  * (`store.recordFinished`) in a Recreate session, made once and reused. The composer then runs the
- * item's suggested prompt (domain/suggested-prompts.ts) there.
+ * item's prompt there: an import's own, or an upload's suggested one (domain/suggested-prompts.ts).
  */
 export function registerRecreateRoute(app, { store }) {
   app.post("/api/gallery/recreate", (req, res) => {
@@ -24,7 +24,7 @@ export function registerRecreateRoute(app, { store }) {
       store.recordFinished(
         ownerId,
         store.createSession(ownerId, "Recreate").id,
-        { prompt: item.suggestedPrompt || "", kind: item.type },
+        { prompt: item.prompt || item.suggestedPrompt || "", kind: item.type },
         {
           operation: item.type === "video" ? "animate" : "image",
           outputs: [

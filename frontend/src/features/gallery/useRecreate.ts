@@ -8,8 +8,8 @@ import type { Action } from "../../ui/ActionBar";
 import { useItemMutation } from "./useItemMutation";
 
 /**
- * Edit › Recreate for an item made without a prompt (an upload), once its suggested prompt is
- * written: the composer opens on that prompt with the model it has for the item's kind, and the run
+ * Edit › Recreate for an item made outside Studio (an upload), once it has a prompt (an import's own
+ * or a written suggestion): the composer opens on that prompt with the model it has for the item's kind, and the run
  * is one of the item's versions (backend/gallery/recreate.js).
  */
 export function useRecreateAction(item: MediaItem, onApplied: () => void): Action {
@@ -33,7 +33,7 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
         references: [],
         input: {
           ...previous.input,
-          prompt: item.suggestedPrompt || "",
+          prompt: item.prompt || item.suggestedPrompt || "",
           seed: "",
           referenceAssets: [],
           referenceDetails: [],
@@ -47,9 +47,11 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
   return {
     id: "prompt-composer",
     label: "Recreate in Composer",
-    description: "Open its suggested prompt in the composer",
+    description: item.prompt
+      ? "Open its prompt in the composer"
+      : "Open its suggested prompt in the composer",
     icon: icons.prompt,
-    disabled: !item.suggestedPrompt || recreate.isPending,
+    disabled: !(item.prompt || item.suggestedPrompt) || recreate.isPending,
     loading: recreate.isPending,
     onClick: () => recreate.mutate(),
   };
