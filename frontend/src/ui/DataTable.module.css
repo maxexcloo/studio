@@ -1,0 +1,8 @@
+/* The outer cells drop their side padding, so the table's text and actions line up with the
+   heading, toolbar and other content of its dialog or section. */
+.cell:first-child {
+  padding-inline-start: 0;
+}
+.cell:last-child {
+  padding-inline-end: 0;
+}
