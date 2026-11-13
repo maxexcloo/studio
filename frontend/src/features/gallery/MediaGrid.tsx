@@ -73,8 +73,8 @@ interface GridLayout {
 const headingHeight = 36;
 const sectionSpace = 12;
 
-/** A layout being built, with each lane's next free top. */
-type Building = GridLayout & { lanes: number[] };
+/** A layout being built, with each lane's next free top and the last tile's result set. */
+type Building = GridLayout & { lanes: number[]; lastSet?: string };
 
 /**
  * Adds `items` to a masonry of `columns` lanes: each tile joins the shortest lane. With `byDay`,
@@ -91,8 +91,10 @@ function place(
   for (const item of items) {
     const index = layout.tiles.length;
     const day = byDay ? mediaDay(item) : "";
-    // An undated item stays in the day before it.
-    if (!index || (day && day !== layout.sections.at(-1)!.day)) {
+    // An undated item, and a result set's later results, stay in the day before them.
+    const setMate = Boolean(item.resultSet && item.resultSet.id === layout.lastSet);
+    layout.lastSet = item.resultSet?.id;
+    if (!index || (day && !setMate && day !== layout.sections.at(-1)!.day)) {
       const top = index ? Math.max(...layout.lanes) - gap + sectionSpace : 0;
       layout.sections.push({ day, first: index, top });
       layout.lanes = Array(columns).fill(top + (day ? headingHeight : 0));

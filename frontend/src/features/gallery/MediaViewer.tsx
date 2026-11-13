@@ -36,7 +36,7 @@ import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
-import { setMembers, setPosition } from "./resultSets";
+import { neighbourSets, setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
@@ -365,6 +365,7 @@ export function MediaViewer({
   const family = useRunFamily(item, queued, related);
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
+  const neighbours = neighbourSets(related, item);
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
@@ -770,6 +771,7 @@ export function MediaViewer({
               item={displayed}
               family={family}
               set={members}
+              neighbours={neighbours}
               choose={(next) => {
                 setCompare(false);
                 navigate?.(next);

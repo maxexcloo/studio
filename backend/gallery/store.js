@@ -12,7 +12,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadSharp } from "../sharp-loader.js";
 import { localOutputFile } from "../comfy/comfy.js";
-import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from "./order.js";
+import {
+  compareGalleryItems,
+  compareGalleryKeys,
+  galleryOrderKey,
+  galleryTime,
+  groupSets,
+} from "./order.js";
 import { currentDataDir } from "../data-dir.js";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { replyTitle } from "../../shared/titles.ts";
@@ -243,12 +249,14 @@ function visibleItems({
   let entry = lists.get(listKey);
   if (!entry) {
     // The gallery is kept sorted, so this sort only confirms the order (linear on sorted input).
-    const items = sortGallery(visibleGallery()).filter((item) => {
-      if (type && item.type !== type) return false;
-      if (Boolean(item.uploaded) !== uploads) return false;
-      if (!includeFailed && item.status === "failed") return false;
-      return item.status !== "cancelled";
-    });
+    const items = groupSets(
+      sortGallery(visibleGallery()).filter((item) => {
+        if (type && item.type !== type) return false;
+        if (Boolean(item.uploaded) !== uploads) return false;
+        if (!includeFailed && item.status === "failed") return false;
+        return item.status !== "cancelled";
+      }),
+    );
     entry = { items, positions: null };
     visibleListBuilds += 1;
     lists.set(listKey, entry);

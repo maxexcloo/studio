@@ -109,3 +109,23 @@ test("a ranked page (Find Similar) orders by score, leaves out the unscored and 
   assert.equal(first.totalApprox, 3);
   assert.deepEqual(ids(pageGallery({ rank, limit: 2, cursor: first.nextCursor }).items), ["a"]);
 });
+
+test("a result set's results page together in set order, where its newest result sorts", () => {
+  const set = (index) => ({ resultSet: { id: "set", title: "Variety Test", index } });
+  setGallery([
+    item("newest", "2026-01-05"),
+    item("set-2", "2026-01-04", set(2)),
+    item("between", "2026-01-03"),
+    item("set-0", "2026-01-02", set(0)),
+    item("set-1", "2026-01-01", set(1)),
+    item("oldest", "2025-12-31"),
+  ]);
+  const collected = [];
+  let cursor = "";
+  do {
+    const page = pageGallery({ cursor, limit: 2 });
+    collected.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+  assert.deepEqual(ids(collected), ["newest", "set-0", "set-1", "set-2", "between", "oldest"]);
+});
