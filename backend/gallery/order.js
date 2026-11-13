@@ -41,3 +41,30 @@ export function compareGalleryKeys(a, b) {
 export function compareGalleryItems(a, b) {
   return compareGalleryKeys(galleryOrderKey(a), galleryOrderKey(b));
 }
+
+const setOrder = (a, b) =>
+  (Number(a.resultSet.index) || 0) - (Number(b.resultSet.index) || 0) ||
+  galleryTime(a) - galleryTime(b) ||
+  (Number(a.index) || 0) - (Number(b.index) || 0);
+
+/**
+ * Sorted items with each MCP result set's results together, in the set's order (prompt order,
+ * then as made), where its newest result sorts.
+ */
+export function groupSets(items) {
+  const sets = new Map();
+  for (const item of items) {
+    const id = item.resultSet?.id;
+    if (!id) continue;
+    if (sets.has(id)) sets.get(id).push(item);
+    else sets.set(id, [item]);
+  }
+  if (!sets.size) return items;
+  const grouped = [];
+  for (const item of items) {
+    const members = sets.get(item.resultSet?.id);
+    if (!members) grouped.push(item);
+    else if (members[0] === item) grouped.push(...[...members].sort(setOrder));
+  }
+  return grouped;
+}
