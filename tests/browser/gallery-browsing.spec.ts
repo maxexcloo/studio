@@ -3,7 +3,7 @@ import {
   closeReferences,
   expandComposer,
   fixtures,
-  gallerySearch,
+  toolbarSearch,
   image,
   selectionAction,
   selectionMenuItem,
@@ -92,7 +92,7 @@ test("Select All takes every match across pages, and the search and Starred stay
   const starred = page.getByRole("button", { name: "Starred", exact: true });
   await starred.click();
   await expect(starred).toHaveAttribute("aria-pressed", "true");
-  await (await gallerySearch(page)).fill("Browse");
+  await (await toolbarSearch(page)).fill("Browse");
   await expect.poll(() => requests.at(-1)?.get("q")).toBe("Browse");
   const select = page.getByRole("button", { name: "Select Items", exact: true });
   await select.click();
@@ -712,12 +712,12 @@ test("Gallery search closes cleanly and the status panel stops active and clears
       updatedAt: stamp,
     });
   await page.goto("/");
-  const search = await gallerySearch(page);
+  const search = await toolbarSearch(page);
   await search.fill("birds");
   await search.press("Escape");
   // Desktop keeps its box and query; closing the phone's search clears it.
   const phone = test.info().project.use.isMobile;
-  await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
+  await expect(await toolbarSearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   // Starred and Uploads are toolbar toggles, one at a time.
   await showOnly(page, "Starred");
@@ -896,7 +896,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
   await chips.getByRole("button", { name: "Remove Square Filter", exact: true }).click();
   await expect(removable).toHaveCount(5);
   // The search narrows within them.
-  const search = await gallerySearch(page);
+  const search = await toolbarSearch(page);
   await search.fill("bird");
   await expect
     .poll(() => {
@@ -933,7 +933,7 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
       }),
     )
     .toBe(true);
-  await expect(await gallerySearch(page)).toHaveValue(expected);
+  await expect(await toolbarSearch(page)).toHaveValue(expected);
 });
 
 test("The phone Generations drawer fills the screen height and swipes away", async ({
