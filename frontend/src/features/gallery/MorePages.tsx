@@ -44,8 +44,7 @@ export function MorePages({
   }, [hasNextPage, isFetching, isFetchNextPageError, failed, fetchNextPage, paused, root]);
   if (!hasNextPage) return null;
   return (
-    <Center mih={44}>
-      <div ref={trigger} aria-hidden="true" />
+    <Center ref={trigger} mih={44}>
       {failed ? (
         <Stack gap={4} align="center">
           <Text size="sm" c="dimmed">
