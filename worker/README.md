@@ -18,16 +18,10 @@ and 1 replicas; see
 [runtime control](../README.md#runtime-control) for
 the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
-finished, so a switch waits for it. Idle workers keep running unless Park When
-Idle parks them.
+finished, so a switch waits for it.
 
 Studio refuses to target its text gateway's origin (`STUDIO_ASSISTANT_URL`) as a
 worker.
-
-Automatic lifecycle control (Settings › Workers › Automatic Control) never stops or starts
-text workers; only an administrator's change in Settings › Workers or the control
-MCP tools does. Runtime status and control are administrator-only at
-`/api/runtime`.
 
 CPU checks: `node --test backend/runtime/*.test.ts` and `mise run test:python`; no
 GPU is needed. GPU startup and actual inference need separate deployment
