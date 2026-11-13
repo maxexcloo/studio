@@ -431,7 +431,7 @@ test("Custom follows its instruction, and only Uncensored Models lift the explic
   });
   assert.match(
     seen.calls.at(-1).body.messages[0].content,
-    /"make it summer"\nEvery person in it is an adult\. Explicit/,
+    /"make it summer"\nEvery person in it is an adult, 18 or older,[^\n]*Explicit/,
   );
 });
 

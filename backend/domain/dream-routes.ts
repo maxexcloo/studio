@@ -2,7 +2,7 @@ import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
 
 // What Dream's settings route accepts: the ranges of its numbers and its on/off switches.
-const limits = { buffer: [1, 50], dailyImages: [0, 500], dailyVideos: [0, 100] } as const;
+const limits = { dailyImages: [0, 500], dailyVideos: [0, 100] } as const;
 const switches = ["enabled", "paused", "videos", "spicy"] as const;
 
 /** The caller's own Dream: settings, the unseen pool, verdicts and discards. */
