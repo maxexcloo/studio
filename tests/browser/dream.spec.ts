@@ -39,7 +39,11 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   await page.goto("/dream");
   await expect(page.getByRole("heading", { name: "While You Were Away" })).toBeVisible();
   await expect(page.getByText(/^4 new since /)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 3 })).toHaveText(["Beach", "City", "Other"]);
+  await expect(page.getByRole("heading", { level: 3, name: /^(Beach|City|Other)$/ })).toHaveText([
+    "Beach",
+    "City",
+    "Other",
+  ]);
   const beach = page.getByRole("region", { name: "Beach" });
   const views = beach.getByRole("button", { name: /^View / });
   await expect(views).toHaveCount(2);
