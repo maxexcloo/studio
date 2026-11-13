@@ -15,6 +15,7 @@ import { mayUseFeature } from "../account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
 import { registerManageTools } from "./manage.js";
+import { createChatChoices, registerProjectTool } from "./project.js";
 import { registerGenerateTools } from "./generate.js";
 import { registerResultTools } from "./results.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
@@ -139,6 +140,7 @@ export function registerMcpRoutes(
   const assistantFor = (account) =>
     assistantGateway && (!account || mayUseFeature(account, "promptAssistant"));
   const chatAssistant = createChatAssistantMemory({ dataDir });
+  const chatChoices = createChatChoices({ dataDir });
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
   app.use("/api/models", (req, _res, next) => {
     if (req.method !== "GET" ? true : req.path === "/" && req.query.cached !== "1")
@@ -322,9 +324,11 @@ export function registerMcpRoutes(
         recentGenerates,
         previews,
         chatAssistant,
+        chatChoices,
       });
       registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds });
       registerManageTools({ tool, server, media, owner, refs, resolve });
+      registerProjectTool({ tool, server, media, owner, chat: actor.conversation, namedInTier });
       if (actor.admin)
         registerAdminTools({
           tool,

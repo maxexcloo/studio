@@ -1,12 +1,16 @@
 import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
+import { projectPatch, type Projects } from "./projects.ts";
 
 // What Dream's settings route accepts: the ranges of its numbers and its on/off switches.
 const limits = { dailyImages: [0, 500], dailyVideos: [0, 100] } as const;
 const switches = ["enabled", "paused", "videos", "spicy"] as const;
 
-/** The caller's own Dream: settings, the unseen pool, verdicts and discards. */
-export function registerDreamRoutes(app: object, { dream }: { dream: Dream }) {
+/** The caller's own Dream: settings, the unseen pool, verdicts, discards and projects. */
+export function registerDreamRoutes(
+  app: object,
+  { dream, projects }: { dream: Dream; projects: Projects },
+) {
   const owner = (account: RouteAccount) => account?.userId || "";
   const refused = {
     status: 403,
@@ -64,6 +68,56 @@ export function registerDreamRoutes(app: object, { dream }: { dream: Dream }) {
     await dream.save(owner(account), patch);
     return { status: 200, payload: show(owner(account)) };
   });
+  /** A project route's answer, or its refusal. */
+  const answer = (run: () => Record<string, unknown>) => {
+    try {
+      return { status: 200, payload: run() };
+    } catch (error) {
+      return refuse(error);
+    }
+  };
+  const chatOf = (body: Record<string, unknown> | undefined) => {
+    const chat = body?.chat;
+    if (typeof chat !== "string" || !chat || chat.length > 300)
+      throw Object.assign(new Error("Name the chat."), { status: 400 });
+    return chat;
+  };
+  route("GET", "/api/dream/projects", (account) => ({
+    status: 200,
+    payload: { projects: projects.list(owner(account)) },
+  }));
+  route("POST", "/api/dream/projects", (account, { body }) =>
+    answer(() => ({ project: projects.create(owner(account), projectPatch(body)) })),
+  );
+  // A chat's change (`?by=chat`) shows as one on the Dream page, beside its Undo.
+  route("PUT", "/api/dream/projects/:projectId", (account, { params, query, body }) =>
+    answer(() => ({
+      project: projects.update(
+        owner(account),
+        params.projectId,
+        projectPatch(body),
+        query?.by === "chat" ? "chat" : "studio",
+      ),
+    })),
+  );
+  route("POST", "/api/dream/projects/:projectId/undo", (account, { params }) =>
+    answer(() => ({ project: projects.undo(owner(account), params.projectId) })),
+  );
+  route("DELETE", "/api/dream/projects/:projectId", (account, { params }) =>
+    answer(() => (projects.remove(owner(account), params.projectId), { ok: true })),
+  );
+  // MCP's: attach a chat to a project (null detaches), and read its project as it asks for work.
+  route("POST", "/api/dream/projects/attach", (account, { body }) =>
+    answer(() => {
+      const projectId = body?.projectId;
+      if (projectId !== null && typeof projectId !== "string")
+        throw Object.assign(new Error("Choose a project, or null to detach."), { status: 400 });
+      return { project: projects.attach(owner(account), chatOf(body), projectId) };
+    }),
+  );
+  route("POST", "/api/dream/projects/activity", (account, { body }) =>
+    answer(() => ({ project: projects.activity(owner(account), chatOf(body)) })),
+  );
   route("GET", "/api/dream/calibration", (account, { query }) => {
     const limit = Math.max(
       1,
