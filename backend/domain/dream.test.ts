@@ -17,6 +17,7 @@ import {
   type DreamProfile,
 } from "./dream.ts";
 import { registerDreamRoutes } from "./dream-routes.ts";
+import { createProjects } from "./projects.ts";
 import { writtenJob, type GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
 import { queuePriority, Store } from "./store.ts";
@@ -515,13 +516,18 @@ test("Dream skips unavailable accounts and offline services, logging each reason
 
 /** Serves the Dream routes; `request` answers as the user named in its last argument. */
 async function serve(t: TestContext, dream: ReturnType<typeof createDream>) {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-projects-"));
+  t.after(() => {
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
     next();
   });
-  registerDreamRoutes(app as never, { dream });
+  registerDreamRoutes(app as never, { dream, projects: createProjects({ dataDir }) });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {

@@ -20,6 +20,7 @@ import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
+import { DreamProjects } from "./DreamProjects";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
 import { dreamQuery, dreamWhen, type Dream } from "./queries";
 import classes from "./DreamPage.module.css";
@@ -77,13 +78,13 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   );
 }
 
-/** Dream: the deck with its pause and settings, the discards or the taste profile. */
+/** Dream: the deck with its pause and settings, the discards, projects or the taste profile. */
 export function DreamPage() {
   const phone = usePhone();
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
   // Dream always opens on the deck; Taste is its own control beside Settings.
-  const [view, setView] = useState<"deck" | "discarded" | "taste">("deck");
+  const [view, setView] = useState<"deck" | "discarded" | "projects" | "taste">("deck");
   const taste = {
     variant: view === "taste" ? "light" : "subtle",
     color: view === "taste" ? undefined : "gray",
@@ -103,6 +104,7 @@ export function DreamPage() {
           data={[
             { value: "deck", label: "Deck" },
             { value: "discarded", label: "Discarded" },
+            { value: "projects", label: "Projects" },
           ]}
         />
         <Group gap={4} wrap="nowrap" ml="auto">
@@ -141,6 +143,8 @@ export function DreamPage() {
       )}
       {view === "discarded" ? (
         <DiscardedDreams />
+      ) : view === "projects" ? (
+        <DreamProjects />
       ) : view === "taste" ? (
         phone ? (
           <TasteProfile fill />

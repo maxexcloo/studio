@@ -360,3 +360,76 @@ test("The Dream tab counts the results waiting for a verdict", async ({ page }) 
   await expect(current(page)).toContainText("Dream prompt two");
   await expect(tab).toHaveAccessibleDescription("2 Unseen");
 });
+
+test("Dream's projects are created, edited, undone and deleted in dialogs", async ({
+  page,
+  isMobile,
+}) => {
+  await fixtures(page);
+  const dream = await serveDream(page, {
+    projects: [
+      {
+        id: "project-coast",
+        name: "Coast",
+        brief: { subjects: "Seabirds", styles: "", avoid: "" },
+        constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+        previous: {
+          name: "Coast",
+          brief: { subjects: "Gulls", styles: "", avoid: "" },
+          constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+          by: "chat",
+        },
+      },
+    ],
+  });
+  await page.goto("/dream");
+  await page.getByText("Projects", { exact: true }).click();
+  const coast = page.getByRole("region", { name: "Coast", exact: true });
+  // A chat's change shows with Undo, which restores what it replaced.
+  await expect(coast).toContainText("Changed by a chat");
+  await coast.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(coast).toContainText("Gulls");
+  await expect(coast.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
+
+  await page.getByRole("button", { name: "New Project", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New Project", exact: true });
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Harbour");
+  if (isMobile) {
+    await editor.getByRole("textbox", { name: "Avoid", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Avoid", exact: true });
+    await sheet.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
+    await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  } else await editor.getByRole("textbox", { name: "Avoid", exact: true }).fill("people");
+  await editor.getByRole("checkbox", { name: "Use LoRAs", exact: true }).uncheck();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(editor).toBeHidden();
+  const harbour = page.getByRole("region", { name: "Harbour", exact: true });
+  await expect(harbour).toContainText("people");
+  await expect(harbour).toContainText("No LoRAs");
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "POST",
+    path: "/api/dream/projects",
+    body: { name: "Harbour", brief: { avoid: "people" }, constraints: { loras: false } },
+  });
+
+  await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Project", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit Project", exact: true });
+  await edit.getByRole("checkbox", { name: "Use LoRAs", exact: true }).check();
+  await edit.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(edit).toBeHidden();
+  await expect(harbour).not.toContainText("No LoRAs");
+  await expect(harbour).toContainText("Changed");
+
+  await harbour.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete Project", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Project", exact: true })
+    .getByRole("button", { name: "Delete Project", exact: true })
+    .click();
+  await expect(harbour).toBeHidden();
+  expect(dream.requests.at(-1)).toMatchObject({
+    method: "DELETE",
+    path: "/api/dream/projects/project-2",
+  });
+});

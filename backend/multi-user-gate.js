@@ -63,6 +63,11 @@ const ordinaryRoutes = [
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
+  // Dream projects are the requester's own (domain/projects.ts).
+  ["GET", /^\/api\/dream\/projects$/],
+  ["POST", /^\/api\/dream\/projects(\/(attach|activity)|\/[\w-]+\/undo)?$/],
+  ["PUT", /^\/api\/dream\/projects\/[\w-]+$/],
+  ["DELETE", /^\/api\/dream\/projects\/[\w-]+$/],
   // More Like This Set queues into the requester's own set (result-sets.js).
   ["POST", /^\/api\/result-sets\/more$/],
   ["GET", /^\/api\/(finishing|upscale\/status)$/],

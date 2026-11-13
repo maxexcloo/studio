@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
+import type { Project } from "../../../../shared/projects";
 
 /** One account's Dream settings (backend/domain/dream.ts). */
 export interface DreamSettings {
@@ -78,3 +79,10 @@ export const dreamWhen = ({ settings, today }: Dream) =>
     `${today.images} of ${settings.dailyImages} today`,
     ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
   ].join(" · ");
+
+export const projectsQuery = queryOptions({
+  queryKey: ["dream", "projects"],
+  queryFn: () => api<{ projects: Project[] }>("/api/dream/projects"),
+});
+export const projectPath = (project: { id: string }, action = "") =>
+  `/api/dream/projects/${encodeURIComponent(project.id)}${action && `/${action}`}`;

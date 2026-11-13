@@ -43,6 +43,7 @@ import { output, shortPrompt } from "./results.js";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { resolutions } from "../../shared/resolution.ts";
+import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { accessFeatures } from "../account-policy.js";
 import { isCloudProfile } from "../../shared/profiles.ts";
 import { compareVariants } from "../../shared/compare.ts";
@@ -158,6 +159,7 @@ export function registerGenerateTools({
   recentGenerates,
   previews,
   chatAssistant,
+  chatChoices,
 }) {
   const { owner, refs, conversation } = actor;
   // A guide goes to each conversation (each MCP session without a conversation header, else the account).
@@ -900,7 +902,25 @@ export function registerGenerateTools({
     media.adopt(owner, refs, { assets: referenceIds });
     return { ...card, referenceIds };
   };
+  /** The chat's project, noting the request; none without a chat or where Dream is unavailable. */
+  const attachedProject = (signal) =>
+    conversation
+      ? media
+          .request("POST", "/api/dream/projects/activity", { chat: conversation }, owner, {
+            signal,
+          })
+          .then(
+            ({ project }) => project || null,
+            () => null,
+          )
+      : null;
   const generateOnce = async (input, signal, accepted) => {
+    const project = await attachedProject(signal);
+    const choices = chatChoices.read(owner, conversation);
+    const remembered = keptChoices(choices, structuredClone(input));
+    const constrained = project
+      ? projectArgs(project, remembered.args)
+      : { args: remembered.args, note: "" };
     const {
       kind,
       tier: wanted,
@@ -911,7 +931,7 @@ export function registerGenerateTools({
       each_profile,
       title,
       ...args
-    } = structuredClone(input);
+    } = constrained.args;
     if (args.reference_asset_ids)
       args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
     const views = args.character_views === true;
@@ -973,6 +993,7 @@ export function registerGenerateTools({
       throw new Error(
         `Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts, an array of strings, with the user's words as request${Object.keys(input).length ? "" : " (this call had no arguments)"}. Then call generate again.`,
       );
+    if (project) assertAvoided(project, args.prompts);
     if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
       throw new Error(
         "Pass one of profile_id (one model), profile_ids (several) or each_profile (every model of kind and tier), then call generate again.",
@@ -1040,11 +1061,22 @@ export function registerGenerateTools({
           : null;
       const fits = fromRequest && (fromRequest.profile.mediaInputs || []).length >= references;
       if (fits) modelNamed = true;
+      // The model this chat chose earlier, unless this call names another, a tier or a character.
+      const keptId = choices[kind || "image"]?.profile_id;
+      let keptModel = null;
+      if (args.profile_id === undefined && !fits && keptId && !input.tier && !card)
+        try {
+          keptModel = namedInTier(await media.profiles(kind || "all", owner), keptId);
+          remembered.kept.push(keptModel.profile.label || keptId);
+        } catch {
+          // Gone or no longer granted: Studio picks as usual.
+        }
       targets = [
         args.profile_id === undefined
           ? fits
             ? fromRequest
-            : picked(
+            : keptModel ||
+              picked(
                 await media.choices(owner, {
                   kind,
                   tier: wanted,
@@ -1080,6 +1112,22 @@ export function registerGenerateTools({
         }
       }
     }
+    let projectNote = "";
+    if (project) {
+      const kept = projectTargets(project, targets, await media.profiles("all", owner), {
+        references,
+      });
+      targets = kept.targets;
+      projectNote = `${constrained.note}${kept.note}${briefLine(project)}`;
+    }
+    if (remembered.kept.length)
+      projectNote = `Kept from earlier: ${remembered.kept.join(", ")}. ${projectNote}`;
+    chatChoices.remember(
+      owner,
+      conversation,
+      input,
+      input.profile_id !== undefined && targets.length === 1 ? targets[0].profile.id : undefined,
+    );
     targets = targets.map((target) => ({
       ...target,
       profile: media.profileForBackend(target.profile, target.profile.namedBackend),
@@ -1227,7 +1275,7 @@ export function registerGenerateTools({
         content: [
           {
             type: "text",
-            text: `Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
+            text: `${projectNote}Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
           },
         ],
       };
@@ -1270,7 +1318,7 @@ export function registerGenerateTools({
         sets.push(set);
         if (set.queued.jobs.length) accepted.push(set);
       }
-      return respondSets(sets, "", signal, await comparisonOf(sets));
+      return respondSets(sets, projectNote, signal, await comparisonOf(sets));
     }
     const [{ profile, note: tierNote, plan, source }] = plans;
     // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.
@@ -1305,7 +1353,7 @@ export function registerGenerateTools({
       signal,
       submission.guide,
       source,
-      `${tierNote || ""}${faceNote}${viewsNote}`,
+      `${projectNote}${tierNote || ""}${faceNote}${viewsNote}`,
     );
   };
   tool(
