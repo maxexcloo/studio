@@ -8,8 +8,9 @@ import {
   noteWorkerProfiles,
   withComfyBackend,
   workerAvailability,
+  workerReachable,
 } from "../comfy/backends.js";
-import { comfy, comfyUrl, demoMode, isComfyTimeout, optionsFor } from "../comfy/comfy.js";
+import { comfy, comfyUrl, demoMode, optionsFor } from "../comfy/comfy.js";
 import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { visibleGallery } from "../gallery/store.js";
@@ -59,14 +60,6 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   const emptyContext = { info: null, stats: null, fetchedAt: 0 };
   const contextCaches = new Map();
   const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
-  // A stopped extra worker fails slowly (a name that no longer resolves, a refused
-  // connection), so its failure is remembered briefly rather than retried on every
-  // catalogue load and run.
-  // The default worker is always asked: its absence is what the studio's offline screen shows.
-  const workerUnreachableForMs = 30_000;
-  const workerUnreachableUntil = new Map();
-  const backendUnreachable = (error) =>
-    error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error);
 
   // One fetch of a worker's context at a time: callers that arrive meanwhile share it.
   const shareContextRequest = sharedRequests();
@@ -151,14 +144,12 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
    * catalogue never waits on a worker's node list, which a large remote ComfyUI takes seconds to send.
    */
   async function backendModels(backend, force = false) {
-    const extra = !isDefaultBackend(backend);
-    if (extra && Date.now() < (workerUnreachableUntil.get(backend) || 0))
+    // A stopped extra worker fails slowly (a name that no longer resolves, a refused connection), so
+    // it is not asked again while its failure is recent (backends.js). The default worker is always
+    // asked: its absence is what the studio's offline screen shows.
+    if (!isDefaultBackend(backend) && workerReachable(backend) === false)
       throw new Error(`${workerById(backend)?.name || "That worker"} did not answer just now.`);
-    const forget = (error) => {
-      if (extra && backendUnreachable(error))
-        workerUnreachableUntil.set(backend, Date.now() + workerUnreachableForMs);
-      contextCaches.delete(backend);
-    };
+    const forget = () => contextCaches.delete(backend);
     return withComfyBackend(backend, async () => {
       try {
         const known = !force && contextFor(backend).info ? contextFor(backend) : null;
