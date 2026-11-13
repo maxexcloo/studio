@@ -9,10 +9,6 @@ checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 The image starts ComfyUI on port 8188 with arguments from `CLI_ARGS`. Supply
 model directories and GPU placement in the deployment, owned by kubelab.
 
-The image sets `HSA_TOOLS_DISABLE_REGISTER=1` to prevent ROCm from consuming a
-CPU core per idle worker. This disables HSA profiler/tool registration; override
-the variable to `0` when profiling with ROCm tools.
-
 Studio starts and stops workers by scaling their Kubernetes deployments between 0
 and 1 replicas; see
 [runtime control](../README.md#runtime-control) for
