@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
 import { createCatalogueStore } from "./catalogue.js";
+import { civitaiAvailability } from "./availability.js";
 import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
 import { withCatalogueSources } from "../catalogue-downloads.js";
 
@@ -53,6 +54,58 @@ test("a newer free version of the same family is an update; a paid newest one su
   assert.equal(publicUpdate(fromV1).freeAlternative.downloadable, true);
 });
 
+test("other precisions of a release are variants; a newer release offers the installed precision", () => {
+  const file = (id, fp, digit) => ({
+    id,
+    name: `FinePorn_${id}_${fp}.safetensors`,
+    type: "Diffusion Model",
+    primary: true,
+    sizeKB: 1,
+    metadata: { format: "SafeTensor", fp },
+    hashes: { SHA256: sha(digit) },
+  });
+  const version = (id, name, publishedAt, files, extra = {}) => ({
+    id,
+    name,
+    baseModel: "Krea 2",
+    publishedAt,
+    availability: "Public",
+    status: "Published",
+    files,
+    ...extra,
+  });
+  const v6Int8 = version(64, "V6 INT8", "2026-10-31T00:00:00Z", [file(640, "int8", "6")]);
+  // Published later, and in early access: Civitai reports it only as earlyAccessDeadline and paidAccess.
+  const v6Bf16 = version(65, "V6 BF16", "2026-11-12T00:00:00Z", [file(650, "bf16", "7")], {
+    earlyAccessDeadline: "2026-11-15T00:00:00Z",
+    paidAccess: { permanent: false, endsAt: "2026-11-15T00:00:00Z" },
+  });
+  const v7Fp8 = version(71, "V7 FP8", "2026-11-20T00:00:00Z", [file(710, "fp8", "8")]);
+  const v7Int8 = version(72, "V7 INT8", "2026-11-18T00:00:00Z", [file(720, "int8", "9")]);
+  const entry = { sha256: sha("6"), source: { provider: "civitai", modelId: 9, versionId: 64 } };
+  const check = (...modelVersions) =>
+    civitaiUpdate(
+      entry,
+      { id: 9, name: "FinePorn", type: "Checkpoint", modelVersions },
+      {
+        now: Date.parse("2026-11-13T00:00:00Z"),
+      },
+    );
+  assert.deepEqual(check(v6Bf16, v6Int8), { state: "current", note: "" });
+  assert.equal(civitaiAvailability(v6Bf16, v6Bf16.files[0], { now }).reason, "early-access");
+  const matched = check(v7Fp8, v7Int8, v6Bf16, v6Int8);
+  assert.deepEqual(
+    [matched.state, matched.latest.name, matched.latest.file, matched.note],
+    ["available", "V7 INT8", "FinePorn_720_int8.safetensors", "V7 INT8 is newer than V6 INT8."],
+  );
+  const other = check(v7Fp8, v6Bf16, v6Int8);
+  assert.deepEqual(
+    [other.state, other.latest.unavailable.reason, other.note],
+    ["available", "precision", "V7 FP8 is newer than V6 INT8 but comes only in FP8."],
+  );
+  assert.equal(publicUpdate(other).latest.downloadable, false, "never swaps precision itself");
+});
+
 test("a Hugging Face file with a new checksum on main is an update under its own name", () => {
   const entry = {
     file: "style.safetensors",
@@ -75,6 +128,9 @@ test("a Hugging Face file with a new checksum on main is an update under its own
     ],
   );
   assert.equal(hfUpdate(entry, { sha: "b".repeat(40), siblings: [] }).state, "error");
+  const variant = metadata("a");
+  variant.siblings.push({ rfilename: "loras/style-fp8.safetensors", lfs: { sha256: sha("d") } });
+  assert.equal(hfUpdate(entry, variant).state, "current", "another precision in the repo");
 });
 
 test("an installed catalogue download is checked at its pinned commit and updates under its own name", () => {
@@ -169,6 +225,21 @@ test("Check Updates marks Update Available, and nothing downloads on its own", a
   // A restart reads the state back.
   const again = createUpdateChecker({ dataDir: h.dir, catalogue: h.catalogue });
   assert.equal(again.summary().available, 1);
+  // A check that can't reach the provider no longer reports the update.
+  const refused = createUpdateChecker({
+    dataDir: h.dir,
+    catalogue: h.catalogue,
+    installed: async () => h.installed,
+    json: async () => {
+      throw new Error("Civitai requires a token or access to this resource.");
+    },
+  });
+  const failed = await refused.check();
+  assert.equal(failed.available, 0);
+  assert.equal(
+    failed.byEntry["checkpoints/nightfall-v1-fp8.safetensors"].note,
+    "The check failed: Civitai requires a token or access to this resource.",
+  );
 });
 
 test("an update that verifies moves the catalogue and removes the old file when nothing uses it", async (t) => {

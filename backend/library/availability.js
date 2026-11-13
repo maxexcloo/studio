@@ -22,8 +22,12 @@ export function civitaiAvailability(
     version.earlyAccessConfig && typeof version.earlyAccessConfig === "object"
       ? version.earlyAccessConfig
       : null;
+  // Civitai's model API reports early access as `earlyAccessDeadline` and `paidAccess`.
+  const paidAccess =
+    version.paidAccess && typeof version.paidAccess === "object" ? version.paidAccess : null;
+  if (paidAccess?.permanent === true) return deny("paid", "Downloads are paid on Civitai.");
   const price = Number(config?.downloadPrice || 0);
-  const ends = version.earlyAccessEndsAt;
+  const ends = version.earlyAccessEndsAt ?? version.earlyAccessDeadline ?? paidAccess?.endsAt;
   let earlyUntil = 0;
   if (ends !== undefined && ends !== null && ends !== "") {
     earlyUntil = Date.parse(String(ends));
