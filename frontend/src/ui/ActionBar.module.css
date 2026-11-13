@@ -76,12 +76,12 @@
   margin-inline: 1px;
 }
 
-/* An icon with options: its ▾ close beside it. */
-.options {
+/* An icon with options: its ▾ close beside it, over Mantine's Button padding whatever the CSS order. */
+.actions .options {
   padding-inline: 8px 6px;
 }
 
-.chevron {
+.actions .chevron {
   margin-inline-start: 2px;
 }
 
