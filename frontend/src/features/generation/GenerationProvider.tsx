@@ -117,6 +117,7 @@ const empty: Draft = {
   parentItemId: undefined,
   presetId: undefined,
   presetTitle: undefined,
+  compare: undefined,
 };
 const emptyProfiles: Profile[] = [];
 const initialDrafts: Record<MediaKind, Draft> = {

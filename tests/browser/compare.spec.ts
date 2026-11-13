@@ -211,9 +211,7 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
   // The run is a set in the gallery that links back to its comparison.
   await page.getByRole("link", { name: "Show in Gallery", exact: true }).click();
   await expect(page).toHaveURL(/\/images\?set=compare-2/);
-  await page
-    .getByRole("button", { name: "Open image: A jade bird in flight", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Open image: Prompt B", exact: true }).click();
   await expect(page.getByTitle("Open Comparison", { exact: true })).toHaveAttribute(
     "href",
     "/compare/compare-2",
