@@ -61,38 +61,33 @@ export function versionSources(items: MediaItem[], jobs: QueueJob[]) {
  * Orders `items` (newest first) as their version trees, each oldest first: an original, then each
  * of its versions followed by that version's own, the branch holding the latest version last.
  * Reversed, the latest version leads and the original ends, each branch kept together. An item
- * whose source is not among them, or is one of its own versions, is an original; trees keep the
- * order of their latest version.
+ * whose source is not among them is an original; trees keep the order of their latest version.
  */
 export function versionTree(items: MediaItem[], sources: Map<string, string>): Version[] {
-  const order = new Map(items.map((item, index) => [item.id, index]));
-  const children = new Map<string | undefined, MediaItem[]>();
-  const parent = new Map<string, string>();
-  // Of sources recorded in a loop, the oldest result's is left out, so it stays the original.
+  const ids = new Set(items.map(({ id }) => id));
+  const originals: MediaItem[] = [];
+  const children = new Map<string, MediaItem[]>();
   for (const item of items) {
-    let key = sources.get(item.id);
-    for (let up = key; up; up = parent.get(up)) if (up === item.id) key = undefined;
-    if (key && order.has(key)) parent.set(item.id, key);
-    else key = undefined;
-    children.set(key, [...(children.get(key) || []), item]);
+    const source = sources.get(item.id);
+    if (source && ids.has(source)) children.set(source, [...(children.get(source) || []), item]);
+    else originals.push(item);
   }
-  const latest = new Map<string, number>();
-  const newest = (item: MediaItem): number => {
-    if (!latest.has(item.id))
-      latest.set(
-        item.id,
-        Math.min(order.get(item.id)!, ...(children.get(item.id) || []).map(newest)),
-      );
-    return latest.get(item.id)!;
-  };
-  const branches = (key?: string) =>
-    [...(children.get(key) || [])].sort((a, b) => newest(b) - newest(a));
+  // Each item's index (newest first) or its latest version's, whichever is newer.
+  const latest = new Map<MediaItem, number>();
+  items.forEach((item, index) => latest.set(item, index));
+  const newest = (item: MediaItem): number =>
+    Math.min(latest.get(item)!, ...(children.get(item.id) || []).map(newest));
+  const branches = (versions: MediaItem[] = []) =>
+    versions
+      .map((item) => ({ item, newest: newest(item) }))
+      .sort((a, b) => b.newest - a.newest)
+      .map(({ item }) => item);
   const tree: Version[] = [];
   const visit = (item: MediaItem, depth: number, source?: string) => {
     tree.push({ item, source, depth });
-    for (const version of branches(item.id)) visit(version, depth + 1, item.id);
+    for (const version of branches(children.get(item.id))) visit(version, depth + 1, item.id);
   };
-  for (const original of branches().reverse()) visit(original, 0);
+  for (const original of branches(originals).reverse()) visit(original, 0);
   return tree;
 }
 
