@@ -14,7 +14,7 @@ import {
 } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Combine, Merge, Plus } from "lucide-react";
+import { ChevronDown, Combine, Merge, Plus, Zap } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
@@ -31,6 +31,7 @@ import {
 } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
+import { ConvertToRadiance } from "./ConvertToRadiance";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 interface ProfileRow {
@@ -40,6 +41,8 @@ interface ProfileRow {
   kind?: string;
   version: number;
   aiDrafted?: boolean;
+  /** A combined profile's current backend. */
+  backend?: string;
 }
 interface GuideRow {
   packId: string;
@@ -240,6 +243,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [merging, setMerging] = useState(false);
   const [combining, setCombining] = useState(false);
+  const [converting, setConverting] = useState<ProfileRow | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   const { profileList, profiles, guideOf } = useDefinitions();
   const stats = useQuery({
@@ -414,7 +418,17 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
                 cell: (entry) => <ProfileUse stats={statsOf(entry.id)} />,
               },
             ]}
-            rowActions={(entry) => rowMenu(setEditing, "profile", "Profile", entry.id)}
+            rowActions={(entry) => (
+              <>
+                {rowMenu(setEditing, "profile", "Profile", entry.id)}
+                {/* A Krea 2 profile on ComfyUI alone can take a converted Radiance backend. */}
+                {entry.family === "krea2" && entry.kind === "image" && !entry.backend && (
+                  <Menu.Item leftSection={<Zap size={16} />} onClick={() => setConverting(entry)}>
+                    Convert to Radiance…
+                  </Menu.Item>
+                )}
+              </>
+            )}
           />
         )}
       </Stack>
@@ -433,6 +447,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
       </Modal>
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       <CombineBackends opened={combining} onClose={() => setCombining(false)} />
+      <ConvertToRadiance profile={converting} onClose={() => setConverting(null)} />
       {editing && (
         <DefinitionEditor
           kind={editing.kind}

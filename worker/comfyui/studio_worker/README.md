@@ -23,6 +23,8 @@ Mount it read-only where possible.
 - `POST /studio/worker/models/file`: `{ "folder": "loras", "file": "example.safetensors", "action": "stat" }`. Actions are `stat`, `hash`, `discard`, explicit `replace` and `remove`; replacement preserves the original as a `.previous.*` file, and `remove` (Library updates) deletes an installed model only when its SHA-256 matches the `sha256` given.
 - `PUT /studio/worker/models/upload`: streamed weights with `folder`, `file`, `offset`, `size` and `sha256` query parameters. `X-Studio-Model-Metadata` contains ASCII-escaped JSON with a source fingerprint and resume validators. Transfers require a published SHA-256 checksum, stay below 256 GiB and never overwrite an existing destination. Partial bytes resume only when their source, checksum and total size match.
 
+- `POST /studio/worker/models/radiance`: `{ "action": "start" | "status" | "cancel" | "clear", … }` converts one Krea 2 fine-tune at a time to a Radiance `.rad` in `RADIANCE_IMAGE_MODELS` (default `/models/radiance-image`), which must be writable on this worker; its work files stay in that folder's `.convert`. Credentials Studio sends reach curl only as a header file.
+
 Model endpoints always require a nonempty matching token. Give the worker with
 the `models` capability a writable models mount.
 Studio keeps Civitai and Hugging Face credentials and fetches the provider;
