@@ -1004,3 +1004,31 @@ test("The Tags facet lists the most used caption tags with counts and filters by
     page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }),
   ).toBeVisible();
 });
+
+test("The viewer's strip moves to the sets either side of its own", async ({ page }) => {
+  const state = await fixtures(page);
+  // Newest first: set B's results, then set A's.
+  state.gallery.push(
+    ...[
+      ["b-0", "Set B", 0],
+      ["a-1", "Set A", 1],
+      ["a-0", "Set A", 0],
+    ].map(([id, title, index], position) => ({
+      ...results(1)[0],
+      id,
+      prompt: `Prompt ${id}`,
+      createdAt: `2026-10-23T00:00:0${3 - position}.000Z`,
+      resultSet: { id: title, title, index },
+    })),
+  );
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Prompt a-1", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
+  await expect(strip.getByRole("listitem")).toHaveCount(3);
+  await strip.getByRole("listitem", { name: "Previous Set: Set B", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "Prompt b-0", exact: true })).toBeVisible();
+  const other = viewer.getByRole("list", { name: "Set: Set B", exact: true });
+  await other.getByRole("listitem", { name: "Next Set: Set A", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
+});
