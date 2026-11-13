@@ -55,3 +55,13 @@ test("a version whose source is not loaded starts its own tree", () => {
     [["edit", "again", "latest"]],
   );
 });
+
+test("sources recorded in a loop still make a tree", () => {
+  const first = result("first", 0, "second");
+  const second = result("second", 1, "first");
+  const groups = versionGroups([second, first], []);
+  assert.deepEqual(
+    groups.map((group) => group.map(({ id }) => id)),
+    [["first", "second"]],
+  );
+});
