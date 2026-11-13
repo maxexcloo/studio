@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dreamItem, fixtures, serveDream } from "./fixtures";
+import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
-const current = (page: Page) => page.getByRole("group", { name: "Current Dream", exact: true });
 /** Clicks a secondary action in full screen's Dream bar, which phones keep under ⋯ More. */
 async function dreamAction(page: Page, phone: boolean, name: string) {
   const actions = page.getByRole("group", { name: "Dream Actions" });
@@ -12,70 +11,98 @@ async function dreamAction(page: Page, phone: boolean, name: string) {
 const verdicts = (state: Awaited<ReturnType<typeof serveDream>>) =>
   state.requests.map((request) => `${request.method} ${request.path}`);
 
-test("The Dream deck judges results with keys, a drag and its buttons", async ({ page }) => {
+test("While You Were Away ranks each project's results, folds its misses and judges them", async ({
+  page,
+  isMobile,
+}) => {
   await fixtures(page);
+  const result = (id: string, projectId: string, score: number, miss = "", createdAt = stamp) =>
+    dreamItem(id, {
+      createdAt,
+      dream: { ...dreamItem(id).dream, projectId },
+      review: { score, miss, model: "vision", at: stamp },
+    });
   const dream = await serveDream(page, {
-    unseen: ["one", "two", "three", "four", "five"].map((id) => dreamItem(id)),
+    since: "2026-10-22T00:00:00.000Z",
+    projects: [
+      { id: "beach", name: "Beach", brief: { subjects: "the sea", styles: "", avoid: "" } },
+      { id: "city", name: "City", brief: { subjects: "", styles: "", avoid: "" } },
+    ],
+    unseen: [
+      result("wave", "beach", 9),
+      result("shore", "beach", 7),
+      result("indoors", "beach", 2, "Indoors; the brief asks for the sea."),
+      result("street", "city", 8, "", "2026-10-20T00:00:00.000Z"),
+      dreamItem("loose"),
+    ],
   });
-  await page.goto("/images");
-  await page.getByRole("link", { name: "Dream", exact: true }).click();
-  await expect(page).toHaveURL(/\/dream$/);
-  await expect(current(page)).toContainText("Because you star one.");
-  await expect(current(page)).toContainText("Dream prompt one");
+  await page.goto("/dream");
+  await expect(page.getByRole("heading", { name: "While You Were Away" })).toBeVisible();
+  await expect(page.getByText(/^4 new since /)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: /^(Beach|City|Other)$/ })).toHaveText([
+    "Beach",
+    "City",
+    "Other",
+  ]);
+  const beach = page.getByRole("region", { name: "Beach" });
+  const views = beach.getByRole("button", { name: /^View / });
+  await expect(views).toHaveCount(2);
+  await expect(views.first()).toHaveAccessibleName("View Dream prompt wave");
+  await expect(beach.getByText("9/10")).toBeVisible();
 
-  const batch = page.getByRole("progressbar", { name: "Dream Batch", exact: true });
-  await expect(batch).toHaveAttribute("aria-valuetext", "1 of 5");
-  await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
-  await expect(batch).toHaveAttribute("aria-valuetext", "2 of 5");
-  await page.keyboard.press("ArrowLeft");
-  await expect(current(page)).toContainText("Dream prompt three");
-  await page.keyboard.press("ArrowUp");
-  await expect(current(page)).toContainText("Dream prompt four");
+  // Misses stay folded until asked for, with what they miss.
+  const misses = beach.getByRole("button", { name: "Misses (1)" });
+  await expect(misses).toHaveAttribute("aria-expanded", "false");
+  await misses.click();
+  await expect(beach.getByText("Indoors; the brief asks for the sea.")).toBeVisible();
 
-  // A drag past a third of the card's width discards it; a short one springs back.
-  const box = (await current(page).boundingBox())!;
-  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  await page.mouse.move(centre.x, centre.y);
-  await page.mouse.down();
-  await page.mouse.move(centre.x - 20, centre.y, { steps: 4 });
-  await page.mouse.up();
-  await expect(current(page)).toContainText("Dream prompt four");
-  await page.mouse.move(centre.x, centre.y);
-  await page.mouse.down();
-  await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
-  await page.mouse.up();
-  await expect(current(page)).toContainText("Dream prompt five");
-
-  // Super Like keeps and stars it, from the deck's bar or the viewer's.
-  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  // Pass, Super Like and Like judge in place.
+  await beach.getByRole("button", { name: "Like Dream prompt wave", exact: true }).click();
+  await expect(beach.getByRole("button", { name: "View Dream prompt wave" })).toHaveCount(0);
+  await beach.getByRole("button", { name: "Pass Dream prompt indoors", exact: true }).click();
   await page
-    .getByRole("group", { name: "Dream Actions" })
-    .getByRole("button", { name: "Super Like", exact: true })
+    .getByRole("region", { name: "City" })
+    .getByRole("button", { name: "Super Like Dream prompt street", exact: true })
     .click();
+
+  // Full screen has every choice and moves on to the next result after a verdict.
+  await beach.getByRole("button", { name: "View Dream prompt shore" }).click();
+  const viewer = page.getByRole("dialog");
+  await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
+  await dreamAction(page, isMobile, "More Like This");
+  await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
+  await viewer
+    .getByRole("group", { name: "Dream Actions" })
+    .getByRole("button", { name: "Pass", exact: true })
+    .click();
+  await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(verdicts(dream)).toEqual([
-    "POST /api/dream/one/keep",
-    "POST /api/dream/two/discard",
-    "POST /api/dream/three/variations",
-    "POST /api/dream/four/discard",
+    "POST /api/dream/wave/keep",
+    "POST /api/dream/indoors/discard",
     "POST /api/gallery/favorite",
+    "POST /api/dream/shore/more",
+    "POST /api/dream/loose/discard",
   ]);
-  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], favorite: true });
 });
 
-test("On a phone held sideways, the Dream card's caption stands beside its media", async ({
+test("On a phone held sideways, a deck card's caption stands beside its media", async ({
   page,
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Only touch screens hold a phone sideways.");
   await fixtures(page);
-  await serveDream(page, { unseen: [dreamItem("one")] });
+  await serveDream(page, {
+    enabled: false,
+    calibration: [{ ...dreamItem("one"), dream: undefined }],
+  });
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto("/dream");
+  await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
   await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
-  const card = (await current(page).boundingBox())!;
-  const why = (await current(page).getByText("Because you star one.").boundingBox())!;
-  expect(why.x).toBeGreaterThan(card.x + card.width / 2);
+  const current = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  const card = (await current.boundingBox())!;
+  const caption = (await current.getByText("Dream prompt one").boundingBox())!;
+  expect(caption.x).toBeGreaterThan(card.x + card.width / 2);
   const like = (await page.getByRole("button", { name: "Like", exact: true }).boundingBox())!;
   expect(like.y + like.height).toBeLessThanOrEqual(390);
 });
@@ -167,7 +194,7 @@ test("Animate keeps a Dream image and stages it in the Videos composer", async (
   const state = await fixtures(page);
   const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
   await page.goto("/dream");
-  await current(page).getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("button", { name: "View Dream prompt fox", exact: true }).click();
   await dreamAction(page, isMobile, "Animate");
   await expect(page).toHaveURL(/\/video/);
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -205,7 +232,6 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
 
 test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
   page,
-  isMobile,
 }) => {
   await fixtures(page);
   const side = (id: string, pair: string, index: 0 | 1, label: string) =>
@@ -226,7 +252,6 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
       side("p2b", "two", 1, "40 Steps"),
       side("p3b", "three", 1, "Guidance 5"),
       side("p3a", "three", 0, "Guidance 3"),
-      dreamItem("last"),
     ],
   });
   await page.goto("/dream");
@@ -254,8 +279,6 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("group", { name: "Which Steps?" })).toContainText("Guidance 3");
   await page.getByRole("button", { name: "Both", exact: true }).click();
-  await current(page).getByRole("button", { name: "View", exact: true }).click();
-  await dreamAction(page, isMobile, "More Like This");
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(
     dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`),
@@ -263,7 +286,6 @@ test("A Dream comparison asks its question and answers with swipes, keys and but
     '/api/dream/pairs/one/answer {"answer":"a"}',
     '/api/dream/pairs/two/answer {"answer":"neither"}',
     '/api/dream/pairs/three/answer {"answer":"both"}',
-    "/api/dream/last/more {}",
   ]);
 });
 
@@ -304,7 +326,7 @@ test("Full screen switches between a comparison's sides and judges from its bar"
       },
     });
   const dream = await serveDream(page, {
-    unseen: [side("sa", 0, "20 Steps"), side("sb", 1, "40 Steps"), dreamItem("solo")],
+    unseen: [side("sa", 0, "20 Steps"), side("sb", 1, "40 Steps")],
   });
   await page.goto("/dream");
   await page
@@ -329,20 +351,12 @@ test("Full screen switches between a comparison's sides and judges from its bar"
     await expect(shown.getByRole("radio", { name: "B · 40 Steps" })).toBeChecked();
   }
 
-  // An answer or a verdict returns to the deck, where the next card shows.
+  // An answer returns to the deck.
   const answers = viewer.getByRole("group", { name: "Comparison Answers" });
   await answers.getByRole("button", { name: "Neither", exact: true }).click();
   await expect(viewer).toBeHidden();
-  await expect(current(page)).toContainText("Dream prompt solo");
-  await current(page).getByRole("button", { name: "View", exact: true }).click();
-  const actions = viewer.getByRole("group", { name: "Dream Actions" });
-  await actions.getByRole("button", { name: "Like", exact: true }).click();
-  await expect(viewer).toBeHidden();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
-  expect(verdicts(dream)).toEqual([
-    "POST /api/dream/pairs/steps/answer",
-    "POST /api/dream/solo/keep",
-  ]);
+  expect(verdicts(dream)).toEqual(["POST /api/dream/pairs/steps/answer"]);
   expect(dream.requests[0].body).toEqual({ answer: "neither" });
 });
 
@@ -355,9 +369,7 @@ test("The Dream tab counts the results waiting for a verdict", async ({ page }) 
     .getByRole("link", { name: "Dream", exact: true });
   await expect(tab).toHaveAccessibleDescription("3 Unseen");
   await tab.click();
-  await expect(current(page)).toContainText("Dream prompt one");
-  await page.keyboard.press("ArrowRight");
-  await expect(current(page)).toContainText("Dream prompt two");
+  await page.getByRole("button", { name: "Like Dream prompt one", exact: true }).click();
   await expect(tab).toHaveAccessibleDescription("2 Unseen");
 });
 

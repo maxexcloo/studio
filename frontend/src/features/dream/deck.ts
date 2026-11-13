@@ -18,19 +18,15 @@ export type DeckCard =
   | { kind: "calibration"; key: string; item: MediaItem }
   | PairDeckCard;
 
-/** The finished Dream results as cards: both sides of a comparison make one pair card. */
+/** Dream's comparisons as cards: both sides of each make one pair card. */
 function dreamCards(dream: DreamItem[]): DeckCard[] {
   const cards: DeckCard[] = [];
   const paired = new Set<string>();
   for (const item of dream) {
     const pair = item.dream?.pair;
-    if (pair && paired.has(pair.id)) continue;
-    const other =
-      pair && dream.find((entry) => entry !== item && entry.dream?.pair?.id === pair.id);
-    if (!pair || !other) {
-      cards.push({ kind: "dream", key: item.id, item });
-      continue;
-    }
+    if (!pair || paired.has(pair.id)) continue;
+    const other = dream.find((entry) => entry !== item && entry.dream?.pair?.id === pair.id);
+    if (!other) continue;
     paired.add(pair.id);
     const [a, b] = pair.side ? [other, item] : [item, other];
     cards.push({

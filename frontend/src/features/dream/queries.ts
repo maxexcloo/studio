@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
-import type { Project } from "../../../../shared/projects";
+import type { DigestGroup, Project, Review } from "../../../../shared/projects";
 
 /** One account's Dream settings (backend/domain/dream.ts). */
 export interface DreamSettings {
@@ -23,7 +23,9 @@ export type DreamItem = MediaItem & {
     spicy?: true;
     /** One side of a comparison: alike but for what `question` asks about. */
     pair?: { id: string; side: 0 | 1; question: string; label: string };
+    projectId?: string;
   };
+  review?: Review;
 };
 /** A comparison's answer: side A or B, both or neither. */
 export type PairAnswer = "a" | "b" | "both" | "neither";
@@ -31,6 +33,10 @@ export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
   unseen: DreamItem[];
+  /** The unseen single results per project, ranked, for While You Were Away. */
+  digest: DigestGroup<DreamItem>[];
+  /** When the visit before this one ended; null on the first. */
+  since: string | null;
   /** What Dream has made today, counted against the daily caps. */
   today: { images: number; videos: number };
   spicyAvailable: boolean;
