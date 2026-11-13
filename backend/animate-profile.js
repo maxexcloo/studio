@@ -20,6 +20,22 @@ export function frameSize(profile, width, height) {
 }
 
 /**
+ * The size a video framed by its first frame (`aspectPolicy` "reference") draws at: frameSize of the
+ * staged start frame. Null where the run keeps its asked size: an image, a profile with manual
+ * framing, no sized start frame, or a frame that only guides (`referenceRole` "reference").
+ */
+export function startFrameSize(profile, body) {
+  if (body.kind !== "video" || profile?.aspectPolicy !== "reference") return null;
+  if (body.referenceRole === "reference") return null;
+  const slot =
+    profile.mediaInputs?.find((item) => item.role === "start") || profile.mediaInputs?.[0];
+  const frame = body.referenceAssets?.find((asset) => asset.slot === slot?.id);
+  return frame?.width > 0 && frame?.height > 0
+    ? frameSize(profile, frame.width, frame.height)
+    : null;
+}
+
+/**
  * The video profile that animates an image when the user named none. `where` picks the pool: `auto`
  * takes the `prefer`red pool (`local` unless asked) while it can run, otherwise the other, with a
  * `note` saying so; `local` and `cloud` (MCP's `runs_on`) take only their own pool and refuse
