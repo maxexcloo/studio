@@ -720,14 +720,20 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           if (own && !identitiesOf(account).length && !account.passwordSignIn) return null;
           return (
             <>
-              {identitiesOf(account).map(({ identity }) => (
+              {identitiesOf(account).map(({ identity }, _, links) => (
                 <Menu.Item
                   key={identity}
                   leftSection={<Unlink size={16} />}
                   disabled={gatewayChange.isPending}
                   onClick={() => gatewayChange.mutate({ kind: "link", identity })}
                 >
-                  Unlink {identity}
+                  Unlink Chat Gateway
+                  {/* The raw identity tells several links apart. */}
+                  {links.length > 1 && (
+                    <Text size="xs" c="dimmed" style={{ wordBreak: "break-all" }}>
+                      {identity}
+                    </Text>
+                  )}
                 </Menu.Item>
               ))}
               {!own && (
