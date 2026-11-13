@@ -26,8 +26,6 @@ import { contentRule, writerGuide } from "./writing-standard.ts";
 export interface DreamSettings {
   enabled: boolean;
   paused: boolean;
-  /** Dream stops once this many results wait unseen. */
-  buffer: number;
   dailyImages: number;
   dailyVideos: number;
   videos: boolean;
@@ -191,7 +189,6 @@ const shares = {
 const defaultDreamSettings: DreamSettings = {
   enabled: false,
   paused: false,
-  buffer: 6,
   dailyImages: 40,
   dailyVideos: 4,
   videos: false,
@@ -475,9 +472,6 @@ export function createDream(options: {
   }
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId).filter((item) => item.dream?.state === state);
-  const unseenCount = (ownerId: string) =>
-    pool(ownerId, "unseen").filter((item) => !["failed", "cancelled"].includes(item.status || ""))
-      .length;
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
     const image = counts.images < settings.dailyImages;
@@ -493,21 +487,13 @@ export function createDream(options: {
       ...(video && !videoDue ? (["video"] as Kind[]) : []),
     ];
   }
-  /** What stands in the way without asking any service: off, paused, the buffer or the caps. */
+  /** What stands in the way without asking any service: off, paused, busy workers or the caps. */
   function quick(ownerId: string, record: DreamRecord) {
     const { settings } = record;
     if (!settings.enabled) return { status: "off" as const };
     if (settings.paused) return { status: "paused" as const };
     const running = held(ownerId);
     if (running >= options.slots()) return { status: "generating" as const };
-    // Work still running counts toward the buffer, so parallel jobs never overfill it.
-    if (unseenCount(ownerId) + running >= settings.buffer)
-      return running
-        ? { status: "generating" as const }
-        : {
-            status: "waiting" as const,
-            reason: "Dream waits until you have looked at what it made.",
-          };
     if (!kinds(settings, today(ownerId)).length)
       return { status: "capped" as const, reason: "Dream has made today’s share." };
     return null;

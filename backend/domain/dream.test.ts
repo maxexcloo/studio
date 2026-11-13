@@ -216,7 +216,6 @@ test("Dream is off until turned on, queues one hidden job per account only while
   assert.deepEqual(dream.read("alice").settings, {
     enabled: false,
     paused: false,
-    buffer: 6,
     dailyImages: 40,
     dailyVideos: 4,
     videos: false,
@@ -333,10 +332,10 @@ test("Dream is off until turned on, queues one hidden job per account only while
   );
 });
 
-test("Dream keeps one job per worker going, so every idle GPU takes part, within the buffer", async (t) => {
+test("Dream keeps one job per worker going, so every idle GPU takes part", async (t) => {
   const { dream, state, dreamJobs } = fixture(t);
   state.slots = 2;
-  await dream.save("alice", { enabled: true, buffer: 3 });
+  await dream.save("alice", { enabled: true });
   await dream.tick();
   await dream.tick();
   assert.equal(dreamJobs("alice").length, 2);
@@ -346,24 +345,18 @@ test("Dream keeps one job per worker going, so every idle GPU takes part, within
   assert.equal(dream.status("alice").status, "generating");
 });
 
-test("Dream stops at the unseen buffer and today's cap per kind, and animates kept or starred images", async (t) => {
+test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or starred images", async (t) => {
   const { dream, state, dreamOnce, live } = fixture(t);
-  await dream.save("alice", { enabled: true, buffer: 2, dailyImages: 3 });
+  await dream.save("alice", { enabled: true, dailyImages: 3 });
+  assert.ok(await dreamOnce());
   assert.ok(await dreamOnce());
   assert.ok(await dreamOnce());
   assert.equal(await dreamOnce(), undefined);
-  assert.deepEqual(dream.status("alice"), {
-    status: "waiting",
-    reason: "Dream waits until you have looked at what it made.",
-  });
   const [first, second] = dream.unseen("alice");
   assert.deepEqual([first.prompt, second.prompt], ["dream 1", "dream 2"]);
   // The writer saw the recent Dream ideas so it can avoid them.
   assert.match(state.calls[1].user, /- Fox Dream 1/);
-  dream.discard("alice", String(first.id));
-  assert.ok(await dreamOnce());
   dream.keep("alice", String(second.id));
-  assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").status, "capped");
   assert.deepEqual(dream.today("alice"), { images: 3, videos: 0 });
   // A new day starts a new share.
@@ -371,7 +364,7 @@ test("Dream stops at the unseen buffer and today's cap per kind, and animates ke
   assert.equal(dream.status("alice").status, "waiting");
 
   // Videos animate a kept or starred image with the default video profile.
-  await dream.save("alice", { buffer: 10, dailyImages: 0, videos: true, dailyVideos: 1 });
+  await dream.save("alice", { dailyImages: 0, videos: true, dailyVideos: 1 });
   const video = await dreamOnce();
   assert.equal(video?.input.kind, "video");
   assert.equal(video?.input.profileId, "wan");
@@ -568,7 +561,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
     encodeURIComponent(String(item.id)),
   );
 
-  assert.equal((await request("/settings", { buffer: 0 }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { dailyImages: -1 }, "PUT")).status, 400);
   assert.equal((await request("/settings", { videos: "yes" }, "PUT")).status, 400);
   assert.equal((await request("/settings", { spicy: true }, "PUT")).status, 403);
   const saved = await request("/settings", { paused: true, dailyVideos: 2 }, "PUT");
