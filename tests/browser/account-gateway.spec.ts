@@ -50,7 +50,7 @@ test("Administrators link, dismiss and unlink chat identities in Settings › Us
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
-  await page.getByRole("menuitem", { name: "Unlink chat-member", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Unlink Chat Gateway", exact: true }).click();
   await expect(member.getByText("Chat Gateway", { exact: true })).toHaveCount(0);
   expect(actions).toEqual([
     { identity: "chat-member", accountId: "member" },
