@@ -1172,7 +1172,6 @@ export async function serveDream(
     settings: {
       enabled: options.enabled ?? true,
       paused: false,
-      buffer: 6,
       dailyImages: 40,
       dailyVideos: 4,
       videos: false,

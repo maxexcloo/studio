@@ -6,7 +6,6 @@ import type { MediaItem } from "../../types";
 export interface DreamSettings {
   enabled: boolean;
   paused: boolean;
-  buffer: number;
   dailyImages: number;
   dailyVideos: number;
   videos: boolean;
@@ -72,10 +71,10 @@ export const dreamItemPath = (item: { id: string }, action: string) =>
 export const pairAnswerPath = (pairId: string) =>
   `/api/dream/pairs/${encodeURIComponent(pairId)}/answer`;
 
-/** When Dream works and how much of today's share it has made, such as "Dream keeps 6 ready … · 12 of 40 today". */
+/** When Dream works and how much of today's share it has made, such as "Dream works when the queue is free · 12 of 40 today". */
 export const dreamWhen = ({ settings, today }: Dream) =>
   [
-    `Dream keeps ${settings.buffer} ready and makes more when the queue is free`,
+    "Dream works when the queue is free",
     `${today.images} of ${settings.dailyImages} today`,
     ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
   ].join(" · ");

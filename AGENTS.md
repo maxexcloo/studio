@@ -294,7 +294,7 @@ the primary component reference and verify APIs against the installed version.
   offers every choice.
   Calibration uses only the account's own Studio generations and leaves the
   gallery unchanged apart from an explicit Star. Dream starts work only while
-  Studio is idle and respects its buffer and caps. Its jobs show in the
+  Studio is idle and respects its daily caps. Its jobs show in the
   person's queue with a Dream badge, wait below everyone's own work and are not
   reordered; Stop All leaves them to Dream's own pause.
 - Face Redo queues one Run Again of a drifted character result in its owner's

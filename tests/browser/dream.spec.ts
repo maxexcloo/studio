@@ -88,7 +88,7 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await page.getByRole("button", { name: "Turn On", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("Dream keeps 6 ready and makes more when the queue is free · 12 of 40 today", {
+    page.getByText("Dream works when the queue is free · 12 of 40 today", {
       exact: true,
     }),
   ).toBeVisible();
@@ -100,13 +100,13 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await videos.dispatchEvent("click");
   await expect(videos).toBeChecked();
   await expect(settings).toContainText("12 of 40 today · 1 of 4 videos");
-  const buffer = settings.getByRole("textbox", { name: "Unseen Buffer" });
-  await buffer.fill("20");
-  await buffer.press("Enter");
+  const images = settings.getByRole("textbox", { name: "Images per Day" });
+  await images.fill("200");
+  await images.press("Enter");
   await expect(settings.getByRole("switch", { name: /^Spicy/ })).toBeVisible();
   await expect
     .poll(() => dream.requests.map((request) => request.body))
-    .toEqual([{ enabled: true }, { videos: true }, { buffer: 20 }]);
+    .toEqual([{ enabled: true }, { videos: true }, { dailyImages: 200 }]);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();

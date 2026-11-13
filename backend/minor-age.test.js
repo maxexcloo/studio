@@ -12,6 +12,8 @@ test("a prompt that states an age under 18 is refused, naming the words", () => 
     ["girls aged 16–22, varied", "aged 16"],
     ["Age: 15, school uniform", "Age: 15"],
     ["an underage girl", "underage"],
+    ["nude teen girl on a bed", "teen"],
+    ["Topless schoolgirl in a classroom", "schoolgirl"],
   ])
     assert.equal(minorAge(prompt), found, prompt);
   assert.match(minorAgeRefusal("a 16-year-old girl"), /under 18.*"16-year-old"/);
@@ -25,6 +27,8 @@ test("adult ages and other numbers pass", () => {
     "a 21yo Korean woman in Tokyo",
     "Image 2 of the set, page 12, stage 3, 35mm film, f/1.8",
     "A woman doing yoga at 5 yoga mats",
+    "teenagers skateboarding in a park at dusk",
+    "nude woman, 25, reading in the bath",
     "",
   ])
     assert.equal(minorAge(prompt), "", prompt);
