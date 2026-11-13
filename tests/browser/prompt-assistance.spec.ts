@@ -5,6 +5,7 @@ import {
   create,
   fixtures,
   loadSaved,
+  openLoraChoices,
   promptMenu,
   promptTool,
   openPresets,
@@ -156,7 +157,7 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
     page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
   ).toBeDisabled();
   await expect(prompt).toHaveValue("My later direction in warm light");
-  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await openLoraChoices(page);
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);
   await undoAssistance(page, "LoRA applied");
