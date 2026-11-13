@@ -346,6 +346,14 @@ export function createAccountSession(accountId) {
   return { token, maxAge: Math.floor(sessionLifetimeMs / 1000) };
 }
 
+/** A session for the enabled account with this email (agent-sign-in.js). */
+export function createEmailSession(email) {
+  const key = usernameKey(email);
+  const account = readStore().accounts.find((item) => usernameKey(item.username) === key);
+  if (!account) throw new Error("No account has that email.");
+  return { accountId: account.id, ...createAccountSession(account.id) };
+}
+
 export function accountSession(token) {
   if (!token) return null;
   const session = readStore().sessions.find(
