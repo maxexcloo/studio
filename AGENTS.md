@@ -224,7 +224,8 @@ the primary component reference and verify APIs against the installed version.
   (Edit Image, or a video's Trim and the like) with Recreate in Composer last;
   menu options expand in place on phones and touch screens. The phone viewer bar fits every action
   on one row at a compact size, without More; elsewhere the viewer bar shows
-  every action, wrapping onto another row rather than using More or scrolling. The phone bar drops its prompt field
+  every action on one row: where they outgrow it the last named actions drop to icons
+  alone, and only then do they wrap onto another row, never using More or scrolling. The phone bar drops its prompt field
   while Details is open. Gallery selection uses the shared contextual selection
   bar under the search and filters, which stay in place; its quick selects take
   every match, not only loaded pages, and it confirms deletion. The phone bar shows
