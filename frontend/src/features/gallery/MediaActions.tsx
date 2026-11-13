@@ -206,11 +206,7 @@ function useCharacterAction(item: MediaItem, onApplied: () => void): Action | nu
       onApplied();
       navigate("/library#characters", {
         state: {
-          // The gallery under Library, without its viewer.
-          backgroundLocation: location.state?.backgroundLocation || {
-            ...location,
-            search: location.search.replace(/[?&]item=[^&]*/, "").replace(/^&/, "?"),
-          },
+          backgroundLocation: location.state?.backgroundLocation || location,
           characterFrom: item.id,
         },
       });
