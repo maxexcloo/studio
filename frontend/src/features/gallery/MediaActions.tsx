@@ -312,7 +312,7 @@ export function useMediaActions(
   const stopUpscale = useStopUpscale(item);
   const assistant = useQuery(assistantQuery);
   // The assistant writes new variations into the item's MCP result set, in the queue.
-  const moreLikeSet = useItemMutation(item.id, "more-like-set", {
+  const moreSet = useItemMutation(item.id, "more-like-set", {
     mutationFn: () => post("/api/result-sets/more", { itemId: item.id }),
     onSuccess: () =>
       void Promise.all(
@@ -321,6 +321,15 @@ export function useMediaActions(
         ),
       ),
   });
+  const moreLikeSet: Omit<Action, "id"> | null =
+    ready && !item.uploaded && item.resultSet && assistant.data?.available
+      ? {
+          label: "More Like This Set",
+          icon: icons.suggestions,
+          disabled: moreSet.isPending,
+          onClick: () => moreSet.mutate(),
+        }
+      : null;
   // Animate says why no model can run before anything queues.
   const [videos, setVideos] = useVideosPreference();
   const [review, setReview] = useAnimateReview();
@@ -462,17 +471,6 @@ export function useMediaActions(
                     icon: Repeat,
                     onClick: () => run({ kind: "repeat" }),
                   },
-                  ...(item.resultSet && assistant.data?.available
-                    ? [
-                        {
-                          id: "more-like-set",
-                          label: "More Like This Set",
-                          icon: icons.suggestions,
-                          disabled: moreLikeSet.isPending,
-                          onClick: () => moreLikeSet.mutate(),
-                        },
-                      ]
-                    : []),
                 ],
             ...(image
               ? [
@@ -507,14 +505,26 @@ export function useMediaActions(
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
-    // The gallery ranked by likeness to this image (GalleryPage reads `similar`).
-    image &&
-      itemAction("similar", {
-        onClick: () => {
-          onApplied();
-          navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
-        },
-      }),
+    // The gallery ranked by likeness to this image (GalleryPage reads `similar`), then new
+    // variations of its MCP result set; a video in a set has only the latter.
+    image
+      ? itemAction("similar", {
+          menu: [
+            [
+              {
+                id: "similar-gallery",
+                label: "Similar",
+                icon: icons.similar,
+                onClick: () => {
+                  onApplied();
+                  navigate(`/images?${new URLSearchParams({ similar: item.id })}`);
+                },
+              },
+              ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
+            ],
+          ],
+        })
+      : moreLikeSet && itemAction("similar", moreLikeSet),
     upscale,
     // Its options sort alphabetically.
     itemAction("copy", {

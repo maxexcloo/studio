@@ -378,13 +378,19 @@ test("Edit › More Like This Set asks for new variations of a result's set", as
       return route.fulfill({ json: { jobIds: ["new-1", "new-2"] } });
     }),
   );
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Similar");
+  // Similar leads its menu.
+  await expect(page.getByRole("menuitem")).toHaveText(["Similar", "More Like This Set"]);
   await page.getByRole("menuitem", { name: "More Like This Set", exact: true }).click();
   await expect.poll(() => asked).toEqual([{ itemId: "hub" }]);
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
-  await seed(page);
+  const { viewer } = await seed(page);
+  // Without it, Similar has no menu and ranks the gallery at once.
+  await expect(viewer.getByRole("button", { name: "Similar", exact: true })).not.toHaveAttribute(
+    "aria-haspopup",
+  );
   await viewerAction(page, "Edit");
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
