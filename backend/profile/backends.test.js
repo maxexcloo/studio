@@ -282,7 +282,7 @@ test("backend choices include their own reference slots, controls and defaults",
     assert.equal(backend.radiance.defaults.width, 1536);
     assert.equal(backend.comfyui.defaults.width, 2048);
     assert.equal(backend.radiance.maxLoras, 4);
-    assert.equal(backend.comfyui.maxLoras, 8);
+    assert.equal(backend.comfyui.maxLoras, undefined);
     assert.equal(backend.radiance.backendOptions.length, 0);
   } finally {
     fs.rmSync(path.join(userWorkflowsDir, "combined.json"));
