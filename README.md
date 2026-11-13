@@ -68,8 +68,6 @@ Keep each `id` stable (it defaults to the lower-case name): jobs, previews, canc
 
 `STUDIO_CLIPROXYAPI_URL` and `STUDIO_CLIPROXYAPI_KEY` point Studio at CLIProxyAPI, which it calls directly. A cloud profile is a workflow whose every mode is one `GrokMedia` node, listed only while the provider advertises its model; `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none. Groups grant Cloud Models per account.
 
-**Where Work Runs** (Settings › Preferences) sets, per account, whether Images default to Cloud or Local (Local when unsaved), and Videos to Cloud, Fast or Quality as in Animate's menus (Fast when unsaved). When the chosen side can't run, Studio uses the other and says so; a model the person picks always wins. Otherwise Studio never switches work to the cloud, and held video work never does. Text picks the gateway text model for the account's prompt writing; see Prompt Assistant.
-
 ### Accounts & Single Sign-On
 
 `STUDIO_MULTI_USER=1` turns on accounts, and every deployment uses it. Every request then needs an account; the first visit from the computer running Studio creates the recovery administrator, who adds accounts in **Settings › Users** and grants features in **Settings › Groups**. Without it, Studio is single-user and answers only the computer running it.
@@ -94,7 +92,7 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 ### Prompt Assistant
 
-The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing (Improve Prompt, negatives, Animate's prompts, More Like This Set and Ask for a Change) uses the text model each account picks in **Settings › Preferences › Where Work Runs › Text**, from the gateway's models and Studio's text workloads; Bifrost routes aliases such as `cloud/auto` and `local/auto` itself. Unsaved, it is the cloud model's uncensored alias (`cloud/uncensored`) for accounts with Uncensored Models, otherwise the cloud model; uncensored models are offered and used only for those accounts. Other calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
+The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing uses the text model each account picks; Studio's own calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
 
 **Background AI** (**Settings › Generation**) has a switch for each call Studio makes on its own, each on by default; `0` turns it off: `STUDIO_FACE_CHECK`, `STUDIO_FACE_REDO`, `STUDIO_GALLERY_CAPTIONS`, `STUDIO_GALLERY_TITLES`, `STUDIO_IMAGE_SEARCH`, `STUDIO_NEXT_STEPS`, `STUDIO_PROMPT_IDEAS`, `STUDIO_SUGGESTED_PROMPTS` and `STUDIO_TASTE_UPDATES`. Face Check (about 260 MB) and Image Search (about 690 MB) download their CPU models into the data folder on first use. `STUDIO_GALLERY_WHILE_BUSY=1` lets that work run while Studio is generating.
 
@@ -102,11 +100,11 @@ The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSIST
 
 ### Characters
 
-Characters, outfits and scenes are cards each account keeps in Library (behind the Characters group feature). A character's first image goes to the model as a reference and its description leads the prompt; an outfit or scene adds its description. `STUDIO_CARD_IMAGES=1` (off by default, until a live proof run) also sends the image of an outfit or scene that MCP `generate`'s shots name, after the character's: an outfit to a Style slot and a scene to a Pose/Layout slot, else each to a spare reference on a model that edits with its references. Where the model has no room, the card stays words and the reply says so. Face Check compares each image made with a character with that image and marks a result that shows someone else or the character twice. Face Redo then runs a drifted result from the last day once more with a new seed, as Run Again would, in its owner's queue at their own tier and as a version of it; its Details say "Redone automatically after the face drifted", and a redo that drifts too is not redone.
+`STUDIO_CARD_IMAGES=1` (off by default, until a live proof run) sends the images of the outfit and scene cards that MCP `generate`'s shots name as references, after the character's.
 
 ### Downloads & Imports
 
-Library › Imports takes Civitai image and model links and Hugging Face file or repository links. Downloads stream to the `models` worker, resume against their recorded source and check published SHA-256 values. Hugging Face files, the built-in catalogue's included, download at a pinned commit; the daily update check offers an Update when a file changes upstream. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` apply to Hugging Face downloads.
+Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `HF_TOKEN` open restricted files and stay on the server; `HF_ENDPOINT` and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` apply to Hugging Face downloads.
 
 ### Profiles, Guides & Catalogue
 
@@ -162,7 +160,7 @@ STUDIO_LOCAL_TEXT_MODEL=local/auto
 
 Each deployment's name is its workload id, its node selector names its pool, its resource claim templates give its GPUs, and the one Service selecting its pods gives its address. Optional `studio.excloo.dev/` annotations add `label`, `vision: "true"` for text workloads that read images, and `worker` and `capabilities` for media. Text workloads serve `STUDIO_LOCAL_TEXT_MODEL` and take `STUDIO_TEXT_KEY` for their health check. Anything missing or ambiguous stops Studio at start with the deployment's name; restart Studio after changing a workload. Its service account needs, in each namespace, to list deployments, Services and `resourceclaimtemplates`, read pods and their logs, and update `deployments/scale`. `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
-Administrators choose the running workloads in **Settings › Workers**. Automatic Control, off until turned on there, starts media workloads for queued work. Once a GPU pool has had no queued or running work for **Idle After**, it parks the pool's idle media workloads and starts **Run When Idle**, any image, video or text workload (None by default). Queued work still starts what it needs. Automatic Control never stops a text workload and starts one only as Run When Idle, so media work that needs a running text workload's GPUs waits. The waiting job then offers a swap, in its queue row and a notification when it starts waiting: after confirming, Studio stops the text workload and starts the media one, recorded in the change history as requested by that account (`account:<id>: swap to images`), and the work runs. Administrators can always swap; **Let Everyone Swap Models** (off by default) lets other accounts swap too, and otherwise they see only the waiting reason. Run When Idle may start the text workload again once Studio has been idle for Idle After.
+Administrators choose the running workloads in **Settings › Workers**, where Automatic Control is off until turned on.
 
 ## Troubleshooting
 
@@ -246,7 +244,7 @@ Inspect the job's error and worker logs. Check that the workflow runs with the s
 
 ### References, Upscaling & Library
 
-References can be selected from the gallery, uploaded or dragged from gallery items into generation controls. Uploads are gallery images too, shown under the gallery's **Uploads** filter. Masking and video input require a profile that supports those operations; changing profile can change the available controls.
+Masking and video input require a profile that supports those operations; changing profile can change the available controls.
 
 Upscaling uses the durable queue. Check the job reason and worker's upscaler models and nodes if it fails. The original result remains available.
 
@@ -254,7 +252,7 @@ For missing or gated Library downloads, verify the catalogue link, model licence
 
 ### Accounts & Devices
 
-Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage groups, roles, passwords, galleries and disabled accounts in **Settings › Users** and permissions in **Settings › Groups**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
+Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Too many failed sign-ins temporarily delay further attempts.
 
 Single-user mode answers only the computer running Studio; other devices need account mode ([Accounts & Single Sign-On](#accounts--single-sign-on)). Keep container port bindings, proxy configuration and host validation consistent.
 
