@@ -103,6 +103,15 @@ test("provider and local catalogue metadata retain compatible name-refined I2V m
   }
 });
 
+test("a video LoRA is not offered to the image model its family's name refines to", () => {
+  const name = "motion.safetensors";
+  const info = { families: ["minimax_h3"], triggers: [] };
+  const view = { catalogue: { [name]: { baseModel: "MiniMax H3" } }, sources: {} };
+  const enriched = catalogueLoraInfo(name, info, view);
+  assert.equal(loraCompatibility(enriched, { family: "minimax_h3" }), "fits");
+  assert.notEqual(loraCompatibility(enriched, { family: "minimax_h3_image" }), "fits");
+});
+
 test("LoRA details come from the catalogue definitions and edits; a left-over lora-catalogue.json is ignored", () => {
   const data = process.env.STUDIO_DATA_DIR;
   fs.mkdirSync(path.join(data, "library"), { recursive: true });

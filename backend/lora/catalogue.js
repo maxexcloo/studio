@@ -1,12 +1,13 @@
 import { loraCompatibility, strengthRange } from "./policy.js";
 
-/** Name-refined models share their parent family's adapter layout. */
+/** Name-refined models of the same kind share their parent family's adapter layout. */
 export function withFamilyRefinements(ids, families) {
   const all = new Set(ids);
   for (let grew = true; grew;) {
     grew = false;
     for (const [id, spec] of Object.entries(families)) {
-      if (spec.refines && all.has(spec.refines.family) && !all.has(id)) {
+      const parent = families[spec.refines?.family];
+      if (parent && spec.kind === parent.kind && all.has(spec.refines.family) && !all.has(id)) {
         all.add(id);
         grew = true;
       }
