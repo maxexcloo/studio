@@ -36,10 +36,15 @@ export function briefText({ subjects, styles, avoid }: ProjectBrief) {
 
 /**
  * A model's reply as a review: a whole score from 1 to 10, and a miss only at `missAt` or below,
- * worded where the model gave none.
+ * worded where the model gave none; null without a numeric score, so the result stays unscored.
  */
 export function reviewReply(reply: { score?: unknown; miss?: unknown }) {
-  const score = Math.min(10, Math.max(1, Math.round(Number(reply.score)) || 1));
+  const number =
+    typeof reply.score === "number" || (typeof reply.score === "string" && reply.score.trim())
+      ? Number(reply.score)
+      : NaN;
+  if (!Number.isFinite(number)) return null;
+  const score = Math.min(10, Math.max(1, Math.round(number)));
   const miss =
     score > missAt
       ? ""

@@ -1100,9 +1100,9 @@ export function createAssistant(
       temperature: 0.2,
       signal,
     });
-    const parsed = replyJson(reply.text);
-    if (!Number.isFinite(Number(parsed?.score))) throw new AssistantError("unusable reply");
-    return { ...reviewReply(parsed), model };
+    const review = reviewReply(replyJson(reply.text) || {});
+    if (!review) throw new AssistantError("unusable reply");
+    return { ...review, model };
   }
 
   /**

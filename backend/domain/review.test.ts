@@ -12,7 +12,7 @@ const project = (id: string, brief: Partial<Project["brief"]> = {}): Project => 
   updatedAt: "",
 });
 
-test("a reply becomes a whole score from 1 to 10, with a miss only at 5 or below", () => {
+test("a reply becomes a whole score from 1 to 10, with a miss only at 5 or below; no score is none", () => {
   assert.deepEqual(reviewReply({ score: 8.6, miss: "too dark" }), { score: 9, miss: "" });
   assert.deepEqual(reviewReply({ score: 3, miss: " a  man, not a woman " }), {
     score: 3,
@@ -20,6 +20,9 @@ test("a reply becomes a whole score from 1 to 10, with a miss only at 5 or below
   });
   assert.deepEqual(reviewReply({ score: 0 }), { score: 1, miss: "Misses the brief." });
   assert.deepEqual(reviewReply({ score: 42 }), { score: 10, miss: "" });
+  assert.deepEqual(reviewReply({ score: "6" }), { score: 6, miss: "" });
+  for (const score of [undefined, null, "", "high", Number.NaN])
+    assert.equal(reviewReply({ score, miss: "a miss" }), null);
 });
 
 test("the digest groups results by project, ranks them by score and keeps misses apart", () => {
