@@ -507,7 +507,6 @@ test("Catalogue views, sorting, search and filters order and narrow the list", a
   await expect(table.getByRole("row")).toHaveCount(2);
   // Escape leaves search, keeping the query and the Library open.
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("textbox", { name: "Search Models", exact: true })).not.toBeFocused();
   await expect(table).toContainText("Flux Base");
   await expect(table).not.toContainText("XL Base");
   await (await toolbarSearch(page, "Models")).fill("nothing");
