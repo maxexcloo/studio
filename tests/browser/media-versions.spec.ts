@@ -95,8 +95,8 @@ for (const kind of ["image", "video"] as const) {
     if (kind === "image") await expect(compare).toBeVisible();
     else await expect(compare).toHaveCount(0);
     await page.keyboard.press("Escape");
+    // The viewer opens again from the URL.
     await page.reload();
-    await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
     await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expectDownload(upscaleUrl);
@@ -107,7 +107,6 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", originalUrl);
     await expectDownload(originalUrl, originalExtension);
     await page.reload();
-    await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
     await expect(version).toHaveAttribute("aria-pressed", "false");
     await expect(media).toHaveAttribute("src", originalUrl);
   });
