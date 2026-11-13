@@ -22,6 +22,16 @@ export function listCards(kind, ownerId = "") {
 const save = (kind, ownerId, cards) =>
   writeRuntimeDocument(dataDir, document(kind, ownerId), { [kind]: cards });
 
+/** Saves `change(card)` of the account's character `id` and returns it; undefined when it's gone. */
+export function updateCharacter(ownerId, id, change) {
+  const characters = listCards("characters", ownerId);
+  const index = characters.findIndex((character) => character.id === id);
+  if (index < 0) return undefined;
+  const character = change(characters[index]);
+  save("characters", ownerId, characters.with(index, character));
+  return character;
+}
+
 /** Generate References' results so far, the account's own visible gallery items. */
 function generatedResults(ownerId, generated) {
   return generated.jobIds.flatMap((jobId) =>
@@ -37,17 +47,44 @@ function generatedResults(ownerId, generated) {
   );
 }
 
+const assetOf = (account, id) => {
+  try {
+    return referenceAssetMetadataForAccount(account, id);
+  } catch {
+    return null;
+  }
+};
+
 /**
- * A card as the account sees it: its images that still exist, as reference assets, and a
- * character's generated references waiting to be picked.
+ * A character's sheet as the account sees it: its panels that still exist, as reference assets
+ * with their role, and how far Make Sheet has come (`making` until its panels are kept).
+ */
+function shownSheet(account, sheet) {
+  const failed = galleryJobItems(sheet.jobId).some(
+    (item) =>
+      (item.ownerId || "") === (account?.userId || "") &&
+      ["failed", "cancelled"].includes(item.status),
+  );
+  return {
+    jobId: sheet.jobId,
+    at: sheet.at,
+    status: sheet.panels ? "done" : sheet.error || failed ? "failed" : "making",
+    ...(sheet.error ? { error: sheet.error } : {}),
+    panels: (sheet.panels || []).flatMap(({ role, referenceId }) => {
+      const asset = assetOf(account, referenceId);
+      return asset ? [{ ...asset, role }] : [];
+    }),
+  };
+}
+
+/**
+ * A card as the account sees it: its images that still exist, as reference assets, a character's
+ * generated references waiting to be picked and its sheet.
  */
 export function shownCard(account, character) {
   const references = character.referenceIds.flatMap((id) => {
-    try {
-      return [referenceAssetMetadataForAccount(account, id)];
-    } catch {
-      return [];
-    }
+    const asset = assetOf(account, id);
+    return asset ? [asset] : [];
   });
   return {
     ...character,
@@ -61,6 +98,7 @@ export function shownCard(account, character) {
           },
         }
       : {}),
+    ...(character.sheet ? { sheet: shownSheet(account, character.sheet) } : {}),
   };
 }
 
@@ -91,7 +129,8 @@ function cleanCard(kind, account, body) {
   return { name, description, referenceIds: ids };
 }
 
-const refusal = (account) => {
+/** Why the account may not use cards, as a route's answer, or null. */
+export const refusal = (account) => {
   if (!account) return localRefusal(account);
   if (!mayUseFeature(account, "characters"))
     return { status: 403, payload: { ok: false, error: "Characters are off for this account." } };

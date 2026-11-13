@@ -39,6 +39,8 @@ import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { loraAllowed } from "./model/catalogue.js";
+import { listCards } from "./cards.js";
+import { sheetReferences } from "./character-sheets.js";
 
 export function createGenerationSubmission({ loadComfyContext, mediaModels, comfyDownMessage }) {
   /**
@@ -345,6 +347,26 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         await loraInfos(body.loras.map((item) => item.name)),
       );
       if (body.prompt !== typed) body.typedPrompt = typed;
+    }
+    // A character's sheet: the view the prompt names, or the whole sheet for a video model that
+    // animates subjects (character-sheets.js); never in the run that makes the sheet.
+    if (!isMockJob && body.referenceAssets?.length && input.writing?.kind !== "sheet") {
+      const ownerId = body.ownerId || "";
+      body.referenceAssets = sheetReferences({
+        references: body.referenceAssets,
+        prompt: body.prompt,
+        cards: listCards("characters", ownerId),
+        profile:
+          body.kind === "video"
+            ? (await mediaModels().catch(() => null))?.models?.profiles?.find(
+                (item) => item.id === body.profileId,
+              )
+            : undefined,
+        madeWith: (id) =>
+          gallery
+            .find((item) => item.id === id && (item.ownerId || "") === ownerId)
+            ?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
+      });
     }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.

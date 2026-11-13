@@ -6,6 +6,7 @@
  *   animate   the viewer's Animate menu and MCP reuse's themes (prompt-animate.js)
  *   dream     Dream's ideas (domain/dream.ts)
  *   set       More Like This Set's new variations of an MCP result set (prompt-set.js)
+ *   sheet     Make Sheet's character design sheet (prompt-sheet.js)
  *
  * Admission keeps only the request (writingRequest) and refuses one the account can't have written
  * (writingIssue). The stage resolves the job's profile and guide and streams the thinking and the
@@ -17,6 +18,7 @@ import { promptAssistantOff } from "./assistant-routes.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { writeSetPrompt } from "./prompt-set.js";
+import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
 
 const text = (value, limit = maxPromptCharacters) =>
   String(typeof value === "string" ? value : "")
@@ -28,6 +30,7 @@ export function writingRequest(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   if (value.kind === "animate") return animateRequest(value);
   if (value.kind === "set") return { kind: "set" };
+  if (value.kind === "sheet") return sheetRequest(value);
   if (value.kind === "dream")
     return {
       kind: "dream",
@@ -47,9 +50,9 @@ export function writingRequest(value) {
 export function writingIssue(writing, { engine, account }) {
   const allowed = (feature) => !account || mayUseFeature(account, feature);
   if (!writing) return { status: 400, error: "Choose a known way to write the prompt." };
-  // Animate's themes and a set's variations are written for the person; Dream's writing follows
-  // the Dream feature.
-  if ((writing.kind === "animate" || writing.kind === "set") && !allowed("promptAssistant"))
+  // Animate's themes, a set's variations and a sheet are written for the person; Dream's writing
+  // follows the Dream feature.
+  if (writing.kind !== "dream" && !allowed("promptAssistant"))
     return { status: 403, error: promptAssistantOff };
   if (!engine) return { status: 503, error: "The prompt assistant is not configured." };
   if (writing.kind === "dream" && writing.spicy && !allowed("uncensoredModels"))
@@ -97,8 +100,19 @@ export function createPromptStage({
         onThinking,
         onDelta,
       });
-    // The job's first reference is the frame it animates from.
+    // The job's first reference is the frame it animates from, or the character a sheet redraws.
     const start = job.input.referenceAssets?.[0]?.assetId;
+    if (writing.kind === "sheet")
+      return writeSheetPrompt({
+        engine,
+        writing,
+        writer,
+        frame: () => frame(access, start),
+        caption: () => caption(access, start),
+        signal,
+        onThinking,
+        onDelta,
+      });
     return writeAnimatePrompt({
       engine,
       profile,

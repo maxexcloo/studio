@@ -17,11 +17,17 @@ import {
   type CharacterCard,
 } from "./queries";
 
-/** A card's images. */
+const sheetStatus = { making: "Making Sheet", done: "Sheet", failed: "Sheet Failed" };
+
+/** A card's images and its sheet. */
 export function characterDetail(card: CharacterCard) {
   const count = card.references.length;
-  if (!count) return "No images";
-  return `${count} ${count === 1 ? "image" : "images"}`;
+  return [
+    count ? `${count} ${count === 1 ? "image" : "images"}` : "No images",
+    card.sheet && sheetStatus[card.sheet.status],
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**
@@ -114,6 +120,7 @@ export function CharacterChoices({
                     withinPortal={false}
                     onEdit={() => dialogs.edit(card)}
                     onGenerate={() => dialogs.generate(card)}
+                    onSheet={() => dialogs.sheet(card)}
                     onDelete={() => dialogs.remove(card)}
                   />
                 }

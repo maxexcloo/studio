@@ -486,7 +486,7 @@ export function registerGenerateTools({
     server,
     "models",
     "find models",
-    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
+    "What Studio has now. Without profile_id: ready profiles as \"id — label\" by kind (Stopped or Offline marked), those needing setup, each service's state and the account's features and characters (generate's character adds its image and looks: prompts set only outfit and scene; shots: Studio writes each, outfit and scene a card's name or words; character_views queues views; character_sheet its sheet). With profile_id (id, label or words): its guide's gist, defaults, controls, references and LoRAs. lora_query or lora_names look up LoRAs, in every profile without profile_id; lora_page pages.",
     {
       kind: z.enum(["all", "image", "video"]).default("all"),
       tier: tier.optional(),
@@ -628,6 +628,7 @@ export function registerGenerateTools({
                   name: card.name,
                   description: card.description,
                   images: card.references.length,
+                  ...(card.sheet ? { sheet: card.sheet.status } : {}),
                 })),
               }
             : {}),
@@ -814,6 +815,8 @@ export function registerGenerateTools({
       character: z.string().min(1).optional(),
       // Generate References: Studio writes one prompt per view of the character (shared/characters.ts).
       character_views: z.boolean().optional(),
+      // Make Sheet: the character's design sheet, whose views generate then sends (character-sheets.js).
+      character_sheet: z.boolean().optional(),
       // The user insists on a model that can't hold the character's face (the refusal says so).
       any_model: z.boolean().optional(),
       // Shots Studio writes itself (shared/characters.ts composePrompt); outfit and scene may name a card.
@@ -935,10 +938,38 @@ export function registerGenerateTools({
     if (args.reference_asset_ids)
       args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
     const views = args.character_views === true;
+    const sheet = args.character_sheet === true;
     delete args.character_views;
-    if (views && !args.character)
-      throw new Error("character_views needs character: the name or id of the card.");
+    delete args.character_sheet;
+    if ((views || sheet) && !args.character)
+      throw new Error(
+        `${sheet ? "character_sheet" : "character_views"} needs character: the name or id of the card.`,
+      );
     const card = args.character ? await characterFor(args.character, signal, views) : null;
+    if (sheet) {
+      if (views || args.prompts || args.shots)
+        throw new Error(
+          "character_sheet queues the sheet alone: leave out prompts, shots and character_views.",
+        );
+      const made = await media.request(
+        "POST",
+        `/api/characters/${encodeURIComponent(card.id)}/sheet`,
+        {},
+        owner,
+        { signal },
+      );
+      media.adopt(owner, refs, { jobs: [made.jobId] });
+      const { ref, link } = media.handle(owner, refs, made.jobId);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Queued ${card.name}'s character sheet on ${made.profile}: Studio writes its prompt, then keeps its face, front, side and back views and gear on the card, and generate sends the view a prompt names. Share the link and end your turn.\n\n[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
+          },
+        ],
+        structuredContent: { status: "queued", jobs: [{ job_id: made.jobId, ref, link }] },
+      };
+    }
     const anyModel = args.any_model === true;
     delete args.character;
     delete args.any_model;
