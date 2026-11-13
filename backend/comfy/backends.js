@@ -76,20 +76,21 @@ export const workerReachable = (id, now = Date.now()) => {
 /** How a worker's inventory names a profile on one backend of a combined profile. */
 export const profileOnBackendKey = (profileId, backend = "") =>
   backend ? `${profileId}@${backend}` : profileId;
+/** Logs the profiles a worker stops offering, which routing then sends elsewhere. */
 export const noteWorkerProfiles = (id, profiles = []) => {
-  if (id)
-    inventories.set(
-      id,
-      new Set(
-        profiles.flatMap((profile) => [
-          ...(profile.ready !== false ? [profile.id] : []),
-          // Each backend this worker can run it on, so a run on the other backend routes to it.
-          ...(profile.backendOptions || [])
-            .filter((option) => option.ready)
-            .map((option) => profileOnBackendKey(profile.id, option.id)),
-        ]),
-      ),
-    );
+  if (!id) return;
+  const next = new Set(
+    profiles.flatMap((profile) => [
+      ...(profile.ready !== false ? [profile.id] : []),
+      // Each backend this worker can run it on, so a run on the other backend routes to it.
+      ...(profile.backendOptions || [])
+        .filter((option) => option.ready)
+        .map((option) => profileOnBackendKey(profile.id, option.id)),
+    ]),
+  );
+  const dropped = [...(inventories.get(id) || [])].filter((profile) => !next.has(profile));
+  if (dropped.length) logWarning("Worker no longer offers profiles", { worker: id, dropped });
+  inventories.set(id, next);
 };
 
 /**
