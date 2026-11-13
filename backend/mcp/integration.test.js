@@ -1277,7 +1277,17 @@ test("Generate attaches a compact guide once per account unless it read the sele
     guideOf(await call(await f.client("carol"), "generate", args)),
     "another account has not read it",
   );
-  assert.equal(f.submitted.length, 4);
+  // Long chats lose an early guide to summaries, so it returns after eight generates or half an hour.
+  for (let index = 0; index < 6; index++) await call(alice, "generate", args);
+  assert.ok(
+    guideOf(await call(alice, "generate", args)),
+    "the guide returns after eight generates",
+  );
+  assert.equal(guideOf(await call(alice, "generate", args)), undefined);
+  const now = Date.now();
+  t.mock.method(Date, "now", () => now + 30 * 60_000);
+  assert.ok(guideOf(await call(alice, "generate", args)), "the guide returns after half an hour");
+  assert.equal(f.submitted.length, 13);
 });
 
 test("Models caches each owner’s catalogue for the TTL instead of rescanning per call", async (t) => {
@@ -3666,7 +3676,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
   assert.match(
     result.content[0].text,
-    /call reuse with its ref \(such as "result 1"\) and your revised prompt/,
+    /call reuse with its ref \(such as "result 1"\) and its full prompt revised \(status shows it\)/,
   );
   assert.equal(f.downloads.length, 0, "nothing is downloaded until the sheet is fetched");
   const sheet = await fetch(localLink(f, previews(result)[0]));
@@ -3696,7 +3706,7 @@ test("Generate falls back to the queued response when a job outlasts the wait or
   assert.deepEqual(Object.keys(slow.jobs[0]), ["job_id", "ref", "link"]);
   assert.match(
     texts(slowResult),
-    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call result now or in the background\. When the user later asks to see results, call result\. Never poll or resubmit\. To change or animate one later, call reuse with its ref \(such as "result 1"\) and your revised prompt\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call result now or in the background\. When the user later asks to see results, call result\. Never poll or resubmit\. To change or animate one later, call reuse with its ref \(such as "result 1"\) and its full prompt revised \(status shows it\)\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   started = performance.now();
@@ -3819,6 +3829,20 @@ test("Reuse leaves out a saved LoRA made for another model family and says so", 
   });
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /fixture-other is for SDXL, not Fixture Image/);
+});
+
+test("Status and reuse give a result's full prompt where generate shortens it", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const prompt = `A heron ${"standing in still water ".repeat(12)}at dawn`;
+  const queued = await call(client, "generate", { kind: "image", prompts: [prompt], count: 1 });
+  assert.match(texts(queued), /Prompt: A heron [^\n]+…$/);
+  finish(f);
+  assert.equal(data(await call(client, "status", { job_id: "result 1" })).prompt, prompt);
+  assert.match(
+    texts(await call(client, "reuse", { job_id: "result 1" })),
+    /Prompt: A heron .+ at dawn$/,
+  );
 });
 
 test("Reuse runs a result again with its profile and settings, a new seed and an optional prompt, without Models", async (t) => {
@@ -5198,7 +5222,7 @@ test("Reuse runs the chat's revised prompt as written and refuses a change in wo
   const submitted = f.submitted.length;
   const words = await call(client, "reuse", { job_id: "result 1", request: "make it warmer" });
   assert.equal(words.isError, true);
-  assert.match(texts(words), /Write the revised prompt yourself/);
+  assert.match(texts(words), /Revise the result.s full prompt yourself/);
   await failure(client, "reuse", { job_id: "result 1", mode: "animate", request: "snow falls" });
   assert.equal(f.submitted.length, submitted);
   const warmer = data(
