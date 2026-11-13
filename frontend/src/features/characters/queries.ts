@@ -1,5 +1,5 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api";
+import { api, post } from "../../api";
 import type { Profile, ReferenceAsset } from "../../types";
 import {
   characterLead,
@@ -7,11 +7,13 @@ import {
   withCharacter,
   withoutCharacter,
   type Character,
+  type SheetRole,
 } from "../../../../shared/characters";
 import { nextReferenceTarget, placeReference } from "../generation/references";
+import { queueQuery } from "../generation/Queue";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
-export interface CharacterCard extends Omit<Character, "generated"> {
+export interface CharacterCard extends Omit<Character, "generated" | "sheet"> {
   references: ReferenceAsset[];
   missing: number;
   /** Generate References' results, waiting to be picked in the editor. */
@@ -26,6 +28,14 @@ export interface CharacterCard extends Omit<Character, "generated"> {
       prompt: string;
     }[];
   };
+  /** Make Sheet's sheet: its views by role once made (backend/cards.js shownSheet). */
+  sheet?: {
+    jobId: string;
+    at: string;
+    status: "making" | "done" | "failed";
+    error?: string;
+    panels: (ReferenceAsset & { role: SheetRole })[];
+  };
 }
 export interface CharacterFields {
   name: string;
@@ -36,10 +46,12 @@ export interface CharacterFields {
 export const charactersQuery = queryOptions({
   queryKey: ["characters"],
   queryFn: async () => (await api<{ characters: CharacterCard[] }>("/api/characters")).characters,
-  // Follows generated references until each has finished.
+  // Follows generated references and sheets until each has finished.
   refetchInterval: (query) =>
-    query.state.data?.some((card) =>
-      card.generated?.results.some((result) => !["done", "failed"].includes(result.status)),
+    query.state.data?.some(
+      (card) =>
+        card.sheet?.status === "making" ||
+        card.generated?.results.some((result) => !["done", "failed"].includes(result.status)),
     )
       ? 5000
       : false,
@@ -58,6 +70,21 @@ export function useSaveCharacter(id?: string) {
         )
       ).character,
     onSuccess: () => client.invalidateQueries({ queryKey: charactersQuery.queryKey }),
+  });
+}
+
+/** Make Sheet: queues the card's sheet, which the card then follows (backend/character-sheets.js). */
+export function useMakeSheet() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (card: CharacterCard) =>
+      post<{ jobId: string; profile: string }>(
+        `/api/characters/${encodeURIComponent(card.id)}/sheet`,
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: charactersQuery.queryKey });
+      void client.invalidateQueries({ queryKey: queueQuery.queryKey });
+    },
   });
 }
 

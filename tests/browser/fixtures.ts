@@ -668,6 +668,11 @@ export async function fixtures(page: Page) {
         };
         return respond({ ok: true, character: characters[index] });
       }
+      // Make Sheet's job, which the card follows until a test gives it panels.
+      if (path.endsWith("/sheet")) {
+        characters[index].sheet = { jobId: "sheet-job", at: stamp, status: "making", panels: [] };
+        return respond({ ok: true, jobId: "sheet-job", profile: "Qwen-Image 2.1" });
+      }
       if (method === "POST") {
         list.push(card(body, `${noun}-${list.length + 1}`));
         return respond({ ok: true, [noun]: list.at(-1) }, 201);

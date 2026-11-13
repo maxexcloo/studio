@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionIcon, getDefaultZIndex, Menu } from "@mantine/core";
+import { ActionIcon, getDefaultZIndex, Menu, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
@@ -8,16 +8,18 @@ import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
 import { useGeneration } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { useGenerateReferences } from "./generateReferences";
-import { useDeleteCharacter, type CharacterCard } from "./queries";
+import { useDeleteCharacter, useMakeSheet, type CharacterCard } from "./queries";
 
 /**
- * New, Edit and Delete Character and Generate References for a list of cards: `edit` and `remove`
- * open their dialog, which `dialogs` renders. `onLayer` hears when one opens or closes over a sheet.
+ * New, Edit and Delete Character, Generate References and Make Sheet for a list of cards: `edit`
+ * and `remove` open their dialog, which `dialogs` renders. `onLayer` hears when one opens or closes
+ * over a sheet. A sheet in the making shows on its card.
  */
 export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {}) {
   const [editing, setEditing] = useState<{ card?: CharacterCard; start?: CharacterStart }>();
   const [deleting, setDeleting] = useState<CharacterCard | null>(null);
   const deletion = useDeleteCharacter();
+  const making = useMakeSheet();
   const { profile } = useGeneration();
   const generation = useGenerateReferences(profile?.kind === "image" ? profile.id : undefined);
   const generate = (card: CharacterCard) =>
@@ -47,6 +49,7 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
       onLayer(true);
     },
     generate,
+    sheet: (card: CharacterCard) => making.mutate(card),
     remove: (card: CharacterCard) => {
       deletion.reset();
       setDeleting(card);
@@ -79,17 +82,19 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
   };
 }
 
-/** A card's ⋯ menu: Edit Character, Generate References, then Delete Character. */
+/** A card's ⋯ menu: Edit Character, Generate References, Make Sheet, then Delete Character. */
 export function CharacterMenu({
   card,
   onEdit,
   onGenerate,
+  onSheet,
   onDelete,
   withinPortal = true,
 }: {
   card: CharacterCard;
   onEdit: () => void;
   onGenerate: () => void;
+  onSheet: () => void;
   onDelete: () => void;
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
@@ -107,6 +112,17 @@ export function CharacterMenu({
         </Menu.Item>
         <Menu.Item leftSection={<icons.variations size={16} />} onClick={onGenerate}>
           Generate References
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<icons.sheet size={16} />}
+          disabled={!card.references.length || card.sheet?.status === "making"}
+          aria-label="Make Sheet"
+          onClick={onSheet}
+        >
+          Make Sheet
+          <Text size="xs" c="dimmed">
+            Front, side and back views, expressions and gear
+          </Text>
         </Menu.Item>
         <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
           Delete Character

@@ -94,6 +94,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                       card={card}
                       onEdit={() => dialogs.edit(card)}
                       onGenerate={() => dialogs.generate(card)}
+                      onSheet={() => dialogs.sheet(card)}
                       onDelete={() => dialogs.remove(card)}
                     />
                   </Group>
@@ -116,6 +117,25 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                       .join(" · ")}
                   </Text>
                 </div>
+                {card.sheet?.panels.some((panel) => panel.role !== "sheet") && (
+                  <Group gap={6} wrap="nowrap" role="group" aria-label={`${card.name}'s Sheet`}>
+                    {card.sheet.panels
+                      .filter((panel) => panel.role !== "sheet")
+                      .map((panel) => (
+                        <Image
+                          key={panel.id}
+                          src={panel.thumbnailUrl || panel.url}
+                          alt={`${card.name} ${panel.role}`}
+                          title={`${panel.role[0].toUpperCase()}${panel.role.slice(1)}`}
+                          h={56}
+                          w="auto"
+                          fit="contain"
+                          radius="md"
+                          fallbackSrc=""
+                        />
+                      ))}
+                  </Group>
+                )}
                 {card.generated && (
                   <Group justify="space-between" wrap="nowrap">
                     <Text size="xs" c="dimmed">

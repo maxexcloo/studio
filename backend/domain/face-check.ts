@@ -32,9 +32,9 @@ type Item = IdleItem & {
 };
 
 /**
- * The face check: each image made with a character's image (a card whose first image is among
- * the job's references) is compared with that image, and its `identity` saved, drifted when the
- * face is someone else's or the character appears twice.
+ * The face check: each image made with a character's image (its first or a sheet view among the
+ * job's references) is compared with the card's first image, and its `identity` saved, drifted
+ * when the face is someone else's or the character appears twice.
  */
 export function createFaceCheck(options: {
   enabled(): boolean;
@@ -42,7 +42,10 @@ export function createFaceCheck(options: {
   idle(): boolean;
   items(): Iterable<Item>;
   visible(item: Item): boolean;
-  /** The owner's character cards: id and image IDs in order (backend/cards.js). */
+  /**
+   * The owner's character cards: id and the image IDs Studio sends, its first image first
+   * (shared/characters.ts characterImageIds). A result made with any of them is compared with the first.
+   */
   characters(ownerId: string): { id: string; referenceIds: string[] }[];
   image(item: Item): Promise<Uint8Array>;
   reference(ownerId: string, assetId: string): Promise<Uint8Array>;
@@ -58,7 +61,7 @@ export function createFaceCheck(options: {
     if (!used.size) return undefined;
     return options
       .characters(item.ownerId || "")
-      .find((card) => card.referenceIds[0] && used.has(card.referenceIds[0]));
+      .find((card) => card.referenceIds.some((id) => used.has(id)));
   };
   // A character's image vector, kept by its asset: one image serves its every result.
   const references = new Map<string, Promise<Float32Array | null>>();
