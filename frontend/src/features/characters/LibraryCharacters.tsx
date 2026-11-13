@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Alert, Button, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Alert, Button, Group, Paper, Progress, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
@@ -8,17 +8,11 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { CardThumbnails } from "./CardImages";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
+import { sheetViews } from "./CharacterEditor";
 import { charactersQuery, type CharacterCard } from "./queries";
-
-/** How far Generate References has come: finished results to pick from, or those still running. */
-function generatedNote({ jobIds, results }: NonNullable<CharacterCard["generated"]>) {
-  const done = results.filter((result) => result.status === "done").length;
-  const ended = results.filter((result) => ["done", "failed"].includes(result.status)).length;
-  if (ended < jobIds.length) return `Generating references: ${done} of ${jobIds.length} done`;
-  return `${done} generated ${done === 1 ? "reference" : "references"} to pick from`;
-}
 
 /**
  * Library › Characters: every card the account keeps, to search, edit and delete. Use as Character
@@ -77,19 +71,17 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
           {cards.map((card) => (
             <Paper key={card.id} p="sm" withBorder role="listitem" aria-label={card.name}>
               <Stack gap="xs">
-                <Group gap={6} wrap="nowrap">
-                  {card.references.map((asset, index) => (
-                    <Image
-                      key={asset.id}
-                      src={asset.thumbnailUrl || asset.url}
-                      alt={`${card.name} ${index + 1}`}
-                      w={56}
-                      h={56}
-                      radius="md"
-                      fallbackSrc=""
-                    />
-                  ))}
-                  <Group ml="auto" style={{ alignSelf: "flex-start" }}>
+                <Group gap={6} wrap="nowrap" align="flex-start">
+                  <CardThumbnails
+                    label={`${card.name}'s Images`}
+                    images={card.references.map((asset, index) => ({
+                      key: asset.id,
+                      src: asset.url || asset.thumbnailUrl,
+                      thumbnailUrl: asset.thumbnailUrl,
+                      alt: `${card.name} ${index + 1}`,
+                    }))}
+                  />
+                  <Group ml="auto">
                     <CharacterMenu
                       card={card}
                       onEdit={() => dialogs.edit(card)}
@@ -117,34 +109,11 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                       .join(" · ")}
                   </Text>
                 </div>
-                {card.sheet?.panels.some((panel) => panel.role !== "sheet") && (
-                  <Group gap={6} wrap="nowrap" role="group" aria-label={`${card.name}'s Sheet`}>
-                    {card.sheet.panels
-                      .filter((panel) => panel.role !== "sheet")
-                      .map((panel) => (
-                        <Image
-                          key={panel.id}
-                          src={panel.thumbnailUrl || panel.url}
-                          alt={`${card.name} ${panel.role}`}
-                          title={`${panel.role[0].toUpperCase()}${panel.role.slice(1)}`}
-                          h={56}
-                          w="auto"
-                          fit="contain"
-                          radius="md"
-                          fallbackSrc=""
-                        />
-                      ))}
-                  </Group>
+                {sheetViews(card).length > 0 && (
+                  <CardThumbnails label={`${card.name}'s Sheet`} images={sheetViews(card)} views />
                 )}
                 {card.generated && (
-                  <Group justify="space-between" wrap="nowrap">
-                    <Text size="xs" c="dimmed">
-                      {generatedNote(card.generated)}
-                    </Text>
-                    <Button variant="default" size="compact-sm" onClick={() => dialogs.edit(card)}>
-                      Pick References
-                    </Button>
-                  </Group>
+                  <GeneratedFooter generated={card.generated} onPick={() => dialogs.edit(card)} />
                 )}
               </Stack>
             </Paper>
@@ -153,5 +122,44 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
       )}
       {dialogs.dialogs}
     </>
+  );
+}
+
+/**
+ * Generate References on a card: a progress line while they run, then how many wait to be picked,
+ * with Pick References wrapping under it where the card is too narrow for both.
+ */
+function GeneratedFooter({
+  generated,
+  onPick,
+}: {
+  generated: NonNullable<CharacterCard["generated"]>;
+  onPick: () => void;
+}) {
+  const done = generated.results.filter((result) => result.status === "done").length;
+  const ended = generated.results.filter((result) =>
+    ["done", "failed"].includes(result.status),
+  ).length;
+  const total = generated.jobIds.length;
+  const running = ended < total;
+  return (
+    <Group gap="xs" justify="space-between">
+      <Group gap="xs" wrap="nowrap" flex="1 1 8rem">
+        <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+          {running ? `References ${done}/${total}` : `${done} References to Pick`}
+        </Text>
+        {running && (
+          <Progress
+            flex={1}
+            size="sm"
+            value={total ? (done / total) * 100 : 0}
+            aria-label="Generating References"
+          />
+        )}
+      </Group>
+      <Button variant="default" size="compact-sm" style={{ flexShrink: 0 }} onClick={onPick}>
+        Pick References
+      </Button>
+    </Group>
   );
 }

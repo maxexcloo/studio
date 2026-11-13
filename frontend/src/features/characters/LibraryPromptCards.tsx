@@ -5,6 +5,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { CardThumbnails } from "./CardImages";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { promptCardsQuery, type PromptCardKind } from "./queries";
 
@@ -52,10 +53,22 @@ export function LibraryPromptCards({
           {cards.map((card) => (
             <Paper key={card.id} p="sm" withBorder role="listitem" aria-label={card.name}>
               <Stack gap={4}>
-                <Group justify="space-between" wrap="nowrap">
-                  <Text size="sm" fw={500}>
-                    {card.name}
-                  </Text>
+                <Group justify="space-between" wrap="nowrap" align="flex-start">
+                  {card.references.length ? (
+                    <CardThumbnails
+                      label={`${card.name}'s Images`}
+                      images={card.references.map((asset, index) => ({
+                        key: asset.id,
+                        src: asset.url || asset.thumbnailUrl,
+                        thumbnailUrl: asset.thumbnailUrl,
+                        alt: `${card.name} ${index + 1}`,
+                      }))}
+                    />
+                  ) : (
+                    <Text size="sm" fw={500}>
+                      {card.name}
+                    </Text>
+                  )}
                   <PromptCardMenu
                     kind={kind}
                     card={card}
@@ -63,6 +76,11 @@ export function LibraryPromptCards({
                     onDelete={() => dialogs.remove(card)}
                   />
                 </Group>
+                {card.references.length > 0 && (
+                  <Text size="sm" fw={500}>
+                    {card.name}
+                  </Text>
+                )}
                 <Text size="sm" c="dimmed" lineClamp={3}>
                   {card.description}
                 </Text>
