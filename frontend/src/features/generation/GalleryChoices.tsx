@@ -167,7 +167,7 @@ export function GalleryChoices({
       {/* Loading and empty states fill the space under the header, centred in it. */}
       {listing.isPending ? (
         <LoadingState fill label="Loading Images" />
-      ) : listing.error ? (
+      ) : listing.error && !listing.data ? (
         <Alert color="red">{listing.error.message}</Alert>
       ) : !items.length ? (
         <EmptyState
