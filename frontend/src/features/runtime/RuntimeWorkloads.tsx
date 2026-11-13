@@ -358,6 +358,7 @@ function AutomaticControlRows({
   const idleChoice = workloads.find((item) => item.id === settings.idleWorkload);
   return (
     <>
+      {/* The main switch leads with the rows it enables; Let Everyone Swap Models stands apart. */}
       <SettingRow
         label="Automatic Control"
         description="Start image and video workers for queued work, and settle the GPUs when Studio is idle."

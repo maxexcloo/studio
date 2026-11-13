@@ -162,6 +162,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       </SettingGroup>
       {status.data?.enabled && (
         <SettingGroup title="Danger Zone" danger>
+          {/* The milder action first, as Delete comes last. */}
           <SettingRow
             label="Rotate Token"
             description="Issues a new token; MCP clients using the old one lose access at once."
