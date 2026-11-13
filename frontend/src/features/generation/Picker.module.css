@@ -50,8 +50,8 @@
   border-top: 1px solid var(--studio-glass-border);
 }
 
-/* A popup's aside: on desktop a column beside the rest, divided from it to the top, whose own
-   content never sets the popup's height; on phones a section under the content. */
+/* A popup's aside: a column beside the rest, divided from it to the top, whose own content never
+   sets the popup's height. */
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 20rem;
@@ -69,16 +69,6 @@
   contain: size;
   padding-left: var(--mantine-spacing-md);
   border-left: 1px solid var(--studio-glass-border);
-}
-
-.sheetBody > .aside {
-  margin-top: var(--mantine-spacing-sm);
-}
-
-/* With a section under the content (the LoRA stack), the body scrolls as one: nothing in it
-   shrinks, or a long stack would squeeze the list to nothing and draw over the search. */
-.sheetBody:has(> .aside) > * {
-  flex-shrink: 0;
 }
 
 /* Tabs and the search row share one line; on narrow phones the search row wraps under the tabs. */

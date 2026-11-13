@@ -1126,8 +1126,25 @@ export async function pickerTab(page: Page, picker: string, tab: string) {
     .click();
 }
 
+/** Opens the LoRA choices: the popup on desktop, or Add LoRAs over the stack on phones. */
+export async function openLoraChoices(page: Page) {
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  if (await page.evaluate(() => "phone" in document.documentElement.dataset))
+    await page.getByRole("button", { name: "Add LoRAs", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Search LoRAs", exact: true })).toBeVisible();
+}
+
+/** Returns from the phone's LoRA choices to the stack; desktop shows both. */
+export async function showLoraStack(page: Page) {
+  const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
+  if (!(await adding.isVisible())) return;
+  await adding.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(adding).toBeHidden();
+}
+
 /** Closes the LoRA picker. */
 export async function closeLoras(page: Page) {
+  await showLoraStack(page);
   await closePopup(page, "LoRAs");
 }
 
