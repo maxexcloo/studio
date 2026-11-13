@@ -21,7 +21,8 @@ export function registerDreamRoutes(
     const { status = 500, message } = error as Error & { status?: number };
     return { status, payload: { ok: false, error: message } };
   };
-  // Single results show in While You Were Away; comparisons stay in the deck.
+  // Single results, and a comparison's side whose other failed, show in While You Were Away;
+  // comparisons stay in the deck.
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
     const record = dream.read(ownerId);
@@ -30,7 +31,13 @@ export function registerDreamRoutes(
       settings: record.settings,
       unseen,
       digest: digest(
-        unseen.filter((item) => !item.dream?.pair),
+        unseen.filter(
+          (item) =>
+            !unseen.some(
+              (other) =>
+                other !== item && other.dream?.pair && other.dream.pair.id === item.dream?.pair?.id,
+            ),
+        ),
         projects.list(ownerId),
       ),
       since: record.visit?.since || null,

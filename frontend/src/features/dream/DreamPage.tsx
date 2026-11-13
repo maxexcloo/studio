@@ -104,6 +104,10 @@ export function DreamPage() {
   } as const;
   const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
+  // A comparison's side whose other failed is judged in While You Were Away.
+  const digested = new Set(
+    data?.digest.flatMap((group) => [...group.items, ...group.misses].map((item) => item.id)),
+  );
   return (
     <div className={classes.page}>
       <Group className={classes.toolbar} gap="sm" wrap="nowrap">
@@ -181,7 +185,7 @@ export function DreamPage() {
         <DreamDigest groups={data!.digest} since={data!.since} />
       ) : (
         <DreamDeck
-          items={data!.unseen.filter((item) => item.dream?.pair)}
+          items={data!.unseen.filter((item) => !digested.has(item.id))}
           calibrate={tuning || data!.settings.enabled}
           empty={(calibration) => (
             <Empty dream={data!} onTune={calibration ? () => setTuning(true) : undefined} />
