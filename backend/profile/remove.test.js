@@ -24,3 +24,25 @@ test("removing a profile backs it up, keeps its history and refuses a stale hash
   assert.equal(fs.readFileSync(path.join(temporary, backup, `${id}.json`), "utf8"), text);
   assert.equal(profileStore({ workflowsDir: userWorkflowsDir }).known(id), true);
 });
+
+test("retiring a profile into another makes its id resolve to that one", () => {
+  const write = (id, kind) => {
+    const text = `${JSON.stringify({ studio: { id, name: id, kind } }, null, 2)}\n`;
+    fs.writeFileSync(path.join(userWorkflowsDir, `${id}.json`), text);
+  };
+  write("image-tier-fast", "image");
+  write("image-tier-quality", "image");
+  write("video-tier-fast", "video");
+  const baseHash = readEditableProfile("image-tier-fast").hash;
+  assert.throws(
+    () => removeProfile("image-tier-fast", { baseHash, replacement: "video-tier-fast" }),
+    {
+      status: 400,
+    },
+  );
+
+  removeProfile("image-tier-fast", { baseHash, replacement: "image-tier-quality" });
+  assert.throws(() => readEditableProfile("image-tier-fast"), { status: 404 });
+  const store = profileStore({ workflowsDir: userWorkflowsDir });
+  assert.equal(store.canonical("custom:image-tier-fast"), "custom:image-tier-quality");
+});
