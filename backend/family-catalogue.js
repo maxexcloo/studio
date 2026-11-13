@@ -269,7 +269,7 @@ export const families = {
     size: [1024, 1024],
   },
   flux1: {
-    label: "Flux.1",
+    label: "FLUX.1",
     kind: "image",
     native: draws2kMaybe,
     sources: ["unet", "checkpoint"],
@@ -312,7 +312,7 @@ export const families = {
     size: [1024, 1024],
   },
   flux2_dev: {
-    label: "Flux.2 Dev",
+    label: "FLUX.2 [dev]",
     kind: "image",
     native: draws2k,
     sources: ["unet", "checkpoint"],
@@ -349,7 +349,7 @@ export const families = {
     size: [1024, 1024],
   },
   flux2_klein_4b: {
-    label: "Flux.2 Klein 4B",
+    label: "FLUX.2 [klein] 4B",
     kind: "image",
     native: draws2k,
     sources: ["unet", "checkpoint"],
@@ -384,7 +384,7 @@ export const families = {
     size: [1024, 1024],
   },
   flux2_klein_9b: {
-    label: "Flux.2 Klein 9B",
+    label: "FLUX.2 [klein] 9B",
     kind: "image",
     native: draws2k,
     sources: ["unet", "checkpoint"],
@@ -1176,7 +1176,7 @@ export const families = {
   // BFL recommend 2K. "Do not use the model without a prompt upsampler", so every run goes
   // through theirs first, as their code runs it.
   flux3: {
-    label: "Flux.3 Klein",
+    label: "FLUX.3 [klein]",
     kind: "image",
     native: draws4k,
     sources: ["unet", "checkpoint"],
