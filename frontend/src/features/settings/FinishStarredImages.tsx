@@ -60,8 +60,19 @@ export function FinishStarredImages() {
           onChange={(event) => save.mutate({ enabled: event.currentTarget.checked })}
         />
       </SettingRow>
+      {/* Its options sit under the switch they depend on. */}
       {settings?.enabled && (
         <>
+          <SettingRow
+            label="Face Detail"
+            description="Refine faces when the prompt shows a full-body person."
+          >
+            <Switch
+              aria-label="Face Detail"
+              checked={settings.faceDetail}
+              onChange={(event) => save.mutate({ faceDetail: event.currentTarget.checked })}
+            />
+          </SettingRow>
           <SettingRow
             label="Finishing Quality"
             description="Higher quality takes longer for each starred image."
@@ -73,16 +84,6 @@ export function FinishStarredImages() {
               value={settings.quality}
               allowDeselect={false}
               onChange={(value) => value && save.mutate({ quality: value as UpscaleQuality })}
-            />
-          </SettingRow>
-          <SettingRow
-            label="Face Detail"
-            description="Refine faces when the prompt shows a full-body person."
-          >
-            <Switch
-              aria-label="Face Detail"
-              checked={settings.faceDetail}
-              onChange={(event) => save.mutate({ faceDetail: event.currentTarget.checked })}
             />
           </SettingRow>
         </>
