@@ -245,11 +245,21 @@ export function GallerySelectionBar({
       ? itemAction("share", {
           label: "Share",
           disabled: !ready.length || ready.length > shareLimit,
+          description: !ready.length
+            ? "Nothing selected has finished."
+            : ready.length > shareLimit
+              ? `Shares up to ${shareLimit} items at a time.`
+              : undefined,
           loading: prepare.isPending,
           onClick: () => void share(),
         })
       : itemAction("download", {
           disabled: !ready.length || downloadTooLarge,
+          description: !ready.length
+            ? "Nothing selected has finished."
+            : downloadTooLarge
+              ? "Too many items to download at once: select fewer."
+              : undefined,
           link: {
             href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
             download: true,
@@ -259,6 +269,7 @@ export function GallerySelectionBar({
       label: allStarred ? "Unstar" : "Star",
       pressed: allStarred,
       disabled: !ready.length || pending,
+      description: ready.length ? undefined : "Nothing selected has finished.",
       onClick: () =>
         favorites.mutate(
           { ids: ready.map((item) => item.id), favorite: !allStarred },
@@ -267,6 +278,7 @@ export function GallerySelectionBar({
     }),
     itemAction("delete", {
       disabled: !deletable.length || pending,
+      description: deletable.length ? undefined : "Stop work in progress before deleting it.",
       onClick: () => setConfirm(true),
     }),
   ]);
@@ -290,10 +302,11 @@ export function GallerySelectionBar({
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
-  // Phones name them by what they select (All, Failed, In Progress). Each takes every match of the
-  // search and filters, loading the pages not shown yet first.
+  // Phones name them by what they select (All, None, Failed, In Progress). Each select takes every
+  // match of the search and filters, loading the pages not shown yet first. Select None takes Select
+  // All's place once everything is selected.
   const [quickPicked, setQuickPicked] = useState("");
-  const quick = [
+  const matching = [
     { id: "select-all", label: "Select All", short: "All", match: () => true },
     {
       id: "select-failed",
@@ -309,7 +322,7 @@ export function GallerySelectionBar({
     },
   ]
     .map((action) => ({ ...action, shown: selection.items.some(action.match) }))
-    .filter(({ id, shown }) => id === "select-all" || shown)
+    .filter(({ id, shown }) => (id === "select-all" ? !selection.all : shown))
     .map(({ match, shown, ...action }) => ({
       ...action,
       disabled: !shown || pending || selection.loading,
@@ -319,6 +332,20 @@ export function GallerySelectionBar({
         selection.selectMatching(match);
       },
     }));
+  const none = {
+    id: "select-none",
+    label: "Select None",
+    short: "None",
+    disabled: pending,
+    loading: false,
+    onClick: selection.clear,
+  };
+  const all = matching.filter((action) => action.id === "select-all");
+  const quick = [
+    ...all,
+    ...(selected.length ? [none] : []),
+    ...matching.filter((action) => action.id !== "select-all"),
+  ];
   const bar = phone ? (
     <ActionBarGroups
       groups={[withMore(actions, primaryIds, phoneRoom).flat()]}
