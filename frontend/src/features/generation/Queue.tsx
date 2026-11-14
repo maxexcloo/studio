@@ -315,6 +315,10 @@ function QueueJobDetails({
   );
 }
 
+/** A worker's progress phase ("Loading model") in Title Case, as Studio's labels are. */
+export const phaseLabel = (phase: unknown) =>
+  String(phase || "").replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
+
 /** A job's state in short: Upscaling for a running upscale, then its progress or phase. */
 function shortStatus(job: QueueJob) {
   const percent = progressPercent(job.progress);
@@ -322,7 +326,7 @@ function shortStatus(job: QueueJob) {
     job.operation === "upscale" && job.status === "running"
       ? "Upscaling"
       : statusLabels[job.status],
-    percent ? `${Math.round(percent)}%` : job.progress?.phase,
+    percent ? `${Math.round(percent)}%` : phaseLabel(job.progress?.phase),
   ]
     .filter(Boolean)
     .join(" · ");
