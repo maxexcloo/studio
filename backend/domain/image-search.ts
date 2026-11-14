@@ -89,7 +89,7 @@ export function createImageSearch(options: {
   encoder: ImageEncoder;
   vectors: ImageVectors;
   idle(): boolean;
-  items(): Iterable<IdleItem>;
+  items(since?: number): Iterable<IdleItem>;
   changes?(): number;
   visible(item: IdleItem): boolean;
   /** The image file's bytes. */

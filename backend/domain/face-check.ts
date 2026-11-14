@@ -40,7 +40,7 @@ export function createFaceCheck(options: {
   enabled(): boolean;
   faces: FaceReader;
   idle(): boolean;
-  items(): Iterable<Item>;
+  items(since?: number): Iterable<Item>;
   changes?(): number;
   visible(item: Item): boolean;
   /**

@@ -92,7 +92,7 @@ export function createReview(options: {
   writer: ReviewWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  items(): Iterable<ReviewItem>;
+  items(since?: number): Iterable<ReviewItem>;
   changes?(): number;
   visible(item: ReviewItem): boolean;
   projects(ownerId: string): Project[];

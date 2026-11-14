@@ -630,7 +630,7 @@ export function createNextStepWork(options: {
   writer: { supportsVision(): Promise<boolean> } | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  items(): Iterable<SuggestionItem>;
+  items(since?: number): Iterable<SuggestionItem>;
   changes?(): number;
   visible(item: SuggestionItem): boolean;
   /** A small (≤512 px) copy of the image, or null when there is none. */

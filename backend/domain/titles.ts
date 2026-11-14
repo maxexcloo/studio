@@ -22,7 +22,7 @@ export function createTitler(options: {
   writer: TitleWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  items(): Iterable<TitleItem>;
+  items(since?: number): Iterable<TitleItem>;
   /** The title the item's owner already has for the same prompt, if any. */
   titled(item: TitleItem): string | undefined;
   changes?(): number;
