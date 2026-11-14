@@ -16,9 +16,6 @@ the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
 finished, so a switch waits for it.
 
-Studio refuses to target its text gateway's origin (`STUDIO_ASSISTANT_URL`) as a
-worker.
-
 CPU checks: `node --test backend/runtime/*.test.ts` and `mise run test:python`; no
 GPU is needed. GPU startup and actual inference need separate deployment
 verification.
