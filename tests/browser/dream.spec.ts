@@ -194,19 +194,20 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await images.fill("200");
   await images.press("Enter");
   await expect(settings.getByRole("switch", { name: /^Spicy/ })).toBeVisible();
-  // Images per Day follows Images, as Videos per Day follows Videos.
-  await settings.getByRole("switch", { name: /^Images/ }).dispatchEvent("click");
-  await expect(images).toBeDisabled();
-  await expect(settings).toContainText("Dream works when the queue is free · 1 of 4 videos");
   await expect
     .poll(() => dream.requests.map((request) => request.body))
-    .toEqual([{ enabled: true }, { videos: true }, { dailyImages: 200 }, { images: false }]);
+    .toEqual([{ enabled: true }, { videos: true }, { dailyImages: 200 }]);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
   await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+  await expect(settings).toContainText("Dream is paused · 12 of 200 today");
+  // Images per Day follows Images, as Videos per Day follows Videos.
+  await settings.getByRole("switch", { name: /^Images/ }).dispatchEvent("click");
+  await expect(images).toBeDisabled();
   await expect(settings).toContainText("Dream is paused · 1 of 4 videos");
+  await expect.poll(() => dream.settings.images).toBe(false);
 });
 
 test("The taste read-out fits the screen and adds what to avoid", async ({ page }) => {
