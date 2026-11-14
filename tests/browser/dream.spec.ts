@@ -86,6 +86,73 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   ]);
 });
 
+test("While You Were Away shows a series as one set, in its order", async ({ page }) => {
+  await fixtures(page);
+  const shot = (id: string, index: number) =>
+    dreamItem(id, {
+      resultSet: { id: "night", title: "Mara · Diner, Midnight", index, source: "dream" },
+    });
+  await serveDream(page, { unseen: [shot("second", 1), dreamItem("loose"), shot("first", 0)] });
+  await page.goto("/dream");
+  const set = page.getByRole("group", { name: "Series: Mara · Diner, Midnight" });
+  await expect(set.getByText("· Series of 2")).toBeVisible();
+  const views = set.getByRole("button", { name: /^View / });
+  await expect(views).toHaveCount(2);
+  await expect(views.first()).toHaveAccessibleName("View Dream prompt first");
+  await expect(views.last()).toHaveAccessibleName("View Dream prompt second");
+  await expect(page.getByRole("button", { name: "View Dream prompt loose" })).toBeVisible();
+  await expect(set.getByRole("button", { name: "View Dream prompt loose" })).toHaveCount(0);
+  // Liking one judges only that result.
+  await set.getByRole("button", { name: "Like Dream prompt first", exact: true }).click();
+  await expect(views).toHaveCount(1);
+});
+
+test("Library › Characters offers Dream's suggested cards: Accept makes the card, Dismiss turns one down", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const liked = (id: string) => ({ ...dreamItem(id), dream: undefined, favorite: true });
+  const dream = await serveDream(page, {
+    characters: state.characters,
+    suggestions: [
+      {
+        id: "mara",
+        kind: "characters",
+        name: "Mara",
+        description: "red hair, freckles",
+        items: [liked("one"), liked("two")],
+      },
+      {
+        id: "rooftop",
+        kind: "scenes",
+        name: "Rooftop",
+        description: "a city rooftop at night",
+        items: [liked("three"), liked("four")],
+      },
+    ],
+  });
+  await page.goto("/library#characters");
+  const suggestions = page.getByRole("list", { name: "Suggestions" });
+  const mara = suggestions.getByRole("listitem", { name: "Mara" });
+  await expect(mara.getByText("Character", { exact: true })).toBeVisible();
+  await expect(mara.getByText("In 2 liked results", { exact: true })).toBeVisible();
+  await expect(mara.getByRole("group", { name: "Mara's Results" }).getByRole("button")).toHaveCount(
+    2,
+  );
+  const rooftop = suggestions.getByRole("listitem", { name: "Rooftop" });
+  await rooftop.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await expect(rooftop).toHaveCount(0);
+  await mara.getByRole("button", { name: "Accept", exact: true }).click();
+  await expect(suggestions).toHaveCount(0);
+  await expect(
+    page.getByRole("list", { name: "Characters" }).getByRole("listitem", { name: "Mara" }),
+  ).toBeVisible();
+  expect(verdicts(dream)).toEqual([
+    "POST /api/dream/suggestions/rooftop/dismiss",
+    "POST /api/dream/suggestions/mara/accept",
+  ]);
+});
+
 test("On a phone held sideways, a deck card's caption stands beside its media", async ({
   page,
 }, testInfo) => {

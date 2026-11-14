@@ -15,15 +15,10 @@
 import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
 import { promptAssistantOff } from "./assistant-routes.js";
-import { maxPromptCharacters } from "../shared/queue.ts";
+import { dreamRequest } from "./domain/dream.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 import { writeSetPrompt } from "./prompt-set.js";
 import { sheetRequest, writeSheetPrompt } from "./prompt-sheet.js";
-
-const text = (value, limit = maxPromptCharacters) =>
-  String(typeof value === "string" ? value : "")
-    .trim()
-    .slice(0, limit);
 
 /** The admitted writing request: only its kind's request fields, never a written result; or null. */
 export function writingRequest(value) {
@@ -31,18 +26,7 @@ export function writingRequest(value) {
   if (value.kind === "animate") return animateRequest(value);
   if (value.kind === "set") return { kind: "set" };
   if (value.kind === "sheet") return sheetRequest(value);
-  if (value.kind === "dream")
-    return {
-      kind: "dream",
-      ...(value.spicy === true ? { spicy: true } : {}),
-      ...(text(value.source, 1000) ? { source: text(value.source, 1000) } : {}),
-      ...(text(value.reword) ? { reword: text(value.reword) } : {}),
-      ...(text(value.like) ? { like: text(value.like) } : {}),
-      loras: (Array.isArray(value.loras) ? value.loras : [])
-        .map((name) => text(name, 300))
-        .filter(Boolean)
-        .slice(0, 8),
-    };
+  if (value.kind === "dream") return dreamRequest(value);
   return null;
 }
 
