@@ -217,6 +217,17 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   });
 });
 
+test("Use as Reference says why the chosen model takes none", async ({ page }) => {
+  await galleryFixture(page);
+  await serveProfiles(page, [{ ...profiles[0], mediaInputs: [] }, ...profiles.slice(1)]);
+  await page.reload();
+  await tileMenu(page);
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  const reference = page.getByRole("menuitem", { name: "Use as Reference", exact: true });
+  await expect(reference).toBeDisabled();
+  await expect(reference).toHaveAccessibleDescription(/takes no references/);
+});
+
 test("A reference placed by hand applies the profile's reference-mode settings", async ({
   page,
 }) => {
