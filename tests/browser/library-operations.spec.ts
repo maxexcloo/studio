@@ -650,8 +650,9 @@ test("Library › Presets lists what each preset holds, renames with unique name
   await page.goto("/library#presets");
   const table = page.getByRole("table", { name: "Presets", exact: true });
   await expect(table.getByRole("row", { name: /Heron/ })).toContainText("Prompt");
-  // Saved dates read in Australian English whatever the browser's locale.
-  await expect(table.getByRole("row", { name: /Heron/ })).toContainText(/\d+ Oct 2026/);
+  // Saved dates read in Australian English whatever the browser's locale; phones leave them out.
+  if (!test.info().project.use.isMobile)
+    await expect(table.getByRole("row", { name: /Heron/ })).toContainText(/\d+ Oct 2026/);
   await expect(table.getByRole("row", { name: /Fine Detail/ })).toContainText("LoRAs");
   await page.getByRole("button", { name: "Actions for Heron", exact: true }).click();
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
