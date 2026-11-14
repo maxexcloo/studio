@@ -186,7 +186,14 @@ test("AI offers Library's fixed changes above the image's suggestions", async ({
         available: true,
         presets: [],
         themes: [],
-        changes: [{ id: "softer", label: "Softer Shadows", description: "Gentler contrast." }],
+        changes: [
+          {
+            id: "softer",
+            label: "Softer Shadows",
+            description: "Gentler contrast.",
+            instruction: "soften the shadows",
+          },
+        ],
       },
     }),
   );
@@ -210,7 +217,7 @@ test("AI offers Library's fixed changes above the image's suggestions", async ({
   await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
   await expect
     .poll(() => asked.find((body) => body.surface === "change")?.request)
-    .toBe("Softer Shadows");
+    .toBe("soften the shadows");
 });
 
 test("Animate offers its themes, then motions written for the image, then Custom…", async ({
