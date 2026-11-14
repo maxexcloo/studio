@@ -473,32 +473,32 @@ export class McpMedia {
     };
   }
   async catalogue(owner = "") {
-    // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
+    // Each owner's catalogue is kept separately: accounts may see different profiles and LoRAs.
+    // Once a minute old it is read again in the background while the last copy answers, so only
+    // an owner's first call, or one after the model list changed, waits for the read.
     this.profileRequests ||= new Map();
     this.profileCache ||= new Map();
     const cached = this.profileCache.get(owner);
-    let models =
-      cached && Date.now() - cached.at < (this.profileTtl ?? 60000) ? cached.models : null;
-    if (!models) {
-      // Concurrent submissions share discovery; do not queue repeated catalogue scans.
-      if (!this.profileRequests.has(owner)) {
-        const generation = this.profileGeneration || 0;
-        const pending = this.request("GET", "/api/models?cached=1", undefined, owner)
-          .then((result) => {
-            // A scan that overlapped a model-list change is used once but not cached.
-            if ((this.profileGeneration || 0) === generation) {
-              if (this.profileCache.size >= 4096)
-                this.profileCache.delete(this.profileCache.keys().next().value);
-              this.profileCache.set(owner, { at: Date.now(), models: result });
-            }
-            return result;
-          })
-          .finally(() => this.profileRequests.delete(owner));
-        this.profileRequests.set(owner, pending);
-      }
-      models = await step("catalogue", () => this.profileRequests.get(owner));
+    const stale = !cached || Date.now() - cached.at >= (this.profileTtl ?? 60000);
+    // Concurrent submissions share discovery; do not queue repeated catalogue scans.
+    if (stale && !this.profileRequests.has(owner)) {
+      const generation = this.profileGeneration || 0;
+      const pending = this.request("GET", "/api/models?cached=1", undefined, owner)
+        .then((result) => {
+          // A scan that overlapped a model-list change is used once but not cached.
+          if ((this.profileGeneration || 0) === generation) {
+            if (this.profileCache.size >= 4096)
+              this.profileCache.delete(this.profileCache.keys().next().value);
+            this.profileCache.set(owner, { at: Date.now(), models: result });
+          }
+          return result;
+        })
+        .finally(() => this.profileRequests.delete(owner));
+      this.profileRequests.set(owner, pending);
+      if (cached) pending.catch(() => null);
     }
-    return models;
+    if (cached) return cached.models;
+    return step("catalogue", () => this.profileRequests.get(owner));
   }
   /** The studio LoRA picker's metadata for this account, briefly cached; access rules apply upstream. */
   async loraInfos(owner = "") {
