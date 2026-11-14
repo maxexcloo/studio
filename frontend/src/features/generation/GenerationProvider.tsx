@@ -178,9 +178,11 @@ function useGenerationState() {
       ),
     [selectedProfile, draft.input.profileBackend, draft.references, draft.input.referenceAssets],
   );
-  function update(patch: Partial<GenerationInput>) {
-    setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));
-  }
+  const update = useCallback(
+    (patch: Partial<GenerationInput>) =>
+      setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } })),
+    [setDraft],
+  );
   /** Moves the draft to `profile`: one the person picked, or the account's default (`defaulted`). */
   function selectProfile(profile: Profile, defaulted = false) {
     // The output toggle restores that mode's whole draft, including its chosen profile.
