@@ -1,109 +1,44 @@
-/**
- * Text encoders and VAEs. ComfyUI recognises them by tensor names and shapes in
- * the safetensors header (comfy/sd.py detect_te_model and VAE.__init__); the
- * worker only gives Studio file names, so each kind carries a filename pattern.
- */
+/** Text encoder and VAE kinds, by the keys the download catalogue uses. */
 
-/* ------------------------------------------------------------ Kinds */
-
-// Text encoder kinds. `name` is the filename fallback; order matters where
-// patterns overlap (Qwen3-VL before Qwen3, UMT5 before T5).
 export const encoderKinds = {
-  clip_l: { label: "CLIP-L", name: /clip[-_ ]?l(?![a-z])|clip_l|vit[-_]?l/i },
-  clip_g: { label: "CLIP-G", name: /clip[-_ ]?g(?![a-z])|clip_g|bigg/i },
-  clip_h: { label: "CLIP-H", name: /clip[-_ ]?h(?![a-z])|vit[-_]?h/i },
-  umt5xxl: { label: "UMT5-XXL", name: /umt5/i },
-  t5xl: { label: "T5-XL (Pile)", name: /t5[-_ ]?xl(?!l)|pile[-_ ]?t5|pony[-_ ]?v7.*t5/i },
-  t5xxl: { label: "T5-XXL", name: /t5[-_ ]?(v1_1[-_ ]?)?xxl|t5xxl/i },
-  byt5_glyph: { label: "ByT5 Glyph", name: /byt5/i },
-  qwen35_9b: { label: "Qwen3.5 9B", name: /qwen[-_ ]?3[._]5[-_ ]?9b|qwen35[-_ ]?9b/i },
-  qwen3vl_32b: { label: "Qwen3-VL 32B", name: /qwen[-_ ]?3[-_ ]?vl.*32b/i },
-  qwen3vl_8b: { label: "Qwen3-VL 8B", name: /qwen[-_ ]?3[-_ ]?vl.*8b/i },
-  qwen3vl_4b: {
-    label: "Qwen3-VL 4B",
-    name: /qwen[-_ ]?3[-_ ]?vl.*4b|qwen[-_ ]?3[-_ ]?vl(?!.*\d+b)/i,
-  },
-  qwen25vl_7b: { label: "Qwen2.5-VL 7B", name: /qwen[-_ ]?2[._]?5[-_ ]?vl/i },
-  qwen3_8b: { label: "Qwen3 8B", name: /qwen[-_ ]?3(?![-_ .]?vl)(?![-_ .]?5)[-_ .]*8b/i },
-  qwen3_4b: { label: "Qwen3 4B", name: /qwen[-_ ]?3(?![-_ .]?vl)(?![-_ .]?5)[-_ .]*4b/i },
-  qwen3_06b: { label: "Qwen3 0.6B", name: /qwen[-_ ]?3(?![-_ .]?vl)[-_ .]*0[._]?6b/i },
-  mistral3_24b: {
-    label: "Mistral 3 Small 24B",
-    name: /mistral[-_ ]?3|mistral.*small|mistral.*24b/i,
-  },
-  ministral3_3b: { label: "Ministral 3 3B", name: /ministral/i },
-  gemma3_12b: { label: "Gemma 3 12B", name: /gemma[-_ ]?3.*12b/i },
-  gemma2_2b: { label: "Gemma 2 2B", name: /gemma[-_ ]?2.*2b/i },
-  llama31_8b: { label: "Llama 3.1 8B", name: /llama/i },
+  clip_l: { label: "CLIP-L" },
+  clip_g: { label: "CLIP-G" },
+  clip_h: { label: "CLIP-H" },
+  umt5xxl: { label: "UMT5-XXL" },
+  t5xl: { label: "T5-XL (Pile)" },
+  t5xxl: { label: "T5-XXL" },
+  byt5_glyph: { label: "ByT5 Glyph" },
+  qwen35_9b: { label: "Qwen3.5 9B" },
+  qwen3vl_32b: { label: "Qwen3-VL 32B" },
+  qwen3vl_8b: { label: "Qwen3-VL 8B" },
+  qwen3vl_4b: { label: "Qwen3-VL 4B" },
+  qwen25vl_7b: { label: "Qwen2.5-VL 7B" },
+  qwen3_8b: { label: "Qwen3 8B" },
+  qwen3_4b: { label: "Qwen3 4B" },
+  qwen3_06b: { label: "Qwen3 0.6B" },
+  mistral3_24b: { label: "Mistral 3 Small 24B" },
+  ministral3_3b: { label: "Ministral 3 3B" },
+  gemma3_12b: { label: "Gemma 3 12B" },
+  gemma2_2b: { label: "Gemma 2 2B" },
+  llama31_8b: { label: "Llama 3.1 8B" },
 };
 
-// VAE layouts group kinds whose shapes match exactly
-// (an SD1.5 and an SDXL VAE, a Flux and an SD3 VAE, or a Wan 2.1 and a Qwen-Image
-// VAE share their shapes exactly).
 export const vaeKinds = {
-  sd15: { label: "SD 1.5 VAE", layout: "kl4" },
-  sdxl: { label: "SDXL VAE", layout: "kl4" },
-  aura: { label: "Pony V7 VAE", layout: "kl4" },
-  flux1: { label: "Flux VAE (ae)", layout: "kl16" },
-  sd3: { label: "SD3 VAE", layout: "kl16" },
-  flux2: { label: "Flux.2 VAE", layout: "flux2" },
-  wan21: { label: "Wan 2.1 VAE", layout: "wan16" },
-  qwen_image: { label: "Qwen-Image VAE", layout: "wan16" },
-  // Not in this ComfyUI's detection yet, so its layout is unknown: trust the name.
-  qwen_image_21: { label: "Qwen-Image 2.1 VAE", layout: "unknown" },
-  wan22: { label: "Wan 2.2 VAE", layout: "wan48" },
-  hunyuan15: { label: "HunyuanVideo 1.5 VAE", layout: "hv15" },
-  hunyuan_video: { label: "HunyuanVideo VAE", layout: "hv1" },
-  ltx_video: { label: "LTX video VAE", layout: "ltx" },
-  h3_video: { label: "MiniMax H3 video VAE", layout: "h3v" },
-  h3_audio: { label: "MiniMax H3 audio VAE", layout: "h3a" },
-  h3_image: { label: "MiniMax H3 Image VAE", layout: "unknown" },
-  mage_flow: { label: "MageFlow VAE", layout: "mage" },
+  sd15: { label: "SD 1.5 VAE" },
+  sdxl: { label: "SDXL VAE" },
+  aura: { label: "Pony V7 VAE" },
+  flux1: { label: "Flux VAE (ae)" },
+  sd3: { label: "SD3 VAE" },
+  flux2: { label: "Flux.2 VAE" },
+  wan21: { label: "Wan 2.1 VAE" },
+  qwen_image: { label: "Qwen-Image VAE" },
+  qwen_image_21: { label: "Qwen-Image 2.1 VAE" },
+  wan22: { label: "Wan 2.2 VAE" },
+  hunyuan15: { label: "HunyuanVideo 1.5 VAE" },
+  hunyuan_video: { label: "HunyuanVideo VAE" },
+  ltx_video: { label: "LTX video VAE" },
+  h3_video: { label: "MiniMax H3 video VAE" },
+  h3_audio: { label: "MiniMax H3 audio VAE" },
+  h3_image: { label: "MiniMax H3 Image VAE" },
+  mage_flow: { label: "MageFlow VAE" },
 };
-
-function encoderKindFromName(name = "") {
-  const base = String(name).split(/[\\/]/).pop() || "";
-  for (const [kind, spec] of Object.entries(encoderKinds)) {
-    if (spec.name.test(base)) return kind;
-  }
-  return "";
-}
-
-/** What one text encoder file is, by its name. */
-export function classifyEncoder(name) {
-  const kind = encoderKindFromName(name);
-  return { name, kind, via: kind ? "name" : "" };
-}
-
-const vaeNameHints = [
-  ["mage_flow", /mage[-_ ]?flow/i],
-  ["qwen_image_21", /qwen[-_ ]?image[-_ ]?2[._]?1/i],
-  ["qwen_image", /qwen/i],
-  ["wan22", /wan[-_ ]?2[._]?2/i],
-  ["wan21", /wan/i],
-  ["flux2", /flux[-_ ]?2|full_encoder_small_decoder/i],
-  ["sd3", /sd[-_ ]?3/i],
-  ["flux1", /\bae\b|^ae[._]|flux|lumina|z[-_ ]?image|chroma|hidream/i],
-  ["aura", /pony[-_ ]?v7|aura/i],
-  ["sdxl", /xl/i],
-  ["hunyuan15", /hunyuan[-_ ]?video[-_ ]?1[._]?5|hunyuanvideo15/i],
-  ["hunyuan_video", /hunyuan/i],
-  ["h3_image", /h3[-_ ]?image/i],
-  ["h3_audio", /h3.*audio/i],
-  ["h3_video", /h3/i],
-  ["ltx_video", /ltx/i],
-  ["sd15", /sd[-_ ]?1|vae[-_]ft|mse|ema/i],
-];
-
-/** What one VAE file is, by its name. */
-export function classifyVae(name) {
-  const base = String(name).split(/[\\/]/).pop() || "";
-  const kind = vaeNameHints.find(([, pattern]) => pattern.test(base))?.[0] || "";
-  return {
-    name,
-    layout: kind ? vaeKinds[kind].layout : "",
-    kind,
-    kinds: kind ? [kind] : [],
-    via: kind ? "name" : "",
-  };
-}
