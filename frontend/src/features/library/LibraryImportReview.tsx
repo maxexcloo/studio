@@ -370,7 +370,7 @@ export function LibraryImportReview({
                         {resource.want?.file || resource.name}
                       </Text>
                       <Badge color={resource.status === "installed" ? "green" : "gray"}>
-                        {resource.status}
+                        {stateLabel(resource.status)}
                       </Badge>
                     </Group>
                     {resource.note && <Text size="sm">{resource.note}</Text>}
