@@ -1623,11 +1623,12 @@ export function createDream(options: {
           loras = lorasOf(ready, seed.input);
           references = Array.isArray(seed.input.referenceAssets) ? seed.input.referenceAssets : [];
         }
+        const rating = record.ratings?.[String(likedSeed?.item.id)] ?? elo.start;
         const what = likedSeed?.item.favorite
           ? "a starred image"
-          : likedSeed?.item.dream
-            ? "a liked result"
-            : "an image you chose in a comparison";
+          : rating > elo.start
+            ? "a comparison winner"
+            : "a liked result";
         note = likedSeed
           ? `Varying ${what}: new ${vary}`
           : `Continuing ${project!.name}: new ${vary}`;

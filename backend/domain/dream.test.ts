@@ -941,6 +941,8 @@ test("Comparisons rate gallery images against each other, and an image that wins
       type: "image",
       status: "done",
       createdAt: old,
+      // The winner is also a liked Dream result; its note names the comparison.
+      ...(id === "win" ? { dream: { state: "kept" as const, prompt: "", why: "", at: "" } } : {}),
     });
   }
   dream.calibrate("alice", { liked: ["win"], passed: ["lose"] });
@@ -952,7 +954,7 @@ test("Comparisons rate gallery images against each other, and an image that wins
   // Nothing is starred: the image that won seeds.
   state.rolls = [99];
   const job = await dreamOnce();
-  assert.match(String(job?.dream?.why), /^Varying an image you chose in a comparison: /);
+  assert.match(String(job?.dream?.why), /^Varying a comparison winner: /);
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt win/);
 });
 
