@@ -116,7 +116,7 @@ export function ComposerDock() {
     if (!shared) return;
     void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
       .then(({ asset }) => placement.place(asset))
-      .catch(() => {});
+      .catch(failure);
     const next = new URLSearchParams(params);
     next.delete("shared");
     setParams(next, { replace: true });
