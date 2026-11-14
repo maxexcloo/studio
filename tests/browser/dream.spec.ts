@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { dreamItem, fixtures, serveDream, stamp } from "./fixtures";
 
-/** Clicks a secondary action in full screen's Dream bar, which phones keep under ⋯ More. */
+/** Clicks an action in full screen's Dream bar; phones keep More Like This and Variations under ⋯ More. */
 async function dreamAction(page: Page, phone: boolean, name: string) {
   const actions = page.getByRole("group", { name: "Dream Actions" });
-  if (!phone) return actions.getByRole("button", { name, exact: true }).click();
+  if (!phone || !["More Like This", "Variations"].includes(name))
+    return actions.getByRole("button", { name, exact: true }).click();
   await actions.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
