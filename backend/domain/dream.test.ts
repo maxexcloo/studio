@@ -1460,7 +1460,7 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
 });
 
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
-  const { dream, state, dreamOnce } = fixture(t, profiles);
+  const { dream, state, dreamOnce, finish, live } = fixture(t, profiles);
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
   for (const [id, score] of [
     ["gone", 9],
@@ -1482,6 +1482,16 @@ test("A Dream video skips a source that left the gallery and animates the next",
     { assetId: "asset-next", source: "gallery", slot: "start" },
   ]);
   assert.deepEqual(dream.read("alice").animated, ["next", "gone"]);
+  // With images capped, a second image worker's slot waits while Dream's one video runs.
+  state.slots = 2;
+  state.items.push({ ...state.items.find((item) => item.id === "next")!, id: "more" });
+  await dream.tick();
+  await dream.tick();
+  assert.deepEqual(dream.status("alice"), {
+    status: "waiting",
+    reason: "Dream makes one video at a time.",
+  });
+  finish("alice", live("alice")[0].id);
   assert.equal(await dreamOnce(), undefined);
   assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, starred/);
 });
