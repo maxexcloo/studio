@@ -229,7 +229,7 @@ export function LibraryImports({
         <Text size="sm" c={added.failed.length ? "red" : "dimmed"}>
           {added.imported} {added.imported === 1 ? "image" : "images"} added to Uploads
           {added.failed.length > 0 &&
-            `; ${added.failed.length} couldn’t be saved: ${added.failed.map((entry) => entry.error).join(" ")}`}
+            `; ${added.failed.length} couldn't be saved: ${added.failed.map((entry) => entry.error).join(" ")}`}
           .
         </Text>
       )}

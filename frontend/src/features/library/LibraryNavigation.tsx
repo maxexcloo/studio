@@ -69,7 +69,7 @@ export const librarySections = {
   imports: {
     label: "Imports",
     description:
-      "Import a Civitai or Hugging Face link, or an image, and review its compatibility. Reddit posts’ images go to Uploads.",
+      "Import a Civitai or Hugging Face link, or an image, and review its compatibility. Reddit posts' images go to Uploads.",
     icon: Import,
     admin: true,
     group: "Getting More",

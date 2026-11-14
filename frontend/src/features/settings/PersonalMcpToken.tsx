@@ -69,7 +69,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       await client.invalidateQueries({ queryKey: ["personal-mcp-status"] });
       await client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Couldn’t update the MCP token");
+      setError(error instanceof Error ? error.message : "Couldn't update the MCP token");
     } finally {
       setBusy(false);
       setConfirming(null);
@@ -106,8 +106,8 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
           label="MCP Token"
           description={
             status.data?.createdAt
-              ? `Carries your account’s access. Created ${new Date(status.data.createdAt).toLocaleString("en-AU")}.`
-              : "Carries your account’s access. Send it as a bearer token, or use the URL with it in a client that only takes a URL (such as Grok)."
+              ? `Carries your account's access. Created ${new Date(status.data.createdAt).toLocaleString("en-AU")}.`
+              : "Carries your account's access. Send it as a bearer token, or use the URL with it in a client that only takes a URL (such as Grok)."
           }
         >
           <Badge color={status.data?.enabled ? "green" : "gray"} miw="max-content">

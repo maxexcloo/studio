@@ -11,6 +11,7 @@ depends = ["check:app", "check:python", "check:shell", "test:python"]
 [tasks."check:app"]
 depends = [
   "check:actions",
+  "check:apostrophes",
   "check:mise",
   "check:oxfmt",
   "check:oxlint",
@@ -19,6 +20,10 @@ depends = [
   "check:whitespace",
   "test",
 ]
+
+# Frontend copy uses straight apostrophes.
+[tasks."check:apostrophes"]
+run = "! git grep -n '’' -- frontend/src"
 
 [tasks."check:oxlint"]
 run = "oxlint --deny-warnings"

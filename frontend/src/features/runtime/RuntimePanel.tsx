@@ -90,7 +90,7 @@ function WorkerList({ workers }: { workers: WorkerStatus[] }) {
     </Stack>
   ) : (
     <Text size="sm" c="dimmed">
-      The deployment lists no workers, so Studio can’t generate.
+      The deployment lists no workers, so Studio can't generate.
     </Text>
   );
 }

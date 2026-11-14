@@ -266,7 +266,7 @@ export function DreamProjects() {
       {projects.isPending ? (
         <LoadingState fill label="Loading Projects" />
       ) : projects.isError ? (
-        <Alert color="red" title="Couldn’t Load Projects">
+        <Alert color="red" title="Couldn't Load Projects">
           {projects.error.message}
         </Alert>
       ) : !list.length ? (

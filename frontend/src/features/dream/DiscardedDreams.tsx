@@ -62,7 +62,7 @@ export function DiscardedDreams() {
   if (discarded.isPending) return <LoadingState fill label="Loading Discards" />;
   if (discarded.isError)
     return (
-      <Alert color="red" title="Couldn’t Load Discards">
+      <Alert color="red" title="Couldn't Load Discards">
         {discarded.error.message}
       </Alert>
     );
@@ -88,7 +88,7 @@ export function DiscardedDreams() {
         onConfirm={() => deleteAll.mutate()}
         onClose={() => setConfirming(false)}
       >
-        Delete every discarded Dream result and its file? This can’t be undone.
+        Delete every discarded Dream result and its file? This can't be undone.
       </ConfirmDialog>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (

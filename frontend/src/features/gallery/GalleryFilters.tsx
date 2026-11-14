@@ -455,7 +455,7 @@ export function GalleryFilterPanel({
           loading={facets.isFetching}
           onClick={() => void facets.refetch()}
         >
-          Couldn’t Load Filters
+          Couldn't Load Filters
         </Button>
       )}
       {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}

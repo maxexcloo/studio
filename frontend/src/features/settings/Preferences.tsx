@@ -273,7 +273,7 @@ export function Preferences() {
         <FinishStarredImages />
         <SettingRow
           label="Tile Captions"
-          description="Show each tile’s title and details on phones. Desktop shows them on hover."
+          description="Show each tile's title and details on phones. Desktop shows them on hover."
         >
           <Switch
             key={loaded ? "loaded" : "loading"}
@@ -304,7 +304,7 @@ export function Preferences() {
       <SettingGroup title="Prompts">
         <SettingRow
           label="Keep Recent Prompts"
-          description="Offer your recent prompts in the composer’s history. Pinned prompts stay either way."
+          description="Offer your recent prompts in the composer's history. Pinned prompts stay either way."
         >
           <Switch
             // Remounts once loaded so the saved state appears without the thumb sliding.

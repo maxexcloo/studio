@@ -22,7 +22,7 @@ export const post = <T>(url: string, value?: unknown) =>
 export function failure(error: unknown) {
   notifications.show({
     color: "red",
-    title: "Couldn’t Complete the Action",
+    title: "Couldn't Complete the Action",
     message: error instanceof Error ? error.message : String(error),
     autoClose: false,
   });

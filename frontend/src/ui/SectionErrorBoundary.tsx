@@ -13,7 +13,7 @@ export class SectionErrorBoundary extends Component<
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <Alert color="red" title={`Couldn’t Show ${this.props.label}`}>
+      <Alert color="red" title={`Couldn't Show ${this.props.label}`}>
         {this.state.error.message}
       </Alert>
     );
