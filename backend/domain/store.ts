@@ -295,6 +295,17 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
+  /** Whether any unfinished job is someone's own work, not Dream's, without reading records. */
+  hasOpenOwnWork(): boolean {
+    return Boolean(
+      this.db
+        .prepare(
+          `SELECT 1 FROM studio_queue WHERE status IN (${placeholders(openStatuses)}) AND COALESCE(json_extract(record, '$.priority'), ${queuePriority.manual}) != ${queuePriority.dream} LIMIT 1`,
+        )
+        .get(...openStatuses),
+    );
+  }
+
   /**
    * The owner's queue as it lists, in queue order: every unfinished job, every failed one not
    * cleared, and the newest `listedFinishedJobs` of the rest. Nothing is deleted: an older job

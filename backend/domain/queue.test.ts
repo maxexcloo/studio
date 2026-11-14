@@ -1097,3 +1097,16 @@ test("The queue lists unfinished and failed work and only the latest finished jo
   assert.ok(listed.includes(finished.at(-1)!.id));
   assert.equal(store.job("alice", finished[0].id)?.id, finished[0].id);
 });
+
+test("Only someone's own unfinished work, not Dream's or finished work, counts as open", () => {
+  const store = new Store(openDatabase(":memory:"));
+  const session = store.createSession("alice");
+  const queue = (priority: number) =>
+    store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, { priority });
+  queue(queuePriority.dream);
+  assert.equal(store.hasOpenOwnWork(), false);
+  const own = queue(queuePriority.mcp);
+  assert.equal(store.hasOpenOwnWork(), true);
+  store.save({ ...own, status: "completed" });
+  assert.equal(store.hasOpenOwnWork(), false);
+});
