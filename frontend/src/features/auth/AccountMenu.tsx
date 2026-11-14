@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
@@ -47,9 +47,10 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
   );
 }
 export function AccountMenu() {
+  const [opened, setOpened] = useState(false);
   return (
-    <Menu position="bottom-end" shadow="md" width={240}>
-      <Tooltip label="Account">
+    <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md" width={240}>
+      <Tooltip label="Account" disabled={opened}>
         <Menu.Target>
           <ActionIcon aria-label="Account" variant="subtle" color="gray">
             <UserRound size={19} />
