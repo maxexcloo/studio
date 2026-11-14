@@ -11,10 +11,7 @@ import {
 } from "./inpaint.js";
 
 const objectInfo = JSON.parse(
-  fs.readFileSync(
-    new URL("./fixtures/object_info-comfyui-0.41.0-master-ce1e922.json", import.meta.url),
-    "utf8",
-  ),
+  fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.45.0.json", import.meta.url), "utf8"),
 );
 
 test("the inpaint nodes are all ComfyUI core nodes", () => {

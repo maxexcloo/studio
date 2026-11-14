@@ -27,7 +27,7 @@ test(
     );
     const info = JSON.parse(
       fs.readFileSync(
-        new URL("./fixtures/object_info-comfyui-0.41.0-master-ce1e922.json", import.meta.url),
+        new URL("./fixtures/object_info-comfyui-0.45.0.json", import.meta.url),
         "utf8",
       ),
     );
