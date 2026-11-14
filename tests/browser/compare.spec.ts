@@ -345,7 +345,7 @@ test("Variants of a result show their numbers, the axis they vary and Undo for t
 
   // Picking one adds it to the chat's project brief, which Undo restores.
   await page.getByRole("button", { name: "Star B · Golden Dusk as Winner", exact: true }).click();
-  await expect(page.getByText("Added to Foxes’s brief", { exact: true })).toBeVisible();
+  await expect(page.getByText("Added to Foxes's brief", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect.poll(() => undone).toEqual(["POST"]);
 

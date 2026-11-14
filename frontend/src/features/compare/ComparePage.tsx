@@ -80,7 +80,7 @@ export function ComparePage() {
       autoClose: 10000,
       message: (
         <Group justify="space-between" wrap="nowrap">
-          <Text size="sm">Added to {name}’s brief</Text>
+          <Text size="sm">Added to {name}'s brief</Text>
           <Button
             size="compact-sm"
             variant="subtle"
