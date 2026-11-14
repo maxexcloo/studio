@@ -187,7 +187,7 @@ function missingFileParts(workflow, info) {
   return workflowMissingFiles(workflow, info).map(({ file, folder, classType }) => ({
     part: loaderParts[classType] || "model",
     label: file,
-    detail: `Put ${file} in ComfyUI’s models/${folder} folder.`,
+    detail: `Put ${file} in ComfyUI's models/${folder} folder.`,
     downloads: catalogueDownloadsForFile(file, folder),
   }));
 }
@@ -305,7 +305,7 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
   const format = detectWorkflowFormat(raw);
   if (format === "unsupported")
     throw new Error(
-      "This isn’t a ComfyUI workflow. Use one saved from ComfyUI, in the regular or API format.",
+      "This isn't a ComfyUI workflow. Use one saved from ComfyUI, in the regular or API format.",
     );
   const source = format === "comfyui-api-wrapper" ? raw.prompt : raw;
   const graph = graphFromJson(format === "comfyui-visual" ? { ...raw } : source, info);

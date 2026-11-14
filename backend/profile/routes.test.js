@@ -172,7 +172,7 @@ test("versions list, show, revert as a new version and approve an AI draft", asy
   );
 });
 
-test("a profile’s guide view, guide edits, guide versions, revert and approve", async (t) => {
+test("a profile's guide view, guide edits, guide versions, revert and approve", async (t) => {
   const { call } = await serve(t);
   const guides = guideStore();
   guides.save("krea2", { name: "Krea 2", summary: "Seed guide." }, { by: "seed", origin: "seed" });

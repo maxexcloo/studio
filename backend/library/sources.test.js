@@ -286,7 +286,7 @@ test("a Hugging Face file link imports that file; a repository lists its model f
     resolveHuggingFace("https://huggingface.co/org/repo/blob/main/missing.safetensors", {
       request,
     }),
-    /isn’t in this repository/,
+    /isn't in this repository/,
   );
 });
 

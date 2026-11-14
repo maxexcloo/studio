@@ -133,7 +133,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     const worker = workerById(backend);
     if (!worker) return noWorkerMessage("image");
     const name = isDefaultBackend(backend) ? "ComfyUI" : worker.name;
-    return `Can’t reach ${name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
+    return `Can't reach ${name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   }
 
   /**

@@ -121,7 +121,7 @@ const codeInput = /^(code|python_code|script|python|command|cmd|expression|expr)
 
 const reasons = {
   code: "runs code on this computer",
-  files: "reads or writes files outside ComfyUI’s own folders",
+  files: "reads or writes files outside ComfyUI's own folders",
   network: "reaches the internet",
 };
 

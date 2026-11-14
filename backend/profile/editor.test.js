@@ -113,7 +113,7 @@ test("unknown nodes and files are warnings, not errors", () => {
   assert.match(checked.warnings.join(" "), /absent.safetensors/);
   assert.match(
     editor.validateProfileText("image-test", JSON.stringify(profile())).warnings[0],
-    /couldn’t be asked/,
+    /couldn't be asked/,
   );
 });
 

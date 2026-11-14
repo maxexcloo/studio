@@ -250,7 +250,7 @@ export function choicePool(profiles, { kind, tier, references = 0, firstFrame = 
 }
 
 /**
- * The pool’s usual pick: one not failing, then the deployment default, then its family, then
+ * The pool's usual pick: one not failing, then the deployment default, then its family, then
  * censored before uncensored, then catalogue order.
  */
 export function chooseProfile(profiles, { defaultId, ...options }) {

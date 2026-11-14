@@ -68,7 +68,7 @@ export function comfySampling(samplerName = "", scheduleName = "") {
     )?.[1] || (Object.values(a1111Schedules).includes(schedule) ? schedule : "");
   if (schedule && !scheduler) approximate.push(`Schedule “${schedule}” needs a manual choice`);
   if (sampler && !schedule)
-    approximate.push("No sampling schedule was recorded; the workflow’s default will be used");
+    approximate.push("No sampling schedule was recorded; the workflow's default will be used");
   return { sampler, scheduler, approximate };
 }
 
@@ -523,7 +523,7 @@ export function a1111Recipe(text = "") {
     if (value !== undefined) recipe.settings[key] = value;
   if (seedOf(settings.Seed)) recipe.settings.seed = seedOf(settings.Seed);
   else if (settings.Seed !== undefined)
-    recipe.warnings.push("The seed couldn’t be read exactly; a random seed will be used.");
+    recipe.warnings.push("The seed couldn't be read exactly; a random seed will be used.");
   const sampling = comfySampling(settings.Sampler, settings["Schedule type"]);
   if (sampling.sampler) recipe.settings.sampler = sampling.sampler;
   if (sampling.scheduler) recipe.settings.scheduler = sampling.scheduler;
@@ -589,7 +589,7 @@ export function a1111Recipe(text = "") {
   if (settings["Clip skip"] && Number(settings["Clip skip"]) !== 1)
     recipe.warnings.push(`CLIP skip ${settings["Clip skip"]} needs a matching workflow.`);
   if (settings["Denoising strength"] && !recipe.extraProcessing)
-    recipe.warnings.push("The image was made from another image; that source isn’t included.");
+    recipe.warnings.push("The image was made from another image; that source isn't included.");
   return recipe;
 }
 
@@ -864,7 +864,7 @@ export function comfyRecipe(prompt) {
       }
     }
     if (number(scalar(inputs.denoise), 0, 1) !== undefined && Number(scalar(inputs.denoise)) < 1)
-      recipe.warnings.push("The image was made from another image; that source isn’t included.");
+      recipe.warnings.push("The image was made from another image; that source isn't included.");
   } else recipe.warnings.push("No sampler was found in the ComfyUI graph.");
   for (const [, item] of nodes) {
     const inputs = item.inputs || {};
@@ -967,7 +967,7 @@ export function imageRecipe(metadata) {
     recipe.settings.height = metadata.height;
     recipe.approximate = [
       ...recipe.approximate,
-      "The size is the image’s own; no generation size was recorded",
+      "The size is the image's own; no generation size was recorded",
     ];
   }
   return recipe;

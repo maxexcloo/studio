@@ -783,7 +783,7 @@ export function createDream(options: {
     const running = held(ownerId);
     if (running >= options.slots()) return { status: "generating" as const };
     if (!kinds(settings, today(ownerId)).length)
-      return { status: "capped" as const, reason: "Dream has made today’s share." };
+      return { status: "capped" as const, reason: "Dream has made today's share." };
     return null;
   }
 
@@ -1370,7 +1370,7 @@ export function createDream(options: {
         const why = [note, clean(reply.why, 160)].filter(Boolean).join(" · ");
         return { prompt, why, ...(title ? { title } : {}), thinking, model };
       }
-      if (attempt) throw new Error("The text model’s idea was unusable.");
+      if (attempt) throw new Error("The text model's idea was unusable.");
       onThinking("\n");
       onDelta("\n");
       messages = [
@@ -1398,7 +1398,7 @@ export function createDream(options: {
     if (now() < (failures.get(ownerId)?.until ?? 0))
       return {
         status: "waiting",
-        reason: "Dream’s last ideas failed to write; it tries again soon.",
+        reason: "Dream's last ideas failed to write; it tries again soon.",
       };
     const access = options.access(ownerId);
     if (!access) return { status: "unavailable", reason: "This account is unavailable." };

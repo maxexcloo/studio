@@ -276,9 +276,9 @@ export function createImportEngine({
   profileFor = () => "",
   pictures = { save: async () => false, copy: async () => false },
   describe = async () => {
-    throw new Error("The prompt assistant isn’t set up.");
+    throw new Error("The prompt assistant isn't set up.");
   },
-  vision = async () => ({ available: false, reason: "The prompt assistant isn’t set up." }),
+  vision = async () => ({ available: false, reason: "The prompt assistant isn't set up." }),
   draftProfile = null,
 }) {
   /** Each resource's status from the files and the download queue, then the grade and state. */
@@ -443,7 +443,7 @@ export function createImportEngine({
       } catch (error) {
         record.warnings = [
           ...(record.warnings || []),
-          `Couldn’t write the catalogue entry for ${resource.want.file}: ${error.message}`,
+          `Couldn't write the catalogue entry for ${resource.want.file}: ${error.message}`,
         ];
       }
     }
@@ -527,7 +527,7 @@ export function createImportEngine({
       return store.put(record);
     } catch (error) {
       record.state = "failed";
-      record.error = error.message || "Couldn’t import that link.";
+      record.error = error.message || "Couldn't import that link.";
       record.grade = { value: "partial", reasons: [record.error], missingFields: [] };
       return store.put(record);
     }
@@ -606,7 +606,7 @@ export function createImportEngine({
     if (!queue.length)
       throw new Error(
         chosen.some((resource) => resource.unavailable)
-          ? "Those files can’t be downloaded."
+          ? "Those files can't be downloaded."
           : "Nothing is missing.",
       );
     const failures = [];
@@ -640,7 +640,7 @@ export function createImportEngine({
   async function setFolder(id, index, folder) {
     const record = store.get(id);
     const resource = record?.resources?.[index];
-    if (!resource) throw new Error("That file isn’t in this import.");
+    if (!resource) throw new Error("That file isn't in this import.");
     if (record.input.kind === "civitai-model" || record.input.kind === "civitai-image")
       throw new Error("Civitai files choose their folder on their own.");
     if (!folders.has(folder)) throw new Error("Choose a supported model folder.");
@@ -713,11 +713,11 @@ export function createImportEngine({
       if (!recipe) {
         const sight = await vision().catch(() => ({
           available: false,
-          reason: "The assistant couldn’t be reached.",
+          reason: "The assistant couldn't be reached.",
         }));
         if (!sight.available) {
           record.state = "failed";
-          record.error = `This image has no generation metadata. ${sight.reason || "The running text model can’t read images."}`;
+          record.error = `This image has no generation metadata. ${sight.reason || "The running text model can't read images."}`;
           record.grade = { value: "partial", reasons: [record.error], missingFields: [] };
           return store.put(record);
         }
@@ -757,7 +757,7 @@ export function createImportEngine({
       return store.put(record);
     } catch (error) {
       record.state = "failed";
-      record.error = error.message || "Couldn’t read that image.";
+      record.error = error.message || "Couldn't read that image.";
       record.grade = { value: "partial", reasons: [record.error], missingFields: [] };
       return store.put(record);
     }
@@ -797,7 +797,7 @@ export function createImportEngine({
       return store.put(record);
     } catch (error) {
       record.state = "failed";
-      record.error = `The assistant couldn’t describe this image: ${error.message}`;
+      record.error = `The assistant couldn't describe this image: ${error.message}`;
       record.grade = { value: "partial", reasons: [record.error], missingFields: [] };
       return store.put(record);
     }
@@ -809,7 +809,7 @@ export function createImportEngine({
     if (!source?.picture) throw new Error("Only an imported image can be described.");
     const sight = await vision();
     if (!sight.available)
-      throw new Error(sight.reason || "The running text model can’t read images.");
+      throw new Error(sight.reason || "The running text model can't read images.");
     const record = store.put({
       id: importId(),
       createdAt: now(),
@@ -831,11 +831,11 @@ export function createImportEngine({
   async function useExact(id, index) {
     const record = store.get(id);
     const resource = record?.resources?.[index];
-    if (!resource?.substitute) throw new Error("That file isn’t using a substitute.");
+    if (!resource?.substitute) throw new Error("That file isn't using a substitute.");
     await refresh(record, { verify: true });
     if (!resource.exactInstalled)
       throw new Error(
-        `${resource.want.file || resource.name} isn’t installed yet. Download it first.`,
+        `${resource.want.file || resource.name} isn't installed yet. Download it first.`,
       );
     delete resource.substitute;
     delete resource.exactInstalled;
@@ -848,7 +848,7 @@ export function createImportEngine({
     const record = store.get(id);
     const offer = record?.offers?.[index];
     if (!offer) throw new Error("That offer is gone. Open the import again.");
-    if (!offer.spec) throw new Error(offer.unavailable?.note || "That file can’t be downloaded.");
+    if (!offer.spec) throw new Error(offer.unavailable?.note || "That file can't be downloaded.");
     let at = record.resources.findIndex((resource) => resource.spec?.id === offer.spec.id);
     if (at < 0) {
       const { url, ...source } = offer.source || {};

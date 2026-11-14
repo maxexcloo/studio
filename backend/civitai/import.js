@@ -214,7 +214,7 @@ export function imagePreset(image) {
   }
   if (meta.sampler && !settings.scheduler && !schedule)
     warnings.push(
-      "No sampling schedule was recorded; the selected workflow’s default will be used.",
+      "No sampling schedule was recorded; the selected workflow's default will be used.",
     );
   return {
     id: String(image.id),
@@ -388,7 +388,7 @@ export async function importCivitaiImage(
         throw new Error("This image references too many resources to import.");
     } catch {
       preset.warnings.push(
-        "The source page’s exact model associations could not be recovered. Filename-only entries need review.",
+        "The source page's exact model associations could not be recovered. Filename-only entries need review.",
       );
     }
   }

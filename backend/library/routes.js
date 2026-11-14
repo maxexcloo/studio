@@ -166,7 +166,7 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
 /** Removes an installed model file, only when it is still the one recorded (by checksum when known). */
 async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
-    throw new Error("That isn’t a model file Studio manages.");
+    throw new Error("That isn't a model file Studio manages.");
   const names = subfolders[want.folder] || [want.folder];
   await refreshWorkerModels({ force: true });
   const file = workerInventory().files.find((item) =>
@@ -408,7 +408,7 @@ export function registerLibraryRoutes(
         : {
             available: false,
             reason:
-              "The running text model can’t read images. Start one that does in Settings › Workers.",
+              "The running text model can't read images. Start one that does in Settings › Workers.",
           };
     } catch {
       return { available: false, reason: "The prompt assistant is unavailable." };
@@ -416,7 +416,7 @@ export function registerLibraryRoutes(
   };
   const describePicture = async ({ id }) => {
     const engine = assistant();
-    if (!engine) throw new Error("The prompt assistant isn’t set up.");
+    if (!engine) throw new Error("The prompt assistant isn't set up.");
     const file = pictures.file(id);
     const data = (await fs.promises.readFile(file)).toString("base64");
     const offered = await profilesNow().catch(() => []);
@@ -427,7 +427,7 @@ export function registerLibraryRoutes(
       loras,
     });
     if (!result.available)
-      throw new Error(result.reason || "The running text model can’t read images.");
+      throw new Error(result.reason || "The running text model can't read images.");
     return {
       ...result,
       profileLabel: offered.find((item) => item.id === result.profileId)?.label || "",
@@ -696,7 +696,7 @@ export function registerLibraryRoutes(
     const key = String(body?.key || "");
     const entry = catalogue().entry(key);
     if (!entry)
-      return { status: 404, payload: { ok: false, error: "That entry isn’t in the catalogue." } };
+      return { status: 404, payload: { ok: false, error: "That entry isn't in the catalogue." } };
     const { folder, file } = splitCatalogueKey(key);
     if (folder === "loras") forget(file);
     const users = await references({ folder, file });

@@ -195,7 +195,7 @@ test(
 );
 
 test(
-  "generate leads with enabled LoRAs’ trigger words unless their toggle is off, and the run keeps that prompt",
+  "generate leads with enabled LoRAs' trigger words unless their toggle is off, and the run keeps that prompt",
   { timeout: 10000 },
   async () => {
     const sdxl = (await api("/api/models")).body.profiles.find(

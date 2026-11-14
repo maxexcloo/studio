@@ -17,7 +17,7 @@ test("the catalogue keeps up to ten LoRA tags and its own negative", () => {
   assert.deepEqual(loraPromptMetadata({ tags: [] }), {});
 });
 
-test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, unless already said", () => {
+test("enabled LoRAs' trigger words lead the prompt in stack order, once each, unless already said", () => {
   const infos = {
     first: { triggers: ["ohwx"] },
     second: { triggers: ["glowfx", "[]", "OHWX"] },
@@ -46,7 +46,7 @@ test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, 
   assert.equal(withLoraTriggers("A harbour", [], infos), "A harbour");
 });
 
-test("a recommended negative fills above cfg 1 with the LoRAs’ own; optional and none never do", () => {
+test("a recommended negative fills above cfg 1 with the LoRAs' own; optional and none never do", () => {
   const recommended = { negative: { effect: "recommended", default: "blurry" } };
   const infos = { a: { negative: "colour bleed" }, b: {} };
   assert.equal(

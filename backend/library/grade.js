@@ -28,7 +28,7 @@ const present = (value) => value !== undefined && value !== null && String(value
 const unavailableWords = {
   paid: "is paid on Civitai",
   "early-access": "is in early access on Civitai",
-  licence: "can’t be downloaded under its licence",
+  licence: "can't be downloaded under its licence",
   "no-checksum": "has no published checksum",
 };
 
@@ -79,7 +79,7 @@ export function gradeImport({
   if (resources.length && !graded.length) partial.push("No file chosen yet");
   if (baseModel) {
     if (!baseModel.required) partial.push("No base model recorded");
-    else if (!baseModel.installed) partial.push("The base model isn’t installed");
+    else if (!baseModel.installed) partial.push("The base model isn't installed");
     else if (!baseModel.profile) partial.push("No profile runs the base model");
   }
   for (const resource of graded) {
@@ -94,16 +94,16 @@ export function gradeImport({
       );
     else if (resource.status === "unavailable")
       partial.push(`${name} ${unavailableWords[resource.unavailable?.reason] || "is unavailable"}`);
-    else if (resource.status === "unsupported") partial.push(`${name} isn’t supported here`);
+    else if (resource.status === "unsupported") partial.push(`${name} isn't supported here`);
     else if (resource.status === "conflict")
       partial.push(`A different file already uses the name of ${name}`);
     else if (resource.status === "downloading") partial.push(`${name} is downloading`);
-    else partial.push(`${name} isn’t installed`);
+    else partial.push(`${name} isn't installed`);
   }
   const missingFields = recipe ? missingPromptFields(recipe) : [];
   for (const field of missingFields) partial.push(promptFields.find(([name]) => name === field)[1]);
   for (const reason of approximate) close.push(reason);
-  if (extraProcessing) close.push("Extra processing was recorded that Studio can’t reproduce");
+  if (extraProcessing) close.push("Extra processing was recorded that Studio can't reproduce");
   if (partial.length) return { value: "partial", reasons: [...partial, ...close], missingFields };
   if (close.length) return { value: "close", reasons: close, missingFields };
   return {

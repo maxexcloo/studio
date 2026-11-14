@@ -286,13 +286,13 @@ function faceDetailStack(graph, body, imageSource, info) {
   const vae = String(settings.vae || "");
   if (!model || !textEncoder || !vae) {
     throw new Error(
-      "Face detail needs the image’s model, text encoder and VAE, and this image doesn’t record them.",
+      "Face detail needs the image's model, text encoder and VAE, and this image doesn't record them.",
     );
   }
   const unets = optionsFor(info, "UNETLoader", "unet_name").map(String);
   if (unets.length && !unets.includes(model)) {
     throw new Error(
-      `Face detail needs this image’s model, ${model}, and ComfyUI doesn’t have it. Turn off face detail to upscale this image.`,
+      `Face detail needs this image's model, ${model}, and ComfyUI doesn't have it. Turn off face detail to upscale this image.`,
     );
   }
   const detector = faceDetector(info);
@@ -399,7 +399,7 @@ export function upscaleGraph(body, info = {}) {
   const have = available(info);
   const dit = resolveDit(plan.quality, have);
   const vae = resolveVae(have);
-  if (dit.missing || vae.missing) throw new Error("The SeedVR2 models aren’t installed yet.");
+  if (dit.missing || vae.missing) throw new Error("The SeedVR2 models aren't installed yet.");
   const ditDevices = devicesFor(info, "SeedVR2LoadDiTModel");
   const vaeDevices = devicesFor(info, "SeedVR2LoadVAEModel");
   const swap = ditDevices.offload !== "none";

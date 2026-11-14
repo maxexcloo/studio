@@ -14,7 +14,7 @@ const version = (id) => ({
 });
 const now = Date.parse("2026-10-21T00:00:00Z");
 
-test("Civitai offers: newer and older versions of the family, and the version’s other files", () => {
+test("Civitai offers: newer and older versions of the family, and the version's other files", () => {
   const offers = civitaiOffers({ model, version: version(703), familiesOf, gguf: true, now });
   assert.deepEqual(
     offers.map(({ label, relation, file, variant }) => [label, relation, file, variant]),
@@ -24,7 +24,7 @@ test("Civitai offers: newer and older versions of the family, and the version’
       ["v4 Early", "newer", "nightfall-v4-fp8.safetensors", "FP8"],
       ["v1", "older", "nightfall-v1-fp8.safetensors", "FP8"],
     ],
-    "the SDXL version is another family; the VAE isn’t a model file",
+    "the SDXL version is another family; the VAE isn't a model file",
   );
   const gguf = offers.find((offer) => offer.relation === "format");
   assert.equal(gguf.folder, "diffusion_models");
@@ -61,7 +61,7 @@ test("a paid or early-access offer stays refused, without a download", () => {
   );
 });
 
-test("without the GGUF loader, GGUF files aren’t offered", () => {
+test("without the GGUF loader, GGUF files aren't offered", () => {
   const offers = civitaiOffers({ model, version: version(703), familiesOf, gguf: false, now });
   assert.equal(
     offers.some((offer) => offer.file.endsWith(".gguf")),
@@ -96,7 +96,7 @@ test("an unknown family keeps only versions on the same base model", () => {
   );
 });
 
-test("Hugging Face offers: the same model’s other precisions and formats in the repository", () => {
+test("Hugging Face offers: the same model's other precisions and formats in the repository", () => {
   const sha = (digit) => digit.repeat(64);
   const siblings = [
     { rfilename: "flux1-dev-fp8.safetensors", lfs: { sha256: sha("a"), size: 11 } },
