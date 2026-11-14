@@ -49,9 +49,9 @@ export interface Dream {
 export const dreamQuery = queryOptions({
   queryKey: ["dream"],
   queryFn: () => api<Dream>("/api/dream"),
-  // Only a Dream that is about to make something has anything new to show.
+  // Only a Dream that is on and not paused has anything new to show or a reason that may clear.
   refetchInterval: (query) =>
-    ["waiting", "generating"].includes(query.state.data?.status || "") ? 15_000 : false,
+    query.state.data?.settings.enabled && !query.state.data.settings.paused ? 15_000 : false,
 });
 export const discardedQuery = infiniteQueryOptions({
   queryKey: ["dream", "discarded"],

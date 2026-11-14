@@ -151,9 +151,9 @@ export function DreamPage() {
           {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
-      {data?.status === "unavailable" && data.reason && (
+      {data?.reason && (
         <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
-          Can’t Run: {data.reason}
+          {data.status === "unavailable" ? `Can’t Run: ${data.reason}` : data.reason}
         </Text>
       )}
       {view === "discarded" ? (
