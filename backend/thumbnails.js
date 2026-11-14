@@ -378,16 +378,11 @@ export function viewParams(url = "") {
 function forgetThumbnail(filename, subfolder = "", type = "output") {
   if (!filename) return 0;
   // Every rendition: the viewer's display copy is as much a copy as the thumbnail.
-  const keys = Object.keys(RENDITIONS).map((size) => cacheKey(filename, subfolder, type, size));
+  const names = Object.keys(RENDITIONS).flatMap((size) => [
+    ...(indexed().get(cacheKey(filename, subfolder, type, size)) || []),
+  ]);
   let removed = 0;
-  let names = [];
-  try {
-    names = fs.readdirSync(thumbnailDir);
-  } catch {
-    return 0;
-  }
   for (const name of names) {
-    if (!keys.some((key) => name.startsWith(`${key}-`))) continue;
     try {
       fs.rmSync(path.join(thumbnailDir, name), { force: true });
       indexRemove(name);
