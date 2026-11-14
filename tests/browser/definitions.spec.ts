@@ -618,7 +618,7 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
   await improve.getByRole("button", { name: "Actions for Spicy", exact: true }).click();
   await page.getByRole("menuitem", { name: "Move Up", exact: true }).click();
   await expect
-    .poll(() => saves[1]?.styles.map((entry: any) => entry.id))
+    .poll(() => saves.at(-1).styles.map((entry: any) => entry.id))
     .toEqual(["spicy", "candid", "cinematic"]);
 
   // Editing keeps the style's ID and kind and saves in a dialog.
@@ -628,7 +628,7 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(saves[2].styles[2]).toMatchObject({
+  expect(saves.at(-1).styles[2]).toMatchObject({
     id: "cinematic",
     kind: "animate",
     description: "A moving camera.",
