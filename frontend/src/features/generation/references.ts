@@ -203,10 +203,14 @@ export function useReferencePlacement(list: ReferenceList) {
         ...(type === "video" ? { frame: frame ?? "last" } : {}),
       }),
   });
+  // A gallery reference arrives after a render, perhaps one that moved the draft to another profile.
+  const latest = useRef(list);
+  latest.current = list;
   function place(asset: ReferenceAsset, chosen?: ReferenceTarget | null) {
-    const references = list.get();
-    const target = nextReferenceTarget(references, list.profile, chosen);
-    if (target) list.set(placeReference(references, asset, list.profile, target));
+    const { get, profile, set } = latest.current;
+    const references = get();
+    const target = nextReferenceTarget(references, profile, chosen);
+    if (target) set(placeReference(references, asset, profile, target));
   }
   async function uploadFiles(files: File[], chosen?: ReferenceTarget | null) {
     for (const file of files.filter((file) => uploadTypes.includes(file.type))) {

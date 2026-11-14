@@ -21,21 +21,22 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { useOpenComposer } from "../generation/openComposer";
 import { post } from "../../api";
-import type { MediaItem } from "../../types";
+import type { MediaItem, Profile } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useStageComparison } from "../compare/variants";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
-import { useGeneration } from "../generation/GenerationProvider";
+import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
-import { profileName } from "../generation/payload";
+import { profileForBackend, profileName } from "../generation/payload";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
 import { videoExport } from "./download";
@@ -149,27 +150,51 @@ function useSaveFrame(item: MediaItem): Action {
   };
 }
 
+/** Whether a run with references on `profile` takes them: any of a combined profile's backends may. */
+function takesReferences(profile: Profile | undefined, backend?: string) {
+  const run = profileForBackend(profile, backend, true);
+  return Boolean(
+    run && (run.mediaInputs?.length || run.capabilities.img2img || run.capabilities.imageInput),
+  );
+}
+
 /**
- * Edit › Use as Reference: adds the image to the composer's references when its profile takes one.
- * A video gives the frame showing in the viewer, or its last frame from elsewhere.
+ * Edit › Use as Reference: adds the image to the composer's references. Where the composer's model
+ * takes none, it moves to one that does (the account's default first) and says so. A video gives
+ * the frame showing in the viewer, or its last frame from elsewhere.
  */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
-  const { profile } = useGeneration();
+  const { profile, profiles, models, input, selectProfile } = useGeneration();
   const reference = useGalleryReference();
   const location = useLocation();
   const openComposer = useOpenComposer();
   if (!profile) return null;
-  const takesImages =
-    profile.mediaInputs?.length || profile.capabilities.img2img || profile.capabilities.imageInput;
+  const takes = takesReferences(profile, input.profileBackend);
+  const fallback = takes
+    ? undefined
+    : [defaultProfile(models.data, input.kind), ...profiles].find(
+        (candidate) =>
+          candidate?.kind === input.kind && candidate.ready !== false && takesReferences(candidate),
+      );
   const video = item.type === "video";
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
-    description: takesImages ? undefined : `${profileName(profile)} takes no references`,
+    description: takes
+      ? undefined
+      : fallback
+        ? `Switches to ${profileName(fallback)}`
+        : `${profileName(profile)} takes no references`,
     icon: ImagePlus,
-    disabled: !takesImages || reference.isPending,
+    disabled: !(takes || fallback) || reference.isPending,
     keepOpen: true,
     onClick: () => {
+      if (fallback) {
+        selectProfile(fallback);
+        notifications.show({
+          message: `${profileName(profile)} takes no references, so the composer uses ${profileName(fallback)}.`,
+        });
+      }
       reference.mutate(
         { ...item, frame: video ? viewerFrame(item) : undefined },
         {
