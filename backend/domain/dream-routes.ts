@@ -15,7 +15,7 @@ export function registerDreamRoutes(
   const owner = (account: RouteAccount) => account?.userId || "";
   const refused = {
     status: 403,
-    payload: { ok: false, error: "Dream is unavailable for this account." },
+    payload: { ok: false, error: "Dream is off for this account." },
   };
   const refuse = (error: unknown) => {
     const { status = 500, message } = error as Error & { status?: number };

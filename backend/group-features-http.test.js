@@ -95,7 +95,7 @@ test("Dream is on unless the account's group turns it off", { timeout: 30_000 },
   assert.equal((await call("/api/dream", { cookie: cookies.member })).status, 200);
   const refused = await call("/api/dream", { cookie: cookies.limited });
   assert.equal(refused.status, 403);
-  assert.equal(refused.body.error, "Dream is unavailable for this account.");
+  assert.equal(refused.body.error, "Dream is off for this account.");
 });
 
 test(
