@@ -778,6 +778,8 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
 
   // The chat asked for something within the hour: it keeps its project, and Dream varies the
   // starred image on its profile, with its settings, the LoRAs that still fit and its references.
+  // A roll of 99 starts no series.
+  state.rolls = [99];
   const held = await dreamOnce();
   assert.equal(held?.dream?.projectId, undefined);
   assert.equal(held?.dream?.arm, "continue:scene");
@@ -796,6 +798,7 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
 
   // The axes take turns; a handed-over project continues its chat's work, its brief steering.
   state.clock += 61 * 60_000;
+  state.rolls = [99];
   const outfit = await dreamOnce();
   assert.equal(outfit?.dream?.projectId, beach.id);
   assert.equal(outfit?.dream?.arm, "continue:outfit");
@@ -1191,7 +1194,6 @@ test("A Dream job's writing request keeps its own fields through admission", () 
     source: "a clip",
     series: {
       id: "set-1",
-      character: "Mara: red hair",
       place: "a diner",
       night: "midnight",
       index: 1,
@@ -1211,7 +1213,6 @@ test("A Dream job's writing request keeps its own fields through admission", () 
     vary: "scene",
     series: {
       id: "set-1",
-      character: "Mara: red hair",
       place: "a diner",
       night: "midnight",
       index: 1,
@@ -1334,22 +1335,29 @@ test("Dream suggests recurring cards from liked results once a day; Accept makes
   assert.deepEqual(dream.suggestions("alice"), []);
 });
 
-test("A series keeps one character in one place and night across a result set, then ends", async (t) => {
-  const editing: DreamProfile = {
-    id: "qwen-edit",
+test("A series follows a starred image's character through one night on its profile and LoRAs, then ends", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t);
+  const input = {
     kind: "image",
-    label: "Qwen Edit",
-    editReferences: true,
-    mediaInputs: [{ id: "image1" }],
+    profileId: "flux",
+    prompt: "Mara, red hair and freckles, in a leather jacket",
+    steps: 20,
+    width: 832,
+    height: 1216,
+    loras: [{ name: "fox.safetensors", strength: 0.8, enabled: true }],
+    referenceAssets: [{ assetId: "mara", slot: "reference" }],
   };
-  const { dream, state, store, dreamOnce } = fixture(t, [...profiles, editing]);
-  state.cards!.characters.push({
-    id: "chr-mara",
-    name: "Mara",
-    description: "red hair, freckles",
-    referenceIds: ["mara-front"],
-    createdAt: "",
-    updatedAt: "",
+  const session = store.createSession("alice", "Gallery").id;
+  const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", "mara");
+  store.save({ ...job, status: "completed" });
+  state.items.push({
+    id: "mara",
+    jobId: job.id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    title: "Mara",
+    favorite: true,
   });
   await dream.save("alice", { enabled: true });
   const jobs = [];
@@ -1360,30 +1368,40 @@ test("A series keeps one character in one place and night across a result set, t
   assert.equal(new Set(sets.map((set) => set.id)).size, 1);
   assert.deepEqual(
     sets.map((set) => [set.title, set.index]),
-    [0, 1, 2, 3].map((index) => ["Mara · Rooftop Bar, Dusk", index]),
+    [0, 1, 2, 3].map((index) => ["Mara · Night Out", index]),
   );
   for (const job of jobs) {
-    assert.equal(job.input.profileId, "qwen-edit");
-    assert.deepEqual(job.input.referenceAssets, [{ assetId: "mara-front", slot: "image1" }]);
+    assert.deepEqual(
+      [job.input.profileId, job.input.steps, job.input.width, job.input.height],
+      ["flux", 20, 832, 1216],
+    );
+    assert.deepEqual(job.input.loras, input.loras);
+    assert.deepEqual(job.input.referenceAssets, input.referenceAssets);
     assert.equal(job.dream?.arm, "series");
   }
+  // Each result moves on to a later time and a new place, hearing the ones before it.
   const written = state.calls.slice(-4);
   assert.match(written[0].system, /result 1 of 4 in a series/);
   assert.match(
     written[0].user,
-    /Character: Mara: red hair, freckles\nPlace: a rooftop bar above the city\nTime of night: dusk/,
+    /Seed prompt: Mara, red hair and freckles, in a leather jacket\nIt loads these LoRAs: fox.safetensors\nPlace: a rooftop bar above the city\nTime of night: dusk/,
   );
-  // Each result hears the ones before it, so it is a new moment.
+  assert.match(
+    written[1].user,
+    /Place: a neon-lit back street in the rain\nTime of night: early evening/,
+  );
   assert.match(written[3].user, /Results so far:\n- dream 1\n- dream 2\n- dream 3/);
-  assert.match(store.job("alice", jobs[0].id)!.dream!.why, /^Mara · Rooftop Bar, Dusk \(1 of 4\)/);
+  assert.match(
+    store.job("alice", jobs[0].id)!.dream!.why,
+    /^Mara · Night Out \(1 of 4\): Rooftop Bar, Dusk/,
+  );
   // The series is done; with a share's roll against it the next idea is an ordinary one.
   state.rolls = [99];
   const after = await dreamOnce();
   assert.equal(after?.input.resultSet, undefined);
-  // A series whose character is deleted ends.
-  state.rolls = [];
+  // A series whose image is no longer starred ends.
   await dreamOnce();
-  state.cards!.characters = [];
+  state.items.find((item) => item.id === "mara")!.favorite = false;
   const next = await dreamOnce();
   assert.equal(next?.input.resultSet, undefined);
   assert.equal(dream.read("alice").series, undefined);
