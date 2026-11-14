@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import type { StudioSession } from "../../../../shared/queue";
-import type { QueueJob, ReferenceAsset } from "../../types";
+import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
 import {
   defaultProfile,
   draftForProfile,
@@ -84,20 +83,24 @@ function useDraftSubmit({
 
 export function GenerationForm({
   onSubmitted,
+  onKindChange,
+  onCompared,
   compact = false,
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
 }: {
   onSubmitted?: (jobId: string) => void;
+  /** Switches the gallery to the other output. */
+  onKindChange: (kind: MediaKind) => void;
+  /** Shows a comparison the draft's variants queued. */
+  onCompared: (comparisonId: string) => void;
   compact?: boolean;
   autoFocusPrompt?: boolean;
   focusPrompt?: boolean;
   fill?: boolean;
 }) {
   const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
-  const navigate = useNavigate();
-  const location = useLocation();
   const phone = usePhone();
   // A draft without a picked profile runs on the account's default, following it as it changes.
   const preferred = defaultProfile(models.data, input.kind);
@@ -107,7 +110,10 @@ export function GenerationForm({
   }, [defaulted, preferred, input.profileId]);
   // A draft with variants queues them as one comparison instead.
   const comparison = useDraftComparison();
-  const compareRun = useCompareRun(() => onSubmitted?.(""));
+  const compareRun = useCompareRun((comparisonId) => {
+    onSubmitted?.("");
+    onCompared(comparisonId);
+  });
   const single = useDraftSubmit({ onSubmitted });
   const submit = draft.compare ? compareRun : single;
   const submitLabel = draft.compare ? `Compare ${comparison.variants.length}` : undefined;
@@ -203,10 +209,7 @@ export function GenerationForm({
       onCharacterProfile={(editor, next) =>
         setDraft((previous) => draftForProfile(previous, editor, next))
       }
-      // The output toggle switches the gallery; the route restores that output's draft.
-      onKindChange={(kind) =>
-        navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
-      }
+      onKindChange={onKindChange}
       onUndoClear={cleared ? () => setDraft(cleared) : undefined}
       onClear={() => {
         clearing.current = true;
