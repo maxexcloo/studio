@@ -8,6 +8,7 @@ import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionTo
 import { CardThumbnails } from "./CardImages";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import { promptCardsQuery, type PromptCardKind } from "./queries";
+import { useCardInComposer } from "./useCardInComposer";
 
 /** Library › Outfits and Library › Scenes: every card of the kind, to search, edit and delete. */
 export function LibraryPromptCards({
@@ -21,6 +22,7 @@ export function LibraryPromptCards({
   const label = `${noun}s`;
   const listing = useQuery(promptCardsQuery(kind));
   const dialogs = usePromptCardDialogs(kind);
+  const use = useCardInComposer();
   const [query, setQuery] = useState("");
   const words = query.trim().toLowerCase();
   const cards = (listing.data || []).filter(
@@ -70,6 +72,7 @@ export function LibraryPromptCards({
                     card={card}
                     onEdit={() => dialogs.edit(card)}
                     onDelete={() => dialogs.remove(card)}
+                    onUse={() => use.promptCard(kind, card)}
                   />
                 </Group>
                 {card.references.length > 0 && (

@@ -151,12 +151,15 @@ export function PromptCardMenu({
   card,
   onEdit,
   onDelete,
+  onUse,
   withinPortal = true,
 }: {
   kind: PromptCardKind;
   card: PromptCard;
   onEdit: () => void;
   onDelete: () => void;
+  /** Library's Use in Composer; the References sheet picks a card by its tile instead. */
+  onUse?: () => void;
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
 }) {
@@ -171,7 +174,12 @@ export function PromptCardMenu({
       <Menu.Dropdown>
         <ActionMenuItems
           groups={[
-            [{ id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit }],
+            [
+              ...(onUse
+                ? [{ id: "use", label: "Use in Composer", icon: icons.prompt, onClick: onUse }]
+                : []),
+              { id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit },
+            ],
             [
               {
                 id: "delete",
