@@ -60,6 +60,8 @@ export function uploadPage({ message = "", open = true } = {}) {
 }
 /** An account's result number, as Studio shows it ("#123", or "123"). */
 const numberPattern = /^\s*#?\s*(\d{1,9})\s*$/;
+/** A conversation's own result number from before Studio's ("result 3", "r3"), which older chats still use. */
+const chatNumberPattern = /^\s*(?:result|r)\s*#?\s*(\d{1,7})\s*$/i;
 /** A lettered option of the conversation's latest variants ("B", "option B"). */
 const letterPattern = /^\s*(?:option\s+)?([A-J])\s*$/i;
 const maxReferenceScopes = 5000;
@@ -1088,7 +1090,8 @@ export class McpMedia {
     });
   }
   /**
-   * The job output a value names: a result link (or its id), a result number ("#12"), a letter of
+   * The job output a value names: a result link (or its id), the conversation's "result 3" from
+   * before Studio's numbers, a result number ("#12"), a letter of
    * the conversation's latest variants ("B"), else the value as a job id. `index` is set only when
    * the value named one output.
    */
@@ -1099,6 +1102,15 @@ export class McpMedia {
     const linked = short && Object.hasOwn(this.state.links, short) ? this.state.links[short] : null;
     if (linked?.jobId && linked.owner === owner)
       return { jobId: linked.jobId, ...(linked.page ? {} : { index: linked.index }) };
+    const chatNumber = Number(chatNumberPattern.exec(String(value || ""))?.[1]);
+    if (chatNumber) {
+      const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[chatNumber];
+      if (!jobId)
+        throw new Error(
+          `There is no result ${chatNumber} in this conversation. Use its #number or job_id.`,
+        );
+      return { jobId };
+    }
     const letter = letterPattern.exec(String(value || ""))?.[1];
     if (letter) {
       const offer = this.state.refs[scope || this.referenceScope(owner)]?.offer;
@@ -1133,7 +1145,9 @@ export class McpMedia {
   }
   /** Whether a value names a result by its number or option letter rather than an id. */
   namesResult(value) {
-    return numberPattern.test(String(value)) || letterPattern.test(String(value));
+    return [numberPattern, chatNumberPattern, letterPattern].some((pattern) =>
+      pattern.test(String(value)),
+    );
   }
   /** A result's image as a new reference asset, for generate. */
   async resultReference(owner, jobId, index) {

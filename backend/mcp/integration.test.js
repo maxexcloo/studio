@@ -2986,6 +2986,14 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
     assert.equal(status.ref, "#2");
   }
   await failure(first, "status", { job_id: "#9" });
+  // Older chats' own "result N" still names the Nth result of that chat, beside the account's #N.
+  for (const reference of ["result 2", "Result 2", "r2"])
+    assert.equal(data(await call(first, "status", { job_id: reference })).job_id, secondJob.job_id);
+  assert.equal(
+    data(await call(second, "status", { job_id: "result 1" })).job_id,
+    f.submitted[3].clientJobId,
+  );
+  await failure(second, "status", { job_id: "result 9" });
   // Bob's conversation with the same identifier cannot reach Alice's numbers.
   await failure(await conversation("bob", "conversation-a"), "status", { job_id: "#1" });
 
