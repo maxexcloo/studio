@@ -2,7 +2,8 @@ name: Worker
 
 on:
   pull_request:
-    paths:
+    # Studio's release reads these to tell whether the worker changed.
+    paths: &worker
       - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
@@ -11,13 +12,7 @@ on:
       - "!worker/**/*.md"
   push:
     branches: [main]
-    paths:
-      - .dockerignore
-      - .github/workflows/worker.yaml
-      - LICENSE
-      - NOTICE
-      - worker/**
-      - "!worker/**/*.md"
+    paths: *worker
   workflow_dispatch:
 
 permissions:
