@@ -163,6 +163,36 @@ interface DreamWriting {
   seed?: string;
   vary?: string;
 }
+const text = (value: unknown, limit = maxPromptCharacters) =>
+  typeof value === "string" ? value.trim().slice(0, limit) : "";
+/** A Dream job's writing request as admission keeps it (prompt-stage.js): only its own fields. */
+export function dreamRequest(value: Record<string, unknown>): DreamWriting {
+  const strings = Object.fromEntries(
+    (
+      [
+        ["source", 1000],
+        ["reword", maxPromptCharacters],
+        ["like", maxPromptCharacters],
+        ["inspiration", 1000],
+        ["note", 200],
+        ["feature", 200],
+        ["project", 100],
+        ["seed", maxPromptCharacters],
+        ["vary", 20],
+      ] as const
+    ).flatMap(([key, limit]) => (text(value[key], limit) ? [[key, text(value[key], limit)]] : [])),
+  );
+  return {
+    kind: "dream",
+    ...(value.spicy === true ? { spicy: true } : {}),
+    ...(value.explore === true ? { explore: true as const } : {}),
+    ...strings,
+    loras: (Array.isArray(value.loras) ? value.loras : [])
+      .map((name) => text(name, 300))
+      .filter(Boolean)
+      .slice(0, 8),
+  };
+}
 type Reach = "online" | "offline" | "parked";
 const unreachable = (what: string, reach: Reach) =>
   reach === "parked"
