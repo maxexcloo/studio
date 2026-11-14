@@ -344,6 +344,15 @@ test("gateway identities map to accounts only through administrator links, and S
   // generate's character and shots read the account's cards.
   assert.equal(internal("GET", "/api/characters").userId, artist.id);
   assert.equal(internal("GET", "/api/outfits").userId, artist.id);
+  // status, generate's estimate, the prompt assistant and the cards tool.
+  for (const [method, routePath] of [
+    ["GET", "/api/comparisons"],
+    ["GET", "/api/estimate"],
+    ["POST", "/api/assistant/rewrite"],
+    ["POST", "/api/assistant/cards/describe"],
+    ["PUT", "/api/outfits/out-1"],
+  ])
+    assert.equal(internal(method, routePath)?.userId, artist.id, `${method} ${routePath}`);
   assert.equal(internal("DELETE", "/api/characters/chr-1"), null);
   assert.equal(internal("GET", "/api/accounts/admin"), null);
   assert.equal(mcpAccount(artist.id, undefined, "POST", "/api/generate"), null);

@@ -70,6 +70,14 @@ const mcpBearerRoutes = [
   // records its jobs on the character, and character_sheet makes its sheet.
   ["GET", /^\/api\/(?:characters|outfits|scenes)$/],
   ["POST", /^\/api\/characters\/[\w-]+\/(?:generated|sheet)$/],
+  // The cards tool's create, update, describe and rate.
+  ["POST", /^\/api\/(?:characters|outfits|scenes)$/],
+  ["PUT", /^\/api\/(?:characters|outfits|scenes)\/[\w-]+$/],
+  ["POST", /^\/api\/assistant\/cards\/(?:describe|rate)$/],
+  // rewrite_prompt, suggest_negative and suggest_loras.
+  ["POST", /^\/api\/assistant\/(?:loras|negative|rewrite)$/],
+  // generate's finish estimate.
+  ["GET", /^\/api\/estimate$/],
   // The account's LoRA thumbs up and down, which order every LoRA list MCP shows.
   ["GET", /^\/api\/loras\/library$/],
   ["POST", /^\/api\/generate$/],
@@ -86,6 +94,8 @@ const mcpBearerRoutes = [
   ["POST", /^\/api\/reference-assets\/from-gallery$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
   ["POST", /^\/api\/comparisons$/],
+  // status and results read the comparisons their jobs are in.
+  ["GET", /^\/api\/comparisons$/],
   // An uploaded reference's own pixels (owner-scoped): rewrite_prompt's vision references and import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],
