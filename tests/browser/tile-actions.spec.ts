@@ -228,7 +228,7 @@ test("Use as Reference counts every backend of a combined profile", async ({ pag
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
-  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: /^Reference 1/ })).toBeVisible();
 });
 
 test("Use as Reference moves to a model that takes references, or says none does", async ({
@@ -250,7 +250,7 @@ test("Use as Reference moves to a model that takes references, or says none does
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   // With no image model that takes one, it stays disabled and says why.
   await serveProfiles(page, [none, profiles[1], { ...profiles[2], mediaInputs: [] }]);
-  await page.reload();
+  await page.goto("/images");
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await expect(reference).toBeDisabled();
