@@ -346,17 +346,19 @@ export function LibraryImportReview({
               <SettingGroup
                 title="Files"
                 toolbar={
-                  <SectionToolbar
-                    label="Files"
-                    actions={
-                      <ToolbarAction
-                        label="Download Missing"
-                        icon={icons.download}
-                        disabled={!missing || action.isPending}
-                        onClick={() => run("download")}
-                      />
-                    }
-                  />
+                  missing && (
+                    <SectionToolbar
+                      label="Files"
+                      actions={
+                        <ToolbarAction
+                          label="Download Missing"
+                          icon={icons.download}
+                          disabled={action.isPending}
+                          onClick={() => run("download")}
+                        />
+                      }
+                    />
+                  )
                 }
               >
                 {resources.map((resource, index) => (
