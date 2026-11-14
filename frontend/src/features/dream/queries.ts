@@ -85,10 +85,19 @@ export const dreamItemPath = (item: { id: string }, action: string) =>
 export const pairAnswerPath = (pairId: string) =>
   `/api/dream/pairs/${encodeURIComponent(pairId)}/answer`;
 
-/** When Dream works and how much of today's share it has made, such as "Dream works when the queue is free · 12 of 40 today". */
-export const dreamWhen = ({ settings, today }: Dream) =>
+/**
+ * When Dream works, or why it doesn't, and how much of today's share it has made, such as "Dream
+ * works when the queue is free · 12 of 40 today".
+ */
+export const dreamWhen = ({ settings, today, status }: Dream) =>
   [
-    "Dream works when the queue is free",
+    status === "off"
+      ? "Dream is off"
+      : status === "paused"
+        ? "Dream is paused"
+        : status === "capped"
+          ? "Dream has made today’s share"
+          : "Dream works when the queue is free",
     `${today.images} of ${settings.dailyImages} today`,
     ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
   ].join(" · ");
