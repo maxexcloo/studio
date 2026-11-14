@@ -77,6 +77,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     /** The local video profile Dream would choose, or why none can. */
     video: "wan",
     videoRefusal: "",
+    /** Gallery items deleted or hidden since Dream listed them, which can't be referenced. */
+    gone: new Set<string>(),
     /** The text model's reply when asked for suggestions. */
     suggestions: { suggestions: [] } as unknown,
   };
@@ -141,10 +143,10 @@ function fixture(t: TestContext, catalogue = profiles) {
     // As the LoRA policy would: klein.safetensors is for another model family.
     fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
     inspiration: () => state.inspiration,
-    reference: (_account, itemId, frame) => ({
-      id: frame ? `${frame}-frame-${itemId}` : `asset-${itemId}`,
-      source: "gallery",
-    }),
+    reference: (_account, itemId, frame) => {
+      if (state.gone.has(itemId)) throw new Error("That image is no longer in the gallery.");
+      return { id: frame ? `${frame}-frame-${itemId}` : `asset-${itemId}`, source: "gallery" };
+    },
     // As Animate chooses: an Extend keeps its video's model.
     videoProfile: async (_ownerId, _account, { extend }) => {
       if (state.videoRefusal) throw new Error(state.videoRefusal);
@@ -1455,4 +1457,31 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
   state.videoRefusal = "No video profile that takes a starting image is available to this account.";
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, state.videoRefusal);
+});
+
+test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t, profiles);
+  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  for (const [id, score] of [
+    ["gone", 9],
+    ["next", 7],
+  ] as const)
+    state.items.push({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `still ${id}`,
+      jobId: `job-${id}`,
+      dream: { prompt: "", why: "", at: "", state: "unseen" },
+      review: { score, miss: "", model: "m", at: "" },
+    });
+  state.gone.add("gone");
+  const job = await dreamOnce();
+  assert.deepEqual(job?.input.referenceAssets, [
+    { assetId: "asset-next", source: "gallery", slot: "start" },
+  ]);
+  assert.deepEqual(dream.read("alice").animated, ["next", "gone"]);
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(dream.status("alice").reason!, /^Dream videos animate a kept, starred/);
 });

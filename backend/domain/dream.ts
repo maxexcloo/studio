@@ -104,6 +104,7 @@ export interface DreamPair {
 type PairAxis = "profile" | "lora" | "strength" | "steps" | "cfg" | "wording";
 export type PairAnswer = "a" | "b" | "both" | "neither";
 type DreamState = "unseen" | "kept" | "discarded";
+type DreamVideoSource = { item: DreamItem; extend: boolean };
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
 interface DreamMark extends DreamOrigin {
   state: DreamState;
@@ -846,7 +847,7 @@ export function createDream(options: {
    * extension Dream made; otherwise a still to animate, its Dream images that fit their brief (kept
    * or still unseen) by review score, then its kept or starred images, newest first.
    */
-  function videoSource(ownerId: string, record: DreamRecord) {
+  function videoSources(ownerId: string, record: DreamRecord) {
     const animated = new Set(record.animated);
     const extended = new Set(record.extended);
     const done = (item: DreamItem, type: string) => item.type === type && item.status === "done";
@@ -861,7 +862,6 @@ export function createDream(options: {
           done(item, "video") && item.dream?.arm !== "extend" && !extended.has(String(item.id)),
       )
       .sort(best);
-    if (video && chance(extendShare)) return { item: video, extend: true };
     const fresh = (item: DreamItem) => done(item, "image") && !animated.has(String(item.id));
     const reviewed = options
       .gallery(ownerId)
@@ -874,8 +874,8 @@ export function createDream(options: {
           score(item) > 0,
       )
       .sort(best);
-    const [still] = [...reviewed, ...liked.filter(fresh)];
-    return still ? { item: still, extend: false } : undefined;
+    const stills = [...reviewed, ...liked.filter(fresh)].map((item) => ({ item, extend: false }));
+    return video && chance(extendShare) ? [{ item: video, extend: true }, ...stills] : stills;
   }
   /**
    * The series to continue, or for a share of familiar images a new one, where the account has a
@@ -1386,7 +1386,7 @@ export function createDream(options: {
   function session(ownerId: string, record: DreamRecord) {
     if (record.session && store.session(ownerId, record.session)) return record.session;
     record.session = store.createSession(ownerId, "Dream").id;
-    write(ownerId, record);
+    write(ownerId, { ...read(ownerId), session: record.session });
     return record.session;
   }
 
@@ -1603,22 +1603,51 @@ export function createDream(options: {
   }
   /**
    * Queues a video that animates the account's best still or extends one of its videos
-   * (videoSource), on a local model at its Fast or Quality; answers why it couldn't, or "".
+   * (videoSources), on a local model at its Fast or Quality; answers why it couldn't, or "".
    */
   async function video(ownerId: string, record: DreamRecord, access: DreamAccess) {
-    const source = videoSource(ownerId, record);
-    if (!source)
-      return "Dream videos animate a kept, starred or well-reviewed image. Keep or star one first.";
-    const { item, extend } = source;
+    const referenceOf = ({ item, extend }: DreamVideoSource) => {
+      try {
+        return options.reference(access.account, String(item.id), extend ? "last" : undefined);
+      } catch {
+        return null;
+      }
+    };
+    // A source deleted or hidden since it was chosen counts as used, so the next one is tried.
+    for (const source of videoSources(ownerId, record)) {
+      const reference = referenceOf(source);
+      if (!reference) {
+        markUsed(ownerId, source);
+        continue;
+      }
+      const refused = await animate(ownerId, record, access, source, reference);
+      if (refused && referenceOf(source)) return refused;
+      markUsed(ownerId, source);
+      if (!refused) return "";
+    }
+    return "Dream videos animate a kept, starred or well-reviewed image. Keep or star one first.";
+  }
+  /** Marks a video source used, so Dream animates or extends it only once. */
+  function markUsed(ownerId: string, { item, extend }: DreamVideoSource) {
+    const latest = read(ownerId);
+    const used = extend ? "extended" : "animated";
+    latest[used] = [String(item.id), ...(latest[used] || [])].slice(0, usedLimit);
+    write(ownerId, latest);
+  }
+  async function animate(
+    ownerId: string,
+    record: DreamRecord,
+    access: DreamAccess,
+    { item, extend }: DreamVideoSource,
+    reference: { id: string; source?: string },
+  ) {
     let choice: Awaited<ReturnType<typeof options.videoProfile>>;
-    let reference: { id: string; source?: string };
     try {
       choice = await options.videoProfile(ownerId, access.account, {
         width: Number(item.width) || 0,
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
       });
-      reference = options.reference(access.account, String(item.id), extend ? "last" : undefined);
     } catch (error) {
       return (error as Error).message;
     }
@@ -1670,10 +1699,6 @@ export function createDream(options: {
       },
     );
     if (result.status >= 400) return String(result.payload.error || "Studio refused the video.");
-    const latest = read(ownerId);
-    const used = extend ? "extended" : "animated";
-    latest[used] = [String(item.id), ...(latest[used] || [])].slice(0, usedLimit);
-    write(ownerId, latest);
     return "";
   }
   /**
