@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { api, post } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { formatDateTime } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { ownAccountQuery } from "../auth/AccountGate";
@@ -106,7 +107,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
           label="MCP Token"
           description={
             status.data?.createdAt
-              ? `Carries your account's access. Created ${new Date(status.data.createdAt).toLocaleString("en-AU")}.`
+              ? `Carries your account's access. Created ${formatDateTime(status.data.createdAt)}.`
               : "Carries your account's access. Send it as a bearer token, or use the URL with it in a client that only takes a URL (such as Grok)."
           }
         >

@@ -7,6 +7,7 @@ import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { formatDateTime } from "../../ui/dates";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
 import { closeWhenTop } from "../../ui/popupClicks";
@@ -160,7 +161,7 @@ export function UnfinishedItems() {
               sortValue: (job) => job.updatedAt,
               cell: (job) => (
                 <Text size="xs" style={{ whiteSpace: "nowrap" }}>
-                  {new Date(job.updatedAt).toLocaleString()}
+                  {formatDateTime(job.updatedAt)}
                 </Text>
               ),
             },
