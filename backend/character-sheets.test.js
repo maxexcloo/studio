@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import sharp from "sharp";
 
 import { sheetView } from "../shared/characters.ts";
-import { sheetPanels, sheetProfile, sheetReferences } from "./character-sheets.js";
+
+process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-character-sheets-"));
+const { sheetPanels, sheetProfile, sheetReferences } = await import("./character-sheets.js");
 
 /** A sheet drawn to prompt-sheet.js's layout: boxes of colour on a light grey background. */
 async function drawnSheet({ gear = true, touching = false } = {}) {
