@@ -85,8 +85,7 @@ export function createJobRecovery({
   request,
   setGallery,
   visible,
-  withBackend,
-  ingest = async (records) => records,
+  ingest = async (_backend, records) => records,
   cancel = async () => {},
   now = Date.now,
 }) {
@@ -154,7 +153,7 @@ export function createJobRecovery({
     const configured = backends();
     let scanned = 0;
     for (const backend of configured) {
-      await withBackend(backend, async () => {
+      try {
         // Recovered jobs whose prompts are known are looked up one by one; only an unknown prompt needs the history list.
         const prompts = [...candidateIds()]
           .filter(
@@ -166,12 +165,12 @@ export function createJobRecovery({
         const listed = untracked.size > 0 || prompts.some((promptId) => !promptId);
         // Both must answer before a missing prompt can count as lost.
         const [queue, history] = await Promise.all([
-          request("/queue", { timeout: 10000 }),
+          request(backend, "/queue", { timeout: 10000 }),
           listed
-            ? request("/history?max_items=500", { timeout: 15000 })
+            ? request(backend, "/history?max_items=500", { timeout: 15000 })
             : Promise.all(
                 prompts.map((promptId) =>
-                  request(`/history/${encodeURIComponent(promptId)}`, { timeout: 15000 }),
+                  request(backend, `/history/${encodeURIComponent(promptId)}`, { timeout: 15000 }),
                 ),
               ).then((answers) =>
                 Object.assign(
@@ -213,7 +212,7 @@ export function createJobRecovery({
               missing.delete(id);
               absentSince.delete(id);
               jobs.set(id, { ...current, promptId: place.promptId, comfyBackend: backend });
-              await cancel(place.promptId).catch(() => {});
+              await cancel(backend, place.promptId).catch(() => {});
             } else if (current.promptId) {
               const misses = (missing.get(id) || 0) + 1;
               missing.set(id, misses);
@@ -262,7 +261,7 @@ export function createJobRecovery({
             .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
           const restored = done
             ? restoreRecoveredRecords(
-                visible(recordsFromHistory({ [done.promptId]: done.entry })),
+                visible(recordsFromHistory(backend, { [done.promptId]: done.entry })),
                 tiles,
                 done.entry,
                 done.promptId,
@@ -274,7 +273,7 @@ export function createJobRecovery({
             untracked.delete(id);
             missing.delete(id);
             // With Studio media storage, recovered outputs move out of ComfyUI like delivered ones.
-            const outputs = await ingest(restored, done.promptId);
+            const outputs = await ingest(backend, restored, done.promptId);
             if (outputs.length) {
               const urls = new Set(
                 getGallery()
@@ -329,9 +328,9 @@ export function createJobRecovery({
           }
         }
         scanned++;
-      }).catch(() => {
+      } catch {
         // An unavailable backend must not invalidate its persisted jobs or block the other backend.
-      });
+      }
     }
     // An untracked tile has no backend identity; every backend must confirm absence.
     for (const id of untracked) {

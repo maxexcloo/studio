@@ -83,6 +83,7 @@ test("each saved picture carries its own upscale; upscales are not pictures of t
   const image = (filename) => ({ images: [{ filename, subfolder: "studio", type: "output" }] });
   const pairs = [{ base: "9", upscale: "studio_up0_9" }];
   const done = pairRunOutputs(
+    "primary",
     {
       9: { images: [image("a.png").images[0], image("b.png").images[0]] },
       studio_up0_9: { images: [image("a-up.png").images[0], image("b-up.png").images[0]] },
@@ -97,7 +98,7 @@ test("each saved picture carries its own upscale; upscales are not pictures of t
     ],
   );
   // Stopped mid-upscale: the picture is there, its upscale is not.
-  const stopped = pairRunOutputs({ 9: image("a.png") }, pairs);
+  const stopped = pairRunOutputs("primary", { 9: image("a.png") }, pairs);
   assert.equal(stopped.length, 1);
   assert.equal(stopped[0].paired, true);
   assert.equal(stopped[0].upscale, null);

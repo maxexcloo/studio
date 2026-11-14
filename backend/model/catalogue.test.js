@@ -32,7 +32,7 @@ test("the Library lists a worker's last known files without waiting on it", asyn
     saveWorkerModels: () => {},
   };
   const started = Date.now();
-  const latest = await createModelCatalogue({ store }).latestComfyContext();
+  const latest = await createModelCatalogue({ store }).latestComfyContext("primary");
   assert.deepEqual(latest.info, info);
   assert.equal(latest.current, false);
   assert.ok(Date.now() - started < 1000);

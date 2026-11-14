@@ -188,7 +188,8 @@ export async function prepareInpaint(account, body) {
     feather: body.inpaint.feather,
   });
   if (!files) return null;
-  const upload = (buffer, name) => uploadBufferToComfy({ buffer, mime: "image/png", name });
+  const upload = (buffer, name) =>
+    uploadBufferToComfy(body.comfyBackend, { buffer, mime: "image/png", name });
   const crop = await upload(files.crop, "inpaint-crop.png");
   const mask = await upload(files.samplingMask, "inpaint-mask.png");
   const composite = await upload(files.compositeMask, "inpaint-stitch.png");

@@ -17,7 +17,7 @@ import {
   sendVideoPreview,
 } from "../video-previews.js";
 import {
-  comfyUrl,
+  comfyFileUrl,
   inDotFolder,
   localOutputFile,
   noteComfyFetchError,
@@ -46,17 +46,14 @@ function thumbnailCacheControl(req) {
  * the file changes; never cached, since the plain one lives at the same address.
  */
 async function sendWithoutSettings(req, res) {
-  const params = new URLSearchParams(
-    Object.entries(req.query)
-      .filter(([key]) => key !== "clean")
-      .map(([key, value]) => [key, String(value)]),
-  );
+  const { clean: _clean, ...query } = req.query;
+  const worker = String(req.query.worker || "");
   let response;
   try {
-    response = await fetch(`${comfyUrl}/view?${params}`, { signal: AbortSignal.timeout(120000) });
-    noteComfyReachable();
+    response = await fetch(comfyFileUrl(query), { signal: AbortSignal.timeout(120000) });
+    noteComfyReachable(worker);
   } catch (error) {
-    noteComfyFetchError(error);
+    noteComfyFetchError(worker, error);
     res.status(502).json({ ok: false, error: "ComfyUI isn’t answering." });
     return;
   }
@@ -124,10 +121,10 @@ export async function comfyView(account, query) {
   }
   let response;
   try {
-    response = await fetch(`${comfyUrl}/view?${new URLSearchParams(query)}`);
-    noteComfyReachable();
+    response = await fetch(comfyFileUrl(query));
+    noteComfyReachable(String(query.worker || ""));
   } catch (error) {
-    noteComfyFetchError(error);
+    noteComfyFetchError(String(query.worker || ""), error);
     return { status: 502, payload: { ok: false, error: error.message } };
   }
   if (!response.ok) return { status: response.status, payload: {} };
@@ -147,6 +144,7 @@ export function registerComfyMediaRoutes(app) {
     const filename = String(req.query.filename || "");
     const subfolder = String(req.query.subfolder || "");
     const type = String(req.query.type || "output");
+    const worker = String(req.query.worker || "");
     if (
       req.studioAccount &&
       (!ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))
@@ -184,7 +182,10 @@ export function registerComfyMediaRoutes(app) {
       if (req.query.format === "play") {
         const playback = await getComfyVideoPlayback(filename, subfolder, type);
         if (!playback)
-          res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
+          res.redirect(
+            302,
+            `/comfy/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`,
+          );
         else if (playback.original)
           res.sendFile(playback.file, { headers: { "Cache-Control": immutableMediaCache } });
         else sendVideoPreview(req, res, playback.file, cacheControl);
@@ -195,14 +196,14 @@ export function registerComfyMediaRoutes(app) {
         await sendVideoPoster(
           req,
           res,
-          await getComfyVideoPoster(filename, subfolder, type),
+          await getComfyVideoPoster(filename, subfolder, type, worker),
           cacheControl,
         );
       else
         sendVideoPreview(
           req,
           res,
-          await getComfyVideoPreview(filename, subfolder, type),
+          await getComfyVideoPreview(filename, subfolder, type, worker),
           cacheControl,
         );
     } catch {
@@ -214,6 +215,7 @@ export function registerComfyMediaRoutes(app) {
     const filename = String(req.query.filename || "");
     const subfolder = String(req.query.subfolder || "");
     const type = String(req.query.type || "output");
+    const worker = String(req.query.worker || "");
     if (!filename) {
       res.status(400).json({ ok: false, error: "filename is required." });
       return;
@@ -240,7 +242,7 @@ export function registerComfyMediaRoutes(app) {
         await sendVideoPoster(
           req,
           res,
-          await getComfyVideoPoster(filename, subfolder, type),
+          await getComfyVideoPoster(filename, subfolder, type, worker),
           thumbnailCacheControl(req),
         );
         return;
@@ -251,6 +253,7 @@ export function registerComfyMediaRoutes(app) {
         subfolder,
         type,
         req.query.size === "display" ? "display" : "thumb",
+        worker,
       );
       if (!thumbnail) {
         res.status(404).json({ ok: false, error: "Source image is unavailable." });
@@ -258,7 +261,10 @@ export function registerComfyMediaRoutes(app) {
       }
       // No sharp (see sharp-loader.js): the full image stands in for the thumbnail.
       if (thumbnail.original) {
-        res.redirect(302, `/comfy/view?${new URLSearchParams({ filename, subfolder, type })}`);
+        res.redirect(
+          302,
+          `/comfy/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`,
+        );
         return;
       }
       // The ETag is a source-content hash, so revalidation safely handles a reused filename.
@@ -278,7 +284,6 @@ export function registerComfyMediaRoutes(app) {
 
   app.get("/comfy/*path", async (req, res) => {
     try {
-      const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
       const proxyPath = Array.isArray(req.params.path)
         ? req.params.path.join("/")
         : req.params.path;
@@ -318,12 +323,13 @@ export function registerComfyMediaRoutes(app) {
         await sendWithoutSettings(req, res);
         return;
       }
+      const worker = String(req.query.worker || "");
       let response;
       try {
-        response = await fetch(`${comfyUrl}/${proxyPath}${query}`, { headers: conditional });
-        noteComfyReachable();
+        response = await fetch(comfyFileUrl(req.query, proxyPath), { headers: conditional });
+        noteComfyReachable(worker);
       } catch (error) {
-        noteComfyFetchError(error);
+        noteComfyFetchError(worker, error);
         throw error;
       }
       res.status(response.status);

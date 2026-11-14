@@ -10,7 +10,6 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-previews-test-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
 const previews = await import("./video-previews.js");
-const { comfyUrl } = await import("./comfy/comfy.js");
 let encoder;
 try {
   encoder = createRequire(import.meta.url)("ffmpeg-static");
@@ -55,7 +54,7 @@ test(
       "aac",
       source,
     ]);
-    const identity = `${comfyUrl}/view?filename=original.mp4&subfolder=&type=output`;
+    const identity = "/view?filename=original.mp4&subfolder=&type=output";
     const [one, same] = await Promise.all([
       previews.getFileVideoPreview(source, identity),
       previews.getFileVideoPreview(source, identity),

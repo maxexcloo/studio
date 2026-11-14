@@ -70,18 +70,25 @@ test(
       );
     }
     const items = [
-      { id: "square", filename: "square.png", url: "/comfy/view?filename=square.png&type=output" },
+      {
+        id: "square",
+        filename: "square.png",
+        url: "/comfy/view?filename=square.png&type=output&worker=primary",
+      },
       {
         id: "landscape",
         filename: "landscape.png",
-        url: "/comfy/view?filename=landscape.png&type=output",
+        url: "/comfy/view?filename=landscape.png&type=output&worker=primary",
       },
       {
         id: "active",
         filename: "active-original.png",
-        url: "/comfy/view?filename=active-original.png&type=output",
+        url: "/comfy/view?filename=active-original.png&type=output&worker=primary",
         upscaleActive: true,
-        upscale: { status: "done", url: "/comfy/view?filename=active.png&type=output" },
+        upscale: {
+          status: "done",
+          url: "/comfy/view?filename=active.png&type=output&worker=primary",
+        },
       },
     ].map((item) => ({
       ...item,
@@ -314,7 +321,7 @@ test(
       const after = (await (await fetch(base + "/api/gallery")).json()).items;
       const landscape = after.find((item) => item.id === "landscape");
       assert.equal(landscape.status, "done");
-      assert.equal(landscape.url, "/comfy/view?filename=landscape.png&type=output");
+      assert.equal(landscape.url, "/comfy/view?filename=landscape.png&type=output&worker=primary");
       assert.equal(landscape.upscale.status, "cancelled");
       assert.equal(landscape.upscale.url, undefined);
       assert.equal(landscape.upscale.error, "");
@@ -322,7 +329,10 @@ test(
       const active = after.find((item) => item.id === "active");
       assert.equal(active.status, "done");
       assert.equal(active.upscale.status, "cancelled");
-      assert.equal(active.upscale.url, "/comfy/view?filename=active.png&type=output");
+      assert.equal(
+        active.upscale.url,
+        "/comfy/view?filename=active.png&type=output&worker=primary",
+      );
     } finally {
       await stop();
       for (const socket of tunnels) socket.destroy();

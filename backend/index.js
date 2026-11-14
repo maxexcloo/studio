@@ -91,13 +91,8 @@ import {
 
 import { adminRefusal, requireAdmin } from "./route-access.js";
 import express from "express";
-import {
-  configuredBackends,
-  currentComfyBackend,
-  routeJob,
-  withComfyBackend,
-} from "./comfy/backends.js";
-import { defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
+import { configuredBackends, routeJob } from "./comfy/backends.js";
+import { defaultWorker, defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -106,7 +101,8 @@ import {
   networkListening,
   demoMode,
   comfy,
-  comfyUrl,
+  comfyFile,
+  comfyOn,
   host,
   optionsFor,
   port,
@@ -312,9 +308,9 @@ const recoverRunningJobs = createJobRecovery({
   setGallery,
   // Dream's pool included: an orphaned Dream job otherwise runs forever, holding its worker.
   visible: (items) => items.filter(hasGalleryMedia),
-  withBackend: withComfyBackend,
-  cancel: cancelPrompt,
-  ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : []),
+  cancel: (backend, promptId) => cancelPrompt(promptId, comfyOn(backend)),
+  ingest: (backend, records, promptId) =>
+    ingestRecoveredRecords(backend, records, promptId ? [promptId] : []),
 });
 
 /**
@@ -322,9 +318,9 @@ const recoverRunningJobs = createJobRecovery({
  * leave ComfyUI. ComfyUI's copies go only after the caller has put the records
  * in the gallery and it is on disk.
  */
-async function ingestRecoveredRecords(records, promptIds = []) {
+async function ingestRecoveredRecords(backend, records, promptIds = []) {
   if (!records.length) return records;
-  const moved = await ingestRecords(records);
+  const moved = await ingestRecords(backend, records);
   // A history record carries the size asked for; the saved file's own size is what the run drew.
   moved.records = await Promise.all(
     moved.records.map(async (record) => {
@@ -335,13 +331,12 @@ async function ingestRecoveredRecords(records, promptIds = []) {
     }),
   );
   if (moved.comfyFiles.length) {
-    const backend = currentComfyBackend();
     const ids = [
       ...new Set([...promptIds, ...records.map((item) => item.promptId).filter(Boolean)]),
     ];
     setTimeout(
       () =>
-        withComfyBackend(backend, async () => {
+        (async () => {
           await flushGalleryStrict();
           const inGallery = new Set(gallery.map((item) => item.url));
           // Nothing that did not make it into the gallery loses its ComfyUI copy.
@@ -352,9 +347,9 @@ async function ingestRecoveredRecords(records, promptIds = []) {
           )
             return;
           noteIngested(records.map((item) => item.jobId));
-          await removeComfyFiles(moved.comfyFiles);
-          if (ids.length) await forgetComfyRun({ promptIds: ids }).catch(() => false);
-        }).catch(() => null),
+          await removeComfyFiles(backend, moved.comfyFiles);
+          if (ids.length) await forgetComfyRun(backend, { promptIds: ids }).catch(() => false);
+        })().catch(() => null),
       0,
     );
   }
@@ -405,7 +400,7 @@ const observeServices = createServicesObserver({
 const discoveredProfiles = async () => {
   const models = await mediaModels(false, { wait: false })
     .then((result) => result.models)
-    .catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+    .catch(() => (demoMode ? mockModelResult() : offlineModelResult(defaultWorker()?.url)));
   return models.profiles || [];
 };
 registerMultiUserAuthRoutes(app, {
@@ -449,11 +444,11 @@ const library = registerLibraryRoutes(app, {
       info: () => profileObjectInfo("image"),
     }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  loraInfo: (names, options) => loraInfos(names, options),
-  installed: async () => installedFiles((await loadComfyContext()).info),
+  loraInfo: (names, options) => loraInfos(defaultWorkerId(), names, options),
+  installed: async () => installedFiles((await loadComfyContext(defaultWorkerId())).info),
   // The Library's list: the worker's last known files at once, refreshed in the background.
   latestInstalled: async () => {
-    const { info, current } = await latestComfyContext();
+    const { info, current } = await latestComfyContext(defaultWorkerId());
     return { files: installedFiles(info), current };
   },
   // Lookup says which ready profiles a link's base model fits.
@@ -471,7 +466,7 @@ const library = registerLibraryRoutes(app, {
       model: profile.defaults?.model || profile.model || "",
     })),
   familiesOf: (name) => familiesFromMetadata({ base_model: String(name || "") }),
-  gguf: async () => Boolean((await loadComfyContext()).info?.UnetLoaderGGUF),
+  gguf: async () => Boolean((await loadComfyContext(defaultWorkerId())).info?.UnetLoaderGGUF),
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
@@ -491,12 +486,8 @@ const library = registerLibraryRoutes(app, {
 registerWorkflowRoutes(app, { loadComfyContext });
 
 const profileObjectInfo = async (kind) =>
-  (
-    await withComfyBackend(
-      routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(),
-      () => loadComfyContext(),
-    )
-  ).info;
+  (await loadComfyContext(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId()))
+    .info;
 registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (account) => account?.userId || "",
@@ -736,10 +727,7 @@ registerMigrationRoutes(app, {
   // missingComfyOutputs asks the worker that made a record for its file, as publicGalleryBuffer reads it.
   gallery: {
     items: () => gallery,
-    check: (item) =>
-      withComfyBackend(item.settings?.comfyBackend, () =>
-        comfy(item.url.replace(/^\/comfy/, ""), { method: "HEAD", timeout: 15_000 }),
-      ),
+    check: (item) => comfyFile(item.url, { method: "HEAD", timeout: 15_000 }),
     remove: removeGalleryItems,
     update: (jobId, patch) => updateGalleryJob(jobId, patch),
   },
@@ -1222,6 +1210,7 @@ server.listen(Number(port), host, () => {
       return;
     }
     // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
+    const comfyUrl = defaultWorker()?.url || "";
     const answering = await fetch(`${comfyUrl}/system_stats`, {
       signal: AbortSignal.timeout(3000),
     }).then(

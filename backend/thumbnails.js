@@ -3,7 +3,7 @@ import { mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  comfyUrl,
+  comfyFileUrl,
   localOutputFile,
   noteComfyFetchError,
   noteComfyReachable,
@@ -227,21 +227,20 @@ function cachedThumbnail(key) {
     : null;
 }
 
-/** The original's bytes: Studio media from its folder, anything else from ComfyUI. */
-async function sourceBytes(filename, subfolder, type) {
-  const params = new URLSearchParams({ filename, subfolder, type });
+/** The original's bytes: Studio media from its folder, anything else from `worker`'s ComfyUI. */
+async function sourceBytes(filename, subfolder, type, worker) {
   if (type === mediaType) {
     const file = localOutputFile(filename, subfolder, type);
     return file ? fs.promises.readFile(file) : null;
   }
   try {
-    const response = await fetch(`${comfyUrl}/view?${params}`, {
+    const response = await fetch(comfyFileUrl({ filename, subfolder, type, worker }), {
       signal: AbortSignal.timeout(15000),
     });
-    noteComfyReachable();
+    noteComfyReachable(worker);
     return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
   } catch (error) {
-    noteComfyFetchError(error);
+    noteComfyFetchError(worker, error);
     return null;
   }
 }
@@ -266,7 +265,7 @@ async function localSource(filename, subfolder, type) {
   }
 }
 
-async function build(filename, subfolder, type, size) {
+async function build(filename, subfolder, type, size, worker) {
   const key = cacheKey(filename, subfolder, type, size);
   const local = await localSource(filename, subfolder, type);
   if (local) {
@@ -288,7 +287,7 @@ async function build(filename, subfolder, type, size) {
   // installations do not consistently provide a useful ETag, and a reused
   // filename could otherwise receive an unrelated old preview, so hash the bytes.
   return inSlot(async () => {
-    const source = await sourceBytes(filename, subfolder, type);
+    const source = await sourceBytes(filename, subfolder, type, worker);
     // ComfyUI is down and the file is not on this computer: an earlier thumbnail still beats nothing.
     if (source === undefined) return cachedThumbnail(key);
     if (!source) return null;
@@ -335,37 +334,50 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
 // Concurrent requests for the same not-yet-cached image share one build instead of
 // each downloading and resizing the source independently. Without sharp there is
 // nothing to build: an earlier thumbnail, else `{ original: true }` (serve the full image).
-// `size` is a rendition: "thumb" for the grid, "display" for the viewer.
-export async function getThumbnail(filename, subfolder, type, size = "thumb") {
-  const result = await findOrBuild(filename, subfolder, type, size);
+// `size` is a rendition: "thumb" for the grid, "display" for the viewer; `worker` holds a ComfyUI file.
+export async function getThumbnail(filename, subfolder, type, size = "thumb", worker = "") {
+  const result = await findOrBuild(filename, subfolder, type, size, worker);
   if (result?.file) noteUsed(result.file);
   return result;
 }
 
 /** Builds an output's thumbnail ahead of its first view (media-warmup.js); unlike a request, not a use. */
-export function warmThumbnail(filename, subfolder = "", type = "output", size = "thumb") {
-  return findOrBuild(filename, subfolder, type, size);
+export function warmThumbnail(
+  filename,
+  subfolder = "",
+  type = "output",
+  size = "thumb",
+  worker = "",
+) {
+  return findOrBuild(filename, subfolder, type, size, worker);
 }
 
-async function findOrBuild(filename, subfolder, type, size = "thumb") {
+async function findOrBuild(filename, subfolder, type, size = "thumb", worker = "") {
   if (!RENDITIONS[size]) size = "thumb";
   if (!(await loadSharp()))
     return cachedThumbnail(cacheKey(filename, subfolder, type, size)) || { original: true };
   const dedupeKey = `${size}:${type}:${subfolder}:${filename}`;
   if (pending.has(dedupeKey)) return pending.get(dedupeKey);
-  const promise = build(filename, subfolder, type, size).finally(() => pending.delete(dedupeKey));
+  const promise = build(filename, subfolder, type, size, worker).finally(() =>
+    pending.delete(dedupeKey),
+  );
   pending.set(dedupeKey, promise);
   return promise;
 }
 
-/** The filename, subfolder and type a /comfy/view or /comfy/thumb URL names, or null. */
+/** The filename, subfolder, type and worker a /comfy/view or /comfy/thumb URL names, or null. */
 export function viewParams(url = "") {
   const text = String(url || "");
   if (!/^\/comfy\/(view|thumb)\?/.test(text)) return null;
   const params = new URLSearchParams(text.slice(text.indexOf("?") + 1));
   const filename = params.get("filename") || "";
   return filename
-    ? { filename, subfolder: params.get("subfolder") || "", type: params.get("type") || "output" }
+    ? {
+        filename,
+        subfolder: params.get("subfolder") || "",
+        type: params.get("type") || "output",
+        worker: params.get("worker") || "",
+      }
     : null;
 }
 

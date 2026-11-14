@@ -1,14 +1,8 @@
 import { runBackend } from "../shared/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
-import {
-  moveTargets,
-  onWorkerOffline,
-  profileOnBackendKey,
-  routeJob,
-  withComfyBackend,
-} from "./comfy/backends.js";
-import { demoMode } from "./comfy/comfy.js";
+import { moveTargets, onWorkerOffline, profileOnBackendKey, routeJob } from "./comfy/backends.js";
+import { comfyOn, demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logWarning } from "./crash-log.js";
@@ -99,15 +93,14 @@ export function createGenerationQueue({
         (item) =>
           item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
       );
-      const moved = await withComfyBackend(job.backend, () =>
-        ingestRunResults(
-          records.map((item) => ({
-            output: item,
-            ...(item.upscale?.url ? { upscale: item.upscale } : {}),
-          })),
-          job.ownerId,
-          { strict: true },
-        ),
+      const moved = await ingestRunResults(
+        job.backend,
+        records.map((item) => ({
+          output: item,
+          ...(item.upscale?.url ? { upscale: item.upscale } : {}),
+        })),
+        job.ownerId,
+        { strict: true },
       );
       for (const result of moved.results)
         updateGalleryJob(result.output.id, {
@@ -128,15 +121,13 @@ export function createGenerationQueue({
               (item.ownerId || "") === job.ownerId,
           ),
         });
-      if (moved.comfyFiles.length)
-        await withComfyBackend(job.backend, async () => {
-          await removeComfyFiles(moved.comfyFiles);
-          if (job.providerJobId)
-            await forgetComfyRun({ promptIds: [job.providerJobId] }).catch(() => false);
-        });
+      if (moved.comfyFiles.length) {
+        await removeComfyFiles(job.backend, moved.comfyFiles);
+        if (job.providerJobId)
+          await forgetComfyRun(job.backend, { promptIds: [job.providerJobId] }).catch(() => false);
+      }
     },
-    cancelPrompt: ({ promptId, backend }) =>
-      withComfyBackend(backend, () => cancelPrompt(promptId)),
+    cancelPrompt: ({ promptId, backend }) => cancelPrompt(promptId, comfyOn(backend)),
     recover: async (job) => {
       if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
         jobs.set(job.id, {
@@ -156,7 +147,7 @@ export function createGenerationQueue({
       try {
         if (workloads.length && !mediaLeases.has(job.id))
           mediaLeases.set(job.id, await runtime.controller.acquire(workloads, `job ${job.id}`));
-        await withComfyBackend(job.backend, () => loadComfyContext());
+        await loadComfyContext(job.backend);
       } catch (error) {
         mediaLeases.get(job.id)?.release();
         mediaLeases.delete(job.id);
@@ -227,19 +218,18 @@ export function createGenerationQueue({
     jobs,
     itemFor: (ownerId, itemId) =>
       gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
-    execute: (job, callbacks) =>
-      withComfyBackend(job.backend, async () => {
-        const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
-        if (!job.providerJobId && job.ownerId && !account?.authenticated)
-          throw new Error("This account can no longer upscale images.");
-        const info = job.providerJobId ? null : (await loadComfyContext()).info;
-        return runUpscaleJob(job.id, job.input.upscaleBody, info, undefined, {
-          ...callbacks,
-          promptId: job.providerJobId,
-          plan: job.input.upscalePlan,
-        });
-      }),
-    cancelPrompt: (promptId, backend) => withComfyBackend(backend, () => cancelPrompt(promptId)),
+    execute: async (job, callbacks) => {
+      const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
+      if (!job.providerJobId && job.ownerId && !account?.authenticated)
+        throw new Error("This account can no longer upscale images.");
+      const info = job.providerJobId ? null : (await loadComfyContext(job.backend)).info;
+      return runUpscaleJob(job.backend, job.id, job.input.upscaleBody, info, undefined, {
+        ...callbacks,
+        promptId: job.providerJobId,
+        plan: job.input.upscalePlan,
+      });
+    },
+    cancelPrompt: (promptId, backend) => cancelPrompt(promptId, comfyOn(backend)),
     flushGallery: flushGalleryStrict,
     eligible: queueAdapter.eligible,
     settled: async (job) => {

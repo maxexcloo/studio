@@ -5,9 +5,9 @@ import {
   refreshWorkerModels,
   uploadWorkerModel,
 } from "../worker-models.js";
+import { modelLibraryWorker } from "../workers.js";
 import crypto from "node:crypto";
 import path from "node:path";
-import { comfyUrl } from "../comfy/comfy.js";
 // Every catalogue request goes through Hugging Face access: token and mirror (hf-access.js).
 import { hfAccessNote, hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
 import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
@@ -154,7 +154,7 @@ export function startDownload(spec) {
   const waiting = queue.find(same);
   if (waiting) return snapshot(waiting);
   const entry = {
-    workerUrl: spec.workerUrl || comfyUrl,
+    workerUrl: modelLibraryWorker()?.url || "",
     id: spec.id,
     file: spec.file,
     folder: spec.folder,
@@ -312,7 +312,9 @@ function sameFile(saved, response) {
 /** Throws away a stopped download's partial file. */
 export function discardDownload(spec) {
   const workerUrl =
-    [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl || comfyUrl;
+    [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl ||
+    modelLibraryWorker()?.url ||
+    "";
   cancelDownload(spec.id);
   return workerModelFile({ ...spec, workerUrl }, "discard").then(() =>
     refreshWorkerModels({ force: true, workerUrl }),

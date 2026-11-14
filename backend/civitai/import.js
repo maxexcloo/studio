@@ -1,6 +1,6 @@
 import path from "node:path";
-import { comfyUrl } from "../comfy/comfy.js";
 import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
+import { modelLibraryWorker } from "../workers.js";
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
 import { sameResourceFilename, workflowModelSources } from "./workflow.js";
 import { civitaiAvailability } from "../library/availability.js";
@@ -457,7 +457,7 @@ export async function importCivitaiImage(
 }
 
 /**
- * Finds each resource's file in the worker's model library. `verify: false`
+ * Finds each resource's file in the Model Library worker's library (workers.js). `verify: false`
  * (the Library's list) never reads a model: a known checksum decides,
  * otherwise the same file name and size count as installed (marked
  * `unverified`); opening one image checks its checksums in full.
@@ -467,7 +467,7 @@ export async function matchResources(
   { profiles = [], loras = [], textEncoders = [], vaes = [] } = {},
   { verify = true } = {},
 ) {
-  const workerUrl = comfyUrl;
+  const workerUrl = modelLibraryWorker()?.url || "";
   const remote = await refreshWorkerModels({ workerUrl });
   const resources = [];
   for (const resource of preset.resources) {
