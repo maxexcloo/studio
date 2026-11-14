@@ -66,6 +66,7 @@ const comfyOutput = (filename, subfolder = "studio") => ({
 
 test("finished outputs move into the owner's Studio media folder and leave ComfyUI", async () => {
   const { results, comfyFiles } = await media.ingestRunResults(
+    "primary",
     [
       {
         output: comfyOutput("image_00001_.png", "studio/accounts/x"),
@@ -88,7 +89,7 @@ test("finished outputs move into the owner's Studio media folder and leave Comfy
     ["image_00001_.png", "upscale_00001_.png"],
   );
 
-  await media.removeComfyFiles([
+  await media.removeComfyFiles("primary", [
     ...comfyFiles,
     ...media.temporaryInputFiles({
       referenceAssets: [
@@ -110,6 +111,7 @@ test("finished outputs move into the owner's Studio media folder and leave Comfy
 
 test("media files are visible, deletable and confined to the media folder", async () => {
   const { results } = await media.ingestRunResults(
+    "primary",
     [{ output: comfyOutput("image_00002_.png") }],
     "",
   );
@@ -144,7 +146,7 @@ test("recovered history records move into media and keep their titles", async ()
     index: 0,
     status: "done",
   };
-  const { records, comfyFiles } = await media.ingestRecords([record]);
+  const { records, comfyFiles } = await media.ingestRecords("primary", [record]);
   assert.equal(records[0].filename, "A quiet harbour");
   assert.equal(records[0].id, records[0].url);
   assert.equal(paths.mediaParams(records[0].url).subfolder, accountOutputSubfolder("account-b"));

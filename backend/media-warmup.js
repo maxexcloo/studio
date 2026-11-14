@@ -153,12 +153,12 @@ export function warmNewOutputs(outputs = []) {
   for (const output of outputs) {
     const params = viewParams(output?.url);
     if (!params) continue;
-    const { filename, subfolder, type } = params;
+    const { filename, subfolder, type, worker } = params;
     const build = videoPattern.test(filename)
-      ? getComfyVideoPoster(filename, subfolder, type)
+      ? getComfyVideoPoster(filename, subfolder, type, worker)
       : imagePattern.test(filename)
-        ? warmThumbnail(filename, subfolder, type).then(() =>
-            warmThumbnail(filename, subfolder, type, "display"),
+        ? warmThumbnail(filename, subfolder, type, "thumb", worker).then(() =>
+            warmThumbnail(filename, subfolder, type, "display", worker),
           )
         : null;
     build?.catch(() => {});

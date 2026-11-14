@@ -18,9 +18,10 @@ function fixture() {
       state.jobs.set(id, { ...state.jobs.get(id), ...patch, terminalAt: 1 }),
     getGallery: () => state.gallery,
     jobs: state.jobs,
-    recordsFromHistory: (history) => Object.values(history).flatMap((entry) => entry.outputs || []),
-    request: async (path) => {
-      const snapshot = state.snapshots[state.backend];
+    recordsFromHistory: (_backend, history) =>
+      Object.values(history).flatMap((entry) => entry.outputs || []),
+    request: async (backend, path) => {
+      const snapshot = state.snapshots[backend];
       if (snapshot.error) throw new Error("Offline");
       return path === "/queue" ? snapshot.queue : snapshot.history;
     },
@@ -29,11 +30,7 @@ function fixture() {
       state.writes++;
     },
     visible: (items) => items.filter((item) => !item.deleted),
-    withBackend: async (backend, run) => {
-      state.backend = backend;
-      await run();
-    },
-    cancel: async (promptId) => state.cancellations.push({ promptId, backend: state.backend }),
+    cancel: async (backend, promptId) => state.cancellations.push({ promptId, backend }),
     now: () => state.now,
   });
   return state;
@@ -75,8 +72,9 @@ test("a stale queue snapshot cannot resurrect a job delivered while another reco
     jobs,
     getGallery: () => gallery,
     finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch, terminalAt: 1 }),
-    recordsFromHistory: (history) => Object.values(history).flatMap((entry) => entry.outputs),
-    request: async (path) =>
+    recordsFromHistory: (_backend, history) =>
+      Object.values(history).flatMap((entry) => entry.outputs),
+    request: async (_backend, path) =>
       path === "/queue"
         ? { queue_running: [queued("live")] }
         : { "recovered-prompt": result("recovered") },
@@ -84,8 +82,7 @@ test("a stale queue snapshot cannot resurrect a job delivered while another reco
       gallery = items;
     },
     visible: (items) => items,
-    withBackend: async (_backend, run) => run(),
-    ingest: async (records) => {
+    ingest: async (_backend, records) => {
       saving();
       await released;
       return records;
@@ -337,13 +334,12 @@ test("a running job its runner follows costs the worker nothing: no queue or his
     getGallery: () => s.gallery,
     jobs: s.jobs,
     recordsFromHistory: () => [],
-    request: async (path) => {
+    request: async (_backend, path) => {
       asked.push(path);
       return {};
     },
     setGallery: () => assert.fail("a live job’s tiles are the runner’s to write"),
     visible: (items) => items,
-    withBackend: async (_backend, run) => run(),
   });
   for (let tick = 0; tick < 5; tick++) await recover();
   assert.deepEqual(asked, []);
@@ -469,8 +465,9 @@ test("recovered jobs with known prompts are looked up one by one, not through th
     finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch }),
     getGallery: () => gallery,
     jobs,
-    recordsFromHistory: (history) => Object.values(history).flatMap((entry) => entry.outputs || []),
-    request: async (path) => {
+    recordsFromHistory: (_backend, history) =>
+      Object.values(history).flatMap((entry) => entry.outputs || []),
+    request: async (_backend, path) => {
       asked.push(path);
       return path === "/queue"
         ? {}
@@ -482,7 +479,6 @@ test("recovered jobs with known prompts are looked up one by one, not through th
       gallery = items;
     },
     visible: (items) => items,
-    withBackend: async (_backend, run) => run(),
   });
   await recover();
   assert.deepEqual(asked.sort(), ["/history/one-prompt", "/queue"]);

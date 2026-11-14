@@ -2,8 +2,7 @@ import fs from "node:fs";
 import querystring from "node:querystring";
 import { outputFilenameBelongsToRequest } from "../account-ownership.js";
 import { accountAccessForId } from "../account-store.js";
-import { withComfyBackend } from "../comfy/backends.js";
-import { comfy, inDotFolder, localOutputFile } from "../comfy/comfy.js";
+import { comfyFile, inDotFolder, localOutputFile } from "../comfy/comfy.js";
 import { comfyView, outputMime, ownerMediaTypes } from "../comfy/media-routes.js";
 import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
@@ -11,7 +10,6 @@ import { gallery } from "../gallery/store.js";
 import { mediaType, outputMediaPattern } from "../media-paths.js";
 import { mcpAccount, multiUserEnabled } from "../multi-user-auth.js";
 import { multiUserRefusal, publicAccountPaths } from "../multi-user-gate.js";
-import { defaultWorkerId } from "../workers.js";
 import { mcpOutputPath } from "./media.js";
 
 /** A signed MCP result link's file for its owner, as `{ content, mime }`, or null. */
@@ -38,18 +36,12 @@ export async function resolveSignedMcpResult(owner, jobId, index) {
   )
     return null;
   try {
-    const backend = item.settings?.comfyBackend || defaultWorkerId();
     // Studio media is read from its folder only, whichever worker made it.
     const file = localOutputFile(filename, subfolder, type);
     if (type === mediaType && !file) return null;
     const bytes = file
       ? await fs.promises.readFile(file)
-      : await withComfyBackend(backend, () =>
-          comfy(
-            `/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`,
-            { timeout: 120000 },
-          ),
-        );
+      : await comfyFile(item.url, { timeout: 120000 });
     const mime = outputMime(filename);
     return mime === "application/octet-stream" ? null : { content: Buffer.from(bytes), mime };
   } catch {

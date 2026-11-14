@@ -171,11 +171,11 @@ export function loraInfo(name) {
 }
 
 /**
- * Every listed LoRA's info. ComfyUI hands out the metadata block (no tensor
+ * Every listed LoRA's info. `worker`'s ComfyUI hands out the metadata block (no tensor
  * names) through /view_metadata, so each is read a few at a time and remembered;
  * `remote: false` (a worker that isn't answering) keeps to what is remembered.
  */
-export async function loraInfos(names = [], { concurrency = 6, remote: ask = true } = {}) {
+export async function loraInfos(worker, names = [], { concurrency = 6, remote: ask = true } = {}) {
   const result = {};
   const remote = [];
   for (const name of names) {
@@ -183,13 +183,17 @@ export async function loraInfos(names = [], { concurrency = 6, remote: ask = tru
     if (info) result[name] = info;
     else if (ask && /\.safetensors$/i.test(name)) remote.push(name);
   }
-  async function worker() {
+  async function reader() {
     while (remote.length) {
       const name = remote.shift();
       try {
-        const metadata = await comfy(`/view_metadata/loras?filename=${encodeURIComponent(name)}`, {
-          timeout: 10_000,
-        });
+        const metadata = await comfy(
+          worker,
+          `/view_metadata/loras?filename=${encodeURIComponent(name)}`,
+          {
+            timeout: 10_000,
+          },
+        );
         cache.set(name, describe(metadata && typeof metadata === "object" ? metadata : {}));
       } catch (error) {
         // No metadata block is an answer worth keeping; anything else is tried again next time.
@@ -198,7 +202,7 @@ export async function loraInfos(names = [], { concurrency = 6, remote: ask = tru
       if (cache.has(name)) result[name] = cache.get(name);
     }
   }
-  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, reader));
   // One catalogue view for the whole list, rather than a manifest check per LoRA.
   const view = loraCatalogue().loraView();
   for (const [name, info] of Object.entries(result))

@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import Busboy from "busboy";
-import { comfy } from "./comfy/comfy.js";
+import { comfy, comfyFile } from "./comfy/comfy.js";
 import { addGalleryItems, gallery, hasGalleryMedia, importedImageFile } from "./gallery/store.js";
 
 import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
@@ -374,10 +374,9 @@ export async function publicGalleryBuffer(item) {
       name: item.outputName || path.basename(file),
     };
   }
-  if (!String(item.url || "").startsWith("/comfy/"))
+  if (!String(item.url || "").startsWith("/comfy/view?"))
     throw new Error("That image is no longer in the gallery.");
-  const relative = String(item.url).replace(/^\/comfy/, "");
-  const data = await comfy(relative);
+  const data = await comfyFile(item.url);
   return {
     buffer: Buffer.from(data),
     mime: mimeFromName(item.outputName || item.filename || item.url),
@@ -533,7 +532,8 @@ export async function bytesForReferenceAccount(account, id) {
   );
 }
 
-export async function uploadBufferToComfy({ buffer, mime, name }, { unique = false } = {}) {
+/** Stages an input image on `worker`'s ComfyUI. */
+export async function uploadBufferToComfy(worker, { buffer, mime, name }, { unique = false } = {}) {
   await inspectImage(buffer, mime);
   // Content-named files are shared between runs; a run-only copy gets its own name,
   // so removing it afterwards can never pull an input out from under another job.
@@ -544,11 +544,13 @@ export async function uploadBufferToComfy({ buffer, mime, name }, { unique = fal
   form.append("image", new Blob([buffer], { type: mime }), filename);
   form.append("type", "input");
   form.append("overwrite", "false");
-  const uploaded = await comfy("/upload/image", { method: "POST", body: form });
+  const uploaded = await comfy(worker, "/upload/image", { method: "POST", body: form });
   return { comfyName: uploaded.name || filename, name: safeName(name), mime };
 }
 
+/** Stages an account's references on `worker` for a run. */
 export async function stageReferenceAssetsForAccount(
+  worker,
   account,
   references = [],
   { unique = false, generation = null } = {},
@@ -572,7 +574,7 @@ export async function stageReferenceAssetsForAccount(
     const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
     // Content names are reused, so a resized file is not uploaded again on every run; a unique
     // copy is the run's own and goes when it ends (media-store.js temporaryInputFiles).
-    const uploaded = await uploadBufferToComfy(bytes, { unique });
+    const uploaded = await uploadBufferToComfy(worker, bytes, { unique });
     staged.push({
       slot,
       assetId,

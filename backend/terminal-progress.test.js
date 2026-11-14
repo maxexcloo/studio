@@ -88,6 +88,7 @@ test(
       scheduler: "normal",
       seed: "1234",
       weightDtype: "default",
+      comfyBackend: "primary",
     };
     const items = makePendingItems(id, body);
     store.setGallery(items, { persist: false });

@@ -6,7 +6,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { earliest } from "./domain/eta.ts";
 import { queuePriority } from "./domain/store.ts";
 import { profileOnBackendKey, readyWorkers } from "./comfy/backends.js";
-import { comfyUrl, isComfyTimeout } from "./comfy/comfy.js";
+import { isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { dataDir, gallery, visibleGallery } from "./gallery/store.js";
@@ -14,10 +14,10 @@ import { requireAdmin } from "./route-access.js";
 import { galleryStats, profileStats } from "./stats.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { upscaleQualities } from "./upscale.js";
-import { capabilityForProfile } from "./workers.js";
+import { capabilityForProfile, defaultWorker } from "./workers.js";
 
-// Whether ComfyUI runs on this machine, for the bug report.
-const comfyIsLocal = () => {
+// Whether the default worker's ComfyUI runs on this machine, for the bug report.
+const comfyIsLocal = (comfyUrl) => {
   try {
     return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(new URL(comfyUrl).hostname);
   } catch {
@@ -162,6 +162,7 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
   app.get("/api/diagnostics", async (_req, res) => {
     // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
     let comfyBusy = false;
+    const comfyUrl = defaultWorker()?.url || "";
     const stats = !comfyUrl
       ? null
       : await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(10_000) }).then(
@@ -175,7 +176,7 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       version: appVersion,
       stats,
       comfyBusy,
-      comfyLocal: comfyIsLocal(),
+      comfyLocal: comfyIsLocal(comfyUrl),
     });
     res.json({ ok: true, ...report, text: diagnosticsText(report) });
   });

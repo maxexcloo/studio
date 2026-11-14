@@ -2,15 +2,13 @@ import { isCloudProfile } from "../../shared/profiles.ts";
 import { mayUseFeature, visibleGenerationProfiles } from "../account-policy.js";
 import {
   allowedProfile,
-  currentComfyBackend,
   isDefaultBackend,
   mergeWorkerModels,
   noteWorkerProfiles,
-  withComfyBackend,
   workerAvailability,
   workerReachable,
 } from "../comfy/backends.js";
-import { comfy, comfyUrl, demoMode, optionsFor } from "../comfy/comfy.js";
+import { comfy, demoMode, optionsFor } from "../comfy/comfy.js";
 import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { visibleGallery } from "../gallery/store.js";
@@ -20,6 +18,7 @@ import { sharedRequests } from "../shared-requests.js";
 import { profileStats } from "../stats.js";
 import {
   capabilityForProfile,
+  defaultWorker,
   defaultWorkerId,
   listWorkers,
   noWorkerMessage,
@@ -59,7 +58,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   // Each worker's latest ComfyUI answer (node list and stats), by worker id.
   const emptyContext = { info: null, stats: null, fetchedAt: 0 };
   const contextCaches = new Map();
-  const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
+  const contextFor = (id) => contextCaches.get(id) || emptyContext;
 
   // One fetch of a worker's context at a time: callers that arrive meanwhile share it.
   const shareContextRequest = sharedRequests();
@@ -69,13 +68,12 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   const contextFailures = new Map();
 
   /**
-   * A worker's node list, stats and model folders, cached for 30 seconds. A
+   * Worker `backend`'s node list, stats and model folders, cached for 30 seconds. A
    * request already on its way is shared, so a burst of callers (a page load's
    * models, workflows and upscale status) asks ComfyUI once. `force` always
    * skips the cache and a recent failure; callers still share a request already in flight.
    */
-  function loadComfyContext({ force = false } = {}) {
-    const backend = currentComfyBackend();
+  function loadComfyContext(backend, { force = false } = {}) {
     const cached = contextFor(backend);
     const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
     if (fresh) return Promise.resolve(cached);
@@ -86,27 +84,27 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
   }
 
   /**
-   * The default worker's latest known context without waiting on it: its cached answer, refreshed
+   * Worker `backend`'s latest known context without waiting on it: its cached answer, refreshed
    * in the background once 30 seconds old, else its last stored observation. Only a worker never
    * seen is waited for. `current` says whether it answered within those 30 seconds.
    */
-  function latestComfyContext() {
-    const backend = currentComfyBackend();
+  function latestComfyContext(backend) {
     const cached = contextFor(backend);
     if (cached.info && Date.now() - cached.fetchedAt < 30000)
       return Promise.resolve({ ...cached, current: true });
     const worker = workerById(backend);
     const known = cached.info ? cached : worker && store.workerModels(backend, worker.url);
-    if (!known?.info) return loadComfyContext().then((context) => ({ ...context, current: true }));
-    loadComfyContext().catch(() => null);
+    if (!known?.info)
+      return loadComfyContext(backend).then((context) => ({ ...context, current: true }));
+    loadComfyContext(backend).catch(() => null);
     return Promise.resolve({ ...known, current: false });
   }
 
   async function fetchComfyContext(backend) {
     const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
     const [info, stats] = await Promise.all([
-      comfy("/object_info", { signal }),
-      comfy("/system_stats", { signal }).catch(() => ({})),
+      comfy(backend, "/object_info", { signal }),
+      comfy(backend, "/system_stats", { signal }).catch(() => ({})),
     ]).catch((error) => {
       contextFailures.set(backend, { error, at: Date.now() });
       throw error;
@@ -114,6 +112,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     contextFailures.delete(backend);
     // Model-type detection is synchronous; fetch what it needs from a remote ComfyUI first.
     await primeModelMetadata(
+      backend,
       {
         unet: optionsFor(info, "UNETLoader", "unet_name"),
         checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
@@ -129,13 +128,12 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return result;
   }
 
-  /** What to say when ComfyUI does not answer: restarting on purpose, or simply not there. */
-  function comfyDownMessage(detail = "") {
-    const worker = workerById(currentComfyBackend());
+  /** What to say when worker `backend`'s ComfyUI does not answer. */
+  function comfyDownMessage(backend, detail = "") {
+    const worker = workerById(backend);
     if (!worker) return noWorkerMessage("image");
-    if (!isDefaultBackend())
-      return `Can’t reach ${worker.name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
-    return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
+    const name = isDefaultBackend(backend) ? "ComfyUI" : worker.name;
+    return `Can’t reach ${name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   }
 
   /**
@@ -150,20 +148,18 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     if (!isDefaultBackend(backend) && workerReachable(backend) === false)
       throw new Error(`${workerById(backend)?.name || "That worker"} did not answer just now.`);
     const forget = () => contextCaches.delete(backend);
-    return withComfyBackend(backend, async () => {
-      try {
-        const known = !force && contextFor(backend).info ? contextFor(backend) : null;
-        if (known && Date.now() - known.fetchedAt >= 30000) loadComfyContext().catch(forget);
-        const context = known || (await loadComfyContext({ force }));
-        const models = inferred(context.info, context.stats);
-        // What this worker has, so a job for one of its profiles goes to it (routeJob).
-        noteWorkerProfiles(backend, models.profiles || []);
-        return { ...context, models };
-      } catch (error) {
-        forget(error);
-        throw error;
-      }
-    });
+    try {
+      const known = !force && contextFor(backend).info ? contextFor(backend) : null;
+      if (known && Date.now() - known.fetchedAt >= 30000) loadComfyContext(backend).catch(forget);
+      const context = known || (await loadComfyContext(backend, { force }));
+      const models = inferred(context.info, context.stats);
+      // What this worker has, so a job for one of its profiles goes to it (routeJob).
+      noteWorkerProfiles(backend, models.profiles || []);
+      return { ...context, models };
+    } catch (error) {
+      forget(error);
+      throw error;
+    }
   }
 
   /** The deployments an administrator can start for a worker (Settings › Workers). */
@@ -326,7 +322,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         reason: noWorkerMessage("image"),
         backends: workerAvailability(),
       };
-    return offlineModelResult(comfyUrl);
+    return offlineModelResult(defaultWorker()?.url);
   }
 
   /** The media catalogue; demo mode without workers serves its sample one. */
@@ -338,9 +334,12 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         throw error;
       });
 
-  /** The current worker's profiles as its node list describes them, for presets and the Library. */
+  /** The default worker's profiles as its node list describes them, for presets and the Library. */
   const presetModels = async () => {
-    const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
+    const { info, stats } = await loadComfyContext(defaultWorkerId()).catch(() => ({
+      info: null,
+      stats: null,
+    }));
     return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
   };
 

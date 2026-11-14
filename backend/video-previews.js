@@ -9,7 +9,7 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { dataDir } from "./gallery/store.js";
-import { comfyUrl, localOutputFile } from "./comfy/comfy.js";
+import { comfyFileUrl, localOutputFile } from "./comfy/comfy.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { mediaType } from "./media-paths.js";
 
@@ -153,8 +153,9 @@ function coalesce(key, work, options) {
 function identityKey(identity) {
   return crypto.createHash("sha256").update(`${version}:${identity}`).digest("hex");
 }
-function comfySource(filename, subfolder, type) {
-  return `${comfyUrl}/view?${new URLSearchParams({ filename, subfolder, type })}`;
+/** What a video's cached copies are filed under: its file, and the worker holding a ComfyUI one. */
+function sourceIdentity(filename, subfolder, type, worker = "") {
+  return `/view?${new URLSearchParams({ filename, subfolder, type, ...(worker ? { worker } : {}) })}`;
 }
 
 export async function getFileVideoPreview(file, identity = file) {
@@ -532,21 +533,21 @@ export async function getFileVideoPoster(file, identity = file) {
 }
 
 /** An output's still: from the file when it's on this computer, else from its preview. */
-export async function getComfyVideoPoster(filename, subfolder, type) {
-  const source = comfySource(filename, subfolder, type);
+export async function getComfyVideoPoster(filename, subfolder, type, worker = "") {
   const local = localOutputFile(filename, subfolder, type);
-  if (local) return getFileVideoPoster(local, source);
+  if (local) return getFileVideoPoster(local, sourceIdentity(filename, subfolder, type));
   if (type === mediaType) throw new Error("Source video is unavailable.");
-  return getVideoPoster(await getComfyVideoPreview(filename, subfolder, type));
+  return getVideoPoster(await getComfyVideoPreview(filename, subfolder, type, worker));
 }
 
-export async function getComfyVideoPreview(filename, subfolder, type) {
-  const source = comfySource(filename, subfolder, type);
+/** An output's preview: from the file when it's on this computer, else from `worker`'s ComfyUI. */
+export async function getComfyVideoPreview(filename, subfolder, type, worker = "") {
   const local = localOutputFile(filename, subfolder, type);
-  if (local) return getFileVideoPreview(local, source);
+  if (local) return getFileVideoPreview(local, sourceIdentity(filename, subfolder, type));
   // Studio media is never fetched from ComfyUI.
   if (type === mediaType) throw new Error("Source video is unavailable.");
-  const key = identityKey(source);
+  const source = comfyFileUrl({ filename, subfolder, type, worker });
+  const key = identityKey(sourceIdentity(filename, subfolder, type, worker));
   const known = remoteVersions.get(key);
   if (known && Date.now() - known.checked < 60_000 && fs.existsSync(known.file)) return known.file;
   return coalesce(key, async () => {
@@ -665,7 +666,7 @@ export async function getComfyVideoPlayback(filename, subfolder, type) {
   if (!local) return null;
   const stat = await fs.promises.stat(local);
   const revision = crypto.createHash("sha256").update(`${stat.size}:${stat.mtimeMs}`).digest("hex");
-  const key = identityKey(comfySource(filename, subfolder, type));
+  const key = identityKey(sourceIdentity(filename, subfolder, type));
   const output = path.join(dir, `${key}-play-${revision}.mp4`);
   const known = playbackPlans.get(output);
   if (known === "original") return { file: local, original: true };
@@ -753,10 +754,11 @@ export async function forgetItemVideoPreviews(item) {
   try {
     const url = new URL(item.url, "http://studio.local");
     if (url.pathname === "/comfy/view")
-      identity = comfySource(
+      identity = sourceIdentity(
         url.searchParams.get("filename") || "",
         url.searchParams.get("subfolder") || "",
         url.searchParams.get("type") || "output",
+        url.searchParams.get("worker") || "",
       );
   } catch {
     return 0;

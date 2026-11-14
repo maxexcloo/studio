@@ -1,6 +1,6 @@
 import { canAdmin } from "./access.js";
 import { mayUseGenerationProfile } from "./account-policy.js";
-import { comfyUrl, demoMode } from "./comfy/comfy.js";
+import { demoMode } from "./comfy/comfy.js";
 import { deleteImportedWorkflow, saveImportedWorkflow } from "./custom-workflows.js";
 import { inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
 import { requireAdmin } from "./route-access.js";
@@ -10,6 +10,7 @@ import {
   saveWorkflowPreferences,
   workflowSummaries,
 } from "./workflow-catalogue.js";
+import { defaultWorker, defaultWorkerId } from "./workers.js";
 
 /** The workflow list, imports and their removal. `loadComfyContext` is model/catalogue.js's. */
 export function registerWorkflowRoutes(app, { loadComfyContext }) {
@@ -35,12 +36,15 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
 
   app.get("/api/workflows", async (req, res) => {
     try {
-      const { info, stats } = await loadComfyContext().catch(() => ({ info: {}, stats: {} }));
+      const { info, stats } = await loadComfyContext(defaultWorkerId()).catch(() => ({
+        info: {},
+        stats: {},
+      }));
       const models = Object.keys(info || {}).length
         ? inferModels(info, stats)
         : demoMode
           ? mockModelResult()
-          : offlineModelResult(comfyUrl);
+          : offlineModelResult(defaultWorker()?.url);
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(
@@ -50,7 +54,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
         ...preferencesForRequest(req, preferences),
       });
     } catch {
-      const models = demoMode ? mockModelResult() : offlineModelResult(comfyUrl);
+      const models = demoMode ? mockModelResult() : offlineModelResult(defaultWorker()?.url);
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(
@@ -66,7 +70,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
     if (!requireAdmin(req, res)) return;
     try {
       const raw = req.body?.workflow || req.body;
-      const { info } = await loadComfyContext().catch(() => ({ info: {} }));
+      const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
       res.json({ ok: true, preview: previewWorkflowImport(raw, req.body?.filename || "", info) });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
@@ -77,7 +81,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
     if (!requireAdmin(req, res)) return;
     try {
       const raw = req.body?.workflow || req.body;
-      const { info } = await loadComfyContext().catch(() => ({ info: {} }));
+      const { info } = await loadComfyContext(defaultWorkerId()).catch(() => ({ info: {} }));
       // The review's own notes (the node list, what was guessed) aren't part of the workflow.
       const { nodes: _nodes, guessed: _guessed, ...metadata } = req.body?.metadata || {};
       const normalized =

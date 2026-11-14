@@ -2,8 +2,7 @@ import crypto from "node:crypto";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
- * an address and what it runs. The single `comfyUrl` follows the default
- * worker (comfy.js).
+ * an address and what it runs. Every request to one names it (comfy/comfy.js).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
  * workloads Studio found in Kubernetes (runtime/workloads.ts).
@@ -176,7 +175,6 @@ function workloadWorkers(kubernetes) {
 }
 
 let cache = null;
-const listeners = new Set();
 
 /** Every worker in list order. */
 export function listWorkers() {
@@ -190,9 +188,9 @@ const workersWith = (capability) =>
   listWorkers().filter((worker) => worker.capabilities.includes(capability));
 
 /**
- * The worker the single `comfyUrl` follows: the first that runs images,
- * else the first of any kind. Local conveniences (the output folder, Manager
- * restarts with their progress) belong to it.
+ * The default worker: the first that runs images, else the first of any kind. Its node list
+ * stands for the catalogue where no particular worker is asked (presets, the Library, LoRA
+ * metadata) and it answers for the studio in diagnostics.
  */
 export function defaultWorker() {
   const workers = listWorkers();
@@ -200,38 +198,20 @@ export function defaultWorker() {
 }
 export const defaultWorkerId = () => defaultWorker()?.id || "";
 
-/** The worker model downloads go to (worker-models.js): the first with Model Library, else the default. */
+/** The worker model downloads go to (worker-models.js): the first with Model Library, or null. */
 export function modelLibraryWorker() {
   return workersWith("models")[0] || null;
-}
-
-/** Called with the new list whenever it changes (comfy.js keeps its address in step). */
-export function onWorkersChanged(listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function changed() {
-  cache = null;
-  const workers = listWorkers();
-  for (const listener of listeners) {
-    try {
-      listener(workers);
-    } catch {
-      /* one listener never blocks another */
-    }
-  }
 }
 
 /** The workloads Studio found at start (runtime/bootstrap.ts), whose media addresses are workers. */
 export function useWorkloadWorkers(list) {
   workloads = list;
-  changed();
+  cache = null;
 }
 
 /** Reads the configuration again (tests). */
 export function reloadWorkers() {
-  changed();
+  cache = null;
   return listWorkers();
 }
 

@@ -551,8 +551,8 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
   return { graph: next, pairs, plan };
 }
 
-/** Stage the original local video; the gallery keeps its audio and frame rate. */
-export async function uploadUpscaleVideoSource(item) {
+/** Stage the original local video on `worker`; the gallery keeps its audio and frame rate. */
+export async function uploadUpscaleVideoSource(worker, item) {
   const url = new URL(String(item.url || ""), "http://localhost");
   if (url.pathname !== "/comfy/view")
     throw new Error("The original video is not a ComfyUI output.");
@@ -572,6 +572,6 @@ export async function uploadUpscaleVideoSource(item) {
   form.append("image", new Blob([buffer]), filename);
   form.append("type", "input");
   form.append("overwrite", "false");
-  const uploaded = await comfy("/upload/image", { method: "POST", body: form });
+  const uploaded = await comfy(worker, "/upload/image", { method: "POST", body: form });
   return uploaded.name || filename;
 }

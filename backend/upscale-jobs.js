@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy/comfy.js";
+import { workerUrl } from "./comfy/backends.js";
+import { comfy, comfyOn, normalizeComfyError } from "./comfy/comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { flushGalleryStrict, gallery, updateGalleryJob } from "./gallery/store.js";
 import { outputsFrom } from "./gallery/records.js";
@@ -48,11 +49,11 @@ function galleryTarget(itemId) {
  * heard and times the upscale. `run.promptId`, once known, guards against
  * strays; `run.clock` is the job's place on the queue's clock (jobs.js).
  */
-function watchUpscaleProgress(clientId, target, run) {
+function watchUpscaleProgress(worker, clientId, target, run) {
   let socket;
   try {
     socket = new WebSocket(
-      `${activeComfyUrl().replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`,
+      `${workerUrl(worker).replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`,
     );
   } catch {
     return null;
@@ -95,7 +96,9 @@ function watchUpscaleProgress(clientId, target, run) {
   return socket;
 }
 
+/** Runs one upscale on worker `worker`. */
 export async function runUpscaleJob(
+  worker,
   jobId,
   body,
   info,
@@ -139,12 +142,12 @@ export async function runUpscaleJob(
       );
     });
     run.clock = clock;
-    socket = watchUpscaleProgress(jobId, target, run);
+    socket = watchUpscaleProgress(worker, jobId, target, run);
     await waitForOpen(socket);
     if (!recorded.promptId) recorded.onSubmitting?.();
     const queued = recorded.promptId
       ? { prompt_id: recorded.promptId }
-      : await comfy("/prompt", {
+      : await comfy(worker, "/prompt", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
@@ -169,12 +172,12 @@ export async function runUpscaleJob(
       promptId: queued.prompt_id,
     });
     run.promptId = queued.prompt_id;
-    const tracker = promptTracker(queued.prompt_id);
+    const tracker = promptTracker(queued.prompt_id, { request: comfyOn(worker) });
     run.alive = tracker.alive;
     while (true) {
       const state = jobs.get(jobId)?.status;
       if ((state === "cancelling" || state === "cancelled") && !cancelSent) {
-        await cancelPrompt(queued.prompt_id);
+        await cancelPrompt(queued.prompt_id, comfyOn(worker));
         cancelSent = true;
       }
       // A blip in the connection is waited out; a minute of silence or a dropped run ends it.
@@ -184,7 +187,9 @@ export async function runUpscaleJob(
         continue;
       }
       if (checked.state === "done") {
-        const outputs = outputsFrom({ outputs: { 9: checked.entry?.outputs?.["9"] || {} } });
+        const outputs = outputsFrom(worker, {
+          outputs: { 9: checked.entry?.outputs?.["9"] || {} },
+        });
         let output = outputs.find((item) => item.type === (body.mediaType || "image"));
         if (!output) {
           if (cancelSent) {
@@ -197,7 +202,9 @@ export async function runUpscaleJob(
           });
         }
         // ComfyUI as a worker: the upscale moves into Studio media beside its source.
-        const moved = await ingestRunResults([{ output }], body.ownerId || "", { strict: true });
+        const moved = await ingestRunResults(worker, [{ output }], body.ownerId || "", {
+          strict: true,
+        });
         output = moved.results[0].output;
         const comfyCopies = moved.comfyFiles;
         // Learned from, unless its start was never heard.
@@ -208,8 +215,8 @@ export async function runUpscaleJob(
         setTerminalJob(jobId, { status: "done", outputs: [output] });
         if (comfyCopies.length) {
           await flushGalleryStrict();
-          await removeComfyFiles(comfyCopies);
-          await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
+          await removeComfyFiles(worker, comfyCopies);
+          await forgetComfyRun(worker, { promptIds: [queued.prompt_id] }).catch(() => false);
         }
         socket?.close();
         return;
