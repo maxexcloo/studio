@@ -277,6 +277,18 @@ test("compare runs queue one seeded set, read back per owner and record the star
     (await request("", { jobIds: [winner.jobId, winner.jobId], itemIds: ["w-0", "w-0"] })).status,
     400,
   );
+
+  // Variants with seeds of their own keep them, and no shared seed is recorded.
+  const seeded = await request("/run", {
+    variants: [variant("Seed 1", { seed: "1" }), variant("Seed 2", { seed: 2 })],
+  });
+  assert.deepEqual(
+    seeded.body.variants.map(
+      (entry: { jobId: string }) => store.job("alice", entry.jobId)!.input.seed,
+    ),
+    ["1", "2"],
+  );
+  assert.equal(seeded.body.seed, "");
   const filtered = await request(`?jobIds=${encodeURIComponent(other.jobId)}`);
   assert.ok(filtered.body.comparisons.length > 0);
   assert.ok(
