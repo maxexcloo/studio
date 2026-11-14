@@ -5,6 +5,7 @@ import {
   type NextStep,
   type Suggestions,
   changeActions,
+  maxNextSteps,
 } from "../../shared/suggestions.ts";
 import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
@@ -339,7 +340,7 @@ export function createSuggestions({
         return true;
       })
       .filter(unlike(offered))
-      .slice(0, 4) as NextStep[];
+      .slice(0, maxNextSteps) as NextStep[];
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 

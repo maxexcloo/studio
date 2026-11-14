@@ -4,6 +4,8 @@ export interface NextStep {
   request: string;
   prompt: string;
 }
+/** The most next steps one ask returns, so a menu can hold their place while they load. */
+export const maxNextSteps = 4;
 /** How a requested change is carried out; a composer draft has nothing to upscale. */
 export const changeActions = ["edit", "recreate", "animate", "upscale"] as const;
 export type ChangeAction = (typeof changeActions)[number];

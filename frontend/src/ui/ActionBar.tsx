@@ -72,6 +72,8 @@ export interface Action {
   note?: string;
   /** Names its group in menus (Themes, Suggestions) rather than acting. */
   heading?: boolean;
+  /** An unseen menu row holding the place of options still to come. */
+  reserved?: boolean;
   /** Runs as its options show, so they load only when wanted (an item's suggestions). */
   onOpen?: () => void;
 }
@@ -181,6 +183,12 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
         const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
         const describedBy = `${uid}-${id}`;
         if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
+        if (action.reserved)
+          return (
+            <Menu.Item key={id} disabled aria-hidden className={classes.reserved}>
+              &nbsp;
+            </Menu.Item>
+          );
         if (action.choice)
           return (
             <div key={id} className={classes.choice}>
