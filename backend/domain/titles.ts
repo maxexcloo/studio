@@ -23,6 +23,8 @@ export function createTitler(options: {
   idle(): boolean;
   allowed(ownerId: string): boolean;
   items(): Iterable<TitleItem>;
+  /** The title the item's owner already has for the same prompt, if any. */
+  titled(item: TitleItem): string | undefined;
   changes?(): number;
   visible(item: TitleItem): boolean;
   save(item: TitleItem, title: string): void;
@@ -39,9 +41,8 @@ export function createTitler(options: {
     wanted: (item) =>
       (item.type === "image" || item.type === "video") && !item.title && Boolean(item.prompt),
     async run(item, signal) {
-      for (const other of options.items())
-        if (other.title && other.prompt === item.prompt && other.ownerId === item.ownerId)
-          return options.save(item, other.title);
+      const title = options.titled(item);
+      if (title) return options.save(item, title);
       const reply = await writer!.title({ prompt: item.prompt!, signal });
       if (!signal.aborted) options.save(item, reply.title);
     },

@@ -101,6 +101,7 @@ import {
   deleteOwnedGalleryItems,
   eachGalleryItem,
   filterVisibleGallery,
+  findGalleryItem,
   forgetGalleryItems,
   galleryChangeCount,
   galleryItem,
@@ -1132,6 +1133,8 @@ const titler = createTitler({
   idle: galleryIdle,
   allowed: promptAssistantOwner,
   items: () => eachGalleryItem(),
+  titled: (item) =>
+    findGalleryItem({ ownerId: item.ownerId ?? "", prompt: item.prompt, titled: true })?.title,
   changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   save: (item, title) => updateGalleryJob(galleryKey(item), { title }),

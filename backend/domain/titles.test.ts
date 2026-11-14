@@ -38,6 +38,11 @@ function fixture(items: TitleItem[]) {
       state.walks += 1;
       return state.items;
     },
+    titled: (target) =>
+      state.items.find(
+        (other) =>
+          other.title && other.prompt === target.prompt && other.ownerId === target.ownerId,
+      )?.title,
     changes: () => state.changes,
     visible: () => true,
     save: (target, title) => {
