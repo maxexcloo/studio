@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 
 /**
  * Who is asking: this computer, or someone else. Every trust decision in the
@@ -10,10 +9,6 @@ import crypto from "node:crypto";
  * someone else, so any proxy header makes a request remote, whatever its
  * socket says. Single-user Studio answers only this computer; account mode
  * answers anyone with an account.
- *
- * The one proxy trusted to say who is behind it is Vite in `mise run dev`:
- * dev.mjs hands it and the server a random token, and Vite passes the
- * real client address along with it (see vite.config.ts).
  */
 
 /** Headers a proxy adds. Any one of them means the socket's address is not the client's. */
@@ -50,13 +45,6 @@ function hasProxyHeaders(headers = {}) {
   return proxyHeaders.some((name) => headers[name] !== undefined && headers[name] !== "");
 }
 
-function tokenMatches(given, expected) {
-  if (!given || !expected) return false;
-  const a = Buffer.from(String(given));
-  const b = Buffer.from(String(expected));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
 /** Whether a server on this host answers other devices, not only this computer. */
 export function listensBeyondThisComputer(host = "") {
   return !["127.0.0.1", "localhost", "::1", ""].includes(host);
@@ -68,13 +56,9 @@ export function listensBeyondThisComputer(host = "") {
  *   proxied       something between the client and this server added headers
  *   thisComputer  the browser runs on the machine Studio runs on
  */
-export function classifyClient(req, { devToken = "" } = {}) {
+export function classifyClient(req) {
   const headers = req?.headers || {};
-  let address = plainAddress(req?.socket?.remoteAddress || "");
-  // Vite in `mise run dev`, vouched for by the token dev.mjs made.
-  const viaDevProxy =
-    isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
-  if (viaDevProxy) address = plainAddress(headers["x-studio-dev-client"] || "");
+  const address = plainAddress(req?.socket?.remoteAddress || "");
   const proxied = hasProxyHeaders(headers);
   const thisComputer = !proxied && isLoopbackAddress(address);
   return { address: proxied ? `proxied:${address}` : address, proxied, thisComputer };

@@ -19,19 +19,8 @@ function precompress(): Plugin {
   };
 }
 
-// `mise run dev` (dev.mjs) hands Vite and the server one token, so the
-// server can tell a phone on the network from this computer even though every
-// proxied request reaches it from 127.0.0.1 (see backend/client-trust.js).
-const devProxyToken = process.env.STUDIO_DEV_PROXY_TOKEN || "";
 const api: ProxyOptions = {
   target: `http://127.0.0.1:${process.env.STUDIO_DEV_API_PORT || 8787}`,
-  configure(proxy) {
-    if (!devProxyToken) return;
-    proxy.on("proxyReq", (proxyReq, req) => {
-      proxyReq.setHeader("x-studio-dev-client", req.socket.remoteAddress || "");
-      proxyReq.setHeader("x-studio-dev-token", devProxyToken);
-    });
-  },
 };
 
 export default defineConfig({

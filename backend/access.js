@@ -5,9 +5,7 @@ import { accountSession } from "./account-store.js";
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false };
   if (!req.studioClient)
-    req.studioClient = classifyClient(req, {
-      devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "",
-    });
+    req.studioClient = classifyClient(req);
   return req.studioClient;
 }
 

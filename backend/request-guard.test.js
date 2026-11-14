@@ -165,33 +165,6 @@ test("another device is never this computer", () => {
   });
 });
 
-test("only the dev proxy with the right token may say who is behind it", () => {
-  const viaVite = (token, client = "192.168.1.40") =>
-    classifyClient(
-      {
-        socket: { remoteAddress: "127.0.0.1" },
-        headers: { "x-studio-dev-token": token, "x-studio-dev-client": client },
-      },
-      { devToken: "secret-token" },
-    );
-  assert.equal(viaVite("secret-token").thisComputer, false);
-  assert.equal(viaVite("secret-token").address, "192.168.1.40");
-  assert.equal(viaVite("secret-token", "127.0.0.1").thisComputer, true);
-  // A wrong token changes nothing: still just the socket.
-  assert.equal(viaVite("guess").address, "127.0.0.1");
-  // A token sent from elsewhere is not believed at all.
-  assert.equal(
-    classifyClient(
-      {
-        socket: { remoteAddress: "192.168.1.40" },
-        headers: { "x-studio-dev-token": "secret-token", "x-studio-dev-client": "127.0.0.1" },
-      },
-      { devToken: "secret-token" },
-    ).thisComputer,
-    false,
-  );
-});
-
 test("only the sign-in provider's top-level return navigation crosses sites, and capitals change nothing", () => {
   assert.ok(
     run(guard, {
