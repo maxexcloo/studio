@@ -8,7 +8,7 @@ import {
 import crypto from "node:crypto";
 import path from "node:path";
 import { comfyUrl } from "../comfy/comfy.js";
-// Every catalogue request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
+// Every catalogue request goes through Hugging Face access: token and mirror (hf-access.js).
 import { hfAccessNote, hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
 import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
 

@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
-import http from "node:http";
-import net from "node:net";
 import test from "node:test";
-import { hfFetch, hfTokenStatus, mirroredUrl, openTunnel, proxyFor } from "./hf-access.js";
+import { hfFetch, hfTokenStatus, mirroredUrl } from "./hf-access.js";
 
 const token = "hf_abcdefghijklmnopqrstuvwxyz1234";
 
@@ -49,60 +47,6 @@ test("a mirror takes the downloads, and does not get the token", async () => {
     },
   );
   assert.deepEqual(seen, [["hf-mirror.com", null]]);
-});
-
-test("proxy variables are honoured, NO_PROXY included", () => {
-  const env = {
-    HTTPS_PROXY: "http://user:pa%40ss@proxy.local:3128",
-    NO_PROXY: "localhost,.internal.corp,mirror.lan:8080",
-  };
-  assert.equal(proxyFor("https://huggingface.co/x", env)?.host, "proxy.local:3128");
-  assert.equal(proxyFor("https://a.internal.corp/x", env), null);
-  assert.equal(proxyFor("http://mirror.lan:8080/x", env), null);
-  assert.equal(
-    proxyFor("https://huggingface.co/x", { http_proxy: "proxy.lan:8080" })?.host,
-    "proxy.lan:8080",
-    "https falls back to HTTP_PROXY, scheme optional",
-  );
-  assert.equal(
-    proxyFor("https://huggingface.co/x", { HTTPS_PROXY: "http://p:1", NO_PROXY: "*" }),
-    null,
-  );
-  assert.equal(proxyFor("https://huggingface.co/x", {}), null);
-});
-
-test("a CONNECT tunnel carries bytes through the proxy, with its credentials", async () => {
-  const echo = net.createServer((socket) => socket.pipe(socket));
-  await new Promise((resolve) => echo.listen(0, "127.0.0.1", resolve));
-  let auth = "";
-  const proxy = http.createServer();
-  proxy.on("connect", (request, client) => {
-    auth = request.headers["proxy-authorization"] || "";
-    const [host, port] = request.url.split(":");
-    const upstream = net.connect(Number(port), host, () => {
-      client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-      upstream.pipe(client);
-      client.pipe(upstream);
-    });
-  });
-  await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
-  try {
-    const socket = await openTunnel(
-      new URL(`http://me:secret@127.0.0.1:${proxy.address().port}`),
-      "127.0.0.1",
-      echo.address().port,
-    );
-    const answer = await new Promise((resolve) => {
-      socket.once("data", (data) => resolve(String(data)));
-      socket.write("ping");
-    });
-    socket.destroy();
-    assert.equal(answer, "ping");
-    assert.equal(auth, `Basic ${Buffer.from("me:secret").toString("base64")}`);
-  } finally {
-    proxy.close();
-    echo.close();
-  }
 });
 
 test("the status says whether a token is set and where from, never the token", () => {
