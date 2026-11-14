@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Button, Group, Menu, SegmentedControl, Stack, Text } from "@mantine/core";
+import { Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { Bookmark, Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
@@ -14,11 +15,13 @@ import { generationInput } from "./payload";
 import {
   ChipPopup,
   PickerHeader,
-  SaveCurrent,
+  SaveButton,
   SavedList,
+  SavedName,
   SortMenu,
   savedSortLabels,
   savedItems,
+  useNaming,
   type SavedSort,
 } from "./Picker";
 import classes from "./Picker.module.css";
@@ -29,6 +32,8 @@ export interface Preset {
   savedAt?: string;
   /** The parts of the draft it holds, when only some; one saved without holds them all. */
   parts?: PresetPart[];
+  /** The model family its LoRAs were chosen for, which the LoRA picker lists it under. */
+  family?: string;
 }
 /** The parts of a draft a preset may hold, by their input fields; Model & Settings has the rest. */
 const presetParts = [
@@ -57,6 +62,14 @@ const presetInput = (input: GenerationInput, parts?: PresetPart[]) =>
   (parts
     ? Object.fromEntries(Object.entries(input).filter(([key]) => parts.includes(partOf(key))))
     : input) as GenerationInput;
+/** What a preset holds, by its parts' names, or those it leaves out when it holds most. */
+export const presetHolds = ({ parts }: Preset) => {
+  if (!parts) return "Everything";
+  const [held, left] = [true, false].map((holds) =>
+    presetParts.filter((part) => parts.includes(part.value) === holds).map((part) => part.label),
+  );
+  return left.length < held.length ? `All but ${left.join(" · ")}` : held.join(" · ");
+};
 /** Asks before a preset replaces the draft's parts it holds. */
 function replaceMessage(preset: Preset) {
   if (!preset.parts) return "Replace the current prompt and settings with this preset?";
@@ -66,26 +79,91 @@ function replaceMessage(preset: Preset) {
   const list = nouns.length > 1 ? `${nouns.slice(0, -1).join(", ")} and ${nouns.at(-1)}` : nouns[0];
   return `Replace the current ${list} with this preset? The rest stays as it is.`;
 }
+/** A value as JSON with its keys sorted, so equal drafts compare equal however they were built. */
+const stable = (value: unknown) =>
+  JSON.stringify(value, (_, item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+      : item,
+  );
+/** Whether the draft differs from the preset in any part the preset holds. */
+const presetEdited = (preset: Preset, input: GenerationInput) => {
+  const draft = presetInput(input, preset.parts) as Record<string, unknown>;
+  const saved = preset.input as Record<string, unknown>;
+  return Object.keys(saved).some((key) => stable(draft[key]) !== stable(saved[key]));
+};
 /** The preset an editor last loaded or saved. */
 export interface PresetSelection {
   presetId?: string;
   presetTitle?: string;
 }
 /** The account's saved presets, newest first. */
-const presetsQuery = queryOptions({
+export const presetsQuery = queryOptions({
   queryKey: ["user-presets"],
   queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
 });
 const json = (method: string, value: unknown) => ({ method, body: JSON.stringify(value) });
 const defaultParts: PresetPart[] = ["prompt", "negative", "settings", "size", "loras"];
 
+/** The account's presets, named for the shared pickers, and their edits. Deleting offers Undo. */
+export function usePresets(enabled = true) {
+  const client = useQueryClient();
+  const presets = useQuery({ ...presetsQuery, enabled });
+  const change = useMutation({
+    mutationFn: ({
+      id,
+      method,
+      value,
+    }: {
+      id?: string;
+      method: "POST" | "PATCH" | "DELETE";
+      value?: Partial<Preset>;
+      deleted?: Preset;
+    }) =>
+      api<{ preset?: Preset }>(
+        id ? `/api/user-presets/${encodeURIComponent(id)}` : "/api/user-presets",
+        json(method, value ?? {}),
+      ),
+    onSuccess: (_, { deleted }) => {
+      void client.invalidateQueries({ queryKey: presetsQuery.queryKey });
+      if (deleted)
+        notifications.show({
+          message: (
+            <Group justify="space-between">
+              <Text size="sm">Preset deleted</Text>
+              <Button
+                variant="subtle"
+                onClick={() => {
+                  const { id: _, savedAt: __, ...value } = deleted;
+                  change.mutate({ method: "POST", value });
+                }}
+              >
+                Undo
+              </Button>
+            </Group>
+          ),
+        });
+    },
+  });
+  return {
+    ...presets,
+    records: (presets.data?.presets || []).map((preset) => ({ ...preset, name: preset.title })),
+    save: (value: Omit<Preset, "id" | "savedAt">) =>
+      change.mutateAsync({ method: "POST", value }).then(({ preset }) => preset!),
+    rename: (preset: Preset, title: string) =>
+      change.mutateAsync({ id: preset.id, method: "PATCH", value: { title } }),
+    update: (preset: Preset, input: GenerationInput) =>
+      change.mutateAsync({ id: preset.id, method: "PATCH", value: { input } }),
+    remove: (preset: Preset) => change.mutate({ id: preset.id, method: "DELETE", deleted: preset }),
+  };
+}
+
 /**
- * The Presets chip and its popup for any generation editor, built on the same picker as LoRA
- * stacks: search, sort, load (asking before replacing a written prompt), rename, update and
- * delete, with Clear and Save Preset in its heading. Administrators also choose Inspiration, the
- * Library's imported images, which load their settings where the editor's profile fits them and
- * otherwise their prompt; they are edited in Library › Imports. `onLoad` replaces that editor's
- * input and preset selection, then the popup closes.
+ * The Presets chip and its popup for any generation editor: the preset's name, which loads, saves
+ * and renames presets, with what a new one saves in its menu; then the Library's imported images,
+ * which load their settings where the editor's profile fits them and otherwise their prompt (they
+ * are edited in Library › Imports). `onLoad` replaces that editor's input and preset selection,
+ * then the popup closes.
  */
 export function PresetPicker({
   input,
@@ -104,70 +182,25 @@ export function PresetPicker({
 }) {
   const [opened, setOpened] = useState(false);
   const phone = usePhone();
-  const client = useQueryClient();
-  const [source, setSource] = useState<"saved" | "inspiration">("saved");
-  const inspiring = source === "inspiration";
-  const presets = useQuery({ ...presetsQuery, enabled: opened && !inspiring });
-  const inspiration = useQuery({ ...inspirationQuery, enabled: opened && inspiring });
+  const presets = usePresets(opened);
+  const inspiration = useQuery({ ...inspirationQuery, enabled: opened });
+  const naming = useNaming();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SavedSort>("name-asc");
   const [parts, setParts] = useRemembered("preset-parts", defaultParts);
   // A preset of every part holds them all, as one saved before parts.
   const savedParts = parts.length < presetParts.length ? parts : undefined;
-  const refresh = () => void client.invalidateQueries({ queryKey: presetsQuery.queryKey });
   const current = () => generationInput(input, profile, references);
-  const change = useMutation({
-    mutationFn: ({
-      id,
-      method,
-      value,
-    }: {
-      id?: string;
-      method: "POST" | "PATCH" | "DELETE";
-      value?: Partial<Preset>;
-      deleted?: Preset;
-    }) =>
-      api<{ preset?: Preset }>(
-        id ? `/api/user-presets/${encodeURIComponent(id)}` : "/api/user-presets",
-        json(method, value ?? {}),
-      ),
-    onSuccess: ({ preset }, { method, deleted }) => {
-      refresh();
-      if (method === "POST" && preset)
-        onSelectionChange({ presetId: preset.id, presetTitle: preset.title });
-      if (deleted) {
-        if (deleted.id === selection.presetId)
-          onSelectionChange({ presetId: undefined, presetTitle: undefined });
-        notifications.show({
-          message: (
-            <Group justify="space-between">
-              <Text size="sm">Preset deleted</Text>
-              <Button
-                variant="subtle"
-                onClick={() =>
-                  change.mutate({
-                    method: "POST",
-                    value: { title: deleted.title, input: deleted.input, parts: deleted.parts },
-                  })
-                }
-              >
-                Undo
-              </Button>
-            </Group>
-          ),
-        });
-      }
-    },
-  });
-  // The list arrives newest first; saved items sort undated records by their place, oldest first.
-  const items = [...(presets.data?.presets || [])]
-    .reverse()
-    .map((preset) => ({ ...preset, name: preset.title }));
+  const records = presets.records.map((preset) => ({ ...preset, detail: presetHolds(preset) }));
+  const selected = records.find((preset) => preset.id === selection.presetId);
+  const edited = !!selected && presetEdited(selected, current());
+  const prompted = !!input.prompt.trim();
   const ideas = (inspiration.data?.presets || []).map((preset) => ({
     ...preset,
     detail: preset.prompt,
   }));
-  const error = (inspiring ? inspiration : presets).error;
+  const select = (preset?: Preset) =>
+    onSelectionChange({ presetId: preset?.id, presetTitle: preset?.title });
   return (
     <ChipPopup
       title="Presets"
@@ -183,39 +216,54 @@ export function PresetPicker({
           aria-expanded={opened}
           onClick={() => setOpened(!opened)}
         >
-          <Bookmark size={16} />
+          <icons.preset size={16} />
         </Button>
       }
       headerEnd={
-        <SaveCurrent
-          noun="Preset"
-          disabled={!input.prompt.trim()}
-          onSave={(title) =>
-            change.mutate({
-              method: "POST",
-              value: { title, input: presetInput(current(), savedParts), parts: savedParts },
-            })
-          }
-          options={
-            <Menu withinPortal={false} position="bottom-end" closeOnItemClick={false}>
-              <Menu.Target>
-                <Button
-                  size="compact-sm"
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Preset Parts"
-                  rightSection={<ChevronDown size={14} />}
-                >
-                  Parts
-                </Button>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Label>Save</Menu.Label>
+        <>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            aria-label="Clear Preset"
+            disabled={!selection.presetId}
+            onClick={() => select()}
+          >
+            Clear
+          </Button>
+          <SaveButton
+            noun="Preset"
+            naming={naming}
+            current={selected}
+            edited={edited}
+            disabled={!prompted || !presets.isSuccess}
+            onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
+          />
+        </>
+      }
+    >
+      <Stack gap="sm" flex={1} mih={0}>
+        {presets.isPending ? (
+          <LoadingState label="Loading Presets" />
+        ) : (
+          <SavedName
+            noun="Preset"
+            naming={naming}
+            records={records}
+            current={selected}
+            edited={edited}
+            canSave={prompted}
+            replaces={(preset) =>
+              prompted && (!selected || edited) ? replaceMessage(preset) : undefined
+            }
+            menu={
+              <>
+                <Menu.Label>New Presets Save</Menu.Label>
                 {presetParts.map(({ value, label }) => {
                   const checked = parts.includes(value);
                   return (
                     <Menu.Item
                       key={value}
+                      closeMenuOnClick={false}
                       aria-checked={checked}
                       // A preset holds at least one part.
                       disabled={checked && parts.length === 1}
@@ -234,101 +282,81 @@ export function PresetPicker({
                     </Menu.Item>
                   );
                 })}
-              </Menu.Dropdown>
-            </Menu>
-          }
-        >
-          <Button
-            size="compact-sm"
-            variant="subtle"
-            aria-label="Clear Preset"
-            disabled={!selection.presetId}
-            onClick={() => onSelectionChange({ presetId: undefined, presetTitle: undefined })}
-          >
-            Clear
-          </Button>
-        </SaveCurrent>
-      }
-    >
-      <Stack gap="sm" flex={1} mih={0}>
-        <SegmentedControl
-          aria-label="Preset Source"
-          size="xs"
-          fullWidth
-          data={[
-            { value: "saved", label: "Saved" },
-            { value: "inspiration", label: "Inspiration" },
-          ]}
-          value={source}
-          onChange={(value) => setSource(value as typeof source)}
-        />
+              </>
+            }
+            onLoad={(preset) => {
+              // A preset of some parts leaves the rest of the draft as it is.
+              onLoad(preset.parts ? { ...current(), ...preset.input } : preset.input, {
+                presetId: preset.id,
+                presetTitle: preset.title,
+              });
+              setOpened(false);
+            }}
+            onSave={(title) =>
+              presets
+                .save({
+                  title,
+                  input: presetInput(current(), savedParts),
+                  parts: savedParts,
+                  ...(profile?.family && (!savedParts || savedParts.includes("loras"))
+                    ? { family: profile.family }
+                    : {}),
+                })
+                .then(select)
+            }
+            onRename={(preset, title) =>
+              presets.rename(preset, title).then(() => select({ ...preset, title }))
+            }
+            onDelete={(preset) => {
+              presets.remove(preset);
+              select();
+            }}
+          />
+        )}
+        {presets.error && (
+          <Text c="red" size="sm">
+            {presets.error.message}
+          </Text>
+        )}
+        <Stack gap={4}>
+          <Text fw={500}>From Library</Text>
+          <Text size="xs" c="dimmed">
+            Images imported into the Library: start from their prompt and settings.
+          </Text>
+        </Stack>
         <PickerHeader
-          label="Presets"
+          label="From Library"
           query={query}
           onQueryChange={setQuery}
           actions={<SortMenu labels={savedSortLabels} value={sort} onChange={setSort} />}
         />
-        {error && (
+        {inspiration.error && (
           <Text c="red" size="sm">
-            {error.message}
+            {inspiration.error.message}
           </Text>
         )}
-        {/* Desktop keeps the list at one height, so switching source or loading never resizes the
-            popup; the phone sheet's body scrolls it, between its header and footer. */}
+        {/* Desktop keeps the list at one height, so loading never resizes the popup; the phone
+            sheet's body scrolls it, between its header and footer. */}
         <Stack
           gap={0}
-          h={phone ? undefined : "min(45dvh, 360px)"}
+          h={phone ? undefined : "min(35dvh, 280px)"}
           flex={phone ? 1 : undefined}
           mih={0}
           className={classes.list}
         >
-          {(inspiring ? inspiration : presets).isPending ? (
-            <LoadingState fill label={inspiring ? "Loading Inspiration" : "Loading Presets"} />
-          ) : inspiring ? (
+          {inspiration.isPending ? (
+            <LoadingState fill label="Loading Images" />
+          ) : (
             <SavedList
-              label="Inspiration"
-              noun="Inspiration"
+              label="From Library"
               items={savedItems(ideas, query, sort)}
-              empty={ideas.length ? "No Matches" : "No Inspiration"}
-              replaces={!!input.prompt.trim()}
-              replaceMessage="Replace the current prompt with this inspiration, and its settings where they fit?"
+              empty={ideas.length ? "No Matches" : "No Imported Images"}
+              replaces={prompted}
+              replaceMessage="Replace the current prompt with this image's, and its settings where they fit?"
               onLoad={(preset) => {
                 onLoad(inspirationInput(preset, input, profile), {});
                 setOpened(false);
               }}
-            />
-          ) : (
-            <SavedList
-              label="Saved Presets"
-              noun="Preset"
-              items={savedItems(items, query, sort)}
-              current={selection.presetId}
-              empty={items.length ? "No Matches" : "No Saved Presets"}
-              replaces={!!input.prompt.trim()}
-              replaceMessage={replaceMessage}
-              onLoad={(preset) => {
-                // A preset of some parts leaves the rest of the draft as it is.
-                onLoad(preset.parts ? { ...current(), ...preset.input } : preset.input, {
-                  presetId: preset.id,
-                  presetTitle: preset.title,
-                });
-                setOpened(false);
-              }}
-              onRename={(preset, title) => {
-                change.mutate({ id: preset.id, method: "PATCH", value: { title } });
-                if (preset.id === selection.presetId)
-                  onSelectionChange({ presetId: preset.id, presetTitle: title });
-              }}
-              onUpdate={(preset) =>
-                change.mutate({
-                  id: preset.id,
-                  method: "PATCH",
-                  value: { input: presetInput(current(), preset.parts) },
-                })
-              }
-              onDelete={(preset) =>
-                change.mutate({ id: preset.id, method: "DELETE", deleted: preset })
-              }
             />
           )}
         </Stack>

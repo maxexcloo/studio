@@ -6,6 +6,7 @@ import {
   Chip,
   Group,
   ScrollArea,
+  Select,
   Stack,
   Switch,
   Text,
@@ -16,7 +17,8 @@ import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
+import { loraLibraryQuery, type LoraLibrary, type LoraRating } from "./loraLibrary";
+import { usePresets, type Preset } from "./PresetPicker";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -36,12 +38,10 @@ import {
   PickerHeader,
   PickerTile,
   PopupHeading,
-  SaveCurrent,
-  SavedList,
+  SaveButton,
+  SavedName,
   SortMenu,
-  savedItems,
-  savedSortLabels,
-  type SavedSort,
+  useNaming,
 } from "./Picker";
 import classes from "./LoraPicker.module.css";
 export interface LoraInfo {
@@ -71,16 +71,11 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/**
- * Which LoRAs the picker lists, narrowest first: Recommended match the profile's family (the
- * default), Starred are this family's thumbs up and All lists every one it can load. Saved stacks sit with
- * the stack they replace, not among these.
- */
+/** Which LoRAs the picker lists: every one the profile can load, or the thumbs up among them. */
 const loraTabs = [
-  { value: "recommended", label: "Recommended" },
+  { value: "all", label: "All" },
   // The stored tab value keeps its earlier name.
   { value: "favourites", label: "Starred" },
-  { value: "all", label: "All" },
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
@@ -113,24 +108,28 @@ const byRating =
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
-  const [filter, setFilter] = useState("all");
+  // The family the list shows; null shows the profile's.
+  const [family, setFamily] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "recommended");
-  const [sort, setSort] = useState<SavedSort>("name-asc");
+  const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "all");
   const [loraSort, setLoraSort] = useState<LoraSort>("rating");
+  // The preset the stack was loaded from or saved as, and its name field's state.
+  const [presetId, setPresetId] = useState<string>();
+  const naming = useNaming();
   return {
     opened,
     setOpened,
-    filter,
-    setFilter,
+    family,
+    setFamily,
     query,
     setQuery,
     tab,
     setTab,
-    sort,
-    setSort,
     loraSort,
     setLoraSort,
+    presetId,
+    setPresetId,
+    naming,
   };
 }
 export type LoraPickerState = ReturnType<typeof useLoraPicker>;
@@ -191,7 +190,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
           if (!opened) setAdding(false);
         }}
         target={trigger}
-        headerEnd={<StackActions value={value} onChange={onChange} />}
+        headerEnd={<StackActions value={value} onChange={onChange} picker={picker} />}
         footer={{
           apply: true,
           start: (
@@ -312,34 +311,33 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
   };
 }
 
-/** The LoRAs to choose from: tabs, search, sort and filter over the list. */
+/** The LoRAs to choose from: tabs, search, family and sort over the list. */
 function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
-  const { input, profile, update, info, metadata, title, compatible } = useLoraDraft({
+  const { input, profile, update, info, metadata, title } = useLoraDraft({
     value,
     onChange,
   });
   const library = useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
-  const family = profile?.family || "";
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
   const available = profile?.options?.loras || [];
   const ratings = library.data?.library.ratings || {};
-  // A tab remembered from before Stacks left the tabs shows Recommended.
-  const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "recommended";
+  // A tab remembered from before shows All.
+  const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "all";
   const listed =
-    tab === "recommended"
-      ? available.filter((file) => fitsFamily(familiesOf(file), family))
-      : tab === "favourites"
-        ? compatible.filter((file) => ratings[file] === "up")
-        : compatible;
-  const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
-  const filter = types.includes(picker.filter) ? picker.filter : "all";
+    tab === "favourites" ? available.filter((file) => ratings[file] === "up") : available;
+  const families = [...new Set(listed.flatMap(familiesOf).map(loraFamilyId))].sort((a, b) =>
+    modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)),
+  );
+  // The profile's family until another is chosen; All Families when no LoRA lists it.
+  const ownFamily = loraFamilyId(profile?.family || "");
+  const family = picker.family ?? (families.includes(ownFamily) ? ownFamily : "all");
   const terms = picker.query.trim().toLowerCase();
   const shown = listed
     .filter(
       (file) =>
-        (filter === "all" || typeOf(file) === filter) &&
+        (family === "all" || fitsFamily(familiesOf(file), family)) &&
         (!terms ||
           [title(file), file, ...(metadata[file]?.triggers || [])]
             .join(" ")
@@ -367,13 +365,11 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
           ],
     );
   const empty =
-    terms || filter !== "all"
+    terms || family !== "all"
       ? "No Matches"
-      : tab === "recommended"
-        ? "No Recommended LoRAs"
-        : tab === "favourites"
-          ? "No Starred LoRAs"
-          : "No LoRAs";
+      : tab === "favourites"
+        ? "No Starred LoRAs"
+        : "No LoRAs";
   // Loading and empty states take the scroll pane's place, centred in its space.
   const state = info.isPending ? (
     <LoadingState fill label="Loading LoRAs" />
@@ -420,24 +416,24 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
       query={picker.query}
       onQueryChange={picker.setQuery}
       actions={
-        <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
-      }
-      filterCount={filter === "all" ? 0 : 1}
-      onClearFilters={() => picker.setFilter("all")}
-      filters={
-        types.length > 0 && (
-          <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
-            <Group gap={6} role="radiogroup" aria-label="LoRA Filter">
-              {[["all", "Any"], ...types.map((value) => [value, typeNames[value] || value])].map(
-                ([value, label]) => (
-                  <Chip key={value} value={value} variant="light">
-                    {label}
-                  </Chip>
-                ),
-              )}
-            </Group>
-          </Chip.Group>
-        )
+        <>
+          <Select
+            aria-label="Family"
+            size="sm"
+            radius="xl"
+            w="10rem"
+            data={[
+              { value: "all", label: "All Families" },
+              ...families.map((value) => ({ value, label: modelFamilyLabel(value) })),
+            ]}
+            value={family}
+            onChange={(value) => value && picker.setFamily(value)}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: false }}
+            data-mantine-stop-propagation
+          />
+          <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
+        </>
       }
     />
   );
@@ -455,16 +451,51 @@ function LoraChoices({ value, onChange, picker }: LoraPickerProps) {
   );
 }
 
-/** The stack's Clear and Save Stack: beside its heading, or in the phone sheet's footer. */
-function StackActions({ value, onChange }: Omit<LoraPickerProps, "picker">) {
-  const { input, profile, update } = useLoraDraft({ value, onChange });
-  const stacks = useLoraStacks(profile?.family || "");
+/** A LoRA as the server stores it, so a draft and a saved preset compare equal. */
+const storedLora = (lora: Lora) => ({
+  name: lora.name,
+  enabled: lora.enabled !== false,
+  strength: Number(lora.strength),
+  triggers: Array.isArray(lora.triggers) ? lora.triggers : lora.triggers !== false,
+});
+const sameLoras = (a: Lora[], b: Lora[]) =>
+  JSON.stringify(a.map(storedLora)) === JSON.stringify(b.map(storedLora));
+const loraCount = (count: number) => `${count} ${count === 1 ? "LoRA" : "LoRAs"}`;
+
+/**
+ * The draft with the presets holding LoRAs for its family: `current` is the preset whose LoRAs it
+ * matches, else the one it last loaded or saved, which it now differs from (`edited`).
+ */
+function useStackDraft({ value, onChange, picker }: LoraPickerProps) {
+  const context = useGeneration();
+  const draft = useLoraDraft({ value, onChange });
+  const presets = usePresets();
+  const family = draft.profile?.family || "";
+  const familyOf = (preset: Preset) =>
+    preset.family ??
+    context.profiles.find((profile) => isProfile(profile, preset.input.profileId))?.family;
+  const records = presets.records
+    .filter((preset) => preset.input.loras?.length && familyOf(preset) === family)
+    .map((preset) => ({ ...preset, detail: loraCount(preset.input.loras.length) }));
+  const loras = draft.input.loras;
+  const loaded = records.find((preset) => preset.id === picker.presetId);
+  const matched = !loras.length
+    ? undefined
+    : loaded && sameLoras(loaded.input.loras, loras)
+      ? loaded
+      : records.find((preset) => sameLoras(preset.input.loras, loras));
+  const current = matched || (loras.length ? loaded : undefined);
+  return { ...draft, presets, records, family, current, edited: !!current && !matched };
+}
+
+/**
+ * The stack's Clear and Save Preset: beside its heading, or in the phone sheet's footer. Save
+ * Preset updates the current preset's LoRAs, or names a new preset of only LoRAs.
+ */
+function StackActions(props: LoraPickerProps) {
+  const { input, update, presets, current, edited } = useStackDraft(props);
   return (
-    <SaveCurrent
-      noun="Stack"
-      disabled={!input.loras.length || !stacks.ready}
-      onSave={(name) => stacks.save(name, input.loras)}
-    >
+    <>
       <Button
         size="compact-sm"
         variant="subtle"
@@ -474,18 +505,61 @@ function StackActions({ value, onChange }: Omit<LoraPickerProps, "picker">) {
       >
         Clear
       </Button>
-    </SaveCurrent>
+      <SaveButton
+        noun="Preset"
+        naming={props.picker.naming}
+        current={current}
+        edited={edited}
+        disabled={!input.loras.length || !presets.isSuccess}
+        onUpdate={(preset) => presets.update(preset, { ...preset.input, loras: input.loras })}
+      />
+    </>
   );
 }
 
-/** The chosen LoRAs in order under their heading, then saved stacks. */
-function LoraStack({ value, onChange, picker }: LoraPickerProps) {
+/** The stack's preset: its name, the presets with LoRAs for this family, and their edits. */
+function StackPreset(props: LoraPickerProps) {
+  const { picker } = props;
+  const { input, update, presets, records, family, current, edited } = useStackDraft(props);
+  const load = (preset: Preset) => {
+    picker.setPresetId(preset.id);
+    update(preset.input.loras.map((lora) => ({ ...lora })));
+  };
+  return (
+    <SavedName
+      noun="Preset"
+      naming={picker.naming}
+      records={records}
+      current={current}
+      edited={edited}
+      canSave={input.loras.length > 0}
+      // Only LoRAs no preset holds are lost by loading another, so only those ask first.
+      replaces={(preset) =>
+        input.loras.length && (!current || edited)
+          ? `Replace the current LoRAs with “${preset.title}”?`
+          : undefined
+      }
+      onLoad={load}
+      onSave={(title) =>
+        presets
+          .save({
+            title,
+            input: { loras: input.loras } as GenerationInput,
+            parts: ["loras"],
+            family,
+          })
+          .then((preset) => picker.setPresetId(preset.id))
+      }
+      onRename={presets.rename}
+      onDelete={presets.remove}
+    />
+  );
+}
+
+/** The stack's name, then the chosen LoRAs in order under their heading. */
+function LoraStack(props: LoraPickerProps) {
   const phone = usePhone();
-  const { input, profile, update, metadata, title, compatible } = useLoraDraft({
-    value,
-    onChange,
-  });
-  const stacks = useLoraStacks(profile?.family || "");
+  const { input, profile, update, metadata, title, compatible, records } = useStackDraft(props);
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   return (
     <>
@@ -498,11 +572,12 @@ function LoraStack({ value, onChange, picker }: LoraPickerProps) {
             </Text>
           )
         }
-        actions={!phone && <StackActions value={value} onChange={onChange} />}
+        actions={!phone && <StackActions {...props} />}
       />
-      {/* With nothing chosen or saved, the empty state centres in the pane. */}
-      {!input.loras.length && !stacks.records.length ? (
-        <EmptyState fill>Choose LoRAs or a saved stack.</EmptyState>
+      {(!!input.loras.length || !!records.length) && <StackPreset {...props} />}
+      {/* With nothing chosen, the empty state centres in the pane. */}
+      {!input.loras.length ? (
+        <EmptyState fill>Choose LoRAs or a preset.</EmptyState>
       ) : (
         <ScrollArea className={classes.stack}>
           <Stack gap="xs">
@@ -512,61 +587,30 @@ function LoraStack({ value, onChange, picker }: LoraPickerProps) {
                 extras.
               </Text>
             )}
-            {input.loras.length ? (
-              <OrderedItems
-                kind="loras"
-                items={input.loras}
-                identity={(lora) => lora.name}
-                label={(lora) => title(lora.name)}
-                onChange={update}
-              >
-                {(lora) => (
-                  <StackEntry
-                    lora={lora}
-                    title={title(lora.name)}
-                    info={metadata[lora.name]}
-                    compatible={compatible.includes(lora.name)}
-                    onChange={(patch) =>
-                      update(
-                        input.loras.map((item) =>
-                          item.name === lora.name ? { ...item, ...patch } : item,
-                        ),
-                      )
-                    }
-                    onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
-                  />
-                )}
-              </OrderedItems>
-            ) : (
-              <EmptyState fill>Choose LoRAs or a saved stack.</EmptyState>
-            )}
-            {!!stacks.records.length && (
-              <>
-                <Group justify="space-between" gap="xs" mt="xs">
-                  <Text size="sm" fw={600}>
-                    Saved Stacks
-                  </Text>
-                  <SortMenu
-                    label="Sort Stacks"
-                    labels={savedSortLabels}
-                    value={picker.sort}
-                    onChange={picker.setSort}
-                  />
-                </Group>
-                <SavedList
-                  label="Saved LoRA Stacks"
-                  noun="Stack"
-                  items={savedItems(stacks.records, "", picker.sort)}
-                  empty="No Saved Stacks"
-                  replaces={input.loras.length > 0}
-                  replaceMessage="Replace the current LoRAs with this stack?"
-                  onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
-                  onRename={stacks.rename}
-                  onUpdate={(record) => stacks.update(record, input.loras)}
-                  onDelete={stacks.remove}
+            <OrderedItems
+              kind="loras"
+              items={input.loras}
+              identity={(lora) => lora.name}
+              label={(lora) => title(lora.name)}
+              onChange={update}
+            >
+              {(lora) => (
+                <StackEntry
+                  lora={lora}
+                  title={title(lora.name)}
+                  info={metadata[lora.name]}
+                  compatible={compatible.includes(lora.name)}
+                  onChange={(patch) =>
+                    update(
+                      input.loras.map((item) =>
+                        item.name === lora.name ? { ...item, ...patch } : item,
+                      ),
+                    )
+                  }
+                  onRemove={() => update(input.loras.filter((item) => item.name !== lora.name))}
                 />
-              </>
-            )}
+              )}
+            </OrderedItems>
           </Stack>
         </ScrollArea>
       )}

@@ -3,6 +3,7 @@ import {
   ownerDocumentName,
   ownerDocuments,
   readRuntimeDocument,
+  runtimeDatabase,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { cleanTriggers } from "./catalogue.js";
@@ -12,7 +13,6 @@ const stacksDocument = (ownerId = "") => ownerDocumentName("lora-stacks", ownerI
 
 // Generous caps: enough for anyone, small enough that a bad client cannot bloat the document.
 const maxLorasPerStack = 8;
-const maxStacksPerFamily = 200;
 const maxOpsPerRequest = 500;
 
 function readState(ownerId = "") {
@@ -59,41 +59,9 @@ function cleanNames(value, limit = 500) {
     : [];
 }
 
-function cleanSnapshot(value) {
-  const id = String(value?.id || "")
-    .trim()
-    .slice(0, 100);
-  if (!id) return null;
-  return {
-    id,
-    name:
-      String(value?.name || "")
-        .trim()
-        .slice(0, 120) || "Untitled stack",
-    loras: cleanStack(value?.loras),
-    // When it was saved, for sorting by date; stacks saved before this have none.
-    ...(Number.isFinite(Date.parse(value?.savedAt))
-      ? { savedAt: new Date(value.savedAt).toISOString() }
-      : {}),
-  };
-}
-
-/** Families and workflows left with no stacks or strengths drop out, so emptied ones clear themselves. */
+/** Workflows left with no strengths drop out, so emptied ones clear themselves. */
 const withoutEmpty = (entries) =>
   Object.fromEntries(entries.filter(([, value]) => Object.keys(value).length));
-
-function cleanSnapshots(value) {
-  const source = value && typeof value === "object" ? value : {};
-  return withoutEmpty(
-    Object.entries(source).map(([key, list]) => {
-      const seen = new Set();
-      const stacks = (Array.isArray(list) ? list : [])
-        .map(cleanSnapshot)
-        .filter((stack) => stack && !seen.has(stack.id) && seen.add(stack.id));
-      return [String(key).slice(0, 200), stacks.slice(0, maxStacksPerFamily)];
-    }),
-  );
-}
 
 function cleanStrengths(value) {
   const source = value && typeof value === "object" ? value : {};
@@ -123,8 +91,6 @@ function cleanLibrary(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     strengths: cleanStrengths(source.strengths),
-    // Stacks are keyed by model family ("family:zimage").
-    snapshots: cleanSnapshots(source.snapshots),
     ratings: cleanRatings(source.ratings),
     recents: cleanNames(source.recents, 12),
   };
@@ -150,18 +116,12 @@ export function loadLoraLibrary(ownerId = "") {
 }
 
 /**
- * Folds another copy of the library into this one without losing anything:
- * stacks are matched by id, new ones added; recents are joined; ratings and
- * strengths fill in only what is not set yet. Used for the whole-library PUT
- * that older builds (and a device's first sync) send, so it can never wipe
- * stacks saved from another device.
+ * Folds another copy of the library into this one without losing anything: recents are joined;
+ * ratings and strengths fill in only what is not set yet. Used for the whole-library PUT a
+ * device's first sync sends.
  */
 function mergeLibrary(into, incoming) {
   const other = cleanLibrary(incoming);
-  for (const [key, stacks] of Object.entries(other.snapshots)) {
-    const list = into.snapshots[key] || (into.snapshots[key] = []);
-    for (const stack of stacks) if (!list.some((item) => item.id === stack.id)) list.push(stack);
-  }
   into.ratings = { ...other.ratings, ...into.ratings };
   into.recents = [...new Set([...into.recents, ...other.recents])].slice(0, 12);
   for (const [workflow, entries] of Object.entries(other.strengths)) {
@@ -169,39 +129,9 @@ function mergeLibrary(into, incoming) {
   }
 }
 
-/**
- * One edit, applied to whatever the server holds right now. Each is safe to
- * replay: a retried "add" does not duplicate, a retried "delete" is a no-op,
- * and ratings are set rather than toggled.
- */
+/** One edit, applied to whatever the server holds right now. Each is safe to replay: ratings are set rather than toggled. */
 function applyOp(state, library, op) {
-  const key = String(op?.key || "");
-  const list = () => library.snapshots[key] || (library.snapshots[key] = []);
   switch (op?.op) {
-    case "stack.add": {
-      const stack = cleanSnapshot(op.stack);
-      if (stack && key && !list().some((item) => item.id === stack.id)) list().push(stack);
-      break;
-    }
-    case "stack.update":
-      if (key)
-        library.snapshots[key] = list().map((item) =>
-          item.id === op.id ? { ...item, loras: cleanStack(op.loras) } : item,
-        );
-      break;
-    case "stack.rename": {
-      const name = String(op.name || "")
-        .trim()
-        .slice(0, 120);
-      if (key && name)
-        library.snapshots[key] = list().map((item) =>
-          item.id === op.id ? { ...item, name } : item,
-        );
-      break;
-    }
-    case "stack.delete":
-      if (key) library.snapshots[key] = list().filter((item) => item.id !== op.id);
-      break;
     case "strengths": {
       const workflow = String(op.workflowId || "");
       if (workflow)
@@ -245,9 +175,10 @@ export function applyLoraOps(ops, ownerId = "") {
   const state = readState(ownerId);
   const library = cleanLibrary(state.library);
   for (const op of ops.slice(0, maxOpsPerRequest)) applyOp(state, library, op);
-  state.library = cleanLibrary(library);
+  // Keeps what this build no longer reads, such as saved stacks the stackPresets step has yet to move.
+  state.library = { ...state.library, ...cleanLibrary(library) };
   writeState(state, ownerId);
-  return state.library;
+  return cleanLibrary(state.library);
 }
 
 /** Whole-library saves merge rather than replace, so a stale device cannot erase another's stacks. */
@@ -255,19 +186,18 @@ export function saveLoraLibrary(library, ownerId = "") {
   return applyLoraOps([{ op: "merge", library }], ownerId);
 }
 
-/** Forgets every saved stack and the strength/snapshot library (used by "Reset all settings"). */
+/** Forgets the active stacks and the library (used by "Reset all settings"). */
 export function clearLoraState(ownerId = "") {
   writeState({ stacks: {}, library: null }, ownerId);
 }
 
 /**
- * Takes a removed LoRA file out of every account's stacks, saved stacks, strengths, ratings and
- * recents (library/routes.js, Remove). Returns how many accounts' stacks changed.
+ * Takes a removed LoRA file out of every account's stacks, strengths, ratings and recents, and out
+ * of every saved preset (library/routes.js, Remove).
  */
 export function forgetLora(name, directory = dataDir) {
   const without = (list) =>
     Array.isArray(list) ? list.filter((item) => item?.name !== name) : list;
-  let changed = 0;
   for (const document of ownerDocuments(directory, "lora-stacks")) {
     const before = JSON.stringify(document.value);
     const state = JSON.parse(before);
@@ -276,18 +206,21 @@ export function forgetLora(name, directory = dataDir) {
       if (Array.isArray(stacks[key])) stacks[key] = without(stacks[key]);
     const library = state?.library;
     if (library && typeof library === "object") {
-      for (const list of Object.values(library.snapshots || {}))
-        for (const snapshot of Array.isArray(list) ? list : [])
-          snapshot.loras = without(snapshot.loras);
       for (const entries of Object.values(library.strengths || {}))
         if (entries) delete entries[name];
       if (library.ratings) delete library.ratings[name];
       if (Array.isArray(library.recents))
         library.recents = library.recents.filter((item) => item !== name);
     }
-    if (JSON.stringify(state) === before) continue;
-    writeRuntimeDocument(directory, document.name, state);
-    changed++;
+    if (JSON.stringify(state) !== before) writeRuntimeDocument(directory, document.name, state);
   }
-  return changed;
+  const db = runtimeDatabase(directory);
+  if (!db.prepare("SELECT 1 FROM sqlite_schema WHERE name = 'studio_user_presets'").get()) return;
+  const update = db.prepare("UPDATE studio_user_presets SET record = ? WHERE id = ?");
+  for (const row of db.prepare("SELECT id, record FROM studio_user_presets").all()) {
+    const preset = JSON.parse(row.record);
+    if (!preset.input?.loras?.some((item) => item?.name === name)) continue;
+    preset.input.loras = without(preset.input.loras);
+    update.run(JSON.stringify(preset), row.id);
+  }
 }

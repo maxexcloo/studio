@@ -122,10 +122,11 @@ the primary component reference and verify APIs against the installed version.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen
   sheets on phones where the content needs the room; compact choices may use a
   fitted popover. On desktop its heading (`PopupHeading`) holds the title, then
-  its actions at the end: every popup's Clear and Save, such as Save Stack or
-  Save Preset, as compact subtle buttons with Clear first; naming what Save
-  keeps (`SaveCurrent`) turns the whole row into its field, any options, Save
-  and Cancel. A side column, such as the LoRA stack, has its own heading with
+  its actions at the end: every popup's Clear and Save, such as Save Preset,
+  as compact subtle buttons with Clear first. A saved record's name is one
+  combobox (`SavedName`): it loads, searches, and names the draft to save as
+  new or rename, marks Edited, shows Saved for a moment, keeps names unique and
+  enables Save only for a change. A side column, such as the LoRA stack, has its own heading with
   its actions; desktop shows it beside the content, divided to the top, and
   phones under it. On phones, overlays keep their actions at the bottom and
   always in sight: a sheet's header holds only the title and Close, and its
@@ -181,8 +182,9 @@ the primary component reference and verify APIs against the installed version.
   several roles work. Group compatible linked slots by their declared capacity
   rather than a global reference limit.
 - Selected LoRAs retain enable, strength and pointer/keyboard ordering controls
-  when filters hide them. Saved stacks preserve family keys, order, strengths
-  and disabled entries. Trigger words are applied when submitting, without
+  when filters hide them. Presets hold any parts of a draft; the LoRA stack
+  lists and saves this family's presets with LoRAs, applying only their LoRAs,
+  and preserves their family, order, strengths and disabled entries. Trigger words are applied when submitting, without
   altering the typed prompt; reuse restores the typed prompt and Details
   shows what ran.
 - Preserve actual model/provider metadata. Studio routes work to a worker
@@ -200,7 +202,7 @@ the primary component reference and verify APIs against the installed version.
   notification on queuing. Text is the account's text model picker for
   prompt writing, the only one; its aliases route themselves, so it has no
   fallback or notice. Studio's own calls keep their automatic route.
-- Replacing a draft with a preset or stack asks first. Assistant proposals
+- Replacing unsaved work with a preset asks first. Assistant proposals
   replace text in place with a label and Undo, leaving a review pause before
   the proposed action runs, unless the viewer's Review Prompt is off. Suggestions never move layout or act on their own.
   Ideas for an empty prompt are one Suggestions ▾ chip in the

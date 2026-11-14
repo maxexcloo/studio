@@ -1,5 +1,6 @@
 import {
   Blend,
+  Bookmark,
   ChevronLeft,
   ChevronRight,
   CirclePause,
@@ -111,6 +112,8 @@ export const icons = {
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
+  /** A saved preset: the Presets chip and Library › Presets. */
+  preset: Bookmark,
   /** Seeing a choice full screen before choosing it. */
   preview: Maximize2,
   /** Moving to the previous item, as `next`. */

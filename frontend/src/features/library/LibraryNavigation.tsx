@@ -53,6 +53,13 @@ export const librarySections = {
     admin: true,
     group: "Prompting",
   },
+  presets: {
+    label: "Presets",
+    description:
+      "Your saved presets: a prompt, model, settings or LoRAs to start from, or any mix of them.",
+    icon: icons.preset,
+    group: "Prompting",
+  },
   profiles: {
     label: "Profiles",
     description: "Generation profiles and their workflows. Every saved version is kept.",
@@ -84,14 +91,14 @@ export const librarySections = {
     group: "Add Models",
   },
 };
-/** Administrators see the whole Library; other accounts only their Characters, Outfits and Scenes. */
+/** Administrators see the whole Library; other accounts only their cards and Presets. */
 export function useLibraryNavigation() {
   const admin = useIsAdmin();
   const { characters } = useLibraryAccess();
   return {
     admin,
     options: visibleSections(librarySections, admin, (key) =>
-      ["characters", "outfits", "scenes"].includes(key) ? characters : admin,
+      ["characters", "outfits", "scenes"].includes(key) ? characters : key === "presets" || admin,
     ),
   };
 }

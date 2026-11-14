@@ -372,7 +372,7 @@ export function registerLibraryRoutes(
     /** The LoRA files a gallery run used in the last 90 days. */
     recentLoras = () => new Set(),
     removeFile = removeInstalled,
-    /** Takes a removed LoRA out of every account's stacks, strengths, ratings and recents (lora/stacks.js). */
+    /** Takes a removed LoRA out of every account's stacks, strengths, ratings, recents and presets (lora/stacks.js). */
     forget = forgetLora,
     pictures = importPictures({ recorded: (id) => Boolean(store.get(id)) }),
     schedule = true,
@@ -691,7 +691,7 @@ export function registerLibraryRoutes(
     return ok({ key, entry: catalogue().undo(key, { by: by(account) }) });
   });
   // Removes an entry and its installed file, unless a profile still uses it; a LoRA leaves every
-  // account's stacks, strengths, ratings and recents first.
+  // account's stacks, strengths, ratings, recents and presets first.
   route("POST", "/api/library/catalogue/remove", async (account, { body }) => {
     const key = String(body?.key || "");
     const entry = catalogue().entry(key);

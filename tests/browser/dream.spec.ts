@@ -69,6 +69,11 @@ test("While You Were Away ranks each project's results, folds its misses and jud
   await beach.getByRole("button", { name: "View Dream prompt shore" }).click();
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByRole("button", { name: "Generation Details" })).toBeFocused();
+  // In the item bar's order, every action named, the verdicts together at the end.
+  if (!isMobile)
+    await expect(
+      viewer.getByRole("group", { name: "Dream Actions" }).getByRole("button"),
+    ).toHaveText(["Animate", "Edit", "More Like This", "Variations", "Pass", "Super Like", "Like"]);
   await dreamAction(page, isMobile, "More Like This");
   await expect(viewer.getByRole("img", { name: "Dream prompt loose" })).toBeVisible();
   await viewer

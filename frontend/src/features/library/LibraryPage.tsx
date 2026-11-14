@@ -12,6 +12,7 @@ import {
   type LibraryItem,
 } from "./LibraryCatalogueTable";
 import { useStageComparison } from "../compare/variants";
+import { LibraryPresets } from "./LibraryPresets";
 import { LibraryUnused } from "./LibraryUnused";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
@@ -137,6 +138,7 @@ export function LibraryPage() {
           guides: (heading) => <GuideDefinitions heading={heading} />,
           loras: catalogueSection("loras"),
           models: catalogueSection("models"),
+          presets: (heading) => <LibraryPresets heading={heading} />,
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
           promptStyles: (heading) => <PromptStyles heading={heading} />,
           unused: (heading) => <LibraryUnused heading={heading} />,

@@ -5,12 +5,13 @@ import {
   create,
   expandComposer,
   fixtures,
-  loadSaved,
+  loadFromLibrary,
   openNav,
   openLoraChoices,
   openPresets,
   profiles,
   section,
+  stamp,
   toolbarSearch,
 } from "./fixtures";
 
@@ -20,7 +21,7 @@ test("The Library groups its sections under headings and opens on Models", async
   const groups = {
     "Your Cards": ["Characters", "Outfits", "Scenes"],
     "Models & LoRAs": ["Models", "LoRAs", "Unused"],
-    Prompting: ["Guides", "Profiles", "Prompt Styles"],
+    Prompting: ["Guides", "Presets", "Profiles", "Prompt Styles"],
     "Add Models": ["Imports", "Downloads"],
   };
   const order = Object.values(groups).flat();
@@ -309,10 +310,13 @@ test("Update All applies every free update in one request", async ({ page }) => 
       json: {
         items: [
           item("Style", { latest: { name: "Style 2", downloadable: true } }),
-          item("Detail", {
-            latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
-            freeAlternative: { name: "Detail 2", downloadable: true },
-          }),
+          {
+            ...item("Detail", {
+              latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
+              freeAlternative: { name: "Detail 2", downloadable: true },
+            }),
+            families: ["sdxl"],
+          },
         ],
       },
     }),
@@ -327,6 +331,18 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await openNav(page, "Library");
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
+  // LoRAs filter by family alone, from one dropdown beside the search.
+  await expect(loras.getByRole("button", { name: "Filter LoRAs", exact: true })).toHaveCount(0);
+  const family = loras.getByRole("combobox", { name: "Family", exact: true });
+  await expect(family).toHaveValue("All Families");
+  await family.click();
+  await page.getByRole("option", { name: "SDXL", exact: true }).click();
+  const table = loras.getByRole("table", { name: "Library LoRAs", exact: true });
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("Detail");
+  await family.click();
+  await page.getByRole("option", { name: "All Families", exact: true }).click();
+  await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Update All", exact: true }).click();
   await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
   await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();
@@ -554,18 +570,13 @@ test("Library shows import grades, and the Presets chip loads inspiration settin
   await openLoraChoices(page);
   await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await closeLoras(page);
-  // An inspiration whose LoRA is missing gives only its prompt.
+  // An imported image whose LoRA is missing gives only its prompt.
   await openPresets(page);
-  await page
-    .getByRole("radiogroup", { name: "Preset Source", exact: true })
-    .getByText("Inspiration", { exact: true })
-    .click();
-  await loadSaved(page, "Inspiration", "Missing Style Study");
+  await loadFromLibrary(page, "Missing Style Study");
   await expect(prompt).toHaveValue("A missing style study");
-  // The picker keeps its source while it is closed.
   await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
   await openPresets(page);
-  await loadSaved(page, "Inspiration", "Amber Study");
+  await loadFromLibrary(page, "Amber Study");
   await expect(prompt).toHaveValue("Amber bird study");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -612,4 +623,53 @@ test("Unused lists idle models and LoRAs by size and removes one through the cat
   await expect(confirm).toBeHidden();
   await expect(table.getByRole("row", { name: "Idle Style", exact: true })).toHaveCount(0);
   expect(removed).toEqual([{ key: "loras/idle.safetensors" }]);
+});
+
+test("Library › Presets lists what each preset holds, renames with unique names, edits in the composer and deletes after asking", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.presets.push(
+    {
+      id: "heron",
+      title: "Heron",
+      input: { prompt: "A grey heron" },
+      parts: ["prompt"],
+      savedAt: stamp,
+    },
+    {
+      id: "detail",
+      title: "Fine Detail",
+      input: { loras: [{ name: "detail.safetensors", strength: 0.8, enabled: true }] },
+      parts: ["loras"],
+      family: "test",
+      savedAt: stamp,
+    },
+  );
+  await page.goto("/library#presets");
+  const table = page.getByRole("table", { name: "Presets", exact: true });
+  await expect(table.getByRole("row", { name: /Heron/ })).toContainText("Prompt");
+  await expect(table.getByRole("row", { name: /Fine Detail/ })).toContainText("LoRAs");
+  await page.getByRole("button", { name: "Actions for Heron", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  const rename = page.getByRole("dialog", { name: "Rename Preset", exact: true });
+  const name = rename.getByRole("textbox", { name: "Name", exact: true });
+  await name.fill("fine detail");
+  await expect(rename.getByText("A preset has this name", { exact: true })).toBeVisible();
+  await expect(rename.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await name.fill("Grey Heron");
+  await rename.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => state.presets[0].title).toBe("Grey Heron");
+  await page.getByRole("button", { name: "Actions for Fine Detail", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Preset", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect.poll(() => state.presets.map((preset) => preset.id)).toEqual(["heron"]);
+  await page.getByRole("button", { name: "Actions for Grey Heron", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A grey heron",
+  );
 });
