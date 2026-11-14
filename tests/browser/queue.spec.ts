@@ -168,9 +168,17 @@ test("a request's jobs group as one set that moves and stops together", async ({
     ]);
   await expect(set).toBeHidden();
   await queue.getByRole("button", { name: "Stop All", exact: true }).click();
-  await expect(
-    page.getByRole("dialog", { name: "Stop All Generations", exact: true }),
-  ).toContainText("Studio stops your 1 unfinished generation.");
+  const stopAll = page.getByRole("dialog", { name: "Stop All Generations", exact: true });
+  await expect(stopAll).toContainText("Studio stops your 1 unfinished generation.");
+
+  // A stop its worker can't confirm fails as a row's Stop does, leaving the dialog to try again.
+  const unconfirmed = "Cancellation could not be confirmed.";
+  await page.route("**/api/queue/cancel-all", (route) =>
+    route.fulfill({ json: { outcomes: [{ job: {}, cancelRequested: true, error: unconfirmed }] } }),
+  );
+  await stopAll.getByRole("button", { name: "Stop All", exact: true }).click();
+  await expect(page.getByText(unconfirmed, { exact: true })).toBeVisible();
+  await expect(stopAll).toBeVisible();
 });
 
 test("Retry and a set's Retry Failed go through the shared retry, replacing the failed originals", async ({

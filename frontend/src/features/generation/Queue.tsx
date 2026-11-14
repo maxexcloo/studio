@@ -45,7 +45,12 @@ import { isProfile, profileName, shownProfileName } from "./payload";
 import { referenceLabel } from "./references";
 import { WritingStream } from "./PromptWriting";
 import type { QueueRowDrag } from "./SortableQueue";
-import { pausedReason, terminalStatuses, type QueuePause } from "../../../../shared/queue";
+import {
+  pausedReason,
+  terminalStatuses,
+  type QueueCancelAllResponse,
+  type QueuePause,
+} from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
@@ -95,16 +100,21 @@ export function useQueueAction(jobId?: string) {
   });
   const action = useMutation({
     mutationKey: queueActionKey,
-    mutationFn: ({ id, set, action, to }: QueueAction) =>
-      post<{ job?: QueueJob }>(
+    mutationFn: async ({ id, set, action, to }: QueueAction) => {
+      const result = await post<{ job?: QueueJob } & Partial<QueueCancelAllResponse>>(
         set
           ? `/api/queue/sets/${encodeURIComponent(set)}/${action}`
           : id
             ? `/api/queue/${encodeURIComponent(id)}/${action}`
             : `/api/queue/${action}`,
         to === undefined ? undefined : { to },
-      ),
-    onSuccess: () =>
+      );
+      // Stop All answers per job; one its worker couldn't confirm stopping fails like a row's Stop.
+      const unconfirmed = result.outcomes?.find((outcome) => outcome.error);
+      if (unconfirmed) throw new Error(unconfirmed.error);
+      return result;
+    },
+    onSettled: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
         client.invalidateQueries({ queryKey: ["gallery"] }),
