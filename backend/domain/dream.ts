@@ -713,6 +713,11 @@ export function createDream(options: {
 
   const live = () => store.openJobs();
   const busy = (jobs = live()) => jobs.some((job) => !dreamJob(job)) || options.textBusy();
+  /**
+   * Someone's own work waits to start, or text work runs: Dream queues nothing. Images may take a
+   * free worker while other work runs; a video holds its GPU for minutes, so it waits for idle.
+   */
+  const pressed = () => live().some((job) => !dreamJob(job) && waiting(job)) || options.textBusy();
   /** The account's Dream jobs not yet finished. */
   const held = (ownerId: string) =>
     live().filter((job) => dreamJob(job) && job.ownerId === ownerId).length;
@@ -1400,6 +1405,7 @@ export function createDream(options: {
       options.gallery(ownerId).filter((item) => item.dream && item.dream.state !== "unseen").length;
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     let reason = "";
+    let idle = "";
     for (const kind of kinds(record.settings, counts)) {
       const online = await options.online(kind);
       if (online.text !== "online")
@@ -1409,6 +1415,12 @@ export function createDream(options: {
         continue;
       }
       if (kind === "video") {
+        // One local video runs at a time, so a second Dream video would hold a slot idle.
+        if (live().some((job) => dreamJob(job) && kindOf(job.input) === "video")) continue;
+        if (busy()) {
+          idle = "Dream videos wait until Studio is idle.";
+          continue;
+        }
         const refused = await video(ownerId, record, access);
         if (!refused) return { status: "generating" };
         reason = refused;
@@ -1575,6 +1587,7 @@ export function createDream(options: {
       }
       return { status: "generating" };
     }
+    if (idle) return { status: "waiting", reason: idle };
     return { status: "unavailable", reason };
   }
 
@@ -2126,28 +2139,29 @@ export function createDream(options: {
       );
       for (const job of stranded)
         if (job) await options.cancel(job.ownerId, job.id).catch(() => undefined);
-      // Waiting Dream jobs keep their place below other work; new ones wait until Studio is idle.
-      if (busy()) return;
+      // Waiting Dream jobs keep their place below other work; new ones wait while other work waits.
       const owners = options.owners();
-      // Accounts take turns: the search starts after the one served last.
-      for (let step = 0; step < owners.length; step++) {
-        const index = (next + step) % owners.length;
-        const ownerId = owners[index];
-        // An account holding a Dream job for every worker waits its turn; the others may still get theirs.
-        if (held(ownerId) >= options.slots()) continue;
-        let state: { status: DreamStatus; reason?: string };
-        try {
-          state = await consider(ownerId);
-        } catch (error) {
-          state = { status: "waiting", reason: (error as Error).message };
+      // Accounts take turns, one job each, until every account fills its slots or can't: the search
+      // starts after the one served last.
+      for (let queued = true; queued && !pressed();) {
+        queued = false;
+        for (let step = 0; step < owners.length && !pressed(); step++) {
+          const index = (next + step) % owners.length;
+          const ownerId = owners[index];
+          if (held(ownerId) >= options.slots()) continue;
+          let state: { status: DreamStatus; reason?: string };
+          try {
+            state = await consider(ownerId);
+          } catch (error) {
+            state = { status: "waiting", reason: (error as Error).message };
+          }
+          states.set(ownerId, state);
+          note(ownerId, state);
+          if (state.status === "generating") {
+            next = index + 1;
+            queued = true;
+          }
         }
-        states.set(ownerId, state);
-        note(ownerId, state);
-        if (state.status === "generating") {
-          next = index + 1;
-          break;
-        }
-        if (busy()) break;
       }
       // Suggestions wait while a Dream idea is being written, so the text model has one call at a time.
       if (!busy() && !live().some((job) => job.status === "writing"))
