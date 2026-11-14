@@ -194,7 +194,10 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
   controller.configure({ automatic: true, parkIdleMinutes: 0 });
   const automatic = await observe({ allowed: ["image"] });
   assert.equal(automatic.services.image?.endpoints[0].state, "parked");
-  assert.deepEqual([...(await parkedWorkers(controller, workers))], []);
+  assert.deepEqual(
+    [...(await parkedWorkers(controller, workers))],
+    ["image-worker", "video-worker"],
+  );
 });
 
 test("timeouts, authentication failures and non-worker responses never advertise a healthy runtime", async () => {

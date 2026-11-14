@@ -189,8 +189,14 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     const direct = (await directCloud?.profiles().catch(() => [])) || [];
     if (!workers.length && !direct.length)
       throw Object.assign(new Error(noWorkerMessage("image")), { noWorker: true });
+    const stopped = await parkedWorkers(runtime?.controller, workers);
+    // A stopped worker has no pod to answer, so it isn't asked (or logged as not answering).
     const settled = await Promise.allSettled(
-      workers.map((worker) => backendModels(worker.id, force)),
+      workers.map((worker) =>
+        stopped.has(worker.id)
+          ? Promise.reject(new Error("stopped"))
+          : backendModels(worker.id, force),
+      ),
     );
     const answered = workers
       .map((worker, index) => ({
@@ -200,7 +206,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       .filter((entry) => entry.result);
     if (demoMode && !answered.length && !direct.length)
       throw settled[0]?.reason || new Error("No worker is available.");
-    const parked = await parkedWorkers(runtime?.controller, workers);
+    // With automatic lifecycle control, queued work starts what it needs, so nothing waits as parked.
+    const parked = runtime?.controller.automaticLifecycle ? new Set() : stopped;
     const configured = inferred(none, none, { configuredOnly: true });
     const catalogues = workers
       .map((worker) => {
