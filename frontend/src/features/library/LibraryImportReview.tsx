@@ -102,6 +102,9 @@ const stateLabels: Record<string, string> = {
 export const stateLabel = (state: string) =>
   stateLabels[state] ||
   state.replace(/(^|-)([a-z])/g, (_, gap, letter) => `${gap ? " " : ""}${letter.toUpperCase()}`);
+/** An import still resolving or downloading, which polling follows until it settles. */
+export const importBusy = (record: ImportRecord) =>
+  ["resolving", "downloading"].includes(record.state);
 const folders = ["checkpoints", "clip_vision", "diffusion_models", "loras", "text_encoders", "vae"];
 
 export function LibraryImportReview({
@@ -126,7 +129,8 @@ export function LibraryImportReview({
     queryKey: key,
     queryFn: () => api<{ import: ImportRecord }>(`/api/library/imports/${encodeURIComponent(id)}`),
     enabled: active,
-    refetchInterval: active ? 4000 : false,
+    refetchInterval: (query) =>
+      active && query.state.data && importBusy(query.state.data.import) ? 4000 : false,
   });
   const action = useMutation({
     mutationFn: ({ action, body }: { action: string; body?: unknown }) =>
