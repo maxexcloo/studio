@@ -364,17 +364,41 @@ test("Dream is off until turned on, queues one hidden job per account only while
   );
 });
 
-test("Dream keeps one job per worker going, so every idle GPU takes part", async (t) => {
-  const { dream, state, dreamJobs } = fixture(t);
+test("Dream fills every free worker in one tick: images beside running work, videos one at a time and only while idle", async (t) => {
+  const { dream, store, state, dreamJobs, live, finish } = fixture(t);
   state.slots = 2;
   await dream.save("alice", { enabled: true });
   await dream.tick();
-  await dream.tick();
-  assert.equal(dreamJobs("alice").length, 2);
+  assert.equal(live("alice").length, 2);
   // A third waits for a worker.
   await dream.tick();
   assert.equal(dreamJobs("alice").length, 2);
   assert.equal(dream.status("alice").status, "generating");
+  for (const job of live("alice")) finish("alice", job.id);
+
+  // Someone's running work leaves the other GPU to Dream's images, never a video.
+  dream.keep("alice", String(dream.unseen("alice")[0].id));
+  await dream.save("alice", { videos: true, dailyVideos: 10 });
+  const session = store.createSession("bob");
+  const bob = store.enqueue("bob", session.id, { prompt: "mine" }, "image");
+  store.save({ ...bob, status: "running" });
+  await dream.tick();
+  // The third image of the day is a comparison, two jobs at once.
+  assert.deepEqual(
+    live("alice").map((job) => job.input.kind),
+    ["image", "image", "image"],
+  );
+  for (const job of live("alice")) finish("alice", job.id);
+  store.save({ ...store.job("bob", bob.id)!, status: "completed" });
+
+  // Idle, the video due goes first and the other slot takes an image, not a second video.
+  await dream.tick();
+  assert.deepEqual(
+    live("alice")
+      .map((job) => job.input.kind)
+      .sort(),
+    ["image", "video"],
+  );
 });
 
 test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or starred images", async (t) => {
