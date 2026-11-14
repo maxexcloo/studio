@@ -273,7 +273,8 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
     ),
   );
   expect(add!.x + add!.width).toBeLessThanOrEqual(clear!.x);
-  expect(apply!.y).toBeCloseTo(add!.y, 0);
+  // Within a pixel, as layout rounds to device pixels.
+  expect(Math.abs(apply!.y - add!.y)).toBeLessThanOrEqual(1);
   await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   // The search waits for a tap, so the keyboard stays down.
