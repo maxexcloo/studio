@@ -138,14 +138,14 @@ test("a change to the gallery shows on the next page request", () => {
   );
 });
 
-test("a large gallery saves as rows, and a later change writes only its own row", async () => {
-  const items = bigGallery(50_000);
+test("a large gallery saves every row, and a later change writes only its own row", async () => {
+  const items = bigGallery(50_001);
   setGallery(items, { persist: false });
   saveGallery();
   await flushGallery();
   const db = runtimeDatabase(dataDir);
   const saved = readGalleryRows(db);
-  assert.equal(saved.length, 50_000);
+  assert.equal(saved.length, 50_001, "no record is dropped past 50,000");
   assert.deepEqual(
     saved.find((item) => item.id === store.gallery[0].id),
     store.gallery[0],
