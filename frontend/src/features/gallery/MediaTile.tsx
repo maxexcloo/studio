@@ -420,14 +420,18 @@ export function MediaTile({
       </UnstyledButton>
       {item.status !== "done" && <TileStatus item={item} onTryAgain={onTryAgain} />}
       {upscaleShown && <TileUpscale item={item} />}
-      {versions && versions.length > 1 && !selecting && (
-        <VersionBadge count={versions.length} current={version} />
-      )}
-      {item.identity?.drifted && !selecting && (
-        // Face Check found someone else, or the character twice; Details says which.
-        <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
-          <icons.character size={12} />
-          Face
+      {!selecting && (
+        <div className={classes.badges}>
+          {versions && versions.length > 1 && (
+            <VersionBadge count={versions.length} current={version} />
+          )}
+          {item.identity?.drifted && (
+            // Face Check found someone else, or the character twice; Details says which.
+            <div className={classes.drift} role="img" aria-label="Face Check: Face Differs">
+              <icons.character size={12} />
+              Face
+            </div>
+          )}
         </div>
       )}
       {!selecting && actions}
