@@ -281,7 +281,7 @@ export function LibraryImports({
                 <Stack gap={4} align="start">
                   {record.grade && (
                     <Badge miw="max-content" color={gradeColours[record.grade.value] || "gray"}>
-                      {record.grade.value}
+                      {stateLabel(record.grade.value)}
                     </Badge>
                   )}
                   <Text size="xs" c={record.state === "failed" ? "red" : "dimmed"}>
