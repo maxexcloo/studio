@@ -9,7 +9,6 @@ import {
   image,
   loadSaved,
   openPresets,
-  promptTool,
   profiles,
   saveCurrent,
   renamePreset,
@@ -783,19 +782,19 @@ test("Prompt boxes copy and undoably clear, typed in place on phones", async ({
     await expect(prompt).toBeFocused();
   }
   await prompt.fill("A lantern in fog");
-  await promptTool(page, "Prompt", "Copy Prompt");
+  // Copy and Clear stand beside the text, out of the ⋯ menu.
+  const button = (name: string) => page.getByRole("button", { name, exact: true });
+  await button("Copy Prompt").click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
   // Clear turns into Undo, which restores the text; typing turns it back into Clear.
-  await promptTool(page, "Prompt", "Clear Prompt");
+  await button("Clear Prompt").click();
   await expect(prompt).toHaveValue("");
-  await promptTool(page, "Prompt", "Undo");
+  await button("Undo").click();
   await expect(prompt).toHaveValue("A lantern in fog");
-  await promptTool(page, "Prompt", "Clear Prompt");
+  await button("Clear Prompt").click();
   await prompt.fill("A");
-  await page.getByRole("button", { name: "More Prompt Actions", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "Clear Prompt", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Undo", exact: true })).toHaveCount(0);
-  await page.keyboard.press("Escape");
+  await expect(button("Clear Prompt")).toBeVisible();
+  await expect(button("Undo")).toHaveCount(0);
   await prompt.fill("A lantern in fog");
   if (!phone) return;
   // A tap on the text, rather than the fill's focus, starts the sheet's typing layout.

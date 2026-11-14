@@ -1,9 +1,11 @@
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
- * access-profile feature, works only with profiles the account may use, and Spicy needs Uncensored Models.
+ * access-profile feature, works only with profiles the account may use, and an uncensored style (Spicy) needs Uncensored Models.
  * LoRA suggestions need the LoRAs feature.
  *
- *   GET  /api/assistant                 what this account may use: presets, models, vision, and the
+ *   GET  /api/assistant                 what this account may use: presets (Improve Prompt's styles),
+ *                                       themes (Animate's), changes (fixed AI edits, with their
+ *                                       instruction), models, vision, and the
  *                                       profiles whose guide takes no negative (noNegative)
  *   POST /api/assistant/rewrite         { profileId, prompt, preset, instruction?, references?, loras? }
  *                                       (instruction for Custom) → streamed
@@ -15,7 +17,7 @@
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
  */
 import { AssistantError, createAssistant, gatewaySettings, uncensoredText } from "./assistant.js";
-import { assistantPresets, defaultPreset } from "./assistant-presets.js";
+import { promptStyleStore } from "./prompt-styles.js";
 import { mayUseFeature, promptWriter } from "./account-policy.js";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { accountPreferences } from "./account-preferences.js";
@@ -89,7 +91,10 @@ export async function downscaleReferences(values) {
  */
 export function assistantRecord(value, loras = []) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const preset = assistantPresets.find((item) => item.id === value.preset)?.id;
+  // Any style the list holds, enabled or not, or Custom: the record names what ran.
+  const preset = [...promptStyleStore().list().styles, { id: "custom", kind: "improve" }].find(
+    (item) => item.kind === "improve" && item.id === value.preset,
+  )?.id;
   if (!preset) return null;
   const model = String(value.model || "").trim();
   const stacked = new Set(
@@ -226,7 +231,7 @@ export function registerAssistantRoutes(
     const account = req.studioAccount;
     // Without the feature the app hides every assistant control, as without a gateway.
     if (!engine || !allowed(account, "promptAssistant"))
-      return res.json({ ok: true, available: false, presets: [] });
+      return res.json({ ok: true, available: false, presets: [], themes: [], changes: [] });
     try {
       const spicy = allowed(account, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
@@ -251,10 +256,27 @@ export function registerAssistantRoutes(
         vision: await engine.supportsVision(writer),
         writingModel: engine.writerModel(writer),
         models,
-        defaultPreset,
-        presets: assistantPresets
-          .filter((preset) => !preset.spicy || spicy)
-          .map(({ id, label, description }) => ({ id, label, description })),
+        defaultPreset: promptStyleStore().defaultId(),
+        // Library › Prompt Styles' menus: Improve Prompt's styles, Animate's themes and fixed AI edits.
+        ...Object.fromEntries(
+          [
+            ["presets", "improve"],
+            ["themes", "animate"],
+            ["changes", "change"],
+          ].map(([key, kind]) => [
+            key,
+            promptStyleStore()
+              .usable(kind)
+              .filter((style) => !style.uncensored || spicy)
+              // A fixed AI edit runs as its instruction, as a picked suggestion's request does.
+              .map(({ id, label, description, instruction }) => ({
+                id,
+                label,
+                description,
+                ...(kind === "change" ? { instruction } : {}),
+              })),
+          ]),
+        ),
         spicy,
         loras: allowed(account, "loras"),
         noNegative,
@@ -276,7 +298,7 @@ export function registerAssistantRoutes(
       profile: context.profile,
       guide: context.guide,
       prompt: body?.prompt,
-      preset: String(body?.preset || defaultPreset),
+      preset: String(body?.preset || promptStyleStore().defaultId()),
       instruction: body?.instruction,
       explicit: allowed(account, "uncensoredModels"),
       references,
@@ -288,8 +310,13 @@ export function registerAssistantRoutes(
       onDelta,
     });
   };
-  const spicyRefused = (account, body) =>
-    String(body?.preset || defaultPreset) === "spicy" && !allowed(account, "uncensoredModels");
+  /** An uncensored style's refusal without Uncensored Models, else null. */
+  const uncensoredRefusal = (account, body) => {
+    const style = promptStyleStore().style("improve", String(body?.preset || ""));
+    return style?.uncensored && !allowed(account, "uncensoredModels")
+      ? { ok: false, error: `${style.label} needs Uncensored Models for this account.` }
+      : null;
+  };
   // A streamed rewrite (text/event-stream: delta, done, error) answers here; a JSON one below.
   app.post("/api/assistant/rewrite", async (req, res, next) => {
     if (req.body?.stream !== true && !/text\/event-stream/i.test(String(req.headers.accept || "")))
@@ -299,10 +326,8 @@ export function registerAssistantRoutes(
     const context = await ready(account, req.body);
     if (signal.aborted) return;
     if (context.refusal) return res.status(context.refusal.status).json(context.refusal.payload);
-    if (spicyRefused(account, req.body))
-      return res
-        .status(403)
-        .json({ ok: false, error: "Spicy needs Uncensored Models for this account." });
+    const refused = uncensoredRefusal(account, req.body);
+    if (refused) return res.status(403).json(refused);
     const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     try {
       const result = await rewrite(account, req.body, context, {
@@ -332,11 +357,8 @@ export function registerAssistantRoutes(
     }
   });
   writer("/api/assistant/rewrite", async (account, body, context, signal) => {
-    if (spicyRefused(account, body))
-      return {
-        status: 403,
-        payload: { ok: false, error: "Spicy needs Uncensored Models for this account." },
-      };
+    const refused = uncensoredRefusal(account, body);
+    if (refused) return { status: 403, payload: refused };
     return {
       status: 200,
       payload: { ok: true, ...(await rewrite(account, body, context, { signal })) },

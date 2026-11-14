@@ -14,12 +14,8 @@
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
  * or the LoRA pre-filter.
  */
-import {
-  assistantPreset,
-  defaultPreset,
-  familyUpsampler,
-  maxInstructionCharacters,
-} from "./assistant-presets.js";
+import { familyUpsampler, maxInstructionCharacters } from "./assistant-presets.js";
+import { promptStyleStore } from "./prompt-styles.js";
 import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
 import { cleanTriggers } from "./lora/catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
@@ -453,8 +449,8 @@ function rewriteInstructions({
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
     `Style: ${override || preset.instruction}`,
     preset.custom ? `Instruction: ${JSON.stringify(instruction)}` : "",
-    // Spicy is offered only with Uncensored Models (assistant-routes.js).
-    contentRule(explicit || Boolean(preset.spicy)),
+    // An uncensored style is offered only with Uncensored Models (assistant-routes.js).
+    contentRule(explicit || Boolean(preset.uncensored)),
   ]
     .filter(Boolean)
     .join("\n");
@@ -750,7 +746,7 @@ export function createAssistant(
     profile = {},
     guide = null,
     prompt,
-    preset: presetId = defaultPreset,
+    preset: presetId = promptStyleStore().defaultId(),
     instruction = "",
     explicit = false,
     references = [],
@@ -761,7 +757,7 @@ export function createAssistant(
     signal,
     onDelta,
   } = {}) {
-    const preset = assistantPreset(presetId);
+    const preset = promptStyleStore().style("improve", presetId);
     if (!preset) throw new AssistantError("Choose a known preset.", { status: 400 });
     const asked = String(instruction || "")
       .trim()

@@ -80,6 +80,7 @@ import { importStore } from "./library/imports.js";
 import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { seedSamples } from "./profile/seed.js";
+import { promptStyleStore } from "./prompt-styles.js";
 import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import {
@@ -511,6 +512,7 @@ registerProfileEditorRoutes(app, {
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),
+  promptStyles: () => promptStyleStore(),
   objectInfo: profileObjectInfo,
   accountName: (account) => account?.userId || "",
   exportOptions: () => ({

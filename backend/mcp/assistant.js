@@ -6,7 +6,7 @@
 // result (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from "zod";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
-import { assistantPresets, defaultPreset } from "../assistant-presets.js";
+import { promptStyleStore } from "../prompt-styles.js";
 import { mcpJson } from "./media.js";
 import { maxPromptCharacters } from "../../shared/queue.ts";
 
@@ -100,8 +100,17 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
  * profile id or name the way generate does, and `memory` is createChatAssistantMemory's.
  */
 export function registerAssistantTools({ tool, server, media, owner, profileOf, memory }) {
-  // Custom is the UI's free-text instruction; the chat restyles with its own words instead.
-  const presetIds = assistantPresets.filter((preset) => !preset.custom).map((preset) => preset.id);
+  // Library › Prompt Styles' enabled styles. Custom is the UI's free-text instruction; the chat
+  // restyles with its own words instead.
+  const presetIds = () =>
+    promptStyleStore()
+      .usable("improve")
+      .filter((style) => !style.custom)
+      .map((style) => style.id);
+  const uncensored = promptStyleStore()
+    .usable("improve")
+    .filter((style) => style.uncensored)
+    .map((style) => style.id);
   const prompt = z.string().trim().min(1).max(maxPromptCharacters);
   const profileId = z
     .string()
@@ -127,22 +136,31 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     server,
     "rewrite_prompt",
     "rewrite prompt",
-    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; spicy needs Uncensored Models, which models lists among the account's features), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; generate already writes prompts from requests. A vision model reads reference_asset_ids from upload. Show the result; pass it to generate in prompts.`,
+    `Rewrite a prompt for a profile with a preset (${presetIds().join(", ")}${uncensored.length ? `; ${uncensored.join(", ")} need${uncensored.length === 1 ? "s" : ""} Uncensored Models, which models lists among the account's features` : ""}), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; generate already writes prompts from requests. A vision model reads reference_asset_ids from upload. Show the result; pass it to generate in prompts.`,
     {
       prompt,
       profile_id: profileId,
-      // A free string checked here, so a preset this deployment doesn't have gets the current list.
+      // A free string checked here against the current list, which administrators edit.
       preset: z
         .string()
         .trim()
         .toLowerCase()
-        .refine((value) => presetIds.includes(value), {
-          message: `Use one of ${presetIds.join(", ")}`,
-        })
-        .default(defaultPreset),
+        .optional()
+        .superRefine((value, context) => {
+          if (value !== undefined && !presetIds().includes(value))
+            context.addIssue({ code: "custom", message: `Use one of ${presetIds().join(", ")}` });
+        }),
       reference_asset_ids: z.array(z.string().min(1)).max(maxReferences).optional(),
     },
-    async ({ prompt: text, profile_id, preset, reference_asset_ids = [] }, signal) => {
+    async (
+      {
+        prompt: text,
+        profile_id,
+        preset = promptStyleStore().defaultId(),
+        reference_asset_ids = [],
+      },
+      signal,
+    ) => {
       const profile = await profileOf(profile_id);
       const references = await Promise.all(reference_asset_ids.map((id) => reference(id, signal)));
       const written = await ask(
