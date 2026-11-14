@@ -230,7 +230,7 @@ export function DreamDeck({
   items: DreamItem[];
   calibrate: boolean;
   notice?: ReactNode;
-  empty: (calibration: boolean) => ReactNode;
+  empty: ReactNode;
 }) {
   const phone = usePhone();
   const sideways = useSideways();
@@ -247,7 +247,7 @@ export function DreamDeck({
     }),
   );
   const unseen = items.filter((item) => !decided.has(item.id));
-  const gallery = useCalibration(unseen.length < few, decided);
+  const gallery = useCalibration(calibrate && unseen.length < few, decided);
   const cards = deckCards(unseen, calibrate ? gallery : [], counts);
   const [top, next] = cards;
   usePrefetch(cards[2]);
@@ -337,7 +337,7 @@ export function DreamDeck({
       sideBySide={top.kind === "pair"}
     />
   );
-  if (!top) return empty(gallery.length > 0);
+  if (!top) return empty;
   const choices = dreamChoices(top).flat();
   const choice = (id: Choice["choice"]) => choices.find((option) => option.choice === id)!;
   const button = (
