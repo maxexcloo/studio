@@ -55,12 +55,11 @@ jobs:
           path: dist
           retention-days: 1
 
-  # Pull requests run Check only; the browser suite and image build run on main, side by side, and
+  # Pull requests run the browser suite too; on main it and the image build run side by side, and
   # both gate the release.
   browser:
     name: Browser
     needs: check
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
       # Every shard reports its failures; one failing shard doesn't hide the others'.
