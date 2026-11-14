@@ -1,11 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
-import {
-  backendUrl,
-  currentComfyBackend,
-  noteWorkerReachable,
-  workerReachable,
-} from "./backends.js";
-import { defaultWorker, onWorkersChanged } from "../workers.js";
+import { noteWorkerReachable, workerReachable, workerUrl } from "./backends.js";
 import { listensBeyondThisComputer } from "../client-trust.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,13 +7,6 @@ import { mediaFile, mediaType } from "../media-paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "../..");
-// A live binding: importers see the new address as soon as the workers change.
-// It is the default worker's (workers.js), or "" with no workers at all.
-export let comfyUrl = defaultWorker()?.url || "";
-onWorkersChanged(() => {
-  comfyUrl = defaultWorker()?.url || "";
-});
-
 export const host = process.env.HOST || "127.0.0.1";
 export const networkListening = listensBeyondThisComputer(host);
 
@@ -44,6 +31,20 @@ export function inDotFolder(subfolder = "") {
       .some((part) => part.startsWith(".")),
   );
 }
+/**
+ * Where a ComfyUI file's address (`query`, naming its `worker`; gallery/records.js) is read from
+ * that worker's /`route`. Throws for a worker that isn't configured.
+ */
+export function comfyFileUrl(query, route = "view") {
+  const { worker, ...rest } = query;
+  const params = new URLSearchParams(
+    Object.entries(rest).flatMap(([key, value]) =>
+      [].concat(value).map((item) => [key, String(item)]),
+    ),
+  );
+  return `${workerUrl(String(worker || ""))}/${route}?${params}`;
+}
+
 /** The file behind an output URL's parts when it is Studio media; null otherwise. */
 export function localOutputFile(filename, subfolder = "", type = "output") {
   return type === mediaType ? mediaFile(String(filename || ""), String(subfolder || "")) : null;
@@ -52,8 +53,8 @@ export function localOutputFile(filename, subfolder = "", type = "output") {
 /** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
 export const demoMode = process.env.STUDIO_DEMO === "1";
 
-export function noteComfyReachable() {
-  noteWorkerReachable(currentComfyBackend(), true);
+export function noteComfyReachable(worker) {
+  noteWorkerReachable(worker, true);
 }
 
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
@@ -64,9 +65,8 @@ export function isComfyTimeout(error) {
  * Call with what a fetch to ComfyUI threw. A cancelled request says nothing about ComfyUI, and a timed-out
  * one reads as busy: a busy ComfyUI takes the connection and answers late while its runs carry on.
  */
-export function noteComfyFetchError(error) {
-  if (!isComfyTimeout(error) && !error?.noWorker)
-    noteWorkerReachable(currentComfyBackend(), false, error);
+export function noteComfyFetchError(worker, error) {
+  if (!isComfyTimeout(error) && !error?.noWorker) noteWorkerReachable(worker, false, error);
 }
 
 /**
@@ -81,13 +81,11 @@ function comfyTimeoutFor(pathname = "") {
 }
 
 /**
- * One request to ComfyUI. `timeout` (ms) overrides the default for the path;
+ * One request to worker `worker`'s ComfyUI. `timeout` (ms) overrides the default for the path;
  * a caller's own `signal` still cancels it early. A failed answer throws with
  * `status` and the untouched `raw` text next to the friendly message.
  */
-export const activeComfyUrl = () => backendUrl();
-
-export async function comfy(pathname, options = {}) {
+export async function comfy(worker, pathname, options = {}) {
   const { timeout, ...init } = options;
   const limit = AbortSignal.timeout(
     Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname),
@@ -96,14 +94,14 @@ export async function comfy(pathname, options = {}) {
   let response;
   try {
     try {
-      response = await fetch(`${activeComfyUrl()}${pathname}`, init);
+      response = await fetch(`${workerUrl(worker)}${pathname}`, init);
     } catch (error) {
       // A dropped connection ("fetch failed") on a read is tried once more before ComfyUI counts as gone:
       // the link to a remote worker blips, and one lost GET shouldn't fail a run or a chat's request.
       // Only while this worker was answering: one already down fails at once.
       const method = String(init.method || "GET").toUpperCase();
       if (
-        workerReachable(currentComfyBackend()) !== true ||
+        workerReachable(worker) !== true ||
         method !== "GET" ||
         init.signal.aborted ||
         isComfyTimeout(error) ||
@@ -112,16 +110,16 @@ export async function comfy(pathname, options = {}) {
       )
         throw error;
       await delay(250);
-      response = await fetch(`${activeComfyUrl()}${pathname}`, init);
+      response = await fetch(`${workerUrl(worker)}${pathname}`, init);
     }
   } catch (error) {
-    noteComfyFetchError(error);
+    noteComfyFetchError(worker, error);
     throw error;
   }
   // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
   if ([502, 503, 504].includes(response.status))
-    noteWorkerReachable(currentComfyBackend(), false, new Error(`HTTP ${response.status}`));
-  else noteComfyReachable();
+    noteWorkerReachable(worker, false, new Error(`HTTP ${response.status}`));
+  else noteComfyReachable(worker);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     const raw = `Comfy ${response.status}: ${text || response.statusText}`;
@@ -130,6 +128,17 @@ export async function comfy(pathname, options = {}) {
   const type = response.headers.get("content-type") || "";
   return type.includes("application/json") ? response.json() : response.arrayBuffer();
 }
+
+/** A ComfyUI file by its /comfy/view address, read from the worker it names. */
+export function comfyFile(url, options) {
+  const { worker = "", ...query } = Object.fromEntries(
+    new URLSearchParams(String(url).split("?")[1] || ""),
+  );
+  return comfy(worker, `/view?${new URLSearchParams(query)}`, options);
+}
+
+/** `comfy` bound to one worker, for helpers that make several requests. */
+export const comfyOn = (worker) => (pathname, options) => comfy(worker, pathname, options);
 
 export function normalizeComfyError(message = "") {
   let text = String(message || "").trim();

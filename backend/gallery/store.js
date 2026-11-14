@@ -828,7 +828,7 @@ function saveHiddenGalleryIds() {
   persistHiddenMarkers(Object.fromEntries(hiddenGalleryIds));
 }
 
-export function recordsFromComfyHistory(history) {
+export function recordsFromComfyHistory(worker, history) {
   const records = [];
   for (const [promptId, item] of Object.entries(history || {})) {
     const graph = item?.prompt?.[2] || {};
@@ -873,7 +873,7 @@ export function recordsFromComfyHistory(history) {
     const own = Object.fromEntries(
       Object.entries(item?.outputs || {}).filter(([id]) => !graph[id]?._meta?.studioUpscale),
     );
-    for (const output of outputsFrom({ outputs: own })) {
+    for (const output of outputsFrom(worker, { outputs: own })) {
       const record = {
         ...output,
         id: output.url,

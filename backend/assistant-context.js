@@ -8,6 +8,7 @@ import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
 import { canonicalProfileId, livePrompting } from "./profile/store.js";
 import { bytesForReferenceAccount, captionForReferenceAccount } from "./references.js";
+import { defaultWorkerId } from "./workers.js";
 
 /**
  * What the prompt assistant reads for an account: its profiles, their prompting guides, its LoRAs,
@@ -33,10 +34,12 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
   const loras = async (req) => {
     if (!accountMayUseLoras(req)) return [];
     try {
-      const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name").filter(
-        loraAllowed(req.studioAccount),
-      );
-      const infos = await loraInfos(names);
+      const names = optionsFor(
+        (await loadComfyContext(defaultWorkerId())).info,
+        "LoraLoader",
+        "lora_name",
+      ).filter(loraAllowed(req.studioAccount));
+      const infos = await loraInfos(defaultWorkerId(), names);
       return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
     } catch {
       return [];

@@ -87,10 +87,10 @@ function familyFromMetadata(metadata = {}) {
 }
 
 /**
- * Fetch safetensors metadata for the worker's models, so they get better than
+ * Fetch safetensors metadata for `worker`'s models, so they get better than
  * filename guesses. Only the __metadata__ block comes back (no tensor names).
  */
-export async function primeModelMetadata(lists = {}, { concurrency = 6, signal } = {}) {
+export async function primeModelMetadata(worker, lists = {}, { concurrency = 6, signal } = {}) {
   const queue = [];
   for (const source of modelSources) {
     for (const name of lists[source] || []) {
@@ -99,11 +99,12 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6, signal }
       queue.push({ source, name, key });
     }
   }
-  async function worker() {
+  async function reader() {
     while (queue.length && !signal?.aborted) {
       const { source, name, key } = queue.shift();
       try {
         const metadata = await comfy(
+          worker,
           `/view_metadata/${metadataFolders[source]}?filename=${encodeURIComponent(name)}`,
           { signal },
         );
@@ -115,7 +116,7 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6, signal }
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, reader));
 }
 
 // Which parts a checkpoint carries is unknown until ComfyUI tries: assume all-in-one, which is

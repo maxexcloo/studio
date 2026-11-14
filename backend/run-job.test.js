@@ -46,6 +46,7 @@ function sdxlRequest(overrides = {}) {
     scheduler: "normal",
     seed: "1234",
     weightDtype: "default",
+    comfyBackend: "primary",
     ...overrides,
   };
 }
@@ -121,10 +122,13 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   assert.equal(job.outputs.length, 1);
   const item = store.gallery.find((entry) => entry.jobId === id);
   assert.equal(item.status, "done");
-  assert.equal(item.url, "/comfy/view?filename=image_00001_.png&subfolder=studio&type=output");
+  assert.equal(
+    item.url,
+    "/comfy/view?filename=image_00001_.png&subfolder=studio&type=output&worker=primary",
+  );
   assert.equal(
     item.thumbnailUrl,
-    "/comfy/thumb?filename=image_00001_.png&subfolder=studio&type=output",
+    "/comfy/thumb?filename=image_00001_.png&subfolder=studio&type=output&worker=primary",
   );
   assert.equal(item.settings.steps, 4);
   assert.deepEqual(item.resultSet, resultSet);
@@ -243,7 +247,10 @@ test(
     await running;
     const item = store.gallery.find((entry) => entry.jobId === id);
     assert.equal(item.status, "done");
-    assert.equal(item.url, "/comfy/view?filename=kept_00001_.png&subfolder=studio&type=output");
+    assert.equal(
+      item.url,
+      "/comfy/view?filename=kept_00001_.png&subfolder=studio&type=output&worker=primary",
+    );
     assert.equal(item.upscale.status, "cancelled");
     await generations.tick();
     assert.equal(records.job("", id).status, "completed");

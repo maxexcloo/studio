@@ -4,6 +4,7 @@ import { cancelDownload, discardDownload, downloadState, startDownload } from ".
 import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal } from "../route-access.js";
 import { libraryDownload } from "../library/downloads.js";
+import { defaultWorkerId } from "../workers.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   // Every downloads answer starts from the worker's current files.
@@ -32,7 +33,8 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
     try {
       const download = await startDownload(spec);
       // Already on disk: rescan now so the model page catches up without another click.
-      if (download?.already) await loadComfyContext({ force: true }).catch(() => null);
+      if (download?.already)
+        await loadComfyContext(defaultWorkerId(), { force: true }).catch(() => null);
       return { status: 200, payload: { ok: true, download, ...downloadState() } };
     } catch (error) {
       return { status: 400, payload: { ok: false, error: error.message } };

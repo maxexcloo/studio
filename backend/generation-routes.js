@@ -1,9 +1,10 @@
 import { loraInfos } from "./lora/info.js";
 import { optionalLoraIssue } from "./lora/catalogue.js";
 import { withLoraTriggers } from "./lora/prompts.js";
-import { currentComfyBackend, routeProfile, withComfyBackend } from "./comfy/backends.js";
+import { routeProfile } from "./comfy/backends.js";
 import {
   capabilityForProfile,
+  defaultWorkerId,
   listWorkers,
   noWorkerMessage,
   workerById,
@@ -59,7 +60,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       (workers.length === 0 ||
         (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))
     )
-      return { backend: currentComfyBackend() };
+      return { backend: defaultWorkerId() };
     try {
       const available = await mediaModels();
       const profile =
@@ -121,7 +122,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
             payload: { ok: false, error: `This account cannot use the LoRA “${refused.name}”.` },
           };
       }
-      if (demoMode && !workers.length) return { backend: currentComfyBackend() };
+      if (demoMode && !workers.length) return { backend: defaultWorkerId() };
       // A combined profile runs only on the backend it names; one that isn't ready refuses with why.
       const backend = profile.backendOptions?.find(
         (option) => option.id === (input?.profileBackend || profile.backend),
@@ -183,15 +184,15 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     const input = { ...job.input, clientJobId: job.id };
     const routed = await routeGeneration(input, account, job.backend);
     if (routed.payload) return routed;
-    return withComfyBackend(routed.backend, () => generateOnBackend(job, input, account));
+    return generateOnBackend(routed.backend, job, input, account);
   }
 
-  async function prepareGenerationBody(input) {
+  async function prepareGenerationBody(backend, input) {
     let body;
     let isMockJob = false;
     let context = null;
     try {
-      context = await loadComfyContext();
+      context = await loadComfyContext(backend);
     } catch (error) {
       // Placeholder generations are only for agent and UI testing without a GPU.
       if (!demoMode) {
@@ -199,7 +200,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
           status: 503,
           payload: {
             ok: false,
-            error: comfyDownMessage(error?.message),
+            error: comfyDownMessage(backend, error?.message),
           },
         };
       }
@@ -213,13 +214,16 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
             (item) => item && item.enabled !== false && typeof item.name === "string" && item.name,
           )
           .map((item) => item.name);
-        if (requested.length) await loraInfos(requested.slice(0, 32)).catch(() => null);
+        if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
         body = sanitizeGenerateBody(input, context.info, context.stats);
         const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
         if (enabledLoras.length) {
           const issue = optionalLoraIssue(
             enabledLoras,
-            await loraInfos(enabledLoras.map((item) => item.name)),
+            await loraInfos(
+              backend,
+              enabledLoras.map((item) => item.name),
+            ),
           );
           if (issue) throw new Error(issue);
         }
@@ -261,7 +265,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     return { body, isMockJob };
   }
 
-  async function generateOnBackend(job, input, account) {
+  async function generateOnBackend(backend, job, input, account) {
     const id = job.id;
     const existing = jobs.get(id);
     // In account mode a job ID belongs to one owner for good: a reused ID must never touch
@@ -285,10 +289,10 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
           revision: galleryRevisionValue(),
         },
       };
-    const prepared = await prepareGenerationBody(input);
+    const prepared = await prepareGenerationBody(backend, input);
     if (prepared.payload) return prepared;
     let { body, isMockJob } = prepared;
-    body.comfyBackend = currentComfyBackend();
+    body.comfyBackend = backend;
     body.ownerId = job.ownerId;
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details.
     const assistant = assistantRecord(input.assistant, body.loras);
@@ -338,7 +342,10 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       body.prompt = withLoraTriggers(
         typed,
         body.loras,
-        await loraInfos(body.loras.map((item) => item.name)),
+        await loraInfos(
+          backend,
+          body.loras.map((item) => item.name),
+        ),
       );
       if (body.prompt !== typed) body.typedPrompt = typed;
     }
@@ -367,6 +374,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
       body.referenceAssets = await stageReferenceAssetsForAccount(
+        backend,
         account,
         [{ slot: "reference", assetId: body.startImageId }],
         { unique: Boolean(body.ownerId), generation: body },
@@ -378,10 +386,15 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       !body.referenceAssets.every((item) => item.comfyName)
     ) {
       try {
-        body.referenceAssets = await stageReferenceAssetsForAccount(account, body.referenceAssets, {
-          unique: Boolean(body.ownerId),
-          generation: body,
-        });
+        body.referenceAssets = await stageReferenceAssetsForAccount(
+          backend,
+          account,
+          body.referenceAssets,
+          {
+            unique: Boolean(body.ownerId),
+            generation: body,
+          },
+        );
       } catch (error) {
         return { status: 400, payload: { ok: false, error: error.message } };
       }
@@ -408,7 +421,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     if (!isMockJob && input.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssetsForAccount(account, [first], {
+        const [replacement] = await stageReferenceAssetsForAccount(backend, account, [first], {
           unique: Boolean(body.ownerId),
           generation: body,
         });
@@ -494,7 +507,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
    * node list is out of reach the run still goes ahead, without the upscale.
    */
   async function smartUpscalePrepare(graph, body) {
-    const { info } = await loadComfyContext().catch(() => ({ info: null }));
+    const { info } = await loadComfyContext(body.comfyBackend).catch(() => ({ info: null }));
     if (!info)
       return {
         skipped: "Smart upscale couldn’t check ComfyUI’s nodes",
@@ -575,12 +588,10 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         }
         return { status: 200, payload: { ok: true, backend: routed.backend, waiting: true } };
       }
-      return withComfyBackend(routed.backend, async () => {
-        const prepared = await prepareGenerationBody(input);
-        return prepared.payload
-          ? prepared
-          : { status: 200, payload: { ok: true, backend: routed.backend } };
-      });
+      const prepared = await prepareGenerationBody(routed.backend, input);
+      return prepared.payload
+        ? prepared
+        : { status: 200, payload: { ok: true, backend: routed.backend } };
     },
   };
 }

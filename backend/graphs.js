@@ -35,7 +35,10 @@ export async function uploadReferenceImage(dataUrl, body = {}) {
   const form = new FormData();
   form.append("image", new Blob([bytes], { type }), filename);
   form.append("type", "input");
-  const uploaded = await comfy("/upload/image", { method: "POST", body: form });
+  const uploaded = await comfy(body.comfyBackend, "/upload/image", {
+    method: "POST",
+    body: form,
+  });
   const comfyName = uploaded.name || filename;
   body.stagedInputNames = [...(body.stagedInputNames || []), comfyName];
   return comfyName;
