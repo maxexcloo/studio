@@ -163,7 +163,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await tileMenu(page);
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    // The assistant's options load in above Animate in Composer, moving it down the menu.
+    // Animate's options show once the assistant answers.
     if (operation === "Animate")
       await expect(
         page.getByRole("menuitem", { name: "Review Prompt", exact: true }),

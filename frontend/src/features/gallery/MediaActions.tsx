@@ -453,6 +453,8 @@ export function useMediaActions(
         },
       ]
     : [];
+  // The assistant and the animate offers decide every option, so they show together.
+  const optionsLoading = assistant.isPending || animation.isPending;
   const actions = [
     retry,
     stopUpscale &&
@@ -469,6 +471,7 @@ export function useMediaActions(
         note: refusal,
         onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
         menu: assistMenu({
+          loading: optionsLoading,
           settings: [...modelChoice, ...reviewItems],
           fixed: themeOptions(!animation.data),
           suggestions: motionsOffered ? motions.group : [],
@@ -493,6 +496,7 @@ export function useMediaActions(
         // keeps the clip's own model unless videos run on Cloud.
         note: refusal,
         menu: assistMenu({
+          loading: optionsLoading,
           settings: [...modelChoice, ...reviewItems],
           fixed: themeOptions(action.isPending),
           others: [...(reference ? [reference] : []), saveFrame],
