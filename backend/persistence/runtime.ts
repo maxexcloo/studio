@@ -77,12 +77,6 @@ function jsonStoreFiles(dataDir: string): string[] {
 export const ownerDocumentName = (name: string, ownerId = "") =>
   `${name}:${ownerId ? crypto.createHash("sha256").update(String(ownerId)).digest("hex") : ""}`;
 
-/** The file an account's document was (jsonStoreSource). */
-export function ownerDocumentFile(name: string) {
-  const [store, key] = name.split(":");
-  return key ? `accounts/${key}/${store}.json` : `${store}.json`;
-}
-
 /**
  * Runs `read` on a read-only copy of a stopped studio's database (undefined without one), so
  * SQLite may create sidecars only on the private copy.
