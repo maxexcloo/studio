@@ -37,7 +37,7 @@ import {
   withinFamily,
   workerState,
 } from "./tiers.js";
-import { animateThemes } from "../prompt-animate.js";
+import { promptStyleStore } from "../prompt-styles.js";
 import { findCard } from "./manage.js";
 import { output, shortPrompt } from "./results.js";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
@@ -90,15 +90,21 @@ const tier = z
     message: `Use one of ${mcpTiers.join(", ")}`,
   })
   .describe(`One of ${mcpTiers.join(", ")}; turbo is Super Fast.`);
-// The animation themes reuse takes, checked at call time like tier.
+// The animation themes reuse takes (Library › Prompt Styles' enabled Animate records), checked at
+// call time like tier.
+const themeIds = () =>
+  promptStyleStore()
+    .usable("animate")
+    .map((style) => style.id);
 const theme = z
   .string()
   .trim()
   .toLowerCase()
-  .refine((value) => Object.hasOwn(animateThemes, value), {
-    message: `Use one of ${Object.keys(animateThemes).join(", ")}`,
+  .superRefine((value, context) => {
+    if (!themeIds().includes(value))
+      context.addIssue({ code: "custom", message: `Use one of ${themeIds().join(", ")}` });
   })
-  .describe(`One of ${Object.keys(animateThemes).join(", ")}.`);
+  .describe(`One of ${themeIds().join(", ")}.`);
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
 const setTitle = z.string().trim().min(1).max(80);
 const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);

@@ -140,16 +140,18 @@ the primary component reference and verify APIs against the installed version.
   use `useOpenComposer`: close the source surface, open the correct page and
   focus the prompt; phones open Generate with the keyboard down.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
-  other phone text boxes open the shared full-screen editor. Only the send
-  stands beside the text, with one ⋯ menu of its `tools`: the box's own
-  (Suggestions, Ask for a Change… or Improve Prompt, Recent Prompts), then Copy
-  where the page has no other, then Clear, which turns into Undo until the text
-  next changes. The menu is one level deep: a tool's options (suggested changes,
-  Improve Prompt's styles) are listed first under its name, never in a submenu.
+  other phone text boxes open the shared full-screen editor. Beside the text
+  stand only the send, small Copy (where the page has no other) and Clear icons,
+  Clear turning into Undo until the text next changes, and one ⋯ menu of the
+  box's own `tools` (Suggestions, Ask for a Change… or Improve Prompt, Recent
+  Prompts). The menu is one level deep: a tool's options (suggested changes,
+  Improve Prompt's styles, each with its description) are listed first under its
+  name, never in a submenu, then the other tools as one group. Improve Prompt's
+  styles, like Animate's themes, are Library › Prompt Styles' records, in order.
   A box that opens the phone editor has no ⋯ beside it: the editor shows the
-  tools as named buttons in a bar above the keyboard, then Clear as an icon
-  beside the sends, as in the composer, and its header holds only the title and
-  Done. A box without tools has no ⋯. Suggestions holds Refresh Suggestions
+  tools as named buttons in a bar above the keyboard, then Copy and Clear as
+  icons beside the sends, as in the composer, and its header holds only the
+  title and Done. A box without tools has no ⋯, Copy or Clear. Suggestions holds Refresh Suggestions
   under its options. The viewer's prompt has Improve Prompt (every style but
   Custom), resets to the item's prompt rather than clearing, and its phone
   editor sends Ask for a Change beside Generate. It rests on one line ending in

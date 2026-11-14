@@ -5,7 +5,8 @@
  * always knows the frame: it sees it when the running text model reads images, and otherwise reads
  * the frame's gallery caption; the prompt that made the frame is guidance on top. It also gets the
  * video profile's prompting guide, the clip's length and frame rate, and whether the model makes
- * sound. Spicy, and explicit wording in a Custom instruction, need Uncensored Models.
+ * sound. Its themes are Library › Prompt Styles' Animate records; an uncensored theme (Spicy), and
+ * explicit wording in a Custom instruction, need Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
  *
@@ -23,21 +24,10 @@ import {
 } from "./domain/writing-standard.ts";
 import { isCloudProfile } from "../shared/profiles.ts";
 import { families } from "./family-catalogue.js";
+import { promptStyleStore } from "./prompt-styles.js";
 
-export const animateThemes = Object.freeze({
-  cinematic:
-    "Cinematic Camera: a camera move the subject's action motivates carries the shot. The subject does something (turns to look, steps forward, rises, reaches, reacts to someone) and the camera answers it: tracking alongside a walk, arcing around a turn, craning up as they rise, pushing in on a reaction, pulling out to reveal where they are. The move has a speed that matches the action (medium speed while the subject moves, slow only for a held emotional beat) starts with the action and lands on a different framing than it began. The world moves around them: parallax between foreground and background, passers-by, weather and light.",
-  living:
-    "Living Photo: the moment keeps rolling as if the photo were a candid video. Each person carries on with what they are doing in real time, with natural, unposed movement that goes somewhere (a laugh that breaks into a glance away, a sip, brushing hair back, turning to someone, a few steps), and the surroundings keep moving: passers-by, traffic, wind, water, steam, flickering light. Something small but clearly visible changes early (a laugh breaking, a turn, a sip) and the moment settles into a new beat by the end. The camera is handheld with a light natural sway or makes a small reframe as someone moves. No big action or new events.",
-  action:
-    "Action: the subject does one clear, physical, energetic action that this frame sets up, from their pose, the props and the place (spinning, leaping, running, throwing, striking, dancing), with a quick wind-up, a peak that lands by the middle of the clip and a follow-through, the kind of thing this person would do here. Momentum shows in the body and its secondary motion (hair whipping, fabric snapping, splashes, sparks, dust or debris), and the camera moves with it: tracking alongside, whip-panning, a handheld follow or a fast push-in on the impact, at a pace that keeps the motion readable.",
-  dialogue:
-    "Dialogue: the people in the frame talk. Give one or two short spoken lines, or a quick exchange between two people in the frame, that fit who they are, where they are and what they are doing, each with who says it and how. Speech comes with the body language of talking: lips in sync, a nod, a shrug, a hand lifting to make a point, eyes meeting, and the listener reacting. The camera covers the conversation: a push-in on the speaker, a handheld over-the-shoulder reframe, or a small arc from one speaker to the other. The first line starts within the first couple of seconds, and the clip ends on a reaction: the listener's answer, a laugh or a look. Where no one in the frame can speak, a short voiceover that fits the scene speaks instead.",
-  spicy:
-    "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
-  custom:
-    "Custom: the person's instruction decides what happens. Make it happen with what is in the frame, and build the beats, camera and any sound around it without changing it. Bring in only what the instruction names, entering naturally (from out of frame, through a door) rather than appearing from nowhere.",
-});
+/** An enabled Animate theme (Library › Prompt Styles) or Custom, by id; null otherwise. */
+const animateTheme = (id) => promptStyleStore().style("animate", id);
 
 // Phrases that tell a video model nothing; the writer is told to leave them out. Not "cinematic",
 // which MiniMax H3's own guide uses.
@@ -107,6 +97,8 @@ export function animateInstructions({
   explicit = false,
 }) {
   const { seconds = 0, fps = 0 } = clip;
+  const theme = animateTheme(writing.theme);
+  if (!theme) throw new AssistantError("Choose a known animation theme.", { status: 400 });
   const audio = makesSound(profile);
   const words = seconds ? Math.min(160, Math.max(60, Math.round(40 + 12 * seconds))) : 100;
   // About two and a half spoken words a second, leaving room for the action around them.
@@ -138,9 +130,9 @@ export function animateInstructions({
     `Leave out filler that shows nothing (${animateFiller.join(", ")}, stacked adjectives): name the specific movement, speed and camera path instead, so every phrase is something the viewer sees${audio ? " or hears" : ""}.`,
     `Unless the guide sets a length, write about ${words} words.`,
     "Reply with the prompt only, as plain text: no preamble, Markdown or notes, and no quotation marks around the whole prompt.",
-    `Theme: ${animateThemes[writing.theme]}`,
-    // Spicy is admitted only with Uncensored Models (animateIssue).
-    contentRule(explicit || writing.theme === "spicy"),
+    `Theme: ${theme.instruction}`,
+    // An uncensored theme (Spicy) is admitted only with Uncensored Models (animateIssue).
+    contentRule(explicit || Boolean(theme.uncensored)),
     `Prompting guide: ${writerGuide(guide) || "(none; write a clear, specific natural-language prompt)"}`,
   ]
     .filter(Boolean)
@@ -164,12 +156,12 @@ export function animateRequest(value) {
 
 /** Why the request can't be written, as { status, error }, or null; `allowed(feature)` is the account's grant. */
 export function animateIssue(writing, { allowed }) {
-  if (!Object.hasOwn(animateThemes, writing.theme))
-    return { status: 400, error: "Choose a known animation theme." };
-  if (writing.theme === "custom" && !writing.instruction)
+  const theme = animateTheme(writing.theme);
+  if (!theme) return { status: 400, error: "Choose a known animation theme." };
+  if (theme.custom && !writing.instruction)
     return { status: 400, error: "Describe what should happen." };
-  if (writing.theme === "spicy" && !allowed("uncensoredModels"))
-    return { status: 403, error: "Spicy needs Uncensored Models for this account." };
+  if (theme.uncensored && !allowed("uncensoredModels"))
+    return { status: 403, error: `${theme.label} needs Uncensored Models for this account.` };
   return null;
 }
 

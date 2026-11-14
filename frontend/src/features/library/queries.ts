@@ -71,3 +71,31 @@ export const profileStatsQuery = queryOptions({
   queryKey: ["profile-stats"],
   queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
 });
+
+/** One of the assistant's fixed options, as Library › Prompt Styles edits it. */
+export interface PromptStyle {
+  id: string;
+  /** The menu it belongs to: Improve Prompt, Animate or fixed AI edits. */
+  kind: "improve" | "animate" | "change";
+  label: string;
+  description: string;
+  instruction: string;
+  enabled: boolean;
+  uncensored?: boolean;
+}
+export interface PromptStyleVersion {
+  version: number;
+  by?: string;
+  origin?: string;
+  aiDrafted?: boolean;
+}
+/** The assistant's fixed options in menu order, with their hash (an edit's base) and meta. */
+export interface PromptStyleList {
+  styles: PromptStyle[];
+  hash: string;
+  meta: PromptStyleVersion | null;
+}
+export const promptStylesQuery = queryOptions({
+  queryKey: [...definitionsKey, "prompt-styles"],
+  queryFn: () => api<PromptStyleList>("/api/profiles/prompt-styles"),
+});
