@@ -40,14 +40,6 @@ run = "node --test 'backend/**/*.test.{js,ts}' 'frontend/**/*.test.ts'"
 [tasks."test:browser"]
 run = "playwright test"
 
-# Setup
-[tasks.setup]
-run = "npm ci --no-audit --no-fund"
-
-# Prompt Assistant Evals (live Bifrost replay on demand, never in CI; --record refreshes the fixtures)
-[tasks."eval:assistant"]
-run = "node backend/commands/assistant-eval.mjs"
-
 # Native bridge checks live with each custom node, outside tests/.
 [tasks."test:python"]
 run = '''
@@ -55,6 +47,15 @@ PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radia
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
 '''
 
+# Scripts
 # Signs agent-browser in to live Studio and LibreChat as the Git user, through kubectl exec.
 [tasks."browser-sign-in"]
 run = "node backend/commands/browser-sign-in.mjs"
+
+# Replays the prompt assistant evals through live Bifrost on demand, never in CI; --record refreshes the fixtures.
+[tasks."eval:assistant"]
+run = "node backend/commands/assistant-eval.mjs"
+
+# Setup
+[tasks.setup]
+run = "npm ci --no-audit --no-fund"
