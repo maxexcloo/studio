@@ -14,7 +14,7 @@ RUN python3 -m pip install --no-cache-dir \
     # renovate: datasource=pypi depName=fsspec
     fsspec==2026.9.0 \
     # renovate: datasource=pypi depName=peft
-    peft==0.21.2 \
+    peft==0.21.3 \
     # renovate: datasource=pypi depName=rotary_embedding_torch
     rotary_embedding_torch==0.9.2 \
     && rm -rf /root/ComfyUI
