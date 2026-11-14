@@ -14,16 +14,14 @@ import {
   toolbarSearch,
 } from "./fixtures";
 
-test("The Library groups its sections under headings, A–Z, and opens on Models", async ({
-  page,
-}) => {
+test("The Library groups its sections under headings and opens on Models", async ({ page }) => {
   await fixtures(page);
   await page.goto("/library");
   const groups = {
-    Cards: ["Characters", "Outfits", "Scenes"],
-    Catalogue: ["LoRAs", "Models", "Unused"],
-    Generation: ["Guides", "Profiles"],
-    "Getting More": ["Downloads", "Imports"],
+    "Your Cards": ["Characters", "Outfits", "Scenes"],
+    "Models & LoRAs": ["Models", "LoRAs", "Unused"],
+    Prompting: ["Guides", "Profiles"],
+    "Add Models": ["Imports", "Downloads"],
   };
   const order = Object.values(groups).flat();
   if ((page.viewportSize()?.width || 1440) < 768) {
