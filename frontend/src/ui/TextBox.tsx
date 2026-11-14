@@ -23,6 +23,7 @@ import {
   type ModalProps,
   type TextareaProps,
   useProps,
+  VisuallyHidden,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowUp, type LucideIcon } from "lucide-react";
@@ -154,16 +155,18 @@ export function TextBox({
   ];
   // The phone editor's tools, Clear standing beside the sends instead.
   const editorTools = actions?.filter((action) => action !== clear);
-  // What a tool is doing shows over the text with a spinner, where the person is looking, phone
-  // editor included; it stands in for the box's description meanwhile.
-  const description = busy ? (
-    <span className={classes.busy} role="status">
-      <Loader size={12} />
-      {busy}
-    </span>
-  ) : (
-    props.description
-  );
+  // What a tool is doing spins the ⋯ (its tooltip names it); without a ⋯ in sight, as in the phone
+  // editor, it shows over the text with a spinner, standing in for the box's description meanwhile.
+  const spins = Boolean(actions) && !phone && !hideTools;
+  const description =
+    busy && !spins ? (
+      <span className={classes.busy} role="status">
+        <Loader size={12} />
+        {busy}
+      </span>
+    ) : (
+      props.description
+    );
   const [focused, setFocused] = useState(false);
   const resting = oneLine && !focused;
   // The resting line is drawn over the text, since WebKit ends no textarea in an ellipsis; it
@@ -299,6 +302,7 @@ export function TextBox({
   );
   return (
     <>
+      {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
       {(!phone && menu && !inside) || send ? (
         <div className={classes.columned}>
