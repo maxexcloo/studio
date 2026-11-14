@@ -32,7 +32,7 @@ export function registerResultTools({
   media,
   actor,
   resolveOutput,
-  imageWaitSeconds,
+  reviewWaitSeconds,
 }) {
   const { owner, refs } = actor;
   const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
@@ -255,7 +255,7 @@ export function registerResultTools({
           await target(job_id, output_index, signal),
           ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
         ],
-        { scope: refs, signal, waitSeconds: imageWaitSeconds },
+        { scope: refs, signal, waitSeconds: reviewWaitSeconds },
       ),
     { readOnlyHint: true },
   );
