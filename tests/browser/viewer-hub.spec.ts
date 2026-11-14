@@ -428,11 +428,11 @@ test("Similar › More Like This Set asks for new variations of a result's set",
 });
 
 test("More Like This Set is offered only for a result in a set", async ({ page }) => {
-  const { viewer } = await seed(page);
-  // Without it, Similar has no menu and ranks the gallery at once.
-  await expect(viewer.getByRole("button", { name: "Similar", exact: true })).not.toHaveAttribute(
-    "aria-haspopup",
-  );
+  await seed(page);
+  // Similar's menu still holds its strictness and its run.
+  await viewerAction(page, "Similar");
+  await expect(page.getByRole("menuitem")).toHaveText(["Similar"]);
+  await page.keyboard.press("Escape");
   await viewerAction(page, "Recreate");
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(

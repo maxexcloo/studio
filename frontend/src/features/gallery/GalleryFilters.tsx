@@ -5,6 +5,7 @@ import {
   Group,
   Input,
   MultiSelect,
+  Popover,
   Scroller,
   SegmentedControl,
   Stack,
@@ -32,6 +33,18 @@ interface GalleryFilterOption {
   count?: number;
   /** Every recorded value the option stands for, when one clean name covers several. */
   keys?: string[];
+}
+/** An active filter's chip; one with a `choice` opens it beside its remove button, to change in place. */
+export interface FilterChip {
+  key: string;
+  label: string;
+  remove: () => void;
+  choice?: {
+    label: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (value: string) => void;
+  };
 }
 const keysOf = (option: GalleryFilterOption) => option.keys || [option.value];
 
@@ -195,8 +208,8 @@ interface FilterProps {
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
-  extra: { key: string; label: string; remove: () => void }[] = [],
-) {
+  extra: FilterChip[] = [],
+): FilterChip[] {
   const { options } = useFacetOptions(kind, value);
   const date = dates.find((option) => option.value === value.date)?.chip;
   return [
@@ -236,13 +249,7 @@ export function useActiveFilters(
  * Every image list's toolbar shares these parts: the active filters as removable chips with
  * Clear All, and one Filter ▾ chip that opens the filters.
  */
-export function FilterChips({
-  chips,
-  onClear,
-}: {
-  chips: { key: string; label: string; remove: () => void }[];
-  onClear: () => void;
-}) {
+export function FilterChips({ chips, onClear }: { chips: FilterChip[]; onClear: () => void }) {
   return (
     <Scroller
       className={classes.chips}
@@ -250,18 +257,47 @@ export function FilterChips({
       controlSize={28}
     >
       <Group gap={6} wrap="nowrap" py={4} role="group" aria-label="Active Filters">
-        {chips.map((chip) => (
-          <Button
-            key={chip.key}
-            {...chipProps}
-            variant="light"
-            aria-label={`Remove ${chip.label} Filter`}
-            rightSection={<X size={14} />}
-            onClick={chip.remove}
-          >
-            {chip.label}
-          </Button>
-        ))}
+        {chips.map((chip) =>
+          chip.choice ? (
+            <Popover key={chip.key} position="bottom-start" shadow="md" trapFocus>
+              <Button.Group>
+                <Popover.Target>
+                  <Button {...chipProps} variant="light" rightSection={<ChevronDown size={14} />}>
+                    {chip.label}
+                  </Button>
+                </Popover.Target>
+                <Button
+                  {...chipProps}
+                  variant="light"
+                  aria-label={`Remove ${chip.label} Filter`}
+                  onClick={chip.remove}
+                >
+                  <X size={14} />
+                </Button>
+              </Button.Group>
+              <Popover.Dropdown>
+                <SegmentedControl
+                  aria-label={chip.choice.label}
+                  size="xs"
+                  value={chip.choice.value}
+                  onChange={chip.choice.onChange}
+                  data={chip.choice.options}
+                />
+              </Popover.Dropdown>
+            </Popover>
+          ) : (
+            <Button
+              key={chip.key}
+              {...chipProps}
+              variant="light"
+              aria-label={`Remove ${chip.label} Filter`}
+              rightSection={<X size={14} />}
+              onClick={chip.remove}
+            >
+              {chip.label}
+            </Button>
+          ),
+        )}
         {chips.length > 1 && (
           <Button
             {...chipProps}
