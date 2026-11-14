@@ -403,7 +403,8 @@ function ActionControl({
 /**
  * The action bar shared by the viewer and gallery selection: icon controls in divided groups; the
  * `labelled` ones show their names. Controls that overflow scroll sideways, or with `fit` stay on
- * one row by showing the last labelled ones as icons alone, and only past that wrap onto another
+ * one row by showing the last labelled ones as icons alone, then drawing their ▾ closer, and only
+ * past that wrap onto another
  * row a whole group at a time, spaced apart rather than divided so no divider ends a row. Menus
  * open above it unless `menuPosition` says otherwise.
  */
@@ -429,6 +430,7 @@ export function ActionBarGroups({
   const key = actions.map((action) => `${action.id}:${action.label}`).join();
   const [fitted, setFitted] = useState({ key, room: 0, dropped: 0 });
   const dropped = fitted.key === key ? fitted.dropped : 0;
+  const tight = fit && dropped >= named.length;
   const wrap = fit && dropped > named.length;
   const names = new Set(
     named.slice(0, Math.max(0, named.length - dropped)).map((action) => action.id),
@@ -452,6 +454,7 @@ export function ActionBarGroups({
       ref={row}
       className={classes.actions}
       data-fit={fit || undefined}
+      data-tight={tight || undefined}
       data-wrap={wrap || undefined}
       data-compact={compact || undefined}
     >
