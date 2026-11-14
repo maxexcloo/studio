@@ -34,7 +34,7 @@ export function createPromptSuggester(options: {
   writer: PromptDescriber | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  items(): Iterable<SuggestedPromptItem>;
+  items(since?: number): Iterable<SuggestedPromptItem>;
   changes?(): number;
   visible(item: SuggestedPromptItem): boolean;
   /** A small (≤512 px) copy of the picture, or null when there is none. */

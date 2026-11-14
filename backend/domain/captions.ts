@@ -45,7 +45,7 @@ export function createCaptioner(options: {
   writer: CaptionWriter | null;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  items(): Iterable<CaptionItem>;
+  items(since?: number): Iterable<CaptionItem>;
   changes?(): number;
   visible(item: CaptionItem): boolean;
   /** A small (≤512 px) copy of the image, or null when there is none. */
