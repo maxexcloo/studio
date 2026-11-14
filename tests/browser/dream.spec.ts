@@ -434,17 +434,28 @@ test("Full screen switches between a comparison's sides and judges from its bar"
   expect(dream.requests[0].body).toEqual({ answer: "neither" });
 });
 
-test("The Dream tab counts the results waiting for a verdict", async ({ page }) => {
+test("The Dream tab counts the results waiting for a verdict, a comparison as one", async ({
+  page,
+}) => {
   await fixtures(page);
-  await serveDream(page, { unseen: ["one", "two", "three"].map((id) => dreamItem(id)) });
+  const side = (id: string, index: 0 | 1) =>
+    dreamItem(id, {
+      dream: {
+        ...dreamItem(id).dream,
+        pair: { id: "steps", side: index, question: "Which Steps?", label: id },
+      },
+    });
+  await serveDream(page, {
+    unseen: [...["one", "two", "three"].map((id) => dreamItem(id)), side("sa", 0), side("sb", 1)],
+  });
   await page.goto("/images");
   const tab = page
     .getByRole("navigation", { name: "Creative Modes" })
     .getByRole("link", { name: "Dream", exact: true });
-  await expect(tab).toHaveAccessibleDescription("3 Unseen");
+  await expect(tab).toHaveAccessibleDescription("4 Unseen");
   await tab.click();
   await page.getByRole("button", { name: "Like Dream prompt one", exact: true }).click();
-  await expect(tab).toHaveAccessibleDescription("2 Unseen");
+  await expect(tab).toHaveAccessibleDescription("3 Unseen");
 });
 
 test("Dream's projects are created, edited, undone and deleted in dialogs", async ({

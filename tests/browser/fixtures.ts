@@ -840,6 +840,7 @@ export async function fixtures(page: Page) {
         etaSeconds: null,
       });
     // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
+    if (path === "/api/dream/count") return respond({ unseen: 0, active: false });
     if (path === "/api/dream")
       return respond({
         settings: {
@@ -1317,6 +1318,13 @@ export async function serveDream(
       return route.fulfill({ json: { since: options.since ?? null } });
     if (method !== "GET") state.requests.push({ method, path, body });
     if (path === "/api/dream") return route.fulfill({ json: show() });
+    if (path === "/api/dream/count")
+      return route.fulfill({
+        json: {
+          unseen: new Set(state.unseen.map((item) => item.dream?.pair?.id ?? item.id)).size,
+          active: state.settings.enabled && !state.settings.paused,
+        },
+      });
     if (path === "/api/dream/settings") {
       Object.assign(state.settings, body);
       return route.fulfill({ json: show() });

@@ -7,7 +7,7 @@ import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { fittedPopup } from "../generation/chip";
-import { dreamQuery, dreamWhen, type Dream, type DreamSettings } from "./queries";
+import { dreamCountQuery, dreamQuery, dreamWhen, type Dream, type DreamSettings } from "./queries";
 
 /** Saves part of the Dream settings and shows the result at once. */
 export function useDreamSettings() {
@@ -22,7 +22,11 @@ export function useDreamSettings() {
         dreamQuery.queryKey,
         (dream) => dream && { ...dream, settings: { ...dream.settings, ...patch } },
       ),
-    onSuccess: (dream) => client.setQueryData(dreamQuery.queryKey, dream),
+    onSuccess: (dream) => {
+      client.setQueryData(dreamQuery.queryKey, dream);
+      // The header polls its count only while Dream runs.
+      void client.invalidateQueries({ queryKey: dreamCountQuery.queryKey });
+    },
     onError: () => client.invalidateQueries({ queryKey: dreamQuery.queryKey }),
   });
 }
