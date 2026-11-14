@@ -34,11 +34,7 @@ export function LibraryPromptCards({
           query={query}
           onQueryChange={listing.data?.length ? setQuery : undefined}
           actions={
-            <ToolbarAction
-              label={`New ${noun}`}
-              icon={<icons.add size={16} />}
-              onClick={() => dialogs.edit()}
-            />
+            <ToolbarAction label={`New ${noun}`} icon={icons.add} onClick={() => dialogs.edit()} />
           }
         />
       </SectionHeader>

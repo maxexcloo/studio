@@ -51,11 +51,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={characters.data?.length ? setQuery : undefined}
           actions={
-            <ToolbarAction
-              label="New Character"
-              icon={<icons.add size={16} />}
-              onClick={() => dialogs.edit()}
-            />
+            <ToolbarAction label="New Character" icon={icons.add} onClick={() => dialogs.edit()} />
           }
         />
       </SectionHeader>

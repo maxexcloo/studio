@@ -22,7 +22,6 @@ import {
   Check,
   ImageOff,
   KeyRound,
-  Plus,
   ShieldCheck,
   Unlink,
   UserCheck,
@@ -302,11 +301,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
         <SectionToolbar
           label="Groups"
           actions={
-            <ToolbarAction
-              label="New Group"
-              icon={<Plus size={18} />}
-              onClick={() => setEditing("new")}
-            />
+            <ToolbarAction label="New Group" icon={icons.add} onClick={() => setEditing("new")} />
           }
         />
       </SectionHeader>
@@ -617,11 +612,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           query={query}
           onQueryChange={setQuery}
           actions={
-            <ToolbarAction
-              label="New User"
-              icon={<Plus size={18} />}
-              onClick={() => setCreating(true)}
-            />
+            <ToolbarAction label="New User" icon={icons.add} onClick={() => setCreating(true)} />
           }
         />
       </SectionHeader>
