@@ -75,6 +75,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     inspiration: [] as DreamInspiration[],
     /** Rolls for the next chance draws (out of 100); every other draw is 0. */
     rolls: [] as number[],
+    /** The next draws out of other sizes; every other draw is 0. */
+    draws: {} as Record<number, number[]>,
     /** The account's cards, or null without Characters. */
     cards: { characters: [], outfits: [], scenes: [] } as Record<CardKind, Character[]> | null,
     /** The local video profile Dream would choose, or why none can. */
@@ -82,6 +84,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     videoRefusal: "",
     /** Gallery items deleted or hidden since Dream listed them, which can't be referenced. */
     gone: new Set<string>(),
+    /** How alike two images are, as Image Search's vectors would say. */
+    likeness: (_a: DreamItem, _b: DreamItem): number | undefined => undefined,
     /** The text model's reply when asked for suggestions. */
     suggestions: { suggestions: [] } as unknown,
   };
@@ -104,6 +108,7 @@ function fixture(t: TestContext, catalogue = profiles) {
           (query.dreamState === undefined ||
             [query.dreamState].flat().includes(item.dream?.state)) &&
           (!query.liked || item.favorite || item.dream?.state === "kept") &&
+          (!query.favorite || item.favorite) &&
           (!query.type || item.type === query.type) &&
           (!query.status || item.status === query.status) &&
           (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
@@ -157,6 +162,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
     visible: (items) => items.filter((item) => !item.dream || item.dream.state === "kept"),
+    likeness: (a, b) => state.likeness(a, b),
     mark: (ownerId, itemId, mark) => {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
@@ -219,7 +225,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     cancel: async (ownerId, jobId) =>
       store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
     now: () => state.clock,
-    random: (size) => (size === 100 && state.rolls.length ? state.rolls.shift()! : 0),
+    random: (size) => (size === 100 ? state.rolls : (state.draws[size] ??= [])).shift() ?? 0,
     log: { info: (message) => state.logs.push(message) },
   });
   /** Finishes a job and its tile, as saving its outputs would. */
@@ -227,10 +233,15 @@ function fixture(t: TestContext, catalogue = profiles) {
     store.save({ ...store.job(ownerId, jobId)!, status: "completed" });
     for (const item of state.items) if (item.jobId === jobId) item.status = "done";
   };
-  /** Gallery reads not narrowed to Dream results, liked items, chats or ids: walks of the gallery. */
+  /** Gallery reads not narrowed to Dream results, liked or starred items, chats or ids: walks of the gallery. */
   const walks = () =>
     state.reads.filter(
-      (query) => !query.dreamState && !query.liked && !query.conversationIds && !query.ids,
+      (query) =>
+        !query.dreamState &&
+        !query.liked &&
+        !query.favorite &&
+        !query.conversationIds &&
+        !query.ids,
     );
   const dreamJobs = (ownerId?: string) =>
     store.jobs(ownerId).filter((job) => job.priority === queuePriority.dream);
@@ -843,6 +854,45 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
   projects.activity("alice", "chat-1");
   assert.equal((await dreamOnce())?.dream?.projectId, undefined);
   assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
+});
+
+test("Dream seeds from the account's stars, its own results only one draw in four, and spreads its seeds", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const image = (id: string, extra: Partial<DreamItem>) => {
+    const input = { kind: "image", prompt: `prompt ${id}`, profileId: "flux" };
+    const session = store.createSession("alice", "Gallery").id;
+    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
+    store.save({ ...job, status: "completed" });
+    state.items.push({
+      id,
+      jobId: job.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      ...extra,
+    });
+  };
+  const kept = { state: "kept" as const, prompt: "", why: "", at: "" };
+  image("old", { favorite: true, createdAt: "2026-01-01T00:00:00Z" });
+  image("super", { favorite: true, dream: kept });
+  image("liked", { dream: kept });
+  // A roll of 99 starts no series; a draw of 1 of 4 leaves Dream's own results out.
+  state.rolls = [99];
+  state.draws[4] = [1];
+  const first = await dreamOnce();
+  assert.match(String(first?.dream?.why), /^Varying a starred image: /);
+  assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt old/);
+  assert.deepEqual(dream.read("alice").seeds, ["old"]);
+  // A draw of 0 lets them in: the latest seed waits its turn, and of the rest the one least like it
+  // by image seeds. A Like is no star.
+  state.likeness = (a, b) => (a.id === "super" && b.id === "old" ? 0.95 : 0.5);
+  state.rolls = [99];
+  const second = await dreamOnce();
+  assert.match(String(second?.dream?.why), /^Varying a liked result: /);
+  assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt liked/);
+  assert.deepEqual(dream.read("alice").seeds, ["liked", "old"]);
+  assert.equal(state.items.find((item) => item.id === "liked")?.favorite, undefined);
 });
 
 test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
