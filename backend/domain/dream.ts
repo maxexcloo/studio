@@ -111,12 +111,13 @@ export type PairAnswer = "a" | "b" | "both" | "neither";
 type DreamState = "unseen" | "kept" | "discarded";
 type DreamVideoSource = { item: DreamItem; extend: boolean };
 /**
- * A gallery read narrowed in SQL (gallery/store.js): Dream states, starred items with kept results
- * (`liked`), kind, status, the chats that asked for them or ids.
+ * A gallery read narrowed in SQL (gallery/store.js): Dream states, starred items (`favorite`), with
+ * kept results (`liked`), kind, status, the chats that asked for them or ids.
  */
 type DreamQuery = {
   dreamState?: DreamState | DreamState[];
   liked?: boolean;
+  favorite?: boolean;
   type?: string;
   status?: string;
   conversationIds?: string[];
@@ -314,6 +315,8 @@ interface DreamRecord {
   declined?: string[];
   /** The series under way. */
   series?: DreamSeries;
+  /** The starred or liked images Dream continued or started a series from, newest first. */
+  seeds?: string[];
   /** Images Dream animated and videos it extended, newest first, so each is used once. */
   animated?: string[];
   extended?: string[];
@@ -405,8 +408,17 @@ const recentIdeas = 100;
 const recentPromptCharacters = 400;
 /** The writer avoids this many of the latest discarded subjects. */
 const avoidDiscards = 8;
-/** Dream varies one of this many of the newest starred and kept images, and the writer samples a few of their prompts. */
-const tastePool = 100;
+/**
+ * Seeds and the writer's starred prompts come from a random sample of this many of the account's
+ * stars, across its whole history, and for seeds a third as many Likes (kept Dream results). Dream's
+ * own results, Super Liked or Liked, seed one draw in `ownSeedEvery`, so Dream doesn't feed on
+ * itself, unless the account has starred nothing else.
+ */
+const seedSample = 9;
+const ownSeedEvery = 4;
+/** Dream uses none of its latest seeds again, and draws the sampled one least like them by image. */
+const recentSeeds = 30;
+const compareSeeds = 10;
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
 const tickMs = 45_000;
@@ -663,6 +675,8 @@ export function createDream(options: {
   items(ownerId: string, ids: string[]): DreamItem[];
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
+  /** How alike two items' images are (Image Search), undefined where either is not read. */
+  likeness(a: DreamItem, b: DreamItem): number | undefined;
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
   /** Deletes the owner's items and their files, as the gallery's own delete does. */
   remove(ownerId: string, itemIds: string[]): void;
@@ -898,22 +912,25 @@ export function createDream(options: {
     return video && chance(extendShare) ? [{ item: video, extend: true }, ...stills] : stills;
   }
   /**
-   * The series to continue, or for a share of images a new one following one of the newest starred
-   * or liked images through a night: from a drawn time on, through places from the account's scene
-   * cards and drawn ones. Null otherwise; a series whose image or profile is gone ends.
+   * The series to continue, or for a share of images a new one following a drawn starred or liked
+   * image (`seedPick`) through a night: from a drawn time on, through places from the account's
+   * scene cards and drawn ones. Null otherwise; a series whose image is no longer starred or liked,
+   * or whose profile is gone, ends.
    */
   function seriesNext(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
-    const liked = picks(ownerId, profiles);
     const current = record.series;
     if (current) {
-      const seed = liked.find(({ item }) => String(item.id) === current.itemId);
+      const [item] = options
+        .items(ownerId, [current.itemId])
+        .filter((entry) => entry.favorite || entry.dream?.state === "kept");
+      const seed = item && seedOf(ownerId, item, profiles);
       if (seed) return { series: current, seed };
       const latest = read(ownerId);
       delete latest.series;
       write(ownerId, latest);
     }
-    if (!liked.length || !chance(seriesShare)) return null;
-    const seed = pick(liked.slice(0, tastePool));
+    const seed = seedPick(ownerId, record, profiles);
+    if (!seed || !chance(seriesShare)) return null;
     const scenes = (options.cards(ownerId)?.scenes || [])
       .filter((scene) => scene.description)
       .map((scene): [string, string] => [scene.name, `${scene.name}: ${scene.description}`]);
@@ -975,19 +992,60 @@ export function createDream(options: {
     return seeds.length ? pick(seeds) : null;
   }
   /**
-   * The account's starred images and liked results, newest first, with the input each ran with and
-   * its profile where that is still ready.
+   * A random sample of the account's starred images (`seedSample`) and, for one draw in
+   * `ownSeedEvery`, its Likes, a third as many; otherwise stars Dream made are left out too, unless
+   * they are all it starred.
    */
-  function picks(ownerId: string, profiles: DreamProfile[]) {
-    return generations(ownerId, { liked: true, type: "image", status: "done" }).flatMap((item) => {
-      const input = store.job(ownerId, String(item.jobId))?.input;
-      const profile = profiles.find(
-        (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
-      );
-      const prompt = clean(input?.prompt, maxPromptCharacters);
-      return input && profile && prompt ? [{ item, input, profile, prompt }] : [];
-    });
+  function favourites(ownerId: string) {
+    const query = { type: "image", status: "done" };
+    const stars = generations(ownerId, { ...query, favorite: true, sample: seedSample });
+    const others = stars.filter((item) => !item.dream);
+    if (others.length && random(ownSeedEvery)) return others;
+    const likes = generations(ownerId, {
+      ...query,
+      dreamState: "kept",
+      sample: Math.ceil(seedSample / 3),
+    }).filter((item) => !item.favorite);
+    return [...stars, ...likes];
   }
+  /** A starred or liked image with the input it ran with and its profile where that is still ready. */
+  function seedOf(ownerId: string, item: DreamItem, profiles: DreamProfile[]) {
+    const input = store.job(ownerId, String(item.jobId))?.input;
+    const profile = profiles.find(
+      (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
+    );
+    const prompt = clean(input?.prompt, maxPromptCharacters);
+    return input && profile && prompt ? { item, input, profile, prompt } : null;
+  }
+  const drawSeeds = (ownerId: string, profiles: DreamProfile[]) =>
+    favourites(ownerId).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
+  /**
+   * A seed for a continued idea or a series: of `drawSeeds`, one Dream has not used lately where it
+   * can, the one least like the latest few by image, so its seeds spread across the account's
+   * subjects. Null without one.
+   */
+  function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+    const used = record.seeds || [];
+    const drawn = drawSeeds(ownerId, profiles);
+    const unused = drawn.filter(({ item }) => !used.includes(String(item.id)));
+    const latest = options.items(ownerId, used.slice(0, compareSeeds));
+    const nearest = (item: DreamItem) =>
+      Math.max(-1, ...latest.map((seen) => options.likeness(item, seen) ?? -1));
+    let best: ReturnType<typeof seedOf> = null;
+    let least = Infinity;
+    for (const seed of unused.length ? unused : drawn) {
+      const near = nearest(seed.item);
+      if (near < least) [best, least] = [seed, near];
+    }
+    return best;
+  }
+  /** Notes a seed as Dream's latest. */
+  const seeded = (record: DreamRecord, itemId: string) => {
+    record.seeds = [itemId, ...(record.seeds || []).filter((id) => id !== itemId)].slice(
+      0,
+      recentSeeds,
+    );
+  };
   /** The settings of a seed's input a continued idea or a comparison keeps. */
   const settingsOf = (input: GenerationInput): GenerationInput =>
     Object.fromEntries(
@@ -1096,12 +1154,10 @@ export function createDream(options: {
         : {}),
     };
   }
-  /** A few of the newest starred or kept prompts, sampled so each idea sees different ones. */
+  /** A few starred prompts from the account's whole history, sampled so each idea sees different ones. */
   function tastePrompts(ownerId: string) {
-    const pool = generations(ownerId, { liked: true })
+    return generations(ownerId, { favorite: true, sample: seedSample })
       .filter((item) => item.prompt)
-      .slice(0, tastePool);
-    return shuffled(pool)
       .slice(0, 3 + random(3))
       .map((item) => clean(item.prompt, 300));
   }
@@ -1510,13 +1566,12 @@ export function createDream(options: {
       const project = projects.length
         ? projects[(record.projectTurns || 0) % projects.length]
         : undefined;
-      // Familiar images continue a handed-off project's chat work, else one of the newest starred
-      // or liked images, changing one thing in turn.
+      // Familiar images continue a handed-off project's chat work, else a drawn starred or liked
+      // image, changing one thing in turn.
       const familiar = !axis && !steer && kind === "image";
       const chatSeed = familiar && project && handedOff(project) ? seedFor(ownerId, project) : null;
-      const liked =
-        familiar && !chatSeed ? picks(ownerId, catalogue.profiles).slice(0, tastePool) : [];
-      const likedSeed = liked.length ? pick(liked) : null;
+      const likedSeed =
+        familiar && !chatSeed ? seedPick(ownerId, record, catalogue.profiles) : null;
       const seed = chatSeed ?? likedSeed;
       const varied = Object.keys(continueAxes);
       const vary = seed ? varied[made("continue:") % varied.length] : "";
@@ -1623,13 +1678,14 @@ export function createDream(options: {
         reason = String(result.payload.error || `Studio refused the ${kind}.`);
         continue;
       }
-      if (steer || project) {
+      if (steer || project || likedSeed) {
         const latest = read(ownerId);
         if (steer && latest.steer) {
           if (latest.steer.remaining > 1) latest.steer.remaining--;
           else delete latest.steer;
         }
         if (project) latest.projectTurns = (latest.projectTurns || 0) + 1;
+        if (likedSeed) seeded(latest, String(likedSeed.item.id));
         write(ownerId, latest);
       }
       return { status: "generating" };
@@ -1797,24 +1853,23 @@ export function createDream(options: {
     const latest = read(ownerId);
     if (index + 1 < length) latest.series = { ...series, index: index + 1 };
     else delete latest.series;
+    if (!index) seeded(latest, series.itemId);
     write(ownerId, latest);
     return "";
   }
 
   /**
-   * A comparison's starting point: a kept or starred image the account generated with a ready
-   * local profile, without references, not compared before.
+   * A comparison's starting point: a drawn starred or liked image (`drawSeeds`) the account generated
+   * with a ready local profile, without references, not compared before.
    */
   function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
-    const bases = picks(ownerId, profiles)
-      .filter(
-        ({ item, input }) =>
-          !used.has(String(item.id)) &&
-          !(Array.isArray(input.referenceAssets) && input.referenceAssets.length),
-      )
-      .slice(0, 30);
-    return bases.length ? bases[random(bases.length)] : null;
+    const [base] = drawSeeds(ownerId, profiles).filter(
+      ({ item, input }) =>
+        !used.has(String(item.id)) &&
+        !(Array.isArray(input.referenceAssets) && input.referenceAssets.length),
+    );
+    return base ?? null;
   }
 
   type Side = {
