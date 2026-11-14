@@ -11,7 +11,7 @@ import {
 import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
-import { ActionMenuItems, type Action } from "../../ui/ActionBar";
+import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
@@ -173,26 +173,57 @@ export function useChangeSuggestions<K extends QueryKey>({
     keepOpen: true,
     onClick: () => refresh.mutate(),
   };
+  const options: Action[] = loading
+    ? [{ id: "thinking", label: "Thinking of Changes", disabled: true }]
+    : list.length
+      ? list.map((step) => ({
+          id: `step:${step.label}`,
+          label: step.label,
+          onClick: () => onPick(step.request),
+        }))
+      : [{ id: "none", label: "No Suggestions", disabled: true }];
   const action: Action = {
     id: "suggestions",
     label: "Suggestions",
     icon: icons.suggestions,
     disabled,
-    menu: [
-      loading
-        ? [{ id: "thinking", label: "Thinking of Changes", disabled: true }]
-        : list.length
-          ? list.map((step) => ({
-              id: `step:${step.label}`,
-              label: step.label,
-              onClick: () => onPick(step.request),
-            }))
-          : [{ id: "none", label: "No Suggestions", disabled: true }],
-      [again],
-    ],
+    menu: [options, [again]],
   };
-  return { action, loading };
+  // The same under a heading, as one group of an assistant menu (assistMenu).
+  const group: Action[] = [
+    { id: "suggestions-heading", label: "Suggestions", heading: true },
+    ...options.map((option) => ({ ...option, icon: icons.suggestions })),
+    again,
+  ];
+  return { action, group, loading };
 }
+
+/**
+ * An assistant menu (AI, Animate): its settings, then its fixed options under their heading, then
+ * the suggestions written for this item with Refresh, then any other actions, then Custom… and any
+ * run of its own.
+ */
+export const assistMenu = ({
+  settings = [],
+  fixed,
+  suggestions = [],
+  others = [],
+  last,
+}: {
+  settings?: Action[];
+  fixed: { label: string; options: Action[] };
+  suggestions?: Action[];
+  others?: Action[];
+  last: Action[];
+}): ActionGroups => [
+  settings,
+  fixed.options.length
+    ? [{ id: `${fixed.label}-heading`, label: fixed.label, heading: true }, ...fixed.options]
+    : [],
+  suggestions,
+  others,
+  last,
+];
 
 /** Suggestions as their own menu button, beside a field outside a text box's tools. */
 export function ChangeSuggestions<K extends QueryKey>({

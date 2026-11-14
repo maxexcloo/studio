@@ -13,7 +13,7 @@ import {
   useAnimateReview,
   useAnimateWriter,
   useMediaIteration,
-  type AnimateTheme,
+  type AnimateRequest,
   type Iteration,
 } from "./useMediaAction";
 
@@ -27,11 +27,11 @@ export function AnimateDialog({
   item,
   iterate,
   theme,
+  instruction: chosen,
   onClose,
-}: {
+}: AnimateRequest & {
   item: MediaItem;
   iterate?: (iteration: Iteration) => void;
-  theme: AnimateTheme;
   onClose: () => void;
 }) {
   const phone = usePhone();
@@ -39,10 +39,10 @@ export function AnimateDialog({
   const run = iterate ?? iteration.mutate;
   const [review] = useAnimateReview();
   const writer = useAnimateWriter(item);
-  const [instruction, setInstruction] = useState("");
+  const [instruction, setInstruction] = useState(chosen ?? "");
   const [prompt, setPrompt] = useState("");
   const writing = useRef<AbortController>(null);
-  const asking = theme === "custom" && writer.isIdle;
+  const asking = theme === "custom" && !chosen && writer.isIdle;
   const assistant = useQuery(assistantQuery);
   const offered = Boolean(assistant.data?.available && item.jobId) && item.type === "image";
   const ideas = useChangeSuggestions({
@@ -60,7 +60,7 @@ export function AnimateDialog({
     );
   };
   useEffect(() => {
-    if (theme !== "custom") write();
+    if (theme !== "custom" || chosen) write();
     return () => writing.current?.abort();
   }, []);
   const written = writer.data;

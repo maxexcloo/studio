@@ -11,6 +11,7 @@ import { useQueue, useQueueAction } from "../generation/Queue";
 import { ActionBarGroups, ActionMenuItems, withMore } from "../../ui/ActionBar";
 import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import { assistMenu } from "../generation/AskChange";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
@@ -209,17 +210,21 @@ export function GallerySelectionBar({
       themes.length > 0 &&
       itemAction("animate", {
         loading: animate.isPending,
-        menu: [
-          themes
-            .filter((theme) => theme !== "custom")
-            .map((theme) => ({
-              id: `animate-${theme}`,
-              label: animateThemes[theme],
-              icon: icons.animate,
-              disabled: animate.isPending,
-              onClick: () => animate.mutate(theme),
-            })),
-        ],
+        menu: assistMenu({
+          fixed: {
+            label: "Themes",
+            options: themes
+              .filter((theme) => theme !== "custom")
+              .map((theme) => ({
+                id: `animate-${theme}`,
+                label: animateThemes[theme],
+                icon: icons.animate,
+                disabled: animate.isPending,
+                onClick: () => animate.mutate(theme),
+              })),
+          },
+          last: [],
+        }),
       }),
     finishedImages.length > 0 &&
       itemAction("upscale", {
