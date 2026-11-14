@@ -1035,6 +1035,18 @@ test("On a phone held sideways, Gallery Filters fits the screen and scrolls", as
   await expect(square).toBeInViewport();
 });
 
+test("On an iPad held upright, the gallery toolbar fits without scrolling sideways", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.use.isMobile === true, "Tablet width only");
+  await fixtures(page);
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto("/images");
+  await expect(page.getByRole("button", { name: "Select Items" })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole("button", { name: "Larger Tiles" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(820);
+});
+
 test("The grid heads each day, and the date scrubber names the day while it scrolls the gallery", async ({
   page,
 }) => {
