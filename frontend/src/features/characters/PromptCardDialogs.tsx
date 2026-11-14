@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActionIcon, Alert, Button, getDefaultZIndex, Menu } from "@mantine/core";
 import type { ReferenceAsset } from "../../types";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { menuWidth } from "../../theme";
 import { cardKinds } from "../../../../shared/characters";
@@ -168,12 +169,20 @@ export function PromptCardMenu({
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
-          {`Edit ${noun}`}
-        </Menu.Item>
-        <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
-          {`Delete ${noun}`}
-        </Menu.Item>
+        <ActionMenuItems
+          groups={[
+            [{ id: "edit", label: `Edit ${noun}`, icon: icons.edit, onClick: onEdit }],
+            [
+              {
+                id: "delete",
+                label: `Delete ${noun}`,
+                icon: icons.delete,
+                color: "red",
+                onClick: onDelete,
+              },
+            ],
+          ]}
+        />
       </Menu.Dropdown>
     </Menu>
   );
