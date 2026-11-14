@@ -90,10 +90,12 @@ export interface PromptStyleVersion {
   aiDrafted?: boolean;
 }
 /** The assistant's fixed options in menu order, with their hash (an edit's base) and meta. */
+export interface PromptStyleList {
+  styles: PromptStyle[];
+  hash: string;
+  meta: PromptStyleVersion | null;
+}
 export const promptStylesQuery = queryOptions({
   queryKey: [...definitionsKey, "prompt-styles"],
-  queryFn: () =>
-    api<{ styles: PromptStyle[]; hash: string; meta: PromptStyleVersion | null }>(
-      "/api/profiles/prompt-styles",
-    ),
+  queryFn: () => api<PromptStyleList>("/api/profiles/prompt-styles"),
 });

@@ -21,7 +21,12 @@ import { SettingGroup } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { promptStylesQuery, type PromptStyle, type PromptStyleVersion } from "./queries";
+import {
+  promptStylesQuery,
+  type PromptStyle,
+  type PromptStyleList,
+  type PromptStyleVersion,
+} from "./queries";
 
 const path = "/api/profiles/prompt-styles";
 
@@ -32,14 +37,18 @@ function useSaveStyles() {
     void client.invalidateQueries({ queryKey: promptStylesQuery.queryKey });
     void client.invalidateQueries({ queryKey: assistantQuery.queryKey });
   };
-  const save = (styles: PromptStyle[]) =>
-    api(path, {
+  // The saved list's answer becomes the cache at once, so the next edit is over its new hash.
+  const save = async (styles: PromptStyle[]) => {
+    const saved = await api<PromptStyleList>(path, {
       method: "PUT",
       body: JSON.stringify({
         styles,
         baseHash: client.getQueryData(promptStylesQuery.queryKey)?.hash,
       }),
     });
+    client.setQueryData(promptStylesQuery.queryKey, saved);
+    return saved;
+  };
   return { save, refresh };
 }
 
