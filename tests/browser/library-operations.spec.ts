@@ -20,7 +20,7 @@ test("The Library groups its sections under headings and opens on Models", async
   const groups = {
     "Your Cards": ["Characters", "Outfits", "Scenes"],
     "Models & LoRAs": ["Models", "LoRAs", "Unused"],
-    Prompting: ["Guides", "Profiles"],
+    Prompting: ["Guides", "Profiles", "Prompt Styles"],
     "Add Models": ["Imports", "Downloads"],
   };
   const order = Object.values(groups).flat();

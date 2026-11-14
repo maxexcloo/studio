@@ -563,3 +563,73 @@ test("Each profile and guide downloads as its own JSON file from its row menu", 
     expect((await download).suggestedFilename()).toBe(file);
   }
 });
+
+test("Prompt Styles switch, reorder and edit the assistant's fixed options by menu", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const style = (id: string, kind: string, label: string, extra = {}) => ({
+    id,
+    kind,
+    label,
+    description: `${label} line.`,
+    instruction: `${label}: do it.`,
+    enabled: true,
+    ...extra,
+  });
+  let styles = [
+    style("candid", "improve", "Candid"),
+    style("spicy", "improve", "Spicy", { uncensored: true }),
+    style("cinematic", "animate", "Cinematic Camera"),
+  ];
+  let hash = "h1";
+  const saves: any[] = [];
+  await page.route("**/api/profiles/prompt-styles", async (route) => {
+    if (route.request().method() === "PUT") {
+      const body = route.request().postDataJSON();
+      saves.push(body);
+      if (body.baseHash !== hash)
+        return route.fulfill({ status: 409, json: { ok: false, error: "Stale." } });
+      styles = body.styles;
+      hash = `h${saves.length + 1}`;
+    }
+    return route.fulfill({ json: { ok: true, styles, hash, meta: { version: saves.length } } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Library");
+  await section(page, "Library", "Prompt Styles");
+  const improve = page.getByRole("table", { name: "Improve Prompt Styles", exact: true });
+  const animate = page.getByRole("table", { name: "Animate Styles", exact: true });
+  await expect(improve.getByText("Spicy line.")).toBeVisible();
+  await expect(animate.getByText("Cinematic Camera", { exact: true })).toBeVisible();
+  await expect(page.getByText("None Yet", { exact: true })).toBeVisible();
+
+  // A switch applies at once, over the list's hash.
+  await improve.getByRole("switch", { name: "Enable Candid", exact: true }).click();
+  await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0]).toMatchObject({ baseHash: "h1", styles: [{ id: "candid", enabled: false }] });
+  await expect(
+    improve.getByRole("switch", { name: "Enable Candid", exact: true }),
+  ).not.toBeChecked();
+
+  // Moving a style changes its menu's order, leaving the other menus' styles where they are.
+  await improve.getByRole("button", { name: "Actions for Spicy", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Move Up", exact: true }).click();
+  await expect
+    .poll(() => saves[1]?.styles.map((entry: any) => entry.id))
+    .toEqual(["spicy", "candid", "cinematic"]);
+
+  // Editing keeps the style's ID and kind and saves in a dialog.
+  await animate.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Style", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
+  await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(saves[2].styles[2]).toMatchObject({
+    id: "cinematic",
+    kind: "animate",
+    description: "A moving camera.",
+  });
+  await expect(animate.getByText("A moving camera.")).toBeVisible();
+});

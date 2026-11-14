@@ -18,6 +18,7 @@ import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
+import { PromptStyles } from "./PromptStyles";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
@@ -137,6 +138,7 @@ export function LibraryPage() {
           loras: catalogueSection("loras"),
           models: catalogueSection("models"),
           profiles: (heading) => <ProfileDefinitions heading={heading} />,
+          promptStyles: (heading) => <PromptStyles heading={heading} />,
           unused: (heading) => <LibraryUnused heading={heading} />,
           downloads: (heading) => (
             <LibraryDownloads heading={heading} active={activeSection === "downloads"} />

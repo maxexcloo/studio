@@ -51,7 +51,7 @@ function readObject(file, fallback = {}, recover = true) {
 }
 
 /** Version numbers kept in a history folder, ascending. */
-function versionsIn(dir) {
+export function versionsIn(dir) {
   try {
     return fs
       .readdirSync(dir)
@@ -65,7 +65,7 @@ function versionsIn(dir) {
 }
 
 /** Writes version `n` once; an existing version is never replaced. */
-function writeVersion(dir, n, record) {
+export function writeVersion(dir, n, record) {
   const file = path.join(dir, `${n}.json`);
   if (fs.existsSync(file)) throw conflict(`Version ${n} already exists.`);
   writeJsonFile(file, record, { mode: 0o600 });
