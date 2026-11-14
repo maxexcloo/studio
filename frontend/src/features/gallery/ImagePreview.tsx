@@ -1,6 +1,6 @@
 import { lazy, Suspense, useId, useState } from "react";
 import { ActionIcon, getDefaultZIndex, Group, Modal, Text, Tooltip } from "@mantine/core";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";
 
@@ -112,8 +112,8 @@ function ImagePreview({
               style={{ position: "absolute", inset: "50% 0 auto", pointerEvents: "none" }}
             >
               {[
-                { label: "Previous Image", by: -1, Icon: ArrowLeft },
-                { label: "Next Image", by: 1, Icon: ArrowRight },
+                { label: "Previous Image", by: -1, Icon: icons.previous },
+                { label: "Next Image", by: 1, Icon: icons.next },
               ].map(({ label, by, Icon }) => (
                 <Tooltip key={label} label={label}>
                   <ActionIcon

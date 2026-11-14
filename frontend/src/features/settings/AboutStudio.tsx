@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { Anchor, Button, Group, Kbd, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Check, ExternalLink } from "lucide-react";
+import { Check } from "lucide-react";
 import { api } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
@@ -61,7 +61,7 @@ const link = (href: string, label: string) => (
   <Anchor href={href} target="_blank" rel="noopener noreferrer" size="sm">
     <Group gap={4} wrap="nowrap" component="span">
       {label}
-      <ExternalLink size={14} aria-hidden />
+      <icons.external size={14} aria-hidden />
     </Group>
   </Anchor>
 );
