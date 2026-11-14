@@ -85,7 +85,7 @@ export function LibraryPage() {
       : update.variables
         ? "Update queued. The current file stays until the new one is verified and free."
         : update.data.available
-          ? `${update.data.available} updates available.`
+          ? `${update.data.available} ${update.data.available === 1 ? "update" : "updates"} available.`
           : undefined);
   const items = catalogue.data?.items || [];
   const families = [
