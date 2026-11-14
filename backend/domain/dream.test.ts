@@ -405,6 +405,19 @@ test("Dream fills every free worker in one tick: images beside running work, vid
   );
 });
 
+test("A finished Dream job starts the next at once, without waiting for the next tick", async (t) => {
+  const { dream, live, finish } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  await dream.tick();
+  dream.start();
+  t.after(() => dream.stop());
+  finish("alice", live("alice")[0].id);
+  dream.finished();
+  for (let turn = 0; turn < 100 && !live("alice").length; turn++)
+    await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(live("alice").length, 1);
+});
+
 test("Dream stops at today's cap per kind, however much waits unseen, and animates kept or starred images", async (t) => {
   const { dream, state, dreamOnce, live } = fixture(t);
   await dream.save("alice", { enabled: true, dailyImages: 3 });

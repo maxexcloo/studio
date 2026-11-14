@@ -666,6 +666,7 @@ const { generationQueue, queueResourceFor, validateGenerationInput, waitingWorkl
       void imageSearch.completed(items);
       void faceCheck.completed(items);
       void characterSheets.completed(items);
+      if (items.some((item) => item.dream)) dream.finished();
     },
     directCloud,
     generationRoutes,

@@ -2119,6 +2119,10 @@ export function createDream(options: {
   let expiredAt = -Infinity;
   let timer: ReturnType<typeof setInterval> | undefined;
   const tickFailed = logFailure("Dream");
+  /** Ticks now rather than at the next interval, once Dream is started. */
+  const wake = () => {
+    if (timer) void tick().catch(tickFailed);
+  };
   async function tick() {
     if (ticking) return;
     ticking = true;
@@ -2251,6 +2255,8 @@ export function createDream(options: {
     get started() {
       return Boolean(timer);
     },
+    /** A Dream job finished: its worker is free now, so the next starts without waiting a tick. */
+    finished: wake,
     access: (ownerId: string) => options.access(ownerId),
     status(ownerId: string): { status: DreamStatus; reason?: string } {
       const blocked = quick(ownerId, read(ownerId));
@@ -2372,7 +2378,7 @@ export function createDream(options: {
         states.delete(ownerId);
         await stopWaiting(ownerId);
       }
-      if (timer) void tick().catch(tickFailed);
+      wake();
       return record.settings;
     },
     /** Random older gallery images to judge without the GPU, those not judged yet first. */
