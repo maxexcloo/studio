@@ -357,7 +357,7 @@ export function studioTheme({
           content: { minWidth: props.scrollbars === "y" ? 0 : undefined },
         }),
       }),
-      // Vertical panels must shrink to their viewport instead of long labels’ min-content width.
+      // Vertical panels must shrink to their viewport instead of long labels' min-content width.
       ScrollAreaAutosize: ScrollArea.Autosize.extend({
         defaultProps: { scrollbars: "y", type: "never" },
       }),

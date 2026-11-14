@@ -237,7 +237,7 @@ function DefinitionForm({
             <Stack gap="md">
               {!metadata ? (
                 <Alert color="yellow">
-                  Repair this file’s profile metadata in Advanced JSON to edit it here.
+                  Repair this file's profile metadata in Advanced JSON to edit it here.
                 </Alert>
               ) : (
                 <>
@@ -306,7 +306,7 @@ function DefinitionForm({
                       </SimpleGrid>
                       <TextInput
                         label="Conditioning"
-                        description="The profile’s declared workflow conditioning."
+                        description="The profile's declared workflow conditioning."
                         value={String(
                           (metadata.recipe as Record<string, unknown>)?.conditioning || "",
                         )}

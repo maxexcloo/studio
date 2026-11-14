@@ -120,9 +120,9 @@ function changePhase(
     if (operation.stop.includes(id) && !operation.start.includes(id) && phase === "running")
       return { pending: "stopping" };
   } else if (failed) {
-    if (failed.start.includes(id) && phase !== "running") return { failed: "Couldn’t start." };
+    if (failed.start.includes(id) && phase !== "running") return { failed: "Couldn't start." };
     if (failed.stop.includes(id) && !failed.start.includes(id) && holding(phase))
-      return { failed: "Couldn’t stop." };
+      return { failed: "Couldn't stop." };
   }
   return {};
 }
@@ -372,7 +372,7 @@ function AutomaticControlRows({
       </SettingRow>
       <SettingRow
         label="Idle After"
-        description="Time without queued or running work before Studio parks a GPU pool’s image and video workers."
+        description="Time without queued or running work before Studio parks a GPU pool's image and video workers."
       >
         <Select
           aria-label="Idle After"
@@ -419,7 +419,7 @@ function AutomaticControlRows({
       </SettingRow>
       <SettingRow
         label="Let Everyone Swap Models"
-        description="Accounts that aren’t administrators can also swap text out for their waiting work."
+        description="Accounts that aren't administrators can also swap text out for their waiting work."
       >
         <Switch
           aria-label="Let Everyone Swap Models"
@@ -428,7 +428,7 @@ function AutomaticControlRows({
         />
       </SettingRow>
       {save.error && (
-        <Alert color="red" title="Couldn’t Save Automatic Control">
+        <Alert color="red" title="Couldn't Save Automatic Control">
           {save.error.message}
         </Alert>
       )}
@@ -626,7 +626,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             <Text size="sm" c={operation ? undefined : "red"} style={{ overflowWrap: "anywhere" }}>
               {operation
                 ? `${line.doing} ${names(line.ids)}…`
-                : `Couldn’t ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
+                : `Couldn't ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
             </Text>
             <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
               View Log

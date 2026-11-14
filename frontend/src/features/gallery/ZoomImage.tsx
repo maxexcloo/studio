@@ -333,7 +333,7 @@ export function ZoomImage({
           onClick={(event) => event.stopPropagation()}
         >
           <Text size="sm" role="alert">
-            This version couldn’t be loaded.
+            This version couldn't be loaded.
           </Text>
           <Button
             size="compact-sm"

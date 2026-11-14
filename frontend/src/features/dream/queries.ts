@@ -96,7 +96,7 @@ export const dreamWhen = ({ settings, today, status }: Dream) =>
       : status === "paused"
         ? "Dream is paused"
         : status === "capped"
-          ? "Dream has made today’s share"
+          ? "Dream has made today's share"
           : "Dream works when the queue is free",
     `${today.images} of ${settings.dailyImages} today`,
     ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),

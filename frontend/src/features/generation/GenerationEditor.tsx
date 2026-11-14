@@ -90,8 +90,8 @@ export function submitBlockedReason({
     ? "Choose an available profile first."
     : (backend ? backend.ready === false : profile.ready === false)
       ? backend?.reason
-        ? `${backend.label} isn’t ready: ${backend.reason}`
-        : "This model isn’t ready."
+        ? `${backend.label} isn't ready: ${backend.reason}`
+        : "This model isn't ready."
       : !input.prompt.trim()
         ? "Describe what you want to create."
         : referenceCount > referenceMaximum

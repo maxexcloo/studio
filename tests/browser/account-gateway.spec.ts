@@ -363,7 +363,7 @@ test("Administrators change roles, reset passwords and delete galleries, account
     .click();
   await page.getByRole("menuitem", { name: /^Delete Gallery/ }).click();
   const wipe = page.getByRole("dialog", { name: "Delete Gallery", exact: true });
-  await expect(wipe).toContainText("Delete all 3 of member@example.test’s gallery items");
+  await expect(wipe).toContainText("Delete all 3 of member@example.test's gallery items");
   await wipe.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(wipe).toBeHidden();
   expect(state.galleryOwners).toEqual({});

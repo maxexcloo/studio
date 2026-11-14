@@ -25,7 +25,7 @@ export function IntegrationSettings() {
         <SettingRow
           label="Hugging Face"
           description={
-            huggingFace.token.set ? "Token set" : "No token; gated models can’t download"
+            huggingFace.token.set ? "Token set" : "No token; gated models can't download"
           }
         >
           {status(huggingFace.token.set, huggingFace.token.set ? "Connected" : "Public Only")}
