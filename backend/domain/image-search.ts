@@ -115,6 +115,11 @@ export function createImageSearch(options: {
   let failed = "";
   return {
     ...work,
+    /** Loads the text encoder as Studio starts, so the first search doesn't wait seconds for it. */
+    start() {
+      work.start();
+      if (options.enabled() && encoder.downloaded()) encoder.embedText("").catch(() => {});
+    },
     /** A pass first forgets vectors of images that left the gallery. */
     startPass(scope: PassScope) {
       vectors.retain(options.items());
