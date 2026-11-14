@@ -27,7 +27,7 @@ import { useLocalStorage } from "@mantine/hooks";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
@@ -718,7 +718,7 @@ export function MediaViewer({
                             move(-1);
                           }}
                         >
-                          <ChevronLeft size={20} />
+                          <icons.previous size={20} />
                         </ActionIcon>
                       </Tooltip>
                       <Tooltip label="Next Generation (→)">
@@ -732,7 +732,7 @@ export function MediaViewer({
                             move(1);
                           }}
                         >
-                          <ChevronRight size={20} />
+                          <icons.next size={20} />
                         </ActionIcon>
                       </Tooltip>
                     </Group>

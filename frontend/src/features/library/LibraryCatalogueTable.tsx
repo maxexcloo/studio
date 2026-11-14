@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
-import { ExternalLink } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
@@ -425,7 +424,7 @@ export function LibraryCatalogueTable({
               </Menu.Item>
               {source && (
                 <Menu.Item
-                  leftSection={<ExternalLink size={16} />}
+                  leftSection={<icons.external size={16} />}
                   component="a"
                   href={source}
                   target="_blank"

@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { Link, useParams } from "react-router";
 import { api, post } from "../../api";
@@ -267,7 +267,7 @@ function Variants({
           disabled={shown === 0}
           onClick={() => move(-1)}
         >
-          <ChevronLeft size={20} />
+          <icons.previous size={20} />
         </ActionIcon>
         <Text size="sm" c="dimmed" aria-live="polite">
           {shown + 1} of {count}
@@ -278,7 +278,7 @@ function Variants({
           disabled={shown === count - 1}
           onClick={() => move(1)}
         >
-          <ChevronRight size={20} />
+          <icons.next size={20} />
         </ActionIcon>
       </Group>
       <div

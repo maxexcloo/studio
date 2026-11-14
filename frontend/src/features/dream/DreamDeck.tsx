@@ -9,8 +9,8 @@ import {
   Tooltip,
   type ButtonProps,
 } from "@mantine/core";
+import { icons } from "../../ui/icons";
 import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
-import { Maximize2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useOpenComposer } from "../generation/openComposer";
 import { post } from "../../api";
@@ -366,7 +366,7 @@ export function DreamDeck({
         aria-label={label}
         onClick={() => setViewing(item.id)}
       >
-        <Maximize2 size={16} />
+        <icons.preview size={16} />
       </ActionIcon>
     </Tooltip>
   );

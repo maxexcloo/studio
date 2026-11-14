@@ -1,5 +1,7 @@
 import {
   Blend,
+  ChevronLeft,
+  ChevronRight,
   CirclePause,
   CirclePlay,
   CircleStop,
@@ -101,6 +103,8 @@ export const icons = {
   outfit: Shirt,
   /** Asking Dream for more in an item's direction (More Like This). */
   moreLikeThis: CopyPlus,
+  /** Moving to the next item: the viewer's, a preview's and a comparison's arrows. */
+  next: ChevronRight,
   /** Opening every result of a run in the viewer. */
   openAll: GalleryHorizontalEnd,
   paste: ClipboardPaste,
@@ -108,6 +112,8 @@ export const icons = {
   pause: CirclePause,
   /** Seeing a choice full screen before choosing it. */
   preview: Maximize2,
+  /** Moving to the previous item, as `next`. */
+  previous: ChevronLeft,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
   /** Running an item again from its prompt with new seeds (Dream's Variations). */
