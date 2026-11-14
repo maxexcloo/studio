@@ -4,67 +4,61 @@ import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
 
-// Grouped as the navigation lists them, each group alphabetical; the Library opens on Models.
+// Groups run from the most used; Your Cards and Prompting list A–Z, Models & LoRAs lead with their
+// names and Add Models follows an import to its downloads. The Library opens on Models.
 export const librarySections = {
   characters: {
     label: "Characters",
     description:
       "Your character cards: an image and lasting looks that picking one leads a prompt with.",
     icon: icons.character,
-    group: "Cards",
+    group: "Your Cards",
   },
   outfits: {
     label: "Outfits",
     description: "Outfits to dress a character in, the same across a series of shots.",
     icon: icons.outfit,
-    group: "Cards",
+    group: "Your Cards",
   },
   scenes: {
     label: "Scenes",
     description: "Places, light and time of day to reuse across a series of shots.",
     icon: icons.scene,
-    group: "Cards",
-  },
-  loras: {
-    label: "LoRAs",
-    description: "Style and subject adapters for compatible models.",
-    icon: icons.loras,
-    group: "Catalogue",
+    group: "Your Cards",
   },
   models: {
     label: "Models",
     description: "Checkpoints, diffusion models, text encoders and VAEs, with their families.",
     icon: Boxes,
-    group: "Catalogue",
+    group: "Models & LoRAs",
     initial: true,
+  },
+  loras: {
+    label: "LoRAs",
+    description: "Style and subject adapters for compatible models.",
+    icon: icons.loras,
+    group: "Models & LoRAs",
   },
   unused: {
     label: "Unused",
     description: "Models no profile uses and LoRAs no run used in 90 days, with their sizes.",
     icon: ArchiveX,
     admin: true,
-    group: "Catalogue",
+    group: "Models & LoRAs",
   },
   guides: {
     label: "Guides",
     description: "Prompting guides for profiles and families. Every saved version is kept.",
     icon: BookOpen,
     admin: true,
-    group: "Generation",
+    group: "Prompting",
   },
   profiles: {
     label: "Profiles",
     description: "Generation profiles and their workflows. Every saved version is kept.",
     icon: FileCog,
     admin: true,
-    group: "Generation",
-  },
-  downloads: {
-    label: "Downloads",
-    description: "Current and recent model downloads. Stopping keeps partial files to resume.",
-    icon: HardDriveDownload,
-    admin: true,
-    group: "Getting More",
+    group: "Prompting",
   },
   imports: {
     label: "Imports",
@@ -72,7 +66,14 @@ export const librarySections = {
       "Import a Civitai or Hugging Face link, or an image, and review its compatibility. Reddit posts' images go to Uploads.",
     icon: Import,
     admin: true,
-    group: "Getting More",
+    group: "Add Models",
+  },
+  downloads: {
+    label: "Downloads",
+    description: "Current and recent model downloads. Stopping keeps partial files to resume.",
+    icon: HardDriveDownload,
+    admin: true,
+    group: "Add Models",
   },
 };
 /** Administrators see the whole Library; other accounts only their Characters, Outfits and Scenes. */
