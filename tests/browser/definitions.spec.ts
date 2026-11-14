@@ -292,7 +292,7 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
     if (route.request().method() === "POST") {
       posted.push(route.request().postDataJSON());
       merged = true;
-      return route.fulfill({ json: { merged: [merge], backup: "backups/profile-merges/now" } });
+      return route.fulfill({ json: { merged: [merge] } });
     }
     return route.fulfill({
       json: {
@@ -311,7 +311,7 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
   await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
   await expect(dialog).toContainText("a, b differ in graph");
   await dialog.getByRole("button", { name: "Merge 1 Profile", exact: true }).click();
-  await expect(dialog).toContainText("backups/profile-merges/now");
+  await expect(dialog).toContainText("Merged 1.");
   await expect(dialog.getByRole("button", { name: "Merge Profiles", exact: true })).toBeDisabled();
   expect(posted).toEqual([{ hash: "plan-1" }]);
 });
@@ -407,7 +407,6 @@ test("Combine Backends previews pairs with their differences and combines the pi
       return route.fulfill({
         json: {
           combined: [{ id: pair.id, name: "Krea 2 Turbo", backend: "radiance", from: [] }],
-          backup: "backups/profile-backends/now",
         },
       });
     }
@@ -427,7 +426,7 @@ test("Combine Backends previews pairs with their differences and combines the pi
   await dialog.getByRole("combobox", { name: "Default Backend", exact: true }).click();
   await dialog.getByRole("option", { name: "Radiance", exact: true }).click();
   await dialog.getByRole("button", { name: "Combine 1 Pair", exact: true }).click();
-  await expect(dialog).toContainText("backups/profile-backends/now");
+  await expect(dialog).toContainText("Combined Krea 2 Turbo.");
   expect(posted).toEqual([
     {
       hash: "plan-1",

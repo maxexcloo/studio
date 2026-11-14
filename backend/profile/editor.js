@@ -9,7 +9,6 @@ import {
   validateGraph,
   workflowMissingFiles,
 } from "../custom-workflows.js";
-import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal, fromChat } from "../route-access.js";
@@ -19,7 +18,6 @@ import { hashOf, profileStore, validId } from "./store.js";
  * Studio owns editable runtime profiles and their version history; ai is a read-only seed.
  */
 export const editsFile = () => path.join(userWorkflowsDir, ".studio-edits.json");
-const backupsDir = () => path.join(dataDir, "backups", "profile-edits");
 const fileFor = (id) => path.join(userWorkflowsDir, `${id}.json`);
 const metaOf = (raw) => raw?.studio;
 
@@ -243,7 +241,7 @@ function checkGraph(raw, id, { info, where = "" }) {
 }
 
 /**
- * Saves a checked edit: the old file goes to backups, the edit is recorded, and a stale base is refused.
+ * Saves a checked edit: the edit is recorded, and a stale base is refused.
  * Every save is also a version (profile/store.js); an AI draft (`origin` "ai", `aiDrafted`) is marked
  * so, and any other save clears the marker.
  */
@@ -261,12 +259,6 @@ export function saveEditableProfile(
   const checked = validateProfileText(id, text, { info });
   if (!checked.ok) throw Object.assign(new Error(checked.errors[0]), { status: 400, checked });
   const at = new Date();
-  fs.mkdirSync(backupsDir(), { recursive: true });
-  fs.writeFileSync(
-    path.join(backupsDir(), `${id}-${at.toISOString().replace(/[:.]/g, "-")}.json`),
-    current.text,
-    { mode: 0o600 },
-  );
   // Saved as written, so the diff the editor showed is the change on disk.
   const next = String(text).endsWith("\n") ? String(text) : `${text}\n`;
   const temporary = `${fileFor(id)}.${process.pid}.tmp`;

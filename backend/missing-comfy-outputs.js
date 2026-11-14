@@ -14,7 +14,7 @@ import { galleryKey } from "./persistence/gallery-rows.ts";
  * the gallery's own delete, with delete markers, captions and search vectors. A second run finds nothing.
  */
 export const missingComfyOutputsNote =
-  "Deletes these gallery records, with their captions and search vectors, without a backup; --restore cannot bring them back. Their files are already gone.";
+  "Deletes these gallery records, with their captions and search vectors, for good. Their files are already gone.";
 const offline =
   "Asks the workers for each file, so it runs only in Studio: POST /api/maintenance/migrations.";
 const concurrency = 4;

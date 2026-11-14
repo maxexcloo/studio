@@ -138,12 +138,6 @@ test("saving backs up the old file, records the edit and refuses a stale base or
   assert.equal(saved.edited.by, "admin-id");
   assert.equal(saved.edited.baseHash, hash);
   assert.equal(editor.listEditableProfiles()[0].edited.by, "admin-id");
-  const backups = fs.readdirSync(path.join(temporary, "backups", "profile-edits"));
-  assert.equal(backups.length, 1);
-  assert.match(
-    fs.readFileSync(path.join(temporary, "backups", "profile-edits", backups[0]), "utf8"),
-    /"Test Image"/,
-  );
   // The edits list sits beside the profiles but isn't one.
   assert.equal(editor.listEditableProfiles().length, 1);
 });

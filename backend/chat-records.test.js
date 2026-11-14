@@ -55,7 +55,7 @@ test("chatRecords plans Studio Chat's records, then deletes them and keeps what 
 
   const plan = chatRecords(dataDir);
   assert.equal(plan.applied, false);
-  assert.match(plan.note, /without a backup/);
+  assert.match(plan.note, /for good/);
   assert.deepEqual(
     [plan.messagesTable, plan.messages, plan.sessions, plan.preferences, plan.groups],
     [true, 1, 3, ["preferences:a"], ["user"]],

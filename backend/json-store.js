@@ -10,46 +10,23 @@ import path from "node:path";
  * user's stacks, preferences or password config with an empty one.
  *
  * Writes go to a temporary file that is flushed and then renamed over the
- * old one (atomic on the same disk), and the previous good copy is kept as
- * `.bak`. Reads fall back to that copy, and a corrupt file is set aside as
+ * old one (atomic on the same disk), so a reader sees the old file or the new
+ * one, never half of either. A file corrupted some other way is set aside as
  * `.corrupt-<time>` instead of being overwritten, so nothing is lost silently.
  */
 
-function parseFile(file) {
-  return JSON.parse(fs.readFileSync(file, "utf8"));
-}
-
-/**
- * The saved value. Throws when there is none (missing, or corrupt with no good
- * backup), so callers keep their existing "fall back to defaults" catch.
- */
+/** The saved value. Throws when there is none (missing or corrupt), so callers fall back to defaults. */
 export function readJsonFile(file) {
   try {
-    return parseFile(file);
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (error) {
-    if (error.code === "ENOENT") {
-      // A crash between writing the backup and the rename can leave only the backup.
-      if (fs.existsSync(`${file}.bak`)) return parseFile(`${file}.bak`);
-      throw error;
-    }
-    let backup;
-    try {
-      backup = parseFile(`${file}.bak`);
-    } catch {
-      backup = undefined;
-    }
+    if (error.code === "ENOENT") throw error;
     try {
       fs.renameSync(file, `${file}.corrupt-${Date.now()}`);
     } catch {
       // Leave it in place; the next write replaces it either way.
     }
-    if (backup !== undefined) {
-      console.warn(`[Studio] ${path.basename(file)} was unreadable; restored the previous copy.`);
-      return backup;
-    }
-    console.warn(
-      `[Studio] ${path.basename(file)} was unreadable and had no backup; it was set aside.`,
-    );
+    console.warn(`[Studio] ${path.basename(file)} was unreadable; it was set aside.`);
     throw error;
   }
 }
@@ -60,11 +37,11 @@ let temporaryCount = 0;
 const temporaryFor = (file) => `${file}.tmp-${process.pid}-${(temporaryCount += 1)}`;
 
 export function writeJsonFile(file, value, { mode } = {}) {
-  writeBytesFile(file, JSON.stringify(value, null, 2), { mode, backup: true });
+  writeBytesFile(file, JSON.stringify(value, null, 2), { mode });
 }
 
 /** Same-directory writes become visible only after the bytes and directory entry are durable. */
-export function writeBytesFile(file, bytes, { mode, backup = false } = {}) {
+export function writeBytesFile(file, bytes, { mode } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temporary = temporaryFor(file);
   try {
@@ -74,14 +51,6 @@ export function writeBytesFile(file, bytes, { mode, backup = false } = {}) {
       fs.fsyncSync(handle);
     } finally {
       fs.closeSync(handle);
-    }
-    if (backup && fs.existsSync(file)) {
-      try {
-        fs.copyFileSync(file, `${file}.bak`);
-        if (mode !== undefined) fs.chmodSync(`${file}.bak`, mode);
-      } catch {
-        /* Keep the older backup. */
-      }
     }
     fs.renameSync(temporary, file);
     const directory = fs.openSync(path.dirname(file), "r");
