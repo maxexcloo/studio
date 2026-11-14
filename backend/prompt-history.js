@@ -1,4 +1,4 @@
-import { dataDir, gallery } from "./gallery/store.js";
+import { dataDir, galleryItems } from "./gallery/store.js";
 import {
   ownerDocumentName,
   readRuntimeDocument,
@@ -83,7 +83,7 @@ function createHistory(
   field,
   documentName,
   initiallyEnabled = () => true,
-  initialSeedItems = () => gallery,
+  initialSeedItems = () => galleryItems(),
 ) {
   let cache = null;
   let enabled = true;
@@ -205,7 +205,7 @@ function historiesFor(ownerId = "") {
   const key = String(ownerId || "");
   if (!historySets.has(key)) {
     const histories = {};
-    const seeds = key ? () => [] : () => gallery;
+    const seeds = key ? () => [] : () => galleryItems();
     histories.negative = createHistory(
       "negative",
       ownerDocumentName("negative-prompt-history", key),

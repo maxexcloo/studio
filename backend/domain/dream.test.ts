@@ -129,6 +129,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     },
     guide: () => ({ summary: "natural language" }),
     gallery: (ownerId) => state.items.filter((item) => item.ownerId === ownerId),
+    items: (ownerId, ids) =>
+      state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
     visible: (items) => items.filter((item) => !item.dream || item.dream.state === "kept"),
     mark: (ownerId, itemId, mark) => {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;

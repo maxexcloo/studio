@@ -9,19 +9,11 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 process.env.STUDIO_DATA_DIR = dataDir;
-const store = await import("./store.js");
 const { readGalleryRows } = await import("../persistence/gallery-rows.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
-const {
-  filterVisibleGallery,
-  flushGallery,
-  flushGalleryStrict,
-  galleryRevisionValue,
-  pageGallery,
-  saveGallery,
-  setGallery,
-  updateGalleryJob,
-} = await import("./store.js");
+const { filterVisibleGallery, galleryRevisionValue, pageGallery, updateGalleryJob } =
+  await import("./store.js");
+const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 
 const output = (name, subfolder = "") => ({
   id: name,
@@ -64,17 +56,15 @@ const bigGallery = (count) => {
   }));
 };
 
-test("paging through 50,000 items reads each page from one sorted list, without repeats", () => {
+test("paging through 50,000 items serves each once, newest first, with exact counts", () => {
   const items = bigGallery(50_000);
-  setGallery(items, { persist: false });
-  // The first page builds the sorted list; every later page only cuts from it.
-  const buildsBefore = store.visibleListBuildCount();
-  const first = pageGallery({ limit: 220 });
-  const seen = first.items.map((item) => item.id);
-  let cursor = first.nextCursor;
-  let pages = 1;
+  setGallery(items);
+  const seen = [];
+  let cursor = "";
+  let pages = 0;
   do {
     const page = pageGallery({ limit: 220, cursor });
+    assert.equal(page.totalApprox, 50_000);
     seen.push(...page.items.map((item) => item.id));
     cursor = page.nextCursor;
     pages += 1;
@@ -86,13 +76,6 @@ test("paging through 50,000 items reads each page from one sorted list, without 
     ["local-49996", "local-49997", "local-49998", "local-49999"],
     "newest first, a batch in its own order",
   );
-  // Re-filtering and re-sorting per page made every page cost as much as the whole
-  // gallery; all of them are now cut from the one list the first page built.
-  // A folder re-check on a busy machine (at most once a second) may rebuild it once or twice more; per page it'd be hundreds.
-  assert.ok(
-    store.visibleListBuildCount() - buildsBefore <= 3,
-    `the list was rebuilt ${store.visibleListBuildCount() - buildsBefore} times while paging through ${pages} pages`,
-  );
 
   const videos = pageGallery({ type: "video", limit: 500, includeFailed: false });
   assert.ok(videos.items.every((item) => item.type === "video" && item.status !== "failed"));
@@ -102,8 +85,8 @@ test("paging through 50,000 items reads each page from one sorted list, without 
   );
 });
 
-test("paging through a search filters the gallery once, not once per page", () => {
-  setGallery(bigGallery(5000), { persist: false });
+test("paging through a search serves every match once and counts them once", () => {
+  setGallery(bigGallery(5000));
   let tested = 0;
   const filter = (item) => {
     tested += 1;
@@ -111,26 +94,27 @@ test("paging through a search filters the gallery once, not once per page", () =
   };
   const seen = [];
   let cursor = "";
+  let pages = 0;
   do {
     const page = pageGallery({ limit: 100, cursor, filter, filterKey: "videos" });
-    seen.push(...page.items);
+    seen.push(...page.items.map((item) => item.id));
+    assert.equal(page.totalApprox, 455);
     cursor = page.nextCursor;
+    pages += 1;
   } while (cursor);
-  assert.equal(seen.length, store.gallery.filter((item) => item.type === "video").length);
-  assert.equal(tested, 5000, "each item is tested once across every page");
+  assert.equal(new Set(seen).size, 455);
+  // Pages walk on from their cursor; the count is kept rather than made again for every page.
+  assert.ok(tested < 3 * 5000, `the filter ran ${tested} times over ${pages} pages`);
 });
 
 test("a change to the gallery shows on the next page request", () => {
-  setGallery(bigGallery(1000), { persist: false });
+  setGallery(bigGallery(1000));
   assert.equal(pageGallery({ limit: 5 }).totalApprox, 1000);
-  updateGalleryJob("job-249", { status: "cancelled" }, { persist: false });
+  updateGalleryJob("job-249", { status: "cancelled" });
   assert.equal(pageGallery({ limit: 5 }).totalApprox, 996, "cancelled items leave the list");
   // A cursor whose item is gone continues after its time instead of starting over.
   const first = pageGallery({ limit: 3 });
-  setGallery(
-    store.gallery.filter((item) => item.id !== first.items.at(-1).id),
-    { persist: false },
-  );
+  setGallery(galleryRows().filter((item) => item.id !== first.items.at(-1).id));
   const next = pageGallery({ limit: 3, cursor: first.nextCursor });
   assert.equal(
     next.items.some((item) => first.items.some((earlier) => earlier.id === item.id)),
@@ -138,72 +122,26 @@ test("a change to the gallery shows on the next page request", () => {
   );
 });
 
-test("a large gallery saves every row, and a later change writes only its own row", async () => {
-  const items = bigGallery(50_001);
-  setGallery(items, { persist: false });
-  saveGallery();
-  await flushGallery();
+test("a large gallery keeps every row, and a change writes only its own row", () => {
+  setGallery(bigGallery(50_001));
   const db = runtimeDatabase(dataDir);
-  const saved = readGalleryRows(db);
-  assert.equal(saved.length, 50_001, "no record is dropped past 50,000");
-  assert.deepEqual(
-    saved.find((item) => item.id === store.gallery[0].id),
-    store.gallery[0],
-  );
+  assert.equal(readGalleryRows(db).length, 50_001, "no record is dropped past 50,000");
   const changes = () => db.prepare("SELECT total_changes() AS count").get().count;
   const before = changes();
-  updateGalleryJob(store.gallery[0].id, { prompt: "changed" });
-  await flushGallery();
+  updateGalleryJob(galleryRows()[0].id, { prompt: "changed" });
   assert.equal(changes() - before, 1, "only the changed item's row is written");
 });
 
-test("a strict save is not failed by a change made while it is writing", async () => {
-  setGallery([output("first.png")]);
-  const saving = flushGalleryStrict();
-  setGallery([output("first.png"), output("second.png")]);
-  await saving;
-  await flushGalleryStrict();
-  assert.deepEqual(
-    readGalleryRows(runtimeDatabase(dataDir))
-      .map((item) => item.id)
-      .sort(),
-    ["first.png", "second.png"],
-  );
-});
-
-test("a save still waiting when the server stops is written before it exits", async (t) => {
-  const child = await import("node:child_process");
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-exit-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const script = [
-    `const store = await import(${JSON.stringify(new URL("./store.js", import.meta.url).href)});`,
-    `const { installShutdown } = await import(${JSON.stringify(new URL("../shutdown.js", import.meta.url).href)});`,
-    "installShutdown({ flush: store.flushPendingGallery });",
-    "store.setGallery([{ id: 'kept', status: 'done', type: 'image', createdAt: new Date().toISOString() }]);",
-    "process.exit(0);",
-  ].join("\n");
-  child.execFileSync(process.execPath, ["--input-type=module", "-e", script], {
-    env: { ...process.env, STUDIO_DATA_DIR: dataDir, STUDIO_GALLERY_SAVE_MS: "60000" },
-  });
-  assert.deepEqual(
-    readGalleryRows(runtimeDatabase(dataDir)).map((item) => item.id),
-    ["kept"],
-  );
-});
-
-test("a live preview reaches other browsers while rendering, and is not kept once done", () => {
-  setGallery(
-    [
-      {
-        id: "job-1:0",
-        jobId: "job-1",
-        status: "pending",
-        type: "image",
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    { persist: false },
-  );
+test("a live preview reaches other browsers while rendering, and is never saved", () => {
+  setGallery([
+    {
+      id: "job-1:0",
+      jobId: "job-1",
+      status: "pending",
+      type: "image",
+      createdAt: new Date().toISOString(),
+    },
+  ]);
   const since = galleryRevisionValue();
   updateGalleryJob("job-1", { preview: "data:image/jpeg;base64,AAAA" }, { persist: false });
   assert.ok(galleryRevisionValue() > since);
@@ -211,7 +149,10 @@ test("a live preview reaches other browsers while rendering, and is not kept onc
   const before = galleryRevisionValue();
   updateGalleryJob("job-1", { preview: "data:image/jpeg;base64,AAAA" }, { persist: false });
   assert.equal(galleryRevisionValue(), before, "an unchanged patch does not bump the revision");
-  updateGalleryJob("job-1", { status: "done", preview: undefined }, { persist: false });
+  updateGalleryJob("job-1", { progress: { value: 2, max: 4 } });
+  assert.equal(pageGallery({}).items[0].preview, "data:image/jpeg;base64,AAAA", "kept over a save");
+  assert.equal(readGalleryRows(runtimeDatabase(dataDir))[0].preview, undefined);
+  updateGalleryJob("job-1", { status: "done" });
   assert.deepEqual(
     pageGallery({}).items.map((item) => [item.status, item.preview]),
     [["done", undefined]],

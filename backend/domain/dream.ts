@@ -632,6 +632,8 @@ export function createDream(options: {
   guide(profile: DreamProfile): unknown;
   /** Every gallery record the owner has, Dream's pool included, newest first. */
   gallery(ownerId: string): DreamItem[];
+  /** The owner's gallery records with these ids, Dream's pool included. */
+  items(ownerId: string, ids: string[]): DreamItem[];
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
@@ -2217,7 +2219,7 @@ export function createDream(options: {
   }
 
   function find(ownerId: string, itemId: string) {
-    const item = options.gallery(ownerId).find((entry) => entry.id === itemId && entry.dream);
+    const item = options.items(ownerId, [itemId]).find((entry) => entry.dream);
     if (!item) throw failure("That Dream result is unavailable.", 404);
     return item;
   }
@@ -2448,8 +2450,8 @@ export function createDream(options: {
     /** Starring an unseen, finished result, wherever it happens, keeps it. */
     starred(ownerId: string, itemIds: string[]) {
       const ids = new Set(itemIds);
-      for (const item of options.gallery(ownerId))
-        if (ids.has(String(item.id)) && item.dream?.state === "unseen" && item.status === "done")
+      for (const item of options.items(ownerId, [...ids]))
+        if (item.dream?.state === "unseen" && item.status === "done")
           decide(ownerId, String(item.id), "kept");
     },
     /** Keeps an image and queues `count` new seeds of it as the person's own job. */

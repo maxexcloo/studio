@@ -23,6 +23,7 @@ export function createTitler(options: {
   idle(): boolean;
   allowed(ownerId: string): boolean;
   items(): Iterable<TitleItem>;
+  changes?(): number;
   visible(item: TitleItem): boolean;
   save(item: TitleItem, title: string): void;
   now?: () => number;

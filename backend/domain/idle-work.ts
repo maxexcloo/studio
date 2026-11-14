@@ -74,6 +74,7 @@ export interface IdleStatus {
 export const passConcurrency = 2;
 export const dailyItems = 500;
 const spacingMs = 10_000;
+const recheckMs = 5 * 60_000;
 const watchMs = 1_000;
 // After this many failures in a row the model, not the item, is at fault: wait, then retry them.
 const failureStreak = 3;
@@ -101,6 +102,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
   allowed(ownerId: string): boolean;
   /** Every gallery record, newest first. */
   items(): Iterable<Item>;
+  /** Counts saved gallery changes: a walk that found nothing is not repeated until it moves. */
+  changes?(): number;
   /** Whether the work takes the record: one in the gallery, or also Dream's pool, with its file present. */
   visible(item: Item): boolean;
   /** Whether the item still needs the work; `all` and the pass's `target` during a pass. */
@@ -133,6 +136,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (reason !== noted) log.info(`[Studio] ${options.name} skip: ${reason}`);
     noted = reason;
   };
+  // The last walk that found nothing to do, so an idle tick doesn't read the whole gallery again.
+  let nothing = { state: "", at: -Infinity };
   const running = () => options.continuous || pass?.state === "running";
   const counting = () => !options.continuous && pass?.state === "running";
 
@@ -202,12 +207,15 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (!options.idle() || running() !== all) return "busy";
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
-    for (const candidate of eligible(all))
-      if (!inflight.has(key(candidate))) {
-        item = candidate;
-        break;
-      }
+    const state = `${options.changes?.()}|${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
+    if (!options.changes || state !== nothing.state || now() - nothing.at > recheckMs)
+      for (const candidate of eligible(all))
+        if (!inflight.has(key(candidate))) {
+          item = candidate;
+          break;
+        }
     if (!item) {
+      if (!inflight.size && state !== nothing.state) nothing = { state, at: now() };
       if (counting() && !inflight.size) {
         pass = { ...pass!, state: "finished", endedAt: stamp() };
         persist();

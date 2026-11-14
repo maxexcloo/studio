@@ -121,19 +121,22 @@ import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
   hasGalleryMedia,
-  flushGalleryStrict,
   isGalleryHidden,
-  flushPendingGallery,
-  gallery,
+  eachGalleryItem,
   galleryItem,
+  galleryItems,
+  galleryChangeCount,
   galleryJobItems,
+  hasGalleryItems,
+  forgetGalleryItems,
+  putGalleryItems,
+  visibleGallery,
   dataDir,
   importedImageFile,
   outputFileSize,
   recordsFromComfyHistory,
   removeGalleryItems,
   resultNumbers,
-  setGallery,
   cleanupGalleryState,
   updateGalleryJob,
   galleryRevisionValue,
@@ -141,6 +144,7 @@ import {
   setGalleryFavorites,
 } from "./gallery/store.js";
 import { makePendingItems } from "./gallery/records.js";
+import { compareGalleryItems } from "./gallery/order.js";
 import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
@@ -200,7 +204,7 @@ import { characterImageIds } from "../shared/characters.ts";
 import { isCloudProfile } from "../shared/profiles.ts";
 
 let drainServer = async () => {};
-installShutdown({ drain: () => drainServer(), flush: flushPendingGallery });
+installShutdown({ drain: () => drainServer() });
 
 const app = express();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
@@ -304,11 +308,21 @@ const recoverRunningJobs = createJobRecovery({
   finishJob: (id, patch) => {
     setTerminalJob(id, patch);
   },
-  getGallery: () => gallery,
+  gallery: {
+    tiles: () =>
+      galleryItems({ status: ["pending", "failed", "cancelled"] }).filter((item) => !item.url),
+    job: (id) => galleryItems({ jobId: id }),
+    save: putGalleryItems,
+    replace: (id, outputs) => {
+      forgetGalleryItems(galleryItems({ jobId: id }).filter((item) => !item.url));
+      putGalleryItems(
+        outputs.filter((item) => !hasGalleryItems({ named: [item.url], status: "done" })),
+      );
+    },
+  },
   jobs,
   recordsFromHistory: recordsFromComfyHistory,
   request: comfy,
-  setGallery,
   // Dream's pool included: an orphaned Dream job otherwise runs forever, holding its worker.
   visible: (items) => items.filter(hasGalleryMedia),
   cancel: (backend, promptId) => cancelPrompt(promptId, comfyOn(backend)),
@@ -340,12 +354,11 @@ async function ingestRecoveredRecords(backend, records, promptIds = []) {
     setTimeout(
       () =>
         (async () => {
-          await flushGalleryStrict();
-          const inGallery = new Set(gallery.map((item) => item.url));
           // Nothing that did not make it into the gallery loses its ComfyUI copy.
           if (
             !moved.records.every(
-              (record) => !record.url || inGallery.has(record.url) || !isMediaUrl(record.url),
+              (record) =>
+                !record.url || !isMediaUrl(record.url) || hasGalleryItems({ named: [record.url] }),
             )
           )
             return;
@@ -477,7 +490,7 @@ registerLibraryRoutes(app, {
   recentLoras: () => {
     const since = Date.now() - 90 * 86_400_000;
     return new Set(
-      gallery
+      galleryItems({ since })
         .filter((item) => Date.parse(item.createdAt || "") >= since)
         .flatMap((item) => (item.settings?.loras || []).map((lora) => lora.name)),
     );
@@ -588,7 +601,15 @@ const itemsStarred = (ownerId, items, favorite) => {
   );
   taste.record(ownerId, [
     ...items.map((item) => tasteSignal(favorite ? "star" : "unstar", item.jobId, itemValues(item))),
-    ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
+    ...(favorite
+      ? setPreferenceSignals(
+          items,
+          items.flatMap((item) =>
+            item.resultSet?.id ? galleryItems({ setId: item.resultSet.id }) : [],
+          ),
+          itemValues,
+        )
+      : []),
   ]);
 };
 // Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
@@ -724,7 +745,7 @@ registerMigrationRoutes(app, {
   adminRefusal,
   // missingComfyOutputs asks the worker that made a record for its file, as publicGalleryBuffer reads it.
   gallery: {
-    items: () => gallery,
+    items: () => galleryItems(),
     check: (item) => comfyFile(item.url, { method: "HEAD", timeout: 15_000 }),
     remove: removeGalleryItems,
     update: (jobId, patch) => updateGalleryJob(jobId, patch),
@@ -736,7 +757,13 @@ registerCompareRoutes(app, {
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
   read: readComparisons,
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
-  gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
+  gallery: (req, { jobIds = [], itemIds = [] }) =>
+    recordsForRequest(
+      visibleGallery({ jobIds }).concat(
+        visibleGallery({ ids: itemIds }).filter((item) => !jobIds.includes(item.jobId)),
+      ),
+      req,
+    ),
   pendingItems: makePendingItems,
   numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {
@@ -767,6 +794,24 @@ const textBusy = () =>
       .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0),
   );
 /** Whether what the owner is offered may be worded explicitly. */
+// Dream reads an account's gallery many times a tick: one copy serves them until the gallery
+// changes, and is let go once Dream stops asking.
+let dreamCopy = { key: "", items: [], timer: null };
+function dreamGallery(ownerId) {
+  const key = `${ownerId}|${galleryChangeCount()}`;
+  if (dreamCopy.key !== key)
+    dreamCopy = {
+      key,
+      items: galleryItems({ ownerId }, { ordered: false })
+        .sort(compareGalleryItems)
+        .map(withCanonicalProfile),
+      timer: null,
+    };
+  clearTimeout(dreamCopy.timer);
+  dreamCopy.timer = setTimeout(() => (dreamCopy = { key: "", items: [], timer: null }), 30_000);
+  dreamCopy.timer.unref();
+  return dreamCopy.items;
+}
 const explicitFor = (ownerId) =>
   explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
 // Suggestions (domain/suggestions.ts): composer ideas and viewer next steps from taste.
@@ -775,10 +820,7 @@ const suggestions = createSuggestions({
   writer: tasteWriter,
   online: textOnline,
   explicit: explicitFor,
-  item: (ownerId, jobId) =>
-    filterVisibleGallery(
-      gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
-    )[0],
+  item: (ownerId, jobId) => filterVisibleGallery(galleryJobItems(jobId, ownerId))[0],
   image: async (item) => ((await assistantEngine?.supportsVision()) ? smallImage(item) : null),
   // The viewer asks by job, so every result of the run keeps the same steps.
   save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
@@ -841,13 +883,12 @@ const dream = createDream({
     Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
   writer: assistantEngine,
   guide: assistant.guide,
-  gallery: (ownerId) =>
-    gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
+  gallery: dreamGallery,
+  items: (ownerId, ids) => galleryItems({ ownerId, ids }).map(withCanonicalProfile),
   visible: filterVisibleGallery,
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
   mark: (ownerId, itemId, mark) => {
-    if (!gallery.some((item) => item.id === itemId && (item.ownerId || "") === ownerId))
-      throw new Error("That Dream result is unavailable.");
+    if (!galleryItem(itemId, ownerId)) throw new Error("That Dream result is unavailable.");
     updateGalleryJob(itemId, { dream: mark });
   },
   remove: (ownerId, itemIds) => deleteOwnedGalleryItems(ownerId, itemIds),
@@ -874,7 +915,7 @@ const dream = createDream({
   // the profile.
   inspiration: (account) => {
     if (account && account.role !== accountRoles.administrator) return [];
-    const saved = filterVisibleGallery(gallery)
+    const saved = visibleGallery({ idPrefix: "civitai:" })
       .filter((item) => item.civitai && importedImageFile(item) && item.type !== "video")
       .map((item) => ({
         prompt: item.prompt || "",
@@ -952,8 +993,7 @@ const finishing = createFinishing({
     const account = accountAccessForId(ownerId);
     return Boolean(account?.authenticated);
   },
-  item: (ownerId, itemId) =>
-    gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
+  item: (ownerId, itemId) => galleryItem(itemId, ownerId),
   idle: studioIdle,
   ready: (quality) => upscale.upscaleReady(quality),
   fullBody: fullBodyPerson,
@@ -999,7 +1039,8 @@ const captioner = createCaptioner({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   // Dream's pool too, so a Dream verdict's taste signal carries what the image shows.
   visible: hasGalleryMedia,
   image: smallImage,
@@ -1013,7 +1054,8 @@ const dreamReview = createReview({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: (ownerId) => Boolean(dream.access(ownerId)),
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: hasGalleryMedia,
   projects: (ownerId) => projects.list(ownerId),
   explicit: (ownerId) => Boolean(dream.access(ownerId)?.uncensored),
@@ -1026,7 +1068,8 @@ const imageSearch = createImageSearch({
   encoder: createSiglip({ dataDir, fetch: hfFetch }),
   vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
   idle: galleryIdle,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: galleryStill,
   load: runtimeLoad("image-search"),
@@ -1043,7 +1086,8 @@ const faceCheck = createFaceCheck({
       url.startsWith("https://huggingface.co/") ? hfFetch(url, init) : fetch(url, init),
   }),
   idle: galleryIdle,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   characters: (ownerId) =>
     listCards("characters", ownerId).map((card) => ({
@@ -1080,7 +1124,8 @@ const titler = createTitler({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptAssistantOwner,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   save: (item, title) => updateGalleryJob(galleryKey(item), { title }),
 });
@@ -1090,7 +1135,8 @@ const suggester = createPromptSuggester({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
   save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
@@ -1103,7 +1149,8 @@ const nextSteps = createNextStepWork({
   writer: assistantEngine,
   idle: galleryIdle,
   allowed: promptWriterOwner,
-  items: () => gallery,
+  items: () => eachGalleryItem(),
+  changes: galleryChangeCount,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
 });
@@ -1243,7 +1290,6 @@ drainServer = async () => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
   await Promise.all([generationQueue.stop(), closed]);
-  await flushGalleryStrict();
   flushWorkflowPreferences();
   // The runtime database's one connection; nothing may write after this.
   store.close();

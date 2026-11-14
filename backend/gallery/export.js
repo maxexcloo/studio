@@ -3,8 +3,8 @@ import { isMediaUrl, mediaRoot } from "../media-paths.js";
 import path from "node:path";
 import zlib from "node:zlib";
 import { isInside } from "../paths.js";
-import { filterVisibleGallery, gallery, outputFileCandidates } from "./store.js";
-import { recordsForRequest } from "../account-ownership.js";
+import { eachGalleryItem, filterVisibleGallery, outputFileCandidates } from "./store.js";
+import { ownedQuery, recordsForRequest } from "../account-ownership.js";
 
 function dosTime(value) {
   const date = value instanceof Date ? value : new Date();
@@ -110,12 +110,18 @@ function archiveEntries(req = null, ids = null) {
     names.add(name.toLowerCase());
     entries.push({ name, ...source, createdAt: item.createdAt });
   };
-  const sourceGallery = req
-    ? recordsForRequest(gallery, req)
-    : process.env.STUDIO_MULTI_USER === "1"
-      ? []
-      : gallery;
-  for (const item of filterVisibleGallery(sourceGallery)) {
+  const query = ownedQuery(req?.studioAccount);
+  const items = query
+    ? eachGalleryItem({
+        ...query,
+        status: "done",
+        dreamPool: false,
+        ...(ids && { named: [...ids] }),
+      })
+    : [];
+  for (const item of items) {
+    if (req && !recordsForRequest([item], req).length) continue;
+    if (!filterVisibleGallery([item]).length) continue;
     if (ids && ![item.id, item.url].some((key) => ids.has(String(key)))) continue;
     // Only Studio media is on this computer.
     if (item.status !== "done" || !isMediaUrl(item.url)) continue;

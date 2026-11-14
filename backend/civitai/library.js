@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { civitaiFetch, limitedBody } from "./access.js";
 import { parametersText } from "./civitai.js";
 import { matchResources } from "./import.js";
-import { addGalleryItems, gallery, importedImageFile } from "../gallery/store.js";
+import { addGalleryItems, galleryItem, importedImageFile } from "../gallery/store.js";
 import { startLibraryDownload } from "../library/downloads.js";
 import { withPngText } from "../png-text.js";
 import { probeVideo } from "../video-previews.js";
@@ -83,7 +83,7 @@ export function presetFromGallery(item) {
 }
 
 export function refreshImportedItem(preset) {
-  const previous = gallery.find((item) => item.id === `civitai:${preset.id}`);
+  const previous = galleryItem(`civitai:${preset.id}`);
   if (!previous || !fs.existsSync(importedImageFile(previous))) return;
   const item = importedGalleryItem(preset, previous);
   if (JSON.stringify(item) !== JSON.stringify(previous)) addGalleryItems([item]);
@@ -95,10 +95,7 @@ export async function downloadPresetImage(
 ) {
   if (!/^[1-9]\d*$/.test(preset.id)) throw new Error("Choose a valid Civitai image.");
   let matched = await matchResources(preset, await models());
-  const item = importedGalleryItem(
-    matched,
-    gallery.find((item) => item.id === `civitai:${preset.id}`),
-  );
+  const item = importedGalleryItem(matched, galleryItem(`civitai:${preset.id}`));
   const file = importedImageFile(item);
   if (item.type === "video") {
     if (!fs.existsSync(file)) {
@@ -187,7 +184,7 @@ export async function downloadPresetImage(
       downloadWarnings.push(`${resource.name}: ${error.message}`);
     }
   }
-  if (downloadWarnings.length && gallery.some((current) => current.id === item.id)) {
+  if (downloadWarnings.length && galleryItem(item.id)) {
     item.civitai.downloadWarnings = downloadWarnings;
     addGalleryItems([item]);
   }

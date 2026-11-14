@@ -41,6 +41,7 @@ const image = await sharp({
   .toBuffer();
 const queued = [];
 const store = await import("./gallery/store.js");
+const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 const references = await import("./references.js");
 let validImage = true;
 let sourcePrompt = "a landscape";
@@ -108,7 +109,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   assert.equal(imported.status, 200);
   assert.equal(imported.body.preset.settings.seed, "0");
   assert.equal(imported.body.preset.galleryItemId, "civitai:42");
-  const item = store.gallery.find((item) => item.id === "civitai:42");
+  const item = galleryRows().find((item) => item.id === "civitai:42");
   assert.equal(item.prompt, "a landscape");
   assert.equal(item.settings.seed, "0");
   assert.equal(item.width, 128);
@@ -144,14 +145,14 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   sourcePrompt = "updated source landscape";
   store.addGalleryItems([
     {
-      ...store.gallery.find((item) => item.id === "civitai:42"),
+      ...galleryRows().find((item) => item.id === "civitai:42"),
       createdAt: "2025-01-01T00:00:00Z",
     },
   ]);
   const reimported = await api("/api/presets/import", { url: "https://civitai.red/images/42" });
   assert.equal(reimported.status, 200);
   assert.equal(reimported.body.preset.prompt, sourcePrompt);
-  const current = store.gallery.find((item) => item.id === "civitai:42");
+  const current = galleryRows().find((item) => item.id === "civitai:42");
   assert.ok(Date.parse(current.createdAt) > Date.parse("2025-01-01T00:00:00Z"));
   assert.equal(
     JSON.parse(readPngInfo(store.importedImageFile(current)).text.civitai).prompt,
@@ -159,7 +160,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   );
   assert.equal(current.civitai.sourceMetadata.prompt, sourcePrompt);
   sourcePrompt = "a landscape";
-  store.setGallery(store.gallery.filter((item) => item.id !== current.id));
+  setGallery(galleryRows().filter((item) => item.id !== current.id));
   assert.equal((await fetch(base + "/api/presets/42/media")).status, 404);
   assert.equal((await fetch(base + "/api/presets/42/thumbnail")).status, 404);
   assert.equal((await api("/api/presets/resolve", { id: "42" })).status, 400);
@@ -210,7 +211,7 @@ test("video imports save originals, serve byte ranges and generate thumbnails", 
     const result = await api("/api/presets/import", { url: "https://civitai.red/images/42" });
     assert.equal(result.status, 200);
     assert.equal(result.body.preset.type, "video");
-    const item = store.gallery.find((item) => item.id === "civitai:42");
+    const item = galleryRows().find((item) => item.id === "civitai:42");
     assert.equal(item.type, "video");
     assert.equal(item.width, 64);
     assert.match(store.importedImageFile(item), /42\.mp4$/);
@@ -235,11 +236,11 @@ test("video imports save originals, serve byte ranges and generate thumbnails", 
 test("saved recipes migrate into gallery images without a duplicate recipe store", async () => {
   for (
     let attempt = 0;
-    attempt < 100 && !store.gallery.some((item) => item.id === "civitai:43");
+    attempt < 100 && !galleryRows().some((item) => item.id === "civitai:43");
     attempt++
   )
     await new Promise((resolve) => setTimeout(resolve, 10));
-  const item = store.gallery.find((item) => item.id === "civitai:43");
+  const item = galleryRows().find((item) => item.id === "civitai:43");
   assert.ok(item);
   assert.equal(item.prompt, "an older saved landscape");
   assert.equal(item.settings.seed, "0");
@@ -256,7 +257,7 @@ test("failed image downloads leave no gallery record or model download", async (
     const result = await api("/api/presets/import", { url: "https://civitai.com/images/42" });
     assert.equal(result.status, 400);
     assert.equal(
-      store.gallery.some((item) => item.id === "civitai:42"),
+      galleryRows().some((item) => item.id === "civitai:42"),
       false,
     );
     assert.equal(queued.length, before);
@@ -334,7 +335,7 @@ test("split workflow imports queue verified model, encoder, VAE and LoRA files a
     downloads.map((spec) => spec.folder),
     ["diffusion_models", "text_encoders", "vae", "loras"],
   );
-  const item = store.gallery.find((item) => item.id === "civitai:143425442");
+  const item = galleryRows().find((item) => item.id === "civitai:143425442");
   assert.equal(item.model, "exact-int8.safetensors");
   assert.equal(item.settings.textEncoder, "exact-encoder.safetensors");
   assert.deepEqual(item.settings.textEncoders, ["exact-encoder.safetensors"]);

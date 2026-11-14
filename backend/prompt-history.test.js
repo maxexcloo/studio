@@ -6,7 +6,7 @@ import test from "node:test";
 
 // Each test file runs in its own process, so this data folder stays here.
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-const { setGallery } = await import("./gallery/store.js");
+const { setGallery } = await import("./fixtures/gallery.js");
 const history = await import("./prompt-history.js");
 const { deleteRuntimeDocument, ownerDocumentName, readRuntimeDocument } =
   await import("./persistence/runtime.ts");

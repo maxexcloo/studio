@@ -9,7 +9,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-delete-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_MEDIA_DIR = dir;
 process.env.STUDIO_MULTI_USER = "1";
-const store = await import("./store.js");
+const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 const { registerGalleryDeleteRoute } = await import("./routes.js");
 const { accountOutputSubfolder } = await import("../account-ownership.js");
 const { mediaUrls } = await import("../media-paths.js");
@@ -49,7 +49,7 @@ function finishedItem(ownerId, name) {
 test("an account deletes its own finished item by its URL ID; another owner's answers as missing", async () => {
   const { file, item } = finishedItem("alice", "mvzvoi1l-cb839ee3-image");
   assert.match(item.url, /%2F/);
-  store.setGallery([item]);
+  setGallery([item]);
   const remove = (user) =>
     fetch(`${base}/${encodeURIComponent(item.url)}`, {
       method: "DELETE",
@@ -59,12 +59,12 @@ test("an account deletes its own finished item by its URL ID; another owner's an
   const other = await remove("bob");
   assert.equal(other.status, 404);
   assert.equal((await other.json()).error, "That item was not found.");
-  assert.equal(store.gallery.length, 1);
+  assert.equal(galleryRows().length, 1);
 
   const own = await remove("alice");
   assert.equal(own.status, 200);
   assert.equal((await own.json()).removed, 1);
-  assert.equal(store.gallery.length, 0);
+  assert.equal(galleryRows().length, 0);
   assert.equal(fs.existsSync(file), false);
   // Only the owner's own deletion is heard, for the taste profile.
   assert.deepEqual(deleted.at(-1), ["alice", ["mvzvoi1l-cb839ee3-image"]]);
@@ -73,7 +73,7 @@ test("an account deletes its own finished item by its URL ID; another owner's an
 test("one request deletes many of the account's own items and leaves another owner's", async () => {
   const own = Array.from({ length: 300 }, (_, index) => finishedItem("alice", `own-${index}`));
   const other = finishedItem("bob", "other");
-  store.setGallery([...own, other].map(({ item }) => item));
+  setGallery([...own, other].map(({ item }) => item));
   const ids = [...own, other].map(({ item }) => item.id);
 
   const response = await fetch(`${base}/delete`, {
@@ -85,7 +85,7 @@ test("one request deletes many of the account's own items and leaves another own
   const result = await response.json();
   assert.deepEqual(result.removed, ids.slice(0, own.length));
   assert.equal(result.files.deleted, own.length);
-  assert.deepEqual(store.gallery, [other.item]);
+  assert.deepEqual(galleryRows(), [other.item]);
   assert.equal(
     own.some(({ file }) => fs.existsSync(file)),
     false,
@@ -98,14 +98,14 @@ test("only an administrator sees each account's gallery and usage, and deletes a
   const bob = finishedItem("bob", "bob-one");
   // Only Bob's image is from the last 30 days; storage counts every file ("fixture", 7 bytes).
   Object.assign(bob.item, { createdAt: new Date().toISOString(), durationMs: 60_000 });
-  store.setGallery([...alice, bob].map(({ item }) => item));
+  setGallery([...alice, bob].map(({ item }) => item));
   const as = (user, role = "user") => ({ "x-user": user, "x-role": role });
 
   const peek = await fetch(`${base}/owners`, { headers: as("bob") });
   assert.equal(peek.status, 403);
   const refused = await fetch(`${base}/owners/alice`, { method: "DELETE", headers: as("bob") });
   assert.equal(refused.status, 403);
-  assert.equal(store.gallery.length, 3);
+  assert.equal(galleryRows().length, 3);
 
   const counts = await fetch(`${base}/owners`, { headers: as("admin", "administrator") });
   const usage = { videos: 0, cloudJobs: 0 };
@@ -119,7 +119,7 @@ test("only an administrator sees each account's gallery and usage, and deletes a
   });
   assert.equal(removed.status, 200);
   assert.equal((await removed.json()).removed, 2);
-  assert.deepEqual(store.gallery, [bob.item]);
+  assert.deepEqual(galleryRows(), [bob.item]);
   assert.equal(
     alice.some(({ file }) => fs.existsSync(file)),
     false,

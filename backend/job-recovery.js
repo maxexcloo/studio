@@ -75,15 +75,19 @@ function restoreRecoveredRecords(outputs, tiles = [], entry = {}, promptId = "")
  */
 const promptlessCancelMs = 3 * 60_000;
 
-// Reattach persisted tiles to their existing prompts; never submit replacement work.
+/**
+ * Reattach persisted tiles to their existing prompts; never submit replacement work. `gallery`:
+ * `tiles()` lists unfinished tiles (no output yet: pending, failed or cancelled), `job(id)` a
+ * job's items, `save(items)` saves changed items, and `replace(id, outputs)` swaps a job's
+ * unfinished tiles for its outputs, leaving out outputs already saved as finished.
+ */
 export function createJobRecovery({
   backends,
   finishJob,
-  getGallery,
+  gallery,
   jobs,
   recordsFromHistory,
   request,
-  setGallery,
   visible,
   ingest = async (_backend, records) => records,
   cancel = async () => {},
@@ -107,41 +111,35 @@ export function createJobRecovery({
     new Set([
       ...cancellations(),
       ...visible(
-        getGallery().filter(
-          (item) =>
-            !item.url &&
-            (["pending", "failed"].includes(item.status) ||
-              (item.status === "cancelled" && jobs.get(item.jobId)?.recovered)),
-        ),
+        gallery
+          .tiles()
+          .filter(
+            (item) =>
+              ["pending", "failed"].includes(item.status) ||
+              (item.status === "cancelled" && jobs.get(item.jobId)?.recovered),
+          ),
       )
         .map((item) => item.jobId)
         .filter(Boolean),
     ]);
-  /** Only the job's own tiles are compared: the whole gallery can be tens of megabytes of JSON. */
-  function patchTiles(id, patch) {
-    let changed = false;
-    const next = getGallery().map((item) => {
-      if (item.jobId !== id || item.url) return item;
-      const patched = patch(item);
-      if (JSON.stringify(patched) === JSON.stringify(item)) return item;
-      changed = true;
-      return patched;
-    });
-    if (changed) setGallery(next);
+  /** Saves the job's items `patch` changes; with `all`, its outputs as well as its tiles. */
+  function patchJob(id, patch, all = false) {
+    const changed = gallery
+      .job(id)
+      .filter((item) => all || !item.url)
+      .flatMap((item) => {
+        const patched = patch(item);
+        return JSON.stringify(patched) === JSON.stringify(item) ? [] : [patched];
+      });
+    if (changed.length) gallery.save(changed);
   }
   async function recover() {
-    if (
-      !cancellations().length &&
-      !getGallery().some(
-        (item) => !item.url && ["pending", "failed", "cancelled"].includes(item.status),
-      )
-    )
-      return;
+    const tiles = gallery.tiles();
+    if (!cancellations().length && !tiles.length) return;
     const untracked = new Set(
       visible(
-        getGallery().filter(
-          (item) =>
-            !item.url && ["pending", "failed"].includes(item.status) && !jobs.has(item.jobId),
+        tiles.filter(
+          (item) => ["pending", "failed"].includes(item.status) && !jobs.has(item.jobId),
         ),
       )
         .map((item) => item.jobId)
@@ -237,8 +235,7 @@ export function createJobRecovery({
                     current?.progress?.max > 0
                   ? current.progress
                   : { value: 0, max: 0, phase: "Generating", steps: false };
-            const ownerId =
-              current?.ownerId || getGallery().find((item) => item.jobId === id)?.ownerId;
+            const ownerId = current?.ownerId || gallery.job(id)[0]?.ownerId;
             // A run its runner gave up on (a worker too busy to answer) is followed from here on; its old end must not expire it mid-run.
             jobs.set(id, {
               ...current,
@@ -248,7 +245,7 @@ export function createJobRecovery({
               progress,
               ...(!current || current.terminalAt ? { recovered: true, terminalAt: undefined } : {}),
             });
-            patchTiles(id, ({ failure: _failure, error: _error, ...item }) => ({
+            patchJob(id, ({ failure: _failure, error: _error, ...item }) => ({
               ...item,
               status: "pending",
               progress,
@@ -256,8 +253,9 @@ export function createJobRecovery({
             continue;
           }
           const done = completed.get(id);
-          const tiles = getGallery()
-            .filter((item) => item.jobId === id && !item.url)
+          const tiles = gallery
+            .job(id)
+            .filter((item) => !item.url)
             .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
           const restored = done
             ? restoreRecoveredRecords(
@@ -275,15 +273,7 @@ export function createJobRecovery({
             // With Studio media storage, recovered outputs move out of ComfyUI like delivered ones.
             const outputs = await ingest(backend, restored, done.promptId);
             if (outputs.length) {
-              const urls = new Set(
-                getGallery()
-                  .filter((item) => item.status === "done")
-                  .map((item) => item.url),
-              );
-              setGallery([
-                ...outputs.filter((item) => !urls.has(item.url)),
-                ...getGallery().filter((item) => item.jobId !== id || item.url),
-              ]);
+              gallery.replace(id, outputs);
               finishJob(id, {
                 status: "done",
                 outputs,
@@ -295,13 +285,7 @@ export function createJobRecovery({
               const error = failed
                 ? "ComfyUI could not finish this generation."
                 : "ComfyUI finished without an available output file.";
-              setGallery(
-                getGallery().map((item) =>
-                  item.jobId === id && !item.url
-                    ? { ...item, status: "failed", error, progress: null }
-                    : item,
-                ),
-              );
+              patchJob(id, (item) => ({ ...item, status: "failed", error, progress: null }));
               finishJob(id, {
                 status: "failed",
                 error,
@@ -318,11 +302,7 @@ export function createJobRecovery({
               : "failed";
             const error =
               status === "failed" ? "ComfyUI no longer has this generation." : undefined;
-            setGallery(
-              getGallery().map((item) =>
-                item.jobId === id ? { ...item, status, error, progress: null } : item,
-              ),
-            );
+            patchJob(id, (item) => ({ ...item, status, error, progress: null }), true);
             finishJob(id, { status, error });
             missing.delete(id);
           }
@@ -336,8 +316,8 @@ export function createJobRecovery({
     for (const id of untracked) {
       if (
         jobs.has(id) ||
-        !visible(getGallery()).some(
-          (item) => item.jobId === id && !item.url && ["pending", "failed"].includes(item.status),
+        !visible(gallery.job(id)).some(
+          (item) => !item.url && ["pending", "failed"].includes(item.status),
         )
       ) {
         missing.delete(id);
@@ -351,12 +331,10 @@ export function createJobRecovery({
       missing.set(id, misses);
       if (misses < 2) continue;
       const error = "ComfyUI no longer has this generation.";
-      setGallery(
-        getGallery().map((item) =>
-          item.jobId === id && !item.url && ["pending", "failed"].includes(item.status)
-            ? { ...item, status: "failed", error, progress: null }
-            : item,
-        ),
+      patchJob(id, (item) =>
+        ["pending", "failed"].includes(item.status)
+          ? { ...item, status: "failed", error, progress: null }
+          : item,
       );
       finishJob(id, { status: "failed", error, recovered: true });
       missing.delete(id);

@@ -8,7 +8,7 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-job-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_MEDIA_DIR = dir;
-const { setGallery } = await import("./store.js");
+const { setGallery } = await import("../fixtures/gallery.js");
 const { registerGalleryReadRoutes } = await import("./routes.js");
 const { openDatabase } = await import("../persistence/runtime.ts");
 const { Store } = await import("../domain/store.ts");

@@ -2,6 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createJobRecovery } from "./job-recovery.js";
 
+/** The recovery's gallery over an array that `read()` returns and `write(items)` replaces. */
+function arrayGallery(read, write) {
+  const keyOf = (item) => item.url || item.id;
+  return {
+    tiles: () =>
+      read().filter(
+        (item) => !item.url && ["pending", "failed", "cancelled"].includes(item.status),
+      ),
+    job: (id) => read().filter((item) => item.jobId === id),
+    save: (items) => {
+      const saved = new Map(items.map((item) => [keyOf(item), item]));
+      write(read().map((item) => saved.get(keyOf(item)) || item));
+    },
+    replace: (id, outputs) => {
+      const done = new Set(
+        read()
+          .filter((item) => item.status === "done")
+          .map((item) => item.url),
+      );
+      write([
+        ...outputs.filter((item) => !done.has(item.url)),
+        ...read().filter((item) => item.jobId !== id || item.url),
+      ]);
+    },
+  };
+}
+
 function fixture() {
   const state = {
     backend: "",
@@ -16,7 +43,13 @@ function fixture() {
     backends: () => Object.keys(state.snapshots),
     finishJob: (id, patch) =>
       state.jobs.set(id, { ...state.jobs.get(id), ...patch, terminalAt: 1 }),
-    getGallery: () => state.gallery,
+    gallery: arrayGallery(
+      () => state.gallery,
+      (items) => {
+        state.gallery = items;
+        state.writes++;
+      },
+    ),
     jobs: state.jobs,
     recordsFromHistory: (_backend, history) =>
       Object.values(history).flatMap((entry) => entry.outputs || []),
@@ -24,10 +57,6 @@ function fixture() {
       const snapshot = state.snapshots[backend];
       if (snapshot.error) throw new Error("Offline");
       return path === "/queue" ? snapshot.queue : snapshot.history;
-    },
-    setGallery: (items) => {
-      state.gallery = items;
-      state.writes++;
     },
     visible: (items) => items.filter((item) => !item.deleted),
     cancel: async (backend, promptId) => state.cancellations.push({ promptId, backend }),
@@ -70,7 +99,12 @@ test("a stale queue snapshot cannot resurrect a job delivered while another reco
   const recover = createJobRecovery({
     backends: () => ["video"],
     jobs,
-    getGallery: () => gallery,
+    gallery: arrayGallery(
+      () => gallery,
+      (items) => {
+        gallery = items;
+      },
+    ),
     finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch, terminalAt: 1 }),
     recordsFromHistory: (_backend, history) =>
       Object.values(history).flatMap((entry) => entry.outputs),
@@ -78,9 +112,6 @@ test("a stale queue snapshot cannot resurrect a job delivered while another reco
       path === "/queue"
         ? { queue_running: [queued("live")] }
         : { "recovered-prompt": result("recovered") },
-    setGallery: (items) => {
-      gallery = items;
-    },
     visible: (items) => items,
     ingest: async (_backend, records) => {
       saving();
@@ -331,14 +362,16 @@ test("a running job its runner follows costs the worker nothing: no queue or his
   const recover = createJobRecovery({
     backends: () => ["video"],
     finishJob: () => assert.fail("a live job is not finished by recovery"),
-    getGallery: () => s.gallery,
+    gallery: arrayGallery(
+      () => s.gallery,
+      () => assert.fail("a live job's tiles are the runner's to write"),
+    ),
     jobs: s.jobs,
     recordsFromHistory: () => [],
     request: async (_backend, path) => {
       asked.push(path);
       return {};
     },
-    setGallery: () => assert.fail("a live job's tiles are the runner's to write"),
     visible: (items) => items,
   });
   for (let tick = 0; tick < 5; tick++) await recover();
@@ -463,7 +496,12 @@ test("recovered jobs with known prompts are looked up one by one, not through th
   const recover = createJobRecovery({
     backends: () => ["video"],
     finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch }),
-    getGallery: () => gallery,
+    gallery: arrayGallery(
+      () => gallery,
+      (items) => {
+        gallery = items;
+      },
+    ),
     jobs,
     recordsFromHistory: (_backend, history) =>
       Object.values(history).flatMap((entry) => entry.outputs || []),
@@ -474,9 +512,6 @@ test("recovered jobs with known prompts are looked up one by one, not through th
         : path === "/history/one-prompt"
           ? { "one-prompt": result("one") }
           : assert.fail(`unexpected ${path}`);
-    },
-    setGallery: (items) => {
-      gallery = items;
     },
     visible: (items) => items,
   });

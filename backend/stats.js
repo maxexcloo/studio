@@ -2,6 +2,7 @@
 // record only: nothing is tracked beyond what Studio already keeps about its own outputs.
 import { isCloudProfile } from "../shared/profiles.ts";
 import { canonicalProfileId } from "./profile/store.js";
+import { visibleGallery } from "./gallery/store.js";
 
 /**
  * What these gallery items made: finished outputs, images and videos, the cloud jobs among them
@@ -35,6 +36,10 @@ const dayMs = 86_400_000;
  * how many finished ones were starred, the median run time, and `failing` when at least half of five
  * or more runs in the last week failed.
  */
+/** The visible items profileStats counts: those of its last 30 days. */
+export const recentGallery = () =>
+  visibleGallery({ since: Date.now() - 30 * dayMs }, { ordered: false });
+
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
   // Each recorded id resolves once: resolving reads the alias file's state.

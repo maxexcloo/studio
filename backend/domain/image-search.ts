@@ -83,6 +83,7 @@ export function createImageSearch(options: {
   vectors: ImageVectors;
   idle(): boolean;
   items(): Iterable<IdleItem>;
+  changes?(): number;
   visible(item: IdleItem): boolean;
   /** The image file's bytes. */
   image(item: IdleItem): Promise<Uint8Array>;

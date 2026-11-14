@@ -17,7 +17,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
 writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 const { jobs, runJob } = await import("./jobs.js");
-const store = await import("./gallery/store.js");
+const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
 const { registerJobRoutes } = await import("./job-routes.js");
 const { openDatabase } = await import("./persistence/runtime.ts");
@@ -53,7 +53,7 @@ function sdxlRequest(overrides = {}) {
 
 function queue(id, body) {
   const items = makePendingItems(id, body);
-  store.setGallery([...items, ...store.gallery], { persist: false });
+  setGallery([...items, ...galleryRows()]);
   jobs.set(id, {
     status: "queued",
     kind: body.kind,
@@ -84,7 +84,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   };
   const body = sdxlRequest({ resultSet: { ...resultSet, extra: "dropped" } });
   queue(id, body);
-  assert.deepEqual(store.gallery.find((item) => item.jobId === id).resultSet, resultSet);
+  assert.deepEqual(galleryRows().find((item) => item.jobId === id).resultSet, resultSet);
   const queued = fake.nextPrompt();
   const running = runJob(id, body);
   const prompt = await queued;
@@ -103,7 +103,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
     });
     await waitFor(() => jobs.get(id)?.progress?.value === 2, "progress from the socket");
     assert.equal(jobs.get(id).status, "running");
-    assert.equal(store.gallery.find((item) => item.jobId === id).progress.max, 4);
+    assert.equal(galleryRows().find((item) => item.jobId === id).progress.max, 4);
     assert.equal(jobs.get(id).progress.phase, "Step");
   }
 
@@ -120,7 +120,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   const job = jobs.get(id);
   assert.equal(job.status, "done");
   assert.equal(job.outputs.length, 1);
-  const item = store.gallery.find((entry) => entry.jobId === id);
+  const item = galleryRows().find((entry) => entry.jobId === id);
   assert.equal(item.status, "done");
   assert.equal(
     item.url,
@@ -155,7 +155,7 @@ test("a run ComfyUI fails is kept as a failure that says why", async () => {
   assert.equal(job.status, "failed");
   assert.equal(job.failure.title, "The GPU ran out of memory");
   assert.equal(job.failure.nodeType, "KSampler");
-  const item = store.gallery.find((entry) => entry.jobId === id);
+  const item = galleryRows().find((entry) => entry.jobId === id);
   assert.equal(item.status, "failed");
   assert.equal(item.filename, "The GPU ran out of memory");
 });
@@ -171,7 +171,7 @@ test("a run that ends without an image is a failure, not a vanished tile", async
   await running;
   assert.equal(jobs.get(id).status, "failed");
   assert.equal(jobs.get(id).failure.title, "No image was saved");
-  assert.equal(store.gallery.filter((entry) => entry.jobId === id).length, 1);
+  assert.equal(galleryRows().filter((entry) => entry.jobId === id).length, 1);
 });
 
 test("a cancel before dispatch finishes without submitting provider work", async () => {
@@ -183,7 +183,7 @@ test("a cancel before dispatch finishes without submitting provider work", async
   await runJob(id, body);
   assert.equal(fake.prompts.length, submitted);
   assert.equal(jobs.get(id).status, "cancelled");
-  assert.equal(store.gallery.find((entry) => entry.jobId === id).status, "cancelled");
+  assert.equal(galleryRows().find((entry) => entry.jobId === id).status, "cancelled");
 });
 
 test(
@@ -215,9 +215,8 @@ test(
           return { status: 200, payload: { items: [] } };
         },
         jobs,
-        gallery: () => store.gallery,
+        items: (job) => galleryRows().filter((item) => item.jobId === job.id),
         accountForOwner: () => null,
-        flushGallery: async () => undefined,
         cancelPrompt: async () => {
           fake.send(id, { type: "execution_interrupted", data: { prompt_id: prompt.id } });
         },
@@ -245,7 +244,7 @@ test(
     await waitFor(() => jobs.get(id)?.keepsPicture, "the saved picture");
     await routes.get("/api/queue/cancel")({ params: {} }, { json() {} });
     await running;
-    const item = store.gallery.find((entry) => entry.jobId === id);
+    const item = galleryRows().find((entry) => entry.jobId === id);
     assert.equal(item.status, "done");
     assert.equal(
       item.url,
