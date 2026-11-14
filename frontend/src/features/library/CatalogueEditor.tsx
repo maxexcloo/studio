@@ -22,6 +22,7 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { libraryItemCategory, type LibraryItem } from "./LibraryCatalogueTable";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { catalogueQuery } from "./queries";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;
   role?: string;
@@ -64,7 +65,7 @@ function CatalogueForm({
     },
   });
   const refresh = () => {
-    for (const queryKey of [["library"], loraInfoQuery.queryKey, modelsQuery.queryKey])
+    for (const queryKey of [catalogueQuery.queryKey, loraInfoQuery.queryKey, modelsQuery.queryKey])
       void client.invalidateQueries({ queryKey });
     close();
   };

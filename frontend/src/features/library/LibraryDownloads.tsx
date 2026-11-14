@@ -8,25 +8,14 @@ import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { modelsQuery } from "../generation/GenerationProvider";
+import {
+  catalogueQuery,
+  downloadsQuery,
+  importsQuery,
+  type DownloadState,
+  type ModelDownload,
+} from "./queries";
 
-interface ModelDownload {
-  id: string;
-  file: string;
-  folder: string;
-  label?: string;
-  status: string;
-  error?: string;
-  retryable?: boolean;
-  receivedBytes?: number;
-  totalBytes?: number;
-  finishedAt?: string;
-}
-interface DownloadState {
-  active?: ModelDownload | null;
-  queued?: ModelDownload[];
-  paused?: ModelDownload[];
-  recent?: ModelDownload[];
-}
 const statusLabel = (status: string) =>
   ({
     cancelled: "Cancelled",
@@ -49,8 +38,7 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
   const [search, setSearch] = useState("");
   const seenCompleted = useRef(new Set<string>());
   const query = useQuery({
-    queryKey: ["library-downloads"],
-    queryFn: () => api<DownloadState>("/api/models/downloads"),
+    ...downloadsQuery,
     enabled: active,
     refetchInterval: active ? 2000 : false,
   });
@@ -77,7 +65,7 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
       void api<Models>("/api/models")
         .then((models) => client.setQueryData(modelsQuery.queryKey, models))
         .catch(failure);
-      for (const queryKey of [["library"], ["imports"]])
+      for (const queryKey of [catalogueQuery.queryKey, importsQuery.queryKey])
         void client.invalidateQueries({ queryKey });
     }
     seenCompleted.current = completed;
@@ -88,8 +76,8 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
         id,
       }),
     onSuccess: (state) => {
-      client.setQueryData(["library-downloads"], state);
-      void client.invalidateQueries({ queryKey: ["library-downloads"] });
+      client.setQueryData(downloadsQuery.queryKey, state);
+      void client.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
   });
   return (

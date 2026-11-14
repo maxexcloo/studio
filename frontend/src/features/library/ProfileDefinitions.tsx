@@ -20,6 +20,7 @@ import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
 import { ConvertToRadiance } from "./ConvertToRadiance";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { definitionsKey, profileStatsQuery, type ProfileStats } from "./queries";
 
 interface ProfileRow {
   id: string;
@@ -46,13 +47,6 @@ interface GuideBindings {
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
-interface ProfileStats {
-  runs: number;
-  failed: number;
-  starred: number;
-  medianRunMs?: number;
-  failing: boolean;
-}
 const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
 
 /** Runs, failures, stars and typical time; Failing when most recent runs failed. */
@@ -109,15 +103,15 @@ function useDefinitions() {
   // Family names come with the models list; following it re-labels once they arrive.
   useQuery(modelsQuery);
   const profileList = useQuery({
-    queryKey: ["definition-list", "profile"],
+    queryKey: [...definitionsKey, "profile"],
     queryFn: () => api<{ profiles: ProfileRow[] }>("/api/profiles/editable"),
   });
   const guideList = useQuery({
-    queryKey: ["definition-list", "guide"],
+    queryKey: [...definitionsKey, "guide"],
     queryFn: () => api<{ packs: GuideRow[] }>("/api/profiles/guides"),
   });
   const bindings = useQuery({
-    queryKey: ["definition-list", "guide-bindings"],
+    queryKey: [...definitionsKey, "guide-bindings"],
     queryFn: () => api<{ bindings: GuideBindings }>("/api/profiles/guide-bindings"),
   }).data?.bindings;
   const profiles = profileList.data?.profiles || [];
@@ -186,10 +180,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [combining, setCombining] = useState(false);
   const [converting, setConverting] = useState<ProfileRow | null>(null);
   const { profileList, profiles, guideOf } = useDefinitions();
-  const stats = useQuery({
-    queryKey: ["profile-stats"],
-    queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
-  }).data?.profiles;
+  const stats = useQuery(profileStatsQuery).data?.profiles;
   const families = [
     ...new Set(profiles.flatMap((entry) => (entry.family ? [entry.family] : []))),
   ].sort((a, b) => modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)));

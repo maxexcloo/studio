@@ -12,7 +12,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -20,13 +20,13 @@ import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
+import { catalogueQuery, importsQuery } from "./queries";
 import {
   gradeColours,
   importBusy,
   LibraryImportReview,
   stateLabel,
   type ImportRecord,
-  type ImportVision,
 } from "./LibraryImportReview";
 
 /** Sorts the best grade first and unknown grades after the known ones. */
@@ -56,12 +56,6 @@ const views = [
   { value: "attention", label: "Needs Files" },
 ];
 
-/** Library › Imports' records, newest first. */
-export const importsQuery = queryOptions({
-  queryKey: ["imports"],
-  queryFn: () => api<{ imports: ImportRecord[]; vision?: ImportVision }>("/api/library/imports"),
-});
-
 /** Library › Imports: a link or an image becomes a graded import that can be reviewed. */
 export function LibraryImports({
   heading,
@@ -87,7 +81,11 @@ export function LibraryImports({
       active && query.state.data?.imports.some(importBusy) ? 4000 : false,
   });
   const refresh = () => {
-    for (const queryKey of [["imports"], inspirationQuery.queryKey, ["library"]])
+    for (const queryKey of [
+      importsQuery.queryKey,
+      inspirationQuery.queryKey,
+      catalogueQuery.queryKey,
+    ])
       void client.invalidateQueries({ queryKey });
   };
   const opened = (result: { import: ImportRecord }) => {

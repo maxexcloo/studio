@@ -7,6 +7,8 @@ import { DataTable } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { backendLabel } from "../generation/payload";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { definitionsKey, duplicateProfilesQuery } from "./queries";
 
 interface Member {
   id: string;
@@ -124,9 +126,12 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
     onSuccess: () => {
       setChoices({});
       return Promise.all(
-        [["profile-backends"], ["profile-duplicates"], ["definition-list"], ["models"]].map(
-          (queryKey) => client.invalidateQueries({ queryKey }),
-        ),
+        [
+          backendCandidatesQuery.queryKey,
+          duplicateProfilesQuery.queryKey,
+          definitionsKey,
+          modelsQuery.queryKey,
+        ].map((queryKey) => client.invalidateQueries({ queryKey })),
       );
     },
   });

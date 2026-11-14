@@ -32,6 +32,7 @@ import { sharedProfileFields } from "../../../../shared/profiles";
 import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { catalogueQuery, definitionsKey } from "./queries";
 
 export type DefinitionKind = "profile" | "guide";
 interface DefinitionMeta {
@@ -118,9 +119,9 @@ function DefinitionForm({
     field(name, { ...(object(metadata?.[name]) ? metadata[name] : {}), [key]: value });
   }
   const refresh = () => {
-    void client.invalidateQueries({ queryKey: ["definition-list"] });
+    void client.invalidateQueries({ queryKey: definitionsKey });
     void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-    void client.invalidateQueries({ queryKey: ["library"] });
+    void client.invalidateQueries({ queryKey: catalogueQuery.queryKey });
     void client.invalidateQueries({ queryKey: loraInfoQuery.queryKey });
     void client.invalidateQueries({ queryKey: ["definition", kind, id] });
     void client.invalidateQueries({ queryKey: ["definition-versions", kind, id] });
@@ -604,7 +605,7 @@ export function DefinitionEditor({
   const client = useQueryClient();
   // A list opened before the definition was removed still shows it; refresh it so the row goes.
   useEffect(() => {
-    if (loaded.error) void client.invalidateQueries({ queryKey: ["definition-list"] });
+    if (loaded.error) void client.invalidateQueries({ queryKey: definitionsKey });
   }, [loaded.error, client]);
   return (
     <Modal

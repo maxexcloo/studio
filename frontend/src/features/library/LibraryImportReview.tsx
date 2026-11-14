@@ -23,6 +23,7 @@ import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { InspirationPreset } from "./InspirationPreset";
 import { inspirationQuery, type LibraryPreset } from "../generation/inspiration";
+import { catalogueQuery, definitionsKey, importsQuery } from "./queries";
 
 interface Availability {
   note?: string;
@@ -140,12 +141,12 @@ export function LibraryImportReview({
       ),
     onSuccess: (result, variables) => {
       client.setQueryData(["imports", result.import.id], { import: result.import });
-      void client.invalidateQueries({ queryKey: ["imports"] });
-      void client.invalidateQueries({ queryKey: ["library"] });
+      void client.invalidateQueries({ queryKey: importsQuery.queryKey });
+      void client.invalidateQueries({ queryKey: catalogueQuery.queryKey });
       void client.invalidateQueries({ queryKey: inspirationQuery.queryKey });
       if (variables.action === "draft-profile") {
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-        void client.invalidateQueries({ queryKey: ["definition-list", "profile"] });
+        void client.invalidateQueries({ queryKey: [...definitionsKey, "profile"] });
       }
       if (result.failures?.length)
         notifications.show({
