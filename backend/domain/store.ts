@@ -383,6 +383,16 @@ export class Store {
     );
   }
 
+  /** The owner's jobs that ran a prompt on one of `profileIds`. */
+  promptJobIds(ownerId: string, profileIds: string[]): string[] {
+    return this.db
+      .prepare(
+        `SELECT id FROM studio_queue WHERE owner_id = ? AND json_extract(record, '$.input.profileId') IN (SELECT value FROM json_each(?)) AND trim(coalesce(json_extract(record, '$.input.prompt'), '')) != ''`,
+      )
+      .all(ownerId, JSON.stringify(profileIds))
+      .map((row) => row.id as string);
+  }
+
   /**
    * What a scheduler tick weighs, in queue order: every unfinished job, and the finished ones it
    * still counts. Those are, for each resource and tier with work queued or waiting, the newest
