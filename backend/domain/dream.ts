@@ -2359,7 +2359,8 @@ export function createDream(options: {
     },
     async save(ownerId: string, patch: Partial<DreamSettings>) {
       const record = read(ownerId);
-      record.settings = { ...record.settings, ...patch };
+      // Turning Dream on resumes it too.
+      record.settings = { ...record.settings, ...(patch.enabled && { paused: false }), ...patch };
       write(ownerId, record);
       if (!record.settings.enabled || record.settings.paused) {
         states.delete(ownerId);

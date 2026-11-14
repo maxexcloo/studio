@@ -310,6 +310,10 @@ test("Dream is off until turned on, queues one hidden job per account only while
   await dream.save("bob", { enabled: false });
   assert.equal(live("bob").length, 0);
   assert.deepEqual(dream.today("bob"), { images: 0, videos: 0 });
+  // Turning Dream back on resumes a pause left from before.
+  await dream.save("bob", { paused: true });
+  assert.equal((await dream.save("bob", { enabled: true })).paused, false);
+  await dream.save("bob", { enabled: false });
 
   // A person's request leaves the waiting Dream job waiting below it, and Dream queues no more.
   const mine = await admission({ prompt: "now" }, { userId: "bob", role: "user" });
