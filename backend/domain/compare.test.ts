@@ -112,6 +112,14 @@ test("compare runs queue one seeded set, read back per owner and record the star
     ],
   );
   assert.equal(new Set(jobs.map((job: { queueSet?: string }) => job.queueSet)).size, 1);
+  // The run is a result set of its own ID, so the gallery keeps it together and links back.
+  assert.deepEqual(
+    jobs.map((job: { input: Record<string, unknown> }) => job.input.resultSet),
+    [
+      { id: run.body.id, title: "Comparison", index: 0, variation: "Steps 20" },
+      { id: run.body.id, title: "Comparison", index: 1, variation: "Steps 40" },
+    ],
+  );
   assert.equal(new Set(jobs.map((job: { sessionId: string }) => job.sessionId)).size, 1);
   assert.equal(run.body.prompt, "a fox");
   assert.deepEqual(
@@ -230,6 +238,15 @@ test("compare runs queue one seeded set, read back per owner and record the star
     filtered.body.comparisons.every((entry: { variants: { jobId: string }[] }) =>
       entry.variants.some((variant) => variant.jobId === other.jobId),
     ),
+  );
+  const members = await request("?members=1");
+  assert.deepEqual(members.body.comparisons.at(-1), {
+    id: "legacy",
+    jobIds: ["old-a", "old-b"],
+  });
+  assert.deepEqual(
+    members.body.comparisons.find((entry: { id: string }) => entry.id === selected.body.id).itemIds,
+    ["w-1", "o-0"],
   );
   const direct = findDirectRoute(app, "GET", "/api/comparisons")!;
   assert.ok(direct, "MCP can dispatch comparison reads without HTTP");

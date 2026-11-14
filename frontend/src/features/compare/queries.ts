@@ -8,6 +8,8 @@ export interface Comparison {
   createdAt: string;
   /** The shared seed; empty when the variants used different seeds. */
   seed: string;
+  /** The result set every variant belongs to, which the gallery shows together. */
+  set?: string;
   /** Present when every variant used the same prompt. */
   prompt?: string;
   /** Present when every variant used the same negative prompt, even an empty one. */
@@ -29,3 +31,24 @@ export const comparisonQuery = (id: string) =>
         ? false
         : 2000,
   });
+
+/** Which results each of the account's comparisons holds, to find an item's comparison. */
+export const comparisonMembersQuery = queryOptions({
+  queryKey: ["comparisons", "members"],
+  queryFn: () =>
+    api<{ comparisons: { id: string; jobIds: string[]; itemIds?: string[] }[] }>(
+      "/api/comparisons?members=1",
+    ),
+  staleTime: 60_000,
+});
+
+/** The newest comparison holding `item` (its chosen image, else its job's), if any. */
+export const comparisonOf = (
+  members: { comparisons: { id: string; jobIds: string[]; itemIds?: string[] }[] } | undefined,
+  item: MediaItem,
+) =>
+  members?.comparisons.find((comparison) =>
+    comparison.itemIds
+      ? comparison.itemIds.includes(item.id)
+      : Boolean(item.jobId && comparison.jobIds.includes(item.jobId)),
+  )?.id;

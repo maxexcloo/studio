@@ -130,6 +130,7 @@ export async function fixtures(page: Page) {
     ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
       ? { prompt: comparison.requests[0].input.prompt }
       : {}),
+    ...(comparison.itemIds ? {} : { set: comparison.id }),
     variants: comparison.jobIds.map((jobId: string, index: number) => ({
       jobId,
       label: comparison.labels[index],
@@ -156,6 +157,7 @@ export async function fixtures(page: Page) {
       height: 1024,
       createdAt,
       settings: { ...body },
+      ...(body.resultSet ? { resultSet: body.resultSet } : {}),
     };
     const job = {
       id,
@@ -539,18 +541,28 @@ export async function fixtures(page: Page) {
       comparisons.push(comparison);
       return respond(showComparison(comparison), 201);
     }
+    if (path === "/api/comparisons" && method === "GET")
+      return respond({
+        comparisons: comparisons.map(({ id, jobIds, itemIds }) => ({
+          id,
+          jobIds,
+          ...(itemIds ? { itemIds } : {}),
+        })),
+      });
     if (path === "/api/comparisons/run") {
       const seed = String(body.variants[0].input.seed || "4242");
       const sessionId = body.sessionId || "session-compare";
+      const id = `compare-${comparisons.length + 1}`;
       const comparison = {
-        id: `compare-${comparisons.length + 1}`,
+        id,
         seed,
         requests: body.variants,
         jobIds: body.variants.map(
-          (variant: any) =>
+          (variant: any, index: number) =>
             recordGeneration(
               {
                 ...variant.input,
+                resultSet: { id, title: "Comparison", index, variation: variant.label },
                 seed,
                 operation: "image",
                 parentJobId: body.parentJobId,
@@ -618,7 +630,11 @@ export async function fixtures(page: Page) {
           (url.searchParams.get("favorites") !== "1" || i.favorite) &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
-          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")),
+          (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
+          (url.searchParams.get("comparisons") !== "1" ||
+            comparisons.some((entry) =>
+              entry.itemIds ? entry.itemIds.includes(i.id) : entry.jobIds.includes(i.jobId),
+            )),
       );
       // Similar ranks the image first.
       const similar = url.searchParams.get("similar");

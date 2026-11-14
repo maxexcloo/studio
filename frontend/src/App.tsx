@@ -5,7 +5,6 @@ import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
 import { useRemembered } from "./features/auth/useRemembered";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
-import { CompareProvider } from "./features/compare/CompareDialog";
 import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
@@ -69,100 +68,97 @@ function Workspace() {
     return <Navigate to="/images" replace />;
   return (
     <GenerationProvider>
-      <CompareProvider>
-        <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
-          <AppShell.Header>
-            <AppHeader mode={mode} />
-          </AppShell.Header>
-          <AppShell.Main>
-            <div
-              className="studio-page studio-content"
-              style={{
-                maxWidth:
-                  appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined,
-              }}
-            >
-              <Routes location={overlay ? background : location}>
-                <Route path="/images" element={<GalleryPage />} />
-                <Route path="/video" element={<GalleryPage />} />
-                <Route
-                  path="/compare/:id"
-                  element={
-                    <Suspense fallback={<LoadingState fill label="Loading Comparison" />}>
-                      <ComparePage />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/dream"
-                  element={
-                    <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
-                      <DreamPage />
-                    </Suspense>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/images" replace />} />
-              </Routes>
-            </div>
-          </AppShell.Main>
-          <Modal
-            id="workspace"
-            opened={!!overlay}
-            onClose={closeWhenTop("workspace", () =>
-              location.state?.backgroundLocation
-                ? navigate(-1)
-                : navigate("/images", { replace: true }),
-            )}
-            aria-label={panel === "library" ? "Library" : "Settings"}
-            title={
-              phone ? (
-                <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
-              ) : panel === "library" ? (
-                "Library"
-              ) : (
-                "Settings"
-              )
-            }
-            closeButtonProps={{
-              "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
+      <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
+        <AppShell.Header>
+          <AppHeader mode={mode} />
+        </AppShell.Header>
+        <AppShell.Main>
+          <div
+            className="studio-page studio-content"
+            style={{
+              maxWidth: appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined,
             }}
-            size={1320}
-            styles={{
-              content: {
-                height: phone ? "100dvh" : "min(92dvh, 1040px)",
-                display: "flex",
-                flexDirection: "column",
-              },
-              header: { flexShrink: 0 },
-              title: { fontSize: "var(--mantine-font-size-xl)" },
-              body: { flex: 1, minHeight: 0, overflowY: "auto" },
-            }}
-            fullScreen={phone}
           >
-            {/* Initial focus lands here, so the close button doesn't show a focus ring on open. */}
-            <FocusTrap.InitialFocus />
-            {resumeSection ? (
-              <Navigate
-                to={{ pathname: location.pathname, search: location.search, hash: resumeSection }}
-                replace
-                state={location.state}
+            <Routes location={overlay ? background : location}>
+              <Route path="/images" element={<GalleryPage />} />
+              <Route path="/video" element={<GalleryPage />} />
+              <Route
+                path="/compare/:id"
+                element={
+                  <Suspense fallback={<LoadingState fill label="Loading Comparison" />}>
+                    <ComparePage />
+                  </Suspense>
+                }
               />
+              <Route
+                path="/dream"
+                element={
+                  <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
+                    <DreamPage />
+                  </Suspense>
+                }
+              />
+              <Route path="*" element={<Navigate to="/images" replace />} />
+            </Routes>
+          </div>
+        </AppShell.Main>
+        <Modal
+          id="workspace"
+          opened={!!overlay}
+          onClose={closeWhenTop("workspace", () =>
+            location.state?.backgroundLocation
+              ? navigate(-1)
+              : navigate("/images", { replace: true }),
+          )}
+          aria-label={panel === "library" ? "Library" : "Settings"}
+          title={
+            phone ? (
+              <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
             ) : panel === "library" ? (
-              library.allowed ? (
-                <Suspense fallback={<LoadingState label="Loading Library" fill />}>
-                  <LibraryPage />
-                </Suspense>
-              ) : (
-                <LoadingState label="Loading Library" fill />
-              )
+              "Library"
             ) : (
-              <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
-                <SettingsPage />
+              "Settings"
+            )
+          }
+          closeButtonProps={{
+            "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
+          }}
+          size={1320}
+          styles={{
+            content: {
+              height: phone ? "100dvh" : "min(92dvh, 1040px)",
+              display: "flex",
+              flexDirection: "column",
+            },
+            header: { flexShrink: 0 },
+            title: { fontSize: "var(--mantine-font-size-xl)" },
+            body: { flex: 1, minHeight: 0, overflowY: "auto" },
+          }}
+          fullScreen={phone}
+        >
+          {/* Initial focus lands here, so the close button doesn't show a focus ring on open. */}
+          <FocusTrap.InitialFocus />
+          {resumeSection ? (
+            <Navigate
+              to={{ pathname: location.pathname, search: location.search, hash: resumeSection }}
+              replace
+              state={location.state}
+            />
+          ) : panel === "library" ? (
+            library.allowed ? (
+              <Suspense fallback={<LoadingState label="Loading Library" fill />}>
+                <LibraryPage />
               </Suspense>
-            )}
-          </Modal>
-        </AppShell>
-      </CompareProvider>
+            ) : (
+              <LoadingState label="Loading Library" fill />
+            )
+          ) : (
+            <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
+              <SettingsPage />
+            </Suspense>
+          )}
+        </Modal>
+      </AppShell>
     </GenerationProvider>
   );
 }
