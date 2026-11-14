@@ -424,7 +424,8 @@ export const galleryOwnersQuery = queryOptions({
   queryKey: ["gallery-owners"],
   queryFn: () => api<{ owners: Record<string, GalleryOwner> }>("/api/gallery/owners"),
 });
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const plural = (count: number, noun: string) =>
+  `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
 /** The last 30 days in brief: only what the account made, with its GPU minutes. */
 const usageLine = (usage?: GalleryOwner) =>
   [
@@ -688,7 +689,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
               (ownerOf(account)?.images || 0) + (ownerOf(account)?.videos || 0),
             cell: (account) => (
               <Text size="xs" c="dimmed">
-                {usageLine(ownerOf(account))}
+                {galleries.data && usageLine(ownerOf(account))}
               </Text>
             ),
           },
@@ -698,7 +699,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             sortValue: (account) => ownerOf(account)?.bytes,
             cell: (account) => (
               <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                {formatBytes(ownerOf(account)?.bytes) || "None"}
+                {galleries.data && (formatBytes(ownerOf(account)?.bytes) || "None")}
               </Text>
             ),
           },
