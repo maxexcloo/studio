@@ -129,8 +129,7 @@ function mcpBearerRouteAllowed(method, routePath) {
  * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
  * guides, Combine Backends, the export, and accounts' groups. Only an administrator's own MCP token reaches them, or
  * Studio's own credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
- * Nothing here deletes a model file, replaces a download or touches a GPU; Combine Backends backs up
- * the profiles it replaces.
+ * Nothing here deletes a model file, replaces a download or touches a GPU.
  */
 const routeId = "[\\w.-]+";
 const mcpAdminRoutes = [

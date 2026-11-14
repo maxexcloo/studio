@@ -5758,7 +5758,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
   const instructions = (await f.client("", adminToken)).getInstructions();
   assert.match(
     instructions,
-    /removals \(catalogue_edit remove, profile_edit remove, combine_backends apply\) run only when asked and back up or keep versions first, and no tool touches GPUs/,
+    /removals \(catalogue_edit remove, profile_edit remove, combine_backends apply\) run only when asked and keep versions, and no tool touches GPUs/,
   );
   // Only Maintenance, which can end another account's job, is destructive; the read-only ones say so.
   const tools = (await (await f.client("", adminToken)).listTools()).tools.filter((tool) =>
