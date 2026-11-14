@@ -83,12 +83,9 @@ export function createLocalText({
 
 const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
 
-/**
- * The media workers every Studio workload behind which is parked; a worker Studio doesn't manage
- * never is. With automatic lifecycle control, queued work starts what it needs, so none is.
- */
+/** The media workers every Studio workload behind which is parked; a worker Studio doesn't manage never is. */
 export async function parkedWorkers(controller: RuntimeController | undefined, workers: Worker[]) {
-  if (!controller || controller.automaticLifecycle) return new Set<string>();
+  if (!controller) return new Set<string>();
   const parked = await controller.parked();
   return new Set(
     workers
