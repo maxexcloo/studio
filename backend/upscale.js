@@ -565,7 +565,7 @@ export async function uploadUpscaleVideoSource(item) {
   if (!file) throw new Error("The original video file is missing.");
   const extension = path.extname(name).toLowerCase();
   if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension))
-    throw new Error("Unsupported video format.");
+    throw new Error("Only MP4, WebM, MOV, MKV and M4V videos can be upscaled.");
   const buffer = fs.readFileSync(file);
   const filename = `studio-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
   const form = new FormData();
