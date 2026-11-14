@@ -309,12 +309,13 @@ export function registerGalleryErrorRoutes(app) {
 }
 
 /** Deletes the request's own items named by ID (or URL); answers with the IDs it deleted. */
-function deleteRequested(req, ids) {
+function deleteRequested(req, ids, deleted) {
   const wanted = new Set(ids.map(String));
   const removed = recordsForRequest(gallery, req).filter(
     (item) => wanted.has(item.id) || wanted.has(item.url),
   );
   const files = removeGalleryItems(removed);
+  deleted(req, removed);
   const matched = new Set(removed.flatMap((item) => [item.id, item.url]));
   return { files, removed: [...wanted].filter((id) => matched.has(id)) };
 }
@@ -348,7 +349,8 @@ async function storedBytes(items) {
   return sizes.reduce((sum, size) => sum + size, 0);
 }
 
-export function registerGalleryDeleteRoute(app) {
+/** `deleted(req, items)` hears which items a person deleted from their own gallery. */
+export function registerGalleryDeleteRoute(app, { deleted = () => {} } = {}) {
   // Administrators only (Settings › Users): each account's gallery size, its last 30 days' usage
   // and storage, and deleting all of one account's items through the owner's own delete path.
   directRoute(app, "GET", "/api/gallery/owners", async (account) => {
@@ -377,13 +379,13 @@ export function registerGalleryDeleteRoute(app) {
     const ids = Array.isArray(body?.ids) ? body.ids : [];
     return {
       status: 200,
-      payload: { ok: true, ...deleteRequested({ studioAccount: account }, ids) },
+      payload: { ok: true, ...deleteRequested({ studioAccount: account }, ids, deleted) },
     };
   });
   app.delete("/api/gallery/:id", (req, res) => {
     // Express has already decoded the ID once; a finished item's ID is its URL, which keeps its own escapes.
     const id = req.params.id;
-    const { files, removed } = deleteRequested(req, [id]);
+    const { files, removed } = deleteRequested(req, [id], deleted);
     // Accounts never learn whether another owner's item exists.
     if (req.studioAccount && !removed.length) {
       console.warn(`[Studio] Could not delete gallery item ${id}: not among the account's items`);

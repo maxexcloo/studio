@@ -49,7 +49,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
   const taste = createTaste({ dataDir, writer: () => null });
-  const projects = createProjects({ dataDir });
+  const projects = createProjects({ dataDir, now: () => state.clock });
   const state = {
     clock: Date.now(),
     items: [] as DreamItem[],
@@ -85,6 +85,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     store,
     taste,
     projects: (ownerId) => projects.list(ownerId),
+    chats: (ownerId) => projects.chats(ownerId),
     owners: () => ["alice", "bob"],
     access: (ownerId) => state.access[ownerId] ?? null,
     catalogue: async () => ({
@@ -664,6 +665,126 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
     new Date(Date.parse(firstVisit) + 10 * 60_000).toISOString(),
   );
   assert.equal((await request("")).body.since, (await request("/visit", {})).body.since);
+});
+
+test("A quiet chat hands its project to Dream, which continues its work one axis at a time", async (t) => {
+  const { dream, state, store, projects, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const beach = projects.create("alice", { name: "Beach", brief: { avoid: "crowds" } });
+  projects.attach("alice", "chat-1", beach.id);
+  /** An image the chat made, with the input it ran with. */
+  const chatImage = (id: string, prompt: string, extra: Partial<DreamItem> = {}) => {
+    const input = {
+      kind: "image",
+      prompt,
+      profileId: "flux",
+      steps: 20,
+      width: 832,
+      height: 1216,
+      loras: [
+        { name: "fox.safetensors", strength: 0.8, enabled: true },
+        { name: "klein.safetensors", strength: 1, enabled: true },
+      ],
+      referenceAssets: [{ assetId: "character", slot: "reference" }],
+    };
+    const session = store.createSession("alice", "Chat").id;
+    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
+    store.save({ ...job, status: "completed" });
+    state.items.push({
+      id,
+      jobId: job.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt,
+      chat: { conversationId: "chat-1" },
+      ...extra,
+    });
+  };
+  chatImage("seed", "a fox on a beach at dawn", { favorite: true });
+
+  // The chat asked for something within the hour: it keeps its project.
+  const held = await dreamOnce();
+  assert.equal(held?.dream?.projectId, undefined);
+  assert.equal(held?.dream?.arm, "exploit");
+
+  state.clock += 61 * 60_000;
+  const scene = await dreamOnce();
+  assert.equal(scene?.dream?.projectId, beach.id);
+  assert.equal(scene?.dream?.arm, "continue:scene");
+  assert.match(String(scene?.dream?.why), /^Continuing Beach: new scene · /);
+  // On the seed's profile, with its settings, the LoRAs that still fit and its references.
+  assert.deepEqual(
+    [scene?.input.profileId, scene?.input.steps, scene?.input.width, scene?.input.height],
+    ["flux", 20, 832, 1216],
+  );
+  assert.deepEqual(scene?.input.loras, [{ name: "fox.safetensors", strength: 0.8, enabled: true }]);
+  assert.deepEqual(scene?.input.referenceAssets, [{ assetId: "character", slot: "reference" }]);
+  const call = state.calls.at(-1)!;
+  assert.match(call.system, /change only the scene/);
+  assert.match(call.system, /safe for work/);
+  assert.match(call.user, /Seed prompt: a fox on a beach at dawn/);
+  assert.match(call.user, /- Avoid: crowds/);
+  assert.doesNotMatch(call.user, /Recent Dream ideas/);
+
+  // The axes take turns.
+  const outfit = await dreamOnce();
+  assert.equal(outfit?.dream?.arm, "continue:outfit");
+  assert.match(state.calls.at(-1)!.system, /change only the outfit/);
+
+  // A new request takes the project back for the next hour.
+  projects.activity("alice", "chat-1");
+  assert.equal((await dreamOnce())?.dream?.projectId, undefined);
+});
+
+test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  // At a fifth, a roll of 70 of 100 exploits.
+  state.rolls = [70];
+  assert.equal((await dreamOnce())?.dream?.arm, "exploit");
+  let made = 0;
+  const keep = (arm: string, pair = false) => {
+    const id = `kept-${made++}`;
+    state.items.push({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      dream: {
+        state: "unseen",
+        prompt: "p",
+        why: "",
+        at: "",
+        arm,
+        ...(pair
+          ? {
+              pair: {
+                id: "pair",
+                side: 0 as const,
+                question: "",
+                axis: "steps",
+                label: "",
+                value: 1,
+              },
+            }
+          : {}),
+      },
+    });
+    dream.keep("alice", id);
+    return dream.read("alice").explore;
+  };
+  assert.equal(keep("explore:prompt"), 0.22);
+  assert.equal(keep("continue:pose"), 0.2);
+  assert.equal(keep("exploit"), 0.18);
+  // A comparison's side asks something else, and leaves the share as it was.
+  assert.equal(keep("explore:steps", true), 0.18);
+  for (let index = 0; index < 30; index++) keep("explore:lora");
+  assert.equal(dream.read("alice").explore, 0.5);
+  state.rolls = [70];
+  assert.match(String((await dreamOnce())?.dream?.arm), /^explore:/);
+  for (let index = 0; index < 40; index++) keep("exploit");
+  assert.equal(dream.read("alice").explore, 0.05);
 });
 
 test("starring an unseen, finished Dream result keeps it", (t) => {
