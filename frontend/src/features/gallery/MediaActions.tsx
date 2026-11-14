@@ -31,7 +31,8 @@ import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
-import { useCompare } from "../compare/CompareDialog";
+import { useStageComparison } from "../compare/variants";
+import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
@@ -262,10 +263,11 @@ export function useMediaActions(
     ((next: Iteration) => iteration.mutate(next, { onSuccess: () => showQueued(client) }));
   // Runs from the item, also the viewer's own, share its pending state.
   const running = iteration.variables?.kind;
-  const compareVariants = useCompare();
+  const stage = useStageComparison();
   const variants = useItemMutation(item.id, "compare", {
-    mutationFn: () => compareVariants.openItem(item),
+    mutationFn: () => stage.fromItem(item).then(onApplied),
   });
+  const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
@@ -523,6 +525,19 @@ export function useMediaActions(
                 },
               },
               ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
+              ...(comparison
+                ? [
+                    {
+                      id: "open-comparison",
+                      label: "Open Comparison",
+                      icon: icons.compare,
+                      onClick: () => {
+                        onApplied();
+                        navigate(`/compare/${comparison}`);
+                      },
+                    },
+                  ]
+                : []),
             ],
           ],
         })

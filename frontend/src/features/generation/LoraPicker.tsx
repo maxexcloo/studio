@@ -84,7 +84,7 @@ const loraTabs = [
 ] as const;
 type LoraTab = (typeof loraTabs)[number]["value"];
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
-export const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
+const defaultStrength = (info: LoraInfo | undefined) => loraDefaultStrength(info, 1);
 export const loraTitle = (info: LoraInfo | undefined, file: string) =>
   info?.title || file.replace(/\.[^.]+$/, "");
 /** Whether a LoRA lists the profile's family, however the profile spells it. */
@@ -106,7 +106,7 @@ const loraSortLabels: Record<LoraSort, string> = {
   "name-desc": "Name Z–A",
 };
 /** Every LoRA list's order: thumbs up, then unrated, then thumbs down, each by title. */
-export const byRating =
+const byRating =
   (ratings: Record<string, LoraRating>, title: (file: string) => string) =>
   (a: string, b: string) =>
     ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || title(a).localeCompare(title(b));

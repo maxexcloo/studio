@@ -24,7 +24,9 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "react-router";
+import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
@@ -366,6 +368,23 @@ export function MediaViewer({
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
   const neighbours = neighbourSets(related, item);
+  // A comparison's set links to its side-by-side view, unless that is where the viewer is.
+  const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
+  const comparisonPath = comparison && `/compare/${comparison}`;
+  const pathname = useLocation().pathname;
+  const setBadge = {
+    variant: "default",
+    size: "lg",
+    radius: "xl",
+    style: glass,
+    fw: 500,
+    miw: 0,
+    className: classes.setPosition,
+    // Phones show only the place; Details names the set.
+    children: phone
+      ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
+      : item.resultSet && setPosition(item, members),
+  } as const;
   const iteration = useMediaIteration(item);
   const client = useQueryClient();
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
@@ -600,20 +619,16 @@ export function MediaViewer({
                   ]}
                 />
               ) : item.resultSet ? (
-                <Badge
-                  variant="default"
-                  size="lg"
-                  radius="xl"
-                  style={glass}
-                  fw={500}
-                  miw={0}
-                  className={classes.setPosition}
-                >
-                  {/* Phones show only the place; Details names the set. */}
-                  {phone
-                    ? `${members.findIndex((member) => member.id === item.id) + 1} / ${members.length}`
-                    : setPosition(item, members)}
-                </Badge>
+                comparisonPath && comparisonPath !== pathname ? (
+                  <Badge
+                    component={Link}
+                    to={comparisonPath}
+                    title="Open Comparison"
+                    {...setBadge}
+                  />
+                ) : (
+                  <Badge {...setBadge} />
+                )
               ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
                   {currentIndex + 1} / {viewable.length}

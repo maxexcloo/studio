@@ -7,7 +7,8 @@ import type { Store, QueueOrigin } from "./store.ts";
 
 /**
  * A compare set: `compareVariants` image jobs shown side by side. `vote` is the starred winner and,
- * with the variants' recorded inputs, the taste signal the taste profile learns from.
+ * with the variants' recorded inputs, the taste signal the taste profile learns from. A compare run
+ * is also a result set of the same ID (`comparisonSet`), so the gallery keeps its results together.
  */
 export interface ComparisonRecord {
   id: string;
@@ -24,7 +25,12 @@ export interface ComparisonRecord {
   winnerItemId?: string;
   votedAt?: string;
 }
-type GalleryItem = QueueMedia & { jobId?: string; type?: string; status?: string };
+type GalleryItem = QueueMedia & {
+  jobId?: string;
+  type?: string;
+  status?: string;
+  resultSet?: { id: string };
+};
 interface Request {
   studioAccount?: GenerationAccount;
   params: Record<string, string>;
@@ -42,6 +48,13 @@ interface Router {
 }
 
 const letter = (index: number) => String.fromCharCode(65 + index);
+/** The result set a compare run's variant `index` belongs to, named by its label. */
+export const comparisonSet = (id: string, index: number, label: string) => ({
+  id,
+  title: "Comparison",
+  index,
+  variation: label,
+});
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 const owner = (req: Request) => req.studioAccount?.userId || "";
@@ -112,10 +125,14 @@ export function registerCompareRoutes(
       new Set(variants.map((variant) => variant.item?.[key] || "")).size === 1
         ? { [key]: variants[0].item?.[key] || "" }
         : {};
+    const sets = new Set(variants.map((variant) => variant.item?.resultSet?.id));
+    const [set] = sets;
     return {
       id: record.id,
       createdAt: record.createdAt,
       seed: record.seed,
+      // The result set every variant belongs to, which the gallery shows together.
+      ...(sets.size === 1 && set ? { set } : {}),
       ...shared("prompt"),
       ...shared("negative"),
       vote: winner ? record.vote : null,
@@ -179,17 +196,25 @@ export function registerCompareRoutes(
         payload: { ok: false, error: "Gallery access is disabled for this account." },
       };
     const jobs = typeof query.jobIds === "string" ? new Set(query.jobIds.split(",")) : null;
+    const records = options
+      .read()
+      .filter(
+        (record) =>
+          record.ownerId === (account?.userId || "") &&
+          (!jobs || record.jobIds.some((id) => jobs.has(id))),
+      );
+    // `members=1` lists only which results each comparison holds, for finding an item's comparison.
     return {
       status: 200,
       payload: {
-        comparisons: options
-          .read()
-          .filter(
-            (record) =>
-              record.ownerId === (account?.userId || "") &&
-              (!jobs || record.jobIds.some((id) => jobs.has(id))),
-          )
-          .map((record) => show(record, items)),
+        comparisons:
+          query.members === "1"
+            ? records.map(({ id, jobIds, itemIds }) => ({
+                id,
+                jobIds,
+                ...(itemIds ? { itemIds } : {}),
+              }))
+            : records.map((record) => show(record, items)),
       },
     };
   });
@@ -284,10 +309,11 @@ export function registerCompareRoutes(
     const id = randomUUID();
     const session = (sessionId as string | undefined) || store.createSession(ownerId).id;
     const jobIds: string[] = [];
-    for (const variant of variants) {
+    for (const [index, variant] of variants.entries()) {
       const { clientJobId: _clientJobId, ...input } = variant.input as GenerationInput;
+      const resultSet = comparisonSet(id, index, String(variant.label).trim());
       const result = await options.admit(
-        { ...input, kind: "image", seed, count: 1 },
+        { ...input, kind: "image", seed, count: 1, resultSet },
         req.studioAccount,
         {
           sessionId: session,
