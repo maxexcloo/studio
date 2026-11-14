@@ -78,8 +78,21 @@ const recheckMs = 5 * 60_000;
 const watchMs = 1_000;
 // After this many failures in a row the model, not the item, is at fault: wait, then retry them.
 const failureStreak = 3;
+// The longest a walk over the gallery holds the event loop before giving other work a turn.
+const turnMs = 10;
 const backoffMs = 60_000;
 const rateWindow = 20;
+
+/** The items, giving the event loop a turn every `turnMs`: a large gallery takes a while to walk. */
+async function* turns<Item>(items: Iterable<Item>) {
+  let since = performance.now();
+  for (const item of items) {
+    yield item;
+    if (performance.now() - since < turnMs) continue;
+    await new Promise((resolve) => setImmediate(resolve));
+    since = performance.now();
+  }
+}
 
 /**
  * Text-model work on finished gallery records while Studio is idle (no live job but Dream's and no
@@ -142,6 +155,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
   const counting = () => !options.continuous && pass?.state === "running";
 
   const direct = new Set<string>();
+  // Counts finished runs: a walk that one finished during may hold that item as it was before.
+  let finished = 0;
   const target = (): PassTarget => ({
     scope: pass?.scope || "outdated",
     startedAt: pass?.startedAt || "",
@@ -160,29 +175,29 @@ export function createIdleWork<Item extends IdleItem>(options: {
       return allowed.get(owner)! && options.visible(item);
     };
   }
-  function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
+  async function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
     const passing = all ? target() : undefined;
     const visible = shown();
-    for (const item of open(items))
+    for await (const item of turns(open(items)))
       if (options.wanted(item, all, passing) && visible(item)) yield item;
   }
   /** How many items each scope's pass would take, counted in one walk over the gallery. */
   // The last counts, until the gallery, the pass or the failures change (or a while passes):
   // status is asked for every few seconds while Settings shows it.
   let counted = { state: "", at: -Infinity, counts: { all: 0, outdated: 0, missing: 0 } };
-  function scopeCounts() {
+  async function scopeCounts() {
     // Work done outside the gallery (an image's search vector) moves the pass and trickle counts.
     const state = `${options.changes?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
     if (options.changes && state === counted.state && now() - counted.at <= recheckMs)
       return counted.counts;
-    counted = { state, at: now(), counts: walkScopeCounts() };
+    counted = { state, at: now(), counts: await walkScopeCounts() };
     return counted.counts;
   }
-  function walkScopeCounts() {
+  async function walkScopeCounts() {
     const startedAt = running() ? target().startedAt : stamp();
     const counts = { all: 0, outdated: 0, missing: 0 };
     const visible = shown();
-    for (const item of open(options.items())) {
+    for await (const item of turns(open(options.items()))) {
       const wanted = passScopes.filter((scope) => options.wanted(item, true, { scope, startedAt }));
       if (wanted.length && visible(item)) for (const scope of wanted) counts[scope] += 1;
     }
@@ -220,12 +235,17 @@ export function createIdleWork<Item extends IdleItem>(options: {
     let item: Item | null = null;
     const state = `${options.changes?.()}|${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
     const walk = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
+    const finishedBefore = finished;
     if (walk)
-      for (const candidate of eligible(all))
+      for await (const candidate of eligible(all))
         if (!inflight.has(key(candidate))) {
           item = candidate;
           break;
         }
+    // The walk gave other work turns: what it checked first may have changed meanwhile.
+    if (finished !== finishedBefore || !options.idle() || running() !== all) return "busy";
+    if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
+    if (item && inflight.has(key(item))) return "busy";
     if (!item) {
       if (!inflight.size && walk) nothing = { state, at: now() };
       if (counting() && !inflight.size) {
@@ -245,6 +265,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const result = await runOne(item, controller, all).finally(() => {
       clearInterval(watch);
       inflight.delete(key(item));
+      finished += 1;
     });
     if (all && running() && (result === "done" || result === "failed")) spawn();
     return result;
@@ -317,13 +338,18 @@ export function createIdleWork<Item extends IdleItem>(options: {
      */
     async completed(items: Item[]) {
       if (!options.enabled() || (await options.unavailable())) return;
-      for (const item of [...eligible(false, items)]) {
+      const wanted: Item[] = [];
+      for await (const item of eligible(false, items)) wanted.push(item);
+      for (const item of wanted) {
         if (inflight.has(key(item))) continue;
         direct.add(key(item));
         await options
           .run(item, new AbortController().signal)
           .catch((error: Error) => note(error.message))
-          .finally(() => direct.delete(key(item)));
+          .finally(() => {
+            direct.delete(key(item));
+            finished += 1;
+          });
       }
     },
     /** Other work was admitted: items in progress step aside at once. */
@@ -349,7 +375,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     },
     async status(): Promise<IdleStatus> {
       const reason = await unavailable();
-      const scopes = scopeCounts();
+      const scopes = await scopeCounts();
       const scope = target().scope;
       const remaining = scopes[scope];
       const done = pass?.done || 0;
