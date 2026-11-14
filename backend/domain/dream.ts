@@ -1351,9 +1351,12 @@ export function createDream(options: {
 
   const states = new Map<string, { status: DreamStatus; reason?: string }>();
   const noted = new Map<string, string>();
-  /** Each account's reason Dream can't run is logged once, until it changes. */
+  /** Each account's reason Dream doesn't run (paused, capped, unavailable or failing) is logged once, until it changes. */
   function note(ownerId: string, state: { status: DreamStatus; reason?: string }) {
-    const text = state.status === "unavailable" ? state.reason || "" : "";
+    const text =
+      state.status === "generating"
+        ? ""
+        : state.reason || (state.status === "paused" ? "Paused." : "");
     if (text && noted.get(ownerId) !== text)
       log.info(`[Studio] Dream skips ${ownerId ? `account ${ownerId}` : "Studio"}: ${text}`);
     noted.set(ownerId, text);
