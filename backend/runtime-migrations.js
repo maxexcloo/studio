@@ -5,8 +5,6 @@ import { comparisonSets } from "./comparison-sets.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
-import { orphanThumbnails } from "./orphan-thumbnails.js";
-import { pruneBackups } from "./prune-backups.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -29,21 +27,9 @@ const steps = [
     },
   },
   {
-    name: "pruneBackups",
-    run: pruneBackups,
-    changes: (plan) => plan.paths.length,
-    online: true,
-  },
-  {
     name: "missingComfyOutputs",
     run: missingComfyOutputs,
     changes: (plan) => plan.missing,
-    online: true,
-  },
-  {
-    name: "orphanThumbnails",
-    run: orphanThumbnails,
-    changes: (plan) => plan.files,
     online: true,
   },
   {
