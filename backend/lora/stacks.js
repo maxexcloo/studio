@@ -175,8 +175,7 @@ export function applyLoraOps(ops, ownerId = "") {
   const state = readState(ownerId);
   const library = cleanLibrary(state.library);
   for (const op of ops.slice(0, maxOpsPerRequest)) applyOp(state, library, op);
-  // Keeps what this build no longer reads, such as saved stacks the stackPresets step has yet to move.
-  state.library = { ...state.library, ...cleanLibrary(library) };
+  state.library = cleanLibrary(library);
   writeState(state, ownerId);
   return cleanLibrary(state.library);
 }
