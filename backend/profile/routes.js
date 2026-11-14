@@ -23,6 +23,12 @@
  *   GET  /api/profiles/guide-bindings/versions/:n   one version with its bindings
  *   POST /api/profiles/guide-bindings/revert        {version, baseHash}
  *   POST /api/profiles/guide-bindings/approve       clears AI-Drafted on the bindings
+ *   GET  /api/profiles/prompt-styles                Improve Prompt's styles in order, with their hash and meta
+ *   PUT  /api/profiles/prompt-styles                {styles, baseHash, draft?}: saves them as a new version
+ *   GET  /api/profiles/prompt-styles/versions       their versions, newest first
+ *   GET  /api/profiles/prompt-styles/versions/:n    one version with its styles
+ *   POST /api/profiles/prompt-styles/revert         {version, baseHash}
+ *   POST /api/profiles/prompt-styles/approve        clears AI-Drafted on the styles
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
  *   POST /api/profiles/duplicates/merge             {hash}: merges that preview (profile/merge.js)
@@ -53,7 +59,7 @@ import { removeProfile } from "./remove.js";
 import { addRadianceBackend, radianceConversions } from "./radiance.js";
 
 /**
- * `profiles()` and `guides()` give the profile/store.js stores; `objectInfo(kind)` ComfyUI's
+ * `profiles()` and `guides()` give the profile/store.js stores, `promptStyles()` prompt-styles.js's; `objectInfo(kind)` ComfyUI's
  * object_info for revert's check; `exportOptions()` what writeExport needs besides the stores;
  * `onSaved(id)` runs after any change that affects who sees which profile; `accountName(account)`
  * names who made a change.
@@ -63,6 +69,7 @@ export function registerProfileRoutes(
   {
     profiles,
     guides,
+    promptStyles,
     objectInfo = async () => null,
     exportOptions = () => ({}),
     onSaved = () => {},
@@ -283,6 +290,32 @@ export function registerProfileRoutes(
   route("POST", "/api/profiles/guide-bindings/approve", (account) => ({
     meta: guides().approve("_bindings", { by: accountName(account) }),
   }));
+
+  route("GET", "/api/profiles/prompt-styles", () => promptStyles().list());
+  route("PUT", "/api/profiles/prompt-styles", (account, { body }) =>
+    promptStyles().save(body?.styles, {
+      by: accountName(account),
+      origin: origin(account),
+      aiDrafted: fromChat(account) && body?.draft === true,
+      baseHash: String(body?.baseHash || ""),
+    }),
+  );
+  route("GET", "/api/profiles/prompt-styles/versions", () => ({
+    versions: promptStyles().versions(),
+  }));
+  route("GET", "/api/profiles/prompt-styles/versions/:n", (_account, { params }) => ({
+    version: promptStyles().version(versionNumber(params.n)),
+  }));
+  route("POST", "/api/profiles/prompt-styles/revert", (account, { body }) =>
+    promptStyles().revert(versionNumber(body?.version), {
+      by: accountName(account),
+      baseHash: String(body?.baseHash || ""),
+      origin: origin(account),
+    }),
+  );
+  route("POST", "/api/profiles/prompt-styles/approve", (account) =>
+    promptStyles().approve({ by: accountName(account) }),
+  );
 
   route("GET", "/api/profiles/duplicates", () => duplicateProfiles());
   route("POST", "/api/profiles/duplicates/merge", async (account, { body }) => {

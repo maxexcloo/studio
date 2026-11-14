@@ -26,11 +26,11 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp, type LucideIcon } from "lucide-react";
+import { ArrowUp, Check, type LucideIcon } from "lucide-react";
 import { ActionBarGroups, ActionMenuItems, type Action } from "./ActionBar";
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
-import { copyText } from "./clipboard";
+import { useCopy } from "./clipboard";
 import { popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
 import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
@@ -42,15 +42,16 @@ import classes from "./TextBox.module.css";
 const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
- * Every multi-line text box. Beside the text stand only `send` and, with `tools`, a ⋯ menu of the
- * box's own tools (inside the text's corner for a labelled box), then Copy (unless `copy` is off, where the page offers it) and Clear (Reset
- * where `reset` holds the text to return to), which turns into Undo until the text next changes.
- * The menu is one level deep: a tool with options lists them under its name, first, rather than in
- * a submenu. On phones the box is a summary of its text: tapping it opens it full screen with
- * those tools as buttons, since menus are awkward over the keyboard, then Done, and `below` under
- * the text; Done, Escape or dismissing the keyboard returns to the page. There Clear stands beside
- * the sends, as in the composer, and `submit` adds its sends, the last one primary, so typing and
- * sending take one tap. An `inline` box edits in place on phones too, as on desktop.
+ * Every multi-line text box. Beside the text stand `send` and, with `tools`, small Copy (unless
+ * `copy` is off, where the page offers it) and Clear (Reset where `reset` holds the text to return
+ * to) buttons, Clear turning into Undo until the text next changes, then a ⋯ menu of the box's own
+ * tools (all of them inside the text's corner for a labelled box). The menu is one level deep: a
+ * tool with options lists them under its name, first, rather than in a submenu. On phones the box
+ * is a summary of its text: tapping it opens it full screen with those tools as buttons, since
+ * menus are awkward over the keyboard, then Done, and `below` under the text; Done, Escape or
+ * dismissing the keyboard returns to the page. There Copy and Clear stand beside the sends, as in
+ * the composer, and `submit` adds its sends, the last one primary, so typing and sending take one
+ * tap. An `inline` box edits in place on phones too, as on desktop.
  */
 export function TextBox({
   value,
@@ -74,9 +75,9 @@ export function TextBox({
   ref?: Ref<HTMLTextAreaElement>;
   value: string;
   onChange: (value: string) => void;
-  /** The box's own tools, in its ⋯ menu before Copy and Clear. */
+  /** The box's own tools, in its ⋯ menu; with them (even none) come Copy and Clear. */
   tools?: Action[];
-  /** Offers Copy among the tools; off where the page already has it (the viewer's bar). */
+  /** Offers Copy beside the text; off where the page already has it (the viewer's bar). */
   copy?: boolean;
   /** The send, and a proposal's Undo, which stay beside the text. */
   send?: ReactNode;
@@ -130,7 +131,7 @@ export function TextBox({
       ? { id: "clear", label: "Undo", icon: icons.undo, onClick: () => onChange(cleared) }
       : {
           id: "clear",
-          label: `${reset === undefined ? "Clear" : "Reset"} ${title}`,
+          label: reset === undefined ? "Clear" : "Reset",
           icon: reset === undefined ? icons.clear : icons.reset,
           disabled: value === start || props.readOnly,
           onClick: () => {
@@ -138,23 +139,45 @@ export function TextBox({
             onChange(start);
           },
         };
-  const actions: Action[] | undefined = tools && [
-    ...tools,
-    ...(copy
-      ? [
-          {
-            id: "copy",
-            label: `Copy ${title}`,
-            icon: icons.copy,
-            disabled: !value,
-            onClick: () => void copyText(value, title),
-          },
-        ]
-      : []),
-    clear,
-  ];
-  // The phone editor's tools, Clear standing beside the sends instead.
-  const editorTools = actions?.filter((action) => action !== clear);
+  const copier = useCopy();
+  const edits: Action[] = tools
+    ? [
+        ...(copy
+          ? [
+              {
+                id: "copy",
+                label: copier.copied ? "Copied" : "Copy",
+                icon: copier.copied ? Check : icons.copy,
+                disabled: !value,
+                onClick: () => copier.copy(value, title),
+              },
+            ]
+          : []),
+        clear,
+      ]
+    : [];
+  const editButtons = (size: "sm" | "lg") =>
+    edits.map((action) => (
+      <Tooltip key={action.id} label={action.label}>
+        <ActionIcon
+          onMouseDown={keepFocus}
+          variant="subtle"
+          color="gray"
+          size={size}
+          // Named for the box too, as the composer has its own Clear for the whole draft.
+          aria-label={
+            action.label === "Undo"
+              ? "Undo"
+              : `${action.id === "copy" ? "Copy" : action.label} ${title}`
+          }
+          disabled={action.disabled}
+          onClick={action.onClick}
+        >
+          {action.icon && <action.icon size={size === "sm" ? 14 : 18} />}
+        </ActionIcon>
+      </Tooltip>
+    ));
+  const actions = tools?.length ? tools : undefined;
   // What a tool is doing spins the ⋯ (its tooltip names it); without a ⋯ in sight, as in the phone
   // editor, it shows over the text with a spinner, standing in for the box's description meanwhile.
   const spins = Boolean(actions) && !phone && !hideTools;
@@ -192,12 +215,25 @@ export function TextBox({
     ] as const)
       line.current.style[key] = style[key];
   });
-  const listed = actions?.filter((action) => action.menu);
-  const plain = actions?.filter((action) => !action.menu);
+  // A tool with options lists its first group under its name (Improve Prompt's styles); its other
+  // options join the plain tools after them, as one group.
+  const listed = actions?.filter((action) => action.menu) || [];
+  const others = [
+    ...listed.flatMap((tool) =>
+      tool
+        .menu!.slice(1)
+        .flatMap((group) =>
+          group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
+        ),
+    ),
+    ...(actions?.filter((action) => !action.menu) || []),
+  ];
   const menu = actions && (
     <Menu
       position="top-end"
       width={menuWidth}
+      // A long list scrolls within the room the page leaves it.
+      middlewares={{ size: true }}
       // Above any dialog holding the box: a card's sits over the popovers it opens from.
       zIndex={getDefaultZIndex("max")}
       opened={menuOpened}
@@ -227,24 +263,34 @@ export function TextBox({
           </ActionIcon>
         </Menu.Target>
       </PopupTooltip>
-      <Menu.Dropdown>
-        {listed!.map((tool) => (
+      <Menu.Dropdown style={{ overflowY: "auto" }}>
+        {listed.map((tool, index) => (
           <Fragment key={tool.id}>
+            {index > 0 && <Menu.Divider />}
             <Menu.Label>{tool.label}</Menu.Label>
             <ActionMenuItems
-              groups={tool.menu!.map((group) =>
-                group.map((option) => ({ ...option, disabled: option.disabled || tool.disabled })),
-              )}
+              groups={[
+                tool.menu![0].map((option) => ({
+                  ...option,
+                  disabled: option.disabled || tool.disabled,
+                })),
+              ]}
             />
-            <Menu.Divider />
           </Fragment>
         ))}
-        <ActionMenuItems groups={[plain!]} />
+        {listed.length > 0 && others.length > 0 && <Menu.Divider />}
+        <ActionMenuItems groups={[others]} />
       </Menu.Dropdown>
     </Menu>
   );
-  // A labelled box keeps its ⋯ inside the text's corner, sharing its edge with the form's fields.
-  const inside = Boolean(!phone && !send && !hideTools && props.label && menu);
+  // A labelled box keeps its tools inside the text's corner, sharing its edge with the form's fields.
+  const inside = Boolean(!phone && !send && !hideTools && props.label && tools);
+  const boxTools = (
+    <div className={classes.tools}>
+      {editButtons("sm")}
+      {menu}
+    </div>
+  );
   const close = () => setEditing(false);
   const escape = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
@@ -272,8 +318,9 @@ export function TextBox({
         if (phone && !props.readOnly && !props.disabled) setEditing(true);
       }}
       // While the phone editor is open, it alone carries the actions.
-      rightSection={editing ? undefined : inside ? menu : rightSection}
+      rightSection={editing ? undefined : inside ? boxTools : rightSection}
       {...(inside && {
+        rightSectionWidth: "auto",
         rightSectionPointerEvents: "all" as const,
         rightSectionProps: { style: { alignItems: "flex-start", paddingTop: 4 } },
       })}
@@ -304,12 +351,12 @@ export function TextBox({
     <>
       {busy && spins && <VisuallyHidden role="status">{busy}</VisuallyHidden>}
       {/* A phone box opens its editor, which shows the tools, so only the send stands beside it. */}
-      {(!phone && menu && !inside) || send ? (
+      {(!phone && tools && !inside) || send ? (
         <div className={classes.columned}>
           {textarea}
           {!editing && !hideTools && (
             <div className={classes.tools}>
-              {!phone && menu}
+              {!phone && boxTools}
               {send}
             </div>
           )}
@@ -380,32 +427,19 @@ export function TextBox({
               {overlay && <div className={classes.overlay}>{overlay}</div>}
               {below && <div className={classes.below}>{below}</div>}
               {/* The tools, then the send, sit just above the keyboard. */}
-              {(actions || send || submit || rightSection) && (
+              {(tools || send || submit || rightSection) && (
                 <div className={classes.toolbar} onMouseDown={keepFocus}>
                   {actions ? (
                     <ActionBarGroups
-                      groups={[editorTools!]}
-                      labelled={editorTools!.map((action) => action.id)}
+                      groups={[actions]}
+                      labelled={actions.map((action) => action.id)}
                       menuPosition="top-start"
                     />
                   ) : (
                     !send && rightSection
                   )}
                   <div className={classes.sends}>
-                    {actions && (
-                      <Tooltip label={clear.label}>
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          size="lg"
-                          aria-label={clear.label}
-                          disabled={clear.disabled}
-                          onClick={clear.onClick}
-                        >
-                          {clear.icon && <clear.icon size={18} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
+                    {editButtons("lg")}
                     {/* The form's named sends stand in for its compact ones there. */}
                     {!submit && send}
                     {/* Named, as the keyboard leaves room: the last send is primary, after an arrow. */}

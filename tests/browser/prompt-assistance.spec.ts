@@ -235,7 +235,7 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
 });
 
-test("Improve Prompt lists its styles A–Z in the ⋯ menu with Custom… last, which asks what to change", async ({
+test("Improve Prompt lists its styles in their order with descriptions and Custom… last, which asks what to change", async ({
   page,
 }) => {
   await fixtures(page);
@@ -245,29 +245,31 @@ test("Improve Prompt lists its styles A–Z in the ⋯ menu with Custom… last,
         available: true,
         defaultPreset: "enhance",
         presets: [
-          { id: "custom", label: "Custom" },
-          { id: "portrait", label: "Portrait" },
+          { id: "portrait", label: "Portrait", description: "A person in focus." },
           { id: "enhance", label: "Enhance" },
           { id: "candid", label: "Candid" },
+          { id: "custom", label: "Custom" },
         ],
       },
     }),
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A bird in snow");
-  // One level deep: the styles are listed under Improve Prompt, then the box's other tools.
+  // One level deep: the styles are listed under Improve Prompt, then the box's other tools;
+  // Copy and Clear stand beside the text instead.
   const menu = await promptMenu(page, "Prompt");
   await expect(menu.getByText("Improve Prompt", { exact: true })).toBeVisible();
   await expect(menu.getByRole("menuitem")).toHaveText([
-    "Candid",
+    /^Portrait/,
     "Enhance",
-    "Portrait",
+    "Candid",
     "Custom…",
     "Write Negative",
     "Recent Prompts",
-    "Copy Prompt",
-    "Clear Prompt",
   ]);
+  await expect(
+    menu.getByRole("menuitem", { name: "Portrait", exact: true }),
+  ).toHaveAccessibleDescription("A person in focus.");
   await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Custom Improvement", exact: true });
   await expect(dialog.getByRole("textbox", { name: "Change", exact: true })).toBeVisible();

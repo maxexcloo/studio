@@ -10,9 +10,20 @@ import { usePhone } from "../../ui/usePhone";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
 
+/** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
+export interface AssistantOption {
+  id: string;
+  label: string;
+  description?: string;
+}
 interface AssistantStatus {
   available: boolean;
-  presets: { id: string; label: string; description?: string }[];
+  /** Improve Prompt's styles, then Custom. */
+  presets: AssistantOption[];
+  /** Animate's themes, then Custom. */
+  themes: AssistantOption[];
+  /** Fixed AI edits, each run as its instruction. */
+  changes: (AssistantOption & { instruction: string })[];
   defaultPreset?: string;
   vision?: boolean;
   loras?: boolean;
@@ -301,17 +312,17 @@ export function usePromptAssistant({
     if (style) setPresetId(style);
     assistance.mutate({ action, preset: style });
   };
-  // Styles A–Z, with Custom… last: a change to the draft where there is one, else the Custom style.
+  // Styles in Library › Prompt Styles' order, with Custom… last: a change to the draft where there
+  // is one, else the Custom style.
   const custom = change || info.presets.some((item) => item.id === "custom");
-  const styles = info.presets
-    .filter((item) => item.id !== "custom")
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const styles = info.presets.filter((item) => item.id !== "custom");
   const improve: ToolAction[] = [
     // Each style is a choice that runs at once; the last one used carries a check.
     ...(styles.length > 1
       ? styles.map((item) => ({
           id: `style:${item.id}`,
           label: item.label,
+          description: item.description,
           checked: item.id === preset?.id,
           disabled,
           onClick: () => run("rewrite", item.id),
