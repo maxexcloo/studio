@@ -895,6 +895,37 @@ test("Dream seeds from the account's stars, its own results only one draw in fou
   assert.equal(state.items.find((item) => item.id === "liked")?.favorite, undefined);
 });
 
+test("Comparisons rate gallery images against each other, and an image that wins seeds Dream", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
+  for (const id of ["win", "lose", "same"]) {
+    const input = { kind: "image", prompt: `prompt ${id}`, profileId: "flux" };
+    const session = store.createSession("alice", "Gallery").id;
+    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
+    store.save({ ...job, status: "completed" });
+    state.items.push({
+      id,
+      jobId: job.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      createdAt: old,
+    });
+  }
+  dream.calibrate("alice", { liked: ["win"], passed: ["lose"] });
+  assert.deepEqual(dream.read("alice").ratings, { win: 1516, lose: 1484 });
+  // Both (or Neither) draws the two together; a single verdict rates nothing.
+  dream.calibrate("alice", { liked: ["lose", "same"], passed: [] });
+  dream.calibrate("alice", { passed: ["same"], liked: [] });
+  assert.deepEqual(dream.read("alice").ratings, { win: 1516, lose: 1485, same: 1499 });
+  // Nothing is starred: the image that won seeds.
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.match(String(job?.dream?.why), /^Varying an image you chose in a comparison: /);
+  assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt win/);
+});
+
 test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
   const { dream, state, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
@@ -1252,6 +1283,9 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
     [signal.axis, signal.value, signal.over?.value, signal.arm],
     ["profile", "qwen", "flux", "explore:profile"],
   );
+  // B won: it rates above A.
+  const sideB = state.items.find((item) => item.dream?.pair?.side === 1)!;
+  assert.equal(dream.read("alice").ratings![String(sideB.id)], 1516);
   // The same image never starts a second comparison.
   assert.deepEqual(dream.read("alice").compared, ["base"]);
 

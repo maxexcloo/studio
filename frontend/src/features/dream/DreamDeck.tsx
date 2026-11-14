@@ -66,8 +66,6 @@ const keyDirections: Record<string, Direction> = {
 };
 /** Full screen's choices that return to the deck: a verdict or answer, not Star, Edit and the like. */
 const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]);
-// Calibration joins in once Dream has fewer unseen results than this.
-const few = 6;
 
 /** The card's media: the top card plays a video; cards beneath show its still. */
 function Media({ item, playing }: { item: MediaItem; playing: boolean }) {
@@ -269,7 +267,8 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a card (or its View action) opens it in the
  * viewer over the deck, with all the card's choices (Edit, Animate and More Like This too) in its
  * bar; Pass, Like or an answer there returns to the deck, and the others move on in the viewer.
- * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
+ * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile and
+ * rate images against each other;
  * judging them changes nothing in the gallery beyond an optional Super Like (Star). `notice` shows
  * above the cards; `empty` shows once the
  * deck is through, told whether calibration images are available.
@@ -289,7 +288,7 @@ export function DreamDeck({
   const sideways = useSideways();
   const touch = useTouch();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [counts, setCounts] = useState({ calibrated: 0, dreamed: 0 });
+  const [counts, setCounts] = useState({ judged: 0, dreamed: 0 });
   // The id of the top card's item open in the viewer; after a verdict it follows the next card.
   const [viewing, setViewing] = useState<string | null>(null);
   const judge = useJudge((card) =>
@@ -300,8 +299,8 @@ export function DreamDeck({
     }),
   );
   const unseen = items.filter((item) => !decided.has(item.id));
-  const gallery = useCalibration(calibrate && unseen.length < few, decided);
-  const cards = deckCards(unseen, calibrate ? gallery : [], counts);
+  const gallery = useCalibration(calibrate, decided);
+  const cards = deckCards(unseen, calibrate ? gallery : [], counts.judged);
   const [top, next] = cards;
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
@@ -318,7 +317,7 @@ export function DreamDeck({
       return next;
     });
     setCounts((previous) => ({
-      calibrated: previous.calibrated + (dreamed(card) ? 0 : 1),
+      judged: previous.judged + 1,
       dreamed: previous.dreamed + dreamed(card),
     }));
     judge.mutate(judgement);
