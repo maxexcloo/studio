@@ -7,7 +7,7 @@ import type { Action } from "../../ui/ActionBar";
 import { useItemMutation } from "./useItemMutation";
 
 /**
- * Edit › Recreate for an item made outside Studio (an upload), once it has a prompt (an import's own
+ * Recreate › Recreate in Composer for an item made outside Studio (an upload), once it has a prompt (an import's own
  * or a written suggestion): the composer opens on that prompt with the model it has for the item's kind, and the run
  * is one of the item's versions (backend/gallery/recreate.js).
  */

@@ -37,6 +37,7 @@ import {
   Puzzle,
   Redo2,
   RefreshCw,
+  Repeat2,
   RotateCcw,
   RotateCw,
   Rows2,
@@ -116,6 +117,8 @@ export const icons = {
   previous: ChevronLeft,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
+  /** Running an item again (Recreate). */
+  recreate: Repeat2,
   redo: Redo2,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,

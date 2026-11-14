@@ -7,7 +7,7 @@ import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 /**
- * Edit › Run Suggested Prompts for several uploads at once: each with a suggested prompt queues that
+ * Recreate › Run Suggested Prompts for several uploads at once: each with a suggested prompt queues that
  * prompt with the composer's model and settings, as a version of the upload
  * (backend/gallery/recreate.js). The notice counts those still without a prompt.
  */
