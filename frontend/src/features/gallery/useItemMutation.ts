@@ -1,4 +1,10 @@
-import { useMutation, useMutationState, type UseMutationOptions } from "@tanstack/react-query";
+import { useCallback, useSyncExternalStore } from "react";
+import {
+  hashKey,
+  useMutation,
+  useQueryClient,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
 
 /**
  * A media action's mutation, kept with the item it started on rather than with the component that
@@ -15,9 +21,28 @@ export function useItemMutation<TData = unknown, TVariables = void>(
 ) {
   const mutationKey = ["item-action", action, itemId];
   const mutation = useMutation({ ...options, mutationKey });
-  const running = useMutationState({
-    filters: { mutationKey, exact: true, status: "pending" },
-    select: (pending) => pending.state.variables as TVariables,
-  });
-  return { ...mutation, isPending: running.length > 0, variables: running.at(-1) };
+  const cache = useQueryClient().getMutationCache();
+  const key = hashKey(mutationKey);
+  // Only this item's own runs wake it: `useMutationState` rechecks on every cache event, including
+  // each observer's options update, which every render of every action sends.
+  const subscribe = useCallback(
+    (change: () => void) =>
+      cache.subscribe((event) => {
+        if (
+          (event.type === "added" || event.type === "removed" || event.type === "updated") &&
+          event.mutation.options.mutationKey &&
+          hashKey(event.mutation.options.mutationKey) === key
+        )
+          change();
+      }),
+    [cache, key],
+  );
+  const running = useSyncExternalStore(subscribe, () =>
+    cache.findAll({ mutationKey, exact: true, status: "pending" }).at(-1),
+  );
+  return {
+    ...mutation,
+    isPending: Boolean(running),
+    variables: running?.state.variables as TVariables | undefined,
+  };
 }
