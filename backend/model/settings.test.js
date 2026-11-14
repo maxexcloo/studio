@@ -11,18 +11,6 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { variantFor } = await import("../family-catalogue.js");
 const { inferModels } = await import("./models.js");
-const { sanitizeGenerateBody } = await import("../validation.js");
-
-const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
-const zimage = {
-  "cap_embedder.1.weight": t([3840, 2560]),
-  "noise_refiner.0.attention.k_norm.weight": t([128]),
-};
-const wan14b = {
-  "head.modulation": t([1, 2, 5120]),
-  "head.head.weight": t([64, 5120]),
-  "patch_embedding.weight": t([5120, 16, 1, 2, 2]),
-};
 
 const list = (values) => ({ input: { required: values } });
 const nodes = [

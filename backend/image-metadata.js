@@ -282,7 +282,7 @@ export function readImageMetadata(buffer) {
     if (!textValue) return;
     if (/^workflow:\s*\{/.test(textValue)) text.workflow ||= textValue.replace(/^workflow:\s*/, "");
     else if (/^prompt:\s*\{/.test(textValue)) text.prompt ||= textValue.replace(/^prompt:\s*/, "");
-    else if (/^\{/.test(textValue)) {
+    else if (textValue.startsWith("{")) {
       const parsed = parseJson(textValue);
       if (
         parsed &&
@@ -868,7 +868,7 @@ export function comfyRecipe(prompt) {
   } else recipe.warnings.push("No sampler was found in the ComfyUI graph.");
   for (const [, item] of nodes) {
     const inputs = item.inputs || {};
-    const type = item.class_type;
+    const type = String(item.class_type);
     if (type === "CheckpointLoaderSimple" || type === "CheckpointLoader")
       addResource(recipe.resources, resource("checkpoint", { file: scalar(inputs.ckpt_name) }));
     else if (/^UNETLoader|^UnetLoaderGGUF|DiffusionModelLoader/.test(type))
@@ -876,7 +876,7 @@ export function comfyRecipe(prompt) {
         recipe.resources,
         resource("diffusion_model", { file: scalar(inputs.unet_name ?? inputs.model_name) }),
       );
-    else if (/^LoraLoader/.test(type) && typeof scalar(inputs.lora_name) === "string")
+    else if (type.startsWith("LoraLoader") && typeof scalar(inputs.lora_name) === "string")
       addResource(
         recipe.resources,
         resource("lora", {
@@ -951,11 +951,11 @@ export function imageRecipe(metadata) {
     // A sampler the graph names exactly beats an approximate A1111 mapping.
     if (comfy.settings.sampler)
       recipe.approximate = recipe.approximate.filter(
-        (reason) => !/^Sampler /.test(reason) && !/^No sampling schedule/.test(reason),
+        (reason) => !reason.startsWith("Sampler ") && !reason.startsWith("No sampling schedule"),
       );
     if (comfy.settings.scheduler)
       recipe.approximate = recipe.approximate.filter(
-        (reason) => !/^Schedule /.test(reason) && !/^No sampling schedule/.test(reason),
+        (reason) => !reason.startsWith("Schedule ") && !reason.startsWith("No sampling schedule"),
       );
     if (!primary.settings.sampler && comfy.settings.sampler)
       recipe.settings.sampler = comfy.settings.sampler;

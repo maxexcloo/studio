@@ -13,11 +13,15 @@ depends = [
   "check:actions",
   "check:mise",
   "check:oxfmt",
+  "check:oxlint",
   "check:typescript",
   "check:updates",
   "check:whitespace",
   "test",
 ]
+
+[tasks."check:oxlint"]
+run = "oxlint --deny-warnings"
 
 [tasks.dev]
 run = "node dev.mjs"

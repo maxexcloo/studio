@@ -19,7 +19,7 @@ export function findUpscaleTarget(id) {
 function patchUpscale(itemId, patch, options = {}) {
   const item = findUpscaleTarget(itemId);
   if (!item) return false;
-  return updateGalleryJob(item.id, { upscale: { ...(item.upscale || {}), ...patch } }, options);
+  return updateGalleryJob(item.id, { upscale: { ...item.upscale, ...patch } }, options);
 }
 
 /** Where an upscale's state and result go: the gallery item, by default. */
@@ -249,7 +249,6 @@ export function prepareUpscale({
   quality,
   target = 0,
   faceDetail = false,
-  info,
   customWorkflow = null,
 }) {
   const body = {

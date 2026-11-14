@@ -71,7 +71,7 @@ export function civitaiOffers({
   const wanted = familiesOf(version.baseModel || "");
   const shell = { name: model.name, type: model.type, mode: model.mode, nsfw: model.nsfw };
   const chosenFile = (() => {
-    const files = civitaiModelFiles({ ...version, model: { ...shell, ...(version.model || {}) } });
+    const files = civitaiModelFiles({ ...version, model: { ...shell, ...version.model } });
     return files.find((item) => item.primary) || files[0];
   })();
   const offers = [];
@@ -79,7 +79,7 @@ export function civitaiOffers({
     const full = {
       ...candidate,
       modelId: model.id ?? version.modelId,
-      model: { ...shell, ...(candidate.model || {}) },
+      model: { ...shell, ...candidate.model },
     };
     const folder = civitaiFolder(full, file);
     if (!folder) return;
@@ -122,7 +122,7 @@ export function civitaiOffers({
   // Other files of the chosen version: another precision or format.
   for (const file of civitaiModelFiles({
     ...version,
-    model: { ...shell, ...(version.model || {}) },
+    model: { ...shell, ...version.model },
   })) {
     if (file === chosenFile || file.id === chosenFile?.id) continue;
     offer(

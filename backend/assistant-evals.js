@@ -259,7 +259,7 @@ export async function runEvals({
   const transport = async (url, options) => {
     if (!live) return reply(recorded.current);
     const response = await fetchImpl(url, options);
-    if (/chat\/completions$/.test(url) && response.ok) {
+    if (url.endsWith("chat/completions") && response.ok) {
       const answer = await response
         .clone()
         .json()

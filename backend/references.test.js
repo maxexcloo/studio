@@ -189,7 +189,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
   await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs.slice(0, 1));
   assert.deepEqual(uploads.at(-1).buffer, source, "upscale operations keep full resolution");
 
-  const painted = await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs, {
+  await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs, {
     generation: { ...generation, inpaint: { mask: "painted" } },
   });
   assert.deepEqual(

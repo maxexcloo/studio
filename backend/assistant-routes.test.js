@@ -71,9 +71,9 @@ const fetchImpl = async (url, options = {}) => {
     choices: [
       {
         message: {
-          content: /^You write negative prompts/.test(body.messages[0].content)
+          content: body.messages[0].content.startsWith("You write negative prompts")
             ? "blurry"
-            : /^You rewrite/.test(body.messages[0].content)
+            : body.messages[0].content.startsWith("You rewrite")
               ? "A cabin at dusk."
               : '{"loras": [{"name": "cabin.safetensors", "strength": 0.8, "reason": "Cabins"}]}',
         },

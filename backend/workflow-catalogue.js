@@ -77,7 +77,7 @@ function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {
     favorites: Array.isArray(patch.favorites) ? patch.favorites : current.favorites,
-    lastUsed: { ...current.lastUsed, ...(patch.lastUsed || {}) },
+    lastUsed: { ...current.lastUsed, ...patch.lastUsed },
   };
   saveWorkflowPreferences(next);
   return next;

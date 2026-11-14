@@ -73,7 +73,7 @@ test.after(async () => {
 const api = async (pathname, options = {}) => {
   const response = await fetch(`${base}${pathname}`, {
     ...options,
-    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    headers: { "content-type": "application/json", ...options.headers },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   return {

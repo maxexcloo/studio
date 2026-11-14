@@ -16,31 +16,6 @@ const objectInfo = JSON.parse(
     "utf8",
   ),
 );
-const byType = (graph, type) => Object.values(graph).filter((item) => item.class_type === type);
-const inpaint = {
-  original: "original.png",
-  crop: "crop.png",
-  mask: "mask.png",
-  composite: "stitch.png",
-  box: { x: 96, y: 160, width: 512, height: 640 },
-  work: { width: 912, height: 1136 },
-  strength: 1,
-  feather: 0.4,
-};
-
-/** Every node is one this ComfyUI has, and every link points at a node in the graph. */
-function assertWired(graph) {
-  for (const [id, node] of Object.entries(graph)) {
-    assert.ok(
-      objectInfo[node.class_type] || node.class_type === "TextEncodeQwenImage21",
-      `${id}: ${node.class_type} is not a ComfyUI node`,
-    );
-    for (const value of Object.values(node.inputs)) {
-      if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string")
-        assert.ok(graph[value[0]], `${id} links to missing node ${value[0]}`);
-    }
-  }
-}
 
 test("the inpaint nodes are all ComfyUI core nodes", () => {
   for (const node of inpaintNodes) assert.ok(objectInfo[node], node);

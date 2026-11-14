@@ -57,8 +57,8 @@ export function detectLink(value) {
     throw new Error("Paste a Civitai or Hugging Face link.");
   }
   if (isCivitaiHost(url.hostname)) {
-    if (/^\/images\//.test(url.pathname)) return "civitai-image";
-    if (/^\/models\//.test(url.pathname)) return "civitai-model";
+    if (url.pathname.startsWith("/images/")) return "civitai-image";
+    if (url.pathname.startsWith("/models/")) return "civitai-model";
     throw new Error("Use a Civitai image or model link.");
   }
   if (url.hostname === "huggingface.co" || url.hostname === "www.huggingface.co") {
@@ -93,7 +93,7 @@ export async function resolveCivitaiModel(
     ...fetched,
     modelId: id,
     model: {
-      ...(fetched?.model || {}),
+      ...fetched?.model,
       name: fetched?.model?.name || model.name,
       type: fetched?.model?.type || model.type,
       mode: model.mode ?? fetched?.model?.mode,

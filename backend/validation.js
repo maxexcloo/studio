@@ -1,4 +1,3 @@
-import { defaultGenerationCount } from "./generation-defaults.js";
 import { isResolution } from "../shared/resolution.ts";
 import { catalogueLoraInfo } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
