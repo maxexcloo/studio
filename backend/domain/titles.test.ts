@@ -14,7 +14,15 @@ const item = (id: string, extra: Partial<TitleItem> = {}): TitleItem => ({
 
 /** A titler over fakes: no model is called. */
 function fixture(items: TitleItem[]) {
-  const state = { items, idle: true, enabled: true, sent: [] as string[], walks: 0, changes: 0 };
+  const state = {
+    items,
+    idle: true,
+    enabled: true,
+    sent: [] as string[],
+    walks: 0,
+    changes: 0,
+    now: Date.parse("2026-11-14T00:00:00Z"),
+  };
   const titler = createTitler({
     enabled: () => state.enabled,
     writer: {
@@ -35,6 +43,7 @@ function fixture(items: TitleItem[]) {
       state.items = state.items.map((entry) => (entry === target ? { ...entry, title } : entry));
     },
     log: { info: () => {} },
+    now: () => state.now,
   });
   return { state, titler };
 }
@@ -77,6 +86,13 @@ test("an idle tick that found nothing reads the gallery again only once it chang
   const walks = state.walks;
   assert.equal(await titler.tick(), "none");
   assert.equal(state.walks, walks);
+  // Past the recheck it looks once more, then rests again for the next while.
+  state.now += 6 * 60_000;
+  assert.equal(await titler.tick(), "none");
+  assert.equal(state.walks, walks + 1);
+  state.now += 60_000;
+  assert.equal(await titler.tick(), "none");
+  assert.equal(state.walks, walks + 1);
   state.items = [...state.items, item("new")];
   state.changes += 1;
   assert.equal(await titler.tick(), "done");

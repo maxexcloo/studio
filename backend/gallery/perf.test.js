@@ -11,8 +11,13 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 process.env.STUDIO_DATA_DIR = dataDir;
 const { readGalleryRows } = await import("../persistence/gallery-rows.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
-const { filterVisibleGallery, galleryRevisionValue, pageGallery, updateGalleryJob } =
-  await import("./store.js");
+const {
+  filterVisibleGallery,
+  forgetGalleryItems,
+  galleryRevisionValue,
+  pageGallery,
+  updateGalleryJob,
+} = await import("./store.js");
 const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 
 const output = (name, subfolder = "") => ({
@@ -85,7 +90,7 @@ test("paging through 50,000 items serves each once, newest first, with exact cou
   );
 });
 
-test("paging through a search serves every match once and counts them once", () => {
+test("paging through a search serves every match once, testing each item once", () => {
   setGallery(bigGallery(5000));
   let tested = 0;
   const filter = (item) => {
@@ -103,8 +108,7 @@ test("paging through a search serves every match once and counts them once", () 
     pages += 1;
   } while (cursor);
   assert.equal(new Set(seen).size, 455);
-  // Pages walk on from their cursor; the count is kept rather than made again for every page.
-  assert.ok(tested < 3 * 5000, `the filter ran ${tested} times over ${pages} pages`);
+  assert.equal(tested, 5000, `each item is tested once across ${pages} pages`);
 });
 
 test("a change to the gallery shows on the next page request", () => {
@@ -157,4 +161,44 @@ test("a live preview reaches other browsers while rendering, and is never saved"
     pageGallery({}).items.map((item) => [item.status, item.preview]),
     [["done", undefined]],
   );
+});
+
+test("progress shown but not saved goes when the item is saved again or deleted", () => {
+  const tile = (id) => ({
+    id,
+    jobId: id,
+    status: "pending",
+    type: "image",
+    createdAt: new Date().toISOString(),
+  });
+  setGallery([tile("saved"), tile("deleted")]);
+  for (const id of ["saved", "deleted"])
+    updateGalleryJob(id, { progress: { value: 1, max: 4 } }, { persist: false });
+  const progress = () =>
+    Object.fromEntries(galleryRows().map((item) => [item.id, item.progress?.value]));
+  assert.deepEqual(progress(), { saved: 1, deleted: 1 });
+  updateGalleryJob("saved", { status: "done", progress: null });
+  forgetGalleryItems(galleryRows().filter((item) => item.id === "deleted"));
+  assert.deepEqual(progress(), { saved: undefined });
+  setGallery([tile("deleted")]);
+  assert.equal(galleryRows()[0].progress, undefined, "a record put back starts without it");
+});
+
+test("a search's list is kept across pages and enrichment, and rebuilt when items move", () => {
+  setGallery(bigGallery(2000));
+  let tested = 0;
+  const filter = (item) => {
+    tested += 1;
+    return item.type === "video";
+  };
+  const page = (cursor = "") => pageGallery({ limit: 50, cursor, filter, filterKey: "videos" });
+  const first = page();
+  page(first.nextCursor);
+  assert.equal(tested, 2000, "one walk serves every page");
+  updateGalleryJob(first.items[0].id, { caption: { text: "a new caption", tags: [] } });
+  page(first.nextCursor);
+  assert.equal(tested, 2000, "a caption alone doesn't rebuild the list");
+  updateGalleryJob(first.items[0].id, { status: "failed" });
+  assert.equal(page().totalApprox, first.totalApprox, "failed items still list");
+  assert.equal(tested, 4000, "a status change rebuilds it");
 });

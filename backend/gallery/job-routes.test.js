@@ -33,6 +33,7 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
     type: "image",
     url: `/comfy/view?filename=${name}&type=media`,
     prompt: "private prompt text",
+    createdAt: "2026-01-01T00:00:00Z",
     ...extra,
   });
   fs.writeFileSync(path.join(dir, "visible.png"), "fixture");
@@ -40,7 +41,8 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
   setGallery([
     item("visible.png"),
     item("deleted.png", { index: 1 }),
-    item("unrelated.png", { jobId: "other" }),
+    // Made later, so the chosen run's result is numbered first.
+    item("unrelated.png", { jobId: "other", createdAt: "2026-01-02T00:00:00Z" }),
   ]);
   const base = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(`${base}/api/gallery/jobs/chosen`);

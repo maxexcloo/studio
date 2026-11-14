@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadSharp } from "../sharp-loader.js";
 import { localOutputFile } from "../comfy/comfy.js";
-import { compareGalleryItems, setOrder } from "./order.js";
+import { compareGalleryItems, compareGalleryKeys, setOrder } from "./order.js";
 import { currentDataDir } from "../data-dir.js";
 import { recordBelongsToAccount } from "../account-ownership.js";
 import { replyTitle } from "../../shared/titles.ts";
@@ -75,8 +75,22 @@ function bumpRevision() {
   return galleryRevision;
 }
 
-function changed() {
+// Bumped by changes that can move items into, out of or across a list. Idle work's enrichment
+// (titles, captions, suggestions, reviews, face checks) leaves it be: a kept list picks those up
+// when it next expires.
+let listVersion = 0;
+const enrichment = new Set([
+  "caption",
+  "identity",
+  "nextSteps",
+  "review",
+  "suggestedPrompt",
+  "title",
+]);
+
+function changed({ enriched = false } = {}) {
   dataVersion += 1;
+  if (!enriched) listVersion += 1;
   bumpRevision();
 }
 
@@ -123,6 +137,13 @@ function where(query = {}) {
     add("status IN (SELECT value FROM json_each(?))", list([query.status].flat()));
   if (query.notStatus !== undefined)
     add("status NOT IN (SELECT value FROM json_each(?))", list([query.notStatus].flat()));
+  // Words found in the row's own JSON (lowercased by SQLite, ASCII only): a cheap first pass a
+  // search's filter confirms. Pending rows always pass, as searches never hide work in progress.
+  if (query.contains?.length)
+    add(
+      `(status = 'pending' OR (${query.contains.map(() => "instr(lower(value), ?) > 0").join(" AND ")}))`,
+      ...query.contains,
+    );
   if (query.since) add("(status = 'pending' OR created_ms >= ?)", Number(query.since));
   if (query.idPrefix)
     add("item_id >= ? AND item_id < ?", query.idPrefix, `${query.idPrefix}\uffff`);
@@ -162,25 +183,25 @@ const rowKey = (row) => ({
 });
 
 /**
- * The query's rows in gallery order from `start` (`{ key, inclusive }`) on, read a batch at a time,
- * so a walk of the whole gallery never holds all of it.
+ * The query's rows in gallery order after the order key `after`, read a batch at a time, so a walk
+ * of the whole gallery never holds all of it.
  */
-function* galleryRows(query = {}, start = null) {
+function* galleryRows(query = {}, after = null) {
   const base = where(query);
   const select = (conditions, params, limit) =>
     statement(
       `SELECT ${keyColumns} FROM studio_gallery WHERE ${[base.sql.replace(/^WHERE /, ""), ...conditions].filter(Boolean).join(" AND ") || "1"} ORDER BY ${order} LIMIT ?`,
     ).all(...base.params, ...params, limit);
-  let from = start;
+  let from = after;
   for (;;) {
     const rows = [];
-    for (const branch of from ? afterKey(from.key, from.inclusive) : [{ sql: [], params: [] }]) {
+    for (const branch of from ? afterKey(from) : [{ sql: [], params: [] }]) {
       rows.push(...select(branch.sql, branch.params, 200 - rows.length));
       if (rows.length === 200) break;
     }
     yield* rows;
     if (rows.length < 200) return;
-    from = { key: rowKey(rows.at(-1)), inclusive: false };
+    from = rowKey(rows.at(-1));
   }
 }
 
@@ -220,8 +241,11 @@ export const galleryJobItems = (jobId, ownerId) =>
 
 /* ------------------------------------------------------------------ Writes */
 
-/** Saves items whole, by gallery key, replacing any saved under the same key. */
-export function putGalleryItems(items) {
+/**
+ * Saves items whole, by gallery key, replacing any saved under the same key. `enriched` says the
+ * change only added idle work's enrichment, which kept lists needn't rebuild for.
+ */
+export function putGalleryItems(items, { enriched = false } = {}) {
   if (!items.length) return;
   const upsert = statement(
     "INSERT INTO studio_gallery (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -236,7 +260,7 @@ export function putGalleryItems(items) {
       else live.delete(key);
     }
   });
-  changed();
+  changed({ enriched });
 }
 
 /** Deletes items' records only: no files and no delete markers (removeGalleryItems does those). */
@@ -253,7 +277,7 @@ export function forgetGalleryItems(items) {
 /** Each account's result numbers (domain/result-numbers.ts), shown on its gallery items. */
 export const resultNumbers = createResultNumbers({
   db: runtimeDatabase(dataDir),
-  existing: (ownerId) => galleryItems({ ownerId }, { ordered: false }),
+  existing: (ownerId) => galleryItems({ ownerId }),
 });
 
 /*
@@ -424,6 +448,22 @@ function gallerySearchText(item) {
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
+const searchTerms = (q) =>
+  String(q || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 12);
+
+/**
+ * A search's words the gallery's JSON holds as typed, for a first pass in SQL (`contains`): none
+ * unless every word is plain ASCII that JSON writes unescaped.
+ */
+export function searchWords(q) {
+  const terms = searchTerms(q);
+  return terms.every((term) => /^[\x20-\x7e]+$/.test(term) && !/["\\]/.test(term)) ? terms : [];
+}
+
 export function galleryFilter({
   q = "",
   near = null,
@@ -435,11 +475,7 @@ export function galleryFilter({
   aspect = "",
   tag = "",
 } = {}) {
-  const terms = String(q || "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 12);
+  const terms = searchTerms(q);
   const filtered = galleryFiltersTest({ lora, model, workflow, size, aspect, tag });
   if (!terms.length && !favorites && !filtered) return null;
   return (item) => {
@@ -465,25 +501,30 @@ export function setGalleryFavorites(keys, favorite) {
 
 /* ---------------------------------------------------------------- Paging */
 
-const cursorFor = (key, skip) =>
-  `v2|${encodeURIComponent(JSON.stringify(skip ? { ...key, skip } : key))}`;
+/** A cursor: the order key of the row a page ended at; mid-set, the set and its last item shown. */
+const cursorFor = (key, set) =>
+  `v2|${encodeURIComponent(JSON.stringify(set ? { ...key, ...set } : key))}`;
 
 function readCursor(cursor) {
   if (!String(cursor).startsWith("v2|")) return null;
   try {
-    const { skip = 0, ...key } = JSON.parse(decodeURIComponent(String(cursor).slice(3)));
-    return { key, skip: Number(skip) || 0 };
+    const {
+      set = "",
+      after = "",
+      ...key
+    } = JSON.parse(decodeURIComponent(String(cursor).slice(3)));
+    return { key, set: String(set), after: String(after) };
   } catch {
     return null;
   }
 }
 
 /**
- * The rows after `key` in gallery order (or from it, with `inclusive`), as conditions to read in
- * turn: the rest of the key's own bucket and time, the rest of its bucket, then later buckets. Each
- * is a range the order index seeks to, so a deep page costs no more than the first.
+ * The rows after `key` in gallery order, as conditions to read in turn: the rest of the key's own
+ * bucket and time, the rest of its bucket, then later buckets. Each is a range the order index
+ * seeks to, so a deep page costs no more than the first.
  */
-function afterKey(key, inclusive) {
+function afterKey(key) {
   const bucket = Number(key.bucket) || 0;
   const time = key.time ?? null;
   const descending = (column, value) =>
@@ -491,7 +532,7 @@ function afterKey(key, inclusive) {
       ? { after: "0", same: `${column} IS NULL`, values: [] }
       : { after: `(${column} < ? OR ${column} IS NULL)`, same: `${column} = ?`, values: [value] };
   // Within the key's time: after its job, index and id, built from the last column out.
-  let tie = inclusive ? "1" : "0";
+  let tie = "0";
   let tieParams = [];
   for (const column of [
     descending("item_id", key.id ?? null),
@@ -516,52 +557,128 @@ function afterKey(key, inclusive) {
   ];
 }
 
+const visibleItem = (item) => !inDreamPool(item) && hasGalleryMedia(item);
+
+/** A result set's visible items the query matches, in gallery order. */
+function setItems(query, id) {
+  // Unordered, so SQLite looks the set up by its index rather than walking the gallery's order.
+  const { sql, params } = where({ ...query, setId: id });
+  return statement(`SELECT value FROM studio_gallery ${sql}`)
+    .all(...params)
+    .map(parse)
+    .filter(visibleItem)
+    .sort(compareGalleryItems);
+}
+
 /**
- * The visible items of a query, from `start` on, in gallery order with each MCP result set's
- * results together where its newest result sorts: each step is `{ key, items }`, the order key of
- * the row it stands at and what shows there. Sets group before `filter`, so a search keeps a set
- * where the whole set would stand.
+ * The visible items of a query after `start` (an order key), in gallery order with each MCP result
+ * set's results together where its newest result sorts: each step is `{ key, set, items }`, the
+ * order key of the row it stands at, its set and what shows there. Sets group before `filter`, so a
+ * search keeps a set where the whole set would stand; `skipSet` names one already shown.
  */
-function* galleryUnits(query, filter, start = null) {
-  const visible = (item) => !inDreamPool(item) && hasGalleryMedia(item);
+function* galleryUnits(query, filter, start = null, skipSet = "") {
   const sets = new Map();
-  const setMembers = (id) => {
-    if (!sets.has(id)) {
-      // Unordered, so SQLite looks the set up by its index rather than walking the gallery's order.
-      const { sql, params } = where({ ...query, setId: id });
-      const members = statement(`SELECT value FROM studio_gallery ${sql}`)
-        .all(...params)
-        .map(parse)
-        .filter(visible)
-        .sort(compareGalleryItems);
-      sets.set(id, {
-        anchor: members[0] && galleryKey(members[0]),
-        items: (filter ? members.filter(filter) : members).sort(setOrder),
-      });
-    }
-    return sets.get(id);
-  };
   for (const row of galleryRows(query, start)) {
     const item = parse(row);
-    if (!visible(item)) continue;
-    const setId = item.resultSet?.id;
-    if (setId) {
-      const set = setMembers(setId);
-      if (set.anchor === row.key && set.items.length) yield { key: rowKey(row), items: set.items };
-    } else if (!filter || filter(item)) yield { key: rowKey(row), items: [item] };
+    if (!visibleItem(item)) continue;
+    const set = item.resultSet?.id;
+    if (set) {
+      if (set === skipSet) continue;
+      if (!sets.has(set)) {
+        const members = setItems(query, set);
+        sets.set(set, {
+          anchor: members[0] && galleryKey(members[0]),
+          items: (filter ? members.filter(filter) : members).sort(setOrder),
+        });
+      }
+      const found = sets.get(set);
+      if (found.anchor === row.key && found.items.length)
+        yield { key: rowKey(row), set, items: found.items };
+    } else if (!filter || filter(item)) yield { key: rowKey(row), set: "", items: [item] };
   }
 }
 
-// Counts of filtered pages (searches, comparisons) by what they filter, until the gallery changes.
-const counts = new Map();
-const keptCounts = 20;
+// Filtered and ranked lists (searches, comparisons, Find Similar) as their items' keys, so paging
+// through one walks the gallery once. Each is kept until an item moves into, out of or across it,
+// or a minute passes (picking up enrichment, such as a new caption a search would find).
+const lists = new Map();
+const keptLists = 5;
+const listLifeMs = 60_000;
+
+/** The list `filter` (and `rank`) make of the query: `{ entries: [{ key, unit }], positions }`. */
+function keptList(query, filter, filterKey, rank) {
+  const name = filterKey && JSON.stringify([query, filterKey, Boolean(rank)]);
+  const kept = name && lists.get(name);
+  if (kept && kept.version === listVersion && Date.now() - kept.at <= listLifeMs) return kept;
+  let entries = [];
+  for (const unit of galleryUnits(query, filter))
+    for (const item of unit.items)
+      entries.push({ key: galleryKey(item), unit: unit.key, ...(rank && { score: rank(item) }) });
+  if (rank)
+    entries = entries
+      .filter((entry) => entry.score !== undefined)
+      .sort((a, b) => b.score - a.score);
+  const list = {
+    version: listVersion,
+    at: Date.now(),
+    entries,
+    positions: new Map(entries.map((entry, index) => [entry.key, index])),
+  };
+  if (name) {
+    lists.delete(name);
+    if (lists.size >= keptLists) lists.delete(lists.keys().next().value);
+    lists.set(name, list);
+  }
+  return list;
+}
+
+/** A page cut from a kept list; its cursor names its last item and where it stood. */
+function listPage(list, cursor, limit, ranked) {
+  let start = 0;
+  if (ranked) start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
+  else if (cursor) {
+    const [, key = "", unit = "null"] = String(cursor).split("|").map(decodeURIComponent);
+    const at = list.positions.get(key);
+    if (at !== undefined) start = at + 1;
+    else {
+      // Its item has left the list: carry on after where it stood.
+      const after = (() => {
+        try {
+          return JSON.parse(unit);
+        } catch {
+          return null;
+        }
+      })();
+      const found = after
+        ? list.entries.findIndex((entry) => compareGalleryKeys(entry.unit, after) > 0)
+        : -1;
+      start = found < 0 ? list.entries.length : found;
+    }
+  }
+  const slice = list.entries.slice(start, start + limit);
+  const byKey = new Map(
+    galleryItems({ named: slice.map((entry) => entry.key) }).map((item) => [
+      galleryKey(item),
+      item,
+    ]),
+  );
+  const items = slice.flatMap((entry) => (byKey.has(entry.key) ? [byKey.get(entry.key)] : []));
+  const end = start + slice.length;
+  const last = slice.at(-1);
+  const nextCursor =
+    end >= list.entries.length
+      ? ""
+      : ranked
+        ? `r|${end}`
+        : `k|${encodeURIComponent(last.key)}|${encodeURIComponent(JSON.stringify(last.unit))}`;
+  return { items, nextCursor };
+}
 
 /**
  * A page of the gallery; uploaded images (references.js) are listed only, and alone, with `uploads`.
  * `query` narrows it in SQL (galleryItems' fields) and `filter` tests each item in JS, with
- * `filterKey` naming everything `filter` depends on so its count is kept between pages. `rank`
- * (Find Similar) orders by its score instead, highest first, leaving out items it can't score; its
- * cursor is then the position.
+ * `filterKey` naming everything `filter` depends on so its list is kept between pages. `rank`
+ * (Find Similar) orders by its score instead, highest first, leaving out items it can't score.
  */
 export function pageGallery({
   type = "",
@@ -582,43 +699,41 @@ export function pageGallery({
     ...(type && { type }),
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };
-  if (rank) {
-    const all = [...galleryUnits(sql, filter)]
-      .flatMap((unit) => unit.items)
-      .map((item) => ({ item, score: rank(item) }))
-      .filter(({ score }) => score !== undefined)
-      .sort((a, b) => b.score - a.score)
-      .map(({ item }) => item);
-    const start = Number(/^r\|(\d+)$/.exec(cursor)?.[1] || 0);
-    const end = start + safeLimit;
+  if (filter || rank) {
+    const list = keptList(sql, filter, filterKey, rank);
+    const page = listPage(list, cursor, safeLimit, Boolean(rank));
     return {
-      items: all.slice(start, end),
-      nextCursor: end < all.length ? `r|${end}` : "",
-      hasMore: end < all.length,
+      ...page,
+      hasMore: Boolean(page.nextCursor),
       revision: galleryRevision,
-      totalApprox: all.length,
+      totalApprox: list.entries.length,
     };
   }
   const from = cursor ? readCursor(cursor) : null;
   const items = [];
   let nextCursor = "";
-  let skip = from?.skip || 0;
   let previous = null;
-  // A cursor names the order key of the row its page ended at, and how many of a set standing
-  // there that page took.
-  for (const unit of galleryUnits(sql, filter, from && { key: from.key, inclusive: skip > 0 })) {
-    // A set the cursor stood in that is gone starts the page at what follows instead.
-    if (skip && JSON.stringify(unit.key) !== JSON.stringify(from.key)) skip = 0;
+  // The rest of a set the last page stopped inside, even if a newer result has moved the set.
+  const rest = from?.set
+    ? (() => {
+        const members = setItems(sql, from.set).sort(setOrder);
+        const at = members.findIndex((item) => galleryKey(item) === from.after);
+        return at < 0 ? [] : members.slice(at + 1);
+      })()
+    : [];
+  const units = (function* () {
+    if (rest.length) yield { key: from.key, set: from.set, items: rest };
+    yield* galleryUnits(sql, null, from?.key, from?.set);
+  })();
+  for (const unit of units) {
     if (items.length === safeLimit) {
-      nextCursor = cursorFor(previous, 0);
+      nextCursor = cursorFor(previous);
       break;
     }
-    const taken = unit.items.slice(skip, skip + safeLimit - items.length);
+    const taken = unit.items.slice(0, safeLimit - items.length);
     items.push(...taken);
-    const end = skip + taken.length;
-    skip = 0;
-    if (end < unit.items.length) {
-      nextCursor = cursorFor(unit.key, end);
+    if (taken.length < unit.items.length) {
+      nextCursor = cursorFor(unit.key, { set: unit.set, after: galleryKey(taken.at(-1)) });
       break;
     }
     previous = unit.key;
@@ -628,20 +743,8 @@ export function pageGallery({
     nextCursor,
     hasMore: Boolean(nextCursor),
     revision: galleryRevision,
-    totalApprox: filter ? filteredCount(sql, filter, filterKey) : countGalleryItems(sql),
+    totalApprox: countGalleryItems(sql),
   };
-}
-
-function filteredCount(query, filter, filterKey) {
-  const key = filterKey && `${dataVersion}|${JSON.stringify(query)}|${filterKey}`;
-  if (key && counts.has(key)) return counts.get(key);
-  let count = 0;
-  for (const unit of galleryUnits(query, filter)) count += unit.items.length;
-  if (key) {
-    if (counts.size >= keptCounts) counts.delete(counts.keys().next().value);
-    counts.set(key, count);
-  }
-  return count;
 }
 
 /* ------------------------------------------------------------------ Files */
@@ -1080,7 +1183,8 @@ export function updateGalleryJob(id, patch, options = {}) {
     .filter((item) => !fields.every(([key, encoded]) => JSON.stringify(item[key]) === encoded))
     .map((item) => ({ ...item, ...patch }));
   if (!updated.length) return true;
-  if (options.persist !== false) putGalleryItems(updated);
+  if (options.persist !== false)
+    putGalleryItems(updated, { enriched: Object.keys(patch).every((key) => enrichment.has(key)) });
   else {
     for (const item of updated) {
       const key = galleryKey(item);

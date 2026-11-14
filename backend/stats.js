@@ -31,15 +31,15 @@ export function galleryStats(items = []) {
 
 const dayMs = 86_400_000;
 
+/** The visible items profileStats counts: those of its last 30 days. */
+export const recentGallery = () =>
+  visibleGallery({ since: Date.now() - 30 * dayMs }, { ordered: false });
+
 /**
  * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),
  * how many finished ones were starred, the median run time, and `failing` when at least half of five
  * or more runs in the last week failed.
  */
-/** The visible items profileStats counts: those of its last 30 days. */
-export const recentGallery = () =>
-  visibleGallery({ since: Date.now() - 30 * dayMs }, { ordered: false });
-
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
   // Each recorded id resolves once: resolving reads the alias file's state.

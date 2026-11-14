@@ -167,7 +167,18 @@ export function createIdleWork<Item extends IdleItem>(options: {
       if (options.wanted(item, all, passing) && visible(item)) yield item;
   }
   /** How many items each scope's pass would take, counted in one walk over the gallery. */
+  // The last counts, until the gallery, the pass or the failures change (or a while passes):
+  // status is asked for every few seconds while Settings shows it.
+  let counted = { state: "", at: -Infinity, counts: { all: 0, outdated: 0, missing: 0 } };
   function scopeCounts() {
+    // Work done outside the gallery (an image's search vector) moves the pass and trickle counts.
+    const state = `${options.changes?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
+    if (options.changes && state === counted.state && now() - counted.at <= recheckMs)
+      return counted.counts;
+    counted = { state, at: now(), counts: walkScopeCounts() };
+    return counted.counts;
+  }
+  function walkScopeCounts() {
     const startedAt = running() ? target().startedAt : stamp();
     const counts = { all: 0, outdated: 0, missing: 0 };
     const visible = shown();
@@ -208,14 +219,15 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
     const state = `${options.changes?.()}|${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
-    if (!options.changes || state !== nothing.state || now() - nothing.at > recheckMs)
+    const walk = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
+    if (walk)
       for (const candidate of eligible(all))
         if (!inflight.has(key(candidate))) {
           item = candidate;
           break;
         }
     if (!item) {
-      if (!inflight.size && state !== nothing.state) nothing = { state, at: now() };
+      if (!inflight.size && walk) nothing = { state, at: now() };
       if (counting() && !inflight.size) {
         pass = { ...pass!, state: "finished", endedAt: stamp() };
         persist();

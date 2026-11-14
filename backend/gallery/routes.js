@@ -4,6 +4,7 @@ import {
   filterVisibleGallery,
   forgetGalleryItems,
   galleryFilter,
+  searchWords,
   galleryItem,
   galleryItems,
   galleryChangeCount,
@@ -102,17 +103,16 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
    * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
+  const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
   const many = (value) =>
     (Array.isArray(value) ? value : [value])
       .map((item) => String(item ?? "").slice(0, 200))
       .filter(Boolean)
       .slice(0, 50);
-  async function searchFilter(query) {
-    const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
-    const q = one(query.q);
+  function searchFilter(query, looksLike) {
     return galleryFilter({
-      q,
-      near: await near(q),
+      q: one(query.q),
+      near: looksLike,
       favorites: query.favorites === "1",
       workflow: one(query.workflow),
       ...Object.fromEntries(
@@ -182,7 +182,10 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const limit = Number(query.limit || 0);
     const cursor = String(query.cursor || "");
     const includeFailed = query.includeFailed !== "0";
-    const search = await searchFilter(query);
+    const looksLike = await near(one(query.q));
+    const search = searchFilter(query, looksLike);
+    // A text search reads only rows holding every word: the filter still decides what matches.
+    const words = search && !looksLike ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
     // `similar` (an item id, Find Similar) ranks by likeness to that image; none until it is read.
@@ -210,6 +213,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...(query.set && { setId: String(query.set) }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(Number.isFinite(since) && since && { since }),
+            ...(words.length && { contains: words }),
           },
           // The account and every parameter but the page's own name the filter's count.
           filterKey: JSON.stringify([

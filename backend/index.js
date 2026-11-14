@@ -604,8 +604,8 @@ const itemsStarred = (ownerId, items, favorite) => {
     ...(favorite
       ? setPreferenceSignals(
           items,
-          items.flatMap((item) =>
-            item.resultSet?.id ? galleryItems({ setId: item.resultSet.id }) : [],
+          [...new Set(items.map((item) => item.resultSet?.id).filter(Boolean))].flatMap((setId) =>
+            galleryItems({ setId }),
           ),
           itemValues,
         )
