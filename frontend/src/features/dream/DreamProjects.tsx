@@ -273,7 +273,7 @@ export function DreamProjects() {
         </Alert>
       ) : !list.length ? (
         <EmptyState fill action={create}>
-          No Projects Yet
+          A project is a brief that Dream and attached chats follow.
         </EmptyState>
       ) : (
         <ScrollArea flex={1} mih={0}>
