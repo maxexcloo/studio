@@ -38,7 +38,6 @@ import { createCharacterSheets } from "./character-sheets.js";
 import { configuredBackends, routeJob, setParkedCheck } from "./comfy/backends.js";
 import {
   comfy,
-  comfyFile,
   comfyOn,
   host,
   networkListening,
@@ -116,7 +115,6 @@ import {
   outputFileSize,
   putGalleryItems,
   recordsFromComfyHistory,
-  removeGalleryItems,
   resultNumbers,
   setGalleryFavorites,
   updateGalleryJob,
@@ -758,13 +756,6 @@ registerResultSetRoutes(app, {
 registerMigrationRoutes(app, {
   dataDir,
   adminRefusal,
-  // missingComfyOutputs asks the worker that made a record for its file, as publicGalleryBuffer reads it.
-  gallery: {
-    items: () => galleryItems(),
-    check: (item) => comfyFile(item.url, { method: "HEAD", timeout: 15_000 }),
-    remove: removeGalleryItems,
-    update: (jobId, patch) => updateGalleryJob(jobId, patch),
-  },
 });
 registerCompareRoutes(app, {
   store,

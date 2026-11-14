@@ -1,11 +1,5 @@
-import { reloadAccountPreferences } from "./account-preferences.js";
-import { reloadAccountStore } from "./account-store.js";
-import { chatRecordChanges, chatRecords } from "./chat-records.js";
-import { comparisonSets } from "./comparison-sets.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
-import { missingComfyOutputs } from "./missing-comfy-outputs.js";
-import { stackPresets } from "./stack-presets.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -16,36 +10,7 @@ import { stackPresets } from "./stack-presets.js";
  * reload, so it needs Studio stopped.
  */
 // Applied steps are removed once the live data folder has them; Git history keeps them.
-const steps = [
-  {
-    name: "chatRecords",
-    run: chatRecords,
-    changes: chatRecordChanges,
-    online: true,
-    reload: () => {
-      reloadAccountStore();
-      reloadAccountPreferences();
-    },
-  },
-  {
-    name: "missingComfyOutputs",
-    run: missingComfyOutputs,
-    changes: (plan) => plan.missing,
-    online: true,
-  },
-  {
-    name: "comparisonSets",
-    run: comparisonSets,
-    changes: (plan) => plan.items,
-    online: true,
-  },
-  {
-    name: "stackPresets",
-    run: stackPresets,
-    changes: (plan) => plan.stacks,
-    online: true,
-  },
-];
+const steps = [];
 
 const stopped =
   "Needs Studio stopped: run migrate-runtime against the data folder (README.md, Data & Migrations).";
@@ -54,11 +19,10 @@ const stopped =
  * Each step's plan, or with `apply` its result. `online`
  * (the running server) skips applying a step that isn't online-safe and has work, returning its
  * plan with `refused`. `dreamOwner` adds the Dream ownership step (the command's --dream-owner).
- * `gallery` is the running server's, for steps that check or patch its records.
  */
 export async function runtimeMigrations(
   dataDir,
-  { apply = false, online = false, dreamOwner = "", gallery } = {},
+  { apply = false, online = false, dreamOwner = "" } = {},
 ) {
   const list = dreamOwner
     ? [
@@ -77,7 +41,7 @@ export async function runtimeMigrations(
         results[step.name] = step.changes?.(plan) ? { ...plan, refused: stopped } : plan;
         continue;
       }
-      results[step.name] = await step.run(dataDir, { apply, gallery });
+      results[step.name] = await step.run(dataDir, { apply });
       if (apply && results[step.name].applied) step.reload?.(dataDir);
     } catch (error) {
       throw new Error(`${step.name}: ${error.message}`, { cause: error });
@@ -110,13 +74,13 @@ function summary(results, apply) {
  * it returns every step's plan; with it, it applies the online-safe steps against Studio's data
  * folder and refuses the others that have work. `{ ok, apply, steps: { <name>: result } }`.
  */
-export function registerMigrationRoutes(app, { dataDir, adminRefusal, gallery, log = console }) {
+export function registerMigrationRoutes(app, { dataDir, adminRefusal, log = console }) {
   directRoute(app, "POST", "/api/maintenance/migrations", async (account, { body }) => {
     const refused = adminRefusal(account);
     if (refused) return refused;
     const apply = body?.apply === true;
     try {
-      const results = await runtimeMigrations(dataDir, { apply, online: true, gallery });
+      const results = await runtimeMigrations(dataDir, { apply, online: true });
       log.info?.(`[migrations] ${apply ? "Apply" : "Dry run"}: ${summary(results, apply)}`);
       return { status: 200, payload: { ok: true, apply, steps: results } };
     } catch (error) {
