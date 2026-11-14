@@ -7,6 +7,7 @@ import sharp from "sharp";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-reddit-"));
 process.env.STUDIO_DATA_DIR = temporary;
+process.env.STUDIO_REDLIB_URL = "https://redlib.example.test";
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 const { importRedditPost, redditPostPath } = await import("./reddit.js");
 
@@ -25,7 +26,7 @@ const page = (title, media) => `<html><body>
   <div class="post_body"><a href="/img/in-a-comment.jpg">not the post's</a></div>
 </body></html>`;
 
-/** A stand-in for reddit.excloo.com: its pages and images by path, and every URL asked for. */
+/** A stand-in for redlib.example.test: its pages and images by path, and every URL asked for. */
 function fakeRedlib(routes) {
   const asked = [];
   const fetch = async (url) => {
@@ -47,7 +48,7 @@ test("a post or gallery link of any Reddit host reads from Redlib", () => {
     ["https://old.reddit.com/r/pics/comments/abc123/", "/comments/abc123"],
     ["https://redd.it/abc123", "/comments/abc123"],
     ["https://www.reddit.com/gallery/abc123", "/comments/abc123"],
-    ["https://reddit.excloo.com/comments/abc123", "/comments/abc123"],
+    ["https://redlib.example.test/comments/abc123", "/comments/abc123"],
     ["https://www.reddit.com/r/pics/s/Share42", "/r/pics/s/Share42"],
   ])
     assert.equal(redditPostPath(link), route, link);
@@ -76,7 +77,7 @@ test("a single-image post becomes one upload recording its link and title", asyn
     url: "https://www.reddit.com/comments/one",
     title: "Glacier at dawn & dusk [OC]",
   });
-  assert.ok(redlib.asked.every((url) => url.startsWith("https://reddit.excloo.com/")));
+  assert.ok(redlib.asked.every((url) => url.startsWith("https://redlib.example.test/")));
 });
 
 test("a gallery saves each image and lists the ones that aren't images", async () => {
@@ -127,5 +128,5 @@ test("only Reddit links are taken, and nothing is fetched beyond Redlib", async 
     importRedditPost("https://redd.it/away", "", { fetch: redlib.fetch }),
     /somewhere else/,
   );
-  assert.deepEqual(redlib.asked, ["https://reddit.excloo.com/comments/away"]);
+  assert.deepEqual(redlib.asked, ["https://redlib.example.test/comments/away"]);
 });

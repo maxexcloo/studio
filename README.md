@@ -90,6 +90,8 @@ Every MCP action calls the route its UI action calls with the caller's own crede
 
 `STUDIO_CHAT_URL` (such as `https://chat.excloo.com`) adds a Chat item to the navigation that opens that chat site in a new tab; unset, there is none.
 
+`STUDIO_REDLIB_URL` (such as `https://reddit.example.com`) is the [Redlib](https://github.com/redlib-org/redlib) front end that importing a Reddit post reads from; unset, that import is refused.
+
 ### Prompt Assistant
 
 The prompt assistant uses an OpenAI-compatible gateway (Bifrost): `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL` (such as `cloud/auto`). Prompt writing uses the text model each account picks; Studio's own calls go to `STUDIO_LOCAL_TEXT_MODEL` (such as `local/auto`) while a text workload runs, otherwise the cloud model. Without the gateway, the assistant is off.
