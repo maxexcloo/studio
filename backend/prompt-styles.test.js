@@ -65,7 +65,15 @@ test("each kind keeps its own order and Custom, and the default falls back to th
     "spicy",
     "custom",
   ]);
-  assert.deepEqual(ids("change"), []);
+  assert.deepEqual(ids("change"), [
+    "closer",
+    "wider",
+    "warmer",
+    "cooler",
+    "night",
+    "detail",
+    "simple-background",
+  ]);
   // An ID may repeat across kinds: Cinematic is a style and a theme.
   assert.equal(styles.style("animate", "cinematic").label, "Cinematic Camera");
   assert.equal(styles.defaultId(), rest[0].id);

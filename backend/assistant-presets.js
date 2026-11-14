@@ -1,5 +1,6 @@
 // The built-in styles that seed Library › Prompt Styles (prompt-styles.js) in a data folder that has
-// none: Improve Prompt's rewrite styles, then Animate's themes (prompt-animate.js). An Improve
+// none: Improve Prompt's rewrite styles, Animate's themes (prompt-animate.js), then the viewer's
+// fixed AI changes, each asked for as a suggestion's request is. An Improve
 // Prompt style is an instruction block added after the profile's guide; a guide may replace one
 // with its own `presets.<id>` text. Each sets only the tone; the content rule
 // (domain/writing-standard.ts) decides how explicit it may be, and an `uncensored` style is only
@@ -143,6 +144,69 @@ export const seedStyles = Object.freeze([
     uncensored: true,
     instruction:
       "Spicy: slow, sensual, explicit motion built from the people, pose and setting already in the frame, with touch and movement whose intensity builds across the beats, natural breathing and shifting weight, and a camera that moves in close or arcs around them.",
+  },
+  {
+    id: "closer",
+    kind: "change",
+    enabled: true,
+    label: "Closer Crop",
+    description: "Frame the subject tighter.",
+    instruction:
+      "Closer Crop: frame the main subject much closer, filling more of the picture, and drop the surroundings the tighter framing leaves out.",
+  },
+  {
+    id: "wider",
+    kind: "change",
+    enabled: true,
+    label: "Wider Shot",
+    description: "Pull back to show more of the scene.",
+    instruction:
+      "Wider Shot: pull back to a wider shot that shows the whole subject and more of the place around them, adding the surroundings it would plausibly reveal.",
+  },
+  {
+    id: "warmer",
+    kind: "change",
+    enabled: true,
+    label: "Warmer Light",
+    description: "Golden, warm-toned light.",
+    instruction:
+      "Warmer Light: change the light to warm, golden tones, as in late afternoon sun or lamplight, with warmer colours and softer shadows.",
+  },
+  {
+    id: "cooler",
+    kind: "change",
+    enabled: true,
+    label: "Cooler Light",
+    description: "Cool, blue-toned light.",
+    instruction:
+      "Cooler Light: change the light to cool, blue tones, as in overcast daylight or early morning, with cooler colours and crisper shadows.",
+  },
+  {
+    id: "night",
+    kind: "change",
+    enabled: true,
+    label: "Night Version",
+    description: "The same scene at night.",
+    instruction:
+      "Night Version: make it the same scene at night, lit by the moon and the light sources that would be there, such as street lamps, windows or a fire.",
+  },
+  {
+    id: "detail",
+    kind: "change",
+    enabled: true,
+    label: "Add Detail",
+    description: "Richer textures and small details.",
+    instruction:
+      "Add Detail: add rich, specific detail to the subject, materials and surroundings, such as textures, small objects and fine surface wear, without changing what the picture shows.",
+  },
+  {
+    id: "simple-background",
+    kind: "change",
+    enabled: true,
+    label: "Simplify Background",
+    description: "A plain, uncluttered background.",
+    instruction:
+      "Simplify Background: replace the background with a plain, uncluttered one in colours that suit the subject, keeping the subject and its light unchanged.",
   },
 ]);
 
