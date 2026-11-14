@@ -6796,7 +6796,7 @@ test("admin tools chain a Library search, a one-call install and a named update 
   f.app.get("/api/profiles/duplicates", (_req, res) =>
     res.json({ ok: true, hash: "dup-hash", merges: [] }),
   );
-  f.app.post("/api/profiles/duplicates/merge", record({ ok: true, merged: [], backup: "b.zip" }));
+  f.app.post("/api/profiles/duplicates/merge", record({ ok: true, merged: [] }));
   const admin = await f.client("", adminToken);
 
   // Search Civitai for a LoRA by base model, install a found version in one call, check it by name.

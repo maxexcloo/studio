@@ -332,14 +332,8 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
   ]);
   for (const id of [radianceId, comfyId]) {
     assert.ok(!fs.existsSync(path.join(userWorkflowsDir, `${id}.json`)));
-    assert.ok(fs.existsSync(path.join(temporary, result.backup, `${id}.json`)));
     assert.ok(profileStore().versions(id).length >= 1);
   }
-  const backup = path.join(temporary, result.backup);
-  assert.ok(fs.existsSync(path.join(backup, "prompting.json")));
-  assert.ok(fs.existsSync(path.join(backup, "timings.json")));
-  const manifest = JSON.parse(fs.readFileSync(path.join(backup, "combine.json"), "utf8"));
-  assert.equal(manifest.combined[0].id, combinedId);
 
   const raw = JSON.parse(readEditableProfile(combinedId).text);
   assert.equal(raw.studio.backend, "radiance");
@@ -360,7 +354,6 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
       Object.keys(section).filter((key) => key.startsWith("custom:")),
       [],
     );
-  assert.ok(fs.existsSync(path.join(backup, "accounts", "owner", "lora-stacks.json")));
   assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${combinedId}`]);
   assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${combinedId}`]);
   // LoRA stacks and strengths follow; strengths of both old ids join.
@@ -382,10 +375,7 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
   );
 
   assert.deepEqual(backendCandidates().pairs, []);
-  assert.deepEqual(combineBackends({ hash: preview.hash, selections: [] }), {
-    combined: [],
-    backup: "",
-  });
+  assert.deepEqual(combineBackends({ hash: preview.hash, selections: [] }), { combined: [] });
   assert.throws(() => combineBackends({ hash: preview.hash, selections }), { status: 409 });
 });
 

@@ -81,7 +81,6 @@ export function createProfileStore({
   const metaFile = path.join(workflowsDir, ".studio-meta.json");
   const aliasFile = path.join(workflowsDir, ".studio-aliases.json");
   const editsFile = path.join(workflowsDir, ".studio-edits.json");
-  const backupsDir = path.join(dataDir, "backups", "profile-edits");
   const historyDir = (id) => path.join(dataDir, "history", "profiles", id);
   const readMeta = () => readObject(metaFile);
 
@@ -165,23 +164,13 @@ export function createProfileStore({
   }
 
   /**
-   * The boot migration, safe on every start. A profile without history gets its backups (oldest
-   * first; the oldest is the seed) and its current file as versions; one listed in
-   * `.studio-edits.json` has its later versions marked "studio". A profile whose file changed
-   * outside Studio (a seed deploy) gets that as a new "seed" version. Nothing is deleted.
+   * The boot migration, safe on every start. A profile without history gets its current file as its
+   * seed version. A profile whose file changed outside Studio (a seed deploy, or one listed in
+   * `.studio-edits.json`, marked "studio") gets that as a new version. Nothing is deleted.
    */
   function migrate() {
     if (!fs.existsSync(workflowsDir)) return { profiles: 0, versions: 0 };
     const edits = readObject(editsFile);
-    let backups = [];
-    try {
-      backups = fs
-        .readdirSync(backupsDir)
-        .filter((name) => name.endsWith(".json"))
-        .sort();
-    } catch {
-      /* none */
-    }
     let profiles = 0;
     let added = 0;
     for (const name of fs.readdirSync(workflowsDir)) {
@@ -197,41 +186,8 @@ export function createProfileStore({
       profiles += 1;
       const edited = edits[id];
       if (!versionsIn(historyDir(id)).length) {
-        const own = backups.filter(
-          (file) =>
-            file.startsWith(`${id}-`) && /^\d{4}-\d{2}-\d{2}T/.test(file.slice(id.length + 1)),
-        );
-        const steps = own
-          .map((file) => {
-            const when = file
-              .slice(id.length + 1, -5)
-              .replace(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, "$1:$2:$3.$4Z");
-            let body = "";
-            try {
-              body = fs.readFileSync(path.join(backupsDir, file), "utf8");
-            } catch {
-              return null;
-            }
-            return { text: body, at: Number.isNaN(Date.parse(when)) ? stamp() : when };
-          })
-          .filter(Boolean);
-        steps.push({ text, at: edited?.editedAt || stamp() });
-        steps.forEach((step, index) => {
-          const origin = index === 0 || !edited ? "seed" : "studio";
-          const before = latest(id)?.version || 0;
-          record(id, step.text, {
-            origin,
-            at: step.at,
-            by:
-              origin === "studio" && index === steps.length - 1
-                ? edited?.by || "studio"
-                : origin === "seed"
-                  ? "seed"
-                  : "studio",
-            note: index < steps.length - 1 ? "From backups/profile-edits" : "",
-          });
-          if ((latest(id)?.version || 0) > before) added += 1;
-        });
+        record(id, text, { origin: "seed", by: "seed", at: edited?.editedAt || stamp() });
+        added += 1;
         const meta = readMeta();
         if (edited?.baseHash && meta[id]) {
           meta[id].seedHash = edited.baseHash;

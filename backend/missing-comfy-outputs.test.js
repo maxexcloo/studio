@@ -39,7 +39,7 @@ test("missingComfyOutputs plans and deletes records whose ComfyUI file is gone, 
     { checked: 2, missing: 1, unknown: 0, applied: false },
   );
   assert.deepEqual(plan.examples, [{ id: gone.id, createdAt: gone.createdAt }]);
-  assert.match(plan.note, /without a backup/);
+  assert.match(plan.note, /for good/);
   assert.equal(gallery.list.length, 3, "a dry run deletes nothing");
   assert.equal(gallery.checks, 2, "Studio media is never asked about");
 
