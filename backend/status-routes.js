@@ -13,7 +13,7 @@ import { queuePriority } from "./domain/store.ts";
 import { dataDir, galleryItems } from "./gallery/store.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { requireAdmin } from "./route-access.js";
-import { galleryStats, profileStats, recentGallery } from "./stats.js";
+import { galleryStats, profileStats, recentRuns } from "./stats.js";
 import { upscaleQualities } from "./upscale.js";
 import { capabilityForProfile, defaultWorker } from "./workers.js";
 
@@ -159,9 +159,9 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
   });
 
   // Library › Profiles: each profile's runs, failures, stars and speed across every account.
-  app.get("/api/stats/profiles", (req, res) => {
+  app.get("/api/stats/profiles", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    res.json({ ok: true, profiles: profileStats(recentGallery()) });
+    res.json({ ok: true, profiles: profileStats(await recentRuns()) });
   });
 
   // Versions, system and GPU for a bug report (Settings › About, and a failed card's Copy report).
