@@ -11,7 +11,6 @@ import {
   workerHas,
 } from "./workers.js";
 import crypto from "node:crypto";
-import { demoMode } from "./comfy/comfy.js";
 import { startFrameSize } from "./animate-profile.js";
 import { families } from "./family-catalogue.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
@@ -23,7 +22,7 @@ import {
   storedWritingRecord,
 } from "./gallery/records.js";
 import { recordPrompt } from "./prompt-history.js";
-import { jobs, runJob, runMockJob } from "./jobs.js";
+import { jobs, runJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
 
@@ -49,7 +48,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     const checked = Boolean(account) && !hasFullAccess(account);
     const workers = listWorkers();
     const kindCapability = input?.kind === "video" ? "video" : "image";
-    if (!workers.length && !demoMode)
+    if (!workers.length)
       return {
         status: 503,
         payload: { ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) },
@@ -122,7 +121,6 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
             payload: { ok: false, error: `This account cannot use the LoRA “${refused.name}”.` },
           };
       }
-      if (demoMode && !workers.length) return { backend: defaultWorkerId() };
       // A combined profile runs only on the backend it names; one that isn't ready refuses with why.
       const backend = profile.backendOptions?.find(
         (option) => option.id === (input?.profileBackend || profile.backend),
@@ -188,81 +186,40 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
   }
 
   async function prepareGenerationBody(backend, input) {
-    let body;
-    let isMockJob = false;
-    let context = null;
+    let context;
     try {
       context = await loadComfyContext(backend);
     } catch (error) {
-      // Placeholder generations are only for agent and UI testing without a GPU.
-      if (!demoMode) {
-        return {
-          status: 503,
-          payload: {
-            ok: false,
-            error: comfyDownMessage(backend, error?.message),
-          },
-        };
-      }
-    }
-    if (context) {
-      try {
-        // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
-        // refuses one trained for another model instead of applying it.
-        const requested = (Array.isArray(input?.loras) ? input.loras : [])
-          .filter(
-            (item) => item && item.enabled !== false && typeof item.name === "string" && item.name,
-          )
-          .map((item) => item.name);
-        if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
-        body = sanitizeGenerateBody(input, context.info, context.stats);
-        const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
-        if (enabledLoras.length) {
-          const issue = optionalLoraIssue(
-            enabledLoras,
-            await loraInfos(
-              backend,
-              enabledLoras.map((item) => item.name),
-            ),
-          );
-          if (issue) throw new Error(issue);
-        }
-      } catch (error) {
-        return { status: 400, payload: { ok: false, error: error.message } };
-      }
-    } else {
-      const prompt = String(input?.prompt || "").trim();
-      if (!prompt) {
-        return { status: 400, payload: { ok: false, error: "Enter a prompt." } };
-      }
-      isMockJob = true;
-      body = {
-        kind: input?.kind === "video" ? "video" : "image",
-        prompt,
-        negative: String(input?.negative || ""),
-        model: String(input?.model || "flux1-schnell.safetensors"),
-        profileId: String(input?.profileId || ""),
-        width: Number(input?.width || 1024),
-        height: Number(input?.height || 1024),
-        steps: Number(input?.steps || 4),
-        cfg: Number(input?.cfg || 1),
-        count: Number(input?.count || 1),
-        ...(input?.variationCount !== undefined
-          ? {
-              variationCount: Math.max(
-                1,
-                Math.min(8, Math.round(Number(input.variationCount) || 1)),
-              ),
-            }
-          : {}),
-        sampler: String(input?.sampler || "euler"),
-        scheduler: String(input?.scheduler || "simple"),
-        seed: String(input?.seed || ""),
-        startImageId: String(input?.startImageId || ""),
-        startImageName: String(input?.startImageName || ""),
+      return {
+        status: 503,
+        payload: { ok: false, error: comfyDownMessage(backend, error?.message) },
       };
     }
-    return { body, isMockJob };
+    try {
+      // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
+      // refuses one trained for another model instead of applying it.
+      const requested = (Array.isArray(input?.loras) ? input.loras : [])
+        .filter(
+          (item) => item && item.enabled !== false && typeof item.name === "string" && item.name,
+        )
+        .map((item) => item.name);
+      if (requested.length) await loraInfos(backend, requested.slice(0, 32)).catch(() => null);
+      const body = sanitizeGenerateBody(input, context.info, context.stats);
+      const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
+      if (enabledLoras.length) {
+        const issue = optionalLoraIssue(
+          enabledLoras,
+          await loraInfos(
+            backend,
+            enabledLoras.map((item) => item.name),
+          ),
+        );
+        if (issue) throw new Error(issue);
+      }
+      return { body };
+    } catch (error) {
+      return { status: 400, payload: { ok: false, error: error.message } };
+    }
   }
 
   async function generateOnBackend(backend, job, input, account) {
@@ -291,7 +248,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       };
     const prepared = await prepareGenerationBody(backend, input);
     if (prepared.payload) return prepared;
-    let { body, isMockJob } = prepared;
+    const { body } = prepared;
     body.comfyBackend = backend;
     body.ownerId = job.ownerId;
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details.
@@ -319,7 +276,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     body.autoUpscale =
       body.kind === "image" &&
       upscaleQualities.includes(autoUpscale?.quality) &&
-      (demoMode || workerHas(body.comfyBackend, "upscale"))
+      workerHas(body.comfyBackend, "upscale")
         ? {
             quality: autoUpscale.quality,
             faceDetail: Boolean(autoUpscale.faceDetail),
@@ -351,7 +308,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     }
     // A character's sheet: the view the prompt names, or the whole sheet for a video model that
     // animates subjects (character-sheets.js); never in the run that makes the sheet.
-    if (!isMockJob && body.referenceAssets?.length && input.writing?.kind !== "sheet") {
+    if (body.referenceAssets?.length && input.writing?.kind !== "sheet") {
       const ownerId = body.ownerId || "";
       body.referenceAssets = sheetReferences({
         references: body.referenceAssets,
@@ -371,7 +328,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
-    if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
+    if (!body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
       body.referenceAssets = await stageReferenceAssetsForAccount(
         backend,
@@ -380,11 +337,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         { unique: Boolean(body.ownerId), generation: body },
       ).catch(() => []);
     }
-    if (
-      !isMockJob &&
-      body.referenceAssets?.length &&
-      !body.referenceAssets.every((item) => item.comfyName)
-    ) {
+    if (body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
       try {
         body.referenceAssets = await stageReferenceAssetsForAccount(
           backend,
@@ -403,7 +356,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     // The mask itself goes no further: it is never stored with the run.
     if (body.inpaint) {
       try {
-        body.inpaint = isMockJob ? null : await prepareInpaint(account, body);
+        body.inpaint = await prepareInpaint(account, body);
       } catch (error) {
         return { status: 400, payload: { ok: false, error: error.message } };
       }
@@ -417,8 +370,8 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     }
     // A mask was sent but nothing in it was painted, so this runs as a plain edit. Kept with the
     // result, so Details says the mask went unused.
-    body.maskSkipped = Boolean(!isMockJob && input.inpaint?.mask && !body.inpaint);
-    if (!isMockJob && input.inpaint && !body.inpaint && body.referenceAssets?.length) {
+    body.maskSkipped = Boolean(input.inpaint?.mask && !body.inpaint);
+    if (input.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
         const [replacement] = await stageReferenceAssetsForAccount(backend, account, [first], {
@@ -439,7 +392,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       body.height = startSize.height;
     }
     // A video framed by its first frame draws at the frame's proportions, whatever size the draft had.
-    if (!isMockJob && body.kind === "video" && body.referenceAssets?.length) {
+    if (body.kind === "video" && body.referenceAssets?.length) {
       const profile = (await mediaModels().catch(() => null))?.models?.profiles?.find(
         (item) => item.id === body.profileId,
       );
@@ -487,17 +440,13 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
       items,
       startedAt: body.startedAt,
     });
-    if (isMockJob) {
-      setTimeout(() => runMockJob(id, body), 0);
-    } else {
-      setTimeout(
-        () =>
-          runJob(id, body, {
-            prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null,
-          }).catch(() => null),
-        0,
-      );
-    }
+    setTimeout(
+      () =>
+        runJob(id, body, {
+          prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null,
+        }).catch(() => null),
+      0,
+    );
     return { status: 200, payload: { jobId: id, items, revision: galleryRevisionValue() } };
   }
 

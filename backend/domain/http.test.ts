@@ -8,6 +8,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import type { QueueJob } from "../../shared/queue.ts";
+const { startDemoWorker } = await import(
+  new URL("../fixtures/demo-worker.js", import.meta.url).href
+);
 
 const projectRoot = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -16,6 +19,7 @@ test(
   { timeout: 30_000 },
   async () => {
     const dataDir = mkdtempSync(path.join(os.tmpdir(), "studio-http-"));
+    const worker = await startDemoWorker(dataDir);
     const reservation = net.createServer();
     reservation.listen(0, "127.0.0.1");
     await once(reservation, "listening");
@@ -32,8 +36,11 @@ test(
           PORT: String(port),
           STUDIO_ENV_FILE: "/dev/null",
           STUDIO_DATA_DIR: dataDir,
-          STUDIO_DEMO: "1",
-          STUDIO_WORKERS: "[]",
+          STUDIO_FACE_CHECK: "0",
+          STUDIO_IMAGE_SEARCH: "0",
+          STUDIO_WORKERS: JSON.stringify([
+            { id: "demo", url: worker.url, capabilities: ["image", "video"] },
+          ]),
           STUDIO_MULTI_USER: "",
         },
         stdio: ["ignore", "pipe", "pipe"],
@@ -82,6 +89,8 @@ test(
       }
       throw new Error("Fixture generation did not settle.");
     }
+    // The demo worker's test workflows: each profile names its own workflow and model.
+    const profile = (id: string) => ({ profileId: id, workflow: id, model: id });
     try {
       await start();
       const { session } = await api("/api/sessions", "POST", { title: "Image → Refine → Animate" });
@@ -92,6 +101,7 @@ test(
         const ack = await api(`/api/sessions/${session.id}/generations`, "POST", {
           prompt: `Fixture ${operation}`,
           operation,
+          ...profile(operation === "animate" ? "custom:test-video" : "custom:test-image"),
           kind: operation === "animate" ? "video" : "image",
           steps: 2,
           width: 256,
@@ -112,6 +122,7 @@ test(
       const legacy = await api("/api/generate", "POST", {
         clientJobId: "legacy-http-fixture",
         prompt: "Legacy fixture",
+        ...profile("custom:test-image"),
         kind: "image",
         steps: 2,
         width: 256,
@@ -136,6 +147,7 @@ test(
       );
     } finally {
       await stop();
+      await worker.close();
       rmSync(dataDir, { recursive: true, force: true });
     }
   },

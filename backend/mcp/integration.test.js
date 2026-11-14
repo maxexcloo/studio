@@ -20,6 +20,7 @@ import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { pausedReason } from "../../shared/queue.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fakeStudio } from "../fixtures/fake-studio.js";
+import { startDemoWorker } from "../fixtures/demo-worker.js";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
 
@@ -2522,10 +2523,11 @@ test("identical uploads sharing an upstream asset id preserve access for both up
 });
 
 test(
-  "the real demo server exposes native MCP on its existing port and accepts immediate generation",
+  "the real server exposes native MCP on its existing port and accepts immediate generation",
   { timeout: 15000 },
   async (t) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-native-mcp-server-"));
+    const worker = await startDemoWorker(dir, { hold: true });
     const envFile = path.join(dir, ".env");
     fs.writeFileSync(envFile, "");
     const here = path.dirname(fileURLToPath(import.meta.url));
@@ -2537,14 +2539,11 @@ test(
         HOST: "127.0.0.1",
         STUDIO_DATA_DIR: dir,
         STUDIO_ENV_FILE: envFile,
-        STUDIO_DEMO: "1",
+        STUDIO_FACE_CHECK: "0",
+        STUDIO_IMAGE_SEARCH: "0",
         STUDIO_MCP_API_KEY: mediaKey,
         STUDIO_WORKERS: JSON.stringify([
-          {
-            id: "primary",
-            url: "http://127.0.0.1:1",
-            capabilities: ["image", "video", "upscale", "models"],
-          },
+          { id: "demo", url: worker.url, capabilities: ["image", "video"] },
         ]),
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
@@ -2561,6 +2560,7 @@ test(
           : null;
       child.kill("SIGTERM");
       await exited;
+      await worker.close();
       fs.rmSync(dir, { recursive: true, force: true });
     });
     const started = await new Promise((resolve, reject) => {
@@ -2579,9 +2579,12 @@ test(
       }),
     );
     assert.equal((await client.listTools()).tools.length, 17);
-    const [first] = data(await call(client, "models", { kind: "image" })).image;
-    assert.ok(first);
-    const profileId = first.split(" — ")[0];
+    const profileId = "custom:test-image";
+    assert.ok(
+      data(await call(client, "models", { kind: "image" })).image.some((line) =>
+        line.startsWith(`${profileId} — `),
+      ),
+    );
     await call(client, "models", { profile_id: profileId });
     const queued = data(
       await call(client, "generate", {

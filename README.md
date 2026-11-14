@@ -15,7 +15,7 @@ mise run dev
 
 Open the preview address it prints (<http://localhost:5173>, or a free port when another checkout holds it; set `STUDIO_DEV_PORT` to choose). Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`; settings in the shell override these. Image Search and Face Check stay off unless the shell turns them on. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
 
-`mise run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference.
+`mise run dev:demo` runs without a GPU against a stand-in worker (`backend/fixtures/demo-worker.js`) whose test profiles finish every run with a plain picture, not model inference. Its data stays in `data/demo`.
 
 Before submitting a change, run the checks, build the frontend and run the browser scenarios against that build. Install the browsers once with `npx playwright install chromium webkit`. Browser scenarios use isolated fixtures and cover desktop and phone interactions; real generation needs separate verification against the intended worker.
 

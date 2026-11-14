@@ -50,9 +50,6 @@ export function localOutputFile(filename, subfolder = "", type = "output") {
   return type === mediaType ? mediaFile(String(filename || ""), String(subfolder || "")) : null;
 }
 
-/** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
-export const demoMode = process.env.STUDIO_DEMO === "1";
-
 export function noteComfyReachable(worker) {
   noteWorkerReachable(worker, true);
 }
