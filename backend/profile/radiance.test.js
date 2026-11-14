@@ -40,9 +40,9 @@ fs.writeFileSync(path.join(userWorkflowsDir, `${id}.json`), JSON.stringify(profi
 
 test("a converted model joins the profile as a text-only Radiance backend", () => {
   const raw = JSON.parse(withRadianceBackend(profile, "fine-tune-fp8.rad"));
-  assert.equal(raw.studio.backend, "comfyui");
+  assert.equal(raw.studio.backend, "radiance");
   assert.equal(raw.studio.uncensored, true);
-  const comfyui = metadataFromJson(raw, `${id}.json`);
+  const comfyui = metadataFromJson(raw, `${id}.json`, { backend: "comfyui" });
   assert.equal(comfyui.mediaInputs.length, 1);
   const radiance = metadataFromJson(raw, `${id}.json`, { backend: "radiance" });
   assert.equal(radiance.defaults.model, "fine-tune-fp8.rad");

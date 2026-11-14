@@ -143,8 +143,7 @@ export function ConvertToRadiance({
               </Text>
             )}
             <Text size="sm">
-              Radiance runs text-to-image only, so references stay on ComfyUI, which remains the
-              default.
+              Radiance becomes the default for text-to-image; runs with references stay on ComfyUI.
             </Text>
             <TextInput
               label="Fine-Tune Link"
