@@ -154,6 +154,7 @@ export function DreamPage() {
               </ActionIcon>
             </Tooltip>
           )}
+          {data && <DreamSettingsButton dream={data} />}
           {/* Phones name Taste, as its fingerprint alone is ambiguous and they show no tooltips. */}
           {phone ? (
             <Button size="sm" leftSection={<Fingerprint size={18} />} {...taste}>
@@ -166,7 +167,6 @@ export function DreamPage() {
               </ActionIcon>
             </Tooltip>
           )}
-          {data && <DreamSettingsButton dream={data} />}
         </Group>
       </Group>
       {data?.reason && (
