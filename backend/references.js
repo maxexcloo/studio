@@ -12,12 +12,7 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import Busboy from "busboy";
 import { comfy } from "./comfy/comfy.js";
-import {
-  addGalleryItems,
-  importedImageFile,
-  filterVisibleGallery,
-  gallery,
-} from "./gallery/store.js";
+import { addGalleryItems, gallery, hasGalleryMedia, importedImageFile } from "./gallery/store.js";
 
 import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
@@ -338,6 +333,7 @@ function decodeGalleryReference(id = "") {
   }
 }
 
+/** The account's own item, in its gallery or Dream's pool (Dream animates unseen results). */
 function findGalleryItemForAccount(id, account) {
   const decoded = decodeGalleryReference(id);
   const wanted = decoded || String(id || "");
@@ -346,7 +342,7 @@ function findGalleryItemForAccount(id, account) {
       (item) =>
         recordBelongsToAccount(item, account) &&
         (galleryKey(item) === wanted || item.id === wanted || item.url === wanted) &&
-        filterVisibleGallery([item]).length,
+        hasGalleryMedia(item),
     ) || null
   );
 }
