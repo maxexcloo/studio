@@ -687,10 +687,7 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
     route.request().method() === "POST"
       ? ((posted = route.request().postDataJSON().ids),
         route.fulfill({ json: { href: "/api/gallery/export?selection=token" } }))
-      : route.fulfill({
-          body: "archive",
-          headers: { "Content-Disposition": 'attachment; filename="selection.zip"' },
-        }),
+      : route.fulfill({ body: "archive", contentType: "application/zip" }),
   );
   await page.goto("/images");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
@@ -699,7 +696,7 @@ test("Download takes a selection of any size as one archive", async ({ page }, t
   await expect(status).toHaveText("700 Selected");
   const download = page.waitForEvent("download");
   await selectionAction(page, "Download").click();
-  expect((await download).suggestedFilename()).toBe("selection.zip");
+  expect((await download).url()).toMatch(/\/api\/gallery\/export\?selection=token$/);
   expect(posted).toHaveLength(700);
   await expect(status).toHaveCount(0);
 });
