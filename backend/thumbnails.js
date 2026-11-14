@@ -25,7 +25,6 @@ export const RENDITIONS = {
   thumb: { longestEdge: 768, quality: 72 },
   display: { longestEdge: displayEdge, quality: 90 },
 };
-const { longestEdge, quality } = RENDITIONS.thumb;
 const renditionOf = (size) => RENDITIONS[size] || RENDITIONS.thumb;
 const pending = new Map();
 
@@ -270,9 +269,9 @@ async function build(filename, subfolder, type, size, worker) {
   const local = await localSource(filename, subfolder, type);
   if (local) {
     const file = cachePath(key, local.sourceHash);
-    if (fs.existsSync(file)) return { file, etag: `\"${local.sourceHash}\"` };
+    if (fs.existsSync(file)) return { file, etag: `"${local.sourceHash}"` };
     const made = await inSlot(async () => {
-      if (fs.existsSync(file)) return { file, etag: `\"${local.sourceHash}\"` };
+      if (fs.existsSync(file)) return { file, etag: `"${local.sourceHash}"` };
       // sharp reads the file itself, off the main thread, instead of it being
       // read here into a buffer first. Unreadable: try ComfyUI below.
       try {
@@ -293,7 +292,7 @@ async function build(filename, subfolder, type, size, worker) {
     if (!source) return null;
     const sourceHash = crypto.createHash("sha256").update(source).digest("hex");
     const file = cachePath(key, sourceHash);
-    if (fs.existsSync(file)) return { file, etag: `\"${sourceHash}\"` };
+    if (fs.existsSync(file)) return { file, etag: `"${sourceHash}"` };
     return writeThumbnail(key, sourceHash, source, size);
   });
 }
@@ -328,7 +327,7 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
   indexAdd(name);
   lastUsed.set(file, Date.now());
   maybeSweep();
-  return { file, etag: `\"${sourceHash}\"` };
+  return { file, etag: `"${sourceHash}"` };
 }
 
 // Concurrent requests for the same not-yet-cached image share one build instead of

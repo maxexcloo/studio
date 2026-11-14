@@ -129,7 +129,7 @@ test("direct image refinement uses advertised provider model and saves real owne
     const request = remote.calls.find((call) => call.path === "/v1/images/edits")!;
     assert.equal(request.body?.aspect_ratio, "2:1");
     assert.equal(request.body?.size, undefined);
-    assert.equal((request.body?.image as { type: string }).type, "image_url");
+    assert.equal((request.body!.image as { type: string }).type, "image_url");
     assert.equal(store.providerRecord("bob", job.id), undefined);
   } finally {
     store.close();

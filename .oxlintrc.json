@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "import", "typescript", "unicorn", "oxc", "react"],
+  "env": {
+    "browser": true,
+    "es2024": true,
+    "node": true
+  },
+  "rules": {
+    "eslint/no-control-regex": "off",
+    "eslint/no-undef": "error",
+    "eslint/no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "import/named": "error",
+    "react-hooks/exhaustive-deps": "off",
+    "react/immutability": "off",
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/static-components": "off",
+    "unicorn/no-useless-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "eslint/no-undef": "off"
+      }
+    }
+  ]
+}

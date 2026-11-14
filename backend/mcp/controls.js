@@ -315,7 +315,7 @@ function indexLine({ info, fit }, short) {
 }
 
 /** Everything the studio picker knows about one LoRA, for an explicit lookup. */
-function loraDetail({ name, info, fit }, short) {
+function loraDetail({ info, fit }, short) {
   const range = strengthRange(info);
   return {
     name: short,

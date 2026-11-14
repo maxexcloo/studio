@@ -1,5 +1,4 @@
 import { logWarning } from "../crash-log.js";
-import { families } from "../family-catalogue.js";
 import {
   capabilityForProfile,
   defaultWorkerId,

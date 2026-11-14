@@ -88,7 +88,7 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
         folder,
         sha256: entry.sha256 || "",
         bytes: entry.bytes || 0,
-        source: { ...(entry.source || {}), ...(url ? { url } : {}) },
+        source: { ...entry.source, ...(url ? { url } : {}) },
       },
       matchedBy,
       note: "",
@@ -317,7 +317,7 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {}, prof
     if (!item.note && info.note) item.note = info.note;
     if (entry.description) item.description = String(entry.description).slice(0, 600);
     if (!item.links?.civitaiCom && !item.links?.hf && info.sourceUrl)
-      item.links = { ...(item.links || {}), civitaiCom: info.sourceUrl };
+      item.links = { ...item.links, civitaiCom: info.sourceUrl };
     item.installed ||= isInstalled;
     items.set(key, item);
   };

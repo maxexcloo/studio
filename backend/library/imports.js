@@ -880,7 +880,7 @@ export function createImportEngine({
               }
             : { hf: url };
         record.pendingEntries = {
-          ...(record.pendingEntries || {}),
+          ...record.pendingEntries,
           [offer.file]: {
             ...record.entryBase,
             version: offer.label,

@@ -296,7 +296,7 @@ function fallbackFor(failed) {
 /** What If-Range needs: a strong ETag, else the Last-Modified date. Nothing for notes from before. */
 export function resumeValidator(saved = {}) {
   const etag = String(saved.etag || "");
-  if (etag && !/^W\//.test(etag)) return etag;
+  if (etag && !etag.startsWith("W/")) return etag;
   return String(saved.lastModified || "");
 }
 

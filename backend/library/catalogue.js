@@ -345,7 +345,7 @@ export function createCatalogueStore({
           path: entry.path,
           sha256: sha(entry.sha256),
           size: Number(entry.size) || 0,
-          ...(typeof entry.url === "string" && /^https:\/\//.test(entry.url)
+          ...(typeof entry.url === "string" && entry.url.startsWith("https://")
             ? { url: entry.url }
             : {}),
           ...(typeof entry.source === "string" ? { source: entry.source } : {}),
@@ -371,7 +371,7 @@ export function createCatalogueStore({
     const provider = providers.at(-1) || null;
     const manifest = layers.manifest[key] || null;
     const edit = edits[key] || null;
-    const fields = { ...(definition || {}), ...(edit?.fields || {}) };
+    const fields = { ...definition, ...edit?.fields };
     const pick = (field, ...values) =>
       fields[field] !== undefined && fields[field] !== null
         ? fields[field]
@@ -443,7 +443,7 @@ export function createCatalogueStore({
       links: {
         ...linksFrom(manifest?.url),
         ...providerLinks,
-        ...(fields.links || {}),
+        ...fields.links,
       },
       origin,
       ...(edit?.aiDrafted ? { aiDrafted: true } : {}),

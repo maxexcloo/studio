@@ -430,8 +430,8 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
     if (!validPackId(packId)) throw new Error("Choose a valid guide id.");
     if (!versionOrigins.includes(origin)) throw new Error("Choose who made the change.");
     const store = read() || { packs: {}, meta: {} };
-    store.packs = { ...(store.packs || {}) };
-    store.meta = { ...(store.meta || {}) };
+    store.packs = { ...store.packs };
+    store.meta = { ...store.meta };
     if (baseHash && store.packs[packId] && hashOf(store.packs[packId]) !== baseHash)
       throw conflict(
         "This guide changed since you opened it. Reload it, then make your edit again.",
@@ -473,7 +473,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
       throw conflict(
         `This guide is still used by ${users.join(", ")}. Bind them to another guide first, then remove it.`,
       );
-    store.meta = { ...(store.meta || {}) };
+    store.meta = { ...store.meta };
     const last = versionsIn(historyDir(packId)).at(-1);
     if (!last || readJsonFile(path.join(historyDir(packId), `${last}.json`)).hash !== hash)
       addVersion(store, packId, value, { by, origin, note: "Before removing" });
@@ -526,7 +526,7 @@ export function createGuideStore({ dataDir = currentDataDir() } = {}) {
    * first version are recorded first, so revert can always go back. Unchanged is a no-op.
    */
   function writeBindings(store, next, { by, origin, aiDrafted, note = "" }) {
-    store.meta = { ...(store.meta || {}) };
+    store.meta = { ...store.meta };
     // Studio's own moves (a drafted profile's binding, Combine Backends) keep the review state.
     aiDrafted ??= store.meta[bindingsId]?.aiDrafted === true;
     if (

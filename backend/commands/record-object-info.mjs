@@ -42,7 +42,6 @@ function strip(value) {
 function isFileList(options) {
   return (
     Array.isArray(options) &&
-    options.length > 0 &&
     options.some(
       (option) => typeof option === "string" && (fileLike.test(option) || /[\\/]/.test(option)),
     )

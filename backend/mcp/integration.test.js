@@ -4411,7 +4411,7 @@ test("with no local or cloud video profile, video is refused, and named cloud pr
   const f = await fixture(t);
   // With no profile to queue on, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
   await f.profiles(
-    videoCatalogue(false).filter((profile) => !/^cloud/.test(profile.id)),
+    videoCatalogue(false).filter((profile) => !profile.id.startsWith("cloud")),
     { defaults: { image: imageProfile.id }, videoAvailable: false },
   );
   const client = await f.client();
@@ -6722,7 +6722,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.deepEqual(seen.at(-1).body, {
     ops: [{ op: "rating", name: "fixture-effect.safetensors", rating: "up" }],
   });
-  assert.ok(seen.every((entry) => /^Bearer /.test(entry.authorization)));
+  assert.ok(seen.every((entry) => entry.authorization.startsWith("Bearer ")));
 });
 
 test("admin tools chain a Library search, a one-call install and a named update check, and Maintenance stays with administrators", async (t) => {

@@ -434,7 +434,7 @@ const installedFiles = (info) => ({
   vae: optionsFor(info, "VAELoader", "vae_name"),
   clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name"),
 });
-const library = registerLibraryRoutes(app, {
+registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
   draftProfile: (record, options) =>
