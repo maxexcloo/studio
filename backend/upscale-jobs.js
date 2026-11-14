@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { workerUrl } from "./comfy/backends.js";
 import { comfy, comfyOn, normalizeComfyError } from "./comfy/comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy/queue.js";
-import { flushGalleryStrict, gallery, updateGalleryJob } from "./gallery/store.js";
+import { findGalleryItem, updateGalleryJob } from "./gallery/store.js";
 import { outputsFrom } from "./gallery/records.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
@@ -13,7 +13,7 @@ import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 
 export function findUpscaleTarget(id) {
-  return gallery.find((item) => item.id === id || item.url === id) || null;
+  return findGalleryItem({ named: [id] }) || null;
 }
 
 function patchUpscale(itemId, patch, options = {}) {
@@ -214,7 +214,6 @@ export async function runUpscaleJob(
         await target.finish(output, plan);
         setTerminalJob(jobId, { status: "done", outputs: [output] });
         if (comfyCopies.length) {
-          await flushGalleryStrict();
           await removeComfyFiles(worker, comfyCopies);
           await forgetComfyRun(worker, { promptIds: [queued.prompt_id] }).catch(() => false);
         }

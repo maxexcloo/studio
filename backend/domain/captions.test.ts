@@ -327,3 +327,33 @@ test("a stopped pass stays stopped across a restart; a running one resumes", asy
   await resumed.settled();
   assert.equal((await resumed.status()).state, "finished");
 });
+
+test("status counts the gallery again only once it changes", async () => {
+  let items = [image("a"), image("b")];
+  let walks = 0;
+  let changes = 0;
+  const captioner = createCaptioner({
+    enabled: () => true,
+    writer: null,
+    idle: () => true,
+    allowed: () => true,
+    items: () => {
+      walks += 1;
+      return items;
+    },
+    changes: () => changes,
+    visible: () => true,
+    image: async (item) => ({ mime: "image/jpeg", data: item.id || "" }),
+    save: () => {},
+    load: () => null,
+    persist: () => {},
+    log: { info: () => {} },
+  });
+  assert.equal((await captioner.status()).remaining, 2);
+  const counted = walks;
+  assert.equal((await captioner.status()).remaining, 2);
+  assert.equal(walks, counted, "a second status reuses the count");
+  items = [...items, image("c")];
+  changes += 1;
+  assert.equal((await captioner.status()).remaining, 3);
+});

@@ -46,14 +46,13 @@ globalThis.fetch = async (url, options = {}) => {
   return nativeFetch(url, options);
 };
 const { jobs, runJob } = await import("./jobs.js");
-const store = await import("./gallery/store.js");
+const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
 test.after(async () => {
   releaseCleanup();
   globalThis.fetch = nativeFetch;
   globalThis.WebSocket = NativeWebSocket;
   await fake.close();
-  await store.flushGallery();
   fs.rmSync(temporary, { recursive: true, force: true });
 });
 
@@ -91,7 +90,7 @@ test(
       comfyBackend: "primary",
     };
     const items = makePendingItems(id, body);
-    store.setGallery(items, { persist: false });
+    setGallery(items);
     jobs.set(id, { status: "queued", kind: "image", outputs: [], items, startedAt: Date.now() });
     const queued = fake.nextPrompt();
     const running = runJob(id, body);
@@ -112,16 +111,16 @@ test(
     await cleanupReached;
     try {
       assert.equal(jobs.get(id).status, "done");
-      assert.equal(store.gallery[0].status, "done");
-      assert.match(store.gallery[0].url, /type=media/);
-      const completed = { ...store.gallery[0] };
+      assert.equal(galleryRows()[0].status, "done");
+      assert.match(galleryRows()[0].url, /type=media/);
+      const completed = { ...galleryRows()[0] };
       const terminalAt = jobs.get(id).terminalAt;
       await message(id, {
         type: "progress",
         data: { node: sampler, value: 3, max: 4, prompt_id: prompt.id },
       });
       assert.equal(jobs.get(id).status, "done");
-      assert.deepEqual(store.gallery[0], completed);
+      assert.deepEqual(galleryRows()[0], completed);
       await message(id, {
         type: "execution_error",
         data: { prompt_id: prompt.id, exception_message: "late worker error" },
@@ -129,7 +128,7 @@ test(
       await message(id, { type: "execution_interrupted", data: { prompt_id: prompt.id } });
       assert.equal(jobs.get(id).status, "done");
       assert.equal(jobs.get(id).terminalAt, terminalAt);
-      assert.deepEqual(store.gallery[0], completed);
+      assert.deepEqual(galleryRows()[0], completed);
     } finally {
       releaseCleanup();
       await running;

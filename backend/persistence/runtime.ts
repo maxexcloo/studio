@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
-import { createGalleryTable } from "./gallery-rows.ts";
+import { createGalleryTable, galleryColumns } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
 /** The JSON stores runtime-json-v1 moved into SQLite. */
@@ -129,8 +129,11 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
     db.exec(`CREATE TABLE IF NOT EXISTS studio_documents (name TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_library_imports (id TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS studio_ingested_jobs (job_id TEXT PRIMARY KEY, at INTEGER NOT NULL);
-      ${createGalleryTable};`);
+      CREATE TABLE IF NOT EXISTS studio_ingested_jobs (job_id TEXT PRIMARY KEY, at INTEGER NOT NULL);`);
+    if (!hasTable(db, "studio_gallery")) db.exec(createGalleryTable);
+    // Gathers the statistics that let SQLite pick a gallery query's narrowest index (a set's,
+    // not the gallery's order), as SQLite advises on opening a long-lived connection.
+    db.exec("PRAGMA optimize=0x10002");
     databases.set(filename, db);
   }
   return db;
@@ -165,6 +168,15 @@ export function assertCurrentStorage(dataDir: string): void {
   if (pending.length)
     throw new Error(
       `${dataDir} still holds ${pending.join(", ")}, so it predates current storage. Migrate it first with migrate-runtime from Studio v2026.11.10.4, the last release with those steps (see README.md, Data & Migrations), then start this Studio.`,
+    );
+  const columns = new Set(
+    (db.prepare("PRAGMA table_xinfo(studio_gallery)").all() as { name: string }[]).map(
+      (column) => column.name,
+    ),
+  );
+  if (galleryColumns.some(([name]) => !columns.has(name)))
+    throw new Error(
+      `${dataDir}'s gallery has no indexed columns yet. Add them first with migrate-runtime's galleryColumns step from Studio v2026.11.14.18 (see README.md, Data & Migrations), then start this Studio.`,
     );
 }
 

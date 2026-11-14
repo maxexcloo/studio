@@ -2,6 +2,7 @@
 // record only: nothing is tracked beyond what Studio already keeps about its own outputs.
 import { isCloudProfile } from "../shared/profiles.ts";
 import { canonicalProfileId } from "./profile/store.js";
+import { visibleGallery } from "./gallery/store.js";
 
 /**
  * What these gallery items made: finished outputs, images and videos, the cloud jobs among them
@@ -29,6 +30,10 @@ export function galleryStats(items = []) {
 }
 
 const dayMs = 86_400_000;
+
+/** The visible items profileStats counts: those of its last 30 days. */
+export const recentGallery = () =>
+  visibleGallery({ since: Date.now() - 30 * dayMs }, { ordered: false });
 
 /**
  * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),

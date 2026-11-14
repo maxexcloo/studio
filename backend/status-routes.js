@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { canAdmin } from "./access.js";
-import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
+import { ownedQuery, ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { earliest } from "./domain/eta.ts";
 import { queuePriority } from "./domain/store.ts";
@@ -9,9 +9,9 @@ import { profileOnBackendKey, readyWorkers } from "./comfy/backends.js";
 import { isComfyTimeout } from "./comfy/comfy.js";
 import { appVersion } from "./data-dir.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import { dataDir, gallery, visibleGallery } from "./gallery/store.js";
+import { dataDir, galleryItems } from "./gallery/store.js";
 import { requireAdmin } from "./route-access.js";
-import { galleryStats, profileStats } from "./stats.js";
+import { galleryStats, profileStats, recentGallery } from "./stats.js";
 import { queueSchedule, runEstimate, workerLoads } from "./queue-eta.js";
 import { upscaleQualities } from "./upscale.js";
 import { capabilityForProfile, defaultWorker } from "./workers.js";
@@ -148,14 +148,19 @@ export function registerStatusRoutes(app, { observeServices, queue }) {
       ok: true,
       version: appVersion,
       sinceRelease: null,
-      stats: galleryStats(recordsForRequest(gallery, req)),
+      stats: galleryStats(
+        recordsForRequest(
+          galleryItems(ownedQuery(req.studioAccount) || {}, { ordered: false }),
+          req,
+        ),
+      ),
     });
   });
 
   // Library › Profiles: each profile's runs, failures, stars and speed across every account.
   app.get("/api/stats/profiles", (req, res) => {
     if (!requireAdmin(req, res)) return;
-    res.json({ ok: true, profiles: profileStats(visibleGallery()) });
+    res.json({ ok: true, profiles: profileStats(recentGallery()) });
   });
 
   // Versions, system and GPU for a bug report (Settings › About, and a failed card's Copy report).
