@@ -1003,10 +1003,17 @@ export function createDream(options: {
    * A random sample of the account's starred images (`seedSample`) with a few that won comparisons
    * (`elo`) and, for one draw in
    * `ownSeedEvery`, its Likes, a third as many; otherwise stars Dream made are left out too, unless
-   * they are all it starred.
+   * they are all it starred. Only images the account made with a prompt on a ready image profile
+   * are sampled, so a draw finds a seed whenever one exists.
    */
-  function favourites(ownerId: string, record: DreamRecord) {
-    const query = { type: "image", status: "done" };
+  function favourites(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
+    const ready = profiles.filter((entry) => kindOf(entry) === "image").map((entry) => entry.id);
+    const query = {
+      type: "image",
+      status: "done",
+      uploaded: false,
+      jobIds: store.promptJobIds(ownerId, ready),
+    };
     const ratings = Object.entries(record.ratings || {});
     const won = shuffled(ratings.filter(([, rating]) => rating > elo.start).map(([id]) => id));
     const stars = [
@@ -1036,7 +1043,7 @@ export function createDream(options: {
     return input && profile && prompt ? { item, input, profile, prompt } : null;
   }
   const drawSeeds = (ownerId: string, record: DreamRecord, profiles: DreamProfile[]) =>
-    favourites(ownerId, record).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
+    favourites(ownerId, record, profiles).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
   /**
    * A seed for a continued idea or a series: of `drawSeeds`, one Dream has not used lately where it
    * can, the one least like the latest few by image, so its seeds spread across the account's
