@@ -229,7 +229,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
   // A restyle keeps the person's own descriptions, so a character doesn't drift between prompts.
   assert.match(body.messages[0].content, /own descriptions of people and things .* word for word/);
   assert.equal(body.messages[1].content, "secret cabin");
-  assert.match(lines[0], /^Prompt assistant rewrite for custom:fixture in \d+ ms$/);
+  assert.match(lines[0], /^Prompt assistant rewrite with cloud\/auto in \d+ ms$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
 });
 
@@ -290,16 +290,21 @@ test("failures fall back to the original prompt with the reason, and a timeout a
     () => json(""),
   ];
   const reasons = [];
+  const warnings = [];
   for (const reply of failing) {
     const engine = createAssistant(gateway(), {
       fetchImpl: fakeGateway(reply).fetchImpl,
-      log: quiet,
+      log: { info: () => {}, warn: (line) => warnings.push(line) },
     });
     const result = await engine.rewrite({ profile, prompt: "a cabin" });
     assert.deepEqual([result.prompt, result.source], ["a cabin", "fallback"]);
     reasons.push(result.reason);
   }
   assert.deepEqual(reasons, ["HTTP 503", "unreachable", "empty reply"]);
+  assert.match(
+    warnings[0],
+    /^Prompt assistant rewrite with cloud\/auto failed after \d+ ms: HTTP 503$/,
+  );
   const hanging = (_body, options) =>
     new Promise((_resolve, reject) => {
       if (options.signal.aborted) reject(options.signal.reason);
