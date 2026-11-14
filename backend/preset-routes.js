@@ -6,10 +6,10 @@ import { importCivitaiImage, matchResources, versionResource } from "./civitai/i
 import {
   dataDir,
   deleteGalleryFiles,
-  filterVisibleGallery,
-  gallery,
+  forgetGalleryItems,
+  galleryItem,
   importedImageFile,
-  setGallery,
+  visibleGallery,
 } from "./gallery/store.js";
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
@@ -103,7 +103,7 @@ export function registerPresetRoutes(
     if (/^[1-9]\d*$/.test(id)) fs.rmSync(path.join(previewsDir, `${id}.webp`), { force: true });
   };
   const images = () =>
-    filterVisibleGallery(gallery)
+    visibleGallery({ idPrefix: "civitai:" })
       .filter((item) => item.civitai && importedImageFile(item))
       .map(presetFromGallery);
   let migration;
@@ -182,10 +182,10 @@ export function registerPresetRoutes(
   app.delete(
     "/api/presets/:id",
     route(async (req, res) => {
-      const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
+      const item = galleryItem(`civitai:${req.params.id}`);
       if (item) {
         deleteGalleryFiles([item]);
-        setGallery(gallery.filter((entry) => entry !== item));
+        forgetGalleryItems([item]);
       }
       forgetLegacy(req.params.id);
       res.json({ ok: true });
@@ -194,7 +194,7 @@ export function registerPresetRoutes(
   app.get(
     "/api/presets/:id/media",
     route(async (req, res) => {
-      const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
+      const item = galleryItem(`civitai:${req.params.id}`);
       const file = importedImageFile(item);
       if (!file || !fs.existsSync(file)) {
         res.sendStatus(404);
@@ -212,7 +212,7 @@ export function registerPresetRoutes(
   app.get(
     "/api/presets/:id/video-preview",
     route(async (req, res) => {
-      const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
+      const item = galleryItem(`civitai:${req.params.id}`);
       const file = importedImageFile(item);
       if (item?.type !== "video" || !file || !fs.existsSync(file)) {
         res.sendStatus(404);
@@ -230,7 +230,7 @@ export function registerPresetRoutes(
     route(async (req, res) => {
       if (!/^[1-9]\d*$/.test(req.params.id)) throw new Error("Unknown preview.");
       const file = path.join(previewsDir, `${req.params.id}.webp`);
-      const item = gallery.find((item) => item.id === `civitai:${req.params.id}`);
+      const item = galleryItem(`civitai:${req.params.id}`);
       const local = importedImageFile(item);
       if (local && fs.existsSync(local)) {
         // Made once per file version; the browser keeps it and only checks that it is unchanged.

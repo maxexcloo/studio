@@ -1,6 +1,6 @@
 import { recordsForRequest } from "../account-ownership.js";
 import { requireLocal } from "../route-access.js";
-import { gallery } from "./store.js";
+import { galleryItem } from "./store.js";
 
 /**
  * Recreate's start: the session and job a run made from a finished item joins, so the run is one of
@@ -11,9 +11,10 @@ import { gallery } from "./store.js";
 export function registerRecreateRoute(app, { store }) {
   app.post("/api/gallery/recreate", (req, res) => {
     if (!req.studioAccount && !requireLocal(req, res)) return;
-    const item = recordsForRequest(gallery, req).find(
-      (entry) => entry.id === req.body?.galleryItemId && entry.status === "done" && entry.url,
-    );
+    const item = recordsForRequest(
+      [galleryItem(req.body?.galleryItemId)].filter(Boolean),
+      req,
+    ).find((entry) => entry.status === "done" && entry.url);
     if (!item)
       return res.status(404).json({ ok: false, error: "That item is no longer in the gallery." });
     const ownerId = item.ownerId || "";

@@ -2,12 +2,8 @@ import { logCrash, logEvent, logRejection, logWarning } from "./crash-log.js";
 
 let installed = false;
 
-/** One explicit owner for normal stops, crashes and the final synchronous save. */
-export function installShutdown({
-  drain = async () => {},
-  flush = () => {},
-  graceMs = 30_000,
-} = {}) {
+/** One explicit owner for normal stops and crashes. */
+export function installShutdown({ drain = async () => {}, graceMs = 30_000 } = {}) {
   if (installed) return;
   installed = true;
   let stopping = false;
@@ -17,7 +13,6 @@ export function installShutdown({
   });
   process.on("unhandledRejection", logRejection);
   process.on("exit", (code) => {
-    flush();
     logEvent("Studio exited", { code });
   });
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {

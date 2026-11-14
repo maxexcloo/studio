@@ -6,7 +6,7 @@ import { comfyFile, inDotFolder, localOutputFile } from "../comfy/comfy.js";
 import { comfyView, outputMime, ownerMediaTypes } from "../comfy/media-routes.js";
 import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
-import { gallery } from "../gallery/store.js";
+import { galleryJobItems } from "../gallery/store.js";
 import { mediaType, outputMediaPattern } from "../media-paths.js";
 import { mcpAccount, multiUserEnabled } from "../multi-user-auth.js";
 import { multiUserRefusal, publicAccountPaths } from "../multi-user-gate.js";
@@ -15,12 +15,8 @@ import { mcpOutputPath } from "./media.js";
 /** A signed MCP result link's file for its owner, as `{ content, mime }`, or null. */
 export async function resolveSignedMcpResult(owner, jobId, index) {
   if (!accountAccessForId(owner)?.authenticated) return null;
-  const item = gallery.find(
-    (entry) =>
-      entry.ownerId === owner &&
-      entry.jobId === jobId &&
-      entry.index === index &&
-      entry.status === "done",
+  const item = galleryJobItems(jobId, owner).find(
+    (entry) => entry.ownerId === owner && entry.index === index && entry.status === "done",
   );
   if (!item || !mcpOutputPath(item.url)) return null;
   const source = new URL(item.url, "http://localhost");

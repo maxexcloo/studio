@@ -12,7 +12,6 @@ interface UpscaleOptions {
     callbacks: { onSubmitting(): void; onAccepted(promptId: string): void },
   ): Promise<void>;
   cancelPrompt(promptId: string, backend?: string): Promise<unknown>;
-  flushGallery(): Promise<unknown>;
   eligible?: QueueAdapter["eligible"];
   settled?: QueueAdapter["settled"];
 }
@@ -155,9 +154,7 @@ export function createUpscaleQueueAdapter(options: UpscaleOptions): QueueAdapter
       }
       // Without an acknowledgement, cancellation cannot safely release the worker lease.
     },
-    async saveOutputs() {
-      await options.flushGallery();
-    },
+    async saveOutputs() {},
   };
 }
 

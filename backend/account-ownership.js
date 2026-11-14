@@ -18,6 +18,13 @@ export function recordBelongsToAccount(record, account) {
   return record?.ownerId === ownerId;
 }
 
+/** A gallery query (gallery/store.js) for the account's own items, or null when it may see none. */
+export function ownedQuery(account) {
+  const ownerId = typeof account?.userId === "string" ? account.userId : "";
+  if (ownerId) return { ownerId };
+  return process.env.STUDIO_MULTI_USER !== "1" ? {} : null;
+}
+
 export function recordsForRequest(records, req) {
   return records.filter((record) => recordBelongsToRequest(record, req));
 }

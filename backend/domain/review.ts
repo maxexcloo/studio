@@ -93,6 +93,7 @@ export function createReview(options: {
   idle(): boolean;
   allowed(ownerId: string): boolean;
   items(): Iterable<ReviewItem>;
+  changes?(): number;
   visible(item: ReviewItem): boolean;
   projects(ownerId: string): Project[];
   /** Whether the owner's results may be read with the uncensored model. */

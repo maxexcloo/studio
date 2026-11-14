@@ -1,7 +1,13 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { yieldToEventLoop } from "./json-store.js";
 import { mediaType, videoPattern } from "./media-paths.js";
-import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery/store.js";
+import {
+  eachGalleryItem,
+  findGalleryItem,
+  galleryRevisionValue,
+  isGalleryHidden,
+} from "./gallery/store.js";
+import { galleryKey } from "./persistence/gallery-rows.ts";
 import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
 import {
   encoderIdle,
@@ -27,8 +33,6 @@ const previewBudget = Math.floor(maxCacheBytes / 4 / (512 * 1024));
 const settled = new Set();
 let warming = null;
 let warmedRevision = 0;
-let shownRevision = -1;
-let shown = new Set();
 
 /** The Studio media files an item shows: its original and its upscale. */
 function itemMedia(item) {
@@ -43,17 +47,11 @@ function itemMedia(item) {
     .map((params) => ({ ...params, video: videoPattern.test(params.filename) }));
 }
 
-/** Whether a file is still in the gallery: one deleted meanwhile is never built. */
-function stillShown({ filename, subfolder, type }) {
-  if (shownRevision !== galleryRevisionValue()) {
-    shownRevision = galleryRevisionValue();
-    shown = new Set(
-      gallery.flatMap((item) =>
-        itemMedia(item).map((media) => `${media.type}:${media.subfolder}:${media.filename}`),
-      ),
-    );
-  }
-  return shown.has(`${type}:${subfolder}:${filename}`);
+/** Whether an item still shows a file: one deleted meanwhile is never built. */
+function stillShown(item, { filename, subfolder, type }) {
+  return itemMedia(findGalleryItem({ named: [galleryKey(item)] })).some(
+    (media) => media.filename === filename && media.subfolder === subfolder && media.type === type,
+  );
 }
 
 const idle = () => buildStats().building === 0 && buildStats().waiting === 0 && encoderIdle();
@@ -62,7 +60,7 @@ const idle = () => buildStats().building === 0 && buildStats().waiting === 0 && 
 let turnAt = 0;
 
 /** Runs one build when the studio is otherwise quiet, then rests for as long as it took. */
-async function quietly(key, media, build) {
+async function quietly(key, item, media, build) {
   // Done and existing files resolve without waiting on anything, so a pass over a large warmed
   // gallery would hold the event loop for its whole length: give it a turn now and then.
   if (performance.now() - turnAt > 10) {
@@ -71,7 +69,7 @@ async function quietly(key, media, build) {
   }
   if (settled.has(key)) return;
   while (!idle()) await delay(250, undefined, { ref: false });
-  if (!stillShown(media)) return;
+  if (!stillShown(item, media)) return;
   const started = performance.now();
   try {
     await build();
@@ -85,26 +83,28 @@ async function quietly(key, media, build) {
 }
 
 /** One pass over the gallery as it is now. Resolves to how many files it looked at. */
-export async function warmGallery({ items = gallery } = {}) {
+export async function warmGallery({ items = eachGalleryItem({ status: "done" }) } = {}) {
   let images = 0;
   let displays = 0;
   let videos = 0;
   const previews = [];
-  for (const item of [...items]) {
+  for (const item of items) {
     for (const media of itemMedia(item)) {
       const { filename, subfolder, type } = media;
       const key = `${type}:${subfolder}:${filename}`;
       if (media.video) {
         if (videos >= posterBudget) continue;
         videos += 1;
-        await quietly(`poster:${key}`, media, () => getComfyVideoPoster(filename, subfolder, type));
-        if (videos <= previewBudget) previews.push(media);
+        await quietly(`poster:${key}`, item, media, () =>
+          getComfyVideoPoster(filename, subfolder, type),
+        );
+        if (videos <= previewBudget) previews.push({ item, media });
       } else if (images < thumbnailBudget) {
         images += 1;
-        await quietly(`thumb:${key}`, media, () => warmThumbnail(filename, subfolder, type));
+        await quietly(`thumb:${key}`, item, media, () => warmThumbnail(filename, subfolder, type));
         if (displays < displayBudget) {
           displays += 1;
-          await quietly(`display:${key}`, media, () =>
+          await quietly(`display:${key}`, item, media, () =>
             warmThumbnail(filename, subfolder, type, "display"),
           );
         }
@@ -112,9 +112,9 @@ export async function warmGallery({ items = gallery } = {}) {
     }
   }
   // Posters first for every video: a grid shows those before any preview plays.
-  for (const media of previews) {
+  for (const { item, media } of previews) {
     const { filename, subfolder, type } = media;
-    await quietly(`preview:${type}:${subfolder}:${filename}`, media, () =>
+    await quietly(`preview:${type}:${subfolder}:${filename}`, item, media, () =>
       getComfyVideoPreview(filename, subfolder, type),
     );
   }

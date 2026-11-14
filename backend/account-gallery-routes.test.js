@@ -21,6 +21,7 @@ const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
   import("./gallery/routes.js"),
   import("./gallery/store.js"),
 ]);
+const { setGallery, gallery: galleryRows } = await import("./fixtures/gallery.js");
 
 const routes = {};
 // Image search (domain/image-search.ts): a test per search, or null.
@@ -73,7 +74,7 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     writing: { kind: "request", model: "writer", thinking: "long thoughts" },
   };
   const second = item("account-b", "job-b");
-  galleryStore.setGallery([first, second]);
+  setGallery([first, second]);
   const request = {
     studioAccount: {
       userId: "account-a",
@@ -121,7 +122,7 @@ test("unfinished work shows as the account chooses: none, in progress, or queued
     status: "pending",
     createdAt: "2026-10-20T00:00:00.000Z",
   };
-  galleryStore.setGallery([running, done]);
+  setGallery([running, done]);
   const waiting = queue.enqueue(
     "account-a",
     session.id,
@@ -155,8 +156,11 @@ test("Clear Failed takes the account's own failed items; administrators may name
     studioAccount: { userId, role, authenticated: true, features: { gallery: true } },
   });
   const clear = (req) => call(posts["/api/gallery/errors/clear"], req);
-  const left = () => galleryStore.gallery.map((record) => record.jobId).sort();
-  galleryStore.setGallery([
+  const left = () =>
+    galleryRows()
+      .map((record) => record.jobId)
+      .sort();
+  setGallery([
     failed("account-a", "a-failed"),
     failed("account-b", "b-failed"),
     failed("account-c", "c-failed"),
@@ -188,7 +192,7 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
     settings: { loras },
   });
   const detail = { name: "detail.safetensors", strength: 1 };
-  galleryStore.setGallery([
+  setGallery([
     made("account-a", "old", "2026-10-18T00:00:00.000Z", [detail]),
     made("account-a", "new", "2026-10-19T00:00:00.000Z", [detail]),
     made("account-a", "off", "2026-10-20T00:00:00.000Z", [{ ...detail, enabled: false }]),
@@ -219,7 +223,7 @@ test("finished outputs keep the pending tiles' owner and never replace another o
     url: "",
     status: "pending",
   });
-  galleryStore.setGallery([pending("account-a"), pending("account-b")]);
+  setGallery([pending("account-a"), pending("account-b")]);
   const jobs = new Map([["shared-job", { ownerId: "account-a", startedAt: Date.now() }]]);
   const [done] = await galleryStore.replaceGalleryJob(
     "shared-job",
@@ -228,7 +232,7 @@ test("finished outputs keep the pending tiles' owner and never replace another o
     jobs,
   );
   assert.equal(done.ownerId, "account-a");
-  const remaining = galleryStore.gallery.filter((record) => record.jobId === "shared-job");
+  const remaining = galleryRows().filter((record) => record.jobId === "shared-job");
   assert.deepEqual(remaining.map((record) => record.ownerId).sort(), ["account-a", "account-b"]);
   assert.equal(remaining.find((record) => record.ownerId === "account-b").status, "pending");
 });
@@ -240,7 +244,7 @@ test("repeated gallery filters match any of their values and combine across filt
     width,
     height,
   });
-  galleryStore.setGallery([
+  setGallery([
     made("job-flux", "flux.safetensors", 1024, 1024),
     made("job-sdxl", "sdxl.safetensors", 1344, 768),
     made("job-wan", "wan.safetensors", 1024, 1024),
@@ -271,7 +275,7 @@ test("repeated gallery filters match any of their values and combine across filt
 });
 
 test("gallery filter options cover the owned gallery without exposing other accounts or media kinds", async () => {
-  galleryStore.setGallery([
+  setGallery([
     ...Array.from({ length: 65 }, (_, index) => ({
       ...item("account-a", `page-${index}`),
       model: "shared-model",
@@ -315,7 +319,7 @@ test("search matches an image's caption as well as its prompt, within the accoun
     at: "2026-10-26T09:00:00.000Z",
     version: 2,
   });
-  galleryStore.setGallery([
+  setGallery([
     {
       ...item("account-a", "job-fox"),
       caption: caption("A red fox in deep snow at dusk.", ["wildlife", "winter scene"]),
@@ -348,7 +352,7 @@ test("search matches an image's caption as well as its prompt, within the accoun
 });
 
 test("search adds images that look like it to the text matches, and filters still apply", async () => {
-  galleryStore.setGallery([
+  setGallery([
     { ...item("account-a", "job-cat"), model: "flux" },
     { ...item("account-a", "job-cat-sdxl"), model: "sdxl" },
     { ...item("account-a", "job-prompt"), model: "flux", prompt: "ginger cat" },

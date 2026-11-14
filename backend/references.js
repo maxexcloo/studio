@@ -12,7 +12,12 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import Busboy from "busboy";
 import { comfy, comfyFile } from "./comfy/comfy.js";
-import { addGalleryItems, gallery, hasGalleryMedia, importedImageFile } from "./gallery/store.js";
+import {
+  addGalleryItems,
+  galleryItems,
+  hasGalleryMedia,
+  importedImageFile,
+} from "./gallery/store.js";
 
 import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
@@ -263,9 +268,8 @@ async function saveUploadContent(
     const media = mediaParams(item.url);
     return Boolean(media && mediaFile(media.filename, media.subfolder));
   };
-  const existing = gallery.find(
-    (item) =>
-      item.uploaded && item.hash === hash && (item.ownerId || "") === ownerId && stored(item),
+  const existing = galleryItems({ ownerId, uploaded: true }).find(
+    (item) => item.hash === hash && stored(item),
   );
   if (existing) return { item: existing, asset: uploadAsset(existing), added: false };
   const id = crypto.randomUUID();
@@ -338,7 +342,7 @@ function findGalleryItemForAccount(id, account) {
   const decoded = decodeGalleryReference(id);
   const wanted = decoded || String(id || "");
   return (
-    gallery.find(
+    galleryItems({ named: [wanted] }).find(
       (item) =>
         recordBelongsToAccount(item, account) &&
         (galleryKey(item) === wanted || item.id === wanted || item.url === wanted) &&

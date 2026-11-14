@@ -209,7 +209,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 test("a video's last frame is referenced only by its owner and only for finished videos", async () => {
-  const { gallery } = await import("./gallery/store.js");
+  const { forgetGalleryItems, putGalleryItems } = await import("./gallery/store.js");
   const owner = { studioAccount: { userId: "account-a", role: "user" } };
   const other = { studioAccount: { userId: "account-b", role: "user" } };
   const items = [
@@ -231,7 +231,7 @@ test("a video's last frame is referenced only by its owner and only for finished
       createdAt: "2026-01-01T00:00:00Z",
     },
   ];
-  gallery.push(...items);
+  putGalleryItems(items);
   try {
     const asset = referenceAssets.referenceAssetForAccount(owner.studioAccount, "extend-video", {
       frame: "last",
@@ -264,7 +264,7 @@ test("a video's last frame is referenced only by its owner and only for finished
       /no longer in the gallery/,
     );
   } finally {
-    for (const item of items) gallery.splice(gallery.indexOf(item), 1);
+    forgetGalleryItems(items);
   }
 });
 
@@ -312,7 +312,7 @@ test("a video upload is an uploaded gallery video, used by its first frame and r
 });
 
 test("a video started from the account's own photo names that photo; Extend and others' photos don't", async () => {
-  const { gallery } = await import("./gallery/store.js");
+  const { forgetGalleryItems, putGalleryItems } = await import("./gallery/store.js");
   const items = [
     {
       id: "animated-photo",
@@ -332,7 +332,7 @@ test("a video started from the account's own photo names that photo; Extend and 
       createdAt: "2026-01-01T00:00:00Z",
     },
   ];
-  gallery.push(...items);
+  putGalleryItems(items);
   const job = (ownerId, assetId, kind = "video") => ({
     ownerId,
     input: { kind, referenceAssets: [{ assetId, slot: "image" }] },
@@ -348,6 +348,6 @@ test("a video started from the account's own photo names that photo; Extend and 
     assert.equal(referenceAssets.animatedPhoto(job("account-b", photo)), null, "another's photo");
     assert.equal(referenceAssets.animatedPhoto(job("account-a", photo, "image")), null, "an edit");
   } finally {
-    for (const item of items) gallery.splice(gallery.indexOf(item), 1);
+    forgetGalleryItems(items);
   }
 });

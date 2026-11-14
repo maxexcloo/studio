@@ -10,7 +10,7 @@ import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./upscale-adapter
 
 const finishedTasks = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-test("recorded upscale resumes its own prompt and blocks switching until the output is durably saved", async () => {
+test("recorded upscale resumes its own prompt and completes with its saved output", async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-upscale-queue-"));
   const filename = path.join(directory, "studio.sqlite");
   let store = new Store(openDatabase(filename));
@@ -27,7 +27,6 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
   const source: Record<string, any> = { id: "source", ownerId: "alice", type: "image" };
   const submitted: string[] = [];
   const released: string[] = [];
-  let durable = false;
   const other: QueueAdapter = {
     async submit(job) {
       submitted.push(job.id);
@@ -62,9 +61,6 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
       async cancelPrompt() {
         throw new Error("No cancellation expected");
       },
-      async flushGallery() {
-        if (!durable) throw new Error("Disk full");
-      },
       async settled(recorded) {
         released.push(recorded.id);
       },
@@ -82,12 +78,6 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
     queue = new GenerationQueue(store, withUpscaleAdapter(other, adapter(true)));
     await queue.tick();
     await finishedTasks();
-    await queue.tick();
-    assert.equal(store.job("alice", job.id)!.status, "saving");
-    assert.match(store.job("alice", job.id)!.reason, /Disk full/);
-    assert.deepEqual(submitted, []);
-    assert.deepEqual(released, []);
-    durable = true;
     await queue.tick();
     assert.equal(store.job("alice", job.id)!.status, "completed");
     assert.deepEqual(
@@ -133,7 +123,6 @@ test("only the owner's accepted upscale is cancelled, and admission stays held u
     async cancelPrompt(id, backend) {
       cancelled.push(`${backend}:${id}`);
     },
-    async flushGallery() {},
     async settled(recorded) {
       released.push(recorded.id);
     },
@@ -185,7 +174,6 @@ test("an explicitly refused upscale can retry, while a lost acknowledgement is n
     async cancelPrompt() {
       throw new Error("No accepted prompt ID was recorded");
     },
-    async flushGallery() {},
   });
   const queue = new GenerationQueue(store, adapter);
   try {

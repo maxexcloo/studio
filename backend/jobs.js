@@ -4,7 +4,6 @@ import {
   removeComfyFiles,
   temporaryInputFiles,
 } from "./media-store.js";
-import { flushGalleryStrict } from "./gallery/store.js";
 import { workerUrl } from "./comfy/backends.js";
 import { defaultWorkerId } from "./workers.js";
 import { comfy, comfyOn, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
@@ -637,7 +636,6 @@ async function runJob(id, body, { prepare = null } = {}) {
       setTerminalJob(id, { status: "done", outputs: completed });
       // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
-      await flushGalleryStrict();
       noteIngested([id]);
       await removeComfyFiles(worker, [...comfyCopies, ...temporaryInputFiles(body)]);
       if (comfyCopies.length)

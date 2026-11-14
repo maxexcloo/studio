@@ -9,6 +9,7 @@ const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
 process.env.STUDIO_DATA_DIR = dataDir;
 const store = await import("../gallery/store.js");
+const { setGallery } = await import("../fixtures/gallery.js");
 test.after(() => {
   for (const folder of [outputDir, dataDir]) fs.rmSync(folder, { recursive: true, force: true });
 });
@@ -22,7 +23,7 @@ test("search looks through prompts, set titles, models and LoRAs; favourites fil
     createdAt: new Date().toISOString(),
     ...extra,
   });
-  store.setGallery(
+  setGallery(
     [
       done("s1", { prompt: "a red fox in snow", model: "flux1-dev.safetensors" }),
       done("s2", {

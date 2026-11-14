@@ -1,5 +1,5 @@
 import { localOutputFile } from "../comfy/comfy.js";
-import { gallery, setGallery } from "../gallery/store.js";
+import { galleryItems, putGalleryItems } from "../gallery/store.js";
 import { probeVideo } from "../video-previews.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 
@@ -26,11 +26,8 @@ let filling = null;
 export function fillVideoSizes() {
   if (filling) return filling;
   filling = (async () => {
-    const missing = gallery.filter(
-      (item) =>
-        item.type === "video" &&
-        item.status === "done" &&
-        !(Number(item.width) > 0 && Number(item.height) > 0),
+    const missing = galleryItems({ type: "video", status: "done" }).filter(
+      (item) => !(Number(item.width) > 0 && Number(item.height) > 0),
     );
     let filled = 0;
     let batch = new Map();
@@ -38,10 +35,11 @@ export function fillVideoSizes() {
       if (!batch.size) return;
       const sizes = batch;
       batch = new Map();
-      setGallery(
-        gallery.map((item) =>
-          sizes.has(galleryKey(item)) ? { ...item, ...sizes.get(galleryKey(item)) } : item,
-        ),
+      putGalleryItems(
+        galleryItems({ named: [...sizes.keys()] }).map((item) => ({
+          ...item,
+          ...sizes.get(galleryKey(item)),
+        })),
       );
     };
     for (const item of missing) {

@@ -74,6 +74,7 @@ export interface IdleStatus {
 export const passConcurrency = 2;
 export const dailyItems = 500;
 const spacingMs = 10_000;
+const recheckMs = 5 * 60_000;
 const watchMs = 1_000;
 // After this many failures in a row the model, not the item, is at fault: wait, then retry them.
 const failureStreak = 3;
@@ -101,6 +102,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
   allowed(ownerId: string): boolean;
   /** Every gallery record, newest first. */
   items(): Iterable<Item>;
+  /** Counts saved gallery changes: a walk that found nothing is not repeated until it moves. */
+  changes?(): number;
   /** Whether the work takes the record: one in the gallery, or also Dream's pool, with its file present. */
   visible(item: Item): boolean;
   /** Whether the item still needs the work; `all` and the pass's `target` during a pass. */
@@ -133,6 +136,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (reason !== noted) log.info(`[Studio] ${options.name} skip: ${reason}`);
     noted = reason;
   };
+  // The last walk that found nothing to do, so an idle tick doesn't read the whole gallery again.
+  let nothing = { state: "", at: -Infinity };
   const running = () => options.continuous || pass?.state === "running";
   const counting = () => !options.continuous && pass?.state === "running";
 
@@ -162,7 +167,18 @@ export function createIdleWork<Item extends IdleItem>(options: {
       if (options.wanted(item, all, passing) && visible(item)) yield item;
   }
   /** How many items each scope's pass would take, counted in one walk over the gallery. */
+  // The last counts, until the gallery, the pass or the failures change (or a while passes):
+  // status is asked for every few seconds while Settings shows it.
+  let counted = { state: "", at: -Infinity, counts: { all: 0, outdated: 0, missing: 0 } };
   function scopeCounts() {
+    // Work done outside the gallery (an image's search vector) moves the pass and trickle counts.
+    const state = `${options.changes?.()}|${pass?.state}|${pass?.startedAt}|${pass?.done}|${trickle.count}|${failed.size}|${direct.size}`;
+    if (options.changes && state === counted.state && now() - counted.at <= recheckMs)
+      return counted.counts;
+    counted = { state, at: now(), counts: walkScopeCounts() };
+    return counted.counts;
+  }
+  function walkScopeCounts() {
     const startedAt = running() ? target().startedAt : stamp();
     const counts = { all: 0, outdated: 0, missing: 0 };
     const visible = shown();
@@ -202,12 +218,16 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (!options.idle() || running() !== all) return "busy";
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
-    for (const candidate of eligible(all))
-      if (!inflight.has(key(candidate))) {
-        item = candidate;
-        break;
-      }
+    const state = `${options.changes?.()}|${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
+    const walk = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
+    if (walk)
+      for (const candidate of eligible(all))
+        if (!inflight.has(key(candidate))) {
+          item = candidate;
+          break;
+        }
     if (!item) {
+      if (!inflight.size && walk) nothing = { state, at: now() };
       if (counting() && !inflight.size) {
         pass = { ...pass!, state: "finished", endedAt: stamp() };
         persist();
