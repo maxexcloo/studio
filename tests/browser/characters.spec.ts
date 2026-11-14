@@ -217,7 +217,9 @@ test("Use as Character starts a card from a gallery image in Library › Charact
     createdAt: stamp,
   });
   await page.route("**/api/assistant", (route) =>
-    route.fulfill({ json: { available: true, vision: true, presets: [] } }),
+    route.fulfill({
+      json: { available: true, vision: true, presets: [], themes: [], changes: [] },
+    }),
   );
   const described: unknown[] = [];
   await page.route("**/api/assistant/cards/describe", (route) => {

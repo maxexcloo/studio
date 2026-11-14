@@ -36,7 +36,7 @@ import { useStageComparison } from "../compare/variants";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
-import { assistantQuery } from "../generation/PromptAssistant";
+import { assistantQuery, type AssistantOption } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { profileForBackend, profileName } from "../generation/payload";
@@ -54,14 +54,12 @@ import {
 } from "./similarStrictness";
 import {
   animateProfileQuery,
-  animateThemes,
   useAnimateReview,
   useAnimateThemes,
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
   type AnimateRequest,
-  type AnimateTheme,
   type Iteration,
 } from "./useMediaAction";
 import { useItemMutation } from "./useItemMutation";
@@ -91,7 +89,8 @@ function withoutLoneOption(action: Action): Action {
   };
 }
 
-const themeIcons: Record<AnimateTheme, typeof Camera> = {
+// Seeded themes have their own icons; others share Animate's.
+const themeIcons: Record<string, LucideIcon> = {
   cinematic: Camera,
   living: Wind,
   action: Zap,
@@ -403,24 +402,25 @@ export function useMediaActions(
   // Nothing can animate: say why.
   const refusal = animation.error?.message;
   const themes = useAnimateThemes();
-  const themeItem = (theme: AnimateTheme, disabled: boolean): Action => ({
-    id: `animate-${theme}`,
-    label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
-    icon: themeIcons[theme],
+  const themeItem = (theme: AssistantOption, disabled: boolean): Action => ({
+    id: `animate-${theme.id}`,
+    label: `${theme.label}${theme.id === "custom" ? "…" : ""}`,
+    description: theme.description,
+    icon: themeIcons[theme.id] ?? icons.animate,
     disabled,
     onClick:
-      theme === "custom" || review
-        ? () => onAnimate({ theme })
-        : () => run({ kind: "animate", theme }),
+      theme.id === "custom" || review
+        ? () => onAnimate({ theme: theme.id })
+        : () => run({ kind: "animate", theme: theme.id }),
   });
   const themeOptions = (disabled: boolean) => ({
     label: "Themes",
     options: themes
-      .filter((theme) => theme !== "custom")
+      .filter((theme) => theme.id !== "custom")
       .map((theme) => themeItem(theme, disabled)),
   });
   const customTheme = (disabled: boolean) =>
-    themes.includes("custom") ? [themeItem("custom", disabled)] : [];
+    themes.filter((theme) => theme.id === "custom").map((theme) => themeItem(theme, disabled));
   // Motions written for this image, asked for only once its Animate menu opens.
   const [motionsFor, setMotionsFor] = useState<string>();
   const motions = useChangeSuggestions({

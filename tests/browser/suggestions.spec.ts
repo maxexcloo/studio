@@ -177,6 +177,42 @@ test("Custom Animation suggests what could happen from the image, filling the in
   );
 });
 
+test("AI offers Library's fixed changes above the image's suggestions", async ({ page }) => {
+  await openViewer(page);
+  const asked: any[] = [];
+  await page.route("**/api/assistant", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        presets: [],
+        themes: [],
+        changes: [{ id: "softer", label: "Softer Shadows", description: "Gentler contrast." }],
+      },
+    }),
+  );
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    asked.push(body);
+    return route.fulfill({ json: { suggestions: body.surface === "viewer" ? steps : [] } });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  await viewerAction(page, "AI");
+  const menu = page.getByRole("menu");
+  await expect(menu.getByText("Changes", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    "Review Prompt",
+    /^Softer Shadows/,
+    ...steps.map((step) => step.label),
+    "Refresh Suggestions",
+    "Custom…",
+  ]);
+  await menu.getByRole("menuitem", { name: "Softer Shadows", exact: true }).click();
+  await expect
+    .poll(() => asked.find((body) => body.surface === "change")?.request)
+    .toBe("Softer Shadows");
+});
+
 test("Animate offers its themes, then motions written for the image, then Custom…", async ({
   page,
 }) => {
