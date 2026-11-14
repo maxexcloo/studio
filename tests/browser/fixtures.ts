@@ -454,8 +454,15 @@ export async function fixtures(page: Page) {
             "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },
       });
-    if (path === "/api/queue")
-      return respond({ jobs: jobs.filter((job) => !job.cleared), paused: queuePause });
+    if (path === "/api/queue") {
+      // Jobs change in place here, so a poll since a change gets every job back as changed.
+      const listed = jobs.filter((job) => !job.cleared);
+      return respond({
+        jobs: listed,
+        ...(url.searchParams.has("since") ? { ids: listed.map((job) => job.id) } : {}),
+        paused: queuePause,
+      });
+    }
     const pause = /^\/api\/queue\/(pause|resume)(-all)?$/.exec(path);
     if (pause) {
       queuePause[pause[2] ? "all" : "mine"] = pause[1] === "pause";

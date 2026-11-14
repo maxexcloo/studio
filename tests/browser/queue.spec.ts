@@ -293,3 +293,35 @@ test("work waiting on GPUs a text model holds offers a swap that asks first", as
   await expect(page).toHaveURL(/\/settings#workers$/);
   await expect(queue).toBeHidden();
 });
+
+test("while work runs the queue polls only for changes and still shows the work finishing", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const job = {
+    id: "running-job",
+    jobId: "running-job",
+    sessionId: "s",
+    operation: "image",
+    status: "running",
+    reason: "",
+    input: { prompt: "running-job", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+  state.jobs.push(job);
+  const polled = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).pathname === "/api/queue" && request.url().includes("since="),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(queue.getByText(/Generating$/)).toBeVisible();
+  await polled;
+  job.status = "completed";
+  await expect(queue.getByText(/Generating$/)).toHaveCount(0);
+});

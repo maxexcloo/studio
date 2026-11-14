@@ -51,9 +51,28 @@ import {
   type QueueCancelAllResponse,
   type QueuePause,
 } from "../../../../shared/queue";
+type QueueListing = { jobs: QueueJob[]; paused: QueuePause };
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
-  queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
+  // While work runs, a poll fetches only the jobs changed since the newest it holds and keeps the
+  // rest; an invalidation, an idle check or an unknown job fetches the whole listing.
+  queryFn: async ({ client, queryKey }): Promise<QueueListing> => {
+    const state = client.getQueryState<QueueListing>(queryKey);
+    const held = state?.data?.jobs;
+    if (held && !state.isInvalidated && held.some((job) => !terminalStatuses.has(job.status))) {
+      const since = held.reduce(
+        (latest, job) => (job.updatedAt > latest ? job.updatedAt : latest),
+        "",
+      );
+      const changes = await api<QueueListing & { ids: string[] }>(
+        `/api/queue?since=${encodeURIComponent(since)}`,
+      );
+      const known = new Map([...held, ...changes.jobs].map((job) => [job.id, job]));
+      const jobs = changes.ids.map((id) => known.get(id));
+      if (jobs.every((job) => job !== undefined)) return { jobs, paused: changes.paused };
+    }
+    return api<QueueListing>("/api/queue");
+  },
   // Every in-app submit (composer, viewer) invalidates this query; an idle queue still
   // checks now and then, so work started elsewhere (an MCP client, another tab) shows, and the
   // gallery with it, without the window regaining focus.

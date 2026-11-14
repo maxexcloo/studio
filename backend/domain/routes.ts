@@ -156,13 +156,17 @@ export function registerRewriteRoutes(
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
   });
-  directRoute(app, "GET", "/api/queue", (account) => {
+  // With `since` (an `updatedAt`), only the jobs changed since then, and every listed job's ID.
+  directRoute(app, "GET", "/api/queue", (account, { query }) => {
     const ownerId = ownerOf(account);
     const pauses = store.pauses();
+    const jobs = listed(store, ownerId);
+    const since = typeof query.since === "string" ? query.since : undefined;
     return {
       status: 200,
       payload: {
-        jobs: queued(ownerId, listed(store, ownerId)),
+        jobs: queued(ownerId, since ? jobs.filter((job) => job.updatedAt >= since) : jobs),
+        ...(since ? { ids: jobs.map((job) => job.id) } : {}),
         paused: { mine: pauses.has(ownerId), all: pauses.has(everyone) },
       } satisfies QueueResponse,
     };
