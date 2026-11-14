@@ -7,6 +7,7 @@ import {
   Checkbox,
   getDefaultZIndex,
   Group,
+  Input,
   Menu,
   MultiSelect,
   Paper,
@@ -125,10 +126,7 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
         value={draft.constraints.aspect}
         onChange={(aspect) => constraint({ aspect: aspect ?? "" })}
       />
-      <Stack gap={4}>
-        <Text size="sm" fw={500}>
-          Resolution
-        </Text>
+      <Input.Wrapper label="Resolution">
         <SegmentedControl
           aria-label="Resolution"
           data={[{ value: "", label: "Any" }, ...resolutions]}
@@ -137,7 +135,7 @@ function ProjectForm({ project, onClose }: { project?: Project; onClose: () => v
             constraint({ resolution: resolution as ProjectContent["constraints"]["resolution"] })
           }
         />
-      </Stack>
+      </Input.Wrapper>
       <Checkbox
         label="Use LoRAs"
         checked={draft.constraints.loras}
