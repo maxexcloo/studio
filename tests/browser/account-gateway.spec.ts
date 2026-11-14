@@ -339,11 +339,11 @@ test("Administrators change roles, reset passwords and delete galleries, account
   ).toHaveCount(0);
 
   await menu("Make Administrator");
-  await page
-    .getByRole("dialog", { name: "Make Administrator", exact: true })
-    .getByRole("button", { name: "Make Administrator", exact: true })
-    .click();
+  const promote = page.getByRole("dialog", { name: "Make Administrator", exact: true });
+  await promote.getByRole("button", { name: "Make Administrator", exact: true }).click();
+  // The role shows at once; the dialog closes when the change saves.
   await expect(member.getByText("Administrator", { exact: true })).toBeVisible();
+  await expect(promote).toBeHidden();
 
   await menu("Reset Password");
   const reset = page.getByRole("dialog", { name: "Reset Password", exact: true });
