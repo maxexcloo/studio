@@ -47,6 +47,7 @@ import {
   animateProfileQuery,
   animateThemes,
   useAnimateReview,
+  useAnimateThemes,
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
@@ -371,22 +372,18 @@ export function useMediaActions(
       : [];
   // Nothing can animate: say why.
   const refusal = animation.error?.message;
-  const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
-    (theme) => theme !== "spicy" || assistant.data?.spicy,
-  );
+  const themes = useAnimateThemes();
   const themeItems = (disabled: boolean) =>
-    assistant.data?.available
-      ? themes.map((theme) => ({
-          id: `animate-${theme}`,
-          label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
-          icon: themeIcons[theme],
-          disabled,
-          onClick:
-            theme === "custom" || review
-              ? () => onAnimate(theme)
-              : () => run({ kind: "animate", theme }),
-        }))
-      : [];
+    themes.map((theme) => ({
+      id: `animate-${theme}`,
+      label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
+      icon: themeIcons[theme],
+      disabled,
+      onClick:
+        theme === "custom" || review
+          ? () => onAnimate(theme)
+          : () => run({ kind: "animate", theme }),
+    }));
   // Themes write the prompt into an editable review before anything queues.
   const reviewItems = assistant.data?.available
     ? [
