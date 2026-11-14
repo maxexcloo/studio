@@ -142,10 +142,9 @@ export function ChipRail({ label, children }: { label: string; children: ReactNo
 
 /**
  * The chip rail shared by the gallery composer and timeline cards, in one order on
- * every breakpoint: what runs (Profile), what it starts from (References, then their role and
- * mask as one group), what shapes it (LoRAs), what comes out (Aspect, Count, a video's Length,
- * a set Seed), then the settings (Backend when the profile has several, Settings) and the tools
- * (Compare, Presets).
+ * every breakpoint: what runs (Profile, and its Backend when it has several), what it starts from
+ * (References, then their role and mask as one group), what shapes it (LoRAs), what comes out
+ * (Aspect, Count, a video's Length, a set Seed), then Settings and Presets.
  */
 export function GenerationInputControls({
   input,
@@ -158,7 +157,6 @@ export function GenerationInputControls({
   ideas,
   loraPicker,
   settings,
-  compare,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -174,8 +172,6 @@ export function GenerationInputControls({
   ideas?: ReactNode;
   loraPicker: LoraPickerState;
   settings: { opened: boolean; onOpenedChange: (opened: boolean) => void };
-  /** The gallery composer's Compare ▾ (`CompareMenu`). */
-  compare?: ReactNode;
 }) {
   const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
@@ -185,6 +181,17 @@ export function GenerationInputControls({
   return (
     <ChipRail label="Generation Inputs">
       <ProfilePicker value={input} onChange={onChange} startParked />
+      {profile?.backend && backends.length > 1 && (
+        <ChoiceChip
+          label="Backend"
+          value={input.profileBackend || profile.backend}
+          onChange={(profileBackend) => onChange(backendInputPatch(input, profile, profileBackend))}
+          data={backends.map((option) => ({
+            value: option.id,
+            label: option.label || backendLabel(option.id),
+          }))}
+        />
+      )}
       {references}
       {references && hasReferences && (
         <ReferenceRole input={input} onChange={onChange} mask={mask} />
@@ -223,19 +230,7 @@ export function GenerationInputControls({
           Seed {seed}
         </Button>
       )}
-      {profile?.backend && backends.length > 1 && (
-        <ChoiceChip
-          label="Backend"
-          value={input.profileBackend || profile.backend}
-          onChange={(profileBackend) => onChange(backendInputPatch(input, profile, profileBackend))}
-          data={backends.map((option) => ({
-            value: option.id,
-            label: option.label || backendLabel(option.id),
-          }))}
-        />
-      )}
       <GenerationSettings input={input} profile={profile} onChange={onChange} {...settings} />
-      {input.kind === "image" && compare}
       {presets}
     </ChipRail>
   );
