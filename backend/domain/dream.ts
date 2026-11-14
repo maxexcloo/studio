@@ -1422,7 +1422,10 @@ export function createDream(options: {
       }
       if (kind === "video") {
         // One local video runs at a time, so a second Dream video would hold a slot idle.
-        if (live().some((job) => dreamJob(job) && kindOf(job.input) === "video")) continue;
+        if (live().some((job) => dreamJob(job) && kindOf(job.input) === "video")) {
+          idle = "Dream makes one video at a time.";
+          continue;
+        }
         if (busy()) {
           idle = "Dream videos wait until Studio is idle.";
           continue;
