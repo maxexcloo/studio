@@ -1,22 +1,27 @@
 import { useRef, type ReactNode } from "react";
 import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
 
-/** Every dialog's footer: Cancel, then its one primary action (`children`), at the right. */
+/**
+ * Every dialog's footer: Cancel, then its one primary action (`children`), at the right. Without
+ * `onCancel`, where there is nothing to cancel, the action (Done, Close) stands alone.
+ */
 export function DialogFooter({
   pending,
   onCancel,
   children,
 }: {
   pending?: boolean;
-  onCancel: () => void;
+  onCancel?: () => void;
   children: ReactNode;
 }) {
   // A phone's full-screen dialog pins it to the bottom, in sight while the body scrolls (theme).
   return (
     <Group justify="flex-end" data-dialog-footer>
-      <Button variant="default" disabled={pending} onClick={onCancel}>
-        Cancel
-      </Button>
+      {onCancel && (
+        <Button variant="default" disabled={pending} onClick={onCancel}>
+          Cancel
+        </Button>
+      )}
       {children}
     </Group>
   );

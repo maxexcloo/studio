@@ -484,7 +484,7 @@ function ResetPassword({
           autoComplete="off"
           onFocus={(event) => event.currentTarget.select()}
         />
-        <Group justify="flex-end">
+        <DialogFooter>
           <Button
             variant="default"
             leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
@@ -493,7 +493,7 @@ function ResetPassword({
             {copied ? "Copied" : "Copy Password"}
           </Button>
           <Button onClick={saved}>Done</Button>
-        </Group>
+        </DialogFooter>
       </Stack>
     );
   return (

@@ -79,7 +79,8 @@ the primary component reference and verify APIs against the installed version.
   checkboxes select records or form options. Number fields commit on blur or
   Enter. Free text, passwords and record editing use a dialog with Save.
 - Dialogs end with one right-aligned `DialogFooter`: Cancel, then the primary
-  action. Consequential actions sit in a final Danger Zone or row menu and use
+  action, which stands alone (Done, Close) where there is nothing to cancel.
+  Consequential actions sit in a final Danger Zone or row menu and use
   `ConfirmDialog`, titled with the action and no question mark.
 - Choose controls by selection semantics: a SegmentedControl or radio group
   selects exactly one choice, a Switch changes one setting, and toggle chips
