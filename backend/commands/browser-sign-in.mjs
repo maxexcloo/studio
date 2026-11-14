@@ -26,20 +26,24 @@ function lastJson(args, input) {
   }
 }
 
-// LibreChat's own sign-in (setAuthTokens) makes a refresh session; the app trades it for an access token on load.
+// LibreChat's own sign-in session (what setAuthTokens makes), from its data layer alone: loading the
+// whole app beside the running server takes the pod past its memory limit. The app trades the refresh
+// session for an access token on load.
 const libreChatSession = (email) => `
-require("module-alias")({ base: require("path").resolve("api") });
-require("@librechat/data-schemas").createModels(require("mongoose"));
-const { connectDb } = require("~/db/connect");
-const { findUser } = require("~/models");
-const { setAuthTokens } = require("~/server/services/AuthService");
+const mongoose = require("mongoose");
+const { createMethods, createModels } = require("@librechat/data-schemas");
+createModels(mongoose);
+const { createSession, findUser } = createMethods(mongoose);
 (async () => {
-  await connectDb();
+  await mongoose.connect(process.env.MONGO_URI);
   const user = await findUser({ email: ${JSON.stringify(email)} }, "_id");
   if (!user) throw new Error("No LibreChat user has that email.");
-  const cookies = [];
-  const res = { cookie: (name, value, options) => cookies.push({ name, value, options }) };
-  await setAuthTokens(user._id.toString(), res);
+  const { session, refreshToken } = await createSession(user._id.toString());
+  const options = { expires: session.expiration, httpOnly: true };
+  const cookies = [
+    { name: "refreshToken", value: refreshToken, options },
+    { name: "token_provider", value: "librechat", options },
+  ];
   process.stdout.write("\\n" + JSON.stringify(cookies) + "\\n", () => process.exit(0));
 })().catch((error) => {
   console.error(error.message);
@@ -78,7 +82,7 @@ const studio = lastJson(
 );
 if (studio.error) throw new Error(`Studio: ${studio.error}`);
 const chat = lastJson(
-  ["exec", "-i", "-n", "librechat", "deploy/librechat", "--", "sh", "-c", "cd /app && node -"],
+  ["exec", "-i", "-n", "librechat", "deploy/librechat", "--", "sh", "-c", "cd /app/api && node -"],
   libreChatSession(email),
 );
 
