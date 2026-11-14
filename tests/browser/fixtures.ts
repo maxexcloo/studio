@@ -601,6 +601,12 @@ export async function fixtures(page: Page) {
       if (index >= 0) gallery.splice(index, 1);
       return respond({ ok: true });
     }
+    if (path.startsWith("/api/gallery/items/")) {
+      const item = gallery.find((i) => i.id === decodeURIComponent(path.split("/")[4]));
+      return item
+        ? respond({ item })
+        : respond({ error: "That item is no longer in the gallery." }, 404);
+    }
     if (path === "/api/gallery/filters")
       return respond({
         models: ["image.safetensors", "video.safetensors"],
