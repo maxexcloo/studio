@@ -93,9 +93,9 @@ const paid = {
   entry: { ...lora.entry, title: "Paid" },
 };
 
-function harness(t, { resolved = lora } = {}) {
+function harness(t, { resolved = lora, log = quiet } = {}) {
   const dir = tempDir(t);
-  const store = createImportStore({ dataDir: dir, log: quiet });
+  const store = createImportStore({ dataDir: dir, log });
   const catalogue = createCatalogueStore({
     dataDir: dir,
     familiesFromMetadata: ({ base_model: base }) => (/krea/i.test(base) ? ["krea2"] : []),
@@ -214,10 +214,12 @@ test("paid files are listed as unavailable with the reason and never queued", as
 });
 
 test("a failed resolve is recorded with its reason; an interrupted one fails on the next start", async (t) => {
-  const h = harness(t);
+  const warnings = [];
+  const h = harness(t, { log: { warn: (line) => warnings.push(line) } });
   const failed = await h.engine.create("https://huggingface.co/org/gated");
   assert.equal(failed.state, "failed");
   assert.match(failed.error, /gated/);
+  assert.deepEqual(warnings, [`[library] Import ${failed.id} (hf-repo) failed: ${failed.error}`]);
   assert.equal(failed.grade.value, "partial");
   await assert.rejects(
     h.engine.create("https://example.com/x"),

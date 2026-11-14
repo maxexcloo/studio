@@ -51,6 +51,8 @@ export function createImportStore({
       .run(record.id, JSON.stringify(record));
   const erase = (id) => db.prepare("DELETE FROM studio_library_imports WHERE id = ?").run(id);
   let index = null;
+  // Each import's failure is logged once: records are saved again while they stay failed.
+  const failures = new Map();
 
   function load() {
     if (index) return index;
@@ -97,6 +99,10 @@ export function createImportStore({
     load();
     record.updatedAt = now();
     write(record);
+    if (record.state === "failed" && failures.get(record.id) !== record.error)
+      log.warn?.(`[library] Import ${record.id} (${record.input?.kind}) failed: ${record.error}`);
+    if (record.state === "failed") failures.set(record.id, record.error);
+    else failures.delete(record.id);
     index.set(record.id, record);
     prune();
     return record;

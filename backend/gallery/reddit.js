@@ -1,3 +1,4 @@
+import { logWarning } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { imageMimes } from "../reference-names.js";
 import { maxUploadBytes, saveUpload } from "../references.js";
@@ -159,6 +160,13 @@ export function registerRedditImportRoute(
         fetch: fetcher,
       });
       for (const item of result.items) uploaded(item);
+      if (result.failed.length)
+        logWarning("Reddit import failed", {
+          account: account?.userId,
+          imported: result.items.length,
+          failed: result.failed.length,
+          reason: result.failed[0].error,
+        });
       return {
         status: result.items.length ? 201 : 422,
         payload: {
@@ -172,6 +180,7 @@ export function registerRedditImportRoute(
         },
       };
     } catch (error) {
+      logWarning("Reddit import failed", { account: account?.userId, reason: error.message });
       return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
