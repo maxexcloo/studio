@@ -1,3 +1,4 @@
+import { tracked } from "../event-loop.js";
 /** A gallery record the idle work reads; the work's own fields are the caller's. */
 export interface IdleItem {
   id?: string;
@@ -206,7 +207,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
 
   /** Runs `tick` in the background; `settled` waits for every such run. */
   function spawn() {
-    const run: Promise<unknown> = tick()
+    const run: Promise<unknown> = tracked(options.name, tick)
       .catch(() => undefined)
       .finally(() => pending.delete(run));
     pending.add(run);
@@ -325,7 +326,10 @@ export function createIdleWork<Item extends IdleItem>(options: {
       while (pending.size) await Promise.allSettled([...pending]);
     },
     start() {
-      timer ||= setInterval(() => void tick().catch(() => undefined), spacingMs / 2);
+      timer ||= setInterval(
+        () => void tracked(options.name, tick).catch(() => undefined),
+        spacingMs / 2,
+      );
       timer.unref();
     },
     stop() {

@@ -1,5 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
 
+import { tracked } from "./event-loop.js";
 import {
   eachGalleryItem,
   findGalleryItem,
@@ -140,9 +141,9 @@ function warmGalleryNow() {
  * skipped by name, so a pass after a change only builds what is new.
  */
 export function startMediaWarmup({ delayMs = 10_000, everyMs = 15_000 } = {}) {
-  setTimeout(warmGalleryNow, delayMs).unref?.();
+  setTimeout(() => void tracked("Media warmup", warmGalleryNow), delayMs).unref?.();
   setInterval(() => {
-    if (galleryRevisionValue() !== warmedRevision) void warmGalleryNow();
+    if (galleryRevisionValue() !== warmedRevision) void tracked("Media warmup", warmGalleryNow);
   }, everyMs).unref?.();
 }
 

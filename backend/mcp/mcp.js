@@ -13,6 +13,7 @@ import { mayUseFeature } from "../account-policy.js";
 import { gatewaySettings } from "../assistant.js";
 import { logEvent, logWarning } from "../crash-log.js";
 import { appVersion } from "../data-dir.js";
+import { track } from "../event-loop.js";
 import { livePrompting } from "../profile/store.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
@@ -282,6 +283,7 @@ export function registerMcpRoutes(
           const key = extra.requestId === undefined ? null : inflightKey(actor, extra.requestId);
           if (key) inflight.set(key, controller);
           const started = Date.now();
+          const done = track(`MCP ${name}`);
           const call = { tool: name, account: owner || scope, client: actor.client || undefined };
           try {
             if (scope === "unlinked") throw new Error(unlinkedMessage);
@@ -305,6 +307,7 @@ export function registerMcpRoutes(
               ],
             };
           } finally {
+            done();
             extra.signal?.removeEventListener("abort", forward);
             if (key && inflight.get(key) === controller) inflight.delete(key);
           }

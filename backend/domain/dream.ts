@@ -16,6 +16,7 @@ import {
   maxPromptCharacters,
 } from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
+import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
@@ -2284,7 +2285,7 @@ export function createDream(options: {
     tick,
     write: writeJob,
     start() {
-      timer ||= setInterval(() => void tick().catch(tickFailed), tickMs);
+      timer ||= setInterval(() => void tracked("Dream", tick).catch(tickFailed), tickMs);
       timer.unref();
     },
     stop() {
