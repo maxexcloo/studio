@@ -91,7 +91,7 @@ function indexRemove(name) {
 }
 
 /*
- * The cache is capped (2 GB unless STUDIO_THUMBNAIL_CACHE_MB says otherwise).
+ * The cache is capped (2 GB).
  * When it grows past that, the thumbnails used longest ago go first, down to
  * 80%, so a sweep does not run again for the next few images. Anything served
  * in the last 15 minutes counts as in use (an open gallery page) and stays;

@@ -145,8 +145,7 @@ the primary component reference and verify APIs against the installed version.
 - Use the shared `TextBox`. Composer fields edit in place on every breakpoint;
   other phone text boxes open the shared full-screen editor. Beside the text
   stand only the send, small Copy (where the page has no other) and Clear icons,
-  Clear turning into Undo until the text next changes, and one ⋯ menu of the
-  box's own `tools` (Suggestions, Ask for a Change… or Improve Prompt, Recent
+  and one ⋯ menu of the box's own `tools` (Suggestions, Ask for a Change… or Improve Prompt, Recent
   Prompts). The menu is one level deep: a tool's options (suggested changes,
   Improve Prompt's styles, each with its description) are listed first under its
   name, never in a submenu, then the other tools as one group. Improve Prompt's
