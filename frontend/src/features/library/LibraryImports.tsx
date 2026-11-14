@@ -38,9 +38,14 @@ interface RedditImport {
   imported: number;
   failed: { image: number; error: string }[];
 }
+// A Redlib front end's links keep Reddit's post paths, whatever its host.
 const isRedditLink = (url: string) => {
   try {
-    return /(^|\.)(reddit\.com|redd\.it|reddit\.excloo\.com)$/.test(new URL(url.trim()).hostname);
+    const { hostname, pathname } = new URL(url.trim());
+    return (
+      /(^|\.)(reddit\.com|redd\.it)$/.test(hostname) ||
+      /^(\/r\/\w+)?\/(comments|gallery)\/\w+/.test(pathname)
+    );
   } catch {
     return false;
   }
