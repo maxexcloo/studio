@@ -136,6 +136,7 @@ export function GenerationEditor({
   onCharacterProfile,
   onKindChange,
   onClear,
+  onUndoClear,
   onSubmit: submitDraft,
   operation,
   onOperationChange,
@@ -165,6 +166,8 @@ export function GenerationEditor({
   /** Receives the profile the gallery would choose for that output, if any. */
   onKindChange: (kind: MediaKind, profile?: Profile) => void;
   onClear: () => void;
+  /** Restores the draft Clear replaced; Clear shows as Undo while it is set. */
+  onUndoClear?: () => void;
   onSubmit: () => void;
   operation?: Draft["operation"];
   /** Sends Improve Prompt › Custom… as a change to the draft, whose Edit or fresh run sets the operation. */
@@ -366,14 +369,14 @@ export function GenerationEditor({
                   variant="subtle"
                   color="gray"
                   size={44}
-                  aria-label="Clear"
-                  onClick={onClear}
+                  aria-label={onUndoClear ? "Undo" : "Clear"}
+                  onClick={onUndoClear ?? onClear}
                 >
-                  <icons.clear size={18} />
+                  {onUndoClear ? <icons.undo size={18} /> : <icons.clear size={18} />}
                 </ActionIcon>
               ) : (
-                <Button variant="subtle" color="gray" size="sm" onClick={onClear}>
-                  Clear
+                <Button variant="subtle" color="gray" size="sm" onClick={onUndoClear ?? onClear}>
+                  {onUndoClear ? "Undo" : "Clear"}
                 </Button>
               )}
               <Tooltip

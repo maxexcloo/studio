@@ -538,6 +538,10 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear", exact: true }).click();
+  // Clear turns into Undo, which brings the whole staged draft back.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit Image", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
   await prompt.fill("A wide copper horizon");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
