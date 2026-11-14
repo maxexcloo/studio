@@ -97,6 +97,10 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/dream(?:\/discarded)?$/],
   ["PUT", /^\/api\/dream\/settings$/],
   ["POST", /^\/api\/dream\/(?:[^/]+\/(?:keep|discard|more|variations)|pairs\/[^/]+\/answer)$/],
+  // The chat's project (mcp/project.js), which generate keeps to.
+  ["GET", /^\/api\/dream\/projects$/],
+  ["POST", /^\/api\/dream\/projects(?:\/attach|\/activity)?$/],
+  ["PUT", /^\/api\/dream\/projects\/[\w-]+$/],
   ["GET", /^\/api\/taste$/],
   ["PUT", /^\/api\/taste$/],
   ["DELETE", /^\/api\/taste$/],
