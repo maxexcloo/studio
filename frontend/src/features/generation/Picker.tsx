@@ -33,6 +33,7 @@ import {
 } from "react";
 
 import { menuWidth } from "../../theme";
+import { formatDateTime } from "../../ui/dates";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -946,7 +947,7 @@ export function SavedName<T extends SavedItem>({
                             record.detail,
                             shared(record.name) &&
                               (record.savedAt
-                                ? `Saved ${new Date(record.savedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+                                ? `Saved ${formatDateTime(record.savedAt)}`
                                 : "Saved Earlier"),
                           ]
                             .filter(Boolean)
