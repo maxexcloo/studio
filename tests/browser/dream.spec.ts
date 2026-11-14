@@ -284,6 +284,9 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   const dream = await serveDream(page, { enabled: false, calibration: gallery });
   await page.goto("/dream");
   await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
+  const status = page.getByRole("status", { name: "Dream Status", exact: true });
+  await expect(status).toContainText("Dream is off.");
+  await expect(status.getByRole("button", { name: "Turn On", exact: true })).toBeVisible();
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
   // Super Like's label shows in full, phones included.
