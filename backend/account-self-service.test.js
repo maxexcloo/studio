@@ -109,6 +109,7 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   // so ordinary accounts use them too.
   for (const [method, route] of [
     ["POST", "/api/comparisons/run"],
+    ["POST", "/api/comparisons/variants"],
     ["GET", "/api/comparisons/abc-123"],
     ["PUT", "/api/comparisons/abc-123/vote"],
     ["GET", "/api/taste"],
@@ -125,6 +126,7 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["POST", "/api/dream/calibration"],
     ["POST", "/api/dream/visit"],
     ["GET", "/api/gallery/items/%2Fcomfy%2Fview%3Ffilename%3Da.png"],
+    ["GET", "/api/results/12"],
     ["POST", "/api/gallery/export"],
     ["POST", "/api/assistant/cards/describe"],
     ["POST", "/api/assistant/cards/rate"],

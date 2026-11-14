@@ -344,9 +344,12 @@ test("gateway identities map to accounts only through administrator links, and S
   // generate's character and shots read the account's cards.
   assert.equal(internal("GET", "/api/characters").userId, artist.id);
   assert.equal(internal("GET", "/api/outfits").userId, artist.id);
-  // status, generate's estimate, the prompt assistant and the cards tool.
+  // status, generate's estimate, the prompt assistant, the cards tool, variants and result numbers.
   for (const [method, routePath] of [
     ["GET", "/api/comparisons"],
+    ["POST", "/api/comparisons/variants"],
+    ["PUT", "/api/comparisons/cmp-1/vote"],
+    ["GET", "/api/results/12"],
     ["GET", "/api/estimate"],
     ["POST", "/api/assistant/rewrite"],
     ["POST", "/api/assistant/cards/describe"],
