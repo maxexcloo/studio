@@ -771,6 +771,7 @@ export class McpMedia {
               job_id: result.jobId,
               ...this.handle(owner, scope, result.jobId),
               ...(ran ? { prompt: ran } : {}),
+              ...(size > 1 ? { images: size } : {}),
             });
             images += size;
           } catch (error) {
