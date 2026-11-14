@@ -51,7 +51,12 @@ export function uploadPage({ message = "", open = true } = {}) {
   const form = open
     ? '<form method="post" enctype="multipart/form-data"><input type="file" name="image" accept="image/png,image/jpeg,image/webp" required><button>Upload</button></form>'
     : "";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Upload Photo</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark;font-size:1.1rem}form{display:grid;gap:1rem;max-width:30rem}input,button{font:inherit}button{padding:.8rem;border-radius:.5rem}</style></head><body><h1>Upload Photo</h1>${message ? `<p>${escapeHtml(message)}</p>` : open ? "<p>Choose or take the photo for your chat.</p>" : ""}${form}</body></html>`;
+  return resultPage(
+    "Upload Photo",
+    false,
+    `${message ? `<p>${escapeHtml(message)}</p>` : open ? "<p>Choose or take the photo for your chat.</p>" : ""}${form}`,
+    "body{font-size:1.1rem}form{display:grid;gap:1rem;max-width:30rem}input,button{font:inherit}button{padding:.8rem;border-radius:.5rem}",
+  );
 }
 /** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
 const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
