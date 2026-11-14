@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import threading
-import time
 from pathlib import Path
 
 LOCK = threading.Lock()
@@ -262,21 +261,6 @@ def remove(root, folder, filename, expected):
             raise ValueError("The installed file has changed since it was recorded.")
         file.unlink()
         return True
-    finally:
-        release(file)
-
-
-def preserve_replaced(root, folder, filename, expected):
-    if not re.fullmatch("[a-fA-F0-9]{64}", expected):
-        raise ValueError("A published SHA-256 checksum is required.")
-    file = target(root, folder, filename)
-    acquire(file)
-    try:
-        if file.exists() and digest(file) != expected.lower():
-            # Explicit replacement retains the old file without replacing any existing backup.
-            backup = Path(str(file) + ".previous." + str(time.time_ns()))
-            os.link(file, backup, follow_symlinks=False)
-            file.unlink()
     finally:
         release(file)
 
