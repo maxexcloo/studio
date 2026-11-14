@@ -10,7 +10,16 @@ const switches = ["enabled", "paused", "videos", "spicy"] as const;
 /** The caller's own Dream: settings, the unseen pool, verdicts, discards and projects. */
 export function registerDreamRoutes(
   app: object,
-  { dream, projects }: { dream: Dream; projects: Projects },
+  {
+    dream,
+    projects,
+    numbered = (items) => items,
+  }: {
+    dream: Dream;
+    projects: Projects;
+    /** The results with their numbers (domain/result-numbers.ts). */
+    numbered?: <T extends object>(items: T[]) => T[];
+  },
 ) {
   const owner = (account: RouteAccount) => account?.userId || "";
   const refused = {
@@ -26,7 +35,7 @@ export function registerDreamRoutes(
   const show = (ownerId: string) => {
     const access = dream.access(ownerId);
     const record = dream.read(ownerId);
-    const unseen = dream.unseen(ownerId);
+    const unseen = numbered(dream.unseen(ownerId));
     return {
       settings: record.settings,
       unseen,

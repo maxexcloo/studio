@@ -85,6 +85,23 @@ export function projectPatch(body: unknown): ProjectPatch {
 }
 
 /**
+ * Styles with a pick on one axis ("lighting: warm dusk"), replacing the axis's earlier pick; the
+ * oldest parts give way where the result would exceed the brief's length.
+ */
+export function stylesWithChoice(styles: string, axis: string, choice: string) {
+  const prefix = `${axis.trim().toLowerCase()}:`;
+  const parts = [
+    ...styles
+      .split(";")
+      .map((part) => part.trim())
+      .filter((part) => part && !part.toLowerCase().startsWith(prefix)),
+    `${axis.trim().toLowerCase()}: ${choice.trim()}`,
+  ];
+  while (parts.length > 1 && parts.join("; ").length > maxProjectBrief) parts.shift();
+  return parts.join("; ").slice(0, maxProjectBrief);
+}
+
+/**
  * Each account's projects (a brief and sticky constraints) and which chat each is attached to,
  * in the runtime document store as `projects:<ownerId>`.
  */

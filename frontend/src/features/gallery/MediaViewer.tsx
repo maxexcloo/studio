@@ -37,7 +37,7 @@ import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
-import { mediaTitle } from "./mediaLabels";
+import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { neighbourSets, setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
@@ -435,6 +435,7 @@ export function MediaViewer({
     [],
   );
   const subtitle = [
+    mediaNumber(item),
     item.type === "video" ? "Video" : "Image",
     String(item.settings?.profileName || ""),
     source.width ? `${source.width} × ${source.height}` : "",

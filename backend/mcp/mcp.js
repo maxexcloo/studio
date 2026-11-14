@@ -18,6 +18,7 @@ import { registerManageTools } from "./manage.js";
 import { createChatChoices, registerProjectTool } from "./project.js";
 import { registerGenerateTools } from "./generate.js";
 import { registerResultTools } from "./results.js";
+import { registerVariantsTool } from "./variants.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
 import fs from "node:fs";
 import { appVersion } from "../data-dir.js";
@@ -33,7 +34,7 @@ const generateDedupeWindowMs = 120_000;
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide, keeping the user's subject and their own descriptions (face, body, skin, outfit) word for word, changing only what they ask; pass them as prompts and the user's words as request. Studio runs them exactly as written. Without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why; if the user declines LoRAs, pass loras: [] for the rest of the chat. "N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting between them. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution. Ordinary requests need no models call. For what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. For a follow-up on a result ("again", "warmer", "animate it"), call reuse with its ref and your revised prompt, not a new generate. For earlier or starred work, call search. For a winner, read status or search; reuse comparisons[].winner.job_id and output_index. For an attached image, call upload_link; once the user uploads it, generate takes its reference_asset_id. Animate/extend: reuse takes a theme; custom takes motion in request. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a call can't connect, Studio may be restarting: retry once shortly. Stopped or Offline models still queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished generate prompts yourself to the model's prompting guide, keeping the user's subject and their own descriptions (face, body, skin, outfit) word for word, changing only what they ask; pass them as prompts and the user's words as request. Studio runs them exactly as written. Without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why; if the user declines LoRAs, pass loras: [] for the rest of the chat. "N sets of K" is N distinct prompts with count K in one call; asked for variety, vary framing, angle, pose, outfit and setting between them. To suggest first, call generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution. Ordinary requests need no models call. For what is ready, running or installed now call models, for work in progress queue; never answer from memory or an earlier reply. Results are numbered as in Studio (#12). For a follow-up on a result ("again", "warmer", "animate it"), call reuse with its ref and your revised prompt, not a new generate. To let the user choose one thing, call variants. For earlier or starred work, call search. For a winner, read status or search; reuse comparisons[].winner.job_id and output_index. For an attached image, call upload_link; once the user uploads it, generate takes its reference_asset_id. Animate/extend: reuse takes a theme; custom takes motion in request. Reply briefly as each result says; if queued, share the links and end the turn. Call result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a call can't connect, Studio may be restarting: retry once shortly. Stopped or Offline models still queue. If a named model is unavailable, say so; don't substitute. Call review only when asked to judge, compare or improve images.`;
 const unlinkedMessage =
   "This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -236,7 +237,7 @@ export function registerMcpRoutes(
     if (session.length > 256 || /[^\x21-\x7e]/.test(session))
       return res.status(400).json({ error: "Invalid MCP session id." });
     const owner = account?.userId || (scope === "media" ? media.owner(user, token) : null);
-    // Result numbers ("result 3") are per conversation: the one the client names (LibreChat), else its MCP
+    // A conversation's results and options are its own: the one the client names (LibreChat), else its MCP
     // session (a client that sends no headers, such as Grok), else the account's.
     const chat = conversation || (session && `mcp-session:${session}`);
     const assistant = scope === "media" && assistantFor(account);
@@ -307,7 +308,9 @@ export function registerMcpRoutes(
           }
         },
       );
-    const resolve = (value) => media.resolve(owner, refs, value);
+    // A ref, number, option letter or job id as its job output (media.resolve).
+    const resolveOutput = (value, signal) => media.resolve(owner, refs, value, { signal });
+    const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
     const server = new McpServer(
       // The commit the image was built from, so a client sees when Studio (and its tools) changed.
       { name: "Studio", version: appVersion || "development" },
@@ -337,6 +340,7 @@ export function registerMcpRoutes(
         media,
         actor,
         resolve,
+        resolveOutput,
         publicUrl,
         imageWaitSeconds,
         etaProbeMs,
@@ -347,9 +351,18 @@ export function registerMcpRoutes(
         chatAssistant,
         chatChoices,
       });
-      registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds });
+      registerResultTools({ tool, server, media, actor, resolveOutput, imageWaitSeconds });
       registerManageTools({ tool, server, media, owner, refs, resolve });
       registerProjectTool({ tool, server, media, owner, chat: actor.conversation, namedInTier });
+      registerVariantsTool({
+        tool,
+        server,
+        media,
+        owner,
+        refs,
+        chat: actor.conversation,
+        resolveOutput,
+      });
       if (actor.admin)
         registerAdminTools({
           tool,

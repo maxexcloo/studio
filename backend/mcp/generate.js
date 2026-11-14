@@ -41,7 +41,6 @@ import { animateThemes } from "../prompt-animate.js";
 import { findCard } from "./manage.js";
 import { output, shortPrompt } from "./results.js";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
-import { imageMimes } from "../reference-names.js";
 import { resolutions } from "../../shared/resolution.ts";
 import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { accessFeatures } from "../account-policy.js";
@@ -150,7 +149,7 @@ export function registerGenerateTools({
   server,
   media,
   actor,
-  resolve,
+  resolveOutput,
   publicUrl,
   imageWaitSeconds,
   etaProbeMs,
@@ -808,7 +807,7 @@ export function registerGenerateTools({
         .max(16)
         .optional()
         .describe(
-          `From search uploads, upload, upload_link or reuse mode reference. models gives each profile's references.max.`,
+          `From search uploads, upload, upload_link or reuse mode reference, or a result's number or letter. models gives each profile's references.max.`,
         ),
       reference_role: z.enum(["edit", "reference"]).optional(),
       // In reference_asset_ids order, where models lists the profile's reference_strengths.
@@ -937,8 +936,15 @@ export function registerGenerateTools({
       title,
       ...args
     } = constrained.args;
+    // A result's number or option letter ("#12", "B") passes its image as a reference.
     if (args.reference_asset_ids)
-      args.reference_asset_ids = args.reference_asset_ids.map((id) => media.referenceId(id));
+      args.reference_asset_ids = await Promise.all(
+        args.reference_asset_ids.map(async (id) => {
+          if (!media.namesResult(id)) return media.referenceId(id);
+          const found = await resolveOutput(id, signal);
+          return (await media.resultReference(owner, found.jobId, found.index || 0)).asset.id;
+        }),
+      );
     const views = args.character_views === true;
     const sheet = args.character_sheet === true;
     delete args.character_views;
@@ -1400,7 +1406,7 @@ export function registerGenerateTools({
         .string()
         .min(1)
         .max(200)
-        .describe('Its ref as the reply shows it ("result 1"), or a job_id; never "all".'),
+        .describe('Its number ("#12"), a variants letter ("B") or a job_id; never "all".'),
       mode: z.enum(["again", "animate", "extend", "reference", "upscale"]).default("again"),
       request: z.string().trim().min(1).max(2000).optional(),
       prompt: z.string().trim().min(1).optional(),
@@ -1416,7 +1422,7 @@ export function registerGenerateTools({
     async (
       {
         job_id,
-        output_index,
+        output_index: chosenIndex,
         mode,
         upscale_quality,
         tier: wanted,
@@ -1431,7 +1437,12 @@ export function registerGenerateTools({
       },
       signal,
     ) => {
-      const id = resolve(job_id);
+      const found = await resolveOutput(job_id, signal);
+      const id = found.jobId;
+      const output_index = chosenIndex || found.index || 0;
+      // Following up on a lettered option is the user's pick.
+      if (found.letter && found.offer.picked !== found.jobId)
+        await media.pick(owner, refs, found, signal);
       // A reference is the result's image as it is, so other arguments change nothing; they are
       // named back rather than refused, and the chat carries on to generate.
       if (mode === "reference") {
@@ -1449,14 +1460,7 @@ export function registerGenerateTools({
         })
           .filter(([, value]) => value)
           .map(([name]) => name);
-        const result = await media.download(owner, id, output_index);
-        if (!imageMimes.includes(result.mime))
-          throw new Error("Only images can be reused as references.");
-        const uploaded = await media.upload(
-          owner,
-          result.content.toString("base64"),
-          `reference.${result.mime.split("/")[1]}`,
-        );
+        const uploaded = await media.resultReference(owner, id, output_index);
         return mcpJson(
           ignored.length
             ? {
