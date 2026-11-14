@@ -62,7 +62,6 @@ export function CardDialog({
       opened={opened}
       onClose={closeWhenTop(id, onClose)}
       title={title}
-      size="lg"
       fullScreen={phone}
       zIndex={phone ? undefined : getDefaultZIndex("overlay")}
       styles={{

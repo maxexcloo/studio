@@ -379,7 +379,6 @@ export function usePromptAssistant({
       opened={asking}
       onClose={() => setAsking(false)}
       title="Custom Improvement"
-      centered
       size="sm"
       fullScreen={phone}
     >

@@ -39,7 +39,7 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
   const [range, setRange] = useState<[number, number]>([0, 0]);
   const save = useVideoEdit(item, { inlineError: true });
   return (
-    <Modal opened onClose={onClose} title="Trim Video" centered size="lg" fullScreen={phone}>
+    <Modal opened onClose={onClose} title="Trim Video" fullScreen={phone}>
       <form
         onSubmit={(event) => {
           event.preventDefault();

@@ -383,7 +383,6 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
         opened={!!editing}
         onClose={() => setEditing(null)}
         title={editing === "new" ? "New Group" : "Edit Group"}
-        size="lg"
       >
         <FocusTrap.InitialFocus />
         {editing && (

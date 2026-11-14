@@ -69,7 +69,6 @@ export function AnimateDialog({
       opened
       onClose={onClose}
       title={asking ? "Custom Animation" : "Review Prompt"}
-      centered
       size={asking ? "sm" : "md"}
       fullScreen={phone}
     >

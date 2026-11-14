@@ -176,7 +176,6 @@ export function AppearanceControls() {
               >
                 <ActionIcon
                   variant="transparent"
-                  radius="xl"
                   size={30}
                   aria-label={`Use ${colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)} Colour`}
                   aria-pressed={appearance.colour === colour}
