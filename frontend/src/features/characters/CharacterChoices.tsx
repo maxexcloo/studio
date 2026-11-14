@@ -1,7 +1,7 @@
 import { Alert, ScrollArea, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { Profile, ReferenceAsset } from "../../types";
+import type { Models, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { characterProfiles, keepsIdentity } from "../../../../shared/characters";
@@ -30,6 +30,18 @@ export function characterDetail(card: CharacterCard) {
     .join(" · ");
 }
 
+/** The model a character moves an img2img-only image draft to: the best that edits with references. */
+export function characterEditor(profile: Profile | undefined, models: Models | undefined) {
+  if (profile?.kind !== "image" || keepsIdentity(profile)) return undefined;
+  return characterProfiles(
+    (models?.profiles || []).filter((item) => item.kind === "image" && item.ready !== false),
+    [models?.defaults?.imageModel],
+  )[0];
+}
+
+export const switchedText = (name: string) =>
+  `Switched to ${name}, which keeps a character's face and build in new scenes.`;
+
 /**
  * The References sheet's Characters tab: the account's cards and New Character. Picking a card
  * places its first image and leads the prompt with it; picking it again takes both out. Where the
@@ -57,15 +69,7 @@ export function CharacterChoices({
   const characters = useQuery(charactersQuery);
   const models = useQuery(modelsQuery);
   const [switched, setSwitched] = useState("");
-  const editor =
-    switchable && profile?.kind === "image" && !keepsIdentity(profile)
-      ? characterProfiles(
-          (models.data?.profiles || []).filter(
-            (item) => item.kind === "image" && item.ready !== false,
-          ),
-          [models.data?.defaults?.imageModel],
-        )[0]
-      : undefined;
+  const editor = switchable ? characterEditor(profile, models.data) : undefined;
   const dialogs = useCharacterDialogs(onLayer);
   const words = query.trim().toLowerCase();
   const cards = (characters.data || []).filter(
@@ -77,7 +81,7 @@ export function CharacterChoices({
     <Stack gap="xs" flex={1} mih={0}>
       {switched && (
         <Text size="xs" c="dimmed">
-          {`Switched to ${switched}, which keeps a character's face and build in new scenes.`}
+          {switchedText(switched)}
         </Text>
       )}
       {!editor && profile && !keepsIdentity(profile) && cards.length > 0 && (
