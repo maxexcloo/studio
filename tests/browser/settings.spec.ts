@@ -703,11 +703,11 @@ test("Workers keep a stopped workload quiet and stop a running change on request
     status: "running",
     requestedBy: "restoring the last placement after an outside stop",
     startedAt: stamp,
-    before: ["video"],
-    target: ["video-tp2"],
-    stop: ["video"],
-    start: ["video-tp2"],
-    progress: "Waiting for 1 accepted operation on Video to finish.",
+    before: [],
+    target: ["video"],
+    stop: [],
+    start: ["video"],
+    progress: "Waiting for Video: Starting.",
     steps: [],
   };
   await page.route("**/api/runtime", (route) =>
