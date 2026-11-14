@@ -400,9 +400,10 @@ const observeServices = createServicesObserver({
   controller: runtime?.controller,
 });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
-// Cloud profiles are granted by the Cloud Models feature, so they are listed apart.
+// Cloud profiles are granted by the Cloud Models feature, so they are listed apart. Their IDs don't
+// wait on a worker's node list, which takes seconds after a restart.
 const discoveredProfiles = async () => {
-  const models = await mediaModels(false)
+  const models = await mediaModels(false, { wait: false })
     .then((result) => result.models)
     .catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
   return models.profiles || [];
