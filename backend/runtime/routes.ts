@@ -85,6 +85,10 @@ export function createRuntimeRouter(
     "/operations/:id",
     handle((request) => controller.operation(String(request.params.id))),
   );
+  router.post(
+    "/operations/:id/cancel",
+    handle((request) => controller.cancel(String(request.params.id), requestedBy(request))),
+  );
   return router;
 }
 

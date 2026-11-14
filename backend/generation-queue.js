@@ -6,6 +6,7 @@ import {
   readyWorkers,
   routeJob,
   withComfyBackend,
+  workerReachable,
 } from "./comfy/backends.js";
 import { demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
@@ -154,7 +155,7 @@ export function createGenerationQueue({
       const workloads = managedWorkloads(job);
       try {
         if (workloads.length && !mediaLeases.has(job.id))
-          mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
+          mediaLeases.set(job.id, await runtime.controller.acquire(workloads, `job ${job.id}`));
         await withComfyBackend(job.backend, () => loadComfyContext());
       } catch (error) {
         mediaLeases.get(job.id)?.release();
@@ -273,7 +274,10 @@ export function createGenerationQueue({
           ? readyWorkers(
               capability,
               profileOnBackendKey(job.input.profileId, job.input.profileBackend),
-            ).map((worker) => `worker:${worker.id}`)
+            )
+              // Work moves only to a Studio-scaled worker that answers: moved to a stopped one, it would start a GPU switch.
+              .filter((worker) => workerReachable(worker.id) || !workerWorkloads(worker).length)
+              .map((worker) => `worker:${worker.id}`)
           : [];
       },
       settled: async (job) => {

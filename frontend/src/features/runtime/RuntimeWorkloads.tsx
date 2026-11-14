@@ -442,6 +442,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState("");
   const [logId, setLogId] = useState("");
   const [workloadLogId, setWorkloadLogId] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
@@ -470,6 +471,14 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
     meta: { inlineError: true },
     onSuccess: () => {
       setRestarting(null);
+      void refresh();
+    },
+  });
+  const cancel = useMutation({
+    mutationFn: (id: string) => post<RuntimeOperation>(`/api/runtime/operations/${id}/cancel`, {}),
+    meta: { inlineError: true },
+    onSuccess: () => {
+      setCancelling("");
       void refresh();
     },
   });
@@ -530,7 +539,8 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
               const note =
                 short ||
                 item.reason ||
-                reasons[item.id] ||
+                // A stopped workload isn't failing, whatever its shared endpoint says.
+                (item.phase !== "parked" && reasons[item.id]) ||
                 (item.acceptedOperations > 0 &&
                   `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`);
               return (
@@ -617,6 +627,16 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
               View Log
             </Button>
+            {operation && (
+              <Button
+                variant="subtle"
+                color="red"
+                size="compact-sm"
+                onClick={() => setCancelling(operation.id)}
+              >
+                Stop Change
+              </Button>
+            )}
           </Group>
         ) : (
           <span />
@@ -676,6 +696,20 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
         }}
       >
         Accepted work finishes first, then it restarts with the same model and GPUs.
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={Boolean(cancelling)}
+        title="Stop Change"
+        action="Stop Change"
+        pending={cancel.isPending}
+        error={cancel.error?.message}
+        onConfirm={() => cancel.mutate(cancelling)}
+        onClose={() => {
+          setCancelling("");
+          cancel.reset();
+        }}
+      >
+        The change stops at its next step. Workloads it already stopped or started stay that way.
       </ConfirmDialog>
     </Stack>
   );

@@ -247,6 +247,49 @@ test("generation waits on a stopped workload: off says so, automatic starts medi
   (await controller.acquire("text")).release();
 });
 
+test("an automatic switch names its work, and one that gives up leaves what runs in place", async () => {
+  const { kube, controller } = fixture(["image"], { automaticLifecycle: true });
+  const lease = await controller.acquire("image");
+  await assert.rejects(controller.acquire("video-tp2", "job 3d8aa1cc"), {
+    message: "Waiting for Video-tp2 to start.",
+  });
+  await controller.settled;
+  const [failed] = (await controller.observe()).history;
+  assert.equal(failed.requestedBy, "automatic: starting Video-tp2 for job 3d8aa1cc");
+  assert.match(failed.error!, /nothing was stopped/);
+  assert.deepEqual(kube.log, []);
+  // Nothing was stopped outside Studio, so there is nothing to restore, and Video-tp2 reads Stopped.
+  await controller.reconcile();
+  assert.equal((await controller.observe()).history.length, 1);
+  assert.deepEqual([...(await controller.parked())], ["video", "video-tp2", "text", "gaming"]);
+  lease.release();
+});
+
+test("a change doesn't wait on work for a workload without pods, and an administrator can stop it", async () => {
+  const { kube, controller } = fixture(["image", "video"]);
+  controller.retain("image");
+  // Something outside Studio scales the workload down, leaving its recovered lease behind.
+  kube.deployments.get("comfyui/image")!.replicas = 0;
+  for (const pod of kube.deployments.get("comfyui/image")!.pods) pod.deleting = true;
+  kube.tick();
+  kube.log.length = 0;
+  const lease = await controller.acquire("video");
+  const preview = await controller.preview(["text"]);
+  const operation = await controller.apply(["text"], preview.signature, "local");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.match(controller.operation(operation.id).progress, /accepted operation on Video/);
+  controller.cancel(operation.id, "account:admin");
+  await controller.settled;
+  const stopped = controller.operation(operation.id);
+  assert.equal(stopped.error, "Cancelled by account:admin.");
+  assert.deepEqual(kube.log, []);
+  // The cancelled target isn't restored as if it had been stopped outside Studio.
+  await controller.reconcile();
+  assert.equal((await controller.observe()).history.length, 1);
+  assert.throws(() => controller.cancel(operation.id, "account:admin"), /no longer running/);
+  lease.release();
+});
+
 test("automatic control never stops or starts text; an administrator's apply can stop it", async () => {
   const { kube, controller } = fixture(["text"], { automaticLifecycle: true });
   await assert.rejects(controller.acquire("video-tp2"), {
@@ -385,6 +428,9 @@ test("history survives a restart and a change cut short is marked interrupted", 
   assert.equal(recorded.error, "Studio restarted during this change.");
   assert.deepEqual(recorded.before, ["image"]);
   assert.deepEqual(recorded.target, ["text"]);
+  // It stopped nothing, so the placement is still what ran.
+  await second.controller.reconcile();
+  assert.equal((await second.controller.observe()).history.length, 1);
   lease.release();
   await first.controller.settled;
 });
