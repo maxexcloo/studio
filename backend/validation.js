@@ -207,11 +207,14 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
       "Model",
     );
   }
+  // A run without its own, such as one references moved off a text-only backend, takes the profile's.
+  const textEncoder = String(input.textEncoder || customWorkflow.defaults?.textEncoder || "");
+  const vae = String(input.vae || customWorkflow.defaults?.vae || "");
   if (customWorkflow.capabilities?.textEncoder) {
-    ensureOption(info, "CLIPLoader", "clip_name", input.textEncoder, "Text encoder");
+    ensureOption(info, "CLIPLoader", "clip_name", textEncoder, "Text encoder");
   }
   if (customWorkflow.capabilities?.vae) {
-    ensureOption(info, "VAELoader", "vae_name", input.vae, "VAE");
+    ensureOption(info, "VAELoader", "vae_name", vae, "VAE");
   }
   if (input.sampler) ensureOption(info, "KSampler", "sampler_name", input.sampler, "Sampler");
   if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
@@ -264,8 +267,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     negative: String(input.negative || ""),
     model: String(input.model || ""),
     modelName: String(input.modelName || customWorkflow?.defaults?.model || ""),
-    textEncoder: String(input.textEncoder || ""),
-    vae: String(input.vae || ""),
+    textEncoder,
+    vae,
     clipType: String(input.clipType || ""),
     weightDtype: String(input.weightDtype || "default"),
     width: snapInteger(input.width, fallback("width", widthRange), widthRange),
