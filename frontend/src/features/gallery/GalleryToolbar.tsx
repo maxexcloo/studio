@@ -196,7 +196,7 @@ export function GalleryToolbar({
       {/* Phones have no room here for the chips: a spacer keeps the actions at the end. */}
       {phone ? <div className={classes.chips} /> : filterChips}
       {results && !phone && (
-        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+        <Text size="sm" c="dimmed" className={classes.count}>
           {results}
         </Text>
       )}
