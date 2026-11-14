@@ -1175,8 +1175,8 @@ setTimeout(
 // Studio media's thumbnails and posters are built ahead of their first view.
 startMediaWarmup();
 
-// dev.mjs sets the API port behind Vite, which serves the page.
-const dev = Boolean(process.env.STUDIO_DEV_API_PORT);
+// dev.mjs sets the port of Vite, which serves the page.
+const devPort = process.env.STUDIO_DEV_PORT;
 // A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
 // request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
 // POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
@@ -1200,7 +1200,7 @@ server.listen(Number(port), host, () => {
   // on a name, never on an address.
   const shownHost =
     host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
-  const pagePort = dev ? 5173 : listening;
+  const pagePort = devPort || listening;
   console.log(
     `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
   );

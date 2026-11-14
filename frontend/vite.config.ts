@@ -20,7 +20,7 @@ function precompress(): Plugin {
 }
 
 const api: ProxyOptions = {
-  target: `http://127.0.0.1:${process.env.STUDIO_DEV_API_PORT || 8787}`,
+  target: `http://127.0.0.1:${process.env.STUDIO_DEV_API_PORT}`,
 };
 
 export default defineConfig({
@@ -29,7 +29,8 @@ export default defineConfig({
   plugins: [react(), precompress()],
   server: {
     host: "127.0.0.1",
-    port: 5173,
+    // dev.mjs picks a free port.
+    port: Number(process.env.STUDIO_DEV_PORT),
     strictPort: true,
     proxy: {
       "/api": api,

@@ -31,7 +31,7 @@ for (const development of [false, true]) {
               capabilities: ["image", "video", "upscale", "models"],
             },
           ]),
-          STUDIO_DEV_API_PORT: development ? "18787" : "",
+          STUDIO_DEV_PORT: development ? "5173" : "",
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       });
