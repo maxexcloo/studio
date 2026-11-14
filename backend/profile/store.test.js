@@ -44,21 +44,12 @@ const scratch = (t) => {
   return dir;
 };
 
-test("profiles migrate once: backups and the current file become versions, seed first, studio after", (t) => {
+test("profiles migrate once: the current file becomes the seed version", (t) => {
   const dir = scratch(t);
   const workflows = path.join(dir, "workflows");
   fs.mkdirSync(workflows, { recursive: true });
-  fs.mkdirSync(path.join(dir, "backups", "profile-edits"), { recursive: true });
   fs.writeFileSync(path.join(workflows, "edited.json"), profile("Third"));
   fs.writeFileSync(path.join(workflows, "plain.json"), profile("Plain"));
-  fs.writeFileSync(
-    path.join(dir, "backups", "profile-edits", "edited-2026-10-01T10-00-00-000Z.json"),
-    profile("First"),
-  );
-  fs.writeFileSync(
-    path.join(dir, "backups", "profile-edits", "edited-2026-10-02T10-00-00-000Z.json"),
-    profile("Second"),
-  );
   fs.writeFileSync(
     path.join(workflows, ".studio-edits.json"),
     JSON.stringify({
@@ -71,20 +62,13 @@ test("profiles migrate once: backups and the current file become versions, seed 
   );
   const before = fs.readFileSync(path.join(workflows, ".studio-edits.json"), "utf8");
   const store = createProfileStore({ dataDir: dir, workflowsDir: workflows, log: quiet });
-  assert.deepEqual(store.migrate(), { profiles: 2, versions: 4 });
+  assert.deepEqual(store.migrate(), { profiles: 2, versions: 2 });
   assert.deepEqual(
     store.versions("edited").map((item) => [item.version, item.origin, item.by, item.at]),
-    [
-      [3, "studio", "admin-1", "2026-10-03T10:00:00.000Z"],
-      [2, "studio", "studio", "2026-10-02T10:00:00.000Z"],
-      [1, "seed", "seed", "2026-10-01T10:00:00.000Z"],
-    ],
+    [[1, "seed", "seed", "2026-10-03T10:00:00.000Z"]],
   );
-  assert.match(store.version("edited", 1).text, /"First"/);
-  assert.deepEqual(
-    [store.meta("edited").version, store.meta("edited").origin, store.meta("edited").seedHash],
-    [3, "studio", hashOf(profile("First"))],
-  );
+  assert.match(store.version("edited", 1).text, /"Third"/);
+  assert.equal(store.meta("edited").seedHash, hashOf(profile("First")));
   assert.deepEqual(
     store.versions("plain").map((item) => item.origin),
     ["seed"],
@@ -104,11 +88,6 @@ test("profiles migrate once: backups and the current file become versions, seed 
     fs.readFileSync(path.join(workflows, ".studio-edits.json"), "utf8"),
     before,
     ".studio-edits.json is left for the deploy script",
-  );
-  assert.equal(
-    fs.readdirSync(path.join(dir, "backups", "profile-edits")).length,
-    2,
-    "backups stay",
   );
   // The same text again is no new version.
   assert.equal(store.record("plain", profile("Plain v2"), { origin: "studio" }).version, 2);

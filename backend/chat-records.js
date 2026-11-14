@@ -10,10 +10,9 @@ import { isObject } from "./values.js";
  * queue's job records; so do MCP's records (`mcp-ownership`, the conversation result numbers, the
  * assistant's records) and the gateway links. Nothing reads these records any more, so the step is
  * safe while Studio runs; it reloads the accounts and preferences it rewrites. Plans by default
- * with counts; `apply` deletes without a backup. A second run finds nothing.
+ * with counts; `apply` deletes for good. A second run finds nothing.
  */
-export const chatRecordsNote =
-  "Deletes Studio Chat's messages and chat-only marks without a backup; --restore cannot bring them back.";
+export const chatRecordsNote = "Deletes Studio Chat's messages and chat-only marks for good.";
 const marks = "'$.titleSource', '$.archived', '$.hidden'";
 const marked =
   "json_type(record, '$.titleSource') IS NOT NULL OR json_type(record, '$.archived') IS NOT NULL OR json_type(record, '$.hidden') IS NOT NULL";

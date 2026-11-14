@@ -111,19 +111,16 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
   const combine = useMutation({
     meta: { inlineError: true },
     mutationFn: (hash: string) =>
-      post<{ combined: { id: string; name: string }[]; backup: string }>(
-        "/api/profiles/backends/combine",
-        {
-          hash,
-          selections: preview
-            .data!.pairs.filter((pair) => choices[pair.key])
-            .map((pair) => ({
-              radiance: pair.radiance.id,
-              comfyui: pair.comfyui.id,
-              ...choices[pair.key],
-            })),
-        },
-      ),
+      post<{ combined: { id: string; name: string }[] }>("/api/profiles/backends/combine", {
+        hash,
+        selections: preview
+          .data!.pairs.filter((pair) => choices[pair.key])
+          .map((pair) => ({
+            radiance: pair.radiance.id,
+            comfyui: pair.comfyui.id,
+            ...choices[pair.key],
+          })),
+      }),
     onSuccess: () => {
       setChoices({});
       return Promise.all(
@@ -160,7 +157,7 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
           {combine.data && (
             <Alert color="green">
               Combined {combine.data.combined.map((item) => item.name).join(", ")}. The old
-              definitions are kept in {combine.data.backup}.
+              definitions are kept in their version history.
             </Alert>
           )}
           {pairs.length ? (

@@ -8,8 +8,7 @@
  * references, modes, LoRAs, guide). The administrator picks pairs, each one's name and the backend
  * it runs on by default.
  *
- * Applying copies both files, the aliases, workflow preferences, guides, LoRA stacks and timings to
- * `<data>/backups/profile-backends/<time>/`, writes the combined profile (`studio.backend` and
+ * Applying writes the combined profile (`studio.backend` and
  * `studio.backends.<id>`, custom-workflows.js) as a new profile with its own version history, gives
  * it the default backend's guide binding and negatives and drops both old ids' guide entries,
  * records each old id as an alias `{to, backend}` (profile/store.js), so records that name it run
@@ -29,13 +28,11 @@ import {
 } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
 import { profileNameParts } from "../../shared/profiles.ts";
-import { writeJsonFile } from "../json-store.js";
-import { ownerDocumentFile, ownerDocuments, savedDocument } from "../persistence/runtime.ts";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
 import { repointLoraStacks } from "../combined-profiles.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { renameTimingKeys } from "../timings.js";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
+import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });
@@ -179,10 +176,10 @@ export function combinedText(id, name, backend, members) {
  * Combines the pairs `selections` picks from the preview `hash` (`[{radiance, comfyui, name,
  * backend}]`, member ids). Nothing picked is a no-op, so a repeat is safe; a changed preview is
  * refused (409), as is a pair the preview doesn't offer, a profile in two picks or a combined id
- * that already exists. Returns the combined profiles and the backup folder.
+ * that already exists. Returns the combined profiles.
  */
 export function combineBackends({ hash, selections = [], by = "" } = {}) {
-  if (!Array.isArray(selections) || !selections.length) return { combined: [], backup: "" };
+  if (!Array.isArray(selections) || !selections.length) return { combined: [] };
   const plan = backendCandidates();
   if (hash !== plan.hash)
     throw conflict("The profiles changed since the preview. Preview them again.");
@@ -219,36 +216,6 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
   }
 
   const at = new Date().toISOString();
-  const backup = path.join(dataDir, "backups", "profile-backends", at.replace(/[:.]/g, "-"));
-  fs.mkdirSync(backup, { recursive: true, mode: 0o700 });
-  writeJsonFile(
-    path.join(backup, "combine.json"),
-    {
-      at,
-      by: String(by || ""),
-      combined: picks.map(({ pair, name, backend }) => ({
-        id: pair.id,
-        name,
-        backend,
-        radiance: pair.radiance.id,
-        comfyui: pair.comfyui.id,
-      })),
-      aliasesBefore: store.aliases(),
-      preferencesBefore: loadWorkflowPreferences(),
-    },
-    { mode: 0o600 },
-  );
-  for (const id of members)
-    fs.writeFileSync(path.join(backup, `${id}.json`), readEditableProfile(id).text, {
-      mode: 0o600,
-    });
-  if (fs.existsSync(guideStore().file))
-    fs.copyFileSync(guideStore().file, path.join(backup, path.basename(guideStore().file)));
-  const timings = savedDocument(dataDir, "timings");
-  if (timings !== undefined)
-    writeJsonFile(path.join(backup, "timings.json"), timings, { mode: 0o600 });
-  for (const { name, value } of ownerDocuments(dataDir, "lora-stacks"))
-    writeJsonFile(path.join(backup, ownerDocumentFile(name)), value, { mode: 0o600 });
 
   const guides = guideStore();
   const timingKeys = {};
@@ -306,5 +273,5 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
   repointWorkflowPreferences((id) => store.canonical(id));
   repointLoraStacks(dataDir, (id) => store.canonical(id));
   renameTimingKeys(timingKeys);
-  return { combined, backup: path.relative(dataDir, backup) };
+  return { combined };
 }

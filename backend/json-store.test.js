@@ -8,12 +8,11 @@ import { readJsonFile, writeJsonFile, writeBytesFile, writeBytesFileAsync } from
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-test("writes land whole and keep the previous copy as a backup", () => {
+test("writes land whole", () => {
   const file = path.join(dir, "state.json");
   writeJsonFile(file, { version: 1 });
   writeJsonFile(file, { version: 2 });
   assert.deepEqual(readJsonFile(file), { version: 2 });
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.bak`, "utf8")), { version: 1 });
   assert.deepEqual(
     fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
     [],
@@ -41,26 +40,16 @@ test("byte writes preserve a good destination while a replacement is validated",
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
-test("a half-written file falls back to the backup and is set aside, not lost", () => {
+test("a corrupt file is set aside, not lost", () => {
   const file = path.join(dir, "torn.json");
-  writeJsonFile(file, { stacks: ["a"] });
-  writeJsonFile(file, { stacks: ["a", "b"] });
   fs.writeFileSync(file, '{"stacks": ["a", "b"');
-  assert.deepEqual(readJsonFile(file), { stacks: ["a"] });
+  assert.throws(() => readJsonFile(file), SyntaxError);
   assert.equal(
     fs.readdirSync(dir).some((name) => name.startsWith("torn.json.corrupt-")),
     true,
   );
 });
 
-test("a crash between backup and rename still reads the backup", () => {
-  const file = path.join(dir, "gone.json");
-  writeJsonFile(file, { ok: true });
-  writeJsonFile(file, { ok: "again" });
-  fs.rmSync(file);
-  assert.deepEqual(readJsonFile(file), { ok: true });
-});
-
-test("missing with no backup still throws, so callers use their defaults", () => {
+test("missing still throws, so callers use their defaults", () => {
   assert.throws(() => readJsonFile(path.join(dir, "never.json")), { code: "ENOENT" });
 });

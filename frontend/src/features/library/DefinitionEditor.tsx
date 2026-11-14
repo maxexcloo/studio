@@ -572,7 +572,7 @@ function DefinitionForm({
         onClose={() => setRemoving(false)}
       >
         {kind === "profile"
-          ? `Delete ${id}? Its backup and version history keep it restorable; gallery items made with it stay.`
+          ? `Delete ${id}? Its version history keeps it restorable; gallery items made with it stay.`
           : `Delete ${id}? Its version history keeps it restorable. A guide that profiles still use stays until they use another.`}
       </ConfirmDialog>
     </form>

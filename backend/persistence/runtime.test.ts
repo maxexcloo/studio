@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { writeGalleryRows } from "./gallery-rows.ts";
-import { restoreRuntimeBackup, verifiedBackup } from "./migration.ts";
 import {
   assertCurrentStorage,
   closeRuntimeDatabase,
@@ -78,19 +76,4 @@ test("Studio refuses a data folder that predates current storage until its migra
   refused(words, /1 gallery rows with old status words/);
   mark(words, "status-words-v1");
   assertCurrentStorage(words);
-});
-
-test("a verified backup restores only into a separate empty folder", (t) => {
-  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backup-"));
-  t.after(() => fs.rmSync(data, { recursive: true, force: true }));
-  const bytes = Buffer.from(JSON.stringify([{ id: "kept" }]));
-  const mapping = {
-    source: "gallery.json",
-    hash: crypto.createHash("sha256").update(bytes).digest("hex"),
-  };
-  const backup = verifiedBackup(data, "test", [{ ...mapping, bytes }], { mappings: [mapping] });
-  const restored = path.join(data, "restore-rehearsal");
-  assert.deepEqual(restoreRuntimeBackup(backup, restored), { restored: 1 });
-  assert.deepEqual(fs.readFileSync(path.join(restored, "gallery.json")), bytes);
-  assert.throws(() => restoreRuntimeBackup(backup, restored), /empty/);
 });

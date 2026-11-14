@@ -36,7 +36,7 @@ export function MergeDuplicateProfiles({
   const merge = useMutation({
     meta: { inlineError: true },
     mutationFn: (hash: string) =>
-      post<{ merged: Merge[]; backup: string }>("/api/profiles/duplicates/merge", { hash }),
+      post<{ merged: Merge[] }>("/api/profiles/duplicates/merge", { hash }),
     onSuccess: () =>
       Promise.all(
         [["profile-duplicates"], ["definition-list"], ["models"], ["profile-stats"]].map(
@@ -66,8 +66,8 @@ export function MergeDuplicateProfiles({
         <Stack gap="sm">
           {merge.data && (
             <Alert color="green">
-              Merged {merge.data.merged.length}. The removed definitions are kept in{" "}
-              {merge.data.backup || "their version history"}.
+              Merged {merge.data.merged.length}. The removed definitions are kept in their version
+              history.
             </Alert>
           )}
           {count ? (

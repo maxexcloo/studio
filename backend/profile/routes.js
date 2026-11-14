@@ -5,7 +5,7 @@
  *   GET  /api/profiles/editable/:id/versions/:n     one version with its text
  *   POST /api/profiles/editable/:id/revert          {version, baseHash}: that version again, as a new version
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
- *   POST /api/profiles/editable/:id/remove          {baseHash}: removes the profile, with a backup (profile/remove.js)
+ *   POST /api/profiles/editable/:id/remove          {baseHash}: removes the profile (profile/remove.js)
  *   GET  /api/profiles/editable/:id/download        the profile file exactly as on disk, as `<id>.json`
  *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, and its own fields over it
  *   GET  /api/profiles/guides                       every guide pack with its name, version and AI-Drafted state
@@ -25,9 +25,9 @@
  *   POST /api/profiles/guide-bindings/approve       clears AI-Drafted on the bindings
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
- *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile/merge.js)
+ *   POST /api/profiles/duplicates/merge             {hash}: merges that preview (profile/merge.js)
  *   GET  /api/profiles/backends                     Radiance and ComfyUI profiles Combine Backends could make one
- *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile/backends.js)
+ *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs (profile/backends.js)
  *   POST /api/profiles/editable/:id/radiance        {url, name}: converts a Krea 2 fine-tune to Radiance for the profile (profile/radiance.js)
  *   GET  /api/profiles/radiance                     the latest conversion and its progress
  *   POST /api/profiles/radiance/cancel              stops the running conversion

@@ -755,7 +755,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "profile_edit",
     "edit profile or guide",
-    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"<family>": {"image": "<pack>"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile after a backup, or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding and {"families": {"<family>": {"image": "<pack>"}}} sets a family\'s guide); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version; remove deletes a profile (its versions stay), or a guide no profile or family uses (its versions stay, so revert restores it), only when the user asks to remove it. edit, draft, revert and remove need base_hash from profiles get: a stale one is refused. Profiles are checked like Library › Profiles; warnings come back. bindings takes no id.',
     {
       action: z.enum(["draft", "edit", "approve", "revert", "remove"]),
       target: z.enum(["profile", "guide", "bindings"]).default("profile"),
@@ -867,7 +867,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "export",
     "export profiles",
-    "Build the export bundle as a backup (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Library › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
+    "Build the export bundle (profiles, guides, model manifest and EXPORT.json listing origins and unreviewed AI drafts), as Library › Profiles › Download All does, only when asked. Returns a signed download link valid for an hour.",
     {},
     async (_args, signal) => {
       const { headers = {} } = await media.call("GET", "/api/profiles/export", undefined, owner, {
@@ -959,7 +959,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "maintenance",
     "studio maintenance",
-    "Look after the studio as Settings does, only when asked. migrations previews the runtime data migrations (dry run); with apply: true it applies the steps safe while Studio runs, each writing a backup, and names those that need Studio stopped. unfinished lists every account's unfinished jobs (owner_id, job_id); retry_unfinished ends one and queues it again, delete_unfinished ends it and takes it out of the queue. pause_all holds every account's queue (Dream's too) and resume_all releases it. duplicates previews Merge Duplicate Profiles with a hash; merge_duplicates merges that preview after a backup.",
+    "Look after the studio as Settings does, only when asked. migrations previews the runtime data migrations (dry run); with apply: true it applies the steps safe while Studio runs and names those that need Studio stopped. unfinished lists every account's unfinished jobs (owner_id, job_id); retry_unfinished ends one and queues it again, delete_unfinished ends it and takes it out of the queue. pause_all holds every account's queue (Dream's too) and resume_all releases it. duplicates previews Merge Duplicate Profiles with a hash; merge_duplicates merges that preview.",
     {
       action: z.enum([
         "migrations",

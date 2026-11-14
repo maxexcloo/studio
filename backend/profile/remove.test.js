@@ -12,17 +12,18 @@ const { readEditableProfile } = await import("./editor.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
-test("removing a profile backs it up, keeps its history and refuses a stale hash", () => {
+test("removing a profile keeps its history and refuses a stale hash", () => {
   const id = "image-old-comfyui";
   const text = `${JSON.stringify({ studio: { id, name: "Old", kind: "image" } }, null, 2)}\n`;
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   fs.writeFileSync(path.join(userWorkflowsDir, `${id}.json`), text);
   assert.throws(() => removeProfile(id, { baseHash: "0".repeat(64) }), { status: 409 });
 
-  const { backup } = removeProfile(id, { baseHash: readEditableProfile(id).hash, by: "admin" });
+  removeProfile(id, { baseHash: readEditableProfile(id).hash, by: "admin" });
   assert.throws(() => readEditableProfile(id), { status: 404 });
-  assert.equal(fs.readFileSync(path.join(temporary, backup, `${id}.json`), "utf8"), text);
-  assert.equal(profileStore({ workflowsDir: userWorkflowsDir }).known(id), true);
+  const store = profileStore({ workflowsDir: userWorkflowsDir });
+  assert.equal(store.known(id), true);
+  assert.equal(store.version(id, store.meta(id).version).text, text);
 });
 
 test("retiring a profile into another makes its id resolve to that one", () => {

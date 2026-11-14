@@ -130,11 +130,6 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
     [[oldId, keptId]],
   );
   assert.ok(!fs.existsSync(path.join(userWorkflowsDir, `${oldId}.json`)));
-  const backup = path.join(temporary, result.backup);
-  assert.match(fs.readFileSync(path.join(backup, `${oldId}.json`), "utf8"), /Older wording/);
-  const manifest = JSON.parse(fs.readFileSync(path.join(backup, "merge.json"), "utf8"));
-  assert.deepEqual(manifest.merges, [{ from: oldId, to: keptId }]);
-  assert.deepEqual(manifest.preferencesBefore.favorites, [`custom:${oldId}`]);
   assert.equal(profileStore().aliases()[oldId].to, keptId);
   assert.ok(profileStore().versions(oldId).length >= 1);
   assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${keptId}`]);
@@ -144,7 +139,7 @@ test("merging needs the preview's hash, backs up, aliases, and is safe to repeat
   assert.deepEqual(readGalleryRows(runtimeDatabase(temporary)), [ownerRecord]);
 
   assert.deepEqual(duplicateProfiles().merges, []);
-  assert.deepEqual(mergeDuplicateProfiles({ hash: preview.hash }), { merged: [], backup: "" });
+  assert.deepEqual(mergeDuplicateProfiles({ hash: preview.hash }), { merged: [] });
   assert.ok(fs.existsSync(path.join(userWorkflowsDir, "image-radiance-krea2-turbo.json")));
   assert.ok(fs.existsSync(path.join(userWorkflowsDir, "old-a.json")));
 });

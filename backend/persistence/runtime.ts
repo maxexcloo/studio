@@ -77,7 +77,7 @@ function jsonStoreFiles(dataDir: string): string[] {
 export const ownerDocumentName = (name: string, ownerId = "") =>
   `${name}:${ownerId ? crypto.createHash("sha256").update(String(ownerId)).digest("hex") : ""}`;
 
-/** The file an account's document was (jsonStoreSource), the path backups copy it to. */
+/** The file an account's document was (jsonStoreSource). */
 export function ownerDocumentFile(name: string) {
   const [store, key] = name.split(":");
   return key ? `accounts/${key}/${store}.json` : `${store}.json`;

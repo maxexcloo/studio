@@ -10,10 +10,8 @@
  * single id does is listed, not merged. Same-named profiles that differ are listed with what
  * differs.
  *
- * Applying copies the removed files and the records it changes (aliases, workflow preferences,
- * guides and LoRA stacks) to
- * `<data>/backups/profile-merges/<time>/`, records each removed id as an alias of the kept one
- * (profile/store.js), then removes the removed files. Version history stays, so a seed never brings
+ * Applying records each removed id as an alias of the kept one (profile/store.js), then removes the
+ * removed files. Version history stays, so a seed never brings
  * a merged id back. Workflow preferences and LoRA stacks move to the kept id and the removed ids'
  * guide bindings go (the kept one has the same); gallery records, presets, jobs and taste
  * signals keep the ids they hold, and readers resolve them through the aliases.
@@ -22,12 +20,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
-import { writeJsonFile } from "../json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
 import { repointLoraStacks } from "../combined-profiles.js";
-import { ownerDocumentFile, ownerDocuments } from "../persistence/runtime.ts";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalogue.js";
+import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { isObject } from "../values.js";
 
 const currentId = (id) =>
@@ -149,11 +145,11 @@ export function duplicateProfiles() {
 
 /**
  * Merges what `duplicateProfiles` previews. Nothing to merge is a no-op, so a repeat is safe;
- * otherwise `hash` must be the preview's, and a changed plan is refused (409). Returns the merges and the backup folder.
+ * otherwise `hash` must be the preview's, and a changed plan is refused (409). Returns the merges.
  */
 export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   const plan = duplicateProfiles();
-  if (!plan.merges.length) return { merged: [], backup: "" };
+  if (!plan.merges.length) return { merged: [] };
   if (hash !== plan.hash)
     throw Object.assign(
       new Error("The duplicate profiles changed since the preview. Preview them again."),
@@ -161,30 +157,8 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
     );
   const store = profileStore({ workflowsDir: userWorkflowsDir });
   const at = new Date().toISOString();
-  const backup = path.join(dataDir, "backups", "profile-merges", at.replace(/[:.]/g, "-"));
-  fs.mkdirSync(backup, { recursive: true, mode: 0o700 });
-  const preferences = loadWorkflowPreferences();
-  writeJsonFile(
-    path.join(backup, "merge.json"),
-    {
-      at,
-      by: String(by || ""),
-      merges: plan.merges.map(({ from, to }) => ({ from, to })),
-      aliasesBefore: store.aliases(),
-      preferencesBefore: preferences,
-    },
-    { mode: 0o600 },
-  );
-  if (fs.existsSync(guideStore().file)) {
-    const target = path.join(backup, path.relative(dataDir, guideStore().file));
-    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-    fs.copyFileSync(guideStore().file, target);
-  }
-  for (const { name, value } of ownerDocuments(dataDir, "lora-stacks"))
-    writeJsonFile(path.join(backup, ownerDocumentFile(name)), value, { mode: 0o600 });
   for (const { from } of plan.merges) {
     const { text } = readEditableProfile(from);
-    fs.writeFileSync(path.join(backup, `${from}.json`), text, { mode: 0o600 });
     // History keeps the removed definition, and marks the id as one Studio held.
     store.record(from, text, { by, origin: "studio", note: "Before merging as a duplicate" });
   }
@@ -202,6 +176,5 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   );
   return {
     merged: plan.merges.map(({ from, to, name, kind }) => ({ from, to, name, kind })),
-    backup: path.relative(dataDir, backup),
   };
 }
