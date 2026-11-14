@@ -66,6 +66,8 @@ function newId(label: string, taken: string[]) {
 }
 
 type Kind = PromptStyle["kind"];
+/** A style's ID is unique within its menu; a refetch replaces the objects an open dialog holds. */
+const same = (a: PromptStyle, b: PromptStyle) => a.id === b.id && a.kind === b.kind;
 /** Each kind's menu, in the order the section lists them. */
 const kinds: { value: Kind; label: string; description: string }[] = [
   {
@@ -107,7 +109,7 @@ function StyleEditor({
     mutationFn: () =>
       save(
         style
-          ? styles.map((entry) => (entry === style ? draft : entry))
+          ? styles.map((entry) => (same(entry, style) ? draft : entry))
           : [
               ...styles,
               {
@@ -278,7 +280,7 @@ export function PromptStyles({ heading }: { heading: ReactNode }) {
   });
   const remove = useMutation({
     meta: { inlineError: true },
-    mutationFn: (style: PromptStyle) => save(styles.filter((entry) => entry !== style)),
+    mutationFn: (style: PromptStyle) => save(styles.filter((entry) => !same(entry, style))),
     onSuccess: () => {
       refresh();
       setDeleting(null);
