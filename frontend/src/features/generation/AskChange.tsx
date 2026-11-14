@@ -10,7 +10,13 @@ import {
 import { ArrowUp } from "lucide-react";
 import { type PointerEvent, type ReactNode, useState } from "react";
 
-import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
+import {
+  type Change,
+  type ChangeAction,
+  type NextStep,
+  type Suggestions,
+  maxNextSteps,
+} from "../../../../shared/suggestions";
 import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
@@ -191,10 +197,16 @@ export function useChangeSuggestions<K extends QueryKey>({
     disabled,
     menu: [options, [again]],
   };
-  // The same under a heading, as one group of an assistant menu (assistMenu).
+  // The same under a heading, as one group of an assistant menu (assistMenu), keeping room for
+  // the most it can hold so what follows stays put as they arrive.
   const group: Action[] = [
     { id: "suggestions-heading", label: "Suggestions", heading: true },
     ...options.map((option) => ({ ...option, icon: icons.suggestions })),
+    ...Array.from({ length: maxNextSteps - options.length }, (_, index) => ({
+      id: `suggestions-reserved-${index}`,
+      label: "",
+      reserved: true,
+    })),
     again,
   ];
   return { action, group, loading };
