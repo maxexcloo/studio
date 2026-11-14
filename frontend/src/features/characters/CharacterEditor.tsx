@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Alert, Button, Group, Input, Loader, Stack, Text } from "@mantine/core";
+import { useState, type ReactNode } from "react";
+import { Alert, Button, Group, Input, Loader, Paper, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { post } from "../../api";
 import type { MediaItem, ReferenceAsset } from "../../types";
@@ -128,105 +128,93 @@ function CharacterForm({
         onImages={setImages}
       />
       {current && onGenerate && (
-        <Input.Wrapper
-          component="section"
-          aria-label="Generated References"
+        <EditorSection
           label="Generated References"
-          labelElement="div"
           description={
             generated.length
               ? "Pick the ones to keep. The rest stay in the gallery."
               : "A portrait and front, side and back views from the description and first image."
           }
+          empty="None Yet"
+          action={
+            <Button
+              {...chipProps}
+              leftSection={<icons.variations size={15} />}
+              loading={generating}
+              onClick={() => onGenerate(current)}
+            >
+              Generate References
+            </Button>
+          }
         >
-          <Stack gap="xs" mt={6}>
-            {generated.length ? (
-              <PickerGrid label="Generated References">
-                {generated.map((result, index) => {
-                  const selected = images.some(
-                    (asset) => asset.galleryItemId === result.galleryItemId,
-                  );
-                  const done = result.status === "done";
-                  return (
-                    <PickerTile
-                      key={result.galleryItemId}
-                      label={`${selected ? "Remove" : "Add"} generated reference ${index + 1}`}
-                      selected={selected}
-                      disabled={!done || full || fromGallery.isPending}
-                      image={done ? result.thumbnailUrl : undefined}
-                      placeholder={done ? undefined : icons.variations}
-                      title={done ? "Ready" : resultStatus(result.status)}
-                      onToggle={() =>
-                        selected
-                          ? setImages(
-                              images.filter(
-                                (asset) => asset.galleryItemId !== result.galleryItemId,
-                              ),
-                            )
-                          : fromGallery.mutate({ id: result.galleryItemId })
-                      }
-                    />
-                  );
-                })}
-              </PickerGrid>
-            ) : (
-              <EmptyState fill>None Yet</EmptyState>
-            )}
-            <Group gap="xs">
-              <Button
-                {...chipProps}
-                leftSection={<icons.variations size={15} />}
-                loading={generating}
-                onClick={() => onGenerate(current)}
-              >
-                Generate References
-              </Button>
-            </Group>
-          </Stack>
-        </Input.Wrapper>
+          {generated.length > 0 && (
+            <PickerGrid label="Generated References">
+              {generated.map((result, index) => {
+                const selected = images.some(
+                  (asset) => asset.galleryItemId === result.galleryItemId,
+                );
+                const done = result.status === "done";
+                return (
+                  <PickerTile
+                    key={result.galleryItemId}
+                    label={`${selected ? "Remove" : "Add"} generated reference ${index + 1}`}
+                    selected={selected}
+                    disabled={!done || full || fromGallery.isPending}
+                    image={done ? result.thumbnailUrl : undefined}
+                    placeholder={done ? undefined : icons.variations}
+                    title={done ? "Ready" : resultStatus(result.status)}
+                    onToggle={() =>
+                      selected
+                        ? setImages(
+                            images.filter((asset) => asset.galleryItemId !== result.galleryItemId),
+                          )
+                        : fromGallery.mutate({ id: result.galleryItemId })
+                    }
+                  />
+                );
+              })}
+            </PickerGrid>
+          )}
+        </EditorSection>
       )}
       {current && (
-        <Input.Wrapper
-          component="section"
-          aria-label="Sheet"
+        <EditorSection
           label="Sheet"
-          labelElement="div"
           description="Front, side and back views, expressions and gear, sent when a prompt names a view."
+          empty="No Sheet Yet"
+          action={
+            <Button
+              {...chipProps}
+              leftSection={<icons.sheet size={15} />}
+              loading={making.isPending}
+              disabled={!current.references.length || sheet?.status === "making"}
+              onClick={() => making.mutate(current)}
+            >
+              {sheet ? "Make Sheet Again" : "Make Sheet"}
+            </Button>
+          }
         >
-          <Stack gap="xs" mt={6}>
-            {sheet?.status === "making" ? (
-              <Group gap="xs" role="status">
-                <Loader size={14} />
-                <Text size="sm" c="dimmed">
-                  Making Sheet…
-                </Text>
-              </Group>
-            ) : sheet?.status === "failed" ? (
-              <Text size="sm" c="red">
-                {`Sheet Failed${sheet.error ? `: ${sheet.error}` : ""}`}
+          {sheet?.status === "making" ? (
+            <Group gap="xs" role="status">
+              <Loader size={14} />
+              <Text size="sm" c="dimmed">
+                Making Sheet…
               </Text>
-            ) : sheetViews(current).length ? (
+            </Group>
+          ) : sheet?.status === "failed" ? (
+            <Text size="sm" c="red">
+              {`Sheet Failed${sheet.error ? `: ${sheet.error}` : ""}`}
+            </Text>
+          ) : (
+            sheetViews(current).length > 0 && (
               <CardThumbnails
                 label={`${current.name}'s Sheet`}
                 images={sheetViews(current)}
                 views
               />
-            ) : (
-              <EmptyState fill>No Sheet Yet</EmptyState>
-            )}
-            <Group gap="xs">
-              <Button
-                {...chipProps}
-                leftSection={<icons.sheet size={15} />}
-                loading={making.isPending}
-                disabled={!current.references.length || sheet?.status === "making"}
-                onClick={() => making.mutate(current)}
-              >
-                {sheet ? "Make Sheet Again" : "Make Sheet"}
-              </Button>
-            </Group>
-          </Stack>
-        </Input.Wrapper>
+            )
+          )}
+        </EditorSection>
       )}
       {error && <Alert color="red">{error.message}</Alert>}
       <DialogFooter pending={save.isPending} onCancel={onClose}>
@@ -252,3 +240,42 @@ export const sheetViews = (card: CharacterCard) =>
       thumbnailUrl: panel.thumbnailUrl,
       alt: `${card.name} ${panel.role[0].toUpperCase()}${panel.role.slice(1)}`,
     }));
+
+/** A part of the editor under its label: its content then its action, or, empty, both framed. */
+function EditorSection({
+  label,
+  description,
+  empty,
+  action,
+  children,
+}: {
+  label: string;
+  description: string;
+  empty: string;
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Input.Wrapper
+      size="md"
+      component="section"
+      aria-label={label}
+      label={label}
+      labelElement="div"
+      description={description}
+    >
+      {children ? (
+        <Stack gap="xs" mt={6} align="flex-start">
+          {children}
+          {action}
+        </Stack>
+      ) : (
+        <Paper withBorder radius="md" py="md" mt={6}>
+          <EmptyState fill action={action}>
+            {empty}
+          </EmptyState>
+        </Paper>
+      )}
+    </Input.Wrapper>
+  );
+}
