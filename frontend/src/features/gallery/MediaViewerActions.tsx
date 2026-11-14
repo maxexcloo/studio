@@ -6,7 +6,7 @@ import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/A
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
-import type { AnimateTheme, Iteration } from "./useMediaAction";
+import type { AnimateRequest, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
 import { useViewerPrompt, ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
@@ -76,7 +76,7 @@ export function MediaViewerActions({
 }) {
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
-  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
+  const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
   const itemGroups = useMediaActions(item, {
     transfer,
@@ -123,7 +123,7 @@ export function MediaViewerActions({
         <AnimateDialog
           item={item}
           iterate={iterate}
-          theme={animating}
+          {...animating}
           onClose={() => setAnimating(null)}
         />
       )}

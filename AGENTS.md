@@ -99,6 +99,9 @@ the primary component reference and verify APIs against the installed version.
   says what it acts on (Upscale, Share, Copy, Clear, Reset; not Upscale Image or Clear Prompt),
   adding a word only where the verb alone is ambiguous (Stop Upscale, Edit in Composer), and one
   action keeps one label everywhere. Clear and Reset turn into Undo until the text next changes.
+  Assistant menus (AI, Animate) share `assistMenu`: settings, the fixed options from Library
+  records under their heading, the suggestions written for the item under Suggestions with
+  Refresh Suggestions, then Custom… and the menu's run. Animate asks for motions only when opened.
 
 ### Layers, Focus & Phones
 
@@ -156,9 +159,8 @@ the primary component reference and verify APIs against the installed version.
   Custom), resets to the item's prompt rather than clearing, and its phone
   editor sends Ask for a Change beside Generate. It rests on one line ending in
   an ellipsis and shows the whole prompt while focused. Its other assistance is
-  the viewer bar's AI, after Recreate, laid out as Animate's menu: the remembered
-  Review Prompt, then the image's Suggestions and Custom… (a change typed over
-  the prompt), then Refresh Suggestions.
+  the viewer bar's AI, after Recreate, an assistant menu whose Custom… asks for a
+  change typed over the prompt, with Review Prompt remembered.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

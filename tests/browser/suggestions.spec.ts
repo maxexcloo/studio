@@ -84,7 +84,7 @@ test("Suggestions lists ideas for the empty composer prompt from its chip row", 
   expect(asked).toHaveLength(1);
 });
 
-test("The viewer's AI menu offers Review Prompt, then Suggestions and Custom…, then Refresh Suggestions", async ({
+test("The viewer's AI menu offers Review Prompt, then Suggestions with Refresh, then Custom…", async ({
   page,
 }, testInfo) => {
   const phone = testInfo.project.use.isMobile;
@@ -111,8 +111,8 @@ test("The viewer's AI menu offers Review Prompt, then Suggestions and Custom…,
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Review Prompt",
     ...steps.map((step) => step.label),
-    "Custom…",
     "Refresh Suggestions",
+    "Custom…",
   ]);
   expect(asked).toEqual([{ surface: "viewer", jobId: "job-hub", fresh: false }]);
   await menu.getByRole("menuitem", { name: "Refresh Suggestions", exact: true }).click();
@@ -175,6 +175,48 @@ test("Custom Animation suggests what could happen from the image, filling the in
   await expect(page.getByRole("textbox", { name: "Instruction", exact: true }).last()).toHaveValue(
     "The bird spreads its wings and takes off.",
   );
+});
+
+test("Animate offers its themes, then motions written for the image, then Custom…", async ({
+  page,
+}) => {
+  const state = await openViewer(page);
+  const motion = [{ label: "Wings Unfold", request: "The bird spreads its wings and takes off." }];
+  const asked: any[] = [];
+  await page.route("**/api/suggestions", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.surface !== "animate") return route.fallback();
+    asked.push(body);
+    return route.fulfill({
+      json: { suggestions: motion.map((m) => ({ ...m, prompt: m.request })) },
+    });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
+  // Motions are asked for only once the menu opens.
+  await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeVisible();
+  expect(asked).toEqual([]);
+  await viewerAction(page, "Animate");
+  const menu = page.getByRole("menu");
+  await expect(menu.getByText("Themes", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    "Review Prompt",
+    "Action",
+    "Cinematic Camera",
+    "Dialogue",
+    "Living Photo",
+    "Wings Unfold",
+    "Refresh Suggestions",
+    "Custom…",
+    "Animate in Composer",
+  ]);
+  await menu.getByRole("menuitem", { name: "Wings Unfold", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input.writing).toMatchObject({
+    kind: "animate",
+    theme: "custom",
+    instruction: "The bird spreads its wings and takes off.",
+  });
 });
 
 test("No ideas or suggestions show when Studio has none", async ({ page }) => {

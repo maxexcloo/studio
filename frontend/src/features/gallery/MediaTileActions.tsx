@@ -6,7 +6,7 @@ import { menuWidth } from "../../theme";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { AnimateDialog } from "./AnimateDialog";
 import { MediaActionMenu } from "./MediaActions";
-import type { AnimateTheme } from "./useMediaAction";
+import type { AnimateRequest } from "./useMediaAction";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
@@ -29,7 +29,7 @@ export function MediaTileActions({
   hideMore?: boolean;
 }) {
   const [deleting, setDeleting] = useState(false);
-  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
+  const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
   const favorite = useMediaFavorite(item);
   const transfer = useMediaTransfer(item, opened);
@@ -104,9 +104,7 @@ export function MediaTileActions({
         close={() => setDeleting(false)}
         onDeleted={() => {}}
       />
-      {animating && (
-        <AnimateDialog item={item} theme={animating} onClose={() => setAnimating(null)} />
-      )}
+      {animating && <AnimateDialog item={item} {...animating} onClose={() => setAnimating(null)} />}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>
   );
