@@ -23,7 +23,6 @@ import {
   UnstyledButton,
   VisuallyHidden,
 } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
@@ -31,6 +30,7 @@ import { X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
+import { useRemembered } from "../auth/useRemembered";
 import { showQueued } from "../settings/accountPreferences";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
@@ -280,11 +280,7 @@ export function MediaViewer({
   useNeighbourPrefetch(viewable, currentIndex);
   const gestureClick = useRef(false);
   const [compare, setCompare] = useState(false);
-  const [details, setDetails] = useLocalStorage({
-    key: "studio-viewer-details",
-    defaultValue: true,
-    getInitialValueInEffect: false,
-  });
+  const [details, setDetails] = useRemembered("viewer-details", true);
   const [sheet, setSheet] = useState(false);
   // A touch tap on the media hides the chrome around it, as Photos does, until the viewer closes.
   const [chromeHidden, setChromeHidden] = useState(false);
