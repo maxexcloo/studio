@@ -158,7 +158,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
-import { listCards, registerCardRoutes } from "./cards.js";
+import { createCard, listCards, refusal as cardRefusal, registerCardRoutes } from "./cards.js";
 import { createCharacterSheets } from "./character-sheets.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -192,6 +192,8 @@ import {
   promptWriter,
 } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
+import { dreamVideoProfile } from "./animate-profile.js";
+import { minorAge } from "./minor-age.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -908,7 +910,28 @@ const dream = createDream({
       }));
     return [...saved, ...imported].filter((item) => item.prompt.trim());
   },
-  reference: (account, itemId) => referenceAssetForAccount(account, itemId),
+  reference: (account, itemId, frame) =>
+    referenceAssetForAccount(account, itemId, frame ? { frame } : undefined),
+  videoProfile: async (ownerId, account, { width, height, extend }) => {
+    const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
+    return dreamVideoProfile(models.profiles || [], {
+      videos: accountPreferences(ownerId).videos,
+      extend: extend && canonicalProfileId(extend),
+      defaultId: models.defaults?.videoModel,
+      localRunning: models.backends?.video?.available !== false,
+      localParked: models.backends?.video?.parked === true,
+      width,
+      height,
+    });
+  },
+  cards: (ownerId) => {
+    if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
+    return Object.fromEntries(
+      ["characters", "outfits", "scenes"].map((kind) => [kind, listCards(kind, ownerId)]),
+    );
+  },
+  createCard,
+  minorAge,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });

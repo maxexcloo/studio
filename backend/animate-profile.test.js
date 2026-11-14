@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { animateProfile, startFrameSize } from "./animate-profile.js";
+import { animateProfile, dreamVideoProfile, startFrameSize } from "./animate-profile.js";
 
 const slot = (label) => [{ id: "reference", kind: "image", label }];
 const video = (id, label, extra = {}) => ({
@@ -135,4 +135,18 @@ test("A video framed by its start frame draws at the frame's proportions unless 
     null,
   );
   assert.equal(startFrameSize({ ...framed, aspectPolicy: "manual" }, run()), null);
+});
+
+test("Dream's videos run only on local GPUs, even for an account that prefers Cloud", () => {
+  const dream = (options) =>
+    dreamVideoProfile(profiles, { defaultId: "fl-quality", localRunning: true, ...options });
+  assert.equal(dream({ videos: "cloud" }).profile.id, "fl-fast");
+  assert.equal(dream({ videos: "quality" }).profile.id, "fl-quality");
+  // An Extend keeps a local video's model, but a Grok video's continues locally.
+  assert.equal(dream({ videos: "fast", extend: "fl-quality" }).profile.id, "fl-quality");
+  assert.equal(dream({ videos: "cloud", extend: "grok-video" }).profile.id, "fl-fast");
+  // Without local video it refuses rather than fall back to Grok.
+  assert.throws(() => dream({ videos: "cloud", localRunning: false }), {
+    message: "Local video isn't running, so Local GPU can't animate this right now.",
+  });
 });

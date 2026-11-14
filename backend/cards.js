@@ -129,6 +129,22 @@ function cleanCard(kind, account, body) {
   return { name, description, referenceIds: ids };
 }
 
+/** Saves a new `kind` card for the account from `fields` and returns it; a CardError answers 400. */
+export function createCard(account, kind, fields) {
+  const ownerId = account?.userId || "";
+  const cards = listCards(kind, ownerId);
+  if (cards.length >= maxCards) throw new CardError(`An account can keep ${maxCards} ${kind}.`);
+  const now = new Date().toISOString();
+  const card = {
+    id: `${cardKinds[kind].prefix}-${crypto.randomUUID()}`,
+    ...cleanCard(kind, account, fields),
+    createdAt: now,
+    updatedAt: now,
+  };
+  save(kind, ownerId, [...cards, card]);
+  return card;
+}
+
 /** Why the account may not use cards, as a route's answer, or null. */
 export const refusal = (account) => {
   if (!account) return localRefusal(account);
@@ -156,7 +172,7 @@ export function registerCardRoutes(app) {
       }
     });
 
-  for (const [kind, { name: noun, prefix }] of Object.entries(cardKinds)) {
+  for (const [kind, { name: noun }] of Object.entries(cardKinds)) {
     const missing = { status: 404, payload: { ok: false, error: `No such ${noun}.` } };
     const reply = (status, account, card) => ({
       status,
@@ -168,19 +184,9 @@ export function registerCardRoutes(app) {
       payload: { [kind]: listCards(kind, ownerId).map((card) => shownCard(account, card)) },
     }));
 
-    route("POST", `/api/${kind}`, (account, ownerId, { body }) => {
-      const cards = listCards(kind, ownerId);
-      if (cards.length >= maxCards) throw new CardError(`An account can keep ${maxCards} ${kind}.`);
-      const now = new Date().toISOString();
-      const card = {
-        id: `${prefix}-${crypto.randomUUID()}`,
-        ...cleanCard(kind, account, body),
-        createdAt: now,
-        updatedAt: now,
-      };
-      save(kind, ownerId, [...cards, card]);
-      return reply(201, account, card);
-    });
+    route("POST", `/api/${kind}`, (account, _ownerId, { body }) =>
+      reply(201, account, createCard(account, kind, body)),
+    );
 
     route("PUT", `/api/${kind}/:id`, (account, ownerId, { params, body }) => {
       const cards = listCards(kind, ownerId);

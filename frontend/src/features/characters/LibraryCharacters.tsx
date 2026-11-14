@@ -9,13 +9,15 @@ import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { CardThumbnails } from "./CardImages";
+import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
 import { charactersQuery, type CharacterCard } from "./queries";
 
 /**
- * Library › Characters: every card the account keeps, to search, edit and delete. Use as Character
+ * Library › Characters: every card the account keeps, to search, edit and delete, after the cards
+ * Dream suggests (CardSuggestions). Use as Character
  * opens here with `characterFrom` (a gallery image's ID) in the route state, starting a new card
  * from that image.
  */
@@ -56,6 +58,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
         />
       </SectionHeader>
       {start.error && <Alert color="red">{start.error.message}</Alert>}
+      {!words && <CardSuggestions />}
       {characters.isPending ? (
         <LoadingState fill label="Loading Characters" />
       ) : characters.error ? (
