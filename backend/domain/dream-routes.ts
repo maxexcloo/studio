@@ -138,6 +138,19 @@ export function registerDreamRoutes(
   route("POST", "/api/dream/projects/activity", (account, { body }) =>
     answer(() => ({ project: projects.activity(owner(account), chatOf(body)) })),
   );
+  // Library › Characters' suggested cards: Accept makes the card, Dismiss turns it down.
+  route("GET", "/api/dream/suggestions", (account) => ({
+    status: 200,
+    payload: { suggestions: dream.suggestions(owner(account)) },
+  }));
+  route("POST", "/api/dream/suggestions/:suggestionId/accept", (account, { params }) =>
+    answer(() => ({
+      card: dream.accept(owner(account), account || undefined, params.suggestionId),
+    })),
+  );
+  route("POST", "/api/dream/suggestions/:suggestionId/dismiss", (account, { params }) =>
+    answer(() => (dream.dismiss(owner(account), params.suggestionId), { ok: true })),
+  );
   route("GET", "/api/dream/calibration", (account, { query }) => {
     const limit = Math.max(
       1,

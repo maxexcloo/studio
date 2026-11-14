@@ -158,7 +158,7 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { strengthRange } from "./lora/policy.js";
 import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
-import { listCards, registerCardRoutes } from "./cards.js";
+import { createCard, listCards, refusal as cardRefusal, registerCardRoutes } from "./cards.js";
 import { createCharacterSheets } from "./character-sheets.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -192,6 +192,8 @@ import {
   promptWriter,
 } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
+import { animateProfile, frameSize } from "./animate-profile.js";
+import { minorAge } from "./minor-age.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -817,6 +819,7 @@ const dream = createDream({
     if (ownerId && !mayUseFeature(account, "dream")) return null;
     return { account, uncensored: !account || mayUseFeature(account, "uncensoredModels") };
   },
+  // Cloud images never run for Dream; its videos run where the account prefers (videoProfile).
   catalogue: async (_ownerId, account) => {
     const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
     return {
@@ -824,7 +827,7 @@ const dream = createDream({
         (profile) =>
           profile.ready !== false &&
           !["offline", "parked"].includes(profile.availability) &&
-          !isCloudProfile(profile),
+          (profile.kind === "video" || !isCloudProfile(profile)),
       ),
       defaults: models.defaults,
     };
@@ -908,7 +911,49 @@ const dream = createDream({
       }));
     return [...saved, ...imported].filter((item) => item.prompt.trim());
   },
-  reference: (account, itemId) => referenceAssetForAccount(account, itemId),
+  reference: (account, itemId, frame) =>
+    referenceAssetForAccount(account, itemId, frame ? { frame } : undefined),
+  // As Animate chooses (model/routes.js); an Extend keeps its video's model unless Cloud is preferred.
+  videoProfile: async (ownerId, account, { width, height, extend }) => {
+    const { videos } = accountPreferences(ownerId);
+    const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
+    const own =
+      extend &&
+      videos !== "cloud" &&
+      (models.profiles || []).find(
+        (profile) =>
+          profile.id === canonicalProfileId(extend) &&
+          profile.kind === "video" &&
+          profile.ready !== false &&
+          profile.mediaInputs?.length &&
+          !["offline", "parked"].includes(profile.availability),
+      );
+    const choice = own
+      ? {
+          profile: own,
+          cloud: isCloudProfile(own),
+          note: "",
+          size: width > 0 && height > 0 ? frameSize(own, width, height) : undefined,
+        }
+      : animateProfile(models.profiles || [], {
+          defaultId: models.defaults?.videoModel,
+          localRunning: models.backends?.video?.available !== false,
+          localParked: models.backends?.video?.parked === true,
+          tier: videos === "quality" ? "quality" : "fast",
+          prefer: videos === "cloud" ? "cloud" : "local",
+          width,
+          height,
+        });
+    return { profile: choice.profile, cloud: choice.cloud, note: choice.note, size: choice.size };
+  },
+  cards: (ownerId) => {
+    if (cardRefusal(ownerId ? accountAccessForId(ownerId) : undefined)) return null;
+    return Object.fromEntries(
+      ["characters", "outfits", "scenes"].map((kind) => [kind, listCards(kind, ownerId)]),
+    );
+  },
+  createCard,
+  minorAge,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });

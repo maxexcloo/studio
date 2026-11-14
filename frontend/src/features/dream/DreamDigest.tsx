@@ -93,8 +93,31 @@ function DigestCard({
 }
 
 /**
+ * Ranked results as they show: a series' results gathered as one set where its best one ranks, in
+ * the set's order, and the others in runs between.
+ */
+function withSets(items: DreamItem[]) {
+  const blocks: { set?: NonNullable<DreamItem["resultSet"]>; items: DreamItem[] }[] = [];
+  const sets = new Map<string, DreamItem[]>();
+  for (const item of items) {
+    const set = item.resultSet;
+    const members = set && sets.get(set.id);
+    if (members) members.push(item);
+    else if (set) {
+      sets.set(set.id, [item]);
+      blocks.push({ set, items: sets.get(set.id)! });
+    } else if (blocks.length && !blocks.at(-1)!.set) blocks.at(-1)!.items.push(item);
+    else blocks.push({ items: [item] });
+  }
+  for (const members of sets.values())
+    members.sort((a, b) => (a.resultSet?.index ?? 0) - (b.resultSet?.index ?? 0));
+  return blocks;
+}
+
+/**
  * While You Were Away: each project's unseen Dream results, best fit to its brief first, with
- * those that miss it collapsed under Misses. Pass, Super Like and Like judge a card in place;
+ * those that miss it collapsed under Misses, and each series as one set. Pass, Super Like and Like
+ * judge a card in place;
  * opening one shows the viewer with every choice, moving on to the next result after each.
  */
 export function DreamDigest({
@@ -124,11 +147,12 @@ export function DreamDigest({
       misses: group.misses.filter((item) => !decided.has(item.id)),
     }))
     .filter((group) => group.items.length + group.misses.length);
-  // The viewer flips through what is on screen, collapsed misses left out.
-  const order = shown.flatMap((group) => [
-    ...group.items,
-    ...(open.has(group.key) ? group.misses : []),
-  ]);
+  // The viewer flips through what is on screen, in its order, collapsed misses left out.
+  const order = shown.flatMap((group) =>
+    [group.items, open.has(group.key) ? group.misses : []].flatMap((items) =>
+      withSets(items).flatMap((block) => block.items),
+    ),
+  );
   const fresh = (item: DreamItem) => !since || String(item.createdAt || "") > since;
   const count = shown.reduce(
     (sum, group) => sum + [...group.items, ...group.misses].filter(fresh).length,
@@ -143,7 +167,7 @@ export function DreamDigest({
   }
   const current = viewing ? order.find((item) => item.id === viewing) : undefined;
   if (viewing && !current) setViewing(null);
-  const grid = (items: DreamItem[]) => (
+  const cards = (items: DreamItem[]) => (
     <SimpleGrid cols={phone ? (sideways ? 2 : 1) : { base: 2, md: 3, lg: 4 }} spacing="sm">
       {items.map((item) => (
         <DigestCard
@@ -155,6 +179,25 @@ export function DreamDigest({
         />
       ))}
     </SimpleGrid>
+  );
+  const grid = (items: DreamItem[]) => (
+    <Stack gap="sm">
+      {withSets(items).map(({ set, items: members }) =>
+        set ? (
+          <Stack key={set.id} gap={6} role="group" aria-label={`Series: ${set.title}`}>
+            <Title order={4} size="h6">
+              {set.title}
+              <Text span size="sm" c="dimmed" fw={400}>
+                {` · Series of ${members.length}`}
+              </Text>
+            </Title>
+            {cards(members)}
+          </Stack>
+        ) : (
+          <div key={members[0].id}>{cards(members)}</div>
+        ),
+      )}
+    </Stack>
   );
   return (
     <ScrollArea flex={1} mih={0}>

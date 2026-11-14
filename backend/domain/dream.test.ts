@@ -6,10 +6,13 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import express from "express";
+import type { CardKind, Character } from "../../shared/characters.ts";
 import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import {
   createDream,
+  dreamRequest,
+  suggestionsFrom,
   type DreamAccess,
   type DreamInspiration,
   type DreamItem,
@@ -69,6 +72,13 @@ function fixture(t: TestContext, catalogue = profiles) {
     inspiration: [] as DreamInspiration[],
     /** Rolls for the next chance draws (out of 100); every other draw is 0. */
     rolls: [] as number[],
+    /** The account's cards, or null without Characters. */
+    cards: { characters: [], outfits: [], scenes: [] } as Record<CardKind, Character[]> | null,
+    /** Where videos run: the profile Animate would choose, or why none can. */
+    video: { id: "wan", cloud: false, note: "" } as { id: string; cloud: boolean; note: string },
+    videoRefusal: "",
+    /** The text model's reply when asked for suggestions. */
+    suggestions: { suggestions: [] } as unknown,
   };
   const admission = createGenerationAdmission({
     store,
@@ -103,6 +113,8 @@ function fixture(t: TestContext, catalogue = profiles) {
       model: async () => "writer",
       chat: async ({ model, messages }) => {
         state.calls.push({ model, system: messages[0].content, user: messages[1].content });
+        if (messages[0].content.startsWith("You find what recurs"))
+          return { text: JSON.stringify(state.suggestions) };
         state.prompts++;
         return {
           text: JSON.stringify({
@@ -129,7 +141,26 @@ function fixture(t: TestContext, catalogue = profiles) {
     // As the LoRA policy would: klein.safetensors is for another model family.
     fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
     inspiration: () => state.inspiration,
-    reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
+    reference: (_account, itemId, frame) => ({
+      id: frame ? `${frame}-frame-${itemId}` : `asset-${itemId}`,
+      source: "gallery",
+    }),
+    // As Animate chooses: an Extend keeps its video's model.
+    videoProfile: async (_ownerId, _account, { extend }) => {
+      if (state.videoRefusal) throw new Error(state.videoRefusal);
+      const own = catalogue.find((profile) => profile.id === extend);
+      return {
+        ...state.video,
+        profile: own || catalogue.find((profile) => profile.id === state.video.id)!,
+      };
+    },
+    cards: () => state.cards,
+    createCard: (_account, kind, fields) => {
+      const card = { id: `${kind}-${state.cards![kind].length + 1}`, ...fields } as Character;
+      state.cards![kind].push(card);
+      return card;
+    },
+    minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
     // carries its written prompt and mark from the queue record.
     admit: async (input, account, scope, origin) => {
@@ -1099,4 +1130,304 @@ test("Every fourth image compares one thing on a kept image's prompt; answers ke
   assert.equal((steered.input.writing as { like?: string }).like, next.prompt);
   assert.match(state.calls.at(-1)!.user, new RegExp(`More like this one: ${next.prompt}`));
   assert.equal(dream.read("alice").steer?.remaining, 1);
+});
+
+test("A Dream job's writing request keeps its own fields through admission", () => {
+  const request = dreamRequest({
+    kind: "dream",
+    project: "beach",
+    seed: "a red kite",
+    vary: "scene",
+    note: "Continuing Beach",
+    explore: true,
+    extend: true,
+    source: "a clip",
+    series: {
+      id: "set-1",
+      character: "Mara: red hair",
+      place: "a diner",
+      night: "midnight",
+      index: 1,
+      length: 4,
+    },
+    loras: ["fox.safetensors", 3],
+    prompt: "already written",
+  });
+  assert.deepEqual(request, {
+    kind: "dream",
+    explore: true,
+    extend: true,
+    source: "a clip",
+    note: "Continuing Beach",
+    project: "beach",
+    seed: "a red kite",
+    vary: "scene",
+    series: {
+      id: "set-1",
+      character: "Mara: red hair",
+      place: "a diner",
+      night: "midnight",
+      index: 1,
+      length: 4,
+    },
+    loras: ["fox.safetensors"],
+  });
+});
+
+test("Suggestions recur in two liked results, keep within a card's limits and the 18+ floor, and never repeat a card", () => {
+  const liked = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  const found = suggestionsFrom(
+    {
+      suggestions: [
+        { kind: "Character", name: "Mara", description: "red hair, freckles", results: [1, 3, 3] },
+        { kind: "outfit", name: "Green Cloak", description: "a long green cloak", results: [2] },
+        { kind: "scene", name: "Diner", description: "an all-night diner", results: [1, 9] },
+        { kind: "character", name: "Kid", description: "a 16 year old", results: [1, 2] },
+        { kind: "scene", name: "Harbour", description: "a harbour at dusk", results: [2, 3] },
+        { kind: "scene", name: "harbour", description: "the same harbour", results: [1, 2] },
+        { kind: "outfit", name: "Mara", description: "", results: [1, 2] },
+        { kind: "prop", name: "Lamp", description: "a brass lamp", results: [1, 2] },
+      ],
+    },
+    {
+      liked,
+      taken: new Set(["characters:ava"]),
+      minorAge: (text) => /\b16\b/.exec(text)?.[0] || "",
+      at: "now",
+    },
+  );
+  assert.deepEqual(
+    found.map(({ kind, name, itemIds }) => [kind, name, itemIds]),
+    [
+      ["characters", "Mara", ["a", "c"]],
+      ["scenes", "Harbour", ["b", "c"]],
+    ],
+  );
+  assert.deepEqual(
+    suggestionsFrom(
+      {
+        suggestions: [
+          { kind: "character", name: "Ava", description: "dark hair", results: [1, 2] },
+        ],
+      },
+      { liked, taken: new Set(["characters:ava"]), minorAge: () => "", at: "now" },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    suggestionsFrom("nonsense", { liked, taken: new Set(), minorAge: () => "", at: "" }),
+    [],
+  );
+});
+
+test("Dream suggests recurring cards from liked results once a day; Accept makes the card and Dismiss turns it down", async (t) => {
+  const fx = fixture(t);
+  const { dream, state, generated } = fx;
+  const liked = (id: string, prompt: string) => ({
+    id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt,
+    favorite: true,
+    jobId: `job-${id}`,
+  });
+  generated(...["1", "2", "3", "4", "5"].map((id) => liked(id, `Mara on a rooftop ${id}`)));
+  await dream.save("alice", { enabled: true, dailyImages: 0 });
+  state.suggestions = {
+    suggestions: [
+      { kind: "character", name: "Mara", description: "red hair, freckles", results: [1, 2, 3] },
+      { kind: "scene", name: "Rooftop", description: "a city rooftop at night", results: [2, 4] },
+    ],
+  };
+  // Five liked results are too few to look for what recurs.
+  await dream.tick();
+  assert.equal(dream.suggestions("alice").length, 0);
+  generated(liked("6", "Mara on a rooftop 6"));
+  await dream.tick();
+  const asked = state.calls.filter((call) => call.system.startsWith("You find what recurs"));
+  assert.equal(asked.length, 1);
+  assert.match(asked[0].system, /18 or older/);
+  assert.match(
+    asked[0].user,
+    /Liked images:\n\[1\] Mara on a rooftop 1\n\[2\] Mara on a rooftop 2/,
+  );
+  const [mara, rooftop] = dream.suggestions("alice");
+  assert.deepEqual(
+    [mara.kind, mara.name, mara.items.map((item) => item.id)],
+    ["characters", "Mara", ["1", "2", "3"]],
+  );
+  // Once a day.
+  await dream.tick();
+  assert.equal(state.calls.filter((call) => call.system.startsWith("You find")).length, 1);
+
+  const request = await serve(t, fx);
+  const accepted = await request(`/suggestions/${mara.id}/accept`, {});
+  assert.equal(accepted.status, 200);
+  assert.deepEqual(state.cards!.characters, [
+    {
+      id: "characters-1",
+      name: "Mara",
+      description: "red hair, freckles",
+      referenceIds: ["asset-1", "asset-2", "asset-3"],
+    },
+  ]);
+  assert.equal((await request(`/suggestions/${rooftop.id}/dismiss`, {})).status, 200);
+  assert.equal((await request(`/suggestions/${rooftop.id}/dismiss`, {})).status, 404);
+  assert.deepEqual((await request("/suggestions")).body.suggestions, []);
+  // A day later neither is proposed again, and the writer hears they were taken or turned down.
+  state.clock += 86_400_000;
+  await dream.tick();
+  const again = state.calls.filter((call) => call.system.startsWith("You find")).at(-1)!;
+  assert.match(again.user, /- character: Mara/);
+  assert.match(again.user, /- scenes:rooftop/);
+  assert.equal(dream.suggestions("alice").length, 0);
+  // Without Characters there is nothing to suggest or accept.
+  state.cards = null;
+  assert.deepEqual(dream.suggestions("alice"), []);
+});
+
+test("A series keeps one character in one place and night across a result set, then ends", async (t) => {
+  const editing: DreamProfile = {
+    id: "qwen-edit",
+    kind: "image",
+    label: "Qwen Edit",
+    editReferences: true,
+    mediaInputs: [{ id: "image1" }],
+  };
+  const { dream, state, store, dreamOnce } = fixture(t, [...profiles, editing]);
+  state.cards!.characters.push({
+    id: "chr-mara",
+    name: "Mara",
+    description: "red hair, freckles",
+    referenceIds: ["mara-front"],
+    createdAt: "",
+    updatedAt: "",
+  });
+  await dream.save("alice", { enabled: true });
+  const jobs = [];
+  for (let index = 0; index < 4; index++) jobs.push((await dreamOnce())!);
+  const sets = jobs.map(
+    (job) => job.input.resultSet as { id: string; title: string; index: number },
+  );
+  assert.equal(new Set(sets.map((set) => set.id)).size, 1);
+  assert.deepEqual(
+    sets.map((set) => [set.title, set.index]),
+    [0, 1, 2, 3].map((index) => ["Mara · Rooftop Bar, Dusk", index]),
+  );
+  for (const job of jobs) {
+    assert.equal(job.input.profileId, "qwen-edit");
+    assert.deepEqual(job.input.referenceAssets, [{ assetId: "mara-front", slot: "image1" }]);
+    assert.equal(job.dream?.arm, "series");
+  }
+  const written = state.calls.slice(-4);
+  assert.match(written[0].system, /result 1 of 4 in a series/);
+  assert.match(
+    written[0].user,
+    /Character: Mara: red hair, freckles\nPlace: a rooftop bar above the city\nTime of night: dusk/,
+  );
+  // Each result hears the ones before it, so it is a new moment.
+  assert.match(written[3].user, /Results so far:\n- dream 1\n- dream 2\n- dream 3/);
+  assert.match(store.job("alice", jobs[0].id)!.dream!.why, /^Mara · Rooftop Bar, Dusk \(1 of 4\)/);
+  // The series is done; with a share's roll against it the next idea is an ordinary one.
+  state.rolls = [99];
+  const after = await dreamOnce();
+  assert.equal(after?.input.resultSet, undefined);
+  // A series whose character is deleted ends.
+  state.rolls = [];
+  await dreamOnce();
+  state.cards!.characters = [];
+  const next = await dreamOnce();
+  assert.equal(next?.input.resultSet, undefined);
+  assert.equal(dream.read("alice").series, undefined);
+});
+
+test("Dream videos animate the best-reviewed still and extend kept videos, each once, where the account prefers videos to run", async (t) => {
+  const grok: DreamProfile = {
+    id: "grok",
+    kind: "video",
+    label: "Grok",
+    mediaInputs: [{ id: "frame", role: "start" }],
+  };
+  const { dream, state, generated, dreamOnce } = fixture(t, [...profiles, grok]);
+  const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
+    (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
+  await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
+  generated({
+    id: "starred",
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt: "a starred still",
+    favorite: true,
+  });
+  const dreamed = (id: string, score: number, miss = "") =>
+    state.items.push({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      prompt: `still ${id}`,
+      jobId: `job-${id}`,
+      dream: { prompt: "", why: "", at: "", state: "unseen", projectId: "beach" },
+      review: { score, miss, model: "m", at: "" },
+    });
+  dreamed("good", 7);
+  dreamed("best", 9);
+  dreamed("miss", 3, "indoors");
+  const first = await dreamOnce();
+  assert.deepEqual(first?.input.referenceAssets, [
+    { assetId: "asset-best", source: "gallery", slot: "start" },
+  ]);
+  assert.equal(first?.dream?.arm, "animate");
+  assert.equal(first?.dream?.projectId, "beach");
+  assert.match(state.calls.at(-1)!.user, /first frame was made from: still best/);
+  assert.equal(frameOf(await dreamOnce()).assetId, "asset-good");
+  assert.equal(frameOf(await dreamOnce()).assetId, "asset-starred");
+  // Each still is animated once; a miss never is.
+  assert.equal(await dreamOnce(), undefined);
+  assert.match(
+    dream.status("alice").reason!,
+    /^Dream videos animate a kept, starred or well-reviewed image/,
+  );
+
+  // A kept video is extended from its last frame on its own model, never an extension again.
+  generated({
+    id: "clip",
+    ownerId: "alice",
+    type: "video",
+    status: "done",
+    prompt: "a clip",
+    favorite: true,
+    settings: { profileId: "wan" },
+  });
+  const extension = await dreamOnce();
+  assert.deepEqual(extension?.input.referenceAssets, [
+    { assetId: "last-frame-clip", source: "gallery", slot: "start" },
+  ]);
+  assert.equal(extension?.dream?.arm, "extend");
+  assert.match(state.calls.at(-1)!.system, /continues one of their clips from its last frame/);
+  assert.match(state.calls.at(-1)!.user, /clip so far was made from: a clip/);
+  assert.equal(await dreamOnce(), undefined);
+
+  // Cloud runs without the local video worker, and a fallback says where it ran.
+  dreamed("later", 8);
+  state.online.video = false;
+  state.video = {
+    id: "grok",
+    cloud: true,
+    note: "Local video isn't running, so this runs on Grok.",
+  };
+  const cloud = await dreamOnce();
+  assert.equal(cloud?.input.profileId, "grok");
+  assert.equal(frameOf(cloud).slot, "frame");
+  assert.match(cloud!.dream!.why, /^Local video isn't running, so this runs on Grok\./);
+  dreamed("last", 8);
+  state.video = { id: "wan", cloud: false, note: "" };
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal(dream.status("alice").reason, "The video worker is offline.");
+  state.online.video = true;
+  state.videoRefusal = "No video profile that takes a starting image is available to this account.";
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal(dream.status("alice").reason, state.videoRefusal);
 });
