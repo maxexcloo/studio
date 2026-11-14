@@ -1242,6 +1242,9 @@ server.listen(Number(port), host, () => {
   console.log(
     `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
   );
+  // Each worker's node list takes a large ComfyUI a second to send: read it now, not on the first request.
+  if (listWorkers().length)
+    void tracked("Catalogue warm-up", () => catalogue.mediaModels()).catch(() => {});
   void (async () => {
     // Listening beyond this computer: say where a phone can open it.
     if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
