@@ -1506,6 +1506,7 @@ test("image variants queue as one batch from the seed and video keeps the actual
   const client = await f.client();
   const variants = await generate(client, { count: 3, seed: 20 });
   assert.equal(variants.jobs.length, 1);
+  assert.equal(variants.jobs[0].images, 3);
   assert.deepEqual(
     f.submitted.map((body) => [body.count, body.seed]),
     [[3, "20"]],
@@ -3722,6 +3723,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
       job_id,
       ref: `result ${index + 1}`,
       link: result.structuredContent.jobs[index].link,
+      images: 2,
     })),
   });
   assert.equal(result.content.length, 1);
