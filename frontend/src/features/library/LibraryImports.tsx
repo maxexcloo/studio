@@ -22,6 +22,7 @@ import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
 import {
   gradeColours,
+  importBusy,
   LibraryImportReview,
   stateLabel,
   type ImportRecord,
@@ -82,7 +83,8 @@ export function LibraryImports({
   const imports = useQuery({
     ...importsQuery,
     enabled: active,
-    refetchInterval: active ? 4000 : false,
+    refetchInterval: (query) =>
+      active && query.state.data?.imports.some(importBusy) ? 4000 : false,
   });
   const refresh = () => {
     for (const queryKey of [["imports"], inspirationQuery.queryKey, ["library"]])
