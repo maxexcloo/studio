@@ -38,7 +38,7 @@ import { defaultProfile, useGeneration } from "../generation/GenerationProvider"
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery, type AssistantOption } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
-import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
+import { queueQuery, useQueueAction } from "../generation/Queue";
 import { profileForBackend, profileName } from "../generation/payload";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
@@ -101,10 +101,12 @@ const themeIcons: Record<string, LucideIcon> = {
 
 /** A failed item's Retry; the new pending tile replaces it (`onRetried` gets the new job). */
 function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): Action | null {
-  const queue = useQueue();
+  const failed = item.status === "failed" && Boolean(item.jobId);
+  // Only a failed item reads the queue, so others don't re-render on each of its polls.
+  const queue = useQuery({ ...queueQuery, subscribed: failed });
   const retry = useQueueAction(item.jobId);
   const tryAgain = useTryAgain([item]);
-  if (item.status !== "failed" || !item.jobId) return null;
+  if (!failed) return null;
   const job = queue.data?.jobs.find((job) => job.id === item.jobId);
   if (queue.error)
     return itemAction("retry", {
