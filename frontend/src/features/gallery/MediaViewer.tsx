@@ -246,6 +246,7 @@ export function MediaViewer({
   close,
   items = [item],
   related = items,
+  total,
   navigate,
   onReturnFocus,
   actions,
@@ -257,6 +258,8 @@ export function MediaViewer({
   items?: MediaItem[];
   /** The loaded items the version strip and Details › From and Derived look among; `items` by default. */
   related?: MediaItem[];
+  /** How many items match, where `items` are only those loaded so far. */
+  total?: number;
   navigate?: (item: MediaItem) => void;
   onReturnFocus?: (item: MediaItem) => void;
   /** The opening surface's own actions, in place of the item's prompt field and actions. */
@@ -627,7 +630,7 @@ export function MediaViewer({
                 )
               ) : canNavigate ? (
                 <Badge variant="default" size="lg" radius="xl" style={glass} fw={500}>
-                  {currentIndex + 1} / {viewable.length}
+                  {currentIndex + 1} / {Math.max(total ?? 0, viewable.length)}
                 </Badge>
               ) : (
                 <span />
