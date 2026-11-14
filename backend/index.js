@@ -99,7 +99,6 @@ import os from "node:os";
 import path from "node:path";
 import {
   networkListening,
-  demoMode,
   comfy,
   comfyFile,
   comfyOn,
@@ -114,7 +113,7 @@ import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp/mcp.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
+import { buildProfile, offlineModelResult } from "./model/models.js";
 import { flagEnabled } from "./deployment-settings.js";
 import { hfFetch } from "./hf-access.js";
 import { flushWorkflowPreferences } from "./workflow-catalogue.js";
@@ -400,7 +399,7 @@ const observeServices = createServicesObserver({
 const discoveredProfiles = async () => {
   const models = await mediaModels(false, { wait: false })
     .then((result) => result.models)
-    .catch(() => (demoMode ? mockModelResult() : offlineModelResult(defaultWorker()?.url)));
+    .catch(() => offlineModelResult(defaultWorker()?.url));
   return models.profiles || [];
 };
 registerMultiUserAuthRoutes(app, {
@@ -480,7 +479,6 @@ const library = registerLibraryRoutes(app, {
     );
   },
   profileDefinitions,
-  schedule: !demoMode,
 });
 
 registerWorkflowRoutes(app, { loadComfyContext });
@@ -621,14 +619,9 @@ registerRedditImportRoute(app, { uploaded: (item) => void imageSearch.completed(
 
 registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
 
-// Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = createGenerationSubmission({
   loadComfyContext,
-  mediaModels: (force) =>
-    mediaModels(force).catch((error) => {
-      if (demoMode) return { models: mockModelResult() };
-      throw error;
-    }),
+  mediaModels,
   comfyDownMessage,
 });
 
@@ -1010,8 +1003,7 @@ const dreamReview = createReview({
 });
 // Image search (domain/image-search.ts): SigLIP 2 on the CPU, so search finds what images show.
 const imageSearch = createImageSearch({
-  // Demo images are placeholders, and demo test runs must not download the model.
-  enabled: () => !demoMode && flagEnabled("STUDIO_IMAGE_SEARCH"),
+  enabled: () => flagEnabled("STUDIO_IMAGE_SEARCH"),
   encoder: createSiglip({ dataDir, fetch: hfFetch }),
   vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
   idle: galleryIdle,
@@ -1024,8 +1016,7 @@ const imageSearch = createImageSearch({
 registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
 // Face check (domain/face-check.ts): results made with a character, compared by face with its image.
 const faceCheck = createFaceCheck({
-  // Demo images are placeholders, and demo test runs must not download the models.
-  enabled: () => !demoMode && flagEnabled("STUDIO_FACE_CHECK"),
+  enabled: () => flagEnabled("STUDIO_FACE_CHECK"),
   // Studio's Hugging Face fetch (mirror, token and proxy) only for Hugging Face; GitHub plainly.
   faces: createFaces({
     dataDir,
@@ -1203,10 +1194,9 @@ server.listen(Number(port), host, () => {
     }
     // No workers is a setup of its own: say so.
     if (!listWorkers().length) {
-      if (!demoMode)
-        console.log(
-          "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
-        );
+      console.log(
+        "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
+      );
       return;
     }
     // Starting before ComfyUI is fine, but say so instead of leaving people to guess.
@@ -1217,7 +1207,7 @@ server.listen(Number(port), host, () => {
       (response) => response.ok,
       () => false,
     );
-    if (!answering && !demoMode)
+    if (!answering)
       console.log(
         `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
       );

@@ -2,7 +2,7 @@ import { runBackend } from "../shared/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import { moveTargets, onWorkerOffline, profileOnBackendKey, routeJob } from "./comfy/backends.js";
-import { comfyOn, demoMode } from "./comfy/comfy.js";
+import { comfyOn } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logWarning } from "./crash-log.js";
@@ -24,7 +24,6 @@ import { writeBytesFileAsync } from "./json-store.js";
 import { mediaRoot, mediaSubfolder } from "./media-paths.js";
 import { minorAgeRefusal } from "./minor-age.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
-import { mockModelResult } from "./model/models.js";
 import { withPngText } from "./png-text.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { writingIssue, writingRequest } from "./prompt-stage.js";
@@ -60,7 +59,7 @@ export function createGenerationQueue({
     if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
     const models = await mediaModels(false)
       .then((result) => result.models)
-      .catch(() => (demoMode ? mockModelResult() : { profiles: [] }));
+      .catch(() => ({ profiles: [] }));
     const profile = models.profiles?.find(
       (item) => item.id === canonicalProfileId(input.profileId),
     );
@@ -140,7 +139,6 @@ export function createGenerationQueue({
       await recoverRunningJobs();
     },
     eligible: async (job) => {
-      if (demoMode) return;
       if (!job.backend || !workerById(job.backend))
         return "Waiting for its worker to be configured.";
       const workloads = managedWorkloads(job);
