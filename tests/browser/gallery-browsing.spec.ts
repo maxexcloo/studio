@@ -665,6 +665,9 @@ test("Tiles select as in a file manager: Ctrl toggles, Shift selects a range, Es
   // A plain click toggles while selecting.
   await tile(4).click();
   await expect(status).toHaveText("3 Selected");
+  // An open tooltip doesn't take the Escape.
+  await selectionAction(page, "Star").hover();
+  await expect(page.getByRole("tooltip", { name: "Star" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(status).toHaveCount(0);
   await tile(2).focus();
@@ -673,6 +676,32 @@ test("Tiles select as in a file manager: Ctrl toggles, Shift selects a range, Es
   await page.keyboard.press("Escape");
   await tile(2).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+});
+
+test("Download takes a selection of any size as one archive", async ({ page }, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones may share instead");
+  const state = await fixtures(page);
+  state.gallery.push(...results(700));
+  let posted: string[] = [];
+  await page.route("**/api/gallery/export**", (route) =>
+    route.request().method() === "POST"
+      ? ((posted = route.request().postDataJSON().ids),
+        route.fulfill({ json: { href: "/api/gallery/export?selection=token" } }))
+      : route.fulfill({
+          body: "archive",
+          headers: { "Content-Disposition": 'attachment; filename="selection.zip"' },
+        }),
+  );
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.getByRole("button", { name: "Select All", exact: true }).click();
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  await expect(status).toHaveText("700 Selected");
+  const download = page.waitForEvent("download");
+  await selectionAction(page, "Download").click();
+  expect((await download).suggestedFilename()).toBe("selection.zip");
+  expect(posted).toHaveLength(700);
+  await expect(status).toHaveCount(0);
 });
 
 test("Offline views report the API error and support retry", async ({ page }) => {
@@ -790,11 +819,6 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   // Phones that share natively share instead of downloading.
   const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Share")).toBeEnabled();
-  else
-    await expect(selectionAction(page, "Download", "link")).toHaveAttribute(
-      "href",
-      /ids=selection-0%2Cselection-1/,
-    );
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
   // Each finished action ends the selection.
