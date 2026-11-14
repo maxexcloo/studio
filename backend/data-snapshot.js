@@ -8,7 +8,7 @@
  * is a matter of stopping Studio and copying them back (README.md, Running Studio).
  *
  * Only the small state files are copied. Media, thumbnails, video previews,
- * the image search index, reference images and the backups in data/backups
+ * the image search index, face check models, reference images and the backups in data/backups
  * stay where they are: no update rewrites them, and copying them takes
  * gigabytes. Snapshots are readable by this user
  * only and go after 14 days (3 at most).
@@ -19,7 +19,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { trashFolderName } from "./data-names.js";
+import { agentSignInSocketName, trashFolderName } from "./data-names.js";
 import { appVersion, currentDataDir } from "./data-dir.js";
 import { databaseFile } from "./persistence/runtime.ts";
 
@@ -29,12 +29,14 @@ const markerName = ".version";
 const backupsName = ".backups";
 const keepDays = 14;
 const keepCount = 3;
-// Large, or never rewritten by an update, or not ours to keep.
+// Large, or never rewritten by an update, or not ours to keep (a socket can't be copied).
 const skipped = new Set([
   ".thumbnails",
   ".video-previews",
+  agentSignInSocketName,
   backupsName,
   "backups",
+  "face-check",
   "image-search",
   "media",
   "reference-assets",
