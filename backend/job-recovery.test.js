@@ -350,7 +350,7 @@ test("a running job its runner follows costs the worker nothing: no queue or his
   assert.equal(s.jobs.get("long").progress.value, 3);
 });
 
-test("a restored long video keeps its index, request time, settings and elapsed time from ComfyUI history", async () => {
+test("a restored long video keeps its index, request time, settings, Dream mark and elapsed time from ComfyUI history", async () => {
   const s = fixture();
   const createdAt = "2026-10-22T10:00:00.000Z";
   const start = Date.parse(createdAt) + 5_000;
@@ -362,6 +362,7 @@ test("a restored long video keeps its index, request time, settings and elapsed 
       createdAt,
       ownerId: "account-a",
       settings: { profileId: "h3-fl-stock20", frames: 192 },
+      dream: { state: "unseen", prompt: "", why: "", at: createdAt },
     },
   ];
   s.jobs.set("fl20", {
@@ -401,6 +402,7 @@ test("a restored long video keeps its index, request time, settings and elapsed 
   assert.equal(record.createdAt, createdAt);
   assert.equal(record.ownerId, "account-a");
   assert.deepEqual(record.settings, { profileId: "h3-fl-stock20", frames: 192 });
+  assert.equal(record.dream.state, "unseen", "a Dream result stays in Dream's pool");
   assert.equal(record.durationMs, end - Date.parse(createdAt));
   assert.deepEqual(record.timing, { runMs: 19 * 60_000, queueMs: 5_000 });
   assert.equal(record.promptId, "fl20-prompt");
