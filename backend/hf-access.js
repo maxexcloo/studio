@@ -1,5 +1,3 @@
-import { envFileKeys } from "./env.js";
-
 /**
  * How Studio reaches Hugging Face for model downloads, the way the Hugging Face
  * tools themselves do it:
@@ -12,37 +10,26 @@ import { envFileKeys } from "./env.js";
 
 const tokenKeys = ["HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"];
 
-/** The token in use and where it came from ("file" when read from .env, "environment" when set outside). */
-function hfToken(env = process.env) {
+/** The credential for Hugging Face downloads, or "". */
+export function hfTokenValue(env = process.env) {
   for (const key of tokenKeys) {
     const value = String(env[key] || "").trim();
-    if (value) return { token: value, source: envFileKeys.has(key) ? "file" : "environment", key };
+    if (value) return value;
   }
-  return { token: "", source: "", key: "" };
+  return "";
 }
 
 /** What a refusal from a Hugging Face repository asks of the administrator. */
 export function hfAccessNote(repo, env = process.env) {
   const page = `https://huggingface.co/${repo}`;
-  return hfToken(env).token
+  return hfTokenValue(env)
     ? `Hugging Face needs access to this gated repository: accept its terms at ${page} with the account the deployment's token belongs to.`
     : `Hugging Face needs a token for this repository: add HF_TOKEN to the deployment and accept its terms at ${page}.`;
-}
-
-/** The credential for the worker's own Hugging Face download, or "". */
-export function hfTokenValue(env = process.env) {
-  return hfToken(env).token;
 }
 
 /** Whether downloads go to a mirror instead of huggingface.co. */
 export function hfMirrored(env = process.env) {
   return Boolean(hfEndpoint(env));
-}
-
-/** Whether a token is set, where from and under which name, never the token itself. */
-export function hfTokenStatus(env = process.env) {
-  const { token, source, key } = hfToken(env);
-  return { set: Boolean(token), source, ...(token ? { key, hint: `hf_…${token.slice(-4)}` } : {}) };
 }
 
 /** The mirror downloads go to instead of huggingface.co, or null. */
@@ -78,7 +65,7 @@ const redirects = new Set([301, 302, 303, 307, 308]);
  */
 export async function hfFetch(input, init = {}, { env = process.env, transport = null } = {}) {
   let url = mirroredUrl(input, env);
-  const { token } = hfToken(env);
+  const token = hfTokenValue(env);
   for (let hop = 0; hop <= 10; hop += 1) {
     const headers = new Headers(init.headers || {});
     headers.delete("authorization");
