@@ -30,7 +30,7 @@ const steps = [
   {
     name: "pruneBackups",
     run: pruneBackups,
-    changes: (plan) => plan.folders.length,
+    changes: (plan) => plan.paths.length,
     online: true,
   },
   {
@@ -51,7 +51,7 @@ const stopped =
   "Needs Studio stopped: run migrate-runtime against the data folder (README.md, Data & Migrations).";
 
 /**
- * Each step's plan, or with `apply` its result (a `backup` path where it writes one). `online`
+ * Each step's plan, or with `apply` its result. `online`
  * (the running server) skips applying a step that isn't online-safe and has work, returning its
  * plan with `refused`. `dreamOwner` adds the Dream ownership step (the command's --dream-owner).
  * `gallery` is the running server's, for steps that check or patch its records.
@@ -86,7 +86,7 @@ export async function runtimeMigrations(
   return results;
 }
 
-/** What the server log records of a run: per step its change count, outcome and backup. */
+/** What the server log records of a run: per step its change count and outcome. */
 function summary(results, apply) {
   return (
     Object.entries(results)
@@ -99,7 +99,7 @@ function summary(results, apply) {
             : count
               ? "planned"
               : "nothing to do";
-        return `${name}: ${count} ${outcome}${result.backup ? `, backup ${result.backup}` : ""}`;
+        return `${name}: ${count} ${outcome}`;
       })
       .join("; ") || "no steps pending"
   );
