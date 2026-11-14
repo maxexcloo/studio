@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import { memo, type Ref } from "react";
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -102,7 +102,6 @@ export function PromptFields({
   /** Sends the assistant's Custom… as a change to the draft (`useDraftChange`). */
   ask?: DraftChange;
 }) {
-  const phone = usePhone();
   const proposal = ask?.proposal;
   // Suggestions change the prompt as it was before any proposal.
   const base = ask?.typed?.prompt ?? input.prompt;
@@ -131,11 +130,6 @@ export function PromptFields({
     kind: "positive",
     value: input.prompt,
     onPick: (prompt) => onChange({ prompt }),
-  });
-  const negativeHistory = usePromptHistory({
-    kind: "negative",
-    value: input.negative,
-    onPick: (negative) => onChange({ negative }),
   });
   return (
     <>
@@ -175,26 +169,45 @@ export function PromptFields({
         />
         {assistant.dialog}
       </div>
-      {negative && (
-        <div className={classes.negative} data-fill={fill || undefined}>
-          <TextBox
-            tools={[negativeHistory.action]}
-            popups={negativeHistory.popup}
-            classNames={{ input: classes.input }}
-            variant="unstyled"
-            aria-label="Negative Prompt"
-            placeholder="Negative prompt: what to leave out"
-            // In the phone sheet it keeps two rows until edited, when it takes the room left.
-            autosize={!fill}
-            rows={fill ? 2 : undefined}
-            minRows={1}
-            maxRows={phone ? 2 : 4}
-            inline={fill}
-            value={input.negative}
-            onChange={(negative) => onChange({ negative })}
-          />
-        </div>
-      )}
+      {negative && <NegativePrompt value={input.negative} onChange={onChange} fill={fill} />}
     </>
   );
 }
+
+/** Memoised, so typing the prompt doesn't render it: the autosized text measures itself each render. */
+const NegativePrompt = memo(function NegativePrompt({
+  value,
+  onChange,
+  fill,
+}: {
+  value: string;
+  onChange: (patch: Partial<GenerationInput>) => void;
+  fill: boolean;
+}) {
+  const phone = usePhone();
+  const history = usePromptHistory({
+    kind: "negative",
+    value,
+    onPick: (negative) => onChange({ negative }),
+  });
+  return (
+    <div className={classes.negative} data-fill={fill || undefined}>
+      <TextBox
+        tools={[history.action]}
+        popups={history.popup}
+        classNames={{ input: classes.input }}
+        variant="unstyled"
+        aria-label="Negative Prompt"
+        placeholder="Negative prompt: what to leave out"
+        // In the phone sheet it keeps two rows until edited, when it takes the room left.
+        autosize={!fill}
+        rows={fill ? 2 : undefined}
+        minRows={1}
+        maxRows={phone ? 2 : 4}
+        inline={fill}
+        value={value}
+        onChange={(negative) => onChange({ negative })}
+      />
+    </div>
+  );
+});
