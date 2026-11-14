@@ -852,7 +852,7 @@ export async function fixtures(page: Page) {
         },
         today: { images: 0, videos: 0 },
         unseen: [],
-        status: { status: "off" },
+        status: "off",
       });
     return respond({ ok: true });
   });
