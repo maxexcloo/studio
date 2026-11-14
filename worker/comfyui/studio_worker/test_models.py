@@ -8,10 +8,8 @@ from pathlib import Path
 from models import (
     MAX_BYTES,
     digest,
-    discard,
     inventory,
     make_folder,
-    preserve_replaced,
     receive,
     remove,
     state,
@@ -134,17 +132,11 @@ class WorkerModelTests(unittest.TestCase):
             state(self.root, "loras", "nested/real.safetensors")
         self.assertEqual(inventory(self.root)["files"], [])
 
-    def test_existing_files_need_explicit_replacement_and_old_bytes_survive(self):
+    def test_existing_files_are_never_overwritten(self):
         self.file.write_bytes(b"original")
         with self.assertRaisesRegex(ValueError, "already uses"):
             self.receive([b"abcdef"])
-        preserve_replaced(self.root, "loras", self.file.name, self.sha)
-        backups = list(self.file.parent.glob("model.safetensors.previous.*"))
-        self.assertEqual(backups[0].read_bytes(), b"original")
-        self.receive([b"abcdef"])
-        discard(self.root, "loras", self.file.name)
-        self.assertEqual(self.file.read_bytes(), b"abcdef")
-        self.assertEqual(backups[0].read_bytes(), b"original")
+        self.assertEqual(self.file.read_bytes(), b"original")
 
     def test_remove_needs_the_recorded_checksum(self):
         self.file.write_bytes(b"abcdef")
