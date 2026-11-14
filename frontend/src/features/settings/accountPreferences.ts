@@ -46,16 +46,21 @@ export const preferencesQuery = queryOptions({
   queryFn: () => api<PreferencesStatus>("/api/preferences"),
 });
 
-/** Where the gallery holds back queued work (Unfinished Work), queuing says so instead of a tile. */
-export function showQueued(client: QueryClient) {
+/**
+ * Where the gallery holds back queued work (Unfinished Work), queuing says so instead of a tile,
+ * in one notice with any `note` about where the work runs.
+ */
+export function showQueued(client: QueryClient, note?: string) {
   const work = client.getQueryData(preferencesQuery.queryKey)?.preferences.galleryWork;
-  if (work !== "queued")
-    notifications.show({
-      message:
-        work === "running"
-          ? "Queued. It shows in the gallery once it starts."
-          : "Queued. It shows in the gallery once it’s done.",
-    });
+  const message = [
+    note,
+    work === "running"
+      ? "Queued. It shows in the gallery once it starts."
+      : work !== "queued" && "Queued. It shows in the gallery once it’s done.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (message) notifications.show({ message });
 }
 
 /** Saves preferences at once; a failure refetches the saved ones and reports through the default notification. */

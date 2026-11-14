@@ -1052,3 +1052,20 @@ test("A model with its own resolutions offers them with its aspects in the size 
   await page.getByRole("button", { name: "16:9", exact: true }).click();
   await expect(page.getByRole("button", { name: "Aspect", exact: true })).toHaveText("16:9 · 2K");
 });
+
+test("A default that gave way to the other side says so in the one Queued notice", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const note = "No local image model is running, so this runs in the cloud.";
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: { profiles, defaults: { imageModel: profiles[0].id }, defaultNotes: { image: note } },
+    }),
+  );
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet harbour");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  await expect(page.getByRole("alert").filter({ hasText: `${note} Queued.` })).toBeVisible();
+});
