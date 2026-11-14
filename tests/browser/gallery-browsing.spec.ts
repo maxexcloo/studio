@@ -75,11 +75,16 @@ test("The viewer loads the next page as it nears the last loaded result and coun
         : { items: items.slice(0, 60), nextCursor: "next", hasMore: true, totalApprox: 61 },
     });
   });
+  const nextPage = page.waitForResponse((response) => response.url().includes("cursor=next"));
   await page.goto("/images?item=browse-59");
   const viewer = page.getByRole("dialog");
   await expect(viewer.getByText("60 / 61", { exact: true })).toBeVisible();
-  await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/item=browse-60/);
+  // Navigation stops at the last loaded result, so the step waits for the page it loaded to show.
+  await nextPage;
+  await expect(async () => {
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/item=browse-60/, { timeout: 500 });
+  }).toPass();
   await expect(viewer.getByText("61 / 61", { exact: true })).toBeVisible();
 });
 
