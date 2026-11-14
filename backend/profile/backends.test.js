@@ -16,7 +16,7 @@ const { canonicalProfileId, guideStore, profileAliasBackend, profileStore } =
 const { getCustomWorkflow, metadataFromJson, userWorkflowsDir } =
   await import("../custom-workflows.js");
 const { inferModels } = await import("../model/models.js");
-const { mergeWorkerModels, noteWorkerProfiles, noteWorkerReachable, routeJob } =
+const { mergeWorkerModels, moveTargets, noteWorkerProfiles, noteWorkerReachable, routeJob } =
   await import("../comfy/backends.js");
 const { readEditableProfile, saveEditableProfile, validateProfileText } =
   await import("./editor.js");
@@ -242,6 +242,13 @@ test("readiness follows the selected backend, with the reason, and never falls b
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "primary");
     noteWorkerProfiles("primary", []);
     assert.equal(routeJob("image", { profileId: "custom:combined@comfyui" })?.id, "second");
+    // Queued work never moves to a worker Studio scales until it answers, so it can't bounce
+    // between a busy worker and a stopped one due a retry; one Studio doesn't scale stays a choice.
+    const targets = (scaled) => moveTargets("image", "", () => scaled).map((worker) => worker.id);
+    assert.deepEqual(targets(true), []);
+    assert.deepEqual(targets(false), ["primary", "second"]);
+    noteWorkerReachable("primary", true);
+    assert.deepEqual(targets(true), ["primary"]);
     // Two workers' catalogues: the one where the selected backend is ready wins.
     const merged = mergeWorkerModels([
       { worker: { id: "second", capabilities: ["image"] }, models: { profiles: [comfyOnly] } },
