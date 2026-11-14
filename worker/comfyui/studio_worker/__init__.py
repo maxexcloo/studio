@@ -112,11 +112,6 @@ if PromptServer is not None and getattr(PromptServer, "instance", None) is not N
             if action == "discard":
                 await models.discard_when_idle(*args)
                 result = {}
-            elif action == "replace":
-                await asyncio.to_thread(
-                    models.preserve_replaced, *args, str(body.get("sha256", ""))
-                )
-                result = {}
             elif action == "remove":
                 result = {
                     "removed": await asyncio.to_thread(
