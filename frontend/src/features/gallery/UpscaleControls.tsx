@@ -293,7 +293,7 @@ export function useUpscaleAction(
               }
             : {
                 id: upscaled ? "upscale-again" : "upscale-run",
-                label: upscaled ? "Regenerate Upscale" : image ? "Upscale Image" : "Upscale Video",
+                label: upscaled ? "Upscale Again" : "Upscale",
                 description: status?.substituting
                   ? `Uses installed model ${status.fallbackFile}`
                   : undefined,

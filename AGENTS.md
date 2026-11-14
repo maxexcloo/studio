@@ -93,7 +93,12 @@ the primary component reference and verify APIs against the installed version.
   action bar's icon; ⋯ already means more, so it never carries one. Icon-only controls use accessible names and tooltips. Menus group related actions, put the usual
   action first and Delete last, and share their sizing and item style. An option whose label
   alone is ambiguous carries a one-line `description` under it. An action's settings sit in its
-  menu as segmented choices and checked options above its run, not in a separate dialog.
+  menu, not in a separate dialog. Every menu has one shape: settings (segmented choices, switches,
+  checked options) first, then its choices, then after a divider the action that runs or leaves it
+  (Upscale, Animate in Composer, Clear). Labels name the verb alone where the menu or box already
+  says what it acts on (Upscale, Share, Copy, Clear, Reset; not Upscale Image or Clear Prompt),
+  adding a word only where the verb alone is ambiguous (Stop Upscale, Edit in Composer), and one
+  action keeps one label everywhere. Clear and Reset turn into Undo until the text next changes.
 
 ### Layers, Focus & Phones
 
@@ -223,7 +228,7 @@ the primary component reference and verify APIs against the installed version.
   Comparison where the item belongs to one. Edit leads with Run Again and Run Again, Same Seed,
   which queue from where they are, then Use as Character (starting a card in
   Library › Characters) and Use as Reference, then what changes the item itself
-  (Edit Image, or a video's Trim and the like) with Recreate in Composer last;
+  (Edit in Composer, or a video's Trim and the like) with Recreate in Composer last;
   menu options expand in place on phones and touch screens. The phone viewer bar fits every action
   on one row at a compact size, without More; elsewhere the viewer bar shows
   every action on one row: where they outgrow it the last named actions drop to icons
