@@ -778,6 +778,7 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   // The view (Grid or Runs) leads the popup.
   await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
   await expect(page.getByRole("switch", { name: "All Versions", exact: true })).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Comparisons", exact: true })).not.toBeChecked();
   await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");

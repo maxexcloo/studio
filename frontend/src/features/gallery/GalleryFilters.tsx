@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import {
   Badge,
   Button,
-  Divider,
   Group,
   Input,
   MultiSelect,
@@ -357,7 +356,7 @@ export function FilterToggle({
 
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
- * (Grid or Runs) on its own row, then the view's own `toggles` (such as All Versions), the date and
+ * (Grid or Runs) with the view's own `toggles` (such as All Versions) under it, then the date and
  * each facet. Starred and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
  * Choices apply at once.
  */
@@ -445,7 +444,7 @@ export function GalleryFilterPanel({
     </Input.Wrapper>
   );
   return (
-    <Stack gap="sm">
+    <Stack gap="md">
       {facets.error && (
         <Button
           {...chipProps}
@@ -458,9 +457,14 @@ export function GalleryFilterPanel({
           Couldn't Load Filters
         </Button>
       )}
-      {view && <Input.Wrapper label="View">{view}</Input.Wrapper>}
-      {toggles}
-      {(view || toggles) && <Divider />}
+      {view && (
+        <Input.Wrapper label="View">
+          <Stack gap="xs" mt={4} className={classes.toggles}>
+            {view}
+            {toggles}
+          </Stack>
+        </Input.Wrapper>
+      )}
       <Input.Wrapper label="Date">
         <SegmentedControl
           aria-label="Date"
@@ -473,10 +477,8 @@ export function GalleryFilterPanel({
         />
       </Input.Wrapper>
       {lists.tag.length > 0 && many("tag", "Tags")}
-      <Divider />
       {many("model", "Models")}
       {many("lora", "LoRAs")}
-      {(options.size.length > 0 || options.aspect.length > 0) && <Divider />}
       {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
       {options.size.length > 0 && choices("size", "Size")}
     </Stack>
