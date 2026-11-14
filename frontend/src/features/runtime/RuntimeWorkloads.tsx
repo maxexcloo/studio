@@ -39,6 +39,7 @@ import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { usePhone } from "../../ui/usePhone";
 
 export const runtimeStatusQuery = queryOptions({
   queryKey: ["runtime-status"],
@@ -438,6 +439,7 @@ function AutomaticControlRows({
 /** Settings › Workers: which GPU deployments run, a previewed switch and restarts. */
 export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> }) {
   const client = useQueryClient();
+  const phone = usePhone();
   const status = useQuery(runtimeStatusQuery);
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preview, setPreview] = useState<RuntimePreview | null>(null);
@@ -517,6 +519,8 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             cell: (item) => (
               <Checkbox
                 aria-label={`Run ${item.label}`}
+                // Phones fold this cell under the workload's name, without the column's header.
+                label={phone ? "Run" : undefined}
                 checked={chosen.includes(item.id)}
                 disabled={Boolean(operation)}
                 onChange={(event) =>
