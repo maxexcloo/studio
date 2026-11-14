@@ -21,7 +21,6 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { useOpenComposer } from "../generation/openComposer";
@@ -138,7 +137,6 @@ function useSaveFrame(item: MediaItem): Action {
       flash(item.id);
       void cache.invalidateQueries({ queryKey: ["gallery"] });
     },
-    onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
     id: "save-frame",
