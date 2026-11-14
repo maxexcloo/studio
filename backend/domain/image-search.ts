@@ -155,6 +155,12 @@ export function createImageSearch(options: {
         return vector ? likeness(vector, wanted) >= nearThreshold : false;
       };
     },
+    /** How alike two items' images are, undefined where either has no vector or search is off. */
+    likeness(a: IdleItem, b: IdleItem) {
+      const first = options.enabled() ? vectors.get(a) : undefined;
+      const second = vectors.get(b);
+      return first && second ? likeness(first, second) : undefined;
+    },
     /**
      * Find Similar: each item's likeness to `source`'s image, undefined for items not read yet or
      * less alike than `strictness` keeps, or null when `source` has no vector (Image Search off or
