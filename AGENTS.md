@@ -14,16 +14,18 @@
 
 - The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
 - Studio builds the app and `studio-worker` GPU images. Deployment configuration belongs to kubelab (`apps/base/studio`); Studio controls configured GPU workloads. Automatic lifecycle control stays off by default.
-- Every green `main` commit publishes images and deploys through kubelab. CI owns versioning and releases.
+- Every green `main` commit publishes images and deploys through kubelab. CI owns versioning and releases. After a release, tick the manual-run box on kubelab's Dependency Dashboard (issue 23) so the hosted Renovate app deploys it promptly.
 - Open a pull request for large changes. Merge only what is ready for production, including any real-model verification it needs.
 - Single-user mode keeps working for local development.
+- When coordinating Orca workers here, answer their questions and approvals, close finished workers, and review and merge their PRs, including large ones, without waiting for the user. Take a ZFS snapshot before merging a data migration. Product direction, secrets and other people's accounts stay the user's decisions.
+- Restore live service (rollout restarts, GPU workload restores, unwedging a runtime change) without asking, back to its previous intended state, then report. GPU workloads may be swapped or parked while testing; restore GPU 1 and GPU 2 afterwards.
 
 ## Verification
 
-- Retain browser interaction tests in CI.
+- Retain browser interaction tests in CI and run them only there.
 - Keep runtime data out of Git and test output.
 - Tests never generate media or call cloud providers. Verify real behaviour on the live deployment, never on a local copy of production data.
-- To use live Studio or LibreChat in agent-browser as the user, run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser).
+- To use live Studio or LibreChat in agent-browser as the user, never another account, run `mise run browser-sign-in` then `agent-browser --session <name> state load <file>` with the file it names (`--state` is ignored on the shared browser).
 
 ## UI Patterns
 
