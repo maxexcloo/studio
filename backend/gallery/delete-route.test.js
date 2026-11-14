@@ -22,7 +22,11 @@ app.use((req, _res, next) => {
   req.studioAccount = { userId, role, authenticated: true, features: { gallery: true } };
   next();
 });
-registerGalleryDeleteRoute(app);
+const deleted = [];
+registerGalleryDeleteRoute(app, {
+  deleted: (req, items) =>
+    deleted.push([req.studioAccount.userId, items.map((item) => item.jobId)]),
+});
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/gallery`;
@@ -62,6 +66,8 @@ test("an account deletes its own finished item by its URL ID; another owner's an
   assert.equal((await own.json()).removed, 1);
   assert.equal(store.gallery.length, 0);
   assert.equal(fs.existsSync(file), false);
+  // Only the owner's own deletion is heard, for the taste profile.
+  assert.deepEqual(deleted.at(-1), ["alice", ["mvzvoi1l-cb839ee3-image"]]);
 });
 
 test("one request deletes many of the account's own items and leaves another owner's", async () => {

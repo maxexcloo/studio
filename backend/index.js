@@ -596,10 +596,11 @@ const itemsStarred = (ownerId, items, favorite) => {
     ...(favorite ? setPreferenceSignals(items, gallery, itemValues) : []),
   ]);
 };
-// Every admitted job teaches the taste profile (iterations) and makes a waiting finishing upscale step aside.
+// Every admitted job teaches the taste profile (iterations, chat reruns included) and makes a waiting finishing upscale step aside.
 // Animating one of the account's photos, from the app or MCP, stars that photo.
 const jobAdmitted = (job) => {
-  if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+  if (job.parentJobId || job.parentItemId)
+    taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   const photo = animatedPhoto(job);
   if (photo) itemsStarred(job.ownerId, setGalleryFavorites([photo.id], true), true);
   finishing.admitted(job);
@@ -808,6 +809,7 @@ const dream = createDream({
   store,
   taste,
   projects: (ownerId) => projects.list(ownerId),
+  chats: (ownerId) => projects.chats(ownerId),
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   // A group's Dream feature gates its routes and idle work alike.
   access: (ownerId) => {
@@ -1121,7 +1123,16 @@ const mcpDomainRequest = createMcpDomainRequest({
 });
 registerGalleryErrorRoutes(app);
 
-registerGalleryDeleteRoute(app);
+registerGalleryDeleteRoute(app, {
+  // Deleting a finished Studio result teaches the taste profile that its owner passed it over.
+  deleted: (req, items) =>
+    taste.record(
+      ownerIdForRequest(req),
+      items
+        .filter((item) => item.status === "done" && item.jobId)
+        .map((item) => tasteSignal("delete", item.jobId, itemValues(item))),
+    ),
+});
 
 registerComfyMediaRoutes(app);
 
