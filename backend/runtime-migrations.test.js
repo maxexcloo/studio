@@ -30,9 +30,7 @@ test("the migrations route answers administrators with every step's plan, and lo
   assert.equal(dry.code, 200);
   assert.deepEqual(Object.keys(dry.body.steps), [
     "chatRecords",
-    "pruneBackups",
     "missingComfyOutputs",
-    "orphanThumbnails",
     "comparisonSets",
   ]);
   assert.deepEqual(await post({ apply: true }), {
@@ -40,8 +38,8 @@ test("the migrations route answers administrators with every step's plan, and lo
     body: { ok: true, apply: true, steps: dry.body.steps },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: chatRecords: 0 nothing to do; pruneBackups: 0 nothing to do; missingComfyOutputs: 0 nothing to do; orphanThumbnails: 0 nothing to do; comparisonSets: 0 nothing to do",
-    "[migrations] Apply: chatRecords: 0 nothing to do; pruneBackups: 0 nothing to do; missingComfyOutputs: 0 nothing to do; orphanThumbnails: 0 nothing to do; comparisonSets: 0 nothing to do",
+    "[migrations] Dry run: chatRecords: 0 nothing to do; missingComfyOutputs: 0 nothing to do; comparisonSets: 0 nothing to do",
+    "[migrations] Apply: chatRecords: 0 nothing to do; missingComfyOutputs: 0 nothing to do; comparisonSets: 0 nothing to do",
   ]);
   assert.deepEqual(fs.readdirSync(dataDir), [], "nothing pending writes nothing");
 });
