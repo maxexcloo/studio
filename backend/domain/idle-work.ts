@@ -81,8 +81,8 @@ const backoffMs = 60_000;
 const rateWindow = 20;
 
 /**
- * Text-model work on finished gallery records while Studio is idle (the same signal Dream uses: no
- * live job and no text work), newest first. Outside a pass a trickle takes new items one at a
+ * Text-model work on finished gallery records while Studio is idle (no live job but Dream's and no
+ * text work), newest first. Outside a pass a trickle takes new items one at a
  * time, at most one every 10 s and `dailyItems` a day (the server's local day). A pass runs flat
  * out, `passConcurrency` at a time, until every item is done or it is stopped; `continuous` work
  * is always in a pass and keeps no saved state. Either yields the moment work appears: the calls

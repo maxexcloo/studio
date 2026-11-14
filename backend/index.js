@@ -935,16 +935,10 @@ const dream = createDream({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerDreamRoutes(app, { dream, projects });
-// Dream's idle rule (domain/dream.ts): no live job and no text work. A Dream job waiting for a worker
-// doesn't count, so captions and finishing still run while Dream keeps one ready.
+// Idle for background work: no live job but Dream's and no text work. Dream yields to all of it,
+// so review, captions and finishing don't wait for Dream to reach its caps.
 const studioIdle = () =>
-  !textBusy() &&
-  !store
-    .openJobs()
-    .some(
-      (job) =>
-        !(["queued", "waiting"].includes(job.status) && job.priority === queuePriority.dream),
-    );
+  !textBusy() && !store.openJobs().some((job) => job.priority !== queuePriority.dream);
 // Gallery work (captions, image search, titles, suggested prompts, next steps) may run while busy.
 const galleryIdle = () => flagEnabled("STUDIO_GALLERY_WHILE_BUSY") || studioIdle();
 // Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
