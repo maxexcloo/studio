@@ -27,21 +27,14 @@ test("the migrations route answers administrators with every step's plan, and lo
   };
 
   assert.deepEqual(await post({ apply: true }, "user"), { code: 403, body: refusal.payload });
-  const dry = await post({});
-  assert.equal(dry.code, 200);
-  assert.deepEqual(Object.keys(dry.body.steps), [
-    "chatRecords",
-    "missingComfyOutputs",
-    "comparisonSets",
-    "stackPresets",
-  ]);
+  assert.deepEqual(await post({}), { code: 200, body: { ok: true, apply: false, steps: {} } });
   assert.deepEqual(await post({ apply: true }), {
     code: 200,
-    body: { ok: true, apply: true, steps: dry.body.steps },
+    body: { ok: true, apply: true, steps: {} },
   });
   assert.deepEqual(lines, [
-    "[migrations] Dry run: chatRecords: 0 nothing to do; missingComfyOutputs: 0 nothing to do; comparisonSets: 0 nothing to do; stackPresets: 0 nothing to do",
-    "[migrations] Apply: chatRecords: 0 nothing to do; missingComfyOutputs: 0 nothing to do; comparisonSets: 0 nothing to do; stackPresets: 0 nothing to do",
+    "[migrations] Dry run: no steps pending",
+    "[migrations] Apply: no steps pending",
   ]);
   assert.deepEqual(fs.readdirSync(dataDir), [], "nothing pending writes nothing");
 });

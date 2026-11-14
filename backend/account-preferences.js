@@ -81,11 +81,6 @@ export function saveAccountPreferences(ownerId, patch) {
   return accountPreferences(ownerId);
 }
 
-/** Forgets the cached preferences, so the next read takes the saved documents. */
-export function reloadAccountPreferences() {
-  cache.clear();
-}
-
 /** A deleted account's preferences go with it. */
 export function forgetAccountPreferences(ownerId) {
   deleteRuntimeDocument(dataDir, documentName(ownerId));
