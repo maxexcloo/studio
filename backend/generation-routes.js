@@ -109,7 +109,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
         if (Array.isArray(input?.loras) && input.loras.length && !mayUseFeature(account, "loras"))
           return {
             status: 403,
-            payload: { ok: false, error: "LoRAs are not enabled for this account." },
+            payload: { ok: false, error: "LoRAs are off for this account." },
           };
         const allowed = loraAllowed(account);
         const refused = (Array.isArray(input?.loras) ? input.loras : []).find(

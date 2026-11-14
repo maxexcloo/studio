@@ -451,7 +451,7 @@ test("A Reddit link in Library › Import adds the post's images to Uploads", as
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Imports");
-  const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit URL" });
+  const link = page.getByRole("textbox", { name: "Civitai, Hugging Face or Reddit Link" });
   await link.fill("https://www.reddit.com/r/birds/comments/abc/birds/");
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByText("3 images added to Uploads.", { exact: true })).toBeVisible();

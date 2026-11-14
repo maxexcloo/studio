@@ -290,7 +290,7 @@ function DefinitionForm({
                       />
                       <SimpleGrid cols={{ base: 1, sm: 2 }}>
                         <TextInput
-                          label="Model & Finetune Label"
+                          label="Model & Fine-Tune Label"
                           value={String(
                             (metadata.recipe as Record<string, unknown>)?.modelLabel || "",
                           )}

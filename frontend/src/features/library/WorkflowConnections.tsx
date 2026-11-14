@@ -207,7 +207,7 @@ export function WorkflowConnections({
       </Text>
       {preview.isPending && <LoadingState label="Reading Workflow Connections" />}
       {preview.error && (
-        <Alert color="red" title="Could Not Read Workflow Connections">
+        <Alert color="red" title="Couldn’t Read Workflow Connections">
           <Stack gap="xs">
             <Text size="sm">{preview.error.message}</Text>
             <Button variant="default" size="compact-sm" onClick={() => void preview.refetch()}>

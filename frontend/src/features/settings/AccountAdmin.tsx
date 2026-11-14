@@ -51,7 +51,7 @@ const featureLabels = {
   },
   cloudModels: { label: "Cloud Models", description: "Every cloud-provider profile" },
   dream: { label: "Dream", description: "The Dream deck of drawn ideas" },
-  loras: { label: "LoRAs", description: "Style and subject adapters on compatible models" },
+  loras: { label: "LoRAs", description: "Style and subject adapters for compatible models" },
   promptAssistant: {
     label: "Prompt Assistant",
     description: "Improve, Suggestions, prompt ideas and other written help",

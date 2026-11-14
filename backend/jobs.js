@@ -605,7 +605,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         result.upscale && !missed ? runUpscaleState(embed, result.upscale) : null;
       const missedState = (result) =>
         result.paired && (missed || !result.upscale)
-          ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image" })
+          ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image." })
           : null;
       const outputs = results.map((result) => result.output);
       const skipped = upscale?.skipped
