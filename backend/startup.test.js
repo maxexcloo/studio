@@ -21,7 +21,8 @@ for (const development of [false, true]) {
           STUDIO_COMMIT: commit,
           STUDIO_DATA_DIR: data,
           STUDIO_ENV_FILE: path.join(data, ".env"),
-          STUDIO_DEMO: "1",
+          STUDIO_FACE_CHECK: "0",
+          STUDIO_IMAGE_SEARCH: "0",
           HOST: "127.0.0.1",
           PORT: "0",
           STUDIO_WORKERS: JSON.stringify([

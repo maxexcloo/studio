@@ -5,8 +5,9 @@ import path from "node:path";
 import test from "node:test";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-process.env.STUDIO_DEMO = "1";
-process.env.STUDIO_WORKERS = "[]";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  { id: "primary", url: "http://127.0.0.1:1", capabilities: ["image"] },
+]);
 const { createGenerationSubmission } = await import("./generation-routes.js");
 
 const granted = { id: "custom:granted", kind: "image", workflow: "custom:granted" };
@@ -16,7 +17,9 @@ const routes = createGenerationSubmission({
   loadComfyContext: async () => {
     throw new Error("No ComfyUI in this fixture.");
   },
-  mediaModels: async () => ({ models: { profiles: [granted, other] } }),
+  mediaModels: async () => ({
+    models: { profiles: [granted, other], workers: [{ id: "primary", available: false }] },
+  }),
   comfyDownMessage: (message) => message,
 });
 const artist = {

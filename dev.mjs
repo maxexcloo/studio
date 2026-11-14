@@ -36,7 +36,14 @@ const environment = {
   STUDIO_DEV_API_PORT: apiPort,
   STUDIO_DEV_PORT: pagePort,
 };
-if (values.demo) environment.STUDIO_DEMO = "1";
+// A fake ComfyUI that finishes every run with a plain picture, in place of a GPU worker.
+const demoWorker =
+  values.demo &&
+  (await (await import("./backend/fixtures/demo-worker.js")).startDemoWorker(dataDir));
+if (demoWorker)
+  environment.STUDIO_WORKERS = JSON.stringify([
+    { id: "demo", name: "Demo", url: demoWorker.url, capabilities: ["image", "video"] },
+  ]);
 
 const children = [
   spawn(process.execPath, ["--watch", "--watch-preserve-output", "backend/index.js"], {
@@ -55,6 +62,7 @@ function stop(code = 0) {
   if (stopping) return;
   stopping = true;
   for (const child of children) child.kill("SIGTERM");
+  demoWorker?.close();
   process.exitCode = code;
 }
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, () => stop());
@@ -66,5 +74,5 @@ for (const child of children) {
   child.once("exit", (code) => stop(code ?? 1));
 }
 console.log(
-  `Studio preview: http://localhost:${pagePort} (${values.demo ? "sample data" : "isolated development data"}; lifecycle control disabled)`,
+  `Studio preview: http://localhost:${pagePort} (${values.demo ? "demo worker" : "isolated development data"}; lifecycle control disabled)`,
 );

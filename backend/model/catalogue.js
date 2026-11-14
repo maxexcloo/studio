@@ -8,7 +8,7 @@ import {
   workerAvailability,
   workerReachable,
 } from "../comfy/backends.js";
-import { comfy, demoMode, optionsFor } from "../comfy/comfy.js";
+import { comfy, optionsFor } from "../comfy/comfy.js";
 import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { visibleGallery } from "../gallery/store.js";
@@ -25,7 +25,7 @@ import {
   workerById,
 } from "../workers.js";
 import { primeModelMetadata } from "./families.js";
-import { inferModels, mockModelResult, offlineModelResult } from "./models.js";
+import { inferModels, offlineModelResult } from "./models.js";
 import { uncensoredLoraNames } from "../lora/info.js";
 
 // A worker context's catalogue, kept per node list (each fetch or stored observation is its own
@@ -203,8 +203,6 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
         result: settled[index].status === "fulfilled" ? settled[index].value : null,
       }))
       .filter((entry) => entry.result);
-    if (demoMode && !answered.length && !direct.length)
-      throw settled[0]?.reason || new Error("No worker is available.");
     // With automatic lifecycle control, queued work starts what it needs, so nothing waits as parked.
     const parked = runtime?.controller.automaticLifecycle ? new Set() : stopped;
     const configured = inferred(none, none, { configuredOnly: true });
@@ -315,7 +313,6 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
 
   /** /api/models with no worker answering: nothing to run, with the plain reason. */
   function unavailableModels() {
-    if (demoMode) return mockModelResult();
     if (!listWorkers().length)
       return {
         ...inferred(),
@@ -325,14 +322,8 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
     return offlineModelResult(defaultWorker()?.url);
   }
 
-  /** The media catalogue; demo mode without workers serves its sample one. */
-  const catalogueModels = () =>
-    mediaModels(false)
-      .then((result) => result.models)
-      .catch((error) => {
-        if (demoMode) return mockModelResult();
-        throw error;
-      });
+  /** The media catalogue. */
+  const catalogueModels = () => mediaModels(false).then((result) => result.models);
 
   /** The default worker's profiles as its node list describes them, for presets and the Library. */
   const presetModels = async () => {
@@ -340,7 +331,7 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
       info: null,
       stats: null,
     }));
-    return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
+    return info ? inferModels(info, stats) : offlineModelResult();
   };
 
   return {

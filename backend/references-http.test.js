@@ -7,12 +7,14 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { startDemoWorker } from "./fixtures/demo-worker.js";
 
 test(
   "exact reference metadata restores owned uploads and generated aliases",
   { timeout: 30_000 },
   async (t) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-reference-http-"));
+    const worker = await startDemoWorker(directory);
     const child = fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
       env: {
         PATH: process.env.PATH,
@@ -20,9 +22,12 @@ test(
         HOST: "127.0.0.1",
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: directory,
-        STUDIO_DEMO: "1",
+        STUDIO_FACE_CHECK: "0",
+        STUDIO_IMAGE_SEARCH: "0",
         STUDIO_MULTI_USER: "1",
-        STUDIO_WORKERS: "[]",
+        STUDIO_WORKERS: JSON.stringify([
+          { id: "demo", url: worker.url, capabilities: ["image", "video"] },
+        ]),
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
@@ -30,6 +35,7 @@ test(
       const stopped = child.exitCode === null ? once(child, "exit") : undefined;
       child.kill("SIGTERM");
       await stopped;
+      await worker.close();
       fs.rmSync(directory, { recursive: true, force: true });
     });
     const [ready] = await Promise.race([
@@ -135,9 +141,12 @@ test(
     assert.equal(thumbnail.headers.get("location"), uploads[0].thumbnailUrl);
     const generated = [];
     for (const kind of ["image", "video"]) {
+      const profile = `custom:test-${kind}`;
       const ack = await api("/api/generate", "POST", {
         kind,
-        profileId: kind === "image" ? "mock-flux-schnell" : "mock-wan-video",
+        profileId: profile,
+        workflow: profile,
+        model: profile,
         prompt: "Neutral reference fixture",
         width: 256,
         height: 256,
