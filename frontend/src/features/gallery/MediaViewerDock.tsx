@@ -181,7 +181,7 @@ function ResultStrip({
       />
     );
   return (
-    <ScrollArea type="never" className={classes.strip} onClick={(event) => event.stopPropagation()}>
+    <ScrollArea className={classes.strip} onClick={(event) => event.stopPropagation()}>
       <Group gap={6} wrap="nowrap" role="list" aria-label={label} justify="center" px={2} py={2}>
         {neighbour(neighbours?.previous, "Previous")}
         {entries.map(({ key, item: result, depth }, index) => {

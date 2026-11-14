@@ -119,7 +119,6 @@ function ImagePreview({
                   <ActionIcon
                     variant="default"
                     size="lg"
-                    radius="xl"
                     aria-label={label}
                     disabled={index + by < 0 || index + by >= images.length}
                     style={{ pointerEvents: "auto" }}

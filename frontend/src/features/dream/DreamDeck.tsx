@@ -363,7 +363,6 @@ export function DreamDeck({
       <ActionIcon
         className={classes.view}
         variant="default"
-        radius="xl"
         aria-label={label}
         onClick={() => setViewing(item.id)}
       >
@@ -432,7 +431,7 @@ export function DreamDeck({
       {top.kind !== "pair" ? (
         <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap" grow={phone}>
           {[choice("discard"), choice("star"), choice("keep")].map((option) =>
-            button(option, phone ? { size: "md", px: "xs" } : { size: "lg", miw: "9rem" }),
+            button(option, phone ? { px: "xs" } : { size: "lg", miw: "9rem" }),
           )}
         </Group>
       ) : phone && !sideways ? (

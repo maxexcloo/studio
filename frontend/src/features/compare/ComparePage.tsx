@@ -163,7 +163,6 @@ export function ComparePage() {
                         <ActionIcon
                           className={classes.star}
                           variant={won ? "filled" : "default"}
-                          radius="xl"
                           size="lg"
                           aria-label={won ? `Clear Winner ${label}` : `Star ${label} as Winner`}
                           aria-pressed={won}
