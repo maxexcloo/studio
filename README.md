@@ -13,7 +13,7 @@ mise run setup
 mise run dev
 ```
 
-Open the preview address it prints (<http://localhost:5173>, or a free port when another checkout holds it; set `STUDIO_DEV_PORT` to choose). Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`; settings in the shell override these. Image Search and Face Check stay off unless the shell turns them on. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
+Open the preview address it prints (<http://localhost:5173>, or a free port when another checkout holds it; set `STUDIO_DEV_PORT` to choose). Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`; settings in the shell override these. Image Search and Face Check stay off unless the shell turns them on.
 
 `mise run dev:demo` runs without a GPU against a stand-in worker (`backend/fixtures/demo-worker.js`) whose test profiles finish every run with a plain picture, not model inference. Its data stays in `data/demo`.
 
@@ -134,7 +134,7 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the
 
 `studio.sqlite` in the data folder holds the queue, sessions, accounts, the gallery and the other runtime records; profiles, guides, `config/models.json`, `library/catalogue.json` and media stay files. Studio refuses to start on a folder whose storage predates the current format and names what is pending.
 
-Data moves only through `migrate-runtime`, run with Studio stopped: dry-run, then apply. Studio keeps no backups of its data.
+Data moves only through `migrate-runtime`: dry-run, then apply. Run the command with Studio stopped; steps that need the running server's gallery or workers say so and run only through `POST /api/maintenance/migrations` (`{ "apply": true }` applies), for administrators. Studio keeps no backups of its data.
 
 ```sh
 node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data
@@ -143,7 +143,7 @@ node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --appl
 
 The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. `backend/runtime-migrations.js` lists the pending steps; each step's module says what it changes.
 
-`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
+`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream.
 
 ### Runtime Control
 
@@ -173,7 +173,7 @@ Deployment configuration owns worker placements and model paths; Studio owns edi
 
 #### Studio Does Not Start
 
-Read the startup error for the missing setting, occupied port or invalid mounted configuration. Use the container's published address; local development uses the Vite address printed by `mise run dev`. Source development requires the Node.js version in `package.json`; the application image includes its runtime.
+Read the startup error for the missing setting, occupied port or invalid mounted configuration.
 
 #### Profiles or Models Are Missing
 
