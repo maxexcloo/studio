@@ -616,6 +616,7 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
   await expect
     .poll(() => saves.at(-1).styles.map((entry: any) => entry.id))
     .toEqual(["spicy", "candid", "cinematic"]);
+  await expect(page.getByRole("menu", { name: "Actions for Spicy", exact: true })).toBeHidden();
 
   // Editing keeps the style's ID and kind and saves in a dialog.
   await animate.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
