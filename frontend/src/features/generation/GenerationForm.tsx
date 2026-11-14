@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
-import { notifications } from "@mantine/notifications";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
@@ -69,12 +68,13 @@ function useDraftSubmit({
     // the gallery now instead of waiting for its poll.
     onSuccess: (jobId) => {
       // A default that gave way to the other side from the account's preference says so.
-      const note =
-        profile &&
-        draft.defaultedProfileId === profile.id &&
-        models.data?.defaultNotes?.[profile.kind];
-      if (note) notifications.show({ message: note });
-      showQueued(client);
+      showQueued(
+        client,
+        (profile &&
+          draft.defaultedProfileId === profile.id &&
+          models.data?.defaultNotes?.[profile.kind]) ||
+          undefined,
+      );
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       onSubmitted?.(jobId);
