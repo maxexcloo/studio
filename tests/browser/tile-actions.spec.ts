@@ -105,7 +105,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Edit",
     "Upscale",
     "Copy",
-    /^(Download|Share Image)$/,
+    /^(Download|Share)$/,
     "Compare",
     "Similar",
     "Star",
@@ -162,7 +162,7 @@ for (const operation of ["Edit", "Animate"] as const) {
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
     await page
       .getByRole("menuitem", {
-        name: operation === "Animate" ? "Animate in Composer" : "Edit Image",
+        name: operation === "Animate" ? "Animate in Composer" : "Edit in Composer",
         exact: true,
       })
       .click();
@@ -203,7 +203,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.reload();
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");

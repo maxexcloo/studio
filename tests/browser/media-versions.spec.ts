@@ -84,9 +84,7 @@ for (const kind of ["image", "video"] as const) {
     await expectDownload(upscaleUrl, upscaleExtension);
     // Its options regenerate it and compare an image's upscale with its original.
     await viewerAction(page, "Upscale");
-    await expect(
-      page.getByRole("menuitem", { name: "Regenerate Upscale", exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Upscale Again", exact: true })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Show Upscale", exact: true })).toHaveAttribute(
       "aria-checked",
       "true",
