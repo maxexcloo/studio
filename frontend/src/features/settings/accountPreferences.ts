@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { notifications } from "@mantine/notifications";
 import {
   queryOptions,
@@ -91,22 +90,12 @@ export function useSavePreferences() {
   });
 }
 
-// Tile Captions used to be saved per device; the first account to load here keeps that value.
-const deviceTileCaptions = "studio-tile-captions";
-
 /** Phone captions stay hidden unless the account's Tile Captions preference is on. */
 export function useTileCaptions() {
   const preferences = useQuery(preferencesQuery);
   const save = useSavePreferences();
-  const status = preferences.data;
-  useEffect(() => {
-    const device = status && localStorage.getItem(deviceTileCaptions);
-    if (!status || device === null) return;
-    localStorage.removeItem(deviceTileCaptions);
-    if (!status.saved.includes("tileCaptions")) save.mutate({ tileCaptions: device === "true" });
-  }, [status, save]);
   return [
-    status?.preferences.tileCaptions ?? false,
+    preferences.data?.preferences.tileCaptions ?? false,
     (tileCaptions: boolean) => save.mutate({ tileCaptions }),
   ] as const;
 }

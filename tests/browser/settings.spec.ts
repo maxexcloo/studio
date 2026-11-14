@@ -244,29 +244,6 @@ test("Tile Captions in Settings › Preferences pin phone tile captions", async 
   expect(state.preferences.preferences.tileCaptions).toBe(true);
 });
 
-test("A device's earlier Tile Captions choice moves to the account once", async ({ page }) => {
-  const state = await fixtures(page);
-  await page.addInitScript(() => {
-    if (!sessionStorage.getItem("seeded")) {
-      sessionStorage.setItem("seeded", "1");
-      localStorage.setItem("studio-tile-captions", "true");
-    }
-  });
-  await page.goto("/settings#preferences");
-  const toggle = page.getByRole("switch", { name: "Tile Captions", exact: true });
-  await expect(toggle).toBeChecked();
-  expect(state.preferences.saved).toEqual(["tileCaptions"]);
-  expect(await page.evaluate(() => localStorage.getItem("studio-tile-captions"))).toBeNull();
-  // The account's own choice wins over a device value left behind afterwards.
-  await toggle.click({ force: true });
-  await expect(toggle).not.toBeChecked();
-  await expect.poll(() => state.preferences.preferences.tileCaptions).toBe(false);
-  await page.evaluate(() => localStorage.setItem("studio-tile-captions", "true"));
-  await page.reload();
-  await expect(toggle).not.toBeChecked();
-  expect(state.preferences.preferences.tileCaptions).toBe(false);
-});
-
 test("An administrator turns Cloud Models, LoRAs and Uncensored Models off for itself in Settings › Preferences", async ({
   page,
 }) => {
