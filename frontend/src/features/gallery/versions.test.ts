@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import type { MediaItem } from "../../types";
 import { versionGroups, versionSources, versionTree } from "./versions.ts";
 

@@ -3,6 +3,7 @@ import { optionsFor } from "../comfy/comfy.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { accountMayUseLoras, loraAllowed } from "../model/catalogue.js";
 import { requireLocal } from "../route-access.js";
+import { defaultWorkerId } from "../workers.js";
 import { loraInfos } from "./info.js";
 import {
   applyLoraOps,
@@ -12,7 +13,6 @@ import {
   saveLoraLibrary,
   saveLoraStack,
 } from "./stacks.js";
-import { defaultWorkerId } from "../workers.js";
 
 /**
  * An account's LoRA library and per-workflow stacks, and what each installed LoRA was trained for.

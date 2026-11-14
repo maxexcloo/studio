@@ -1,12 +1,13 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+
 import { catalogueDownload } from "./catalogue-downloads.js";
 import { comfy, localOutputFile, optionsFor } from "./comfy/comfy.js";
+import { outputFolderName } from "./data-names.js";
 import { families } from "./family-catalogue.js";
 import { classifyModel } from "./model/families.js";
 import { nodePacks } from "./node-packs.js";
-import { outputFolderName } from "./data-names.js";
 
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
 // the reference workflow: soften the source with a lanczos pre-scale, then let

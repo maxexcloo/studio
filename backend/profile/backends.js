@@ -18,6 +18,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+
+import { profileNameParts } from "../../shared/profiles.ts";
+import { repointLoraStacks } from "../combined-profiles.js";
 import {
   backendIdsOf,
   graphFromJson,
@@ -27,12 +30,10 @@ import {
   userWorkflowsDir,
 } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
-import { profileNameParts } from "../../shared/profiles.ts";
-import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
-import { repointLoraStacks } from "../combined-profiles.js";
-import { guideStore, hashOf, profileStore } from "./store.js";
 import { renameTimingKeys } from "../timings.js";
 import { repointWorkflowPreferences } from "../workflow-catalogue.js";
+import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
+import { guideStore, hashOf, profileStore } from "./store.js";
 
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });

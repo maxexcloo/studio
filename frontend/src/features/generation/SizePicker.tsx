@@ -9,18 +9,19 @@ import {
   Text,
 } from "@mantine/core";
 import { ChevronDown, RectangleHorizontal } from "lucide-react";
+
+import {
+  type Resolution,
+  defaultResolution,
+  resolutionApplies,
+  resolutionPlan,
+  resolutionSize,
+  resolutions,
+} from "../../../../shared/resolution";
 import type { GenerationInput, Profile } from "../../types";
 import { useTouch } from "../../ui/usePhone";
 import { chipProps, fittedPopup } from "./chip";
 import { primaryReference } from "./payload";
-import {
-  defaultResolution,
-  resolutionApplies,
-  resolutionPlan,
-  resolutions,
-  resolutionSize,
-  type Resolution,
-} from "../../../../shared/resolution";
 
 type Size = { w: number; h: number };
 

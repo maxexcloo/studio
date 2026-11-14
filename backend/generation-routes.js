@@ -1,7 +1,36 @@
-import { loraInfos } from "./lora/info.js";
-import { optionalLoraIssue } from "./lora/catalogue.js";
-import { withLoraTriggers } from "./lora/prompts.js";
+import crypto from "node:crypto";
+
+import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
+import { startFrameSize } from "./animate-profile.js";
+import { assistantRecord } from "./assistant-routes.js";
+import { listCards } from "./cards.js";
+import { sheetReferences } from "./character-sheets.js";
 import { routeProfile } from "./comfy/backends.js";
+import { getCustomWorkflow } from "./custom-workflows.js";
+import { families } from "./family-catalogue.js";
+import {
+  makePendingItems,
+  storedChatRecord,
+  storedResultSet,
+  storedWritingRecord,
+} from "./gallery/records.js";
+import {
+  galleryItem,
+  galleryItems,
+  galleryRevisionValue,
+  putGalleryItems,
+} from "./gallery/store.js";
+import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
+import { jobs, runJob } from "./jobs.js";
+import { optionalLoraIssue } from "./lora/catalogue.js";
+import { loraInfos } from "./lora/info.js";
+import { withLoraTriggers } from "./lora/prompts.js";
+import { loraAllowed } from "./model/catalogue.js";
+import { recordPrompt } from "./prompt-history.js";
+import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
+import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
+import { upscaleQualities, upscaleTargets } from "./upscale.js";
+import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
@@ -10,36 +39,7 @@ import {
   workerById,
   workerHas,
 } from "./workers.js";
-import crypto from "node:crypto";
-import { startFrameSize } from "./animate-profile.js";
-import { families } from "./family-catalogue.js";
-import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
-import {
-  galleryItem,
-  galleryItems,
-  galleryRevisionValue,
-  putGalleryItems,
-} from "./gallery/store.js";
-import {
-  makePendingItems,
-  storedChatRecord,
-  storedResultSet,
-  storedWritingRecord,
-} from "./gallery/records.js";
-import { recordPrompt } from "./prompt-history.js";
-import { jobs, runJob } from "./jobs.js";
-import { getCustomWorkflow } from "./custom-workflows.js";
 import { markWorkflowUsed } from "./workflow-catalogue.js";
-
-import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
-import { referenceExistsForAccount, stageReferenceAssetsForAccount } from "./references.js";
-import { upscaleQualities, upscaleTargets } from "./upscale.js";
-import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
-import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
-import { assistantRecord } from "./assistant-routes.js";
-import { loraAllowed } from "./model/catalogue.js";
-import { listCards } from "./cards.js";
-import { sheetReferences } from "./character-sheets.js";
 
 export function createGenerationSubmission({ loadComfyContext, mediaModels, comfyDownMessage }) {
   /**

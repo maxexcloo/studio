@@ -1,10 +1,11 @@
 import "../fixtures/local-worker.js";
-import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { isComfyTimeout, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
-import { setParkedCheck } from "./backends.js";
+import test from "node:test";
+
 import { diagnostics, diagnosticsText } from "../diagnostics.js";
+import { setParkedCheck } from "./backends.js";
+import { isComfyTimeout, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
 
 /** What a check to `url` throws, cut short after `ms`. */
 async function checkError(url, ms) {

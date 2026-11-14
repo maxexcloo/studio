@@ -16,11 +16,13 @@
  * tool alone is marked destructive.
  */
 import { setTimeout as delay } from "node:timers/promises";
+
 import { z } from "zod";
-import { mcpJson } from "./media.js";
+
+import { redditPostPath } from "../gallery/reddit.js";
 import { lineDiff } from "../line-diff.js";
 import { imageMimes } from "../reference-names.js";
-import { redditPostPath } from "../gallery/reddit.js";
+import { mcpJson } from "./media.js";
 
 export const adminInstructions =
   "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with library, profiles, accounts or maintenance before stating or changing it. Nothing downloads unless asked (downloads start), edits are new versions with base_hash from profiles get, removals (catalogue_edit remove, profile_edit remove, combine_backends apply) run only when asked and keep versions, and no tool touches GPUs.";

@@ -1,9 +1,9 @@
 import type { QueueMedia } from "../../shared/queue.ts";
 import {
-  goneOutputs,
-  unreachableCancelReason,
   type JobObservation,
   type QueueAdapter,
+  goneOutputs,
+  unreachableCancelReason,
 } from "./queue.ts";
 import type { OwnedJob } from "./store.ts";
 

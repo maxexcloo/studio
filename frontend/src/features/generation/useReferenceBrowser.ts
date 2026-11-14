@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { emptyGalleryFilters, type GalleryFilterValues } from "../gallery/GalleryFilters";
+
+import { type GalleryFilterValues, emptyGalleryFilters } from "../gallery/GalleryFilters";
 import type { ReferenceTarget } from "./references";
 
 interface ReferenceBrowserState {

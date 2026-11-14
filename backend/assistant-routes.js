@@ -1,3 +1,7 @@
+import { cardKinds } from "../shared/characters.ts";
+import { ownerIdForRequest } from "./account-ownership.js";
+import { mayUseFeature, promptWriter } from "./account-policy.js";
+import { accountPreferences } from "./account-preferences.js";
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
  * access-profile feature, works only with profiles the account may use, and an uncensored style (Spicy) needs Uncensored Models.
@@ -17,13 +21,9 @@
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
  */
 import { AssistantError, createAssistant, gatewaySettings, uncensoredText } from "./assistant.js";
-import { promptStyleStore } from "./prompt-styles.js";
-import { mayUseFeature, promptWriter } from "./account-policy.js";
-import { ownerIdForRequest } from "./account-ownership.js";
-import { accountPreferences } from "./account-preferences.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { cardKinds } from "../shared/characters.ts";
 import { animateClip, animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
+import { promptStyleStore } from "./prompt-styles.js";
 import { loadSharp } from "./sharp-loader.js";
 
 const maxReferences = 4;

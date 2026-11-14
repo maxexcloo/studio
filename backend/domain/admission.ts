@@ -1,7 +1,7 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { referencedResult } from "../../shared/versions.ts";
 import { GenerationQueue } from "./queue.ts";
-import { queuePriority, Store, type OwnedJob, type QueuedCopy, type QueueOrigin } from "./store.ts";
+import { type OwnedJob, type QueueOrigin, type QueuedCopy, Store, queuePriority } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;

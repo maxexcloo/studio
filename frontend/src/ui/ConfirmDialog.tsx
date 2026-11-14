@@ -1,5 +1,5 @@
-import { useRef, type ReactNode } from "react";
 import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
+import { type ReactNode, useRef } from "react";
 
 /**
  * Every dialog's footer: Cancel, then its one primary action (`children`), at the right. Without

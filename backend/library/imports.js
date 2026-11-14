@@ -18,11 +18,12 @@
  * versions and variants that fit; one is downloaded only when chosen.
  */
 import crypto from "node:crypto";
+
 import { currentDataDir } from "../data-dir.js";
-import { runtimeDatabase } from "../persistence/runtime.ts";
-import { gradeImport, presetGrade } from "./grade.js";
-import { catalogueKinds } from "./catalogue.js";
 import { imageRecipe, readImageMetadata } from "../image-metadata.js";
+import { runtimeDatabase } from "../persistence/runtime.ts";
+import { catalogueKinds } from "./catalogue.js";
+import { gradeImport, presetGrade } from "./grade.js";
 import { publicOffers } from "./offers.js";
 
 const importLimit = 500;

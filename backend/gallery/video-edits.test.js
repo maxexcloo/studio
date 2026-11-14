@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
+
 import { openDatabase } from "../persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-edits-"));

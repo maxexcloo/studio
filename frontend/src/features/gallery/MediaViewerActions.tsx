@@ -1,14 +1,16 @@
-import { useState, type Ref, type RefObject } from "react";
-import type { MediaItem } from "../../types";
 import { Box } from "@mantine/core";
-import { usePhone } from "../../ui/usePhone";
+import { type Ref, type RefObject, useState } from "react";
+
+import type { MediaItem } from "../../types";
 import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "../../ui/ActionBar";
+import { usePhone } from "../../ui/usePhone";
 import { AnimateDialog } from "./AnimateDialog";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import type { AnimateRequest, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
-import { useViewerPrompt, ViewerPrompt } from "./ViewerPrompt";
+import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
+
 import classes from "./MediaViewer.module.css";
 
 // Desktop names Animate, Edit, Recreate, AI, Upscale, Copy, Download, Compare and Similar beside their icons.

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { openDatabase } from "../persistence/runtime.ts";
 import { stylesWithChoice } from "./projects.ts";
-import { createResultNumbers, type Numbered } from "./result-numbers.ts";
+import { type Numbered, createResultNumbers } from "./result-numbers.ts";
 
 test("result numbers start from an account's oldest result and stay with their output", () => {
   const db = openDatabase(":memory:");

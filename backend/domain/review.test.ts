@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import type { Project, Review } from "../../shared/projects.ts";
-import { createReview, digest, reviewReply, type ReviewItem } from "./review.ts";
+import { type ReviewItem, createReview, digest, reviewReply } from "./review.ts";
 
 const project = (id: string, brief: Partial<Project["brief"]> = {}): Project => ({
   id,

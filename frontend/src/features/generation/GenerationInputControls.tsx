@@ -1,14 +1,16 @@
-import type { ReactNode } from "react";
 import { Button, ComboboxPopover, SegmentedControl, Tooltip } from "@mantine/core";
 import { Brush, ChevronDown } from "lucide-react";
-import { icons } from "../../ui/icons";
+import type { ReactNode } from "react";
+
 import type { GenerationInput, Profile } from "../../types";
+import { icons } from "../../ui/icons";
 import { chipProps, iconChipProps } from "./chip";
 import { GenerationSettings } from "./GenerationSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
 import { backendInputPatch, backendLabel, controlRange } from "./payload";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
+
 import classes from "./GenerationInputControls.module.css";
 
 /** A chip's dropdown of a few fixed choices, such as Count or Reference Role. */

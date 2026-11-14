@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { findDirectRoute } from "./domain/direct-route.ts";
 import { createPromptStage, writingRequest } from "./prompt-stage.js";
 import { registerResultSetRoutes, setPrompts } from "./result-sets.js";

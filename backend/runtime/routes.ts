@@ -1,5 +1,6 @@
-import { Router, type Request, type Response } from "express";
-import { RuntimeRequestError, type RuntimeController } from "./controller.ts";
+import { type Request, type Response, Router } from "express";
+
+import { type RuntimeController, RuntimeRequestError } from "./controller.ts";
 
 const workloadIds = (value: unknown) => {
   if (!Array.isArray(value) || value.some((id) => typeof id !== "string"))

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { gradeImport, missingPromptFields, presetGrade, promptFields } from "./grade.js";
 
 const complete = {

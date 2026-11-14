@@ -1,4 +1,3 @@
-import { useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Badge,
@@ -28,21 +27,23 @@ import {
   UserRound,
   UserX,
 } from "lucide-react";
+import { type ReactNode, useRef, useState } from "react";
+
+import { isCloudProfile } from "../../../../shared/profiles";
 import { api, post } from "../../api";
+import type { Account } from "../../types";
+import { formatBytes } from "../../ui/bytes";
 import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { formatBytes } from "../../ui/bytes";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import type { Account } from "../../types";
 import { useAccount } from "../auth/AccountGate";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
-import { isCloudProfile } from "../../../../shared/profiles";
-import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
+import { ChatGateway, type GatewayAccounts, useGatewayChange } from "./ChatGatewayAccounts";
 
 const featureLabels = {
   characters: {

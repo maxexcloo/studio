@@ -1,5 +1,4 @@
 import { comfy } from "../comfy/comfy.js";
-import { dataDir } from "../gallery/store.js";
 import {
   families,
   familyFromName,
@@ -7,6 +6,7 @@ import {
   refinedFamily,
   variantFor,
 } from "../family-catalogue.js";
+import { dataDir } from "../gallery/store.js";
 import { readRuntimeDocument } from "../persistence/runtime.ts";
 
 /**

@@ -1,5 +1,6 @@
-import { useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { type FocusEvent, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
+
 import type { MediaKind } from "../../types";
 import { useGroupFeature } from "../auth/AccountGate";
 import { promptIdeasQuery } from "../taste/suggestions";

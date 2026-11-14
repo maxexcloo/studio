@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   ActionIcon,
   Box,
@@ -12,8 +11,10 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { Dices } from "lucide-react";
-import { icons } from "../../ui/icons";
+import type { ReactNode } from "react";
+
 import type { GenerationInput, Profile } from "../../types";
+import { icons } from "../../ui/icons";
 import { iconChipProps } from "./chip";
 import { controlRange, stepsRange } from "./payload";
 import { ChipPopup } from "./Picker";

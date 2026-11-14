@@ -1,5 +1,6 @@
 import { Alert, Badge, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { deploymentQuery } from "./deployment";

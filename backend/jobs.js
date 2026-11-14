@@ -1,25 +1,23 @@
+import { writeCivitaiParameters } from "./civitai/civitai.js";
+import { workerUrl } from "./comfy/backends.js";
+import { comfy, comfyOn, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
+import { cancelPrompt, promptTracker } from "./comfy/queue.js";
+import { forgetComfyRun } from "./comfy/traces.js";
+import { withFixes } from "./failure-fixes.js";
+import { describeFailure } from "./failures.js";
+import { generationSettings, outputsFrom } from "./gallery/records.js";
+import { replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from "./gallery/store.js";
+import { RunTimer, completedTiming, remainingMs, slowSteps } from "./generation-timing.js";
+import { customWorkflowGraph, nameSavesForRun } from "./graphs.js";
 import {
   ingestRunResults,
   noteIngested,
   removeComfyFiles,
   temporaryInputFiles,
 } from "./media-store.js";
-import { workerUrl } from "./comfy/backends.js";
-import { defaultWorkerId } from "./workers.js";
-import { comfy, comfyOn, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
-import { cancelPrompt, promptTracker } from "./comfy/queue.js";
-import { describeFailure } from "./failures.js";
-import { withFixes } from "./failure-fixes.js";
-import { nextProgress } from "./progress-phase.js";
-import { customWorkflowGraph, nameSavesForRun } from "./graphs.js";
-import { replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from "./gallery/store.js";
-import { generationSettings, outputsFrom } from "./gallery/records.js";
-import { forgetComfyRun } from "./comfy/traces.js";
-import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
-import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { warmNewOutputs } from "./media-warmup.js";
-import { markWorkflowUsed } from "./workflow-catalogue.js";
-import { completedTiming, remainingMs, RunTimer, slowSteps } from "./generation-timing.js";
+import { nextProgress } from "./progress-phase.js";
+import { missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import {
   generationEstimate,
   generationWarm,
@@ -28,6 +26,8 @@ import {
   upscaleEstimate,
 } from "./timings.js";
 import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
+import { defaultWorkerId } from "./workers.js";
+import { markWorkflowUsed } from "./workflow-catalogue.js";
 
 export const jobs = new Map();
 const previewSlots = new Map();

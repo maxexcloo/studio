@@ -1,4 +1,5 @@
 import fs from "node:fs";
+
 import { databaseFile, runtimeDatabase } from "./persistence/runtime.ts";
 import { isObject } from "./values.js";
 

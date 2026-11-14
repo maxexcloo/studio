@@ -6,23 +6,25 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import express from "express";
-import { characterShots, composePrompt, withCharacter } from "../../shared/characters.ts";
-import sharp from "sharp";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
-import { presetPlacement } from "./gpu.js";
-import { McpMedia } from "./media.js";
-import { registerGenerateTools } from "./generate.js";
-import { withPreferredDefaults } from "../model/catalogue.js";
-import { readRuntimeDocument } from "../persistence/runtime.ts";
+import express from "express";
+import sharp from "sharp";
+
+import { characterShots, composePrompt, withCharacter } from "../../shared/characters.ts";
 import { pausedReason } from "../../shared/queue.ts";
+import { startDemoWorker } from "../fixtures/demo-worker.js";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fakeStudio } from "../fixtures/fake-studio.js";
-import { startDemoWorker } from "../fixtures/demo-worker.js";
+import { withPreferredDefaults } from "../model/catalogue.js";
+import { readRuntimeDocument } from "../persistence/runtime.ts";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
+import { registerGenerateTools } from "./generate.js";
+import { presetPlacement } from "./gpu.js";
+import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
+import { McpMedia } from "./media.js";
 
 const mediaKey = "fixture-media-credential";
 const controlKey = "fixture-control-credential";

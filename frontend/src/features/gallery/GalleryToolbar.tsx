@@ -1,25 +1,27 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Button, Group, Slider, Text, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { Search, SquareMinus, SquarePlus } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+
+import type { MediaKind } from "../../types";
 import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { SearchInput } from "../../ui/SearchInput";
 import { usePhone } from "../../ui/usePhone";
-import type { MediaKind } from "../../types";
 import { iconChipProps } from "../generation/chip";
 import { ChipPopup } from "../generation/Picker";
 import {
   FilterButton,
+  type FilterChip,
   FilterChips,
   FilterToggle,
   GalleryFilterPanel,
+  type GalleryFilterValues,
   emptyGalleryFilters,
   useActiveFilters,
-  type FilterChip,
-  type GalleryFilterValues,
 } from "./GalleryFilters";
 import { useGalleryColumns } from "./useGalleryLayout";
+
 import classes from "./GalleryFilters.module.css";
 
 /**

@@ -1,4 +1,11 @@
+import { Button, Title } from "@mantine/core";
+import { ArrowUp } from "lucide-react";
 import {
+  type Dispatch,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+  type SetStateAction,
   memo,
   useCallback,
   useEffect,
@@ -6,21 +13,16 @@ import {
   useMemo,
   useRef,
   useState,
-  type Dispatch,
-  type KeyboardEvent,
-  type ReactNode,
-  type RefObject,
-  type SetStateAction,
 } from "react";
-import { Button, Title } from "@mantine/core";
-import { ArrowUp } from "lucide-react";
+
 import type { MediaItem } from "../../types";
 import { dayHeading, mediaDay } from "./mediaLabels";
-import classes from "./MediaGrid.module.css";
 import { MediaTile } from "./MediaTile";
-import type { VersionGroup } from "./versions";
-import type { GallerySelection } from "./useGallerySelection";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
+import type { GallerySelection } from "./useGallerySelection";
+import type { VersionGroup } from "./versions";
+
+import classes from "./MediaGrid.module.css";
 
 export interface GalleryViewProps {
   items: MediaItem[];

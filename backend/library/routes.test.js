@@ -3,15 +3,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import express from "express";
+
+import { createCatalogueStore } from "./catalogue.js";
+import { createImportStore } from "./imports.js";
 import {
   imageFromUpload,
   libraryItems,
   matchImageResource,
   registerLibraryRoutes,
 } from "./routes.js";
-import { createImportStore } from "./imports.js";
-import { createCatalogueStore } from "./catalogue.js";
 
 test("installed files join the catalogue, and catalogued files that are not installed still list", () => {
   const items = libraryItems({

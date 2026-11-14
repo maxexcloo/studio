@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, stamp, upscaleCapabilities, viewerAction } from "./fixtures";
+
 import type { UpscaleRequest } from "../../shared/upscale";
+import { fixtures, image, stamp, upscaleCapabilities, viewerAction } from "./fixtures";
 
 const source = {
   id: "upscale-source",

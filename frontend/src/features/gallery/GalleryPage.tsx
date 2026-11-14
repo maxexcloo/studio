@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -9,7 +8,6 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import {
   type InfiniteData,
@@ -17,43 +15,47 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { useGenerationActions } from "../generation/GenerationProvider";
-import { queueQuery } from "../generation/Queue";
+
+import { terminalStatuses } from "../../../../shared/queue";
 import { api } from "../../api";
 import type { MediaItem, MediaKind } from "../../types";
-import { MediaGrid } from "./MediaGrid";
-import { MorePages } from "./MorePages";
-import { RunsView } from "./RunsView";
-import { MediaTileActions } from "./MediaTileActions";
-import { MediaViewer } from "./MediaViewer";
-import { currentMedia } from "./mediaSource";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { ComposerDock } from "../generation/ComposerDock";
-import type { OpenComposerState } from "../generation/openComposer";
-import { GallerySelectionBar } from "./GallerySelectionBar";
-import { useGallerySelection } from "./useGallerySelection";
-import { useTileCaptions } from "../settings/accountPreferences";
-import { useTryAgain } from "./useTryAgain";
-import { versionGroups } from "./versions";
-import { mediaDetail, mediaTitle } from "./mediaLabels";
-import { galleryItemQuery } from "./MediaDetails";
-import { inRunOrder, runKey } from "./resultSets";
-import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
-import { GalleryToolbar } from "./GalleryToolbar";
-import {
-  similarChipLabels,
-  similarStrictnessOptions,
-  useSimilarStrictness,
-  type SimilarStrictness,
-} from "./similarStrictness";
-import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
+import { ComposerDock } from "../generation/ComposerDock";
+import { useGenerationActions } from "../generation/GenerationProvider";
+import type { OpenComposerState } from "../generation/openComposer";
+import { queueQuery } from "../generation/Queue";
+import { useTileCaptions } from "../settings/accountPreferences";
+import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
+import { GallerySelectionBar } from "./GallerySelectionBar";
+import { GalleryToolbar } from "./GalleryToolbar";
+import { GalleryUpload, droppedFiles, useGalleryUpload } from "./GalleryUpload";
+import { galleryItemQuery } from "./MediaDetails";
+import { MediaGrid } from "./MediaGrid";
+import { mediaDetail, mediaTitle } from "./mediaLabels";
+import { currentMedia } from "./mediaSource";
+import { MediaTileActions } from "./MediaTileActions";
+import { MediaViewer } from "./MediaViewer";
+import { MorePages } from "./MorePages";
+import { inRunOrder, runKey } from "./resultSets";
+import { RunsView } from "./RunsView";
+import {
+  type SimilarStrictness,
+  similarChipLabels,
+  similarStrictnessOptions,
+  useSimilarStrictness,
+} from "./similarStrictness";
+import { useGallerySelection } from "./useGallerySelection";
+import { useTryAgain } from "./useTryAgain";
+import { versionGroups } from "./versions";
+
 import classes from "./GalleryPage.module.css";
-import { terminalStatuses } from "../../../../shared/queue";
 
 interface Page {
   items: MediaItem[];

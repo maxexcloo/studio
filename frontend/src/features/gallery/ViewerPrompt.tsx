@@ -1,27 +1,29 @@
-import { useRef, useState, type KeyboardEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { type KeyboardEvent, useRef, useState } from "react";
+
 import type { Change } from "../../../../shared/suggestions";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
+import type { Action, ActionGroups } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { icons } from "../../ui/icons";
 import { useRemembered } from "../auth/useRemembered";
 import {
   ProposalLabel,
-  proposalText,
-  proposedClass,
-  assistMenu,
   SendButton,
   UndoButton,
+  assistMenu,
+  proposalText,
+  proposedClass,
   useChangeSuggestions,
 } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import type { Action, ActionGroups } from "../../ui/ActionBar";
-import { typedPrompt, type Iteration } from "./useMediaAction";
 import { useItemChange } from "./useItemChange";
+import { type Iteration, typedPrompt } from "./useMediaAction";
+
 import classes from "./MediaViewer.module.css";
 
 /**

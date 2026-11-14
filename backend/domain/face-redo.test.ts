@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import type { GenerationInput } from "../../shared/queue.ts";
 import type { GenerationScope } from "./admission.ts";
-import { createFaceCheck, type Identity } from "./face-check.ts";
+import { type Identity, createFaceCheck } from "./face-check.ts";
 import { createFaceRedo } from "./face-redo.ts";
-import { queuePriority, type OwnedJob, type QueueOrigin } from "./store.ts";
+import { type OwnedJob, type QueueOrigin, queuePriority } from "./store.ts";
 
 const now = Date.parse("2026-11-11T12:00:00Z");
 const job = (id: string, extra: Partial<OwnedJob> = {}): OwnedJob => ({

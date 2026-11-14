@@ -5,25 +5,27 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
+
 import express from "express";
+
 import type { CardKind, Character } from "../../shared/characters.ts";
 import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
+import { registerDreamRoutes } from "./dream-routes.ts";
 import {
-  createDream,
-  dreamRequest,
-  suggestionsFrom,
   type DreamAccess,
   type DreamInspiration,
   type DreamItem,
   type DreamLoraLibrary,
   type DreamProfile,
+  createDream,
+  dreamRequest,
+  suggestionsFrom,
 } from "./dream.ts";
-import { registerDreamRoutes } from "./dream-routes.ts";
 import { createProjects } from "./projects.ts";
-import { writtenJob, type GenerationQueue } from "./queue.ts";
+import { type GenerationQueue, writtenJob } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
-import { queuePriority, Store } from "./store.ts";
+import { Store, queuePriority } from "./store.ts";
 import { createTaste, tasteSignal } from "./taste.ts";
 
 const profiles: DreamProfile[] = [

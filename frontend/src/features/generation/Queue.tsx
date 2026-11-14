@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/helpers";
 import {
   ActionIcon,
   Alert,
@@ -5,9 +6,9 @@ import {
   Button,
   Collapse,
   Group,
-  Image as Thumbnail,
   Stack,
   Text,
+  Image as Thumbnail,
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
@@ -18,39 +19,40 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { arrayMove } from "@dnd-kit/helpers";
-import { lazy, Suspense, useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   CircleAlert,
   GripVertical,
   Image,
-  Video,
   type LucideIcon,
+  Video,
 } from "lucide-react";
-import { icons } from "../../ui/icons";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { EmptyState } from "../../ui/EmptyState";
-import { LoadingState } from "../../ui/LoadingState";
-import { usePhone } from "../../ui/usePhone";
-import classes from "./Queue.module.css";
+import { type ReactNode, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
+
+import {
+  type QueueCancelAllResponse,
+  type QueuePause,
+  pausedReason,
+  terminalStatuses,
+} from "../../../../shared/queue";
 import { api, post } from "../../api";
 import type { Profile, QueueJob, ReferenceAsset } from "../../types";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
+import { usePhone } from "../../ui/usePhone";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { useJobSwap } from "../runtime/JobSwap";
 import { useGenerationActions } from "./GenerationProvider";
 import { loraInfoQuery, loraTitle } from "./LoraPicker";
 import { isProfile, profileName, shownProfileName } from "./payload";
-import { referenceLabel } from "./references";
 import { WritingStream } from "./PromptWriting";
+import { referenceLabel } from "./references";
 import type { QueueRowDrag } from "./SortableQueue";
-import {
-  pausedReason,
-  terminalStatuses,
-  type QueueCancelAllResponse,
-  type QueuePause,
-} from "../../../../shared/queue";
+
+import classes from "./Queue.module.css";
 type QueueListing = { jobs: QueueJob[]; paused: QueuePause };
 export const queueQuery = queryOptions({
   queryKey: ["queue"],

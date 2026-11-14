@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { createImageSearch, createImageVectors, type ImageEncoder } from "./image-search.ts";
+
 import type { IdleItem } from "./idle-work.ts";
+import { type ImageEncoder, createImageSearch, createImageVectors } from "./image-search.ts";
 
 const item = (id: string, type = "image"): IdleItem => ({
   id,

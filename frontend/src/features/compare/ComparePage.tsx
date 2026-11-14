@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -13,20 +12,23 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
+
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { projectPath, projectsQuery } from "../dream/queries";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
-import { projectPath, projectsQuery } from "../dream/queries";
-import { comparisonQuery, type Comparison } from "./queries";
+import { type Comparison, comparisonQuery } from "./queries";
 import { useStageComparison } from "./variants";
+
 import classes from "./ComparePage.module.css";
 
 const titleCase = (text: string) =>

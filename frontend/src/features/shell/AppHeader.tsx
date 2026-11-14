@@ -1,4 +1,3 @@
-import { useId, useState } from "react";
 import {
   ActionIcon,
   Button,
@@ -10,17 +9,20 @@ import {
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Image, Library, Video } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { useId, useState } from "react";
 import { Link, useLocation } from "react-router";
+
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
 import { StudioLogo } from "../../ui/StudioLogo";
+import { usePhone } from "../../ui/usePhone";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
 import { dreamCountQuery } from "../dream/queries";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
 import { useFinishedAway } from "./useFinishedAway";
-import { usePhone } from "../../ui/usePhone";
+
 import classes from "./AppHeader.module.css";
 
 const modes = [

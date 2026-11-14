@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { createGuessLimiter } from "./guess-limit.js";
 
 test("guessing: a few free tries, then doubling lockouts, one try at a time, and this computer untouched", async () => {

@@ -1,19 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { compareVariants } from "../../../../shared/compare";
+import { isCloudProfile } from "../../../../shared/profiles";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
-import { compareVariants } from "../../../../shared/compare";
 import { mediaDraft } from "../gallery/useMediaAction";
+import { submitBlockedReason } from "../generation/GenerationEditor";
 import {
+  type Draft,
+  type Variant,
   defaultProfile,
   initialInput,
   inputForProfile,
   modelsQuery,
   useGeneration,
   useGenerationActions,
-  type Draft,
-  type Variant,
 } from "../generation/GenerationProvider";
-import { submitBlockedReason } from "../generation/GenerationEditor";
 import { compatibleLoras, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -24,7 +26,6 @@ import {
   usesNegative,
 } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
-import { isCloudProfile } from "../../../../shared/profiles";
 import type { Comparison } from "./queries";
 
 export const letter = (index: number) => String.fromCharCode(65 + index);

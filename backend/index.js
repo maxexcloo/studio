@@ -2,186 +2,16 @@
 import "./env.js";
 // Then: refuses to start on data migrate-runtime has not brought current.
 import "./storage-check.js";
-import { createJobRecovery } from "./job-recovery.js";
-import { installShutdown } from "./shutdown.js";
-import { listenForAgentSignIn } from "./agent-sign-in.js";
-import {
-  registerGalleryReadRoutes,
-  registerGalleryHistoryRoutes,
-  registerGalleryErrorRoutes,
-  registerGalleryDeleteRoute,
-} from "./gallery/routes.js";
-import { createGenerationSubmission } from "./generation-routes.js";
-import { createGenerationAdmission } from "./domain/admission.ts";
-import { registerCompareRoutes } from "./domain/compare.ts";
-import { createDream } from "./domain/dream.ts";
-import { registerDreamRoutes } from "./domain/dream-routes.ts";
-import { createProjects, stylesWithChoice } from "./domain/projects.ts";
-import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
-import { fullBodyPerson } from "./mcp/prompt-checks.js";
-import {
-  createNextStepWork,
-  createSuggestions,
-  registerSuggestionRoutes,
-} from "./domain/suggestions.ts";
-import {
-  createTaste,
-  itemValues,
-  preferenceSignal,
-  setPreferenceSignals,
-  registerTasteRoutes,
-  tasteSignal,
-} from "./domain/taste.ts";
-import { queuePriority, Store } from "./domain/store.ts";
-import { createCaptioner } from "./domain/captions.ts";
-import { createReview } from "./domain/review.ts";
-import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
-import { registerIdlePassRoutes } from "./domain/idle-work.ts";
-import { createTitler } from "./domain/titles.ts";
-import { createPromptSuggester } from "./domain/suggested-prompts.ts";
-import {
-  readRuntimeDocument,
-  runtimeDatabase,
-  writeRuntimeDocument,
-} from "./persistence/runtime.ts";
-import { configuredCliProxy } from "./providers/cliproxy.ts";
-import { createSiglip, siglipVersion } from "./providers/siglip.ts";
-import { createFaces } from "./providers/faces.ts";
-import { createFaceCheck } from "./domain/face-check.ts";
-import { createFaceRedo } from "./domain/face-redo.ts";
-import { composeWorkflowPrompt } from "./graphs.js";
-import { studioCloudProfiles } from "./providers/profiles.ts";
-import { workerLoads } from "./queue-eta.js";
-import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
-import { registerMigrationRoutes } from "./runtime-migrations.js";
-import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createSwapRouter } from "./runtime/routes.ts";
-import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
-import { registerModelDownloadRoutes } from "./model/download-routes.js";
-import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
-import { registerModelRoutes } from "./model/routes.js";
-import { registerStatusRoutes } from "./status-routes.js";
-import { createAssistantContext } from "./assistant-context.js";
-import { modelFileReferences, profileDefinitions } from "./library/file-users.js";
-import { draftCheckpointProfile } from "./profile/import-draft.js";
-import { createGenerationQueue } from "./generation-queue.js";
-import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
-import { registerUpscaleRoutes } from "./upscale-routes.js";
-import { registerJobRoutes } from "./job-routes.js";
-import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
-import { registerPreferenceRoutes } from "./preference-routes.js";
-import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
-import { registerDeploymentRoutes } from "./deployment-routes.js";
-import { registerLoraRoutes } from "./lora/routes.js";
-import { registerWorkflowRoutes } from "./workflow-routes.js";
-import { registerPresetRoutes } from "./preset-routes.js";
-import { registerLibraryRoutes } from "./library/routes.js";
-import { importStore } from "./library/imports.js";
-import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
-import { registerProfileRoutes } from "./profile/routes.js";
-import { seedSamples } from "./profile/seed.js";
-import { promptStyleStore } from "./prompt-styles.js";
-import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
-import { createPromptStage } from "./prompt-stage.js";
-import {
-  canonicalProfileId,
-  guideStore,
-  profileStore,
-  withCanonicalProfile,
-} from "./profile/store.js";
-
-import { adminRefusal, requireAdmin } from "./route-access.js";
-import express from "express";
-import { configuredBackends, routeJob, setParkedCheck } from "./comfy/backends.js";
-import { defaultWorker, defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import {
-  networkListening,
-  comfy,
-  comfyFile,
-  comfyOn,
-  host,
-  optionsFor,
-  port,
-  root,
-  setListeningPort,
-} from "./comfy/comfy.js";
-import { canAdmin, clientOf } from "./access.js";
-import { hostAllowed, requestGuard } from "./request-guard.js";
-import { registerMcpRoutes } from "./mcp/mcp.js";
-import { loadSharp } from "./sharp-loader.js";
-import { appVersion } from "./data-dir.js";
-import { buildProfile, offlineModelResult } from "./model/models.js";
-import { flagEnabled } from "./deployment-settings.js";
-import { hfFetch } from "./hf-access.js";
-import { flushWorkflowPreferences } from "./workflow-catalogue.js";
-import {
-  deleteOwnedGalleryItems,
-  filterVisibleGallery,
-  hasGalleryMedia,
-  isGalleryHidden,
-  eachGalleryItem,
-  galleryItem,
-  galleryItems,
-  galleryChangeCount,
-  galleryJobItems,
-  hasGalleryItems,
-  forgetGalleryItems,
-  putGalleryItems,
-  visibleGallery,
-  dataDir,
-  importedImageFile,
-  outputFileSize,
-  recordsFromComfyHistory,
-  removeGalleryItems,
-  resultNumbers,
-  cleanupGalleryState,
-  updateGalleryJob,
-  galleryRevisionValue,
-  onGalleryFilesDeleted,
-  setGalleryFavorites,
-} from "./gallery/store.js";
-import { makePendingItems } from "./gallery/records.js";
-import { compareGalleryItems } from "./gallery/order.js";
-import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
-import { galleryKey } from "./persistence/gallery-rows.ts";
-import { fillVideoSizes } from "./library/library.js";
-import { startMediaWarmup } from "./media-warmup.js";
-import { jobs, setTerminalJob } from "./jobs.js";
-import { cancelPrompt } from "./comfy/queue.js";
-import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
-import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
-import { strengthRange } from "./lora/policy.js";
-import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
-import { registerReferenceRoutes } from "./reference-routes.js";
-import { createCard, listCards, refusal as cardRefusal, registerCardRoutes } from "./cards.js";
-import { createCharacterSheets } from "./character-sheets.js";
-import { registerVideoEditRoutes } from "./gallery/video-edits.js";
-import { registerRecreateRoute } from "./gallery/recreate.js";
-import { registerGalleryImportRoute } from "./gallery/import.js";
-import { registerRedditImportRoute } from "./gallery/reddit.js";
 
-import { loadLoraLibrary } from "./lora/stacks.js";
-import {
-  animatedPhoto,
-  bytesForReferenceAccount,
-  galleryStill,
-  referenceAssetForAccount,
-} from "./references.js";
-import { compressJson, serveApp } from "./http-assets.js";
-import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
-import { gatedPath } from "./gated-path.js";
-import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
-import { forgetComfyRun } from "./comfy/traces.js";
-import {
-  accountForRequest,
-  multiUserEnabled,
-  registerMultiUserAuthRoutes,
-} from "./multi-user-auth.js";
-import { enforceMultiUserRequest } from "./multi-user-gate.js";
+import express from "express";
+
+import { characterImageIds } from "../shared/characters.ts";
+import { isCloudProfile } from "../shared/profiles.ts";
+import { canAdmin, clientOf } from "./access.js";
 import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import {
   accountRoles,
@@ -191,8 +21,6 @@ import {
   promptWriter,
 } from "./account-policy.js";
 import { accountPreferences } from "./account-preferences.js";
-import { dreamVideoProfile } from "./animate-profile.js";
-import { minorAge } from "./minor-age.js";
 import {
   accountAccessForId,
   gatewayAccountAccess,
@@ -201,8 +29,180 @@ import {
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
-import { characterImageIds } from "../shared/characters.ts";
-import { isCloudProfile } from "../shared/profiles.ts";
+import { listenForAgentSignIn } from "./agent-sign-in.js";
+import { dreamVideoProfile } from "./animate-profile.js";
+import { createAssistantContext } from "./assistant-context.js";
+import { promptAssistantOff, registerAssistantRoutes } from "./assistant-routes.js";
+import { refusal as cardRefusal, createCard, listCards, registerCardRoutes } from "./cards.js";
+import { createCharacterSheets } from "./character-sheets.js";
+import { configuredBackends, routeJob, setParkedCheck } from "./comfy/backends.js";
+import {
+  comfy,
+  comfyFile,
+  comfyOn,
+  host,
+  networkListening,
+  optionsFor,
+  port,
+  root,
+  setListeningPort,
+} from "./comfy/comfy.js";
+import { registerComfyMediaRoutes } from "./comfy/media-routes.js";
+import { cancelPrompt } from "./comfy/queue.js";
+import { forgetComfyRun } from "./comfy/traces.js";
+import { getCustomWorkflow, loadCustomWorkflows, userWorkflowsDir } from "./custom-workflows.js";
+import { appVersion } from "./data-dir.js";
+import { registerDeploymentRoutes } from "./deployment-routes.js";
+import { flagEnabled } from "./deployment-settings.js";
+import { createGenerationAdmission } from "./domain/admission.ts";
+import { createCaptioner } from "./domain/captions.ts";
+import { registerCompareRoutes } from "./domain/compare.ts";
+import { registerDreamRoutes } from "./domain/dream-routes.ts";
+import { createDream } from "./domain/dream.ts";
+import { createFaceCheck } from "./domain/face-check.ts";
+import { createFaceRedo } from "./domain/face-redo.ts";
+import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
+import { registerIdlePassRoutes } from "./domain/idle-work.ts";
+import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
+import { createProjects, stylesWithChoice } from "./domain/projects.ts";
+import { createReview } from "./domain/review.ts";
+import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
+import { Store, queuePriority } from "./domain/store.ts";
+import { createPromptSuggester } from "./domain/suggested-prompts.ts";
+import {
+  createNextStepWork,
+  createSuggestions,
+  registerSuggestionRoutes,
+} from "./domain/suggestions.ts";
+import {
+  createTaste,
+  itemValues,
+  preferenceSignal,
+  registerTasteRoutes,
+  setPreferenceSignals,
+  tasteSignal,
+} from "./domain/taste.ts";
+import { createTitler } from "./domain/titles.ts";
+import { registerGalleryImportRoute } from "./gallery/import.js";
+import { compareGalleryItems } from "./gallery/order.js";
+import { makePendingItems } from "./gallery/records.js";
+import { registerRecreateRoute } from "./gallery/recreate.js";
+import { registerRedditImportRoute } from "./gallery/reddit.js";
+import {
+  registerGalleryDeleteRoute,
+  registerGalleryErrorRoutes,
+  registerGalleryHistoryRoutes,
+  registerGalleryReadRoutes,
+} from "./gallery/routes.js";
+import {
+  cleanupGalleryState,
+  dataDir,
+  deleteOwnedGalleryItems,
+  eachGalleryItem,
+  filterVisibleGallery,
+  forgetGalleryItems,
+  galleryChangeCount,
+  galleryItem,
+  galleryItems,
+  galleryJobItems,
+  galleryRevisionValue,
+  hasGalleryItems,
+  hasGalleryMedia,
+  importedImageFile,
+  isGalleryHidden,
+  onGalleryFilesDeleted,
+  outputFileSize,
+  putGalleryItems,
+  recordsFromComfyHistory,
+  removeGalleryItems,
+  resultNumbers,
+  setGalleryFavorites,
+  updateGalleryJob,
+  visibleGallery,
+} from "./gallery/store.js";
+import { registerVideoEditRoutes } from "./gallery/video-edits.js";
+import { gatedPath } from "./gated-path.js";
+import { createGenerationQueue } from "./generation-queue.js";
+import { createGenerationSubmission } from "./generation-routes.js";
+import { composeWorkflowPrompt } from "./graphs.js";
+import { hfFetch } from "./hf-access.js";
+import { compressJson, serveApp } from "./http-assets.js";
+import { createJobRecovery } from "./job-recovery.js";
+import { registerJobRoutes } from "./job-routes.js";
+import { jobs, setTerminalJob } from "./jobs.js";
+import { modelFileReferences, profileDefinitions } from "./library/file-users.js";
+import { importStore } from "./library/imports.js";
+import { fillVideoSizes } from "./library/library.js";
+import { registerLibraryRoutes } from "./library/routes.js";
+import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
+import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
+import { strengthRange } from "./lora/policy.js";
+import { registerLoraRoutes } from "./lora/routes.js";
+import { loadLoraLibrary } from "./lora/stacks.js";
+import { registerMcpRoutes } from "./mcp/mcp.js";
+import { fullBodyPerson } from "./mcp/prompt-checks.js";
+import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
+import { isMediaUrl, mediaFile, mediaParams } from "./media-paths.js";
+import { ingestRecords, noteIngested, removeComfyFiles } from "./media-store.js";
+import { startMediaWarmup } from "./media-warmup.js";
+import { minorAge } from "./minor-age.js";
+import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
+import { registerModelDownloadRoutes } from "./model/download-routes.js";
+import { buildProfile, offlineModelResult } from "./model/models.js";
+import { registerModelRoutes } from "./model/routes.js";
+import {
+  accountForRequest,
+  multiUserEnabled,
+  registerMultiUserAuthRoutes,
+} from "./multi-user-auth.js";
+import { enforceMultiUserRequest } from "./multi-user-gate.js";
+import { galleryKey } from "./persistence/gallery-rows.ts";
+import {
+  readRuntimeDocument,
+  runtimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
+import { registerPreferenceRoutes } from "./preference-routes.js";
+import { registerPresetRoutes } from "./preset-routes.js";
+import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
+import { draftCheckpointProfile } from "./profile/import-draft.js";
+import { registerProfileRoutes } from "./profile/routes.js";
+import { seedSamples } from "./profile/seed.js";
+import {
+  canonicalProfileId,
+  guideStore,
+  profileStore,
+  withCanonicalProfile,
+} from "./profile/store.js";
+import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
+import { createPromptStage } from "./prompt-stage.js";
+import { promptStyleStore } from "./prompt-styles.js";
+import { configuredCliProxy } from "./providers/cliproxy.ts";
+import { createFaces } from "./providers/faces.ts";
+import { studioCloudProfiles } from "./providers/profiles.ts";
+import { createSiglip, siglipVersion } from "./providers/siglip.ts";
+import { workerLoads } from "./queue-eta.js";
+import { registerReferenceRoutes } from "./reference-routes.js";
+import {
+  animatedPhoto,
+  bytesForReferenceAccount,
+  galleryStill,
+  referenceAssetForAccount,
+} from "./references.js";
+import { hostAllowed, requestGuard } from "./request-guard.js";
+import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
+import { adminRefusal, requireAdmin } from "./route-access.js";
+import { registerMigrationRoutes } from "./runtime-migrations.js";
+import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { createSwapRouter } from "./runtime/routes.ts";
+import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
+import { loadSharp } from "./sharp-loader.js";
+import { installShutdown } from "./shutdown.js";
+import { registerStatusRoutes } from "./status-routes.js";
+import { registerUpscaleRoutes } from "./upscale-routes.js";
+import { defaultWorker, defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
+import { flushWorkflowPreferences } from "./workflow-catalogue.js";
+import { registerWorkflowRoutes } from "./workflow-routes.js";
 
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer() });

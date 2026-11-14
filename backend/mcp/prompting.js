@@ -1,5 +1,6 @@
 // Native port of the Studio MCP prompting service.
 import fs from "node:fs";
+
 import { isObject } from "../values.js";
 
 /**

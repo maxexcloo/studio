@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { readJsonFile, writeJsonFile, writeBytesFile, writeBytesFileAsync } from "./json-store.js";
+
+import { readJsonFile, writeBytesFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));

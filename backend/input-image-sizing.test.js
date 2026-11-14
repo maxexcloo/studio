@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import sharp from "sharp";
+
 import { inputImageSize, prepareInputImage } from "./input-image-sizing.js";
 
 const image = (width, height) =>

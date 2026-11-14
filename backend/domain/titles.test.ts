@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createTitler, type TitleItem } from "./titles.ts";
+
+import { type TitleItem, createTitler } from "./titles.ts";
 
 const item = (id: string, extra: Partial<TitleItem> = {}): TitleItem => ({
   id,

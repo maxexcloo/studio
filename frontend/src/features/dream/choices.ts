@@ -1,6 +1,7 @@
-import { X, type LucideIcon } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type LucideIcon, X } from "lucide-react";
+
 import type { Action, ActionGroups } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 import type { DeckCard } from "./deck";
 import type { PairAnswer } from "./queries";
 

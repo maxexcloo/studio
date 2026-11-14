@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Group, Modal, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { DialogFooter } from "../../ui/ConfirmDialog";
-import { icons } from "../../ui/icons";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import { api, failure, request } from "../../api";
-import { TextBox } from "../../ui/TextBox";
-import { usePhone } from "../../ui/usePhone";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import type { Action as ToolAction } from "../../ui/ActionBar";
+import { DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
+import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 
 /** A fixed assistant option from Library › Prompt Styles, in its menu's order. */
 export interface AssistantOption {

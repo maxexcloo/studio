@@ -10,9 +10,10 @@
  * and Animate's Custom… are built in and never stored.
  */
 import path from "node:path";
+
+import { customStyles, defaultPreset, seedStyles } from "./assistant-presets.js";
 import { currentDataDir } from "./data-dir.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { customStyles, defaultPreset, seedStyles } from "./assistant-presets.js";
 import { hashOf, versionsIn, writeVersion } from "./profile/store.js";
 import { isObject } from "./values.js";
 

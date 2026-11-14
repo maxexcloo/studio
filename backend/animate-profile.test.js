@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { animateProfile, dreamVideoProfile, startFrameSize } from "./animate-profile.js";
 
 const slot = (label) => [{ id: "reference", kind: "image", label }];

@@ -6,7 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import sharp from "sharp";
+
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
 
 test(

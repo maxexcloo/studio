@@ -1,7 +1,7 @@
 import type { GenerationInput } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import type { Identity } from "./face-check.ts";
-import { queuePriority, type OwnedJob, type QueueOrigin } from "./store.ts";
+import { type OwnedJob, type QueueOrigin, queuePriority } from "./store.ts";
 
 /**
  * Only results this recent are redone, so the first check of an older gallery (Face Check turned

@@ -1,8 +1,8 @@
 // Numbers for the About page, Settings › Users and per-profile health. Computed from the gallery
 // record only: nothing is tracked beyond what Studio already keeps about its own outputs.
 import { isCloudProfile } from "../shared/profiles.ts";
-import { canonicalProfileId } from "./profile/store.js";
 import { visibleGallery } from "./gallery/store.js";
+import { canonicalProfileId } from "./profile/store.js";
 
 /**
  * What these gallery items made: finished outputs, images and videos, the cloud jobs among them

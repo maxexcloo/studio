@@ -1,4 +1,3 @@
-import { useEffect, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -12,20 +11,22 @@ import {
   Tooltip,
   useCombobox,
 } from "@mantine/core";
-import { History, Pin, PinOff } from "lucide-react";
-import { icons } from "../../ui/icons";
 import {
+  type QueryClient,
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from "@tanstack/react-query";
+import { History, Pin, PinOff } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+
 import { api, post } from "../../api";
+import type { Action } from "../../ui/ActionBar";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
-import type { Action } from "../../ui/ActionBar";
 import { ChipPopup } from "./Picker";
 
 type PromptKind = "positive" | "negative";

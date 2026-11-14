@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
+import { fork } from "node:child_process";
+import { once } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { RuntimeController, type Workload } from "./controller.ts";
-import { createServicesObserver, createLocalText, parkedWorkers } from "./services.ts";
-import { KubernetesEngine } from "./kubernetes.ts";
-import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
-import { fork } from "node:child_process";
-import { once } from "node:events";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
+
 import type { ServicesStatus } from "../../shared/services.ts";
+import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
+import { RuntimeController, type Workload } from "./controller.ts";
+import { KubernetesEngine } from "./kubernetes.ts";
+import { createLocalText, createServicesObserver, parkedWorkers } from "./services.ts";
 
 test("service health observes direct runtimes, shares a bounded cache and scopes waiting and addresses to the caller", async () => {
   const workload = (id: string, kind: Workload["kind"], url: string, label = id): Workload => ({

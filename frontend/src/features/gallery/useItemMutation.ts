@@ -1,5 +1,5 @@
+import { type MutationOptions, hashKey, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { hashKey, useQueryClient, type MutationOptions } from "@tanstack/react-query";
 
 /**
  * A media action's mutation, kept with the item it started on rather than with the component that

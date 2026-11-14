@@ -1,5 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+
 import { galleryStats, profileStats } from "./stats.js";
 
 const done = (extra = {}) => ({ status: "done", type: "image", durationMs: 1000, ...extra });

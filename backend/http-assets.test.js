@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import express from "express";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import zlib from "node:zlib";
-import { compressJson, serveApp } from "./http-assets.js";
+
+import express from "express";
+
 import { precompressDir } from "../frontend/precompress.mjs";
+import { compressJson, serveApp } from "./http-assets.js";
 
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dist-"));
 const script = `console.log(${JSON.stringify("studio ".repeat(2000))});`;

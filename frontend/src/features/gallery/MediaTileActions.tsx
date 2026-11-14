@@ -1,16 +1,18 @@
-import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
-import { icons } from "../../ui/icons";
-import type { MediaItem } from "../../types";
+import { useState } from "react";
+
 import { menuWidth } from "../../theme";
-import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import type { MediaItem } from "../../types";
+import { icons } from "../../ui/icons";
 import { AnimateDialog } from "./AnimateDialog";
+import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaActionMenu } from "./MediaActions";
-import type { AnimateRequest } from "./useMediaAction";
-import { useMediaTransfer } from "./mediaShare";
-import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
+import { useMediaTransfer } from "./mediaShare";
+import type { AnimateRequest } from "./useMediaAction";
+import { useMediaFavorite } from "./useMediaFavorite";
 import { TrimVideoDialog } from "./videoEdits";
+
 import classes from "./MediaTileActions.module.css";
 
 /** Star, Download and More over a gallery tile; the More menu doubles as its context menu. */

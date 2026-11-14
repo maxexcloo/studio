@@ -1,12 +1,13 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { yieldToEventLoop } from "./json-store.js";
-import { mediaType, videoPattern } from "./media-paths.js";
+
 import {
   eachGalleryItem,
   findGalleryItem,
   galleryRevisionValue,
   isGalleryHidden,
 } from "./gallery/store.js";
+import { yieldToEventLoop } from "./json-store.js";
+import { mediaType, videoPattern } from "./media-paths.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
 import {

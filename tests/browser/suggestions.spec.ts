@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+
 import { create, editorMenu, fixtures, image, promptMenu, stamp, viewerAction } from "./fixtures";
 
 const ideas = [

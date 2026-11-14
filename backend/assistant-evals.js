@@ -12,8 +12,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createAssistant } from "./assistant.js";
+
 import { settingWords } from "./assistant-presets.js";
+import { createAssistant } from "./assistant.js";
 import { animateFiller, writeAnimatePrompt } from "./prompt-animate.js";
 
 export const evalsDir = path.join(

@@ -18,13 +18,14 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+
+import { repointLoraStacks } from "../combined-profiles.js";
 import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
+import { isObject } from "../values.js";
+import { repointWorkflowPreferences } from "../workflow-catalogue.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
-import { repointLoraStacks } from "../combined-profiles.js";
-import { repointWorkflowPreferences } from "../workflow-catalogue.js";
-import { isObject } from "../values.js";
 
 const currentId = (id) =>
   /^(image|video)-[a-z0-9.-]+$/.test(id) && !/-(comfyui|radiance|cloud)$/.test(id);

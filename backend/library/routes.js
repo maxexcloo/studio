@@ -28,27 +28,28 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { writeBytesFileAsync } from "../json-store.js";
+
+import { withCatalogueSources } from "../catalogue-downloads.js";
 import { civitaiJson } from "../civitai/access.js";
 import { versionResource } from "../civitai/import.js";
-import { hfFetch } from "../hf-access.js";
-import { withCatalogueSources } from "../catalogue-downloads.js";
-import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { currentDataDir } from "../data-dir.js";
+import { directRoute } from "../domain/direct-route.ts";
+import { familyFromName } from "../family-catalogue.js";
+import { hfFetch } from "../hf-access.js";
 import { fileStem } from "../image-metadata.js";
-import { findSubstitute } from "./substitutes.js";
-import { createUpdateChecker, dailyMs, hfRepositoryMetadata } from "./updates.js";
+import { writeBytesFileAsync } from "../json-store.js";
+import { forgetLora } from "../lora/stacks.js";
+import { downloadState } from "../model/downloads.js";
+import { fromChat, localRefusal } from "../route-access.js";
 import { loadSharp } from "../sharp-loader.js";
+import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
+import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import { startLibraryDownload } from "./downloads.js";
 import { createImportEngine, importStore, publicImport } from "./imports.js";
-import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
-import { familyFromName } from "../family-catalogue.js";
-import { downloadState } from "../model/downloads.js";
-import { directRoute } from "../domain/direct-route.ts";
-import { fromChat, localRefusal } from "../route-access.js";
-import { forgetLora } from "../lora/stacks.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
-import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
+import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
+import { findSubstitute } from "./substitutes.js";
+import { createUpdateChecker, dailyMs, hfRepositoryMetadata } from "./updates.js";
 
 const pictureEdge = 1280;
 const maxImageBytes = 24 * 1024 * 1024;

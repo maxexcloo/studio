@@ -12,17 +12,18 @@ import {
   Table,
   Text,
 } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { api, post } from "../../api";
-import { LoadingState } from "../../ui/LoadingState";
-import { modelsQuery } from "../generation/GenerationProvider";
 import { icons } from "../../ui/icons";
-import { SettingGroup } from "../../ui/SettingRows";
+import { LoadingState } from "../../ui/LoadingState";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
+import { SettingGroup } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { type LibraryPreset, inspirationQuery } from "../generation/inspiration";
 import { InspirationPreset } from "./InspirationPreset";
-import { inspirationQuery, type LibraryPreset } from "../generation/inspiration";
 import { catalogueQuery, definitionsKey, importsQuery } from "./queries";
 
 interface Availability {

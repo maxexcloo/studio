@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
 import { Group, Slider, Text } from "@mantine/core";
+import { useRef, useState } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
+
 import { usePhone } from "../../ui/usePhone";
 import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
+
 import classes from "./MediaComparison.module.css";
 
 const name = (label: string) => (

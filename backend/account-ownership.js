@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+
 import { accountFolder } from "./data-names.js";
 
 /** The authenticated server identity is the only source of a content owner ID. */

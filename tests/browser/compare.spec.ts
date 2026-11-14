@@ -1,11 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+
 import {
   closeLoras,
   create,
   fixtures,
   image,
-  openNav,
   openLoraChoices,
+  openNav,
   section,
   selectionMenuItem,
   stamp,

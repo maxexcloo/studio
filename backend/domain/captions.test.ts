@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import {
-  captionVersion,
-  createCaptioner,
   type Caption,
   type CaptionItem,
   type CaptionWriter,
+  captionVersion,
+  createCaptioner,
 } from "./captions.ts";
-import { dailyItems, passConcurrency, type IdleDocument } from "./idle-work.ts";
+import { type IdleDocument, dailyItems, passConcurrency } from "./idle-work.ts";
 
 const image = (id: string, ownerId = "alice", extra: Partial<CaptionItem> = {}): CaptionItem => ({
   id,

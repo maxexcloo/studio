@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import { SegmentedControl, type SegmentedControlProps } from "@mantine/core";
+import { useEffect, useRef, useState } from "react";
+
 import classes from "./ScrollingSegments.module.css";
 
 // Wide enough to clear the edge fade, so the chosen choice sits fully in view.

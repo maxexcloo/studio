@@ -1,13 +1,13 @@
 import {
-  terminalStatuses,
   type GenerationInput,
   type PromptWriting,
-  pausedReason,
   type QueueMedia,
   type QueueStatus,
+  pausedReason,
+  terminalStatuses,
 } from "../../shared/queue.ts";
 import { logFailure } from "./log-failure.ts";
-import { everyone, pendingStatuses, queuePriority, Store, type OwnedJob } from "./store.ts";
+import { type OwnedJob, Store, everyone, pendingStatuses, queuePriority } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;

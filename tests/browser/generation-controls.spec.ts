@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+
+import type { Profile } from "../../frontend/src/types";
 import {
   closeLoras,
   closePresets,
@@ -10,14 +12,13 @@ import {
   loadSaved,
   openPresets,
   profiles,
-  saveCurrent,
   renamePreset,
+  saveCurrent,
   serveProfiles,
   showUploads,
   stamp,
   withSettings,
 } from "./fixtures";
-import type { Profile } from "../../frontend/src/types";
 
 test("Changing the second encoder and weight type preserves the first encoder in generation", async ({
   page,

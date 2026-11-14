@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
 import { Button, Group, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { waitsOnText, type RuntimeOperation, type RuntimeSwap } from "../../../../shared/runtime";
-import type { QueueJob } from "../../types";
+import { useEffect, useRef, useState } from "react";
+
+import { type RuntimeOperation, type RuntimeSwap, waitsOnText } from "../../../../shared/runtime";
 import { post } from "../../api";
+import type { QueueJob } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { servicesStatusQuery } from "./RuntimePanel";
 import { runtimeStatusQuery } from "./RuntimeWorkloads";

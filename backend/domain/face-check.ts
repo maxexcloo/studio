@@ -1,4 +1,4 @@
-import { createIdleWork, pictured, type IdleDocument, type IdleItem } from "./idle-work.ts";
+import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 
 /**
  * Below this cosine similarity of AuraFace vectors a result's face counts as someone else. On

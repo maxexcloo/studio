@@ -5,6 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import { gatedPath } from "./gated-path.js";
 
 test("every casing of the API and ComfyUI prefixes is gated", () => {

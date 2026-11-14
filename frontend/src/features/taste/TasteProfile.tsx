@@ -1,11 +1,12 @@
-import { useState } from "react";
 import { Alert, Badge, Button, Group, Stack, TagsInput, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { maxAvoid, maxAvoids } from "../../../../shared/taste";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { formatDateTime } from "../../ui/dates";
 import { SettingGroup } from "../../ui/SettingRows";
-import { maxAvoid, maxAvoids } from "../../../../shared/taste";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 
