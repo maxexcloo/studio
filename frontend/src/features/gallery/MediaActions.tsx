@@ -501,8 +501,35 @@ export function useMediaActions(
           ]
         : undefined,
     }),
+    // Compare Models stages this image's prompt across models in the composer; Open Comparison
+    // shows the side-by-side view it belongs to.
     image &&
-      itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
+      itemAction("compare", {
+        menu: [
+          [
+            {
+              id: "compare-models",
+              label: "Compare Models",
+              icon: icons.compare,
+              disabled: variants.isPending,
+              onClick: () => variants.mutate(),
+            },
+            ...(comparison
+              ? [
+                  {
+                    id: "open-comparison",
+                    label: "Open Comparison",
+                    icon: icons.compareSideBySide,
+                    onClick: () => {
+                      onApplied();
+                      navigate(`/compare/${comparison}`);
+                    },
+                  },
+                ]
+              : []),
+          ],
+        ],
+      }),
     // The gallery ranked by likeness to this image (GalleryPage reads `similar`), then new
     // variations of its MCP result set; a video in a set has only the latter.
     image
@@ -519,19 +546,6 @@ export function useMediaActions(
                 },
               },
               ...(moreLikeSet ? [{ id: "more-like-set", ...moreLikeSet }] : []),
-              ...(comparison
-                ? [
-                    {
-                      id: "open-comparison",
-                      label: "Open Comparison",
-                      icon: icons.compare,
-                      onClick: () => {
-                        onApplied();
-                        navigate(`/compare/${comparison}`);
-                      },
-                    },
-                  ]
-                : []),
             ],
           ],
         })
