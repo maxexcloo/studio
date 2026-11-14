@@ -190,6 +190,11 @@ test("workloads stopped on purpose are parked; one Studio's placement should run
     /image is stopped: an administrator can start it/,
   );
   await assert.rejects(controller.acquire("text"), /text is down/);
+  // With automatic control a stopped worker still reads Stopped, though work may start it.
+  controller.configure({ automatic: true, parkIdleMinutes: 0 });
+  const automatic = await observe({ allowed: ["image"] });
+  assert.equal(automatic.services.image?.endpoints[0].state, "parked");
+  assert.deepEqual([...(await parkedWorkers(controller, workers))], []);
 });
 
 test("timeouts, authentication failures and non-worker responses never advertise a healthy runtime", async () => {
