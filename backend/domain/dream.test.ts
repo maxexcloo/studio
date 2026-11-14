@@ -74,8 +74,8 @@ function fixture(t: TestContext, catalogue = profiles) {
     rolls: [] as number[],
     /** The account's cards, or null without Characters. */
     cards: { characters: [], outfits: [], scenes: [] } as Record<CardKind, Character[]> | null,
-    /** Where videos run: the profile Animate would choose, or why none can. */
-    video: { id: "wan", cloud: false, note: "" } as { id: string; cloud: boolean; note: string },
+    /** The local video profile Dream would choose, or why none can. */
+    video: "wan",
     videoRefusal: "",
     /** The text model's reply when asked for suggestions. */
     suggestions: { suggestions: [] } as unknown,
@@ -149,10 +149,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     videoProfile: async (_ownerId, _account, { extend }) => {
       if (state.videoRefusal) throw new Error(state.videoRefusal);
       const own = catalogue.find((profile) => profile.id === extend);
-      return {
-        ...state.video,
-        profile: own || catalogue.find((profile) => profile.id === state.video.id)!,
-      };
+      return { profile: own || catalogue.find((profile) => profile.id === state.video)! };
     },
     cards: () => state.cards,
     createCard: (_account, kind, fields) => {
@@ -1342,14 +1339,8 @@ test("A series keeps one character in one place and night across a result set, t
   assert.equal(dream.read("alice").series, undefined);
 });
 
-test("Dream videos animate the best-reviewed still and extend kept videos, each once, where the account prefers videos to run", async (t) => {
-  const grok: DreamProfile = {
-    id: "grok",
-    kind: "video",
-    label: "Grok",
-    mediaInputs: [{ id: "frame", role: "start" }],
-  };
-  const { dream, state, generated, dreamOnce } = fixture(t, [...profiles, grok]);
+test("Dream videos animate the best-reviewed still and extend kept videos, each once, on local GPUs", async (t) => {
+  const { dream, state, generated, dreamOnce } = fixture(t, profiles);
   const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
@@ -1410,20 +1401,9 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
   assert.match(state.calls.at(-1)!.user, /clip so far was made from: a clip/);
   assert.equal(await dreamOnce(), undefined);
 
-  // Cloud runs without the local video worker, and a fallback says where it ran.
-  dreamed("later", 8);
-  state.online.video = false;
-  state.video = {
-    id: "grok",
-    cloud: true,
-    note: "Local video isn't running, so this runs on Grok.",
-  };
-  const cloud = await dreamOnce();
-  assert.equal(cloud?.input.profileId, "grok");
-  assert.equal(frameOf(cloud).slot, "frame");
-  assert.match(cloud!.dream!.why, /^Local video isn't running, so this runs on Grok\./);
+  // Dream's videos wait for the local video worker.
   dreamed("last", 8);
-  state.video = { id: "wan", cloud: false, note: "" };
+  state.online.video = false;
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, "The video worker is offline.");
   state.online.video = true;

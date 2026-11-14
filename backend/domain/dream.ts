@@ -302,17 +302,16 @@ type Kind = "image" | "video";
  *   adapted, never copied, on its profile with its LoRAs where they are ready
  * - lora: of exploited ideas, those that load one LoRA
  * - spicy: spicy, where the setting and Uncensored Models allow
- * - series: of fresh images, those that start a series (of `seriesLength`), where the account has
- *   a character and a ready model edits with references
- * - extend: of videos, those that extend one of the account's videos rather than animate a still
  */
 const shares = {
   inspiration: 50,
   lora: 40,
   spicy: 40,
-  series: 5,
-  extend: 35,
 };
+/** Percent of fresh images that start a series, where a character and a reference-editing model allow. */
+const seriesShare = 5;
+/** Percent of videos that extend one of the account's videos rather than animate a still. */
+const extendShare = 35;
 const defaultDreamSettings: DreamSettings = {
   enabled: false,
   paused: false,
@@ -653,10 +652,10 @@ export function createDream(options: {
     frame?: "last",
   ): { id: string; source?: string };
   /**
-   * The video profile that animates an image or, with `extend` (the video's profile), continues a
-   * video, where the account prefers videos to run (Cloud, Fast or Quality) and falling back as
-   * Animate does (animate-profile.js), with the size for the frame and a note where it fell back;
-   * a throw where nothing can run it.
+   * The local video profile that animates an image or, with `extend` (the video's profile),
+   * continues a video, at the account's Fast or Quality as Animate chooses (animate-profile.js),
+   * with the size for the frame; a throw where nothing can run it. Dream never runs videos in the
+   * cloud.
    */
   videoProfile(
     ownerId: string,
@@ -664,8 +663,6 @@ export function createDream(options: {
     frame: { width: number; height: number; extend?: string },
   ): Promise<{
     profile: DreamProfile;
-    cloud: boolean;
-    note: string;
     size?: { width: number; height: number };
   }>;
   /** The account's character, outfit and scene cards, or null where it may not use Characters. */
@@ -853,7 +850,7 @@ export function createDream(options: {
           done(item, "video") && item.dream?.arm !== "extend" && !extended.has(String(item.id)),
       )
       .sort(best);
-    if (video && chance(shares.extend)) return { item: video, extend: true };
+    if (video && chance(extendShare)) return { item: video, extend: true };
     const fresh = (item: DreamItem) => done(item, "image") && !animated.has(String(item.id));
     const reviewed = options
       .gallery(ownerId)
@@ -891,7 +888,7 @@ export function createDream(options: {
       delete latest.series;
       write(ownerId, latest);
     }
-    if (!characters.length || !editing.length || !chance(shares.series)) return null;
+    if (!characters.length || !editing.length || !chance(seriesShare)) return null;
     const sheeted = characters.filter((card) => card.sheet?.panels?.length);
     const card = pick(sheeted.length ? sheeted : characters);
     const scenes = (cards?.scenes || []).filter((scene) => scene.description);
@@ -1407,14 +1404,14 @@ export function createDream(options: {
       const online = await options.online(kind);
       if (online.text !== "online")
         return { status: "unavailable", reason: unreachable("The text model", online.text) };
-      if (kind === "video") {
-        const refused = await video(ownerId, record, access, online.media);
-        if (!refused) return { status: "generating" };
-        reason = refused;
-        continue;
-      }
       if (online.media !== "online") {
         reason = unreachable(`The ${kind} worker`, online.media);
+        continue;
+      }
+      if (kind === "video") {
+        const refused = await video(ownerId, record, access);
+        if (!refused) return { status: "generating" };
+        reason = refused;
         continue;
       }
       const catalogue = await options.catalogue(ownerId, access.account);
@@ -1587,9 +1584,9 @@ export function createDream(options: {
   }
   /**
    * Queues a video that animates the account's best still or extends one of its videos
-   * (videoSource), on the model where it prefers videos to run; answers why it couldn't, or "".
+   * (videoSource), on a local model at its Fast or Quality; answers why it couldn't, or "".
    */
-  async function video(ownerId: string, record: DreamRecord, access: DreamAccess, media: Reach) {
+  async function video(ownerId: string, record: DreamRecord, access: DreamAccess) {
     const source = videoSource(ownerId, record);
     if (!source)
       return "Dream videos animate a kept, starred or well-reviewed image. Keep or star one first.";
@@ -1602,7 +1599,6 @@ export function createDream(options: {
         height: Number(item.height) || 0,
         ...(extend ? { extend: String(item.settings?.profileId || "") } : {}),
       });
-      if (!choice.cloud && media !== "online") return unreachable("The video worker", media);
       reference = options.reference(access.account, String(item.id), extend ? "last" : undefined);
     } catch (error) {
       return (error as Error).message;
@@ -1617,7 +1613,6 @@ export function createDream(options: {
       ...(spicy ? { spicy } : {}),
       ...(prompt ? { source: prompt } : {}),
       ...(extend ? { extend: true as const } : {}),
-      ...(choice.note ? { note: choice.note } : {}),
       loras: [],
     };
     const result = await options.admit(
@@ -2114,11 +2109,11 @@ export function createDream(options: {
         for (const ownerId of options.owners()) deleteDiscards(ownerId, now() - discardKeepMs);
       }
       // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
-      // Dream up; Dream makes new work for that kind once the worker is back. Cloud work has none.
+      // Dream up; Dream makes new work for that kind once the worker is back.
       const reach = new Map<Kind, Promise<Reach>>();
       const stranded = await Promise.all(
         live()
-          .filter((job) => dreamJob(job) && waiting(job) && !job.resource.startsWith("provider:"))
+          .filter((job) => dreamJob(job) && waiting(job))
           .map(async (job) => {
             const kind = kindOf(job.input);
             if (!reach.has(kind))

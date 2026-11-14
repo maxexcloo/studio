@@ -135,5 +135,31 @@ export function animateProfile(
         : `${notRunning}, so this runs on ${label}.`,
   );
 }
+/**
+ * The video profile Dream animates or, given `extend` (the video's profile ID), extends with: only
+ * local GPUs, never Cloud, at the account's `videos` preference (Quality, otherwise Fast) as
+ * animateProfile chooses; an Extend keeps its video's model where that is local and runs.
+ */
+export function dreamVideoProfile(profiles, { videos, extend, ...options }) {
+  const own =
+    extend &&
+    profiles.find(
+      (profile) =>
+        profile.id === extend &&
+        profile.kind === "video" &&
+        !isCloudProfile(profile) &&
+        profile.ready !== false &&
+        profile.mediaInputs?.length &&
+        !["offline", "parked"].includes(profile.availability),
+    );
+  const choice = own
+    ? withSize({ profile: own }, options.width, options.height)
+    : animateProfile(profiles, {
+        ...options,
+        tier: videos === "quality" ? "quality" : "fast",
+        where: "local",
+      });
+  return { profile: choice.profile, size: choice.size };
+}
 const withSize = (choice, width, height) =>
   width > 0 && height > 0 ? { ...choice, size: frameSize(choice.profile, width, height) } : choice;
