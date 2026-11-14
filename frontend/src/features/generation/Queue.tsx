@@ -56,12 +56,12 @@ import classes from "./Queue.module.css";
 type QueueListing = { jobs: QueueJob[]; paused: QueuePause };
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
-  // While work runs, a poll fetches only the jobs changed since the newest it holds and keeps the
-  // rest; an invalidation, an idle check or an unknown job fetches the whole listing.
+  // A poll fetches only the jobs changed since the newest it holds and keeps the rest; an
+  // invalidation or an unknown job fetches the whole listing.
   queryFn: async ({ client, queryKey }): Promise<QueueListing> => {
     const state = client.getQueryState<QueueListing>(queryKey);
     const held = state?.data?.jobs;
-    if (held && !state.isInvalidated && held.some((job) => !terminalStatuses.has(job.status))) {
+    if (held?.length && !state?.isInvalidated) {
       const since = held.reduce(
         (latest, job) => (job.updatedAt > latest ? job.updatedAt : latest),
         "",
@@ -75,11 +75,11 @@ export const queueQuery = queryOptions({
     }
     return api<QueueListing>("/api/queue");
   },
-  // Every in-app submit (composer, viewer) invalidates this query; an idle queue still
-  // checks now and then, so work started elsewhere (an MCP client, another tab) shows, and the
-  // gallery with it, without the window regaining focus.
+  // Every in-app submit (composer, viewer) invalidates this query; an idle queue still checks
+  // often, so work started elsewhere (an MCP client, another tab) shows, and the gallery with it,
+  // without the window regaining focus.
   refetchInterval: (query) =>
-    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 15_000,
+    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : 3000,
 });
 /** One of the account's jobs, however old: the queue lists only its latest finished ones. */
 export const queueJobQuery = (id: string) =>

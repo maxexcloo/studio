@@ -301,9 +301,10 @@ the primary component reference and verify APIs against the installed version.
 - Routine success appears where it happened: a saved row, a copy check or a
   brief action label (`useFlash`). Notifications serve failures, Undo and
   outcomes with nowhere else to show. Generation submission and completion
-  appear in their gallery or strip; the gallery shows unfinished work as the
-  account's Unfinished Work preference says (None by default, In Progress or
-  Queued). Keep notifications clear of actions.
+  appear in their gallery or strip, from any source, as soon as the queue
+  reports them, without waiting for every loaded page; the gallery shows
+  unfinished work as the account's Unfinished Work preference says (None by
+  default, In Progress or Queued). Keep notifications clear of actions.
 - Dream results stay in their own pool until liked; Like and Pass teach taste.
   Dream opens on the deck, a swipeable card stack of unseen results,
   comparisons and calibration, keyed on desktop; Overview's While You Were Away

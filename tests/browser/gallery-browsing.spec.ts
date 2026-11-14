@@ -1149,6 +1149,37 @@ test("The viewer's set strip shows only its own set", async ({ page }) => {
   await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
 });
 
+test("A result of work started elsewhere shows as soon as its job finishes", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push(...results(1));
+  await page.goto("/images");
+  await expect(
+    page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }),
+  ).toBeVisible();
+  // An MCP client's job, finished between the idle queue's checks.
+  state.jobs.push({
+    id: "elsewhere",
+    sessionId: "s",
+    operation: "image",
+    status: "completed",
+    reason: "",
+    input: { prompt: "Made Elsewhere", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.gallery.unshift({
+    ...results(1)[0],
+    id: "elsewhere-0",
+    jobId: "elsewhere",
+    prompt: "Made Elsewhere",
+  });
+  await expect(
+    page.getByRole("button", { name: "Open image: Made Elsewhere", exact: true }),
+  ).toBeVisible();
+});
+
 test("The open item is in the URL: Back closes the viewer and a link opens it", async ({
   page,
 }) => {

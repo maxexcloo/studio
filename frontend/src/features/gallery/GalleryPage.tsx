@@ -161,37 +161,48 @@ export function GalleryPage() {
     // between Images and Videos never shows the other mode's results.
     placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
   });
+  // Reads the first page afresh into the shown results: the newest tiles show without waiting for
+  // every loaded page to refetch.
+  const refreshFirst = useCallback(
+    () =>
+      galleryPage("")
+        .then((first) =>
+          client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
+            if (!data) return data;
+            // The fresh first page leads; what it pushed past its end stays, as the next page
+            // carries on from the old first page's cursor. Its jobs' unfinished tiles give way to
+            // their results.
+            const fresh = new Set(first.items.flatMap((item) => [item.id, item.jobId || item.id]));
+            const [old, ...rest] = data.pages;
+            const page = {
+              ...old,
+              items: [
+                ...first.items,
+                ...old.items.filter((item) => !fresh.has(item.id) && !fresh.has(item.jobId || "")),
+              ],
+            };
+            return { ...data, pages: [page, ...rest] };
+          }),
+        )
+        .catch(() => undefined),
+    [galleryPage, galleryKey, client],
+  );
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
   // Work starting or finishing refreshes every page through the queue key below.
   useEffect(() => {
     if (!jobs?.active) return;
     const timer = setInterval(() => {
-      if (document.hidden) return;
-      void galleryPage("")
-        .then((first) =>
-          client.setQueryData<InfiniteData<Page>>(galleryKey, (data) => {
-            if (!data) return data;
-            // The fresh first page leads; what it pushed past its end stays, as the next page
-            // carries on from the old first page's cursor.
-            const fresh = new Set(first.items.map((item) => item.id));
-            const [old, ...rest] = data.pages;
-            const page = {
-              ...old,
-              items: [...first.items, ...old.items.filter((item) => !fresh.has(item.id))],
-            };
-            return { ...data, pages: [page, ...rest] };
-          }),
-        )
-        .catch(() => undefined);
+      if (!document.hidden) void refreshFirst();
     }, 3000);
     return () => clearInterval(timer);
-  }, [jobs?.active, galleryPage, galleryKey, client]);
+  }, [jobs?.active, refreshFirst]);
   const seenJobs = useRef(jobs?.key);
   useEffect(() => {
     if (seenJobs.current === jobs?.key) return;
     seenJobs.current = jobs?.key;
+    void refreshFirst();
     void client.invalidateQueries({ queryKey: ["gallery"] });
-  }, [jobs?.key, client]);
+  }, [jobs?.key, client, refreshFirst]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
