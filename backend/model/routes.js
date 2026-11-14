@@ -2,6 +2,7 @@ import { ownerIdForRequest } from "../account-ownership.js";
 import { accountPreferences } from "../account-preferences.js";
 import { animateProfile } from "../animate-profile.js";
 import { directRoute } from "../domain/direct-route.ts";
+import { step } from "../event-loop.js";
 import {
   familyLabels,
   modelsForAccount,
@@ -22,11 +23,15 @@ export function registerModelRoutes(app, { catalogue }) {
       );
     try {
       // MCP submissions reuse backend metadata; the studio's rescan stays fresh.
-      const { models } = await catalogue.mediaModels(query.cached !== "1");
+      const { models } = await step("models: workers", () =>
+        catalogue.mediaModels(query.cached !== "1"),
+      );
       return {
         status: 200,
         payload: {
-          ...withFailing(withProfileAliases(forAccount(models))),
+          ...(await step("models: account", () =>
+            withFailing(withProfileAliases(forAccount(models))),
+          )),
           familyLabels,
         },
       };
