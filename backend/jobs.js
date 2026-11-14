@@ -33,11 +33,8 @@ import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
 export const jobs = new Map();
 const previewSlots = new Map();
 const terminalCleanupTimers = new Map();
-const previewIntervalMs = Math.max(100, Number(process.env.STUDIO_PREVIEW_INTERVAL_MS || 500));
-const terminalJobTtlMs = Math.max(
-  10_000,
-  Number(process.env.STUDIO_TERMINAL_JOB_TTL_MS || 5 * 60 * 1000),
-);
+const previewIntervalMs = 500;
+const terminalJobTtlMs = 5 * 60 * 1000;
 
 function clearPreviewSlot(id) {
   const slot = previewSlots.get(id);
