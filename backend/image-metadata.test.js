@@ -88,7 +88,7 @@ test("Civitai parameters: exact versions from Civitai resources, approximations 
     sampler: "euler",
   });
   assert.deepEqual(recipe.approximate, [
-    "No sampling schedule was recorded; the workflow’s default will be used",
+    "No sampling schedule was recorded; the workflow's default will be used",
   ]);
   assert.deepEqual(recipe.warnings, ["CLIP skip 2 needs a matching workflow."]);
 });
@@ -215,10 +215,10 @@ test("SamplerCustomAdvanced graphs read their guider, noise, sampler and sigmas"
     recipe.resources.map(({ role, file }) => [role, file]),
     [["checkpoint", "juggernaut.safetensors"]],
   );
-  assert.equal(recipe.extraProcessing, true, "an upscale model is processing Studio can’t redo");
+  assert.equal(recipe.extraProcessing, true, "an upscale model is processing Studio can't redo");
 });
 
-test("Studio’s own PNG round-trips: the parameters lead and the graph gives full file names", () => {
+test("Studio's own PNG round-trips: the parameters lead and the graph gives full file names", () => {
   const recipe = recipeOf("studio.png");
   assert.equal(recipe.source, "studio");
   assert.equal(recipe.prompt, "a lighthouse at dusk, long exposure");
@@ -276,14 +276,14 @@ test("an image without metadata has no recipe; compressed PNG text still reads",
   assert.equal(imageRecipe(readImageMetadata(utf)).prompt, "ein Fuchs im Schnee ✨");
 });
 
-test("a recipe without a generation size takes the image’s own, and says so", () => {
+test("a recipe without a generation size takes the image's own, and says so", () => {
   const recipe = imageRecipe({
     width: 64,
     height: 48,
     text: { parameters: "a dog\nSteps: 5, Seed: 3" },
   });
   assert.deepEqual([recipe.settings.width, recipe.settings.height], [64, 48]);
-  assert.match(recipe.approximate.at(-1), /size is the image’s own/);
+  assert.match(recipe.approximate.at(-1), /size is the image's own/);
 });
 
 test("settings lines keep quoted values and JSON whole", () => {
@@ -302,7 +302,7 @@ test("settings lines keep quoted values and JSON whole", () => {
   assert.equal(a1111Recipe(""), null);
 });
 
-test("A1111 samplers map to ComfyUI’s, and unknown ones are named for a manual choice", () => {
+test("A1111 samplers map to ComfyUI's, and unknown ones are named for a manual choice", () => {
   assert.deepEqual(comfySampling("DPM++ 2M Karras"), {
     sampler: "dpmpp_2m",
     scheduler: "karras",
@@ -324,7 +324,7 @@ test("A1111 samplers map to ComfyUI’s, and unknown ones are named for a manual
   assert.deepEqual(comfySampling("euler"), {
     sampler: "euler",
     scheduler: "",
-    approximate: ["No sampling schedule was recorded; the workflow’s default will be used"],
+    approximate: ["No sampling schedule was recorded; the workflow's default will be used"],
   });
 });
 

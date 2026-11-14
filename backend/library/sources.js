@@ -325,13 +325,13 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
       response.status === 401 || response.status === 403
         ? "This repository is gated or private. Accept its terms on Hugging Face and add a token to the deployment."
         : response.status === 404
-          ? "That Hugging Face repository or revision doesn’t exist."
+          ? "That Hugging Face repository or revision doesn't exist."
           : `Hugging Face metadata is unavailable (HTTP ${response.status}).`,
     );
   }
   const metadata = JSON.parse((await limitedBody(response, 8 * 1024 * 1024)).toString());
   if (!/^[a-f0-9]{40}$/i.test(metadata.sha || ""))
-    throw new Error("Hugging Face didn’t return an exact revision.");
+    throw new Error("Hugging Face didn't return an exact revision.");
   const tags = Array.isArray(metadata.tags) ? metadata.tags.map(String) : [];
   const card = metadata.cardData && typeof metadata.cardData === "object" ? metadata.cardData : {};
   const baseModel = String(
@@ -348,7 +348,7 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
   if (link.filePath && !files.length)
     throw new Error(
       /\.(safetensors|gguf)$/i.test(link.filePath)
-        ? "That file isn’t in this repository revision."
+        ? "That file isn't in this repository revision."
         : "Choose a SafeTensors or GGUF file.",
     );
   if (!files.length) throw new Error("This repository has no SafeTensors or GGUF files.");

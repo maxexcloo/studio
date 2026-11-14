@@ -54,11 +54,11 @@ async function sendWithoutSettings(req, res) {
     noteComfyReachable(worker);
   } catch (error) {
     noteComfyFetchError(worker, error);
-    res.status(502).json({ ok: false, error: "ComfyUI isn’t answering." });
+    res.status(502).json({ ok: false, error: "ComfyUI isn't answering." });
     return;
   }
   if (!response.ok) {
-    res.status(response.status).json({ ok: false, error: "ComfyUI doesn’t have this file." });
+    res.status(response.status).json({ ok: false, error: "ComfyUI doesn't have this file." });
     return;
   }
   const bytes = Buffer.from(await response.arrayBuffer());

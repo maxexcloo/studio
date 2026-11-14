@@ -37,7 +37,7 @@ export function registerPreferenceRoutes(app) {
       if (patch[feature] !== undefined && !grants[feature])
         return res.status(400).json({
           ok: false,
-          error: "Your group doesn’t grant that, so there is nothing to turn off.",
+          error: "Your group doesn't grant that, so there is nothing to turn off.",
         });
     if (patch.spicyPrompts === true && !grants.spicyPrompts)
       return res.status(400).json({ ok: false, error: "Spicy Prompts needs Uncensored Models." });

@@ -462,7 +462,7 @@ export function inferModels(
     if (reason)
       Object.assign(profile, {
         ready: false,
-        readyReason: `${profileBackendLabels[workflow.backend] || workflow.backend} isn’t ready: ${reason}`,
+        readyReason: `${profileBackendLabels[workflow.backend] || workflow.backend} isn't ready: ${reason}`,
       });
     return profile;
   };
@@ -531,7 +531,7 @@ export function inferModels(
 export function offlineModelResult(comfyUrl = "") {
   return {
     ...inferModels({}, {}),
-    reason: `Can’t reach ComfyUI${comfyUrl ? ` at ${comfyUrl}` : ""}.`,
+    reason: `Can't reach ComfyUI${comfyUrl ? ` at ${comfyUrl}` : ""}.`,
   };
 }
 

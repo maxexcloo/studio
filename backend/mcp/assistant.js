@@ -44,7 +44,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
     } catch (error) {
       if (error.code !== "ENOENT")
         log.warn?.(
-          `[mcp] The chat assistant records couldn’t be read; starting afresh: ${error.message}`,
+          `[mcp] The chat assistant records couldn't be read; starting afresh: ${error.message}`,
         );
     }
   }
@@ -57,7 +57,7 @@ export function createChatAssistantMemory({ now = Date.now, dataDir = "", log = 
         suggested: [...suggested].filter(([, value]) => fresh(value)),
       });
     } catch (error) {
-      log.warn?.(`[mcp] The chat assistant records couldn’t be saved: ${error.message}`);
+      log.warn?.(`[mcp] The chat assistant records couldn't be saved: ${error.message}`);
     }
   };
   const keep = (map, id, value) => {
@@ -155,7 +155,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
           prompt: text,
           preset,
           unchanged: true,
-          reason: `The assistant couldn’t rewrite it (${written.reason || "unavailable"}); the prompt is unchanged.`,
+          reason: `The assistant couldn't rewrite it (${written.reason || "unavailable"}); the prompt is unchanged.`,
         });
       memory.rewrote(owner, written.prompt, { preset: written.preset, model: written.model });
       return mcpJson({

@@ -185,7 +185,7 @@ test("a combined profile is checked on every backend, and must name backends Stu
   extra.studio.backends.vllm = { ...radianceBlock, graph: radianceGraph };
   assert.match(
     validateProfileText("combined", text(extra)).errors.join(" "),
-    /studio\.backends\.vllm isn’t a backend Studio runs/,
+    /studio\.backends\.vllm isn't a backend Studio runs/,
   );
 });
 
@@ -198,7 +198,7 @@ test("readiness follows the selected backend, with the reason, and never falls b
     );
     assert.equal(comfyOnly.ready, false);
     assert.equal(comfyOnly.backend, "radiance");
-    assert.match(comfyOnly.readyReason, /^Radiance isn’t ready: .*RadianceImageGenerate/);
+    assert.match(comfyOnly.readyReason, /^Radiance isn't ready: .*RadianceImageGenerate/);
     assert.deepEqual(
       comfyOnly.backendOptions.map(({ id, ready }) => [id, ready]),
       [

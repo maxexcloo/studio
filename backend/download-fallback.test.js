@@ -44,7 +44,7 @@ test("the face detector downloads as pickled weights into its own folder only", 
   assert.equal(detector.label, "Face Detector (YOLOv8m)");
   startDownload(detector);
   assert.equal((await settle("face_yolov8m.pt")).status, "done");
-  assert.throws(() => startDownload(spec("other.pt")), /isn’t a downloadable model file/);
+  assert.throws(() => startDownload(spec("other.pt")), /isn't a downloadable model file/);
 });
 
 test("a build gone from its address falls back to the next one by itself", async () => {

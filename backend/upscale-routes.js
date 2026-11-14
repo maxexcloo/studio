@@ -56,7 +56,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           payload: {
             ok: false,
             offline: true,
-            error: `${isDefaultBackend(worker) ? "ComfyUI" : workerById(worker)?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
+            error: `${isDefaultBackend(worker) ? "ComfyUI" : workerById(worker)?.name || "The upscale worker"} is offline, so smart upscale isn't available.`,
           },
         },
       };
@@ -64,7 +64,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
   }
   const upscaleUnready = (status) =>
     status.nodesInstalled
-      ? "The SeedVR2 models aren’t installed yet."
+      ? "The SeedVR2 models aren't installed yet."
       : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`;
   async function upscaleContext(res, worker, options) {
     const { info, failure } = await upscaleInfo(worker, options);
@@ -162,7 +162,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
         payload: {
           ok: false,
           reason: "unfinished",
-          error: "This image is still rendering. Upscale it when it’s done.",
+          error: "This image is still rendering. Upscale it when it's done.",
         },
       };
     if (["queued", "running"].includes(item.upscale?.status))
@@ -200,7 +200,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
         payload: {
           ok: false,
           reason: "source",
-          error: `Couldn’t read the original image: ${error.message}`,
+          error: `Couldn't read the original image: ${error.message}`,
         },
       };
     }
@@ -211,7 +211,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           ok: false,
           reason: "source",
           error:
-            "ComfyUI didn’t accept the original image. Make sure ComfyUI is running and can write to its input folder.",
+            "ComfyUI didn't accept the original image. Make sure ComfyUI is running and can write to its input folder.",
         },
       };
     const customWorkflow = String(item.model || "").startsWith("custom:")

@@ -298,7 +298,7 @@ test("automatic control never stops or starts text; an administrator's apply can
   });
   await assert.rejects(
     controller.acquire("gaming"),
-    /automatic control doesn’t start text for queued work/,
+    /automatic control doesn't start text for queued work/,
   );
   assert.deepEqual(kube.log, []);
   assert.deepEqual((await controller.observe()).history, []);

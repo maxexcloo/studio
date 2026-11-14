@@ -118,7 +118,7 @@ export function requestGuard({ network = false } = {}) {
       refuse(
         res,
         "host",
-        `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to STUDIO_ALLOWED_HOSTS.`,
+        `Studio doesn't open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer's network address. Add other names to STUDIO_ALLOWED_HOSTS.`,
       );
       return;
     }
@@ -145,7 +145,7 @@ export function requestGuard({ network = false } = {}) {
       refuse(
         res,
         "header",
-        "This request didn’t come from the studio. Reload the page and try again.",
+        "This request didn't come from the studio. Reload the page and try again.",
       );
       return;
     }

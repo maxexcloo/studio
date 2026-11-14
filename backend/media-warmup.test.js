@@ -77,12 +77,12 @@ const files = (folder, pattern) => {
   }
 };
 
-test("a pass builds the gallery’s thumbnails, display copies, posters and previews", async () => {
+test("a pass builds the gallery's thumbnails, display copies, posters and previews", async () => {
   await warmGallery();
-  assert.equal(files(".thumbnails", /\.webp$/).length, 2, "the image’s thumbnail and display copy");
+  assert.equal(files(".thumbnails", /\.webp$/).length, 2, "the image's thumbnail and display copy");
   if (canEncode) {
-    assert.equal(files(".video-previews", /\.jpg$/).length, 1, "the video’s poster");
-    assert.equal(files(".video-previews", /\.mp4$/).length, 1, "the video’s grid preview");
+    assert.equal(files(".video-previews", /\.jpg$/).length, 1, "the video's poster");
+    assert.equal(files(".video-previews", /\.mp4$/).length, 1, "the video's grid preview");
   }
   // A second pass finds everything done and builds nothing.
   const before = fs.readdirSync(path.join(dataDir, ".thumbnails")).length;
@@ -92,7 +92,7 @@ test("a pass builds the gallery’s thumbnails, display copies, posters and prev
   assert.equal(fs.readdirSync(path.join(dataDir, ".thumbnails")).length, before);
 });
 
-test("a delivered output’s thumbnail and display copy are built straight away, before any browser asks", async () => {
+test("a delivered output's thumbnail and display copy are built straight away, before any browser asks", async () => {
   warmNewOutputs([urls("c-new-output.png")]);
   for (let tries = 0; files(".thumbnails", /\.webp$/).length < 4 && tries < 100; tries += 1)
     await new Promise((resolve) => setTimeout(resolve, 50));

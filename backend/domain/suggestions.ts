@@ -290,7 +290,7 @@ export function createSuggestions({
       }));
     } catch (error) {
       return empty(
-        `The text model couldn’t suggest anything (${(error as { reason?: string }).reason || "unreachable"}).`,
+        `The text model couldn't suggest anything (${(error as { reason?: string }).reason || "unreachable"}).`,
       );
     }
     const reply = json(text);
@@ -302,7 +302,7 @@ export function createSuggestions({
             .filter(Boolean),
         ),
       ].slice(0, 3) as string[];
-      return ideas.length ? { suggestions: ideas } : empty("The text model’s reply was unusable.");
+      return ideas.length ? { suggestions: ideas } : empty("The text model's reply was unusable.");
     }
     const labels = new Set<string>();
     const steps = (Array.isArray(reply?.steps) ? reply.steps : [])
@@ -318,7 +318,7 @@ export function createSuggestions({
         return true;
       })
       .slice(0, 4) as NextStep[];
-    return steps.length ? { suggestions: steps } : empty("The text model’s reply was unusable.");
+    return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
 
   /** The taste profile and the prompts the owner liked, as the model's context. */
@@ -435,7 +435,7 @@ export function createSuggestions({
       }));
     } catch (error) {
       return empty(
-        `The text model couldn’t answer (${(error as { reason?: string }).reason || "unreachable"}).`,
+        `The text model couldn't answer (${(error as { reason?: string }).reason || "unreachable"}).`,
       );
     }
     const reply = json(text);
@@ -446,7 +446,7 @@ export function createSuggestions({
         : clean(reply?.prompt, maxPromptCharacters);
     const label = titleCase(clean(reply?.label, 40));
     if (!action || !label || (!prompt && action !== "upscale"))
-      return empty("The text model’s reply was unusable.");
+      return empty("The text model's reply was unusable.");
     return { suggestions: [{ action, label, request, prompt }] };
   }
 

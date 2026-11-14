@@ -998,7 +998,7 @@ export function createAssistant(
         vision: false,
         model,
         reason: pictures.length
-          ? "The running text model can’t read images."
+          ? "The running text model can't read images."
           : "Add an image to describe.",
       };
     const system = [

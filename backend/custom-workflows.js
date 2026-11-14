@@ -438,7 +438,7 @@ export function workflowOptionIssues(workflow, info = {}) {
   // Said as the file and where it goes; node ids mean nothing outside the graph editor.
   return workflowMissingFiles(workflow, info).map(
     ({ file, kind, folder }) =>
-      `Missing ${kind}: ${file}. Put it in ComfyUI’s models/${folder} folder.`,
+      `Missing ${kind}: ${file}. Put it in ComfyUI's models/${folder} folder.`,
   );
 }
 
@@ -460,7 +460,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
         id: safeId(path.basename(file, ".json")),
         profileId: `custom:${safeId(path.basename(file, ".json"))}`,
         name: path.basename(file, ".json"),
-        description: "This file isn’t valid JSON.",
+        description: "This file isn't valid JSON.",
         kind: "image",
         family: "custom",
         graph: {},
@@ -487,7 +487,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
         id: safeId(path.basename(file, ".json")),
         profileId: `custom:${safeId(path.basename(file, ".json"))}`,
         name: path.basename(file, ".json"),
-        description: error.message || "Couldn’t read this workflow.",
+        description: error.message || "Couldn't read this workflow.",
         kind: "image",
         family: "custom",
         graph: {},

@@ -16,7 +16,7 @@ const handle =
     } catch (error) {
       const known = error as Error & { status?: number };
       response.status(known.status ?? 500).json({
-        error: known.status ? known.message : "Studio couldn’t complete the runtime request.",
+        error: known.status ? known.message : "Studio couldn't complete the runtime request.",
       });
     }
   };

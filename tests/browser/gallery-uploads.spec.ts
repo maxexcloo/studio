@@ -15,7 +15,7 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
     const body = route.request().postDataBuffer()?.toString("latin1") || "";
     sent.push(body.match(/filename="([^"]+)"/)?.[1] || "");
     return body.includes("broken.png")
-      ? route.fulfill({ status: 400, json: { ok: false, error: "That image can’t be read." } })
+      ? route.fulfill({ status: 400, json: { ok: false, error: "That image can't be read." } })
       : route.fallback();
   });
   await page.goto("/images");
@@ -29,7 +29,7 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   const notice = page.getByText("Uploaded 2 files to Uploads. 1 file failed.", { exact: true });
   await expect(notice).toBeVisible();
   await expect(
-    page.getByText("broken.png: That image can’t be read.", { exact: true }),
+    page.getByText("broken.png: That image can't be read.", { exact: true }),
   ).toBeVisible();
   expect(sent).toEqual(["one.png", "broken.png", "two.png"]);
   // The gallery turns to Uploads to show them.

@@ -240,7 +240,7 @@ export function nameSavesForRun(graph, runId) {
 export async function customWorkflowGraph(body) {
   const installed = getCustomWorkflow(body.workflow, body.profileBackend);
   const workflow = installed && selectImageMode(installed, body);
-  if (!workflow) throw new Error("This workflow isn’t installed.");
+  if (!workflow) throw new Error("This workflow isn't installed.");
   const graph = cloneGraph(workflow.graph);
   // Inpainting samples the crop around the painted part as the reference, at its own working size (inpaint.js).
   const inpaint = body.inpaint?.crop ? body.inpaint : null;

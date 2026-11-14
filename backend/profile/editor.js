@@ -173,7 +173,7 @@ export function validateProfileText(id, text, { info = null } = {}) {
       for (const backend of ids)
         if (!Object.hasOwn(profileBackendLabels, backend))
           errors.push(
-            `studio.backends.${backend} isn’t a backend Studio runs: use ${Object.keys(profileBackendLabels).join(" or ")}.`,
+            `studio.backends.${backend} isn't a backend Studio runs: use ${Object.keys(profileBackendLabels).join(" or ")}.`,
           );
       if (meta.backend !== undefined && !ids.includes(meta.backend))
         errors.push("studio.backend must name one of studio.backends.");
@@ -213,11 +213,11 @@ function checkGraph(raw, id, { info, where = "" }) {
       const node = workflow.graph?.[String(target.node)];
       if (!node)
         errors.push(
-          `${where}controls.${key} points at node ${target.node}, which isn’t in the graph.`,
+          `${where}controls.${key} points at node ${target.node}, which isn't in the graph.`,
         );
       else if (target.input && !(String(target.input) in (node.inputs || {})))
         errors.push(
-          `${where}controls.${key} points at input "${target.input}", which node ${target.node} (${node.class_type}) doesn’t have.`,
+          `${where}controls.${key} points at input "${target.input}", which node ${target.node} (${node.class_type}) doesn't have.`,
         );
     }
     if (info && Object.keys(info).length) {
@@ -229,13 +229,13 @@ function checkGraph(raw, id, { info, where = "" }) {
         ),
       ];
       if (unknown.length)
-        warnings.push(`${where}ComfyUI doesn’t know these node types: ${unknown.join(", ")}.`);
+        warnings.push(`${where}ComfyUI doesn't know these node types: ${unknown.join(", ")}.`);
       for (const missing of workflowMissingFiles(workflow, info))
         warnings.push(
-          `${where}ComfyUI doesn’t list the ${missing.kind} ${missing.file} (models/${missing.folder}).`,
+          `${where}ComfyUI doesn't list the ${missing.kind} ${missing.file} (models/${missing.folder}).`,
         );
     } else
-      warnings.push("ComfyUI couldn’t be asked, so node types and model files weren’t checked.");
+      warnings.push("ComfyUI couldn't be asked, so node types and model files weren't checked.");
   }
   return { errors, warnings };
 }
@@ -303,7 +303,7 @@ export function repointProfiles(from, to, { by = "update" } = {}) {
     } catch (error) {
       // It keeps the old file, which then stays for it.
       console.warn(
-        `[library] Couldn’t move the ${profile.name} profile to ${to}: ${error.message}`,
+        `[library] Couldn't move the ${profile.name} profile to ${to}: ${error.message}`,
       );
     }
   }

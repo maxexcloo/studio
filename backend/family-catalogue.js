@@ -460,7 +460,7 @@ export const families = {
         kinds: ["clip_l"],
         only: /hidream/i,
         download: "hidream_clip_l",
-        detail: "HiDream needs its own CLIP-L (clip_l_hidream). Flux’s gives black images.",
+        detail: "HiDream needs its own CLIP-L (clip_l_hidream). Flux's gives black images.",
       },
       {
         slot: "clip_g",

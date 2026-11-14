@@ -266,7 +266,7 @@ export function createCharacterSheets({ admit, profiles }) {
             status: 409,
             payload: {
               ok: false,
-              error: "Make Sheet needs Qwen-Image 2.1, which isn’t ready.",
+              error: "Make Sheet needs Qwen-Image 2.1, which isn't ready.",
             },
           };
         const admitted = await admit(
@@ -335,7 +335,7 @@ export function createCharacterSheets({ admit, profiles }) {
                   ...current,
                   sheet: {
                     ...current.sheet,
-                    error: "The sheet couldn’t be split.",
+                    error: "The sheet couldn't be split.",
                   },
                 }
               : current,
