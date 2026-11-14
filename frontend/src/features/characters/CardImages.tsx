@@ -20,6 +20,7 @@ import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import type { Action } from "../../ui/ActionBar";
+import { DialogFooter } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { closeWhenTop } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
@@ -424,7 +425,13 @@ function CardImages({
         zIndex={phone ? undefined : getDefaultZIndex("overlay") + 1}
         styles={{
           content: { display: "flex", flexDirection: "column" },
-          body: { display: "flex", flexDirection: "column", flex: 1, minHeight: 0 },
+          body: {
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+            gap: "var(--mantine-spacing-sm)",
+          },
         }}
       >
         <Stack gap="xs" flex={1} mih={0} h={phone ? undefined : "min(70dvh, 640px)"}>
@@ -450,7 +457,7 @@ function CardImages({
             onDeleted={(id) => set(images.filter((asset) => asset.galleryItemId !== id))}
           />
         </Stack>
-        <Group justify="flex-end" pt="sm">
+        <DialogFooter>
           <Button
             onClick={() => {
               setPicking(false);
@@ -459,7 +466,7 @@ function CardImages({
           >
             Done
           </Button>
-        </Group>
+        </DialogFooter>
       </Modal>
     </Input.Wrapper>
   );

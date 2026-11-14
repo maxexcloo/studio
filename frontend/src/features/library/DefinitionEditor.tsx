@@ -21,7 +21,7 @@ import { SettingGroup } from "../../ui/SettingRows";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -623,9 +623,9 @@ export function DefinitionEditor({
               {loaded.error.message} It may have just been removed; the list now shows what is
               saved.
             </Alert>
-            <Group justify="flex-end">
+            <DialogFooter>
               <Button onClick={close}>Close</Button>
-            </Group>
+            </DialogFooter>
           </Stack>
         ) : (
           <LoadingState label="Loading Definition" />
