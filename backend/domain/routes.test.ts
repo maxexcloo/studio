@@ -305,3 +305,42 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
     store.close();
   }
 });
+
+test("The queue polled since a change sends only the jobs changed since then, with every listed ID", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  const session = store.createSession("alice");
+  const [done, running] = [0, 1].map(() => store.enqueue("alice", session.id, {}, "image"));
+  store.save({ ...done, status: "completed" });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const changed = store.save({ ...running, status: "running" });
+  const app = express();
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  try {
+    const all = await (await fetch(base)).json();
+    assert.deepEqual(
+      all.jobs.map((job: { id: string }) => job.id),
+      [done.id, running.id],
+    );
+    assert.equal(all.ids, undefined);
+    const since = await (await fetch(`${base}?since=${changed.updatedAt}`)).json();
+    assert.deepEqual(
+      since.jobs.map((job: { id: string }) => job.id),
+      [running.id],
+    );
+    assert.deepEqual(since.ids, [done.id, running.id]);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});

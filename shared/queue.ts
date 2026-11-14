@@ -84,6 +84,8 @@ export interface QueueJob {
 
 export interface QueueResponse {
   jobs: QueueJob[];
+  /** Asked with `since`: every listed job's ID in queue order, `jobs` holding only those changed. */
+  ids?: string[];
   paused: QueuePause;
 }
 
