@@ -25,6 +25,7 @@ import {
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
+import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useTouch } from "./usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -267,9 +268,8 @@ function OptionsMenu({
 }: {
   action: Action;
   position: FloatingPosition;
-  target: (opened: boolean) => ReactNode;
+  target: ReactNode;
 }) {
-  const [opened, setOpened] = useState(false);
   // Each opening starts with every option collapsed.
   const [opening, setOpening] = useState(0);
   const dropdown = useRef<HTMLDivElement>(null);
@@ -288,7 +288,6 @@ function OptionsMenu({
         })
       }
       onChange={(open) => {
-        setOpened(open);
         // The closing menu lets go of focus at once rather than at the end of its transition: an
         // option that turns its control busy disables it, so focus can't return there, and keys
         // meanwhile would land in the fading menu instead of the page around it.
@@ -302,7 +301,7 @@ function OptionsMenu({
         setOpening((count) => count + 1);
       }}
     >
-      {target(opened)}
+      {target}
       <Menu.Dropdown ref={dropdown}>
         {note(action)}
         <ActionMenuItems key={opening} groups={action.menu!} />
@@ -375,30 +374,28 @@ function ActionControl({
       {icon}
     </ActionIcon>
   );
-  const tip = (opened: boolean, target: ReactNode) => (
-    <Tooltip
-      label={
-        reason ? (
-          <>
-            {label}
-            <br />
-            {reason}
-          </>
-        ) : (
-          label
-        )
-      }
-      disabled={(labelled && !reason) || opened}
-    >
-      {target}
-    </Tooltip>
-  );
-  if (!options) return tip(false, control);
+  const tip = {
+    label: reason ? (
+      <>
+        {label}
+        <br />
+        {reason}
+      </>
+    ) : (
+      label
+    ),
+    disabled: labelled && !reason,
+  };
+  if (!options) return <Tooltip {...tip}>{control}</Tooltip>;
   return (
     <OptionsMenu
       action={action}
       position={menuPosition}
-      target={(opened) => tip(opened, <Menu.Target>{control}</Menu.Target>)}
+      target={
+        <PopupTooltip {...tip}>
+          <Menu.Target>{control}</Menu.Target>
+        </PopupTooltip>
+      }
     />
   );
 }
