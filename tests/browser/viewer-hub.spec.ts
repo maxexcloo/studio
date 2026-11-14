@@ -492,6 +492,7 @@ const combined = (backend: string, defined = ["comfyui", "radiance"]) => ({
     id,
     label: id === "comfyui" ? "ComfyUI" : "Radiance",
     ready: true,
+    references: 0,
   })),
 });
 const ranOn = (backend: string) => ({

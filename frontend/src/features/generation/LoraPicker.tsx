@@ -297,6 +297,7 @@ function useLoraDraft({ value, onChange }: Omit<LoraPickerProps, "picker">) {
       ? context.profiles.find((profile) => isProfile(profile, value.profileId))
       : context.profile,
     input.profileBackend,
+    Boolean(input.referenceAssets?.length),
   );
   const update = (loras: Lora[]) =>
     onChange ? onChange({ ...input, loras }) : context.update({ loras });

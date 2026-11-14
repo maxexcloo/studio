@@ -87,27 +87,56 @@ test("Switching image backends changes reference capacity and preserves an overs
   expect(state.jobs[0].input.prompt).toBe("Keep every reference");
 });
 
-test("A text-only Radiance backend exposes ComfyUI reference controls when selected", async ({
-  page,
-}) => {
-  await fixtures(page);
+test("A text-only Radiance default sends a run with references to ComfyUI", async ({ page }) => {
+  const state = await fixtures(page);
   await serveProfiles(page, [combinedImageProfile(0)]);
+  await page.route("**/api/reference-assets/upload", (route) =>
+    route.fulfill({
+      json: {
+        asset: {
+          id: "radiance-reference",
+          name: "reference.png",
+          url: image,
+          thumbnailUrl: image,
+          width: 1024,
+          height: 1024,
+        },
+      },
+    }),
+  );
   await create(page);
-  const backend = page.getByRole("combobox", { name: "Backend", exact: true });
-  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Follow the reference");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText(
     "0 of 4 Enabled",
   );
   await closeLoras(page);
-  await backend.click();
-  await page.getByRole("option", { name: "ComfyUI", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await showUploads(page);
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  await picker.locator('input[type="file"]').setInputFiles({
+    name: "reference.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await expect(
+    picker.getByRole("button", { name: "Reference 1 · Reference Image", exact: true }),
+  ).toBeVisible();
+  await closeReferences(page);
+  // The reference moves the run to ComfyUI, with its controls and limits.
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "LoRAs", exact: true })).toContainText(
     "0 of 8 Enabled",
   );
   await closeLoras(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
+  // Radiance chosen by name keeps the run there, so it takes no references.
+  const backend = page.getByRole("combobox", { name: "Backend", exact: true });
   await backend.click();
   await page.getByRole("option", { name: "Radiance", exact: true }).click();
   await expect(page.getByRole("button", { name: "Choose References", exact: true })).toHaveCount(0);

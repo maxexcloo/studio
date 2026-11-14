@@ -1,3 +1,4 @@
+import { runBackend } from "../shared/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import {
@@ -11,7 +12,7 @@ import { demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { logWarning } from "./crash-log.js";
-import { getCustomWorkflow } from "./custom-workflows.js";
+import { getCustomWorkflow, workflowOnBackend } from "./custom-workflows.js";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { GenerationQueue, modelOf } from "./domain/queue.ts";
@@ -348,15 +349,22 @@ export function createGenerationQueue({
     // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
     for (const key of ["profileId", "model", "workflow"])
       if (typeof input[key] === "string") input[key] = canonicalProfileId(input[key]);
-    // The backend a combined profile's run uses, stored with it: the one asked for while the profile
-    // still defines it, else its current one. Any other profile runs without one.
+    // The backend a combined profile's run uses (runBackend) is stored with it. Any other profile
+    // runs without one.
     const combined =
       typeof input.profileId === "string" && input.profileId.startsWith("custom:")
         ? getCustomWorkflow(input.profileId)
         : null;
-    const wanted = input.profileBackend || named;
     if (combined?.backendIds?.length)
-      input.profileBackend = combined.backendIds.includes(wanted) ? wanted : combined.backend;
+      input.profileBackend = runBackend(
+        combined.backendIds.map((id) => ({
+          id,
+          references: workflowOnBackend(combined, id).mediaInputs?.length || 0,
+        })),
+        combined.backend,
+        input.profileBackend || named,
+        Boolean(input.referenceAssets?.length),
+      );
     else delete input.profileBackend;
     // Every path (composer, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
     const sized = (await mediaModels().catch(() => null))?.models?.profiles?.find(

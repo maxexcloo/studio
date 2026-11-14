@@ -23,7 +23,7 @@ import { promptWords } from "../../shared/titles.ts";
 import { imageMimes } from "../reference-names.js";
 import { accessFeatures } from "../account-policy.js";
 import { accountPreferences } from "../account-preferences.js";
-import { isCloudProfile } from "../../shared/profiles.ts";
+import { isCloudProfile, runBackend } from "../../shared/profiles.ts";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -591,7 +591,16 @@ export class McpMedia {
     } = args;
     let profile = (await this.profiles("all", owner)).find((item) => item.id === profile_id);
     if (!profile) throw new Error("Choose a ready profile from models.");
-    profile = this.profileForBackend(profile, profile_backend);
+    if (profile.backend)
+      profile = this.profileForBackend(
+        profile,
+        runBackend(
+          profile.backendOptions,
+          profile.backend,
+          profile_backend,
+          reference_asset_ids.length > 0,
+        ),
+      );
     const cloud = isCloudVideo(profile);
     if (cloud) await this.checkCloudJobs();
     if (cloud && this.cloudPause())
@@ -668,14 +677,7 @@ export class McpMedia {
       ...(record.conversation ? { chat: { conversationId: record.conversation } } : {}),
       kind: profile.kind,
       profileId: profile_id,
-      // A combined profile runs on the backend a call or record named while it has it, else its current one.
-      ...(profile.backend
-        ? {
-            profileBackend: profile.backendOptions?.some((option) => option.id === profile_backend)
-              ? profile_backend
-              : profile.backend,
-          }
-        : {}),
+      ...(profile.backend ? { profileBackend: profile.backend } : {}),
       model: profile.model,
       workflow: profile.workflow,
       loras: stack.map((adapter) => ({ ...adapter, enabled: true })),
