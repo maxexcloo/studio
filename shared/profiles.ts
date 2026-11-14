@@ -4,6 +4,22 @@ export const profileBackendLabels: Readonly<Record<string, string>> = Object.fre
   radiance: "Radiance",
 });
 
+/**
+ * The backend a combined profile's run uses: the one asked for while the profile has it, else its
+ * default, unless the run has references the default takes none of; then the first backend that does.
+ */
+export function runBackend(
+  backends: readonly { id: string; references: number }[],
+  fallback: string,
+  wanted: unknown,
+  references: boolean,
+): string {
+  if (backends.some((option) => option.id === wanted)) return wanted as string;
+  if (!references || backends.find((option) => option.id === fallback)?.references !== 0)
+    return fallback;
+  return backends.find((option) => option.references)?.id || fallback;
+}
+
 /** What a combined profile shares across its backends; any other field in `studio.backends.<id>` replaces the shared one. */
 export const sharedProfileFields: readonly string[] = Object.freeze([
   "id",

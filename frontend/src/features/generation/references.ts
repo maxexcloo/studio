@@ -10,6 +10,7 @@ import { appendGalleryFilters, type GalleryFilterValues } from "../gallery/Galle
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import {
   addReference,
+  profileForBackend,
   referenceCapacity,
   referenceDetails,
   referenceGroup,
@@ -131,8 +132,13 @@ export function useReferenceList({
   profile?: Profile;
   input?: GenerationInput;
 } = {}) {
-  const { form, setDraft, profile: draftProfile } = useGeneration();
-  const profile = selectedProfile || draftProfile;
+  const { form, setDraft, profile: draftProfile, input: draftInput } = useGeneration();
+  // References belong to the backend a run with them uses.
+  const profile = profileForBackend(
+    selectedProfile || draftProfile,
+    (input || draftInput).profileBackend,
+    true,
+  );
   const own = useRef<ReferenceAsset[]>([]);
   if (value) own.current = value;
   function get() {

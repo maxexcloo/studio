@@ -34,6 +34,8 @@ export interface Profile {
     label: string;
     ready?: boolean;
     reason?: string;
+    /** How many reference images it takes. */
+    references: number;
     profile?: Omit<Profile, "backendOptions">;
   }[];
   /** Why it isn't ready, such as its backend's missing nodes. */

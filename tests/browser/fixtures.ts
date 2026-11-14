@@ -84,6 +84,7 @@ export function combinedImageProfile(radianceReferences = 4): Profile {
     id: backend.id,
     label: backend.id === "radiance" ? "Radiance" : "ComfyUI",
     ready: true,
+    references: backend.references,
     profile: {
       ...shared,
       backend: backend.id,

@@ -68,8 +68,8 @@ export function submitBlockedReason({
   uploading: boolean;
   assisting: boolean;
 }) {
-  const profile = profileForBackend(listedProfile, input.profileBackend);
   const referenceCount = references.length || input.referenceAssets.length;
+  const profile = profileForBackend(listedProfile, input.profileBackend, referenceCount > 0);
   const referenceMaximum = profile?.mediaInputs?.length
     ? profile.mediaInputs.reduce((total, slot) => total + (slot.max ?? 1), 0)
     : profile?.capabilities.startImage
@@ -196,7 +196,11 @@ export function GenerationEditor({
   /** Offers taste-led prompt ideas as a Suggestions chip while the prompt is empty. */
   ideas?: boolean;
 }) {
-  const profile = profileForBackend(listedProfile, input.profileBackend);
+  const profile = profileForBackend(
+    listedProfile,
+    input.profileBackend,
+    Boolean(references.length || input.referenceAssets.length),
+  );
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
   const lastMask = useRef<{ assetId?: string; mask?: string }>(undefined);
@@ -245,10 +249,11 @@ export function GenerationEditor({
   if (models.isPending) return <LoadingState label="Loading Profiles" />;
   const details = referenceDetails(references, input, profile);
   const primary = primaryReference(details, profile);
+  const referenceProfile = profileForBackend(listedProfile, input.profileBackend, true);
   const supportsReferences = Boolean(
-    profile?.mediaInputs?.length ||
-    profile?.capabilities?.img2img ||
-    profile?.capabilities?.imageInput,
+    referenceProfile?.mediaInputs?.length ||
+    referenceProfile?.capabilities?.img2img ||
+    referenceProfile?.capabilities?.imageInput,
   );
   const inpaint = input.inpaint as
     | { assetId?: string; mask?: string; strength?: number; feather?: number }

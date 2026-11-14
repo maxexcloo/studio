@@ -1,5 +1,5 @@
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
-import { profileBackendLabels, profileNameParts } from "../../../../shared/profiles";
+import { profileBackendLabels, profileNameParts, runBackend } from "../../../../shared/profiles";
 import { withResolution } from "../../../../shared/resolution";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */
@@ -13,9 +13,19 @@ export const usesNegative = (profile?: Profile) =>
 /** A combined profile's backend by name ("Radiance"). */
 export const backendLabel = (id: string) => profileBackendLabels[id] || id;
 
-/** A run's backend supplies its own settings, controls and reference slots. */
-export function profileForBackend(profile: Profile | undefined, backend = profile?.backend) {
-  const option = profile?.backendOptions?.find((option) => option.id === backend);
+/**
+ * A run's backend supplies its own settings, controls and reference slots: `backend` when asked
+ * for, else the one a run with or without `references` uses (runBackend).
+ */
+export function profileForBackend(
+  profile: Profile | undefined,
+  backend?: string,
+  references = false,
+) {
+  const id = profile?.backend
+    ? runBackend(profile.backendOptions || [], profile.backend, backend, references)
+    : backend;
+  const option = profile?.backendOptions?.find((option) => option.id === id);
   return profile && option?.profile
     ? {
         ...option.profile,
@@ -132,7 +142,11 @@ export function generationInput(
   listedProfile: Profile | undefined,
   references: ReferenceAsset[],
 ) {
-  const profile = profileForBackend(listedProfile, input.profileBackend);
+  const profile = profileForBackend(
+    listedProfile,
+    input.profileBackend,
+    Boolean(references.length || input.referenceAssets?.length),
+  );
   const details = referenceDetails(references, input, profile);
   // The size tier sets the size here as on the server, so the pending tile has the run's shape.
   const sized = withResolution(

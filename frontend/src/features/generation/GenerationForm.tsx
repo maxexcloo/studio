@@ -18,7 +18,7 @@ import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "
 import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
 import { showQueued } from "../settings/accountPreferences";
-import { generationInput, referencePatch } from "./payload";
+import { generationInput, profileForBackend, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
 import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
 import { useCompareRun, useDraftComparison } from "../compare/variants";
@@ -120,10 +120,11 @@ export function GenerationForm({
   });
   const label = submitLabel ?? submitState.label;
   const { blockedReason } = submitState;
+  const referenceProfile = profileForBackend(profile, input.profileBackend, true);
   const supportsReferences = Boolean(
-    profile?.mediaInputs?.length ||
-    profile?.capabilities?.img2img ||
-    profile?.capabilities?.imageInput,
+    referenceProfile?.mediaInputs?.length ||
+    referenceProfile?.capabilities?.img2img ||
+    referenceProfile?.capabilities?.imageInput,
   );
   // Clear turns into Undo, which restores the whole draft, until the draft next changes.
   const [cleared, setCleared] = useState<typeof draft | null>(null);
