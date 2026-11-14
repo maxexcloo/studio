@@ -153,6 +153,8 @@ export function LibraryCatalogueTable({
   const models = label === "Models";
   // Whether a model is an original or a finetune is shown only where the catalogue says so.
   const withModelType = models && items.some((item) => item.modelType);
+  // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.
+  const withType = models || items.some((item) => item.type);
   const typeLabel = (item: LibraryItem) =>
     [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
   const inView = items.filter((item) =>
@@ -190,16 +192,18 @@ export function LibraryCatalogueTable({
                 comboboxProps={{ withinPortal: false }}
                 data-mantine-stop-propagation
               />
-              <Select
-                label="Type"
-                placeholder="All Types"
-                data={unique(items.map(resourceType))}
-                value={type}
-                onChange={setType}
-                clearable
-                comboboxProps={{ withinPortal: false }}
-                data-mantine-stop-propagation
-              />
+              {withType && (
+                <Select
+                  label="Type"
+                  placeholder="All Types"
+                  data={unique(items.map(resourceType))}
+                  value={type}
+                  onChange={setType}
+                  clearable
+                  comboboxProps={{ withinPortal: false }}
+                  data-mantine-stop-propagation
+                />
+              )}
               {withModelType && (
                 <Select
                   label="Model Type"
@@ -349,22 +353,27 @@ export function LibraryCatalogueTable({
               </Text>
             ),
           },
-          {
-            key: "type",
-            header: "Type",
-            hideOnPhone: true,
-            width: 150,
-            sortValue: (item) => (typeLabel(item) === "Unclassified" ? undefined : typeLabel(item)),
-            cell: (item) => (
-              <Text
-                size="sm"
-                c={typeLabel(item) === "Unclassified" ? "dimmed" : undefined}
-                style={{ whiteSpace: "nowrap" }}
-              >
-                {typeLabel(item)}
-              </Text>
-            ),
-          },
+          ...(withType
+            ? [
+                {
+                  key: "type",
+                  header: "Type",
+                  hideOnPhone: true,
+                  width: 150,
+                  sortValue: (item: LibraryItem) =>
+                    typeLabel(item) === "Unclassified" ? undefined : typeLabel(item),
+                  cell: (item: LibraryItem) => (
+                    <Text
+                      size="sm"
+                      c={typeLabel(item) === "Unclassified" ? "dimmed" : undefined}
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {typeLabel(item)}
+                    </Text>
+                  ),
+                },
+              ]
+            : []),
           {
             key: "status",
             header: "Status",
