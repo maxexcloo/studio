@@ -279,7 +279,8 @@ export function registerCompareRoutes(
     const record = create(ownerId, jobIds, items, labels as string[] | undefined, itemIds);
     return { status: 201, payload: show(record, items) };
   });
-  // Every variant shares the seed and runs as one queue set; a refused variant cancels the rest.
+  // The variants run as one queue set, sharing the first numeric seed (else a random one) unless
+  // they carry their own, as a comparison of seeds does; a refused variant cancels the rest.
   async function run(account: RouteAccount, items: GalleryItem[], body: Record<string, any>) {
     const { variants, sessionId, parentJobId, parentItemId, axis, projectId } = body || {};
     if (
@@ -321,8 +322,12 @@ export function registerCompareRoutes(
       (typeof parentItemId !== "string" || !items.some((item) => item.id === parentItemId))
     )
       return { status: 404, payload: { ok: false, error: "Source image not found." } };
-    const requested = String(variants[0].input.seed ?? "");
-    const seed = /^\d+$/.test(requested) ? requested : String(randomInt(2 ** 32));
+    const own = variants.map((variant) => {
+      const requested = String(variant.input.seed ?? "");
+      return /^\d+$/.test(requested) ? requested : undefined;
+    });
+    const shared = own.find(Boolean) ?? String(randomInt(2 ** 32));
+    const seeds = own.map((seed) => seed ?? shared);
     const id = randomUUID();
     const session = (sessionId as string | undefined) || store.createSession(ownerId).id;
     const jobIds: string[] = [];
@@ -330,7 +335,7 @@ export function registerCompareRoutes(
       const { clientJobId: _clientJobId, ...input } = variant.input as GenerationInput;
       const resultSet = comparisonSet(id, index, String(variant.label).trim());
       const result = await options.admit(
-        { ...input, kind: "image", seed, count: 1, resultSet },
+        { ...input, kind: "image", seed: seeds[index], count: 1, resultSet },
         account ?? undefined,
         {
           sessionId: session,
@@ -352,7 +357,7 @@ export function registerCompareRoutes(
       id,
       ownerId,
       createdAt: new Date().toISOString(),
-      seed,
+      seed: new Set(seeds).size === 1 ? shared : "",
       jobIds,
       labels: variants.map((variant) => String(variant.label).trim()),
       vote: null,

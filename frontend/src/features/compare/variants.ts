@@ -64,6 +64,64 @@ export function removeVariant(draft: Draft): Draft {
 
 export const canAddVariant = (draft: Draft) => draftVariants(draft).length < compareVariants.max;
 
+export const fitsComparison = (count: number) =>
+  count >= compareVariants.min && count <= compareVariants.max;
+
+/** A comparison of `inputs`, each a change to the variant being edited, whose references they keep. */
+export function compareInputs(draft: Draft, inputs: GenerationInput[]): Draft {
+  return showVariant(
+    draft,
+    inputs.map((input) => ({ input, references: draft.references })),
+    0,
+  );
+}
+
+/** `input` as it stands, then on each of `profiles` with its seed. */
+export const modelInputs = (input: GenerationInput, profiles: Profile[]) => [
+  input,
+  ...profiles.map((profile) => ({ ...inputForProfile(input, profile), seed: input.seed })),
+];
+
+/** `input` with the LoRA `name` at each strength, 0 leaving it out. */
+export const strengthInputs = (input: GenerationInput, name: string, strengths: number[]) =>
+  strengths.map((strength) => ({
+    ...input,
+    loras: strength
+      ? input.loras.map((lora) =>
+          lora.name === name ? { ...lora, strength, enabled: true } : lora,
+        )
+      : input.loras.filter((lora) => lora.name !== name),
+  }));
+
+const randomSeed = () => String(Math.floor(Math.random() * 2 ** 32));
+
+/** `input` with `count` seeds: its own where it has one, then random ones. */
+export function seedInputs(input: GenerationInput, count: number) {
+  const own = String(input.seed);
+  const seeds = [/^\d+$/.test(own) ? own : randomSeed()];
+  while (seeds.length < count) seeds.push(randomSeed());
+  return seeds.map((seed) => ({ ...input, seed }));
+}
+
+export const promptLines = (prompt: string) =>
+  prompt
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+/** `input` once per line of its prompt. */
+export const promptInputs = (input: GenerationInput) =>
+  promptLines(input.prompt).map((prompt) => ({ ...input, prompt }));
+
+/** Each variant's seed as it runs: its own, else the first variant's that has one, else random (""). */
+function runSeeds(variants: Variant[]) {
+  const own = variants.map(({ input }) =>
+    /^\d+$/.test(String(input.seed)) ? String(input.seed) : "",
+  );
+  const shared = own.find(Boolean) ?? "";
+  return own.map((seed) => seed || shared);
+}
+
 /**
  * Each variant named by what sets it apart from the others ("Flux Dev · 30 Steps"), or by its
  * letter when nothing recorded here does.
@@ -82,6 +140,7 @@ export function variantLabels(
     (name) => new Set(variants.map(({ input }) => strength(input, name))).size > 1,
   );
   const prompts = variants.map(({ input }) => JSON.stringify([input.prompt, input.negative]));
+  const seeds = runSeeds(variants);
   type Facet = (variant: Variant, index: number) => string;
   const differs = (facet: Facet) =>
     new Set(variants.map((variant, index) => facet(variant, index))).size > 1;
@@ -105,6 +164,7 @@ export function variantLabels(
         })
         .join(", "),
     ...settings,
+    (_, index) => `Seed ${seeds[index]}`,
     ({ references }) => `${references.length} References`,
   ];
   const differing = facets.filter(differs);
@@ -137,8 +197,9 @@ export function useDraftComparison() {
     },
     lora: (name) => loraTitle(lora?.[name], name),
   });
-  const keys = variants.map(({ input, references }) =>
-    JSON.stringify([{ ...input, seed: "" }, references.map((reference) => reference.id)]),
+  const seeds = runSeeds(variants);
+  const keys = variants.map(({ input, references }, index) =>
+    JSON.stringify([{ ...input, seed: seeds[index] }, references.map((reference) => reference.id)]),
   );
   const blockedReason =
     variants
@@ -157,7 +218,7 @@ export function useDraftComparison() {
   return { variants, labels, profileOf, blockedReason };
 }
 
-/** Queues the composer's variants as one comparison with a shared seed. */
+/** Queues the composer's variants as one comparison, sharing a seed unless they set their own. */
 export function useCompareRun(onQueued: (comparisonId: string) => void) {
   const { draft } = useGeneration();
   const { variants, labels, profileOf } = useDraftComparison();
@@ -176,7 +237,6 @@ export function useCompareRun(onQueued: (comparisonId: string) => void) {
             input: generationInput(
               {
                 ...input,
-                seed: variants[0].input.seed,
                 count: 1,
                 negative: usesNegative(profile) ? input.negative : "",
               },

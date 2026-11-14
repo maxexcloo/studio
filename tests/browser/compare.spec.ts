@@ -21,7 +21,7 @@ const prompt = (page: Page) => page.getByRole("textbox", { name: "Prompt", exact
 
 test("The composer compares variants that each change one thing, as one labelled set", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   await create(page);
   await prompt(page).fill("A copper fox");
@@ -43,12 +43,18 @@ test("The composer compares variants that each change one thing, as one labelled
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: /^Image Fast\b/ }).click();
   await expect(page.getByText("Image Fast", { exact: true }).first()).toBeVisible();
-  // Variant C copies B with another prompt; A keeps its own settings.
-  await compareMenu(page, "Add Variant");
+  // Variant C duplicates B with another prompt; A keeps its own settings.
+  await compareMenu(page, "Duplicate Variant B");
   await prompt(page).fill("A silver fox");
   await variants(page).getByText("A", { exact: true }).click();
   await expect(prompt(page)).toHaveValue("A copper fox");
-  await expect(page.getByText("Image Quality · Prompt A", { exact: true })).toBeVisible();
+  // Each variant's tooltip names what sets it apart.
+  if (!testInfo.project.use.isMobile) {
+    await variants(page).getByText("A", { exact: true }).hover();
+    await expect(
+      page.getByRole("tooltip", { name: "Image Quality · Prompt A", exact: true }),
+    ).toBeVisible();
+  }
 
   // The draft keeps its variants across a reload.
   await page.reload();
@@ -89,6 +95,82 @@ test("The composer compares variants that each change one thing, as one labelled
   );
   await expect(page.getByRole("button", { name: "Clear Seed 4242", exact: true })).toBeVisible();
   await expect(variants(page)).toHaveCount(0);
+});
+
+/** Builds a comparison from Compare ▾'s `builder`, choosing `options` above its `run`. */
+const build = async (page: Page, builder: string, options: string[], run: string) => {
+  await compareMenu(page, builder);
+  for (const option of options)
+    await page.getByRole("menuitem", { name: option, exact: true }).click();
+  await page.getByRole("menuitem", { name: run, exact: true }).click();
+};
+
+test("Compare ▾ builds several variants at once from prompt lines and seeds", async ({ page }) => {
+  const state = await fixtures(page);
+  await create(page);
+  await prompt(page).fill("A copper fox\nA silver fox\nA golden fox");
+  await compareMenu(page, "Compare Prompts");
+  await expect(variants(page).getByRole("radio")).toHaveCount(3);
+  await expect(prompt(page)).toHaveValue("A copper fox");
+
+  // Duplicating copies the variant being edited, not A.
+  await variants(page).getByText("B", { exact: true }).click();
+  await compareMenu(page, "Duplicate Variant B");
+  await expect(variants(page).getByRole("radio", { name: "D", exact: true })).toBeChecked();
+  await expect(prompt(page)).toHaveValue("A silver fox");
+
+  // Seeds start over from the variant being edited, each run with its own seed.
+  await compareMenu(page, "Compare Seeds");
+  await page.getByRole("radiogroup", { name: "Seeds", exact: true }).getByText("3").click();
+  await page.getByRole("menuitem", { name: "Compare 3 Seeds", exact: true }).click();
+  await expect(variants(page).getByRole("radio")).toHaveCount(3);
+  await page.getByRole("button", { name: "Compare 3", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  const requests = state.comparisons[0].requests;
+  expect(requests.map((variant: any) => variant.input.prompt)).toEqual(
+    Array(3).fill("A silver fox"),
+  );
+  expect(new Set(requests.map((variant: any) => variant.input.seed)).size).toBe(3);
+  expect(requests.every((variant: any) => /^Seed \d+$/.test(variant.label))).toBe(true);
+});
+
+test("Compare ▾ builds variants across a LoRA's strengths and across models", async ({ page }) => {
+  const state = await fixtures(page);
+  await create(page);
+  await prompt(page).fill("A copper fox");
+  await openLoraChoices(page);
+  await page
+    .getByRole("list", { name: "LoRA Choices", exact: true })
+    .getByRole("button", { name: "Detail Slider", exact: true })
+    .click();
+  await closeLoras(page);
+
+  // The strengths are checked options above their run.
+  await build(
+    page,
+    "Compare LoRA Strengths",
+    ["Strength 0.6", "Strength 1.2"],
+    "Compare 4 Strengths",
+  );
+  await expect(variants(page).getByRole("radio")).toHaveCount(4);
+
+  // Models start over from the variant being edited (A, without the LoRA), keeping its seed.
+  await build(page, "Compare Models", ["Image Fast"], "Compare 2 Models");
+  await page.getByRole("button", { name: "Compare 2", exact: true }).click();
+  await expect(page).toHaveURL(/\/compare\/compare-1$/);
+  const requests = state.comparisons[0].requests;
+  expect(
+    requests.map((variant: any) => [
+      variant.label,
+      variant.input.profileId,
+      variant.input.prompt,
+      variant.input.loras.length,
+    ]),
+  ).toEqual([
+    ["Image Quality", "image:test", "A copper fox", 0],
+    ["Image Fast", "image:fast", "A copper fox", 0],
+  ]);
+  expect(requests[0].input.seed).toBe(requests[1].input.seed);
 });
 
 test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async ({ page }) => {
