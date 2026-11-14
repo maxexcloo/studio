@@ -1,5 +1,5 @@
 import { Button, Group, Menu, SegmentedControl, Text } from "@mantine/core";
-import { ChevronDown, CopyPlus, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { chipProps } from "../generation/chip";
 import { useGeneration } from "../generation/GenerationProvider";
@@ -30,7 +30,7 @@ export function CompareMenu() {
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Item
-          leftSection={<CopyPlus size={16} />}
+          leftSection={<icons.duplicate size={16} />}
           disabled={!canAddVariant(draft)}
           onClick={() => setDraft(addVariant)}
         >
