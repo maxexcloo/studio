@@ -3,9 +3,9 @@
  * runs on ComfyUI. Studio resolves the fine-tune's Civitai or Hugging Face file (with its published
  * SHA-256), and the worker with the model library converts it to a Radiance `.rad`
  * (studio_worker/convert.py), one at a time. Studio follows the worker's progress; when the model is
- * installed it makes the profile a combined one (profile/backends.js): its ComfyUI graph stays the
- * default and keeps references, and a text-only Radiance backend runs the new model, because
- * Radiance's Krea 2 refuses image edits.
+ * installed it makes the profile a combined one (profile/backends.js): a text-only Radiance backend
+ * runs the new model by default, and its ComfyUI graph takes runs with references (runBackend),
+ * because Radiance's Krea 2 refuses image edits.
  *
  * The worker remembers the conversion and its profile, so a Studio restart finishes it on the next
  * status read; Studio clears it on the worker once the profile has its backend. A worker restart
@@ -100,12 +100,12 @@ function radianceProfile(studio, model) {
   };
 }
 
-/** The profile's text with a Radiance backend running `model` beside its ComfyUI one, the default. */
+/** The profile's text with a Radiance backend running `model`, the default, beside its ComfyUI one. */
 export function withRadianceBackend(raw, model) {
   const refusal = conversionRefusal(raw);
   if (refusal) throw invalid(refusal);
   const comfyui = { studio: raw.studio, graph: graphFromJson(raw) };
-  return combinedText(raw.studio.id, raw.studio.name, "comfyui", {
+  return combinedText(raw.studio.id, raw.studio.name, "radiance", {
     comfyui,
     radiance: radianceProfile(raw.studio, model),
   });
