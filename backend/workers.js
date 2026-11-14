@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
- * an address and what it runs. A fork module (AGENTS.md): upstream code keeps
- * its one `comfyUrl`, which follows the default worker (comfy.js).
+ * an address and what it runs. The single `comfyUrl` follows the default
+ * worker (comfy.js).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
  * workloads Studio found in Kubernetes (runtime/workloads.ts).
