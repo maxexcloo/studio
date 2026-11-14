@@ -25,6 +25,7 @@ const tileFields = [
   "settings",
   "assistant",
   "ownerId",
+  "dream",
 ];
 
 /**
