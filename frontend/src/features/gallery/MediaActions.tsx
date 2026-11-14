@@ -45,6 +45,11 @@ import type { MediaTransferActions } from "./mediaShare";
 import { itemAction, itemActionGroups } from "./itemActions";
 import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
 import {
+  similarStrictnessOptions,
+  useSimilarStrictness,
+  type SimilarStrictness,
+} from "./similarStrictness";
+import {
   animateProfileQuery,
   animateThemes,
   useAnimateReview,
@@ -328,6 +333,7 @@ export function useMediaActions(
   const gif = ready ? videoExport(item, "gif") : null;
   const loop = ready ? videoExport(item, "loop") : null;
   const image = ready && item.type === "image";
+  const [strictness, setStrictness] = useSimilarStrictness();
   const upscale = useUpscaleAction(item, {
     ready,
     compare,
@@ -556,11 +562,24 @@ export function useMediaActions(
           ],
         ],
       }),
-    // The gallery ranked by likeness to this image (GalleryPage reads `similar`), then new
-    // variations of its MCP result set; a video in a set has only the latter.
+    // How alike the gallery's results must be, then the gallery ranked by likeness to this image
+    // (GalleryPage reads `similar`) and new variations of its MCP result set; a video in a set
+    // has only the latter.
     image
       ? itemAction("similar", {
           menu: [
+            [
+              {
+                id: "similar-strictness",
+                label: "Strictness",
+                icon: icons.similar,
+                choice: {
+                  value: strictness,
+                  options: similarStrictnessOptions,
+                  onChange: (value: string) => setStrictness(value as SimilarStrictness),
+                },
+              },
+            ],
             [
               {
                 id: "similar-gallery",

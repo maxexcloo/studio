@@ -29,6 +29,7 @@ import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
+import { similarThresholds } from "../domain/image-search.ts";
 import { adminRefusal } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 import { galleryStats } from "../stats.js";
@@ -61,8 +62,8 @@ export function galleryJobResponse(store, account, id, settings = false) {
 }
 
 /**
- * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item)` scores items
- * by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
+ * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item, strictness)`
+ * scores items by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
  * is in one of the owner's comparisons.
  */
 export function registerGalleryReadRoutes(app, { near, similar, store, compared }) {
@@ -151,10 +152,15 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const search = await searchFilter(query);
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
-    // `similar` (an item id, Find Similar) ranks by likeness to that image; none until it is read.
+    // `similar` (an item id, Find Similar) ranks by likeness to that image, keeping those at least
+    // as alike as `strictness` (close, similar or loose); none until it is read.
     const source = query.similar ? galleryItem(String(query.similar)) : null;
+    const strictness = Object.hasOwn(similarThresholds, query.strictness)
+      ? query.strictness
+      : "similar";
     const similarTo = query.similar
-      ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
+      ? (source && recordBelongsToAccount(source, account) && similar(source, strictness)) ||
+        (() => undefined)
       : null;
     // `comparisons` keeps results that are in one of the account's comparisons.
     const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;

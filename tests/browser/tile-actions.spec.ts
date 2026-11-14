@@ -414,20 +414,39 @@ test("Similar ranks the gallery by an image from its tile menu or the viewer, as
   await page.reload();
   await tileMenu(page);
   await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
-  const chip = (title: string) =>
-    page.getByRole("button", { name: `Remove Similar to ${title} Filter`, exact: true });
-  await expect(chip("A copper bird")).toBeVisible();
-  expect(state.galleryRequests.at(-1)).toContain("similar=tile-bird");
+  // Its strictness sits above the run.
+  await expect(page.getByRole("radiogroup", { name: "Strictness", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Similar", exact: true }).last().click();
+  const chip = (label: string) =>
+    page.getByRole("button", { name: `Remove ${label} Filter`, exact: true });
+  await expect(chip("Similar to A copper bird")).toBeVisible();
+  expect(state.galleryRequests.at(-1)).toContain("similar=tile-bird&strictness=similar");
+
+  // The chip changes it in place, and Similar ▾ keeps the choice.
+  await page.getByRole("button", { name: "Similar to A copper bird", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "Strictness", exact: true })
+    .getByText("Close", { exact: true })
+    .click();
+  await expect(chip("Close to A copper bird")).toBeVisible();
+  await expect.poll(() => state.galleryRequests.at(-1)).toContain("strictness=close");
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Open image: A paper moth", exact: true }).click();
   await viewerAction(page, "Similar");
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Strictness", exact: true })
+      .getByRole("radio", { name: "Close", exact: true }),
+  ).toBeChecked();
+  await page.getByRole("menuitem", { name: "Similar", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
-  await expect(chip("A paper moth")).toBeVisible();
+  await expect(chip("Close to A paper moth")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open image:/ }).first()).toHaveAccessibleName(
     "Open image: A paper moth",
   );
 
-  await chip("A paper moth").click();
+  await chip("Close to A paper moth").click();
   await expect(page).not.toHaveURL(/similar=/);
-  await expect(chip("A paper moth")).toBeHidden();
+  await expect(chip("Close to A paper moth")).toBeHidden();
 });

@@ -42,6 +42,12 @@ import { galleryItemQuery } from "./MediaDetails";
 import { inRunOrder, runKey } from "./resultSets";
 import { appendGalleryFilters, emptyGalleryFilters } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
+import {
+  similarChipLabels,
+  similarStrictnessOptions,
+  useSimilarStrictness,
+  type SimilarStrictness,
+} from "./similarStrictness";
 import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
@@ -86,6 +92,7 @@ export function GalleryPage() {
   // Similar links here as ?similar=<item id>: the gallery ranked by likeness to that image,
   // within the filters, until its chip is removed.
   const similar = params.get("similar") || "";
+  const [strictness, setStrictness] = useSimilarStrictness();
   const removeSimilar = useCallback(
     () =>
       setParams((next) => {
@@ -120,18 +127,21 @@ export function GalleryPage() {
     }),
   }).data;
   const galleryKey = useMemo(
-    () => ["gallery", search, kind, filters, similar, setId],
-    [search, kind, filters, similar, setId],
+    () => ["gallery", search, kind, filters, similar && [similar, strictness], setId],
+    [search, kind, filters, similar, strictness, setId],
   );
   const galleryPage = useCallback(
     (cursor: string, limit = 60) => {
       const params = new URLSearchParams({ limit: String(limit), cursor, q: search, type: kind });
       appendGalleryFilters(params, filters);
-      if (similar) params.set("similar", similar);
+      if (similar) {
+        params.set("similar", similar);
+        params.set("strictness", strictness);
+      }
       if (setId) params.set("set", setId);
       return api<Page>(`/api/gallery?${params}`);
     },
-    [search, kind, filters, similar, setId],
+    [search, kind, filters, similar, strictness, setId],
   );
   // The gallery key (as JSON) whose every match a quick select is loading: its later pages, refetches
   // included, then come 500 at a time.
@@ -219,10 +229,14 @@ export function GalleryPage() {
       result = await result.fetchNextPage({ cancelRefetch: false });
     return !result.hasNextPage;
   }, [galleryKey, gallery]);
-  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters, similar]), {
-    complete: !gallery.hasNextPage,
-    load: loadEveryMatch,
-  });
+  const selection = useGallerySelection(
+    items,
+    JSON.stringify([kind, search, filters, similar, strictness]),
+    {
+      complete: !gallery.hasNextPage,
+      load: loadEveryMatch,
+    },
+  );
   const hasFilters =
     JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped || Boolean(similar);
   const clearFilters = () => {
@@ -386,8 +400,14 @@ export function GalleryPage() {
             ? [
                 {
                   key: "similar",
-                  label: `Similar to ${similarSource ? mediaTitle(similarSource) : "Image"}`,
+                  label: `${similarChipLabels[strictness]} ${similarSource ? mediaTitle(similarSource) : "Image"}`,
                   remove: removeSimilar,
+                  choice: {
+                    label: "Strictness",
+                    value: strictness,
+                    options: similarStrictnessOptions,
+                    onChange: (value: string) => setStrictness(value as SimilarStrictness),
+                  },
                 },
               ]
             : []),

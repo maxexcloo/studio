@@ -545,7 +545,7 @@ registerGalleryReadRoutes(app, {
     return (item) => items.has(item.id) || jobs.has(item.jobId);
   },
   near: (text) => imageSearch.near(text),
-  similar: (item) => imageSearch.similar(item),
+  similar: (item, strictness) => imageSearch.similar(item, strictness),
 });
 
 registerLoraRoutes(app, { comfyDownMessage, loadComfyContext });
