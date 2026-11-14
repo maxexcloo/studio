@@ -29,7 +29,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(sessions\/[\w-]+|queue(\/[\w-]+)?|user-presets)$/],
   [
     "POST",
-    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry|swap)|sets\/[\w-]+\/move|cancel-pending|cancel-all|clear-failed|pause|resume)|user-presets)$/,
+    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|clear|move|retry|swap)|sets\/[\w-]+\/move|cancel-all|clear-failed|pause|resume)|user-presets)$/,
   ],
   ["PATCH", /^\/api\/user-presets\/[\w-]+$/],
   ["DELETE", /^\/api\/user-presets\/[\w-]+$/],
@@ -56,7 +56,7 @@ const ordinaryRoutes = [
   ["DELETE", /^\/api\/(characters|outfits|scenes)\/[\w-]+$/],
   // The prompt assistant works only with the requester's profiles, LoRAs and references.
   ["GET", /^\/api\/assistant$/],
-  ["POST", /^\/api\/assistant\/(animate|cards\/(describe|rate)|character|loras|negative|rewrite)$/],
+  ["POST", /^\/api\/assistant\/(animate|cards\/(describe|rate)|loras|negative|rewrite)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/discarded)?)$/],
   [

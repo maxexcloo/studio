@@ -35,7 +35,7 @@ const ownerOf = (account: RouteAccount) => account?.userId || "";
  */
 const listed = (store: Store, ownerId: string) =>
   store.queueJobs(ownerId).filter((job) => !job.cleared);
-/** What Stop All and Cancel Pending act on: the person's own unfinished work, as Dream's pause stops Dream's. */
+/** What Stop All acts on: the person's own unfinished work, as Dream's pause stops Dream's. */
 const ownWork = (store: Store, ownerId: string) =>
   store.openJobs(ownerId).filter((job) => !job.cleared && job.priority !== queuePriority.dream);
 const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
@@ -204,15 +204,6 @@ export function registerRewriteRoutes(
       return { status: 409, payload: { error: "Only waiting generations can be moved." } };
     store.move(ownerOf(account), ids, to);
     return { status: 200, payload: { ok: true } };
-  });
-  app.post("/api/queue/cancel-pending", async (req, res) => {
-    let cancelled = 0;
-    for (const job of ownWork(store, owner(req)).filter((item) =>
-      ["writing", "queued", "waiting"].includes(item.status),
-    )) {
-      if ((await queue.cancel(owner(req), job.id))?.status === "cancelled") cancelled++;
-    }
-    return res.json({ cancelled });
   });
   directRoute(app, "POST", "/api/queue/cancel-all", async (account) => {
     const ownerId = ownerOf(account);

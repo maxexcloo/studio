@@ -353,9 +353,8 @@ test("Dream is off until turned on, queues one hidden job per account only while
       (await admission({ prompt: `p${index}` }, { userId: "alice", role: "user" })).status,
       200,
     );
-  // Cancel Pending and Cancel All act on the person's own work and leave Dream alone.
-  for (const route of ["cancel-pending", "cancel-all"])
-    assert.equal((await fetch(`${base}/api/queue/${route}`, { method: "POST" })).status, 200);
+  // Cancel All acts on the person's own work and leaves Dream alone.
+  assert.equal((await fetch(`${base}/api/queue/cancel-all`, { method: "POST" })).status, 200);
   assert.equal(store.job("alice", job.id)?.status, "running");
   assert.ok(
     store
