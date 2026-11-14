@@ -1,50 +1,7 @@
 import { localOutputFile } from "../comfy/comfy.js";
 import { gallery, setGallery } from "../gallery/store.js";
-import { describeComfyGraph } from "../gallery/records.js";
-import { parseA1111Parameters, readPngInfo } from "../png-text.js";
-import { loadSharp } from "../sharp-loader.js";
 import { probeVideo } from "../video-previews.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
-
-const imagePattern = /\.(png|jpe?g|webp|gif|avif)$/i;
-
-/** What a file says about itself: its size, and a prompt when it carries one. */
-export async function readMediaInfo(file) {
-  const info = { width: 0, height: 0, prompt: "", negative: "", model: "" };
-  if (/\.png$/i.test(file)) {
-    const png = readPngInfo(file);
-    if (png) {
-      info.width = png.width;
-      info.height = png.height;
-      const a1111 = png.text.parameters ? parseA1111Parameters(png.text.parameters) : null;
-      if (a1111?.prompt)
-        Object.assign(info, { prompt: a1111.prompt, negative: a1111.negative, model: a1111.model });
-      else if (png.text.prompt) {
-        // The size in the graph is what was asked for; the PNG's own is truer, so only the words are taken.
-        try {
-          const { prompt, negative, model } = describeComfyGraph(JSON.parse(png.text.prompt));
-          Object.assign(info, { prompt, negative, model });
-        } catch {
-          /* not ComfyUI's graph */
-        }
-      }
-      return info;
-    }
-  }
-  if (imagePattern.test(file)) {
-    const sharp = await loadSharp();
-    if (sharp) {
-      try {
-        const meta = await sharp(file).metadata();
-        info.width = Number(meta.width || 0);
-        info.height = Number(meta.height || 0);
-      } catch {
-        /* unreadable: shown without its size */
-      }
-    }
-  }
-  return info;
-}
 
 const yieldToServer = () => new Promise((resolve) => setImmediate(resolve));
 
