@@ -740,7 +740,7 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
   assert.equal((await request("")).body.since, (await request("/visit", {})).body.since);
 });
 
-test("A quiet chat hands its project to Dream, which continues its work one axis at a time", async (t) => {
+test("Dream varies a starred image, and a quiet chat's project once the chat hands it over, one axis at a time", async (t) => {
   const { dream, state, store, projects, dreamOnce } = fixture(t);
   await dream.save("alice", { enabled: true });
   const beach = projects.create("alice", { name: "Beach", brief: { avoid: "crowds" } });
@@ -776,34 +776,34 @@ test("A quiet chat hands its project to Dream, which continues its work one axis
   };
   chatImage("seed", "a fox on a beach at dawn", { favorite: true });
 
-  // The chat asked for something within the hour: it keeps its project.
+  // The chat asked for something within the hour: it keeps its project, and Dream varies the
+  // starred image on its profile, with its settings, the LoRAs that still fit and its references.
   const held = await dreamOnce();
   assert.equal(held?.dream?.projectId, undefined);
-  assert.equal(held?.dream?.arm, "exploit");
-
-  state.clock += 61 * 60_000;
-  const scene = await dreamOnce();
-  assert.equal(scene?.dream?.projectId, beach.id);
-  assert.equal(scene?.dream?.arm, "continue:scene");
-  assert.match(String(scene?.dream?.why), /^Continuing Beach: new scene · /);
-  // On the seed's profile, with its settings, the LoRAs that still fit and its references.
+  assert.equal(held?.dream?.arm, "continue:scene");
+  assert.match(String(held?.dream?.why), /^Varying a starred image: new scene · /);
   assert.deepEqual(
-    [scene?.input.profileId, scene?.input.steps, scene?.input.width, scene?.input.height],
+    [held?.input.profileId, held?.input.steps, held?.input.width, held?.input.height],
     ["flux", 20, 832, 1216],
   );
-  assert.deepEqual(scene?.input.loras, [{ name: "fox.safetensors", strength: 0.8, enabled: true }]);
-  assert.deepEqual(scene?.input.referenceAssets, [{ assetId: "character", slot: "reference" }]);
-  const call = state.calls.at(-1)!;
+  assert.deepEqual(held?.input.loras, [{ name: "fox.safetensors", strength: 0.8, enabled: true }]);
+  assert.deepEqual(held?.input.referenceAssets, [{ assetId: "character", slot: "reference" }]);
+  let call = state.calls.at(-1)!;
   assert.match(call.system, /change only the scene/);
   assert.match(call.system, /safe for work/);
   assert.match(call.user, /Seed prompt: a fox on a beach at dawn/);
-  assert.match(call.user, /- Avoid: crowds/);
   assert.doesNotMatch(call.user, /Recent Dream ideas/);
 
-  // The axes take turns.
+  // The axes take turns; a handed-over project continues its chat's work, its brief steering.
+  state.clock += 61 * 60_000;
   const outfit = await dreamOnce();
+  assert.equal(outfit?.dream?.projectId, beach.id);
   assert.equal(outfit?.dream?.arm, "continue:outfit");
-  assert.match(state.calls.at(-1)!.system, /change only the outfit/);
+  assert.match(String(outfit?.dream?.why), /^Continuing Beach: new outfit · /);
+  call = state.calls.at(-1)!;
+  assert.match(call.system, /change only the outfit/);
+  assert.match(call.system, /brief steer/);
+  assert.match(call.user, /- Avoid: crowds/);
 
   // A new request takes the project back for the next hour.
   projects.activity("alice", "chat-1");
