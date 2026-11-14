@@ -14,13 +14,7 @@ import { demoMode } from "./comfy/comfy.js";
 import { startFrameSize } from "./animate-profile.js";
 import { families } from "./family-catalogue.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
-import {
-  dedupeGallery,
-  gallery,
-  galleryLimit,
-  setGallery,
-  galleryRevisionValue,
-} from "./gallery/store.js";
+import { dedupeGallery, gallery, setGallery, galleryRevisionValue } from "./gallery/store.js";
 import {
   makePendingItems,
   storedChatRecord,
@@ -469,7 +463,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     body.startedAt = Date.now();
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
-    setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
+    setGallery(dedupeGallery([...items, ...gallery]));
     jobs.set(id, {
       status: "queued",
       ownerId: body.ownerId || undefined,
