@@ -21,6 +21,7 @@ function fixture(
     explicit?: (owner: string) => boolean;
     switches?: { ideas?: boolean; nextSteps?: boolean };
     picked?: string;
+    fixed?: Record<string, string[]>;
   } = {},
 ) {
   const calls: Message[][] = [];
@@ -87,6 +88,7 @@ function fixture(
           }
         : null,
     promptWriter: () => ({ picked: options.picked, uncensored: false }),
+    fixed: (kind) => options.fixed?.[kind] ?? [],
     now: () => clock,
   });
   return {
@@ -216,6 +218,29 @@ test("Animate's motion ideas come from the image, each its own instruction, and 
   await suggestions.suggest("alice", { surface: "viewer", jobId: "job-a" });
   assert.equal(calls.length, 2);
   assert.match(calls[1][0].content, /next steps/);
+});
+
+test("suggestions never repeat a fixed option in the same menu, and the writer is told them", async () => {
+  const fixed: Record<string, string[]> = { change: ["Night Version"], animate: ["closer-crop!"] };
+  const { calls, suggestions } = fixture({ fixed });
+  const labels = async (surface: string, extra = {}) =>
+    (await suggestions.suggest("alice", { surface, jobId: "job-a", ...extra })).suggestions.map(
+      (step) => (step as { label: string }).label,
+    );
+  assert.deepEqual(await labels("viewer"), ["Warmer Light Please Now", "Closer Crop"]);
+  assert.match(
+    calls[0][1].content,
+    /The menu already offers \(suggest different ideas\): Night Version$/,
+  );
+  // Matching ignores case and punctuation, and each menu has its own fixed options.
+  assert.deepEqual(await labels("animate"), ["Warmer Light Please Now", "Broken"]);
+  assert.match(calls[1][1].content, /already offers[^\n]*: closer-crop!$/);
+  fixed.improve = ["WARMER light, please now"];
+  assert.deepEqual(await labels("draft", { kind: "image", prompt: "A harbour" }), ["Closer Crop"]);
+  // An image's kept steps leave out a fixed option added since they were written.
+  fixed.change.push("Closer Crop");
+  assert.deepEqual(await labels("viewer"), ["Warmer Light Please Now"]);
+  assert.equal(calls.length, 3);
 });
 
 test("an image's next steps are kept with it, and More asks for different ones", async () => {

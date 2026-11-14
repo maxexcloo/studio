@@ -132,6 +132,14 @@ const empty = <T = string | NextStep>(reason: string): Suggestions<T> => ({
   reason,
 });
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
+// The Library › Prompt Styles kind whose fixed options share a menu with each surface's steps.
+const fixedKinds = { viewer: "change", animate: "animate", draft: "improve" } as const;
+const sameLabel = (label: string) => label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+/** Keeps the steps whose label none of `labels`, a menu's fixed options, already has. */
+const unlike = (labels: string[]) => {
+  const taken = new Set(labels.map(sameLabel));
+  return (step: NextStep) => !taken.has(sameLabel(step.label));
+};
 
 /** What the item was made with and what it shows, for the model's next steps and changes. */
 function describeItem(item: SuggestionItem) {
@@ -175,6 +183,7 @@ export function createSuggestions({
   nextSteps,
   target = async () => null,
   promptWriter = () => undefined,
+  fixed = () => [],
   now = Date.now,
 }: {
   taste: Pick<Taste, "read">;
@@ -197,6 +206,8 @@ export function createSuggestions({
   target?: (ownerId: string, item: SuggestionItem) => Promise<WritingTarget | null>;
   /** The owner's prompt writer (account-policy.js `promptWriter`), which Ask for a Change uses. */
   promptWriter?: (ownerId: string) => PromptWriter | undefined;
+  /** The labels of a Prompt Styles kind's fixed options, which suggestions never repeat. */
+  fixed?: (kind: (typeof fixedKinds)[keyof typeof fixedKinds]) => string[];
   now?: () => number;
 }) {
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
@@ -229,6 +240,7 @@ export function createSuggestions({
       target?: WritingTarget | null;
     } = {},
   ): Promise<Suggestions> {
+    const offered = surface === "composer" ? [] : fixed(fixedKinds[surface]);
     const system = {
       composer: [
         `You suggest prompt ideas for a person's next ${kind} in a media studio, drawn from their taste profile and the prompts they liked.`,
@@ -268,7 +280,7 @@ export function createSuggestions({
         keepDescriptions,
         contentRule(spicy),
         avoidFiller(),
-        'Each has a label of at most four words in Title Case (such as "Warmer Light", "Closer Crop" or "Night Version"), the change in a few plain words, and the full prompt rewritten with only that change applied, in the same style and language.',
+        'Each has a label of at most four words in Title Case (such as "Golden Hour", "Low Angle" or "Rainy Street"), the change in a few plain words, and the full prompt rewritten with only that change applied, in the same style and language.',
         data,
         'Reply with JSON only: {"steps": [{"label": "<label>", "request": "<the change>", "prompt": "<the rewritten prompt>"}]}.',
       ],
@@ -282,7 +294,16 @@ export function createSuggestions({
         model: await model.model("suggestions"),
         messages: [
           { role: "system", content: system },
-          { role: "user", content: userContent(context, image ? [image] : [], true) },
+          {
+            role: "user",
+            content: userContent(
+              offered.length
+                ? `${context}\n\nThe menu already offers (suggest different ideas): ${offered.join(", ")}`
+                : context,
+              image ? [image] : [],
+              true,
+            ),
+          },
         ],
         temperature: 0.9,
         timeout: 45_000,
@@ -317,6 +338,7 @@ export function createSuggestions({
         labels.add(step.label);
         return true;
       })
+      .filter(unlike(offered))
       .slice(0, 4) as NextStep[];
     return steps.length ? { suggestions: steps } : empty("The text model's reply was unusable.");
   }
@@ -545,7 +567,7 @@ export function createSuggestions({
       const spicy = explicit(ownerId);
       const saved = surface === "viewer" ? source?.nextSteps : undefined;
       if (saved?.steps.length && !fresh && Boolean(saved.spicy) === spicy)
-        return { suggestions: saved.steps };
+        return { suggestions: saved.steps.filter(unlike(fixed("change"))) };
       const { known, lines } = tasteContext(ownerId);
       const drafted = surface === "composer" || surface === "draft";
       const kind = drafted ? (body.kind as "image" | "video") : "image";
