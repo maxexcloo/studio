@@ -13,6 +13,7 @@ import {
   Box,
   Button,
   FocusTrap,
+  getDefaultZIndex,
   Group,
   Image,
   Menu,
@@ -36,6 +37,7 @@ import { useFlash } from "../../ui/useFlash";
 import { menuWidth } from "../../theme";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
+import type { PreviewImage } from "../gallery/ImagePreview";
 import { escapePanel, fittedPopup } from "./chip";
 import classes from "./Picker.module.css";
 
@@ -371,8 +373,9 @@ export function PickerGrid({
 
 /**
  * One choice. A selected tile fades with a check and clicking it again removes it. Dragging
- * shows only the picture, without the tile's border and corners. A `preview`, named by its label,
- * opens from a corner button or Space.
+ * shows only the picture, without the tile's border and corners. A `preview` opens from a corner
+ * button or Space; on desktop, with an `image`, hovering that button or Space shows the image larger
+ * beside the tile instead, and the button still opens it.
  */
 export function PickerTile({
   label,
@@ -402,10 +405,18 @@ export function PickerTile({
   /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
-  preview?: { label: string; open: () => void };
+  preview?: { label: string; open: () => void; image?: PreviewImage };
   row?: boolean;
 }) {
   const [state, setState] = useState<"loaded" | "failed">();
+  const peekable = !useTouch() && Boolean(preview?.image);
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef(0);
+  const hover = (on: boolean) => {
+    window.clearTimeout(peekTimer.current);
+    if (on) peekTimer.current = window.setTimeout(() => setPeek(true), 400);
+    else setPeek(false);
+  };
   function dragStart(event: DragEvent<HTMLButtonElement>) {
     if (!drag) return;
     event.dataTransfer.effectAllowed = "copy";
@@ -414,74 +425,111 @@ export function PickerTile({
     if (picture?.complete && picture.naturalWidth) dragPicture(event.dataTransfer, picture);
   }
   return (
-    <div
-      className={classes.tile}
-      role="listitem"
-      data-row={row || undefined}
-      data-selected={selected || undefined}
+    <Popover
+      opened={peekable && peek}
+      onChange={setPeek}
+      position="right"
+      width={320}
+      withRoles={false}
+      returnFocus={false}
+      zIndex={getDefaultZIndex("max")}
     >
-      <UnstyledButton
-        className={classes.toggle}
-        aria-label={label}
-        aria-pressed={selected}
-        disabled={disabled && !selected}
-        onClick={onToggle}
-        draggable={!!drag}
-        onDragStart={dragStart}
-        onKeyDown={(event) => {
-          if (event.key !== " " || !preview) return;
-          event.preventDefault();
-          if (!event.repeat) preview.open();
-        }}
-        // Space previews rather than toggling, which a button does as the key comes up.
-        onKeyUp={(event) => preview && event.key === " " && event.preventDefault()}
-      >
-        <div className={classes.media} style={{ aspectRatio: aspect }}>
-          {Placeholder && <Placeholder size={row ? 18 : 22} aria-hidden />}
-          {image && (
-            <Image
-              className={classes.image}
-              src={image}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              draggable={false}
-              data-loaded={state === "loaded" || undefined}
-              data-failed={state === "failed" || undefined}
-              onLoad={() => setState("loaded")}
-              onError={() => setState("failed")}
-            />
-          )}
-          <span className={classes.check} aria-hidden>
-            <Check size={14} strokeWidth={3} />
-          </span>
-        </div>
-        {title && (
-          <div className={classes.text}>
-            <Text size="sm" fw={500} truncate>
-              {title}
-            </Text>
-            {detail && (
-              <Text size="xs" c="dimmed" truncate>
-                {detail}
-              </Text>
+      <Popover.Target>
+        <div
+          className={classes.tile}
+          role="listitem"
+          data-row={row || undefined}
+          data-selected={selected || undefined}
+        >
+          <UnstyledButton
+            className={classes.toggle}
+            aria-label={label}
+            aria-pressed={selected}
+            disabled={disabled && !selected}
+            onClick={onToggle}
+            draggable={!!drag}
+            onDragStart={dragStart}
+            onKeyDown={(event) => {
+              // Escape closes only the image beside the tile, leaving the picker open.
+              if (event.key === "Escape" && peek) {
+                event.preventDefault();
+                event.stopPropagation();
+                setPeek(false);
+              }
+              if (event.key !== " " || !preview) return;
+              event.preventDefault();
+              if (event.repeat) return;
+              if (peekable) setPeek(!peek);
+              else preview.open();
+            }}
+            onBlur={() => setPeek(false)}
+            // Space previews rather than toggling, which a button does as the key comes up.
+            onKeyUp={(event) => preview && event.key === " " && event.preventDefault()}
+          >
+            <div className={classes.media} style={{ aspectRatio: aspect }}>
+              {Placeholder && <Placeholder size={row ? 18 : 22} aria-hidden />}
+              {image && (
+                <Image
+                  className={classes.image}
+                  src={image}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                  data-loaded={state === "loaded" || undefined}
+                  data-failed={state === "failed" || undefined}
+                  onLoad={() => setState("loaded")}
+                  onError={() => setState("failed")}
+                />
+              )}
+              <span className={classes.check} aria-hidden>
+                <Check size={14} strokeWidth={3} />
+              </span>
+            </div>
+            {title && (
+              <div className={classes.text}>
+                <Text size="sm" fw={500} truncate>
+                  {title}
+                </Text>
+                {detail && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {detail}
+                  </Text>
+                )}
+              </div>
             )}
-          </div>
-        )}
-      </UnstyledButton>
-      {(action || preview) && (
-        <Group className={classes.action} gap={4} wrap="nowrap">
-          {preview && (
-            <Tooltip label={preview.label}>
-              <ActionIcon variant="default" aria-label={preview.label} onClick={preview.open}>
-                <icons.preview size={14} />
-              </ActionIcon>
-            </Tooltip>
+          </UnstyledButton>
+          {(action || preview) && (
+            <Group className={classes.action} gap={4} wrap="nowrap">
+              {preview && (
+                <Tooltip label="Preview" disabled={peek}>
+                  <ActionIcon
+                    variant="default"
+                    aria-label={preview.label}
+                    // Expanded, a press on it opens the preview rather than only closing the image.
+                    aria-expanded={peekable ? peek : undefined}
+                    onMouseEnter={() => peekable && hover(true)}
+                    onMouseLeave={() => hover(false)}
+                    onClick={() => {
+                      hover(false);
+                      preview.open();
+                    }}
+                  >
+                    <icons.preview size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {action}
+            </Group>
           )}
-          {action}
-        </Group>
+        </div>
+      </Popover.Target>
+      {preview?.image && (
+        <Popover.Dropdown p={4} className={classes.peek}>
+          <Image src={preview.image.src} alt={preview.image.alt} radius="sm" />
+        </Popover.Dropdown>
       )}
-    </div>
+    </Popover>
   );
 }
 
