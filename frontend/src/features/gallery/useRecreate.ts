@@ -1,4 +1,3 @@
-import { notifications } from "@mantine/notifications";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -42,7 +41,6 @@ export function useRecreateAction(item: MediaItem, onApplied: () => void): Actio
       onApplied();
       openComposer(item.type);
     },
-    onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
     id: "prompt-composer",
