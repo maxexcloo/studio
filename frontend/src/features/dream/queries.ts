@@ -10,6 +10,7 @@ export interface DreamSettings {
   paused: boolean;
   dailyImages: number;
   dailyVideos: number;
+  images: boolean;
   videos: boolean;
   spicy: boolean;
 }
@@ -98,7 +99,7 @@ export const dreamWhen = ({ settings, today, status }: Dream) =>
         : status === "capped"
           ? "Dream has made today's share"
           : "Dream works when the queue is free",
-    `${today.images} of ${settings.dailyImages} today`,
+    ...(settings.images ? [`${today.images} of ${settings.dailyImages} today`] : []),
     ...(settings.videos ? [`${today.videos} of ${settings.dailyVideos} videos`] : []),
   ].join(" · ");
 

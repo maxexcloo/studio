@@ -34,7 +34,11 @@ export function useDreamSettings() {
 function SettingsForm({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   const { settings } = dream;
-  const toggle = (key: "enabled" | "spicy" | "videos", label: string, description: string) => (
+  const toggle = (
+    key: "enabled" | "images" | "spicy" | "videos",
+    label: string,
+    description: string,
+  ) => (
     <SettingRow label={label} description={description}>
       <Switch
         aria-label={label}
@@ -55,7 +59,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         value={settings[key]}
         min={0}
         max={max}
-        disabled={key === "dailyVideos" && !settings.videos}
+        disabled={!settings[key === "dailyImages" ? "images" : "videos"]}
         onSave={(value) => save.mutate({ [key]: value })}
       />
     </SettingRow>
@@ -67,8 +71,9 @@ function SettingsForm({ dream }: { dream: Dream }) {
       </Text>
       <div>
         {toggle("enabled", "Dream", "Make new images from your taste in idle time.")}
-        {/* Spicy sits under the main switch; the rest run A–Z. */}
+        {/* Spicy sits under the main switch; the rest run A–Z, each switch above its cap. */}
         {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+        {toggle("images", "Images", "Make new images.")}
         {number("dailyImages", "Images per Day", 500, "The most images Dream makes a day.")}
         {toggle("videos", "Videos", "Animate kept or starred images too.")}
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
