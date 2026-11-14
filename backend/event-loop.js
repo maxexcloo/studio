@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { Session } from "node:inspector/promises";
 import { performance } from "node:perf_hooks";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { logWarning } from "./crash-log.js";
 
@@ -59,6 +61,70 @@ export function watchEventLoop({ intervalMs = 100, thresholdMs = 200 } = {}) {
     for (const entry of active) if (entry.end) active.delete(entry);
     windowStart = now;
   }, intervalMs).unref();
+}
+
+/**
+ * Samples the CPU a minute at a time and logs each run of busy samples over `thresholdMs` with the
+ * Studio functions it spent its time in, innermost first.
+ */
+export async function profileStalls({ windowMs = 60_000, thresholdMs = 200 } = {}) {
+  const session = new Session();
+  session.connect();
+  await session.post("Profiler.enable");
+  await session.post("Profiler.setSamplingInterval", { interval: 5000 });
+  for (;;) {
+    await session.post("Profiler.start");
+    await delay(windowMs, undefined, { ref: false });
+    const { profile } = await session.post("Profiler.stop");
+    for (const stall of busyRuns(profile, thresholdMs)) logWarning("Stall profile", stall);
+  }
+}
+
+function busyRuns({ nodes, samples, timeDeltas }, thresholdMs) {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const parent = new Map();
+  for (const node of nodes) for (const child of node.children || []) parent.set(child, node.id);
+  const studio = (frame) => frame.url.includes("/backend/") || frame.url.includes("/shared/");
+  const label = (frame) =>
+    `${frame.functionName || "(anonymous)"} ${frame.url.replace(/^.*\/(backend|shared)\//, "$1/")}:${frame.lineNumber + 1}`;
+  /** The innermost three Studio frames of a sample's stack. */
+  const stack = (id) => {
+    const frames = [];
+    for (let at = id; at !== undefined && frames.length < 3; at = parent.get(at)) {
+      const frame = byId.get(at).callFrame;
+      if (studio(frame)) frames.push(label(frame));
+    }
+    if (frames.length) return frames.join(" < ");
+    // Outside Studio: the nearest frame with a source, such as a package's.
+    for (let at = id; at !== undefined; at = parent.get(at)) {
+      const frame = byId.get(at).callFrame;
+      if (frame.url)
+        return `${frame.functionName || "(anonymous)"} ${frame.url.replace(/^.*\/node_modules\//, "")}:${frame.lineNumber + 1}`;
+    }
+    return byId.get(id).callFrame.functionName || "(native)";
+  };
+  const runs = [];
+  let run = null;
+  for (const [index, id] of samples.entries()) {
+    const ms = (timeDeltas[index + 1] ?? 0) / 1000;
+    if (byId.get(id).callFrame.functionName === "(idle)") {
+      if (run && run.ms > thresholdMs) runs.push(run);
+      run = null;
+      continue;
+    }
+    run ||= { ms: 0, stacks: new Map() };
+    run.ms += ms;
+    const key = stack(id);
+    run.stacks.set(key, (run.stacks.get(key) || 0) + ms);
+  }
+  if (run && run.ms > thresholdMs) runs.push(run);
+  return runs.map(({ ms, stacks }) => ({
+    ms: Math.round(ms),
+    top: [...stacks]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([key, spent]) => `${Math.round(spent)} ms ${key}`),
+  }));
 }
 
 const steps = new AsyncLocalStorage();

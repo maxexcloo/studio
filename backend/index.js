@@ -83,7 +83,7 @@ import {
   tasteSignal,
 } from "./domain/taste.ts";
 import { createTitler } from "./domain/titles.ts";
-import { routeLabel, track, tracked, watchEventLoop } from "./event-loop.js";
+import { profileStalls, routeLabel, track, tracked, watchEventLoop } from "./event-loop.js";
 import { registerGalleryImportRoute } from "./gallery/import.js";
 import { makePendingItems } from "./gallery/records.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -210,6 +210,9 @@ let drainServer = async () => {};
 installShutdown({ drain: () => drainServer() });
 
 watchEventLoop();
+void profileStalls().catch((error) =>
+  console.warn(`[Studio] Stall profiling stopped: ${error.message}`),
+);
 const app = express();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
