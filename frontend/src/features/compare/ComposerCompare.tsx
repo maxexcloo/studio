@@ -35,6 +35,7 @@ const noModels: string[] = [];
 const strengthOptions = [0, 0.4, 0.6, 0.8, 1, 1.2];
 const defaultStrengths = [0, 0.6, 0.8, 1];
 const seedCounts = ["2", "3", "4", "6"];
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 const toggled = <T,>(list: T[], value: T) =>
   list.includes(value) ? list.filter((each) => each !== value) : [...list, value];
@@ -113,7 +114,7 @@ export function CompareMenu() {
         [
           run(
             "run-models",
-            `Compare ${chosen.length + 1} Models`,
+            `Compare ${plural(chosen.length + 1, "Model")}`,
             () => modelInputs(input, chosen),
             chosen.length + 1,
           ),
@@ -153,7 +154,7 @@ export function CompareMenu() {
         [
           run(
             "run-strengths",
-            `Compare ${strengths.length} Strengths`,
+            `Compare ${plural(strengths.length, "Strength")}`,
             () => strengthInputs(input, lora.name, strengths),
             strengths.length,
           ),

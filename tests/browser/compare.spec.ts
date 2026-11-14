@@ -159,7 +159,11 @@ test("Compare ▾ builds variants across a LoRA's strengths and across models", 
   await expect(variants(page).getByRole("radio")).toHaveCount(4);
 
   // Models start over from the variant being edited (A, without the LoRA), keeping its seed.
-  await build(page, "Compare Models", ["Image Fast"], "Compare 2 Models");
+  await compareMenu(page, "Compare Models");
+  await expect(page.getByRole("menuitem", { name: "Compare 1 Model", exact: true })).toBeDisabled();
+  await page.getByRole("menuitem", { name: "Image Fast", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Compare 2 Models", exact: true }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await page.getByRole("button", { name: "Compare 2", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
   const requests = state.comparisons[0].requests;
