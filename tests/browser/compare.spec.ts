@@ -216,7 +216,9 @@ test("Compare from a result keeps its seed, and Compare Again brings every varia
     "href",
     "/compare/compare-2",
   );
-  await viewerAction(page, "Similar");
+  // Compare ▾ holds its usual Compare Models, then the comparison the image belongs to.
+  await viewerAction(page, "Compare");
+  await expect(page.getByRole("menuitem")).toHaveText(["Compare Models", "Open Comparison"]);
   await page.getByRole("menuitem", { name: "Open Comparison", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-2$/);
 });

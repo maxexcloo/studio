@@ -287,7 +287,6 @@ test("Viewer runs queue into the strip and Edit › Recreate opens the composer"
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
   await viewerAction(page, "Edit");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -1547,11 +1546,20 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   if (phone) {
     // Phones fit every action on the bar's one row.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
-    const row = ["Animate", "Edit", "Upscale", "Copy", "Download", "Similar", "Star", "Delete"].map(
-      (name) =>
-        bar
-          .getByRole("button", { name, exact: true })
-          .or(bar.getByRole("link", { name, exact: true })),
+    const row = [
+      "Animate",
+      "Edit",
+      "Upscale",
+      "Copy",
+      "Download",
+      "Compare",
+      "Similar",
+      "Star",
+      "Delete",
+    ].map((name) =>
+      bar
+        .getByRole("button", { name, exact: true })
+        .or(bar.getByRole("link", { name, exact: true })),
     );
     const tops = await Promise.all(row.map(async (control) => (await control.boundingBox())!.y));
     expect(new Set(tops.map(Math.round)).size).toBe(1);

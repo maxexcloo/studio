@@ -219,7 +219,8 @@ the primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
-  Similar | Star, Delete. Edit leads with Run Again and Run Again, Same Seed,
+  Compare, Similar | Star, Delete. Compare ▾ holds Compare Models, then Open
+  Comparison where the item belongs to one. Edit leads with Run Again and Run Again, Same Seed,
   which queue from where they are, then Use as Character (starting a card in
   Library › Characters) and Use as Reference, then what changes the item itself
   (Edit Image, or a video's Trim and the like) with Recreate in Composer last;

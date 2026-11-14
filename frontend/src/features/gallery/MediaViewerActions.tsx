@@ -11,9 +11,9 @@ import { TrimVideoDialog } from "./videoEdits";
 import { useViewerPrompt, ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, AI, Upscale, Copy, Download and Similar beside their icons. Phones
-// show every action as a compact icon on one row.
-const labelled = ["animate", "edit", "ai", "upscale", "copy", "download", "similar"];
+// Desktop names Animate, Edit, AI, Upscale, Copy, Download, Compare and Similar beside their icons.
+// Phones show every action as a compact icon on one row.
+const labelled = ["animate", "edit", "ai", "upscale", "copy", "download", "compare", "similar"];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -74,8 +74,6 @@ export function MediaViewerActions({
     iterate,
     onApplied,
     onCompare,
-    // Compare shows in menus and the selection bar, not under the open item.
-    omit: ["compare"],
     onAnimate: setAnimating,
     onDelete,
     onRetried,

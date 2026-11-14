@@ -98,8 +98,8 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // The viewer's sections and order, plus Compare: Animate, Edit, Upscale | Copy, Download |
-  // Compare, Similar | Star, Delete.
+  // The viewer's sections and order: Animate, Edit, Upscale | Copy, Download | Compare, Similar |
+  // Star, Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Animate",
     "Edit",

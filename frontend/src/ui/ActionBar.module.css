@@ -64,16 +64,22 @@
   --button-height: 30px;
 }
 
+/* Tight enough for every action across a 375 px phone. */
 .actions[data-compact] .options {
-  padding-inline: 5px 3px;
+  padding-inline: 3px 2px;
 }
 
 .actions[data-compact] .chevron {
   margin-inline-start: 0;
 }
 
+.actions[data-compact] .chevron svg {
+  width: 10px;
+  height: 10px;
+}
+
 .actions[data-compact] .divider {
-  margin-inline: 1px;
+  margin-inline: 0;
 }
 
 /* An icon with options: its ▾ close beside it, over Mantine's Button padding whatever the CSS order. */
