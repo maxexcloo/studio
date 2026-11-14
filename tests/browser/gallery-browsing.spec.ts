@@ -62,6 +62,27 @@ test("Gallery continues near the bottom and retains loaded results when the next
   await expect(retry).toBeHidden();
 });
 
+test("The viewer loads the next page as it nears the last loaded result and counts every match", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const items = results(61);
+  await page.route("**/api/gallery?**", (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    return route.fulfill({
+      json: cursor
+        ? { items: items.slice(60), nextCursor: "", hasMore: false, totalApprox: 61 }
+        : { items: items.slice(0, 60), nextCursor: "next", hasMore: true, totalApprox: 61 },
+    });
+  });
+  await page.goto("/images?item=browse-59");
+  const viewer = page.getByRole("dialog");
+  await expect(viewer.getByText("60 / 61", { exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page).toHaveURL(/item=browse-60/);
+  await expect(viewer.getByText("61 / 61", { exact: true })).toBeVisible();
+});
+
 test("Select All takes every match across pages, and the search and Starred stay while selecting", async ({
   page,
 }) => {

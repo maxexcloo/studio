@@ -310,6 +310,13 @@ export function GalleryPage() {
   }
   // New uploads show at once under the Uploads filter.
   const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
+  // The viewer nearing the last loaded item loads the next page, so navigation carries on.
+  const shownIndex = selected && !run ? items.findIndex((item) => item.id === selected.id) : -1;
+  const nearEnd = shownIndex >= 0 && items.length - shownIndex <= 3;
+  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = gallery;
+  useEffect(() => {
+    if (nearEnd && hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage();
+  }, [nearEnd, hasNextPage, isFetching, isFetchNextPageError, fetchNextPage]);
   // A ranking has no runs to group: it shows as a grid.
   const View = view === "runs" && !similar ? RunsView : MediaGrid;
   return (
@@ -508,6 +515,7 @@ export function GalleryPage() {
                 : items
           }
           related={loaded}
+          total={run || versions ? undefined : gallery.data?.pages.at(-1)?.totalApprox}
           navigate={showItem}
           onReturnFocus={(item) => setFocusItem(item.id)}
           close={closeViewer}
