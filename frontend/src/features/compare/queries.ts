@@ -19,6 +19,10 @@ export interface Comparison {
   /** The exact starred image, even when variants share a batch. */
   winnerItemId: string | null;
   variants: { jobId: string; label: string; item: MediaItem | null }[];
+  /** What the variants of one result vary ("lighting"); a pick goes to its project's brief. */
+  axis?: string;
+  /** The project brief a vote just changed, which Undo restores. */
+  brief?: { projectId: string; name: string; styles: string };
 }
 
 /** One compare set; it polls only while a variant is still generating. */

@@ -342,7 +342,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           image = dataUrl(content, mime);
           name = "chat-upload";
         } else {
-          const jobId = resolve(job_id);
+          const jobId = await resolve(job_id, signal);
           const result = await media.download(owner, jobId, output_index);
           if (!imageMimes.includes(result.mime)) throw new Error("Only images can be imported.");
           image = dataUrl(result.content, result.mime);

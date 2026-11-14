@@ -40,6 +40,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     revision: () => 0,
   });
   const votes: string[][] = [];
+  const picks: string[][] = [];
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -59,8 +60,13 @@ test("compare runs queue one seeded set, read back per owner and record the star
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
+    numbered: (items) => items.map((item) => ({ ...item, number: 7 })),
     voted: (ownerId, winner, others) =>
       votes.push([ownerId, winner.id!, ...others.map((item) => item.id!)]),
+    picked: ({ projectId, axis }, choice, by) => {
+      picks.push([projectId!, axis!, choice, by]);
+      return { projectId: projectId!, name: "Foxes", styles: `${axis}: ${choice}` };
+    },
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -98,6 +104,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
 
   const run = await request("/run", {
     variants: [variant("Steps 20", { steps: 20 }), variant("Steps 40", { steps: 40 })],
+    axis: "steps",
+    projectId: "foxes",
   });
   assert.equal(run.status, 201);
   const jobs = run.body.variants.map((entry: { jobId: string }) =>
@@ -132,6 +140,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
       ["Steps 40", "pending"],
     ],
   );
+  assert.equal(run.body.axis, "steps");
+  assert.equal(run.body.variants[0].item.number, 7);
   assert.equal((await request(`/${run.body.id}`, undefined, "GET", "bob")).status, 404);
 
   // Only a finished variant can win; the choice is stored for the taste profile.
@@ -149,12 +159,47 @@ test("compare runs queue one seeded set, read back per owner and record the star
     },
     { id: "o-0", jobId: other.jobId, ownerId: "alice", type: "image", status: "done" },
   ];
-  const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId }, "PUT");
+  const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId, by: "chat" }, "PUT");
   assert.equal(voted.body.vote, winner.jobId);
+  // A pick on an axis goes to the project's brief, which answers what changed.
+  assert.deepEqual(picks, [["foxes", "steps", "Steps 20", "chat"]]);
+  assert.equal(voted.body.brief.styles, "steps: Steps 20");
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
   // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.
   assert.deepEqual(votes, [["alice", "w-0", "o-0"]]);
+
+  // Variants of a result rerun its job with its seed, one prompt each, lettered, as its versions.
+  const offered = await request("/variants", {
+    itemId: "w-0",
+    axis: "lighting",
+    variants: [
+      { label: "Blue Hour", prompt: "a fox at blue hour" },
+      { label: "Golden Dusk", prompt: "a fox at golden dusk" },
+    ],
+  });
+  assert.equal(offered.status, 201);
+  assert.deepEqual(
+    offered.body.variants.map((entry: { label: string }) => entry.label),
+    ["A · Blue Hour", "B · Golden Dusk"],
+  );
+  const offeredJobs = offered.body.variants.map((entry: { jobId: string }) =>
+    store.job("alice", entry.jobId)!,
+  );
+  assert.deepEqual(
+    offeredJobs.map((job: { input: Record<string, unknown> }) => [
+      job.input.prompt,
+      job.input.steps,
+      job.input.seed,
+    ]),
+    [
+      ["a fox at blue hour", 20, run.body.seed],
+      ["a fox at golden dusk", 20, run.body.seed],
+    ],
+  );
+  assert.ok(offeredJobs.every((job: { parentJobId?: string }) => job.parentJobId === winner.jobId));
+  assert.equal((await request("/variants", { itemId: "w-0", variants: [{}, {}] })).status, 400);
+  assert.equal((await request("/variants", { itemId: "missing", variants: [] })).status, 404);
 
   // Existing jobs, such as an MCP fan-out run, form a set; foreign jobs are refused.
   const created = await request("", {
@@ -195,10 +240,10 @@ test("compare runs queue one seeded set, read back per owner and record the star
   const history = (await request("")).body.comparisons;
   assert.deepEqual(
     history.map((entry: { id: string }) => entry.id),
-    [selected.body.id, created.body.id, run.body.id, "legacy"],
+    [selected.body.id, created.body.id, offered.body.id, run.body.id, "legacy"],
   );
   assert.deepEqual(
-    history[3].variants.map((entry: { label: string; item: unknown }) => [
+    history[4].variants.map((entry: { label: string; item: unknown }) => [
       entry.label,
       Boolean(entry.item),
     ]),

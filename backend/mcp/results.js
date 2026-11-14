@@ -25,8 +25,21 @@ export const shortPrompt = (prompt, max = 200) => {
   );
 };
 
-export function registerResultTools({ tool, server, media, actor, resolve, imageWaitSeconds }) {
+export function registerResultTools({
+  tool,
+  server,
+  media,
+  actor,
+  resolveOutput,
+  imageWaitSeconds,
+}) {
   const { owner, refs } = actor;
+  const resolve = async (value, signal) => (await resolveOutput(value, signal)).jobId;
+  /** A value's job output: the output its number names, else `index`. */
+  const target = async (value, index, signal) => {
+    const found = await resolveOutput(value, signal);
+    return { jobId: found.jobId, index: index || found.index || 0 };
+  };
   tool(
     server,
     "status",
@@ -34,9 +47,9 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     "Status, full prompt, outputs and comparison winner, for reuse.",
     { ...job, wait_seconds: wait },
     async ({ job_id, wait_seconds }, signal) => {
-      const id = resolve(job_id);
+      const id = await resolve(job_id, signal);
       const status = await media.job(owner, id, wait_seconds, { signal });
-      const ref = media.refOf(owner, refs, id);
+      const ref = media.refOf(id);
       const comparisons = await media.comparisons(owner, [id], { scope: refs, signal });
       const prompt = media.promptRecord(id)?.prompt || status.prompt;
       return mcpJson({
@@ -64,10 +77,10 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
       job_id: z.string().min(1).max(200),
       wait_seconds: wait,
     },
-    ({ job_id, wait_seconds }, signal) =>
+    async ({ job_id, wait_seconds }, signal) =>
       /^\s*all\s*$/i.test(job_id)
         ? media.resultsAll(owner, refs, { signal })
-        : media.result(owner, resolve(job_id), wait_seconds, { scope: refs, signal }),
+        : media.result(owner, await resolve(job_id, signal), wait_seconds, { scope: refs, signal }),
     { readOnlyHint: true },
   );
   tool(
@@ -127,17 +140,18 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
           signal,
         },
       );
+      // Each output by its own number, which reuse and review take alone.
       const results = hits.map((item) => ({
-        ref: media.refOf(owner, refs, item.jobId),
+        ref: item.number ? `#${item.number}` : media.refOf(item.jobId) || item.jobId,
         job_id: item.jobId,
         output_index: item.index,
         link: media.url(owner, item.jobId, item.index),
         starred: Boolean(item.favorite),
       }));
       const lines = hits.map((item, position) => {
-        const { ref, output_index, link } = results[position];
+        const { ref, link } = results[position];
         return [
-          `- [${ref[0].toUpperCase()}${ref.slice(1)}${output_index ? ` output ${output_index}` : ""}](${link})${item.favorite ? " ★" : ""}`,
+          `- [${ref}](${link})${item.favorite ? " ★" : ""}`,
           item.title && shortPrompt(item.title),
           item.settings?.modelName || item.model || item.settings?.profileId,
           String(item.createdAt || "").slice(0, 10),
@@ -233,12 +247,12 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
       compare_to: z.string().min(1).max(200).optional(),
       compare_to_output_index: z.number().int().min(0).max(999).default(0),
     },
-    ({ job_id, output_index, compare_to, compare_to_output_index }, signal) =>
+    async ({ job_id, output_index, compare_to, compare_to_output_index }, signal) =>
       media.review(
         owner,
         [
-          { jobId: resolve(job_id), index: output_index },
-          ...(compare_to ? [{ jobId: resolve(compare_to), index: compare_to_output_index }] : []),
+          await target(job_id, output_index, signal),
+          ...(compare_to ? [await target(compare_to, compare_to_output_index, signal)] : []),
         ],
         { scope: refs, signal, waitSeconds: imageWaitSeconds },
       ),
@@ -250,8 +264,8 @@ export function registerResultTools({ tool, server, media, actor, resolve, image
     "cancel",
     "Cancel a job when the user asks.",
     job,
-    async ({ job_id }) => {
-      const id = resolve(job_id);
+    async ({ job_id }, signal) => {
+      const id = await resolve(job_id, signal);
       media.own(owner, id);
       await media.job(owner, id);
       return mcpJson(
