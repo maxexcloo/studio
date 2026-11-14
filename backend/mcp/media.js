@@ -708,7 +708,7 @@ export class McpMedia {
     }
     if (resolution) body.resolutionTier = resolution;
     Object.assign(body, withResolution(body, profile));
-    // Large draws decode in tiles, matching the browser’s generation path.
+    // Large draws decode in tiles, matching the browser's generation path.
     if (
       profile.kind === "image" &&
       (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)
