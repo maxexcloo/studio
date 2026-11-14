@@ -1,6 +1,10 @@
+/* As tall as the workspace modal's scrolling body (its size container), so apart sections rest at
+   the foot. */
 .nav {
   position: sticky;
   top: 0;
+  height: 100cqh;
+  overflow-y: auto;
 }
 
 .grid {

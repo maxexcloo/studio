@@ -20,8 +20,9 @@ import classes from "./WorkspaceSections.module.css";
 
 /**
  * One Library or Settings section; `admin` sections are hidden from other accounts, `group` names the
- * run of sections it belongs to (Personal, Administration), `apart` sections (About) follow a
- * divider in the desktop navigation and the `initial` one opens first instead of the first listed.
+ * run of sections it belongs to (Personal, Administration), `apart` sections (Integrations, About)
+ * come last and sit at the foot of the desktop navigation below a divider, and the `initial` one
+ * opens first instead of the first listed.
  */
 interface SectionDefinition {
   label: string;
@@ -168,10 +169,10 @@ export function WorkspaceSections({
               </Stack>
             ))}
             {apart.length > 0 && (
-              <>
+              <Stack gap={4} mt="auto">
                 <Divider my="xs" />
                 {apart.map(link)}
-              </>
+              </Stack>
             )}
           </Stack>
         </Grid.Col>

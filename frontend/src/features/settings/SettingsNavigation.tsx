@@ -7,7 +7,8 @@ import {
   visibleSections,
 } from "../../ui/WorkspaceSections";
 
-// Personal sections, then administration, each alphabetical, with About apart at the end.
+// Personal sections, then administration, each alphabetical, with Integrations and About apart at
+// the end.
 const settingSections = {
   account: {
     label: "Account",
@@ -36,13 +37,6 @@ const settingSections = {
     admin: true,
     group: "Administration",
   },
-  integrations: {
-    label: "Integrations",
-    description: "Civitai, Hugging Face and the prompt assistant.",
-    icon: Plug,
-    admin: true,
-    group: "Administration",
-  },
   users: {
     label: "Users",
     description: "Accounts, their roles and groups, linked chat identities and the default group.",
@@ -56,6 +50,13 @@ const settingSections = {
     icon: Server,
     admin: true,
     group: "Administration",
+  },
+  integrations: {
+    label: "Integrations",
+    description: "Civitai, Hugging Face and the prompt assistant.",
+    icon: Plug,
+    admin: true,
+    apart: true,
   },
   about: {
     label: "About",
