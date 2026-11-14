@@ -97,16 +97,22 @@ function fixture(t: TestContext, catalogue = profiles) {
   });
   // Narrows as gallery/store.js's queries do, so each read takes only what it asks for.
   const matching = (ownerId: string, query: Record<string, any>) =>
-    state.items.filter(
-      (item) =>
-        item.ownerId === ownerId &&
-        (query.dreamState === undefined || [query.dreamState].flat().includes(item.dream?.state)) &&
-        (!query.liked || item.favorite || item.dream?.state === "kept") &&
-        (!query.type || item.type === query.type) &&
-        (!query.status || item.status === query.status) &&
-        (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
-        (!query.ids || query.ids.includes(String(item.id))),
-    );
+    state.items
+      .filter(
+        (item) =>
+          item.ownerId === ownerId &&
+          (query.dreamState === undefined ||
+            [query.dreamState].flat().includes(item.dream?.state)) &&
+          (!query.liked || item.favorite || item.dream?.state === "kept") &&
+          (!query.type || item.type === query.type) &&
+          (!query.status || item.status === query.status) &&
+          (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
+          (!query.ids || query.ids.includes(String(item.id))) &&
+          !query.notIds?.includes(String(item.id)) &&
+          (!query.jobIds || query.jobIds.includes(item.jobId)) &&
+          (query.before === undefined || Date.parse(item.createdAt || "") <= query.before),
+      )
+      .slice(0, query.sample);
   const dream = createDream({
     dataDir,
     store,

@@ -120,6 +120,14 @@ type DreamQuery = {
   status?: string;
   conversationIds?: string[];
   ids?: string[];
+  notIds?: string[];
+  jobIds?: string[];
+  uploaded?: boolean;
+  dreamPool?: boolean;
+  /** Made by then (ms). */
+  before?: number;
+  /** This many matches at random. */
+  sample?: number;
 };
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
 interface DreamMark extends DreamOrigin {
@@ -2235,12 +2243,16 @@ export function createDream(options: {
     return ids.length;
   }
   /** The owner's finished gallery images that are old enough to calibrate with. */
-  const calibrationPool = (ownerId: string, ids?: string[]) => {
-    const before = now() - calibrationAgeMs;
-    return generations(ownerId, { type: "image", status: "done", ...(ids && { ids }) }).filter(
-      (item) => Date.parse(item.createdAt || "") <= before,
-    );
-  };
+  const calibrationPool = (ownerId: string, query: DreamQuery) =>
+    generations(ownerId, {
+      type: "image",
+      status: "done",
+      uploaded: false,
+      dreamPool: false,
+      jobIds: [...store.jobIds(ownerId)],
+      before: now() - calibrationAgeMs,
+      ...query,
+    });
   function shuffled<T>(items: T[]) {
     const list = [...items];
     for (let index = list.length - 1; index > 0; index--) {
@@ -2418,12 +2430,12 @@ export function createDream(options: {
     },
     /** Random older gallery images to judge without the GPU, those not judged yet first. */
     calibration(ownerId: string, limit: number) {
-      const judged = new Set(read(ownerId).judged);
-      const pool = calibrationPool(ownerId);
-      return [
-        ...shuffled(pool.filter((item) => !judged.has(String(item.id)))),
-        ...shuffled(pool.filter((item) => judged.has(String(item.id)))),
-      ].slice(0, limit);
+      const judged = read(ownerId).judged || [];
+      // Twice as many as asked for, as hidden or missing media drops some.
+      const sample = (query: DreamQuery) =>
+        shuffled(calibrationPool(ownerId, { ...query, sample: limit * 2 }));
+      const fresh = sample({ notIds: judged });
+      return [...fresh, ...(fresh.length < limit ? sample({ ids: judged }) : [])].slice(0, limit);
     },
     /**
      * Teaches the taste profile which older images the person likes or passes over (a this-or-that
@@ -2431,7 +2443,10 @@ export function createDream(options: {
      */
     calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
       const pool = new Map(
-        calibrationPool(ownerId, [...liked, ...passed]).map((item) => [String(item.id), item]),
+        calibrationPool(ownerId, { ids: [...liked, ...passed] }).map((item) => [
+          String(item.id),
+          item,
+        ]),
       );
       const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
         const item = pool.get(id);

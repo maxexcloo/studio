@@ -117,8 +117,9 @@ const list = (values) => JSON.stringify([...values].map(String));
  * The SQL for a gallery query: each field narrows the rows. `ownerId` is exact ("" is the
  * single-user owner); `status`, `notStatus` and `dreamState` take one or several; `liked` keeps the
  * owner's starred items and kept Dream results; `conversationIds` match the chats that asked for
- * items; `ids` match items' ids, `named` their id, URL or gallery key and `idPrefix` the start of
- * their id; `since` keeps items made from then on (ms) and every pending one.
+ * items; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
+ * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
+ * pending one, `before` those made by then.
  */
 function where(query = {}) {
   const terms = [];
@@ -163,9 +164,13 @@ function where(query = {}) {
       ...query.contains,
     );
   if (query.since) add("(status = 'pending' OR created_ms >= ?)", Number(query.since));
+  // Naming both buckets lets the order index seek the time range rather than compute each row's.
+  if (query.before !== undefined) add("bucket IN (0, 1) AND created_ms <= ?", Number(query.before));
   if (query.idPrefix)
     add("item_id >= ? AND item_id < ?", query.idPrefix, `${query.idPrefix}\uffff`);
   if (query.ids) add("item_id IN (SELECT value FROM json_each(?))", list(query.ids));
+  if (query.notIds?.length)
+    add("item_id NOT IN (SELECT value FROM json_each(?))", list(query.notIds));
   if (query.named)
     add(
       "(item_id IN (SELECT value FROM json_each(?)) OR key IN (SELECT value FROM json_each(?)))",
@@ -179,9 +184,18 @@ function where(query = {}) {
  * Every item the query matches, in gallery order unless `ordered` is false (sorting a whole
  * gallery costs more than reading it). A query for unfinished states reads the status index: its
  * statistics say each status is common, as most items are done. A query for Dream states reads
- * the Dream index.
+ * the Dream index. `sample` picks that many matches at random before any record is parsed.
  */
 export function galleryItems(query = {}, { ordered = true } = {}) {
+  if (query.sample !== undefined) {
+    const { sample, ...rest } = query;
+    const { sql, params } = where(rest);
+    return statement(
+      `SELECT value FROM studio_gallery WHERE rowid IN (SELECT rowid FROM studio_gallery ${sql} ORDER BY random() LIMIT ?)`,
+    )
+      .all(...params, sample)
+      .map(parse);
+  }
   const { sql, params } = where(query);
   const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
   const index =
