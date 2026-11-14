@@ -22,8 +22,8 @@ interface AssistantStatus {
   presets: AssistantOption[];
   /** Animate's themes, then Custom. */
   themes: AssistantOption[];
-  /** Fixed AI edits. */
-  changes: AssistantOption[];
+  /** Fixed AI edits, each run as its instruction. */
+  changes: (AssistantOption & { instruction: string })[];
   defaultPreset?: string;
   vision?: boolean;
   loras?: boolean;

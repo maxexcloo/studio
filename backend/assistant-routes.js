@@ -4,7 +4,8 @@
  * LoRA suggestions need the LoRAs feature.
  *
  *   GET  /api/assistant                 what this account may use: presets (Improve Prompt's styles),
- *                                       themes (Animate's), changes (fixed AI edits), models, vision, and the
+ *                                       themes (Animate's), changes (fixed AI edits, with their
+ *                                       instruction), models, vision, and the
  *                                       profiles whose guide takes no negative (noNegative)
  *   POST /api/assistant/rewrite         { profileId, prompt, preset, instruction?, references?, loras? }
  *                                       (instruction for Custom) → streamed
@@ -267,7 +268,13 @@ export function registerAssistantRoutes(
             promptStyleStore()
               .usable(kind)
               .filter((style) => !style.uncensored || spicy)
-              .map(({ id, label, description }) => ({ id, label, description })),
+              // A fixed AI edit runs as its instruction, as a picked suggestion's request does.
+              .map(({ id, label, description, instruction }) => ({
+                id,
+                label,
+                description,
+                ...(kind === "change" ? { instruction } : {}),
+              })),
           ]),
         ),
         spicy,

@@ -605,7 +605,8 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
   await expect(page.getByText("None Yet", { exact: true })).toBeVisible();
 
   // A switch applies at once, over the list's hash.
-  await improve.getByRole("switch", { name: "Enable Candid", exact: true }).click();
+  // A switch without a visible label: its track takes the pointer, so the click goes to it directly.
+  await improve.getByRole("switch", { name: "Enable Candid", exact: true }).dispatchEvent("click");
   await expect.poll(() => saves.length).toBe(1);
   expect(saves[0]).toMatchObject({ baseHash: "h1", styles: [{ id: "candid", enabled: false }] });
   await expect(
