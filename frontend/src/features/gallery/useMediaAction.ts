@@ -1,4 +1,10 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { useOpenComposer } from "../generation/openComposer";
 import { api, post } from "../../api";
@@ -11,6 +17,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { backendLabel, generationInput, isProfile, profileName } from "../generation/payload";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { isCloudProfile } from "../../../../shared/profiles";
@@ -237,6 +244,14 @@ export const animateThemes = {
   custom: "Custom",
 } as const;
 export type AnimateTheme = keyof typeof animateThemes;
+/** The themes the assistant can write for the account: none without it, Spicy only where allowed. */
+export function useAnimateThemes(): AnimateTheme[] {
+  const assistant = useQuery(assistantQuery).data;
+  if (!assistant?.available) return [];
+  return (Object.keys(animateThemes) as AnimateTheme[]).filter(
+    (theme) => theme !== "spicy" || assistant.spicy,
+  );
+}
 export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
