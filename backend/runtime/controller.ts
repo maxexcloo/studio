@@ -612,8 +612,9 @@ export class RuntimeController {
   }
 
   /**
-   * The running workloads plus `workload`, stopping others in its pool to make room: media before
-   * text, idle ones first. Workloads in `keep` never stop.
+   * The running workloads, those stopped outside Studio (restored with it) and `workload`, stopping
+   * others in its pool to make room: media before text, idle ones first. Workloads in `keep` never
+   * stop.
    */
   private placementWith(
     workload: Workload,
@@ -621,7 +622,7 @@ export class RuntimeController {
     keep: string[] = [],
   ) {
     const target = this.workloads
-      .filter((item) => item.id === workload.id || states.get(item.id)!.replicas > 0)
+      .filter((item) => item.id === workload.id || !this.isParked(item, states.get(item.id)!))
       .map((item) => item.id);
     const rank = (id: string) => [
       this.workload(id).kind === "text" ? 1 : 0,

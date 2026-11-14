@@ -411,6 +411,34 @@ test("a deployment reset outside Studio shows as drift and is restored, even wit
   );
 });
 
+test("work queued after an outside stop restores the whole placement rather than its own workload", async () => {
+  const { kube, controller } = fixture(["image"], { automaticLifecycle: true });
+  const preview = await controller.preview(["image", "video"]);
+  await controller.apply(["image", "video"], preview.signature, "local");
+  await controller.settled;
+  // A release upgrades the worker chart, which forces both to 0 before reconcile runs.
+  for (const id of ["comfyui/image", "comfyui-video/video"]) {
+    kube.deployments.get(id)!.replicas = 0;
+    for (const pod of kube.deployments.get(id)!.pods) pod.deleting = true;
+  }
+  kube.tick();
+  await assert.rejects(controller.acquire("video", "job 4178af4e"), {
+    message: "Waiting for Video to start.",
+  });
+  await controller.settled;
+  const [restored] = (await controller.observe()).history;
+  assert.deepEqual(restored.target, ["image", "video"]);
+  assert.deepEqual(restored.stop, []);
+  assert.deepEqual(
+    (await controller.running("image")).map((item) => item.id),
+    ["image"],
+  );
+  assert.deepEqual(
+    (await controller.running("video")).map((item) => item.id),
+    ["video"],
+  );
+});
+
 test("history survives a restart and a change cut short is marked interrupted", async () => {
   let saved: unknown;
   const store: RuntimeStore = {
