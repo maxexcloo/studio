@@ -242,33 +242,20 @@ export function useMediaAction(item: MediaItem, prepared?: () => void) {
   });
 }
 
-/** Animate's themes in menu order: alphabetical, with Custom last. */
-export const animateThemes = {
-  action: "Action",
-  cinematic: "Cinematic Camera",
-  dialogue: "Dialogue",
-  living: "Living Photo",
-  spicy: "Spicy",
-  custom: "Custom",
-} as const;
-export type AnimateTheme = keyof typeof animateThemes;
 /** A theme to animate with, and for Custom an instruction already chosen (a suggested motion). */
 export interface AnimateRequest {
-  theme: AnimateTheme;
+  theme: string;
   instruction?: string;
 }
-/** The themes the assistant can write for the account: none without it, Spicy only where allowed. */
-export function useAnimateThemes(): AnimateTheme[] {
+/** Animate's themes for the account (Library › Prompt Styles), Custom last; none without the assistant. */
+export function useAnimateThemes() {
   const assistant = useQuery(assistantQuery).data;
-  if (!assistant?.available) return [];
-  return (Object.keys(animateThemes) as AnimateTheme[]).filter(
-    (theme) => theme !== "spicy" || assistant.spicy,
-  );
+  return assistant?.available ? assistant.themes : [];
 }
 export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
-  | { kind: "animate"; theme: AnimateTheme; instruction?: string; written?: WrittenPrompt }
+  | { kind: "animate"; theme: string; instruction?: string; written?: WrittenPrompt }
   | { kind: "prompt"; prompt: string; operation: PromptOperation };
 /** A motion prompt the assistant wrote for review, as edited: it runs exactly as given. */
 export interface WrittenPrompt {
@@ -384,7 +371,7 @@ export function useAnimateWriter(item: MediaItem) {
       instruction,
       signal,
     }: {
-      theme: AnimateTheme;
+      theme: string;
       instruction?: string;
       signal: AbortSignal;
     }): Promise<AnimateReview> => {

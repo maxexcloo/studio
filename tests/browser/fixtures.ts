@@ -367,6 +367,14 @@ export async function fixtures(page: Page) {
         available: true,
         defaultPreset: "improve",
         presets: [{ id: "improve", label: "Improve" }],
+        themes: [
+          { id: "action", label: "Action" },
+          { id: "cinematic", label: "Cinematic Camera" },
+          { id: "dialogue", label: "Dialogue" },
+          { id: "living", label: "Living Photo" },
+          { id: "custom", label: "Custom" },
+        ],
+        changes: [],
       });
     if (path === "/api/suggestions")
       return respond({
