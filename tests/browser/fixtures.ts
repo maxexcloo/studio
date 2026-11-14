@@ -905,6 +905,8 @@ export async function create(page: Page) {
 export async function expandComposer(page: Page) {
   await page.locator("[data-composer-prompt]").click();
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  // The compact bar leaves once the composer has opened and focused its prompt.
+  await expect(page.locator("[data-composer-prompt]")).toHaveCount(0);
 }
 export async function openNav(page: Page, label: string) {
   const more = page.getByRole("button", { name: "More Options" });
