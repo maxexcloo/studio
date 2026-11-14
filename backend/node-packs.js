@@ -46,7 +46,7 @@ export const nodePacks = {
       "GemmaTextEncode",
       "ExtraVAELoader",
     ],
-    note: "Install it by Git URL. Manager’s search finds the older city96 version.",
+    note: "Install it by Git URL. Manager's search finds the older city96 version.",
   },
   impactpack: {
     name: "ComfyUI Impact Pack",
@@ -116,7 +116,7 @@ export const nodePacks = {
     ref: "0.1.1 (main, 2026-10-16)",
     requirements: false,
     nodes: ["MOSSImageHFLoader"],
-    note: "From MOSS-Image’s makers. It needs ComfyUI 0.38 or newer.",
+    note: "From MOSS-Image's makers. It needs ComfyUI 0.38 or newer.",
   },
 };
 

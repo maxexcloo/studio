@@ -142,7 +142,7 @@ export function civitaiUpdate(entry, model, { familiesOf = () => [], now = Date.
     latest,
     ...(free ? { freeAlternative: free } : {}),
     note: latest.unavailable
-      ? `${latest.name} ${latest.unavailable.reason === "paid" ? "is paid" : latest.unavailable.reason === "early-access" ? "is in early access" : "can’t be downloaded"}${free ? `; ${free.name} is free` : ""}.`
+      ? `${latest.name} ${latest.unavailable.reason === "paid" ? "is paid" : latest.unavailable.reason === "early-access" ? "is in early access" : "can't be downloaded"}${free ? `; ${free.name} is free` : ""}.`
       : `${latest.name} is newer than ${installedName}.`,
   };
 }
@@ -336,7 +336,7 @@ export function createUpdateChecker({
     const choice = alternative ? item.freeAlternative : item.latest;
     if (!choice) throw new Error("That update has no free version.");
     if (!choice.spec)
-      throw new Error(choice.unavailable?.note || "That update can’t be downloaded.");
+      throw new Error(choice.unavailable?.note || "That update can't be downloaded.");
     const { folder, file: oldFile } = splitCatalogueKey(key);
     const spec = { ...choice.spec, folder: choice.spec.folder || folder };
     const download = await startDownload(spec);
@@ -427,7 +427,7 @@ export function createUpdateChecker({
         if (found.status === "conflict") {
           Object.assign(applied, {
             state: "failed",
-            note: "The new file didn’t match its checksum.",
+            note: "The new file didn't match its checksum.",
             finishedAt: iso(now()),
           });
           changed = true;
@@ -479,10 +479,10 @@ export function createUpdateChecker({
           provenance: true,
         });
       } catch (error) {
-        log.warn?.(`[library] Couldn’t move the catalogue entry for ${key}: ${error.message}`);
+        log.warn?.(`[library] Couldn't move the catalogue entry for ${key}: ${error.message}`);
       }
       const moved = await Promise.resolve(repoint(applied.from, applied.to)).catch((error) => {
-        log.warn?.(`[library] Couldn’t move profiles off ${applied.from.file}: ${error.message}`);
+        log.warn?.(`[library] Couldn't move profiles off ${applied.from.file}: ${error.message}`);
         return [];
       });
       const movedNote = moved.length
@@ -504,7 +504,7 @@ export function createUpdateChecker({
         } catch (error) {
           Object.assign(applied, {
             state: "kept",
-            note: `Updated to ${applied.to.name}.${movedNote} The old file couldn’t be removed: ${error.message}`,
+            note: `Updated to ${applied.to.name}.${movedNote} The old file couldn't be removed: ${error.message}`,
           });
         }
       }

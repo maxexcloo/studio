@@ -208,7 +208,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
 
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
-test("a video’s last frame is referenced only by its owner and only for finished videos", async () => {
+test("a video's last frame is referenced only by its owner and only for finished videos", async () => {
   const { gallery } = await import("./gallery/store.js");
   const owner = { studioAccount: { userId: "account-a", role: "user" } };
   const other = { studioAccount: { userId: "account-b", role: "user" } };
@@ -307,7 +307,7 @@ test("a video upload is an uploaded gallery video, used by its first frame and r
   assert.deepEqual([...still.subarray(0, 3)], [0xff, 0xd8, 0xff], "captions read its JPEG poster");
   await assert.rejects(
     referenceAssets.saveUpload({ buffer: buffer.subarray(0, 64), name: "cut.mp4" }, "account-v"),
-    /can’t be read/,
+    /can't be read/,
   );
 });
 

@@ -619,7 +619,7 @@ export async function resetAccountPassword(accountId, password) {
   const found = readStore().accounts.find((item) => item.id === accountId);
   if (!found) throw new Error("That account was not found.");
   if (!found.password || found.identity?.provider === "pocket-id")
-    throw new Error("This account doesn’t sign in with a password.");
+    throw new Error("This account doesn't sign in with a password.");
   if (typeof password !== "string" || password.length < 8)
     throw new Error("Use a password of at least 8 characters.");
   const salt = crypto.randomBytes(16);

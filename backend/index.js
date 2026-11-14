@@ -220,7 +220,7 @@ for (const [name, migrate] of [
     migrate();
   } catch (error) {
     console.warn(
-      `[Studio] The ${name} store couldn’t take in the older files yet: ${error.message}`,
+      `[Studio] The ${name} store couldn't take in the older files yet: ${error.message}`,
     );
   }
 }
@@ -1185,7 +1185,7 @@ server.once("error", (error) => {
   console.error(
     error.code === "EADDRINUSE"
       ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT.\n`
-      : `\n  Studio couldn’t start: ${error.message}\n`,
+      : `\n  Studio couldn't start: ${error.message}\n`,
   );
   process.exit(1);
 });
@@ -1228,7 +1228,7 @@ server.listen(Number(port), host, () => {
     );
     if (!answering)
       console.log(
-        `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
+        `    ComfyUI isn't answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
       );
   })().catch(() => {});
   // Tells a parent process (the server tests) where this one listens.

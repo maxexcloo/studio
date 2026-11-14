@@ -360,7 +360,7 @@ test("a requested change picks one of the offered actions and rewrites the promp
   assert.match(system.content, /Don't make it any more sexual/);
   assert.match(user.content, /Prompt: A harbour at dawn[\s\S]*Request: make it night/);
   // An action that wasn't offered is unusable; a video's animate runs it again.
-  assert.equal((await ask(["recreate"])).reason, "The text model’s reply was unusable.");
+  assert.equal((await ask(["recreate"])).reason, "The text model's reply was unusable.");
   answer = { action: "animate", label: "Slower", prompt: "Slow waves" };
   assert.equal(((await ask(["animate"], "job-video")).suggestions[0] as Change).action, "animate");
   assert.match(calls[2][0].content, /make the video again/);
@@ -452,7 +452,7 @@ test("an account that can't use suggestions, offline text or no taste yet means 
   const broken = fixture({ reply: () => "no JSON here" });
   assert.equal(
     (await broken.suggestions.suggest("alice", { surface: "composer", kind: "video" })).reason,
-    "The text model’s reply was unusable.",
+    "The text model's reply was unusable.",
   );
   // An unusable reply is not cached.
   await broken.suggestions.suggest("alice", { surface: "composer", kind: "video" });

@@ -196,11 +196,11 @@ async function inspectImage(buffer, declaredMime = "") {
           : "";
   if (!mime || !acceptedMimes.has(mime)) throw new Error("Choose a PNG, JPEG or WebP image.");
   if (declaredMime && acceptedMimes.has(declaredMime) && declaredMime !== mime)
-    throw new Error("That file isn’t the type of image its name says.");
+    throw new Error("That file isn't the type of image its name says.");
   const width = Number(metadata.width || 0);
   const height = Number(metadata.height || 0);
   if ((sharp || metadata.format === "png") && (!width || !height || width * height > maxPixels))
-    throw new Error("That image is too large, or its size can’t be read.");
+    throw new Error("That image is too large, or its size can't be read.");
   return { mime, width, height };
 }
 
@@ -248,7 +248,7 @@ async function saveUploadContent(
   if (!size) throw new Error("That file is empty.");
   const video = sniffVideo(temporary ? await fileHead(temporary) : buffer);
   if (video && declaredMime.startsWith("image/"))
-    throw new Error("That file isn’t the type of image its name says.");
+    throw new Error("That file isn't the type of image its name says.");
   const limit = video ? maxVideoBytes : maxUploadBytes;
   if (size > limit)
     throw new Error(`${video ? "Videos" : "Images"} can be up to ${megabytes(limit)} MB.`);
@@ -282,7 +282,7 @@ async function saveUploadContent(
     const clip = await probeVideo(file);
     if (!clip) {
       await fs.promises.rm(file, { force: true });
-      throw new Error("That video can’t be read.");
+      throw new Error("That video can't be read.");
     }
     Object.assign(inspected, {
       width: clip.width,

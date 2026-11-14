@@ -184,10 +184,10 @@ test("a save that fails the job (an unjoinable Extend) settles it as failed", as
     const job = store.enqueue("alice", session.id, {}, "animate");
     await queue.tick();
     observations.set(job.id, { status: "completed", outputs: [{ url: "/media/a.mp4" }] });
-    adapter.saveOutputs = async () => ({ status: "failed", reason: "Studio couldn’t join it." });
+    adapter.saveOutputs = async () => ({ status: "failed", reason: "Studio couldn't join it." });
     await queue.tick();
     assert.equal(store.job("alice", job.id)?.status, "failed");
-    assert.equal(store.job("alice", job.id)?.reason, "Studio couldn’t join it.");
+    assert.equal(store.job("alice", job.id)?.reason, "Studio couldn't join it.");
     assert.deepEqual(events, [`released:${job.id}`]);
   } finally {
     store.close();

@@ -363,7 +363,7 @@ test("references go to a vision model as image parts; a text-only model gets non
   );
 });
 
-test("FLUX.3 Enhance uses the maker’s upsampler prompt verbatim", async () => {
+test("FLUX.3 Enhance uses the maker's upsampler prompt verbatim", async () => {
   const seen = fakeGateway(() => json("Full-color outdoor photograph of a cabin."));
   const engine = createAssistant(gateway(), {
     fetchImpl: seen.fetchImpl,
@@ -596,7 +596,7 @@ test("describe reads an image with a vision model, writes from a hint without on
     available: false,
     vision: false,
     model: "local/auto",
-    reason: "The running text model can’t read images.",
+    reason: "The running text model can't read images.",
   });
   const hinted = await blind.describe({
     images: [{ mime: "image/png", data: "AAAA" }],

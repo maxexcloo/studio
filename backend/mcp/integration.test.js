@@ -4526,7 +4526,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   });
   assert.match(
     texts(moved),
-    /Local video isn’t running, so this runs on Cloud Video · Fast · Cloud\. Tell the user\./,
+    /Local video isn't running, so this runs on Cloud Video · Fast · Cloud\. Tell the user\./,
   );
   // Grok takes only standard aspects: the 64×48 image becomes 4:3 at the profile's pixel count.
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [1108, 831]);
@@ -4536,7 +4536,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
     request: "animate it with Grok",
     prompt: "The heron takes flight",
   });
-  assert.doesNotMatch(texts(animation), /isn’t running/, "asked for, Grok needs no note");
+  assert.doesNotMatch(texts(animation), /isn't running/, "asked for, Grok needs no note");
   // Without a tier, the fastest cloud profile that takes the image.
   assert.deepEqual(data(animation).profile, {
     id: "cloud-video-fast",
@@ -4584,7 +4584,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
     prompt: "The heron takes flight",
   });
   assert.equal(data(cloud).profile.id, "cloud-video-fast");
-  assert.doesNotMatch(texts(cloud), /isn’t running/);
+  assert.doesNotMatch(texts(cloud), /isn't running/);
   const local = await call(client, "reuse", {
     job_id: "#1",
     mode: "animate",
@@ -4683,7 +4683,7 @@ test("video stays local while the worker is up, and a plain request never reache
   finish(f);
   const nowhere = await call(restricted, "reuse", { job_id: "#1", mode: "animate" });
   assert.equal(nowhere.isError, true);
-  assert.match(texts(nowhere), /Local video isn’t running and this account has no Grok access/);
+  assert.match(texts(nowhere), /Local video isn't running and this account has no Grok access/);
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
     ["fl-fast", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],

@@ -143,7 +143,7 @@ test("a Studio media thumbnail is kept a week, then revalidated by its ETag", as
   );
 });
 
-test("the viewer’s display copy is a WebP of the whole picture, cached like a thumbnail", async () => {
+test("the viewer's display copy is a WebP of the whole picture, cached like a thumbnail", async () => {
   const response = await fetch(address("thumb", "still.png", "&size=display&v=abc"));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "image/webp");
@@ -158,7 +158,7 @@ test("the viewer’s display copy is a WebP of the whole picture, cached like a 
   assert.deepEqual(
     [display.width, display.height],
     [900, 900],
-    "under its cap, the original’s own size",
+    "under its cap, the original's own size",
   );
   assert.deepEqual([thumbnail.width, thumbnail.height], [768, 768]);
   assert.equal(
@@ -171,7 +171,7 @@ test("the viewer’s display copy is a WebP of the whole picture, cached like a 
 });
 
 test(
-  "a video’s thumbnail address gives its poster, so small views show a picture",
+  "a video's thumbnail address gives its poster, so small views show a picture",
   { skip: !canEncode },
   async () => {
     const response = await fetch(address("thumb", "clip.mp4", "&v=abc"));

@@ -417,7 +417,7 @@ export function registerAssistantRoutes(
     if (!engine) return refuse(503, "The prompt assistant is not configured.").refusal;
     try {
       if (!(await engine.supportsVision()))
-        return refuse(409, "The running text model can’t read images.").refusal;
+        return refuse(409, "The running text model can't read images.").refusal;
       const images = [];
       for (const id of assetIds) {
         const image = await frame({ studioAccount: account }, String(id || ""));

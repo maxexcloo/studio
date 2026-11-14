@@ -93,7 +93,7 @@ export function featherSigma(softness, box) {
 
 export function maskBufferFromDataUrl(dataUrl) {
   const match = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
-  if (!match) throw new Error("The painted mask didn’t come through. Paint it again.");
+  if (!match) throw new Error("The painted mask didn't come through. Paint it again.");
   const buffer = Buffer.from(match[1], "base64");
   if (!buffer.length || buffer.length > maxMaskBytes)
     throw new Error("The painted mask is too large.");

@@ -168,7 +168,7 @@ test("the assistant is for every account, and only for profiles the account may 
     (await post("/api/assistant/rewrite", { profileId: uncensored.id, prompt: "a cabin" }, "user"))
       .status,
     404,
-    "an uncensored profile this account can’t use",
+    "an uncensored profile this account can't use",
   );
   assert.equal(
     (

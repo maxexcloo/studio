@@ -217,7 +217,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     ),
   ];
   if (!families.length)
-    throw new Error(`Studio can’t tell which family ${record.baseModel || modelFile} belongs to.`);
+    throw new Error(`Studio can't tell which family ${record.baseModel || modelFile} belongs to.`);
   const template = chooseTemplate(await deps.templates(), { families, folder: model.want.folder });
   if (!template)
     throw new Error(
@@ -226,7 +226,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   const info = await deps.info().catch(() => null);
   if (!info || !Object.keys(info).length)
     throw new Error(
-      "ComfyUI couldn’t be asked, so the draft wasn’t checked or activated. Try again when the worker answers.",
+      "ComfyUI couldn't be asked, so the draft wasn't checked or activated. Try again when the worker answers.",
     );
 
   // The template as drafts start from it: its model input named in defaults, its own guidance gone.
@@ -282,7 +282,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     const options = info.KSampler?.input?.required?.[input]?.[0];
     if (dmeta.defaults?.[key] && Array.isArray(options) && !options.includes(dmeta.defaults[key])) {
       warnings.push(
-        `The page recommends the ${key} ${dmeta.defaults[key]}, which this ComfyUI doesn’t offer; the template’s is kept.`,
+        `The page recommends the ${key} ${dmeta.defaults[key]}, which this ComfyUI doesn't offer; the template's is kept.`,
       );
       if (meta.defaults[key]) dmeta.defaults[key] = meta.defaults[key];
       else delete dmeta.defaults[key];
@@ -291,7 +291,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
 
   const text = `${JSON.stringify(drafted, null, 2)}\n`;
   const checked = deps.validate(id, text, { info });
-  if (!checked.ok) throw new Error(`The draft didn’t pass Studio’s check: ${checked.errors[0]}`);
+  if (!checked.ok) throw new Error(`The draft didn't pass Studio's check: ${checked.errors[0]}`);
   const unknown = [
     ...new Set(
       Object.values(drafted.graph || {})
@@ -301,7 +301,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   ];
   if (unknown.length)
     throw new Error(
-      `ComfyUI doesn’t know these node types, so the draft wasn’t activated: ${unknown.join(", ")}.`,
+      `ComfyUI doesn't know these node types, so the draft wasn't activated: ${unknown.join(", ")}.`,
     );
 
   // Parts ComfyUI doesn't list join the import's files when Studio knows where to get them.
@@ -316,7 +316,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     );
     if (!spec) {
       warnings.push(
-        `${part.file} isn’t installed and Studio has no download for it. Put it in ComfyUI’s models/${part.folder} folder.`,
+        `${part.file} isn't installed and Studio has no download for it. Put it in ComfyUI's models/${part.folder} folder.`,
       );
       continue;
     }
@@ -363,7 +363,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   });
   if (!deps.engine)
     warnings.push(
-      "No guide drafted: the prompt assistant isn’t configured, so the family’s guide applies.",
+      "No guide drafted: the prompt assistant isn't configured, so the family's guide applies.",
     );
   else {
     try {
@@ -394,10 +394,10 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
       deps.guides.bind(profileId, packId);
       record.results.guideId = packId;
     } catch (error) {
-      warnings.push(`No guide drafted (${error.message}); the family’s guide applies.`);
+      warnings.push(`No guide drafted (${error.message}); the family's guide applies.`);
     }
   }
-  for (const warning of checked.warnings.filter((item) => !/doesn’t list the/.test(item)))
+  for (const warning of checked.warnings.filter((item) => !/doesn't list the/.test(item)))
     warnings.push(warning);
   record.warnings = [...(record.warnings || []), ...warnings];
   record.draft = { template: template.id, families, settings: read, uncensored };

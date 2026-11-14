@@ -21,7 +21,7 @@ export function registerModelRoutes(app, { catalogue }) {
         accountPreferences(ownerIdForRequest(req)),
       );
     try {
-      // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
+      // MCP submissions reuse backend metadata; the studio's rescan stays fresh.
       const { models } = await catalogue.mediaModels(query.cached !== "1");
       return {
         status: 200,

@@ -75,7 +75,7 @@ test("AI-drafted profiles are live for administrators only until approved", () =
   assert.equal(
     records().some((item) => item.id.startsWith("studio-") || item.name.startsWith(".")),
     false,
-    "Studio’s dotfiles are not workflows",
+    "Studio's dotfiles are not workflows",
   );
   const user = effectiveAccountAccess(
     { id: "u1", role: "user", accessProfileId: "user" },

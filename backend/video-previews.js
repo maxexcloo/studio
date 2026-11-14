@@ -260,7 +260,7 @@ export async function probeVideo(file) {
  */
 export async function joinClips(source, extension, output, at = "last") {
   const [first, second] = await Promise.all([probeVideo(source), probeVideo(extension)]);
-  if (!first || !second) throw new Error("A clip to join couldn’t be read.");
+  if (!first || !second) throw new Error("A clip to join couldn't be read.");
   const fps = first.fps || second.fps || 24;
   const even = (value) => Math.max(2, Math.round(value / 2) * 2);
   const [width, height] = [even(first.width), even(first.height)];
@@ -366,7 +366,7 @@ export const videoEditKinds = Object.keys(videoEdits);
 /** A video edit (`videoEdits`) of `source` written to `output`, keeping its sound where the edit allows. */
 export async function editClip(source, output, edit) {
   const clip = await probeVideo(source);
-  if (!clip) throw new Error("The video couldn’t be read.");
+  if (!clip) throw new Error("The video couldn't be read.");
   const { video, audio } = videoEdits[edit.kind](edit, clip);
   const sound = clip.audio && audio;
   const graph = [`[0:v]${video},format=yuv420p[v]`, ...(sound ? [`[0:a]${audio}[a]`] : [])];
@@ -401,7 +401,7 @@ export async function editClip(source, output, edit) {
   if (code !== 0 || timedOut) {
     // ffmpeg's report names server paths, so it goes to the log, not the person.
     if (!timedOut) console.warn(`[Studio] A video edit failed: ${stderr.slice(0, 500)}`);
-    throw new Error(timedOut ? "Editing the video timed out." : "The video couldn’t be edited.");
+    throw new Error(timedOut ? "Editing the video timed out." : "The video couldn't be edited.");
   }
   return output;
 }
@@ -433,7 +433,7 @@ export async function getComfyVideoGif(filename, subfolder, type) {
       { timeout: 120_000, limit: 48 * 1024 * 1024, low: true },
     ),
   );
-  if (code !== 0 || !stdout.length) throw new Error("The GIF couldn’t be made.");
+  if (code !== 0 || !stdout.length) throw new Error("The GIF couldn't be made.");
   return stdout;
 }
 
@@ -472,7 +472,7 @@ export async function getComfyVideoLoop(filename, subfolder, type) {
       { timeout: 300_000, limit: 256 * 1024 * 1024, low: true },
     ),
   );
-  if (code !== 0 || !stdout.length) throw new Error("The loop couldn’t be made.");
+  if (code !== 0 || !stdout.length) throw new Error("The loop couldn't be made.");
   return stdout;
 }
 
@@ -847,7 +847,7 @@ export async function extractFrame(buffer, at = "last") {
           ],
           { timeout: 60_000, limit: 64 * 1024 * 1024 },
         );
-        if (code !== 0 || !stdout.length) throw new Error("The video’s frame couldn’t be read.");
+        if (code !== 0 || !stdout.length) throw new Error("The video's frame couldn't be read.");
         return stdout;
       }),
     { poster: true },

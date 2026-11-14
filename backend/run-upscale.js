@@ -42,7 +42,7 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
   if (!status.ready) {
     return {
       skipped: status.nodesInstalled
-        ? "Smart upscale’s SeedVR2 model isn’t installed yet"
+        ? "Smart upscale's SeedVR2 model isn't installed yet"
         : "Smart upscale needs the SeedVR2 nodes in ComfyUI",
       quality,
     };
@@ -85,7 +85,7 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
     }
   }
   return {
-    skipped: `Smart upscale couldn’t start: ${normalizeComfyError(lastError?.message || "")}`,
+    skipped: `Smart upscale couldn't start: ${normalizeComfyError(lastError?.message || "")}`,
     quality,
   };
 }

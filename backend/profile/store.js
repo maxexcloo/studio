@@ -327,7 +327,7 @@ const bindingsOf = (store) =>
 function cleanPack(pack) {
   if (!isObject(pack)) throw new Error("A guide pack is a JSON object.");
   if (pack.modes !== undefined && !isObject(pack.modes))
-    throw new Error("A guide pack’s modes are an object.");
+    throw new Error("A guide pack's modes are an object.");
   return structuredClone(pack);
 }
 

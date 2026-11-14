@@ -157,7 +157,7 @@ function harness(t, { vision = true, resolveCivitai = null, preset = null } = {}
     vision: async () =>
       vision
         ? { available: true, reason: "" }
-        : { available: false, reason: "The running text model can’t read images." },
+        : { available: false, reason: "The running text model can't read images." },
   });
   return { dir, store, engine, installed, hashes, state, started, described, pictures };
 }
@@ -220,7 +220,7 @@ test("a dropped A1111 PNG becomes a graded preset; files match by hash, then Civ
   );
   assert.equal(record.grade.value, "partial");
   assert.deepEqual(record.grade.reasons, [
-    "detail-tweaker isn’t installed",
+    "detail-tweaker isn't installed",
     "DreamShaper uses a substitute: Version 9 instead of 8",
   ]);
   assert.equal(record.state, "needs-files");
@@ -242,7 +242,7 @@ test("a substitute lowers the grade to Close; Use Exact File appears once the ex
     "detail-tweaker matched by filename only",
   ]);
   assert.equal(record.state, "ready", "a stand-in counts as there");
-  await assert.rejects(h.engine.useExact(record.id, 0), /isn’t installed yet/);
+  await assert.rejects(h.engine.useExact(record.id, 0), /isn't installed yet/);
   // Download Missing skips the stand-in; choosing its row downloads the exact file.
   await assert.rejects(h.engine.downloadMissing(record.id), /Nothing is missing/);
   const queued = await h.engine.downloadMissing(record.id, { indices: [0] });
@@ -319,7 +319,7 @@ test("a Civitai image link gets the same stand-ins, and the exact file replaces 
   );
 });
 
-test("Studio’s own PNG and a ComfyUI WebP import with their full file names", async (t) => {
+test("Studio's own PNG and a ComfyUI WebP import with their full file names", async (t) => {
   const h = harness(t);
   h.installed.diffusion_models.push("flux1-dev.safetensors");
   h.installed.vae.push("ae.safetensors");
@@ -391,10 +391,10 @@ test("without a vision model, a bare image says why; Describe on request makes a
   assert.equal(failed.state, "failed");
   assert.equal(
     failed.error,
-    "This image has no generation metadata. The running text model can’t read images.",
+    "This image has no generation metadata. The running text model can't read images.",
   );
   assert.equal(blind.described.length, 0);
-  await assert.rejects(blind.engine.describeImport(failed.id), /can’t read images/);
+  await assert.rejects(blind.engine.describeImport(failed.id), /can't read images/);
 
   const h = harness(t);
   const source = await h.engine.createFromImage({ data: fixture("a1111.png"), name: "fox.png" });
@@ -483,7 +483,7 @@ test("offers download only when chosen, as an optional file; refused ones never 
     [added.want.file, added.optional, added.offered, added.status],
     ["nightfall-v3-Q4_K_M.gguf", true, "format", "downloading"],
   );
-  assert.deepEqual(taken.record.grade, before, "an offer doesn’t change the grade");
+  assert.deepEqual(taken.record.grade, before, "an offer doesn't change the grade");
   await assert.rejects(h.engine.acceptOffer(record.id, 2), /Downloads cost 800 Buzz/);
   assert.equal(h.started.length, 1);
 });

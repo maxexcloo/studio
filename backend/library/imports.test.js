@@ -139,7 +139,7 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
     ["civitai-model", "admin-1", "ui"],
   );
   assert.equal(record.grade.value, "partial");
-  assert.deepEqual(record.grade.reasons, ["Watercolour Style isn’t installed"]);
+  assert.deepEqual(record.grade.reasons, ["Watercolour Style isn't installed"]);
   assert.ok(savedImports(h.dir)[record.id], "a studio_library_imports row");
   assert.equal(
     publicImport(record).resources[0].spec,
@@ -209,7 +209,7 @@ test("paid files are listed as unavailable with the reason and never queued", as
   assert.deepEqual(record.resources[0].unavailable.freeAlternative, { versionId: 20, name: "V2" });
   assert.equal(record.grade.value, "partial");
   assert.deepEqual(record.grade.reasons, ["Watercolour Style is paid on Civitai"]);
-  await assert.rejects(h.engine.downloadMissing(record.id), /can’t be downloaded/);
+  await assert.rejects(h.engine.downloadMissing(record.id), /can't be downloaded/);
   assert.deepEqual(h.started, []);
 });
 

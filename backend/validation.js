@@ -56,7 +56,7 @@ function ensureOption(info, node, key, value, label) {
   if (!selected) throw new Error(`${label} is required for this workflow.`);
   const options = optionsFor(info, node, key);
   if (options.length && !options.includes(selected)) {
-    throw new Error(`${label} “${selected}” isn’t available in ComfyUI.`);
+    throw new Error(`${label} “${selected}” isn't available in ComfyUI.`);
   }
 }
 
@@ -76,7 +76,7 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
   for (const item of raw.filter((entry) => entry && entry.enabled !== false).slice(0, maxLoras)) {
     const name = String(item.name || "").trim();
     if (!name) continue;
-    if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn’t available in ComfyUI.`);
+    if (!installed.includes(name)) throw new Error(`LoRA “${name}” isn't available in ComfyUI.`);
     const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
     const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), profile);
     if (issue) throw new Error(issue);
@@ -98,7 +98,7 @@ function sanitizeInpaint(input, profile, referenceAssets) {
   const mask = String(input.inpaint?.mask || "");
   if (!mask || !profile.capabilities.inpaint || !referenceAssets.length) return null;
   if (!mask.startsWith("data:image/png;base64,"))
-    throw new Error("The painted mask didn’t come through. Paint it again.");
+    throw new Error("The painted mask didn't come through. Paint it again.");
   const strength = Number(input.inpaint.strength);
   const feather = Number(input.inpaint.feather);
   return {
@@ -144,8 +144,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const prompt = String(input.prompt || "").trim();
   if (!prompt) throw new Error("Enter a prompt.");
   if (!String(input.model || "").trim()) throw new Error("Choose a supported model first.");
-  if (!customWorkflow) throw new Error("There’s no workflow for this model.");
-  if (kind !== customWorkflow.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
+  if (!customWorkflow) throw new Error("There's no workflow for this model.");
+  if (kind !== customWorkflow.kind) throw new Error(`The selected model isn't a ${kind} workflow.`);
   const referenceAssets = Array.isArray(input.referenceAssets)
     ? input.referenceAssets
         .map((item) => {
@@ -191,7 +191,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
       ),
     },
   };
-  if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
+  if (!profile) throw new Error("ComfyUI doesn't list this model. Rescan models and try again.");
   if (
     customWorkflow?.controls?.model?.node &&
     customWorkflow?.controls?.model?.input &&
