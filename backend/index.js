@@ -312,7 +312,8 @@ const recoverRunningJobs = createJobRecovery({
   recordsFromHistory: recordsFromComfyHistory,
   request: comfy,
   setGallery,
-  visible: filterVisibleGallery,
+  // Dream's pool included: an orphaned Dream job otherwise runs forever, holding its worker.
+  visible: (items) => items.filter(hasGalleryMedia),
   withBackend: withComfyBackend,
   cancel: cancelPrompt,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : []),
