@@ -7,6 +7,7 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { catalogueQuery } from "./queries";
 
 interface UnusedItem {
   key: string;
@@ -34,7 +35,7 @@ export function LibraryUnused({ heading }: { heading: ReactNode }) {
     onSuccess: () => setRemoving(null),
     onSettled: () =>
       Promise.all(
-        [unusedQuery.queryKey, ["library"]].map((queryKey) =>
+        [unusedQuery.queryKey, catalogueQuery.queryKey].map((queryKey) =>
           client.invalidateQueries({ queryKey }),
         ),
       ),

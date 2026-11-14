@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Alert } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, post } from "../../api";
+import { post } from "../../api";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
@@ -16,9 +16,10 @@ import { LibraryUnused } from "./LibraryUnused";
 import { LibraryCharacters } from "../characters/LibraryCharacters";
 import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
-import { importsQuery, LibraryImports } from "./LibraryImports";
+import { LibraryImports } from "./LibraryImports";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
+import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
 /** A check's or an update's answer; Update All also says how many started and which failed. */
 type UpdateResult = {
@@ -35,12 +36,8 @@ export function LibraryPage() {
   const { active: activeSection } = useWorkspaceSection(options);
   const catalogueActive = ["models", "loras"].includes(activeSection);
   const catalogue = useQuery({
-    queryKey: ["library"],
+    ...catalogueQuery,
     enabled: admin,
-    queryFn: () =>
-      api<{ items: LibraryItem[]; updates?: { checkedAt?: string; available: number } }>(
-        "/api/library/items",
-      ),
     refetchInterval: (query) =>
       catalogueActive &&
       query.state.data?.items.some((item) => item.applied?.state === "downloading")
@@ -69,8 +66,8 @@ export function LibraryPage() {
     mutationFn: (choice: { key: string; alternative?: boolean } | { all: true } | undefined) =>
       post<UpdateResult>(`/api/library/updates/${choice ? "apply" : "check"}`, choice),
     onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["library"] });
-      void client.invalidateQueries({ queryKey: ["library-downloads"] });
+      void client.invalidateQueries({ queryKey: catalogueQuery.queryKey });
+      void client.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
   });
   // The last check or update's outcome, shown under the catalogue toolbar; a check that finds

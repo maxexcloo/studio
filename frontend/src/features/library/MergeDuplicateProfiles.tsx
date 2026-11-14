@@ -1,24 +1,10 @@
 import { Alert, List, Stack, Text } from "@mantine/core";
-import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, post } from "../../api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
-
-interface Merge {
-  from: string;
-  to: string;
-  name: string;
-}
-interface DuplicatePreview {
-  hash: string;
-  merges: Merge[];
-  differing: { name: string; ids: string[]; differences: string[] }[];
-  unresolved: { name: string; ids: string[]; reason: string }[];
-}
-const duplicateProfilesQuery = queryOptions({
-  queryKey: ["profile-duplicates"],
-  queryFn: () => api<DuplicatePreview>("/api/profiles/duplicates"),
-});
+import { modelsQuery } from "../generation/GenerationProvider";
+import { definitionsKey, duplicateProfilesQuery, profileStatsQuery, type Merge } from "./queries";
 
 /**
  * Library › Profiles › Merge Duplicate Profiles: previews same-named profiles that run the same
@@ -39,9 +25,12 @@ export function MergeDuplicateProfiles({
       post<{ merged: Merge[] }>("/api/profiles/duplicates/merge", { hash }),
     onSuccess: () =>
       Promise.all(
-        [["profile-duplicates"], ["definition-list"], ["models"], ["profile-stats"]].map(
-          (queryKey) => client.invalidateQueries({ queryKey }),
-        ),
+        [
+          duplicateProfilesQuery.queryKey,
+          definitionsKey,
+          modelsQuery.queryKey,
+          profileStatsQuery.queryKey,
+        ].map((queryKey) => client.invalidateQueries({ queryKey })),
       ),
   });
   const data = preview.data;

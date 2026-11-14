@@ -15,6 +15,8 @@ import { api, post } from "../../api";
 import { formatBytes } from "../../ui/bytes";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { profileNameParts } from "../../../../shared/profiles";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { definitionsKey } from "./queries";
 
 interface Conversion {
   name: string;
@@ -72,7 +74,7 @@ export function ConvertToRadiance({
   }, [profile]);
   useEffect(() => {
     if (conversion?.applied)
-      for (const queryKey of [["definition-list"], ["models"]])
+      for (const queryKey of [definitionsKey, modelsQuery.queryKey])
         void client.invalidateQueries({ queryKey });
   }, [client, conversion?.applied]);
   const start = useMutation({
