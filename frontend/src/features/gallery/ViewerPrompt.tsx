@@ -76,7 +76,10 @@ export function useViewerPrompt(
     disabled: ask.pending,
     onPick: pick,
   });
-  const assistant = useQuery(assistantQuery).data;
+  const assistantState = useQuery(assistantQuery);
+  const assistant = assistantState.data;
+  // AI holds its place in the bar while the assistant loads.
+  const assistantLoading = assistantState.isPending && item.status === "done";
   const profileId = String(item.settings?.profileId || "");
   const improve = useMutation({
     mutationFn: (preset: string) =>
@@ -102,12 +105,12 @@ export function useViewerPrompt(
     field.current?.select();
   };
   const ai: Action | null =
-    ask.available && item.jobId
+    (ask.available || assistantLoading) && item.jobId
       ? {
           id: "ai",
           label: "AI",
           icon: icons.assistant,
-          loading: ask.pending,
+          loading: ask.pending || assistantLoading,
           menu: assistMenu({
             settings: [
               {
