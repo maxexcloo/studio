@@ -19,15 +19,15 @@ test("Settings follow the settled section order and run maintenance and worker r
     if (new URL(request.url()).pathname === "/api/services/status") statusReads++;
   });
   await page.goto("/settings");
-  // Personal, then Administration, each alphabetical, with About apart.
+  // Personal, then Administration, each alphabetical, with Integrations and About apart.
   const order = [
     "Account",
     "Preferences",
     "Generation",
     "Groups",
-    "Integrations",
     "Users",
     "Workers",
+    "Integrations",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -41,7 +41,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   if ((page.viewportSize()?.width || 1440) >= 768)
     await expect(
       page.getByRole("group", { name: "Administration", exact: true }).getByRole("link"),
-    ).toHaveText(order.slice(2, 7));
+    ).toHaveText(order.slice(2, 6));
   await section(page, "Settings", "Preferences");
   const danger = page.getByRole("region", { name: "Danger Zone", exact: true });
   await danger.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
