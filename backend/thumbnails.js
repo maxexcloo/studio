@@ -394,6 +394,18 @@ function forgetThumbnail(filename, subfolder = "", type = "output") {
   return removed;
 }
 
+/** The outputs a gallery item shows: its original, its thumbnail URL and its upscale. */
+const itemViews = (item) =>
+  [item?.url, item?.thumbnailUrl, item?.upscale?.url, item?.upscale?.thumbnailUrl]
+    .map(viewParams)
+    .filter(Boolean);
+
+/** The cache keys (each thumbnail file's name up to its first `-`) of a gallery item's thumbnails. */
+export const itemThumbnailKeys = (item) =>
+  itemViews(item).flatMap(({ filename, subfolder, type }) =>
+    Object.keys(RENDITIONS).map((size) => cacheKey(filename, subfolder, type, size)),
+  );
+
 /**
  * Forgets the thumbnails of a gallery item: its original, its thumbnail URL
  * and its upscale. A thumbnail still being made for it is waited for first,
@@ -401,14 +413,7 @@ function forgetThumbnail(filename, subfolder = "", type = "output") {
  */
 export async function forgetItemThumbnails(item) {
   let removed = 0;
-  for (const url of [
-    item?.url,
-    item?.thumbnailUrl,
-    item?.upscale?.url,
-    item?.upscale?.thumbnailUrl,
-  ]) {
-    const params = viewParams(url);
-    if (!params) continue;
+  for (const params of itemViews(item)) {
     for (const size of Object.keys(RENDITIONS))
       await pending
         .get(`${size}:${params.type}:${params.subfolder}:${params.filename}`)

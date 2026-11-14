@@ -150,6 +150,7 @@ import { registerResultSetRoutes, setPrompts } from "./result-sets.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 import { fillVideoSizes } from "./library/library.js";
 import { startMediaWarmup } from "./media-warmup.js";
+import { itemThumbnailKeys } from "./thumbnails.js";
 import { jobs, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy/queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
@@ -737,6 +738,7 @@ registerMigrationRoutes(app, {
       ),
     remove: removeGalleryItems,
     update: (jobId, patch) => updateGalleryJob(jobId, patch),
+    thumbnailKeys: itemThumbnailKeys,
   },
 });
 registerCompareRoutes(app, {
