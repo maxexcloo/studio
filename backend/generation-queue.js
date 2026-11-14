@@ -1,12 +1,11 @@
 import { withResolution } from "../shared/resolution.ts";
 import { accountAccessForId } from "./account-store.js";
 import {
+  moveTargets,
   onWorkerOffline,
   profileOnBackendKey,
-  readyWorkers,
   routeJob,
   withComfyBackend,
-  workerReachable,
 } from "./comfy/backends.js";
 import { demoMode } from "./comfy/comfy.js";
 import { cancelPrompt } from "./comfy/queue.js";
@@ -271,13 +270,11 @@ export function createGenerationQueue({
       alternatives: (job) => {
         const capability = job.input.kind === "video" ? "video" : "image";
         return job.resource.startsWith("worker:") && job.operation !== "upscale"
-          ? readyWorkers(
+          ? moveTargets(
               capability,
               profileOnBackendKey(job.input.profileId, job.input.profileBackend),
-            )
-              // Work moves only to a Studio-scaled worker that answers: moved to a stopped one, it would start a GPU switch.
-              .filter((worker) => workerReachable(worker.id) || !workerWorkloads(worker).length)
-              .map((worker) => `worker:${worker.id}`)
+              (worker) => workerWorkloads(worker).length > 0,
+            ).map((worker) => `worker:${worker.id}`)
           : [];
       },
       settled: async (job) => {

@@ -127,6 +127,16 @@ export const readyWorkers = (capability, profileId = "") =>
       !(profileId && inventories.has(worker.id) && !inventories.get(worker.id).has(profileId)),
   );
 
+/**
+ * The workers queued work may move to: ready ones, except a worker Studio scales (`scaled`) that
+ * isn't answering. Moved to a stopped worker, work would start a GPU switch for it, and a worker
+ * due a retry would take it back and forth.
+ */
+export const moveTargets = (capability, profileId, scaled) =>
+  readyWorkers(capability, profileId).filter(
+    (worker) => workerReachable(worker.id) || !scaled(worker),
+  );
+
 /** routeJob for a profile, or an error that says plainly why nothing can run it. */
 export function routeProfile(profile, options = {}) {
   const capability = capabilityForProfile(profile);
