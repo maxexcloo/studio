@@ -198,12 +198,8 @@ export function useCompareRun(onSubmitted?: () => void) {
 }
 
 /** A saved result's exact settings and seed, as the composer draft that reruns it. */
-async function exactDraft(
-  item: MediaItem,
-  profiles: Profile[],
-  client: ReturnType<typeof useQueryClient>,
-) {
-  const { draft, seed } = await mediaDraft(item, "image", profiles, client);
+async function exactDraft(item: MediaItem, client: ReturnType<typeof useQueryClient>) {
+  const { draft, seed } = await mediaDraft(item, "image", client);
   return { ...draft, input: { ...draft.input, seed: seed ?? "" } };
 }
 
@@ -221,13 +217,13 @@ export function useStageComparison() {
     openComposer("image");
   };
   return {
-    fromItem: async (item: MediaItem) => open(addVariant(await exactDraft(item, profiles, client))),
+    fromItem: async (item: MediaItem) => open(addVariant(await exactDraft(item, client))),
     again: async (items: MediaItem[]) => {
-      const drafts = await Promise.all(items.map((item) => exactDraft(item, profiles, client)));
+      const drafts = await Promise.all(items.map((item) => exactDraft(item, client)));
       const variants = drafts.map(({ input, references }) => ({ input, references }));
       open(showVariant(drafts[0], variants, 0));
     },
-    useThis: async (item: MediaItem) => open(await exactDraft(item, profiles, client)),
+    useThis: async (item: MediaItem) => open(await exactDraft(item, client)),
     testLora: async (name: string, prompt: string) => {
       const [models, info] = await Promise.all([
         client.fetchQuery(modelsQuery),

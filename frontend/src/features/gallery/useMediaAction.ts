@@ -3,10 +3,11 @@ import { notifications } from "@mantine/notifications";
 import { useOpenComposer } from "../generation/openComposer";
 import { api, post } from "../../api";
 import type { StudioSession } from "../../../../shared/queue";
-import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
+import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import { useRemembered } from "../auth/useRemembered";
 import {
   initialInput,
+  modelsQuery,
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
@@ -55,10 +56,11 @@ export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =
 export async function mediaDraft(
   item: MediaItem,
   operation: Operation,
-  profiles: Profile[],
   client: QueryClient,
   videos?: VideosPreference,
 ) {
+  // An action can run before the composer's models load.
+  const { profiles } = await client.ensureQueryData(modelsQuery);
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
   const priorId = String(item.settings?.profileId || "");
   const compatible = profiles.filter(
@@ -203,19 +205,13 @@ export async function mediaDraft(
 
 /** Prepares the composer to refine, animate or recreate a result. */
 export function useMediaAction(item: MediaItem, prepared?: () => void) {
-  const { setDraft, profiles } = useGenerationActions();
+  const { setDraft } = useGenerationActions();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
   const openComposer = useOpenComposer();
   return useItemMutation(item.id, "prepare", {
     mutationFn: async (operation: Operation) => {
-      const { profile, choice, draft, note } = await mediaDraft(
-        item,
-        operation,
-        profiles,
-        client,
-        videos,
-      );
+      const { profile, choice, draft, note } = await mediaDraft(item, operation, client, videos);
       // The composer's profile chip doesn't say where a video runs, nor why it runs elsewhere.
       const cloud =
         draft.input.kind === "video" && isCloudProfile(profile)
@@ -269,7 +265,7 @@ export function useMediaIteration(item: MediaItem) {
 
 /** `useMediaIteration`'s run for any item, so a selection can iterate each of its items. */
 export function useIterate() {
-  const { profiles, input: composer } = useGeneration();
+  const { input: composer } = useGeneration();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
   return async (item: MediaItem, iteration: Iteration) => {
@@ -279,7 +275,6 @@ export function useIterate() {
     const { profile, choice, seed, draft, note } = await mediaDraft(
       item,
       given?.operation ?? (animate ? "animate" : "image"),
-      profiles,
       client,
       videos,
     );
@@ -351,7 +346,6 @@ interface AnimateReview extends WrittenPrompt {
  * queue's writing stage (backend/prompt-animate.js), from the same frame and video model.
  */
 export function useAnimateWriter(item: MediaItem) {
-  const { profiles } = useGenerationActions();
   const client = useQueryClient();
   const [videos] = useVideosPreference();
   return useMutation({
@@ -366,13 +360,7 @@ export function useAnimateWriter(item: MediaItem) {
       instruction?: string;
       signal: AbortSignal;
     }): Promise<AnimateReview> => {
-      const { profile, choice, draft } = await mediaDraft(
-        item,
-        "animate",
-        profiles,
-        client,
-        videos,
-      );
+      const { profile, choice, draft } = await mediaDraft(item, "animate", client, videos);
       // The clip's length paces the beats, as in the queue stage: the run's input as it would queue.
       const { duration, frames, fps } = generationInput(
         draft.input,
