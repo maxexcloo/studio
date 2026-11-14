@@ -75,3 +75,15 @@ test("switched off, nothing is titled and the model is never asked", async () =>
   assert.deepEqual(state.sent, []);
   assert.equal(state.items[0].title, undefined);
 });
+
+test("a result whose owner already titled the same prompt reuses that title without a call", async () => {
+  const prompt = "a red barn shared, golden hour";
+  const { state, titler } = fixture([
+    item("again", { prompt }),
+    item("theirs", { prompt, ownerId: "bob", title: "Not Alice's" }),
+    item("first", { prompt, title: "Red Barn" }),
+  ]);
+  await titler.completed([state.items[0]]);
+  assert.equal(state.items[0].title, "Red Barn");
+  assert.deepEqual(state.sent, []);
+});
