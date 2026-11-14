@@ -52,8 +52,8 @@ function TileStatus({
     : statusLabels[failed ? "failed" : "cancelled"];
   const reason = failed
     ? job?.reason || ("error" in item && typeof item.error === "string" ? item.error : "")
-    : active && job?.status === "waiting"
-      ? job.reason
+    : active
+      ? job?.reason
       : "";
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
