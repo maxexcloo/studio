@@ -415,8 +415,7 @@ export function GalleryPage() {
           <SegmentedControl
             aria-label="Gallery View"
             fullWidth
-            radius="xl"
-            mt={4}
+            size="xs"
             value={view}
             onChange={(value) => setView(value as "grid" | "runs")}
             data={[
@@ -433,6 +432,7 @@ export function GalleryPage() {
             {view === "grid" && (
               <Switch
                 label="All Versions"
+                labelPosition="left"
                 checked={allVersions}
                 onChange={(event) => setAllVersions(event.currentTarget.checked)}
               />
@@ -440,6 +440,7 @@ export function GalleryPage() {
             {kind === "image" && (
               <Switch
                 label="Comparisons"
+                labelPosition="left"
                 checked={filters.comparisons}
                 onChange={(event) =>
                   setFilters({ ...filters, comparisons: event.currentTarget.checked })
