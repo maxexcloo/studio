@@ -58,10 +58,13 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/assistant$/],
   ["POST", /^\/api\/assistant\/(animate|cards\/(describe|rate)|loras|negative|rewrite)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
-  ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/discarded)?)$/],
+  [
+    "GET",
+    /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/count|\/discarded|\/suggestions)?)$/,
+  ],
   [
     "POST",
-    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/suggestions\/[\w-]+\/(accept|dismiss)|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
