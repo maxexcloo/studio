@@ -20,6 +20,12 @@ import type { Account } from "../../types";
 import { ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 
+/** What an account may change about its sign-in: Email & Password, or only one of them. */
+const credentialsLabel = (account: Account) =>
+  [account.canChangeEmail && "Email", account.canChangePassword && "Password"]
+    .filter(Boolean)
+    .join(" & ");
+
 /** The Email & Password dialog: both need the current password. */
 function AccountForm({
   account,
@@ -90,7 +96,7 @@ function AccountForm({
         {save.error && <Alert color="red">{save.error.message}</Alert>}
         <DialogFooter pending={save.isPending} onCancel={onCancel}>
           <Button type="submit" disabled={!changed} loading={save.isPending}>
-            Save Email & Password
+            Save {credentialsLabel(account)}
           </Button>
         </DialogFooter>
       </Stack>
@@ -149,7 +155,7 @@ export function OwnAccount() {
         </SettingRow>
       </SettingGroup>
       <PersonalMcpToken initial={account.data.mcp} />
-      <Modal opened={editing} onClose={() => setEditing(false)} title="Email & Password">
+      <Modal opened={editing} onClose={() => setEditing(false)} title={credentialsLabel(own)}>
         <FocusTrap.InitialFocus />
         {editing && (
           <AccountForm
