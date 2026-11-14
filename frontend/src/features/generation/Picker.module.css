@@ -410,7 +410,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .filters,
   .reveal,
   .thumb {
     animation: none;

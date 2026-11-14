@@ -32,8 +32,8 @@ export function setListeningPort(value) {
   return port;
 }
 /**
- * A subfolder with a dot folder anywhere in it: the gallery's trash
- * (.studio-trash) and anything else kept out of sight. Never served, whether
+ * A subfolder with a dot folder anywhere in it, such as an old .studio-trash,
+ * kept out of sight. Never served, whether
  * from Studio media or through ComfyUI.
  */
 export function inDotFolder(subfolder = "") {

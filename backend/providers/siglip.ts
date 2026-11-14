@@ -121,7 +121,6 @@ export function createSiglip({
     },
   };
 }
-export type Siglip = ReturnType<typeof createSiglip>;
 
 function unit(vector: Float32Array) {
   let sum = 0;
