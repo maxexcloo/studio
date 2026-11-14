@@ -429,9 +429,10 @@ export function DreamDeck({
       {/* A comparison's sides stand out from Neither and Both, filling the width on phones held
           upright; held sideways, one row leaves the card more height. */}
       {top.kind !== "pair" ? (
-        <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap" grow={phone}>
+        <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
+          {/* Phones share the row by label length, so Super Like is never cut short. */}
           {[choice("discard"), choice("star"), choice("keep")].map((option) =>
-            button(option, phone ? { px: "xs" } : { size: "lg", miw: "9rem" }),
+            button(option, phone ? { px: "xs", flex: "1 1 auto" } : { size: "lg", miw: "9rem" }),
           )}
         </Group>
       ) : phone && !sideways ? (
