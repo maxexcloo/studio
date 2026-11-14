@@ -5,7 +5,7 @@
  *
  * Update downloads the new file under its own name. Once it is installed and verified, the
  * catalogue entry and every profile that named the old file move to the new one. If nothing
- * references the old file any more (no profile, no saved LoRA stack), the old file is removed
+ * references the old file any more (no profile, no saved preset), the old file is removed
  * through the worker model API; otherwise it stays, and the update says what still uses it.
  *
  * Paid and early-access versions are never downloaded: they show with the reason and the newest

@@ -8,7 +8,6 @@ import { GalleryPage } from "./features/gallery/GalleryPage";
 import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
-import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
@@ -28,7 +27,6 @@ const SettingsPage = lazy(() =>
 const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {
   const { appearance } = useAppearance();
-  const library = useLibraryAccess();
   const dream = useGroupFeature("dream");
   const location = useLocation();
   const navigate = useNavigate();
@@ -64,8 +62,7 @@ function Workspace() {
   };
   const panel = overlay || lastPanel;
   const mode = (overlay ? background : location).pathname;
-  if ((location.pathname === "/library" && !library.allowed) || (mode === "/dream" && !dream))
-    return <Navigate to="/images" replace />;
+  if (mode === "/dream" && !dream) return <Navigate to="/images" replace />;
   return (
     <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
       <AppShell.Header>
@@ -145,13 +142,9 @@ function Workspace() {
             state={location.state}
           />
         ) : panel === "library" ? (
-          library.allowed ? (
-            <Suspense fallback={<LoadingState label="Loading Library" fill />}>
-              <LibraryPage />
-            </Suspense>
-          ) : (
-            <LoadingState label="Loading Library" fill />
-          )
+          <Suspense fallback={<LoadingState label="Loading Library" fill />}>
+            <LibraryPage />
+          </Suspense>
         ) : (
           <Suspense fallback={<LoadingState label="Loading Settings" fill />}>
             <SettingsPage />

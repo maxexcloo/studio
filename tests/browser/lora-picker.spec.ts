@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import {
   closeLoras,
-  closePopup,
   create,
   fixtures,
   openLoraChoices,
   pickerTab,
   profiles,
+  renamePreset,
+  saveCurrent,
   serveProfiles,
   showLoraStack,
 } from "./fixtures";
@@ -130,17 +131,15 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await expect(chip).toBeFocused();
 });
 
-test("LoRAs use catalogue family and type metadata", async ({ page }) => {
+test("The LoRA list starts on the profile's family and filters by family", async ({ page }) => {
   await fixtures(page);
   await serveProfiles(page, [
-    profiles[0],
     {
       ...profiles[0],
-      id: "image:other",
-      label: "Other Quality",
-      family: "other",
-      familyName: "Other Images",
-      options: { loras: ["other-detail.safetensors"] },
+      options: {
+        ...profiles[0].options,
+        loras: ["detail.safetensors", "soft-style.safetensors", "other-detail.safetensors"],
+      },
     },
   ]);
   await page.route("**/api/loras/info", (route) =>
@@ -149,42 +148,33 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
         loras: {
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
           "detail.safetensors": { title: "Detail Slider", families: ["test"], type: "slider" },
-          "other-detail.safetensors": {
-            title: "Other Detail",
-            families: ["other"],
-            type: "slider",
-          },
+          "other-detail.safetensors": { title: "Other Detail", families: ["other"] },
         },
       },
     }),
   );
   await create(page);
   await openLoraChoices(page);
-  await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  await page
-    .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
-    .getByText("Style", { exact: true })
-    .click();
-  await closePopup(page, "Filters");
-  await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeHidden();
-  await page.getByRole("button", { name: "Soft Style", exact: true }).click();
-  await showLoraStack(page);
-  await expect(
-    page.getByRole("textbox", { name: "Soft Style Strength", exact: true }),
-  ).toBeVisible();
-  await closeLoras(page);
-  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
-  await page.getByRole("option", { name: /^Other Quality\b/ }).click();
-  await openLoraChoices(page);
-  await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  await expect(page.getByRole("radio", { name: "Any", exact: true })).toBeChecked();
-  await closePopup(page, "Filters");
-  await page.getByRole("button", { name: "Other Detail", exact: true }).click();
+  const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
+  await expect(page.getByRole("button", { name: "Filter LoRAs", exact: true })).toHaveCount(0);
+  await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
+  await expect(choices.getByRole("button", { name: "Other Detail", exact: true })).toHaveCount(0);
+  const family = page.getByRole("combobox", { name: "Family", exact: true });
+  await family.click();
+  await page.getByRole("option", { name: "All Families", exact: true }).click();
+  await expect(choices.getByRole("button", { name: "Other Detail", exact: true })).toBeVisible();
+  await family.click();
+  await page.getByRole("option", { name: "Other", exact: true }).click();
+  await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
+  await choices.getByRole("button", { name: "Other Detail", exact: true }).click();
   await showLoraStack(page);
   await expect(
     page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
   ).toBeChecked();
-  await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
+  // A LoRA for another family is flagged in the stack.
+  await expect(
+    page.getByText("This profile can't use this LoRA. Disable or remove it.", { exact: true }),
+  ).toBeVisible();
 });
 
 test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, testInfo) => {
@@ -220,9 +210,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   );
 });
 
-test("Recommended lists the family's LoRAs; All adds the rest, filtered by type", async ({
-  page,
-}) => {
+test("LoRAs without a family show under All Families", async ({ page }) => {
   await fixtures(page);
   await page.route("**/api/loras/info", (route) =>
     route.fulfill({
@@ -243,15 +231,9 @@ test("Recommended lists the family's LoRAs; All adds the rest, filtered by type"
   const choices = page.getByRole("list", { name: "LoRA Choices", exact: true });
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toHaveCount(0);
-  await pickerTab(page, "LoRAs", "All");
-  await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
-  const types = page.getByRole("radiogroup", { name: "LoRA Filter", exact: true });
-  await expect(types.getByText("Unclassified", { exact: true })).toHaveCount(0);
-  await types.getByText("Style", { exact: true }).click();
-  await closePopup(page, "Filters");
-  await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Family", exact: true }).click();
+  await page.getByRole("option", { name: "All Families", exact: true }).click();
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
-  await pickerTab(page, "LoRAs", "Recommended");
   // Clicking a row adds its LoRA and shows it chosen; the thumbs beside it rate without toggling.
   const row = choices.getByRole("button", { name: "Detail Slider", exact: true });
   await row.click();
@@ -281,7 +263,7 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
-  await expect(stack.getByText("Choose LoRAs or a saved stack.", { exact: true })).toBeVisible();
+  await expect(stack.getByText("Choose LoRAs or a preset.", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
   // The footer's actions share one row without overlapping.
   const [add, clear, apply] = await Promise.all(
@@ -312,4 +294,65 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
     stack.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
   ).toBeVisible();
   await closeLoras(page);
+});
+
+test("The stack's preset field saves, loads and renames LoRA presets, marks edits and keeps names unique", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const portrait = [{ name: "detail.safetensors", strength: 0.8, enabled: true }];
+  const lorasOnly = { input: { loras: portrait }, parts: ["loras"], family: "test" };
+  state.presets.push(
+    { id: "portrait", title: "Portrait", savedAt: "2026-11-01T00:00:00.000Z", ...lorasOnly },
+    { id: "twin-a", title: "Twin", savedAt: "2026-11-02T00:00:00.000Z", ...lorasOnly },
+    { id: "twin-b", title: "Twin", savedAt: "2026-11-03T00:00:00.000Z", ...lorasOnly },
+  );
+  await create(page);
+  await openLoraChoices(page);
+  await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await showLoraStack(page);
+  const name = page.getByRole("combobox", { name: "Preset Name", exact: true });
+  await expect(name).toHaveValue("");
+  await expect(name).toHaveAttribute("placeholder", "Unsaved Preset");
+  // Names stay unique: a name in use offers that preset rather than saving another.
+  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  await expect(name).toBeFocused();
+  await name.fill("portrait");
+  await expect(page.getByRole("option", { name: /^Save as New Preset/ })).toHaveCount(0);
+  await expect(page.getByText("A preset has this name", { exact: true })).toBeVisible();
+  await name.press("Escape");
+  await saveCurrent(page, "Soft Look");
+  await expect.poll(() => state.presets.length).toBe(4);
+  expect(state.presets[3]).toMatchObject({
+    title: "Soft Look",
+    parts: ["loras"],
+    family: "test",
+    input: { loras: [{ name: "soft-style.safetensors", enabled: true }] },
+  });
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeDisabled();
+  await renamePreset(page, "Soft Look Two");
+  await expect.poll(() => state.presets[3].title).toBe("Soft Look Two");
+  // Older duplicates show when each was saved.
+  await name.click();
+  await expect(page.getByRole("option", { name: "Twin", exact: true })).toHaveCount(2);
+  await page.getByRole("option", { name: "Portrait", exact: true }).click();
+  // The stack matched a saved preset, so loading another asks nothing.
+  await expect(page.getByRole("button", { name: "Replace", exact: true })).toHaveCount(0);
+  await expect(name).toHaveValue("Portrait");
+  const detail = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
+  await expect(detail).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toHaveCount(0);
+  await detail.uncheck();
+  await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+  await name.click();
+  await page.getByRole("option", { name: "Soft Look Two", exact: true }).click();
+  await expect(
+    page.getByText("Replace the current LoRAs with “Soft Look Two”?", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Replace", exact: true }).click();
+  await expect(name).toHaveValue("Soft Look Two");
+  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
+  expect(state.presets[0].input.loras).toEqual(portrait);
+  expect(state.jobs).toHaveLength(0);
 });

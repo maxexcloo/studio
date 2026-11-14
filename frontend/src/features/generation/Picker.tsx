@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -12,19 +13,22 @@ import {
   ActionIcon,
   Box,
   Button,
+  Combobox,
   FocusTrap,
   getDefaultZIndex,
   Group,
   Image,
+  InputBase,
   Menu,
   Modal,
   Popover,
   type PopoverProps,
+  ScrollArea,
   Stack,
   Text,
-  TextInput,
   Tooltip,
   UnstyledButton,
+  useCombobox,
 } from "@mantine/core";
 import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -656,153 +660,56 @@ export function SortMenu<Sort extends string>({
 }
 
 /**
- * Saved stacks and presets: choosing one loads it, asking first when it would replace what is
- * there; each row renames, updates from the current settings or deletes from its menu. A list
- * without those (Inspiration) only loads.
+ * The Library's imported images in the Presets popup: choosing one loads it, asking first when it
+ * would replace what is there.
  */
 export function SavedList<T extends SavedItem>({
   label,
-  noun,
   items,
-  current,
   empty,
   replaces,
   replaceMessage,
   onLoad,
-  onRename,
-  onUpdate,
-  onDelete,
 }: {
   label: string;
-  /** Names the record in actions, such as "Stack" or "Preset". */
-  noun: string;
   items: T[];
-  current?: string;
   empty: string;
-  /** Whether loading would overwrite the current selection, so it asks first. */
+  /** Whether loading would overwrite the current draft, so it asks first. */
   replaces: boolean;
-  /** The question it asks, or the item's own. */
-  replaceMessage: string | ((item: T) => string);
+  replaceMessage: string;
   onLoad: (item: T) => void;
-  onRename?: (item: T, name: string) => void;
-  onUpdate?: (item: T) => void;
-  onDelete?: (item: T) => void;
 }) {
-  const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // Update from Current changes nothing in view, so its row says Updated for a moment.
-  const [updated, flashUpdated] = useFlash<string>();
   if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
   return (
     <div className={classes.saved} role="list" aria-label={label}>
       {items.map((item) => (
         <div key={item.id} role="listitem">
-          <div className={classes.savedRow} data-current={item.id === current || undefined}>
-            {renaming === item.id ? (
-              <TextInput
-                flex={1}
-                autoFocus
-                aria-label={`${noun} Name`}
-                defaultValue={item.name}
-                data-mantine-stop-propagation
-                onBlur={() => setRenaming(null)}
-                onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing) return;
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setRenaming(null);
-                  } else if (event.key === "Enter") {
-                    event.preventDefault();
-                    const name = event.currentTarget.value.trim();
-                    if (name && name !== item.name) onRename?.(item, name);
-                    setRenaming(null);
-                  }
-                }}
-              />
-            ) : (
-              <UnstyledButton
-                className={classes.savedName}
-                aria-label={`Load ${noun}: ${item.name}`}
-                aria-current={item.id === current || undefined}
-                onClick={() => (replaces ? setConfirming(item.id) : onLoad(item))}
-              >
-                <Text size="sm" truncate>
-                  {item.name}
+          <div className={classes.savedRow}>
+            <UnstyledButton
+              className={classes.savedName}
+              aria-label={`Load: ${item.name}`}
+              onClick={() => (replaces ? setConfirming(item.id) : onLoad(item))}
+            >
+              <Text size="sm" truncate>
+                {item.name}
+              </Text>
+              {item.detail && (
+                <Text size="xs" c="dimmed" truncate>
+                  {item.detail}
                 </Text>
-                {(updated === item.id || item.detail) && (
-                  <Text size="xs" c="dimmed" truncate>
-                    {updated === item.id ? "Updated" : item.detail}
-                  </Text>
-                )}
-              </UnstyledButton>
-            )}
-            {/* Rename focuses its field, so the closing menu must not take focus back. */}
-            {onRename && onDelete && (
-              <Menu
-                position="bottom-end"
-                width={menuWidth}
-                withinPortal={false}
-                returnFocus={false}
-              >
-                <Menu.Target>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    aria-label={`${noun} Actions for ${item.name}`}
-                  >
-                    <icons.more size={18} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item
-                    leftSection={<icons.rename size={16} />}
-                    onClick={() => setRenaming(item.id)}
-                  >
-                    Rename {noun}
-                  </Menu.Item>
-                  {onUpdate && (
-                    <Menu.Item
-                      leftSection={<icons.refresh size={16} />}
-                      onClick={() => {
-                        onUpdate(item);
-                        flashUpdated(item.id);
-                      }}
-                    >
-                      Update from Current
-                    </Menu.Item>
-                  )}
-                  <Menu.Divider />
-                  <Menu.Item
-                    color="red"
-                    leftSection={<icons.delete size={16} />}
-                    onClick={() => onDelete(item)}
-                  >
-                    Delete {noun}
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            )}
+              )}
+            </UnstyledButton>
           </div>
           {confirming === item.id && (
-            <Group className={classes.reveal} justify="space-between" gap="xs" p="xs">
-              <Text size="sm">
-                {typeof replaceMessage === "string" ? replaceMessage : replaceMessage(item)}
-              </Text>
-              <Group gap="xs">
-                <Button variant="default" onClick={() => setConfirming(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    setConfirming(null);
-                    onLoad(item);
-                  }}
-                >
-                  Replace
-                </Button>
-              </Group>
-            </Group>
+            <ReplaceConfirm
+              message={replaceMessage}
+              onCancel={() => setConfirming(null)}
+              onReplace={() => {
+                setConfirming(null);
+                onLoad(item);
+              }}
+            />
           )}
         </div>
       ))}
@@ -810,87 +717,302 @@ export function SavedList<T extends SavedItem>({
   );
 }
 
+/** Asks in place before a saved record replaces the draft. */
+function ReplaceConfirm({
+  message,
+  onCancel,
+  onReplace,
+}: {
+  message: string;
+  onCancel: () => void;
+  onReplace: () => void;
+}) {
+  return (
+    <Group className={classes.reveal} justify="space-between" gap="xs" p="xs">
+      <Text size="sm">{message}</Text>
+      <Group gap="xs">
+        <Button variant="default" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={onReplace}>Replace</Button>
+      </Group>
+    </Group>
+  );
+}
+
+/** What a saved name's field and its Save share: naming it, and Saved shown for a moment. */
+export function useNaming() {
+  const [naming, setNaming] = useState<"save" | "rename" | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const [saved, flashSaved] = useFlash();
+  /** Focuses the name field to save the draft as new or rename the current record. */
+  const name = (mode: "save" | "rename" | null) => {
+    setNaming(mode);
+    if (mode) setTimeout(() => field.current?.focus());
+  };
+  return { naming, name, field, saved, flashSaved };
+}
+type Naming = ReturnType<typeof useNaming>;
+/** A failed save shows the shared mutation notification; the field just stays as it is. */
+const ignore = () => {};
+
 /**
- * A heading's actions with Save for the current stack or preset: Save asks for a name in place,
- * its field, Save and Cancel taking the actions' row (`children`, such as Clear, step aside), and
- * saves on Enter.
+ * Save for the current preset: it updates the record the draft came from when the draft has
+ * changed, or names a new one in the name field.
  */
-export function SaveCurrent({
+export function SaveButton<T extends SavedItem>({
   noun,
+  naming,
+  current,
+  edited,
   disabled,
-  onSave,
-  options,
-  children,
+  onUpdate,
 }: {
   noun: string;
+  naming: Naming;
+  current?: T;
+  edited: boolean;
   disabled: boolean;
-  onSave: (name: string) => void;
-  /** Beside the name, such as the parts a preset holds. */
-  options?: ReactNode;
-  children?: ReactNode;
+  onUpdate: (record: T) => Promise<unknown>;
 }) {
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
-  // Focus returns to Save after naming, so the composer keeps focus and stays open.
-  const named = useRef(false);
-  const finish = () => {
-    named.current = true;
-    setNaming(false);
-  };
-  const save = () => {
-    if (!name.trim()) return;
-    onSave(name.trim());
-    setName("");
-    finish();
-  };
-  if (!naming)
-    return (
-      <>
-        {children}
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          autoFocus={named.current}
-          disabled={disabled}
-          onClick={() => setNaming(true)}
-        >
-          Save {noun}
-        </Button>
-      </>
-    );
   return (
-    <Group className={classes.reveal} data-naming gap="xs" wrap="nowrap" flex={1} miw={0}>
-      <TextInput
-        autoFocus
-        size="xs"
-        flex={1}
-        miw={0}
-        aria-label={`${noun} Name`}
-        placeholder="Name"
-        value={name}
-        data-mantine-stop-propagation
-        onChange={(event) => setName(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === "Enter") {
-            event.preventDefault();
-            save();
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            finish();
-          }
-        }}
-      />
-      {options}
-      <Button size="compact-sm" disabled={!name.trim()} onClick={save}>
-        Save
-      </Button>
-      <Tooltip label="Cancel">
-        <ActionIcon variant="subtle" color="gray" aria-label="Cancel" onClick={finish}>
-          <icons.clear size={16} />
-        </ActionIcon>
-      </Tooltip>
-    </Group>
+    <Button
+      size="compact-sm"
+      variant="subtle"
+      disabled={disabled || (!!current && !edited)}
+      onClick={() =>
+        current
+          ? onUpdate(current).then(() => naming.flashSaved(true), ignore)
+          : naming.name("save")
+      }
+    >
+      Save {noun}
+    </Button>
+  );
+}
+
+/**
+ * A saved record's name as a combobox: it shows the current record's name, or Unsaved, marked
+ * Edited once the draft differs and Saved for a moment after saving. Its list loads a saved record,
+ * asking first where `replaces` says what it would replace; typing searches the list or names the
+ * draft to save it as new or rename the current record. Names stay unique; duplicates from before
+ * show when each was saved. Its menu holds `menu` (such as what a preset saves), then Rename, Save
+ * as New and Delete.
+ */
+export function SavedName<T extends SavedItem>({
+  noun,
+  naming,
+  records,
+  current,
+  edited,
+  canSave,
+  replaces,
+  menu,
+  onLoad,
+  onSave,
+  onRename,
+  onDelete,
+}: {
+  noun: string;
+  naming: Naming;
+  records: T[];
+  current?: T;
+  edited: boolean;
+  /** Whether the draft holds anything to save. */
+  canSave: boolean;
+  /** What loading `record` asks first, or nothing when the draft has nothing unsaved. */
+  replaces: (record: T) => string | undefined;
+  menu?: ReactNode;
+  onLoad: (record: T) => void;
+  onSave: (name: string) => Promise<unknown>;
+  onRename: (record: T, name: string) => Promise<unknown>;
+  onDelete: (record: T) => void;
+}) {
+  // What is typed; null shows the current record's name.
+  const [text, setText] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ record: T; message: string }>();
+  const combobox = useCombobox({
+    onDropdownClose: () => {
+      combobox.resetSelectedOption();
+      setText(null);
+      naming.name(null);
+    },
+  });
+  const mode = naming.naming;
+  const typed = (text ?? "").trim();
+  const key = (name: string) => name.toLocaleLowerCase();
+  const taken = records.some((record) => key(record.name) === key(typed));
+  const matches = mode
+    ? []
+    : records
+        .filter((record) => text === null || key(record.name).includes(key(typed)))
+        .sort((a, b) => a.name.localeCompare(b.name));
+  const actions: { value: string; label: string }[] = [];
+  if (typed && !taken) {
+    if (mode !== "rename" && canSave)
+      actions.push({ value: "\0save", label: `Save as New ${noun} “${typed}”` });
+    if (current && mode !== "save")
+      actions.push({ value: "\0rename", label: `Rename to “${typed}”` });
+  }
+  if (mode === "rename") actions.reverse();
+  const empty = mode
+    ? typed
+      ? `A ${noun.toLowerCase()} has this name`
+      : "Type a Name"
+    : records.length
+      ? "No Matches"
+      : `No Saved ${noun}s`;
+  const shared = (name: string) => records.filter((record) => record.name === name).length > 1;
+  useEffect(() => {
+    if (text !== null) combobox.selectFirstOption();
+  }, [text]);
+  const submit = async (value: string) => {
+    combobox.closeDropdown();
+    if (value === "\0save") {
+      await onSave(typed).then(() => naming.flashSaved(true), ignore);
+      return;
+    }
+    if (value === "\0rename") {
+      if (current) await onRename(current, typed).then(() => naming.flashSaved(true), ignore);
+      return;
+    }
+    const record = records.find((item) => item.id === value);
+    // Choosing the current record again restores it, once the draft has changed.
+    if (!record || (record === current && !edited)) return;
+    const message = replaces(record);
+    if (message) setConfirming({ record, message });
+    else onLoad(record);
+  };
+  const marker = naming.saved ? "Saved" : edited && "Edited";
+  return (
+    <Stack gap="xs">
+      <Group gap="xs" wrap="nowrap">
+        <Combobox store={combobox} withinPortal={false} onOptionSubmit={submit}>
+          <Combobox.Target withExpandedAttribute>
+            <InputBase
+              ref={naming.field}
+              flex={1}
+              miw={0}
+              aria-label={`${noun} Name`}
+              placeholder={`Unsaved ${noun}`}
+              value={text ?? current?.name ?? ""}
+              data-mantine-stop-propagation
+              rightSection={
+                <Group gap={4} wrap="nowrap">
+                  {marker && (
+                    <Text size="xs" c={naming.saved ? "green" : "dimmed"}>
+                      {marker}
+                    </Text>
+                  )}
+                  <Combobox.Chevron />
+                </Group>
+              }
+              rightSectionWidth={marker ? 80 : undefined}
+              rightSectionPointerEvents="none"
+              onClick={() => combobox.openDropdown()}
+              onFocus={(event) => {
+                event.currentTarget.select();
+                combobox.openDropdown();
+              }}
+              onBlur={() => combobox.closeDropdown()}
+              onChange={(event) => {
+                setText(event.currentTarget.value);
+                combobox.openDropdown();
+              }}
+            />
+          </Combobox.Target>
+          <Combobox.Dropdown>
+            <Combobox.Options aria-label={`Saved ${noun}s`}>
+              <ScrollArea.Autosize mah={240} type="scroll">
+                {matches.map((record) => (
+                  <Combobox.Option
+                    key={record.id}
+                    value={record.id}
+                    active={record === current}
+                    aria-label={record.name}
+                  >
+                    <Group gap="xs" wrap="nowrap" justify="space-between">
+                      <Stack gap={0} miw={0}>
+                        <Text size="sm" fw={record === current ? 600 : undefined} truncate>
+                          {record.name}
+                        </Text>
+                        <Text size="xs" c="dimmed" truncate>
+                          {[
+                            record.detail,
+                            shared(record.name) &&
+                              (record.savedAt
+                                ? `Saved ${new Date(record.savedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
+                                : "Saved Earlier"),
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </Text>
+                      </Stack>
+                      {record === current && <Check size={14} />}
+                    </Group>
+                  </Combobox.Option>
+                ))}
+                {actions.map((action) => (
+                  <Combobox.Option key={action.value} value={action.value}>
+                    <Text size="sm">{action.label}</Text>
+                  </Combobox.Option>
+                ))}
+                {!matches.length && !actions.length && <Combobox.Empty>{empty}</Combobox.Empty>}
+              </ScrollArea.Autosize>
+            </Combobox.Options>
+          </Combobox.Dropdown>
+        </Combobox>
+        <Menu position="bottom-end" width={menuWidth} withinPortal={false} returnFocus={false}>
+          <PopupTooltip label={`${noun} Actions`}>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label={`${noun} Actions`}>
+                <icons.more size={18} />
+              </ActionIcon>
+            </Menu.Target>
+          </PopupTooltip>
+          <Menu.Dropdown>
+            {menu && (
+              <>
+                {menu}
+                <Menu.Divider />
+              </>
+            )}
+            <Menu.Item
+              leftSection={<icons.rename size={16} />}
+              disabled={!current}
+              onClick={() => naming.name("rename")}
+            >
+              Rename {noun}
+            </Menu.Item>
+            <Menu.Item
+              leftSection={<icons.add size={16} />}
+              disabled={!canSave}
+              onClick={() => naming.name("save")}
+            >
+              Save as New {noun}
+            </Menu.Item>
+            <Menu.Divider />
+            <Menu.Item
+              color="red"
+              leftSection={<icons.delete size={16} />}
+              disabled={!current}
+              onClick={() => current && onDelete(current)}
+            >
+              Delete {noun}
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
+      </Group>
+      {confirming && (
+        <ReplaceConfirm
+          message={confirming.message}
+          onCancel={() => setConfirming(undefined)}
+          onReplace={() => {
+            setConfirming(undefined);
+            onLoad(confirming.record);
+          }}
+        />
+      )}
+    </Stack>
   );
 }

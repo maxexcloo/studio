@@ -17,7 +17,6 @@ import { StudioLogo } from "../../ui/StudioLogo";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
 import { dreamCountQuery } from "../dream/queries";
-import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
 import { useFinishedAway } from "./useFinishedAway";
@@ -126,7 +125,6 @@ function ModeSwitcher({ mode }: { mode: string }) {
 export function AppHeader({ mode }: { mode: string }) {
   const { appearance } = useAppearance();
   const phone = usePhone();
-  const library = useLibraryAccess();
   const location = useLocation();
   useFinishedAway();
   return (
@@ -154,25 +152,23 @@ export function AppHeader({ mode }: { mode: string }) {
       ) : (
         <Group gap="xs">
           <AppearanceMenu />
-          {navigation
-            .filter((item) => item.to !== "/library" || library.allowed)
-            .map((item) => {
-              const active = location.pathname.startsWith(item.to);
-              return (
-                <Tooltip key={item.to} label={item.label}>
-                  <ActionIcon
-                    component={Link}
-                    to={item.to}
-                    state={{ backgroundLocation: location }}
-                    variant={active ? "light" : "subtle"}
-                    color={active ? undefined : "gray"}
-                    aria-label={item.label}
-                  >
-                    <item.icon size={19} />
-                  </ActionIcon>
-                </Tooltip>
-              );
-            })}
+          {navigation.map((item) => {
+            const active = location.pathname.startsWith(item.to);
+            return (
+              <Tooltip key={item.to} label={item.label}>
+                <ActionIcon
+                  component={Link}
+                  to={item.to}
+                  state={{ backgroundLocation: location }}
+                  variant={active ? "light" : "subtle"}
+                  color={active ? undefined : "gray"}
+                  aria-label={item.label}
+                >
+                  <item.icon size={19} />
+                </ActionIcon>
+              </Tooltip>
+            );
+          })}
           <AccountMenu />
         </Group>
       )}

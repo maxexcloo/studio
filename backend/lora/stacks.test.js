@@ -15,46 +15,22 @@ const {
   saveLoraLibrary,
   saveLoraStack,
 } = await import("./stacks.js");
+const { runtimeDatabase } = await import("../persistence/runtime.ts");
+const { Store } = await import("../domain/store.ts");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-
-const stack = (id, name, loras = [{ name: "a.safetensors", strength: 1 }]) => ({ id, name, loras });
-const key = "family:krea";
-
-test("two devices adding stacks both keep theirs", () => {
-  clearLoraState();
-  applyLoraOps([{ op: "stack.add", key, stack: stack("mac", "Krea") }]);
-  const library = applyLoraOps([{ op: "stack.add", key, stack: stack("phone", "Portraits") }]);
-  assert.deepEqual(
-    library.snapshots[key].map((item) => item.id),
-    ["mac", "phone"],
-  );
-});
 
 test("account LoRA stacks and library state use separate files from each other and legacy state", () => {
   clearLoraState("account-a");
   clearLoraState("account-b");
-  saveLoraLibrary(
-    { ratings: { "private-a.safetensors": "up" }, snapshots: { [key]: [stack("a", "A")] } },
-    "account-a",
-  );
-  saveLoraLibrary(
-    { ratings: { "private-b.safetensors": "down" }, snapshots: { [key]: [stack("b", "B")] } },
-    "account-b",
-  );
+  saveLoraLibrary({ ratings: { "private-a.safetensors": "up" } }, "account-a");
+  saveLoraLibrary({ ratings: { "private-b.safetensors": "down" } }, "account-b");
   assert.deepEqual(loadLoraLibrary("account-a").ratings, { "private-a.safetensors": "up" });
   assert.deepEqual(loadLoraLibrary("account-b").ratings, { "private-b.safetensors": "down" });
-  assert.equal(loadLoraLibrary().ratings["private-a.safetensors"], undefined);
+  assert.equal(loadLoraLibrary()?.ratings["private-a.safetensors"], undefined);
 });
 
-test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () => {
+test("replayed ratings are harmless", () => {
   clearLoraState();
-  const add = { op: "stack.add", key, stack: stack("x", "Krea") };
-  applyLoraOps([add, add]);
-  applyLoraOps([
-    { op: "stack.delete", key, id: "x" },
-    { op: "stack.delete", key, id: "x" },
-  ]);
-  assert.equal(loadLoraLibrary().snapshots[key], undefined);
   applyLoraOps([
     { op: "rating", name: "a", rating: "up" },
     { op: "rating", name: "a", rating: "up" },
@@ -64,28 +40,20 @@ test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () 
   assert.deepEqual(loadLoraLibrary().ratings, { a: "up" });
 });
 
-test("a stale whole-library save merges instead of wiping newer stacks", () => {
+test("a stale whole-library save merges instead of wiping newer ratings", () => {
   clearLoraState();
-  applyLoraOps([{ op: "stack.add", key, stack: stack("new", "Saved on the Mac") }]);
+  applyLoraOps([{ op: "rating", name: "a", rating: "up" }]);
   const library = saveLoraLibrary({
-    snapshots: { [key]: [stack("old", "From an old tab")] },
-    ratings: { b: "down" },
+    ratings: { a: "down", b: "down" },
     strengths: {},
     recents: [],
   });
-  assert.deepEqual(
-    library.snapshots[key].map((item) => item.name),
-    ["Saved on the Mac", "From an old tab"],
-  );
-  assert.deepEqual(library.ratings, { b: "down" });
+  assert.deepEqual(library.ratings, { a: "up", b: "down" });
 });
 
-test("rename, update, strengths, recents and the active stack all apply", () => {
+test("strengths, recents and the active stack all apply", () => {
   clearLoraState();
   applyLoraOps([
-    { op: "stack.add", key, stack: stack("s", "Draft") },
-    { op: "stack.rename", key, id: "s", name: "Krea" },
-    { op: "stack.update", key, id: "s", loras: [{ name: "b.safetensors", strength: 0.9 }] },
     { op: "strengths", workflowId: "krea2", values: { "b.safetensors": 0.9 } },
     { op: "strengths", workflowId: "krea2", values: { "c.safetensors": 1.1 } },
     { op: "recents", names: ["b.safetensors"] },
@@ -103,14 +71,12 @@ test("rename, update, strengths, recents and the active stack all apply", () => 
     [true, false],
   );
   const library = loadLoraLibrary();
-  assert.equal(library.snapshots[key][0].name, "Krea");
-  assert.equal(library.snapshots[key][0].loras[0].name, "b.safetensors");
   assert.deepEqual(library.strengths.krea2, { "b.safetensors": 0.9, "c.safetensors": 1.1 });
   assert.deepEqual(library.recents, ["b.safetensors"]);
   assert.equal(loadLoraStack("krea2")[0].strength, 0.9);
 });
 
-test("a removed LoRA leaves every account's stacks, strengths, ratings and recents", () => {
+test("a removed LoRA leaves every account's stacks, strengths, ratings, recents and presets", () => {
   clearLoraState("account-c");
   saveLoraStack("fast", [{ name: "gone.safetensors" }, { name: "kept.safetensors" }], "account-c");
   saveLoraLibrary(
@@ -118,29 +84,30 @@ test("a removed LoRA leaves every account's stacks, strengths, ratings and recen
       strengths: { fast: { "gone.safetensors": 0.5 } },
       ratings: { "gone.safetensors": "up" },
       recents: ["gone.safetensors", "kept.safetensors"],
-      snapshots: { [key]: [stack("s", "Saved", [{ name: "gone.safetensors", strength: 1 }])] },
     },
     "account-c",
   );
-  assert.ok(forgetLora("gone.safetensors") >= 1);
+  const presets = new Store(runtimeDatabase(dir));
+  const preset = presets.createPreset("account-c", "Saved", {
+    loras: [{ name: "gone.safetensors", strength: 1 }],
+  });
+  forgetLora("gone.safetensors");
+  assert.deepEqual(presets.presets("account-c")[0], { ...preset, input: { loras: [] } });
   assert.deepEqual(
     loadLoraStack("fast", "account-c").map((item) => item.name),
     ["kept.safetensors"],
   );
   const library = loadLoraLibrary("account-c");
   assert.deepEqual(
-    [library.strengths.fast, library.ratings, library.recents, library.snapshots[key][0].loras],
-    [undefined, {}, ["kept.safetensors"], []],
+    [library.strengths.fast, library.ratings, library.recents],
+    [undefined, {}, ["kept.safetensors"]],
   );
 });
 
-test("families and workflows left empty drop out of the library", () => {
+test("workflows left empty drop out of the library", () => {
   clearLoraState();
-  saveLoraLibrary({
+  const library = saveLoraLibrary({
     strengths: { "custom:image-boogu-base": {}, fast: { "a.safetensors": 0.5 } },
-    snapshots: { "family:krea2": [], [key]: [stack("k", "Krea")] },
   });
-  const library = applyLoraOps([{ op: "stack.delete", key, id: "k" }]);
   assert.deepEqual(library.strengths, { fast: { "a.safetensors": 0.5 } });
-  assert.deepEqual(library.snapshots, {});
 });

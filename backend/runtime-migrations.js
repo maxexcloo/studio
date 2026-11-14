@@ -6,6 +6,7 @@ import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
 import { galleryColumnsStep } from "./gallery-columns.js";
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
+import { stackPresets } from "./stack-presets.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -43,6 +44,12 @@ const steps = [
     name: "galleryColumns",
     run: galleryColumnsStep,
     changes: (plan) => plan.columns.length + plan.indexes.length + plan.thumbnails,
+    online: true,
+  },
+  {
+    name: "stackPresets",
+    run: stackPresets,
+    changes: (plan) => plan.stacks,
     online: true,
   },
 ];

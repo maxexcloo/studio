@@ -4,7 +4,7 @@ import { isObject } from "./values.js";
 /**
  * Per-profile preferences that follow a merged or combined profile id to the id it became
  * (profile/store.js `canonical`): workflow preferences (favourites and last use) and every
- * account's LoRA stacks (the active stack, strengths and older per-workflow snapshots). Combine
+ * account's LoRA stacks (the active stack and strengths). Combine
  * Backends and Merge Duplicate Profiles move them when they run.
  */
 
@@ -49,12 +49,6 @@ function repointLoraState(state, canonical) {
       ...(isObject(old) ? old : {}),
       ...(isObject(own) ? own : {}),
     }));
-  if (isObject(library.snapshots))
-    moved += moveKeys(library.snapshots, canonical, (own, old) => {
-      const list = Array.isArray(own) ? own : [];
-      const ids = new Set(list.map((stack) => stack?.id));
-      return [...list, ...(Array.isArray(old) ? old : []).filter((stack) => !ids.has(stack?.id))];
-    });
   return moved;
 }
 
