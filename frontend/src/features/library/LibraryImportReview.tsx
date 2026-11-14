@@ -89,9 +89,9 @@ export interface ImportVision {
   reason: string;
 }
 export const gradeColours: Record<string, string> = {
-  Exact: "green",
-  Close: "yellow",
-  Partial: "orange",
+  exact: "green",
+  close: "yellow",
+  partial: "orange",
 };
 const stateLabels: Record<string, string> = {
   failed: "Failed",
@@ -225,7 +225,7 @@ export function LibraryImportReview({
             <Group gap="xs">
               {record.grade && (
                 <Badge color={gradeColours[record.grade.value] || "gray"}>
-                  {record.grade.value}
+                  {stateLabel(record.grade.value)}
                 </Badge>
               )}
               <Text size="sm" c="dimmed">
