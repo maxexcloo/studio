@@ -175,4 +175,16 @@ test("new accounts start on the default access profile at once: local, single si
     chat.userId,
     "the identity stays linked to its new account",
   );
+  const linksOf = (accountId) =>
+    store.listGatewayIdentities().links.filter((item) => item.accountId === accountId);
+  store.setGatewayLink("chat-admin-made", chat.userId);
+  assert.equal(
+    store.gatewayAccountAccess("chat-script", "chat.two@example.com").userId,
+    chat.userId,
+  );
+  assert.deepEqual(
+    linksOf(chat.userId).map((item) => item.identity),
+    ["chat-admin-made", "chat-script"],
+    "a new ID with the same email replaces the earlier email link, not an administrator's",
+  );
 });

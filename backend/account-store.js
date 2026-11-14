@@ -685,7 +685,17 @@ function linkGatewayEmail(store, identity, email) {
   if (account?.disabled) return null;
   const access = account ? accessFor(account, store.profiles) : null;
   if (!access?.authenticated) return null;
-  store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
+  // One email link per account: a client sending a new ID with the same email replaces the last
+  // one, which would only link again by email. Administrators' links stay.
+  store.gatewayLinks = store.gatewayLinks.filter(
+    (item) => !(item.byEmail && item.accountId === account.id),
+  );
+  store.gatewayLinks.push({
+    identity,
+    accountId: account.id,
+    byEmail: true,
+    linkedAt: new Date().toISOString(),
+  });
   store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
   saveStore();
   return { ...access, credential: "mcp-token" };
