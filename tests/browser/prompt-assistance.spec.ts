@@ -9,7 +9,6 @@ import {
   promptMenu,
   promptTool,
   openPresets,
-  savedAction,
   saveCurrent,
   stamp,
   withSettings,
@@ -28,33 +27,46 @@ async function undoAssistance(page: Page, message: string) {
   await expect(notification).toBeHidden();
 }
 
-test("Saving and updating a preset never submits a generation", async ({ page }) => {
+test("Saving and updating a preset never submits a generation, and the name shows when it is edited", async ({
+  page,
+}) => {
   const state = await fixtures(page);
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A careful copper bird");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await saveCurrent(page, "Preset", "Copper Study");
+  const name = page.getByRole("combobox", { name: "Preset Name", exact: true });
+  await expect(name).toHaveValue("");
+  await expect(name).toHaveAttribute("placeholder", "Unsaved Preset");
+  await saveCurrent(page, "Copper Study");
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.jobs).toHaveLength(0);
+  // Saved shows where it happened, and Save waits for a change.
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  const save = page.getByRole("button", { name: "Save Preset", exact: true });
+  await expect(save).toBeDisabled();
   await closePresets(page);
   await prompt.fill("A copper bird with blue wings");
   await openPresets(page);
-  await savedAction(page, "Preset", "Copper Study", "Update from Current");
+  await expect(name).toHaveValue("Copper Study");
+  await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+  await save.click();
   await expect.poll(() => state.presets[0].input.prompt).toBe("A copper bird with blue wings");
+  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
+  await expect(save).toBeDisabled();
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);
   await page.reload();
   // The draft survives the reload, so clear it to show the preset fills the prompt.
   await prompt.fill("");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await loadSaved(page, "Preset", "Copper Study");
+  await loadSaved(page, "Copper Study");
   await expect(prompt).toHaveValue("A copper bird with blue wings");
-  // Loading a preset closes the picker; reopening it marks the loaded preset.
-  const load = page.getByRole("button", { name: "Load Preset: Copper Study", exact: true });
-  await expect(load).toBeHidden();
+  // Loading a preset closes the picker; reopening it names the loaded preset, unchanged.
+  await expect(name).toBeHidden();
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await expect(load).toHaveAttribute("aria-current", "true");
+  await expect(name).toHaveValue("Copper Study");
+  await expect(page.getByText("Edited", { exact: true })).toBeHidden();
 });
 
 test("Stopping held assistance retains the draft and unblocks generation", async ({ page }) => {
@@ -198,7 +210,7 @@ test("Loading a new preset dismisses earlier draft Undo and keeps the preset inp
   await assist(page, "Improve Prompt");
   await expect(prompt).toHaveValue("A cinematic amber bird");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await loadSaved(page, "Preset", "Another Working Draft");
+  await loadSaved(page, "Another Working Draft");
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
   await expect(prompt).toHaveValue("A cinematic amber bird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();

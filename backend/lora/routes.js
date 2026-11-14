@@ -27,11 +27,11 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
 
   directRoute(app, "GET", "/api/loras/library", (account) => {
     if (!accountMayUseLoras({ studioAccount: account }))
-      return { status: 200, payload: { found: false, library: { strengths: {}, snapshots: {} } } };
+      return { status: 200, payload: { found: false, library: { strengths: {} } } };
     const library = loadLoraLibrary(account?.userId || "");
     return {
       status: 200,
-      payload: { found: library !== null, library: library || { strengths: {}, snapshots: {} } },
+      payload: { found: library !== null, library: library || { strengths: {} } },
     };
   });
 

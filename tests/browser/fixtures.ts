@@ -114,7 +114,6 @@ export async function fixtures(page: Page) {
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
-    snapshots: {} as Record<string, any[]>,
     ratings: {} as Record<string, string>,
     recents: [],
   };
@@ -330,26 +329,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/loras/library/ops" && method === "POST") {
       for (const operation of body.ops) {
         loraOperations.push(operation);
-        const stacks = loraLibrary.snapshots[operation.key] || [];
         switch (operation.op) {
-          case "stack.add":
-            loraLibrary.snapshots[operation.key] = [...stacks, operation.stack];
-            break;
-          case "stack.update":
-            loraLibrary.snapshots[operation.key] = stacks.map((stack) =>
-              stack.id === operation.id ? { ...stack, loras: operation.loras } : stack,
-            );
-            break;
-          case "stack.rename":
-            loraLibrary.snapshots[operation.key] = stacks.map((stack) =>
-              stack.id === operation.id ? { ...stack, name: operation.name } : stack,
-            );
-            break;
-          case "stack.delete":
-            loraLibrary.snapshots[operation.key] = stacks.filter(
-              (stack) => stack.id !== operation.id,
-            );
-            break;
           case "rating":
             if (operation.rating) loraLibrary.ratings[operation.name] = operation.rating;
             else delete loraLibrary.ratings[operation.name];
@@ -776,9 +756,16 @@ export async function fixtures(page: Page) {
       Object.assign(preset, body);
       return respond({ preset });
     }
+    if (path.match(/^\/api\/user-presets\/[^/]+$/) && method === "DELETE") {
+      presets.splice(
+        presets.findIndex((preset) => preset.id === path.split("/")[3]),
+        1,
+      );
+      return respond({ ok: true });
+    }
     if (path === "/api/user-presets" && method === "GET") return respond({ presets });
     if (path === "/api/user-presets" && method === "POST") {
-      const preset = { id: "preset-1", ...body };
+      const preset = { id: `preset-${presets.length + 1}`, savedAt: nextStamp(), ...body };
       presets.push(preset);
       return respond({ preset });
     }
@@ -1107,25 +1094,26 @@ export async function closeReferences(page: Page) {
   await expect(references).toBeHidden();
 }
 
-/** Saves the draft as a named stack or preset from its picker. */
-export async function saveCurrent(
-  page: Page,
-  noun: "Preset" | "Stack",
-  name: string,
-  /** A preset's parts to switch from the defaults, such as References. */
-  toggle: string[] = [],
-) {
-  await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
-  const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });
-  await field.fill(name);
+/**
+ * Saves the draft as a new preset from the open popup: the Presets chip's, or the LoRA stack's.
+ * `toggle` switches what a new preset saves from the defaults, such as References.
+ */
+export async function saveCurrent(page: Page, name: string, toggle: string[] = []) {
   if (toggle.length) {
-    const parts = page.getByRole("button", { name: "Preset Parts", exact: true });
-    await parts.click();
+    await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
     for (const part of toggle)
       await page.getByRole("menuitem", { name: part, exact: true }).click();
-    await parts.click();
+    await page.keyboard.press("Escape");
   }
+  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  const field = page.getByRole("combobox", { name: "Preset Name", exact: true });
+  await expect(field).toBeFocused();
+  await field.fill(name);
+  await expect(
+    page.getByRole("option", { name: `Save as New Preset “${name}”`, exact: true }),
+  ).toBeVisible();
   await field.press("Enter");
+  await expect(field).toHaveValue(name);
 }
 
 /** Opens the Presets picker unless it is already open. */
@@ -1139,29 +1127,33 @@ export async function closePresets(page: Page) {
   await closePopup(page, "Presets");
 }
 
-/** Loads a saved stack or preset, or an inspiration, confirming when it replaces what the draft has. */
-export async function loadSaved(
-  page: Page,
-  noun: "Preset" | "Stack" | "Inspiration",
-  name: string,
-) {
-  await page.getByRole("button", { name: `Load ${noun}: ${name}`, exact: true }).click();
+/**
+ * Loads a saved preset from the open popup's name field, confirming when it replaces what the
+ * draft has.
+ */
+export async function loadSaved(page: Page, name: string) {
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await page.getByRole("option", { name, exact: true }).click();
   const replace = page.getByRole("button", { name: "Replace", exact: true });
   if (await replace.isVisible()) await replace.click();
 }
 
-/** Runs one action from a saved stack's or preset's row menu. */
-export async function savedAction(
-  page: Page,
-  noun: "Preset" | "Stack",
-  name: string,
-  action: string,
-) {
-  await page.getByRole("button", { name: `${noun} Actions for ${name}`, exact: true }).click();
-  const item = page.getByRole("menuitem", { name: action, exact: true });
-  await item.click();
-  // The next click must not land while the menu is still closing over the row.
-  await expect(item).toBeHidden();
+/** Loads one of the Library's imported images from the Presets popup. */
+export async function loadFromLibrary(page: Page, name: string) {
+  await page.getByRole("button", { name: `Load: ${name}`, exact: true }).click();
+  const replace = page.getByRole("button", { name: "Replace", exact: true });
+  if (await replace.isVisible()) await replace.click();
+}
+
+/** Renames the current preset from the open popup's menu. */
+export async function renamePreset(page: Page, name: string) {
+  await page.getByRole("button", { name: "Preset Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rename Preset", exact: true }).click();
+  const field = page.getByRole("combobox", { name: "Preset Name", exact: true });
+  await expect(field).toBeFocused();
+  await field.fill(name);
+  await field.press("Enter");
+  await expect(field).toHaveValue(name);
 }
 
 /** Chooses a picker tab, such as LoRAs › Stacks. */

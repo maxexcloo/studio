@@ -1,14 +1,6 @@
-import { useGroupFeature, useIsAdmin } from "../auth/AccountGate";
+import { useGroupFeature } from "../auth/AccountGate";
 
-/**
- * The Library is administration, plus each account's own Characters, known from the account status
- * AccountGate has already loaded.
- */
+/** Each account's own Characters in the Library, known from the account status AccountGate has already loaded. */
 export function useLibraryAccess() {
-  const admin = useIsAdmin();
-  const characters = useGroupFeature("characters");
-  return {
-    allowed: admin || characters,
-    characters,
-  };
+  return { characters: useGroupFeature("characters") };
 }
