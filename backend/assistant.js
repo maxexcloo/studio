@@ -592,10 +592,10 @@ export function createAssistant(
    * stripped) goes to `onDelta` and reasoning (`reasoning_content` deltas and `<think>` blocks) to
    * `onThinking` as they arrive; a gateway that answers without streaming hands over each at once.
    * `call` names the call type, whose `reasoningEfforts` entry it sends unless the administrator's
-   * model answers it. Resolves to { text, thinking, model, ms } with the final, reasoning-free text;
+   * model answers it. Resolves to { text, thinking, model, served, ms } with the final, reasoning-free text;
    * throws AssistantError.
    */
-  async function chat({
+  async function request({
     model,
     call,
     messages,
@@ -658,6 +658,8 @@ export function createAssistant(
     }
     let raw = "";
     let finish = "";
+    // The model the gateway ran, which an alias such as `cloud/auto` leaves to it.
+    let served = "";
     try {
       if (
         stream &&
@@ -668,6 +670,7 @@ export function createAssistant(
         for await (const event of readServerSentEvents(response.body)) {
           if (event?.error)
             throw new AssistantError(one(event.error.message || "stream error", 120));
+          served ||= String(event?.model || "");
           const choice = event?.choices?.[0];
           if (choice?.finish_reason) finish = choice.finish_reason;
           const part = choice?.delta || choice?.message;
@@ -682,7 +685,9 @@ export function createAssistant(
         const rest = filter.flush();
         if (rest) shown(rest);
       } else {
-        const choice = (await response.json())?.choices?.[0];
+        const reply = await response.json();
+        served = String(reply?.model || "");
+        const choice = reply?.choices?.[0];
         const message = choice?.message;
         finish = String(choice?.finish_reason || "");
         raw = String(message?.content || "");
@@ -708,15 +713,26 @@ export function createAssistant(
       thinking: reasoning.trim(),
       raw,
       model,
+      served,
       ms: now() - started,
     };
   }
 
-  const note = (operation, profile, started, reason = "") => {
-    const what = `Prompt assistant ${operation}${profile?.id ? ` for ${profile.id}` : ""}`;
-    if (reason) log.warn?.(`${what} fell back after ${now() - started} ms: ${reason}`);
-    else log.info?.(`${what} in ${now() - started} ms`);
-  };
+  /** `request`, logged in one line: the call, the model asked and the one that answered, or why it failed. */
+  async function chat(options) {
+    const started = now();
+    const what = `Prompt assistant ${options.call} with ${options.model}`;
+    try {
+      const reply = await request(options);
+      const by = reply.served && reply.served !== options.model ? ` (${reply.served})` : "";
+      log.info?.(`${what}${by} in ${reply.ms} ms`);
+      return reply;
+    } catch (error) {
+      if (error.reason !== "cancelled")
+        log.warn?.(`${what} failed after ${now() - started} ms: ${error.message}`);
+      throw error;
+    }
+  }
   const failure = (error) => (error instanceof AssistantError ? error.reason : "unusable reply");
   const rethrowCancel = (error) => {
     if (error instanceof AssistantError && error.reason === "cancelled") throw error;
@@ -801,11 +817,9 @@ export function createAssistant(
       });
       const written = cleanPrompt(reply.text);
       if (!written) throw new AssistantError("unusable reply");
-      note("rewrite", profile, started);
       return { ...base, prompt: written, source: "assistant", ms: now() - started };
     } catch (error) {
       rethrowCancel(error);
-      note("rewrite", profile, started, failure(error));
       return {
         ...base,
         prompt: original,
@@ -859,7 +873,6 @@ export function createAssistant(
       });
       const written = cleanPrompt(reply.text, 600).replace(/^negative(?: prompt)?\s*:\s*/i, "");
       if (!written) throw new AssistantError("unusable reply");
-      note("negative", profile, started);
       return {
         negative: written,
         unused: false,
@@ -869,7 +882,6 @@ export function createAssistant(
       };
     } catch (error) {
       rethrowCancel(error);
-      note("negative", profile, started, failure(error));
       return {
         negative: fallback,
         unused: false,
@@ -945,11 +957,9 @@ export function createAssistant(
         );
         if (result.length >= limit) break;
       }
-      note("LoRA match", profile, started);
       return { loras: result, source: "assistant", model, ms: now() - started };
     } catch (error) {
       rethrowCancel(error);
-      note("LoRA match", profile, started, failure(error));
       return {
         loras: candidates
           .slice(0, limit)
@@ -1029,7 +1039,6 @@ export function createAssistant(
       );
       if (!written) throw new AssistantError("unusable reply");
       const known = new Set(loras.map((item) => item.name));
-      note("describe", profile, started);
       return {
         available: true,
         vision,
@@ -1045,7 +1054,6 @@ export function createAssistant(
       };
     } catch (error) {
       rethrowCancel(error);
-      note("describe", profile, started, failure(error));
       throw error instanceof AssistantError ? error : new AssistantError(failure(error));
     }
   }
@@ -1213,11 +1221,9 @@ export function createAssistant(
       });
       const guide = validDraftGuide(replyJson(reply.text));
       if (!guide) throw new AssistantError("unusable reply");
-      note("guide draft", profile, started);
       return { guide, aiDrafted: true, model, ms: now() - started };
     } catch (error) {
       rethrowCancel(error);
-      note("guide draft", profile, started, failure(error));
       throw error instanceof AssistantError ? error : new AssistantError(failure(error));
     }
   }
@@ -1243,7 +1249,6 @@ export function createAssistant(
       });
     let read = {};
     let source = "template";
-    const started = now();
     if (String(sourceText).trim()) {
       const system =
         'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "uncensored": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
@@ -1260,10 +1265,8 @@ export function createAssistant(
         });
         read = replyJson(reply.text) || {};
         source = "assistant";
-        note("profile draft", { id }, started);
       } catch (error) {
         rethrowCancel(error);
-        note("profile draft", { id }, started, failure(error));
       }
     }
     return {
