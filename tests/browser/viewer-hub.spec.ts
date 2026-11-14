@@ -1387,9 +1387,10 @@ test("A tap on the picture hides and shows the chrome; swipes still move and Esc
     expect
       .poll(async () => {
         const { x, y } = await centre();
-        return Math.round(Math.abs(x - width / 2) + Math.abs(y - height / 2));
+        // Within a pixel each way, as layout rounds to device pixels.
+        return Math.max(Math.abs(x - width / 2), Math.abs(y - height / 2));
       })
-      .toBeLessThan(2);
+      .toBeLessThanOrEqual(1);
   await centred(viewport.width, viewport.height);
   // Turning the phone keeps it in the middle.
   await page.setViewportSize({ width: viewport.height, height: viewport.width });
