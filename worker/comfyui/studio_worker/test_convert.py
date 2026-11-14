@@ -196,7 +196,7 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(
             len(list((self.models / ".convert/sources").glob("*.part"))), 1
         )
-        self.assertEqual(list((self.models / ".convert").glob(".*.header")), [])
+        self.assertEqual(list(self.models.rglob("*.header")), [])
 
 
 if __name__ == "__main__":

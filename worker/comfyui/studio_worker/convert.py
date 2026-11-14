@@ -3,7 +3,7 @@
 Downloads the release's other pipeline parts and the fine-tune with curl, renames the fine-tune's
 tensors to diffusers' (the bytes are copied, never decoded), runs rad-convert and installs the .rad
 in the Radiance image folder. Studio starts it, polls `status` and may `cancel`; a stopped download
-resumes on the next start. Provider credentials reach curl only through a header file.
+resumes on the next start. Provider credentials reach curl only through a header file in the container's temporary folder.
 """
 
 import hashlib
@@ -13,6 +13,7 @@ import re
 import shutil
 import struct
 import subprocess
+import tempfile
 import threading
 from pathlib import Path
 
@@ -214,11 +215,11 @@ def convert(job, url, sha256, tokens):
     try:
         for kind, token in tokens.items():
             if token:
-                file = work / f".{kind}-{os.getpid()}-{threading.get_ident()}.header"
-                descriptor = os.open(file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                # In the container's own temporary folder, so a killed worker leaves no token on the volume.
+                descriptor, file = tempfile.mkstemp(suffix=".header")
                 with os.fdopen(descriptor, "w") as stream:
                     stream.write(f"Authorization: Bearer {token}\n")
-                auth[kind] = file
+                auth[kind] = Path(file)
         job["stage"] = "base"
         for name in BASE_FILES:
             fetch(BASE + name, base / name, auth.get("hf"), log, job)
