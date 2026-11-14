@@ -283,6 +283,14 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   const stack = page.getByRole("dialog", { name: "LoRAs", exact: true });
   await expect(stack.getByText("Choose LoRAs or a saved stack.", { exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "LoRA Choices", exact: true })).toHaveCount(0);
+  // The footer's actions share one row without overlapping.
+  const [add, clear, apply] = await Promise.all(
+    ["Add LoRAs", "Clear LoRAs", "Apply"].map((name) =>
+      stack.getByRole("button", { name, exact: true }).boundingBox(),
+    ),
+  );
+  expect(add!.x + add!.width).toBeLessThanOrEqual(clear!.x);
+  expect(apply!.y).toBeCloseTo(add!.y, 0);
   await stack.getByRole("button", { name: "Add LoRAs", exact: true }).click();
   const adding = page.getByRole("dialog", { name: "Add LoRAs", exact: true });
   // The search waits for a tap, so the keyboard stays down.
