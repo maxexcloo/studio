@@ -620,7 +620,10 @@ test("Prompt Styles switch, reorder and edit the assistant's fixed options by me
 
   // Editing keeps the style's ID and kind and saves in a dialog.
   await animate.getByRole("button", { name: "Actions for Cinematic Camera", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Style", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Actions for Cinematic Camera", exact: true })
+    .getByRole("menuitem", { name: "Edit Style", exact: true })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Edit Prompt Style", exact: true });
   await dialog.getByRole("textbox", { name: "Description", exact: true }).fill("A moving camera.");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
