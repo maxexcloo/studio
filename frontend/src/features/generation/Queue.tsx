@@ -19,7 +19,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { arrayMove } from "@dnd-kit/helpers";
-import { lazy, Suspense, useEffect, useId, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import {
   ChevronDown,
   CircleAlert,
@@ -120,25 +120,34 @@ export function useQueueAction(jobId?: string) {
         client.invalidateQueries({ queryKey: ["gallery"] }),
       ]),
   });
-  function matching(value: QueueAction) {
-    return client.isMutating({
-      mutationKey: queueActionKey,
-      predicate: (mutation) => {
-        const pending = mutation.state.variables as QueueAction;
-        return (
-          pending?.id === value.id && pending.set === value.set && pending.action === value.action
-        );
-      },
-    });
-  }
+  const matching = useCallback(
+    (value: QueueAction) =>
+      client.isMutating({
+        mutationKey: queueActionKey,
+        predicate: (mutation) => {
+          const pending = mutation.state.variables as QueueAction;
+          return (
+            pending?.id === value.id && pending.set === value.set && pending.action === value.action
+          );
+        },
+      }),
+    [client],
+  );
+  const { mutate, mutateAsync } = action;
+  // Stable, so callbacks built on them (`useTryAgain`) keep memoised gallery tiles from rendering.
   return {
     isPending: action.isPending || pending > 0,
-    mutate: (value: QueueAction) => {
-      if (!matching(value)) action.mutate(value);
-    },
+    mutate: useCallback(
+      (value: QueueAction) => {
+        if (!matching(value)) mutate(value);
+      },
+      [matching, mutate],
+    ),
     /** Resolves to the response (a retry's new job), or `undefined` when already in flight. */
-    mutateAsync: async (value: QueueAction) =>
-      matching(value) ? undefined : action.mutateAsync(value),
+    mutateAsync: useCallback(
+      async (value: QueueAction) => (matching(value) ? undefined : mutateAsync(value)),
+      [matching, mutateAsync],
+    ),
   };
 }
 export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {

@@ -232,21 +232,21 @@ export function GalleryPage() {
   // The image ranks first, being most like itself, unless the filters leave it out.
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
-  // Stable, so the views' memoised tiles render only when their own item changes.
-  const openItem = useCallback(
-    (item: MediaItem, run?: string) => {
-      setFocusItem(null);
-      setRun(run);
-      setParams(
-        (next) => {
-          next.set("item", item.id);
-          return next;
-        },
-        { state: { viewer: true } },
-      );
-    },
-    [setParams],
-  );
+  // Stable, so the views' memoised tiles render only when their own item changes: `setParams`
+  // changes with every search, including each step through the viewer.
+  const latestSetParams = useRef(setParams);
+  latestSetParams.current = setParams;
+  const openItem = useCallback((item: MediaItem, run?: string) => {
+    setFocusItem(null);
+    setRun(run);
+    latestSetParams.current(
+      (next) => {
+        next.set("item", item.id);
+        return next;
+      },
+      { state: { viewer: true } },
+    );
+  }, []);
   const showItem = useCallback(
     (item: MediaItem) => {
       // Moving to another set's results flips through that set.
