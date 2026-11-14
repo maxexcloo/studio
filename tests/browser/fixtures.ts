@@ -839,6 +839,21 @@ export async function fixtures(page: Page) {
         perMinute: 0,
         etaSeconds: null,
       });
+    // Dream off, as a new account sees it; serveDream replaces this for Dream's own specs.
+    if (path === "/api/dream")
+      return respond({
+        settings: {
+          enabled: false,
+          paused: false,
+          dailyImages: 40,
+          dailyVideos: 4,
+          videos: false,
+          spicy: false,
+        },
+        today: { images: 0, videos: 0 },
+        unseen: [],
+        status: { status: "off" },
+      });
     return respond({ ok: true });
   });
   return {
