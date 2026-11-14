@@ -1301,7 +1301,15 @@ test("A double tap zooms in at the tapped point and back to Fit; a click still c
   await page.waitForTimeout(400);
   await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
   await expect(viewer).toBeVisible();
-  // It hid the chrome, so the picture has glided to the middle of the screen.
+  // It hid the chrome, so the picture glides to the middle of the screen; aim once it has.
+  await expect(page.locator("[data-chrome-hidden]")).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.getAnimations().filter((motion) => motion instanceof CSSTransition).length,
+      ),
+    )
+    .toBe(0);
   ({ x, y } = await aim());
   await tap();
   await page.waitForTimeout(100);
