@@ -11,9 +11,19 @@ import { TrimVideoDialog } from "./videoEdits";
 import { useViewerPrompt, ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// Desktop names Animate, Edit, AI, Upscale, Copy, Download, Compare and Similar beside their icons.
+// Desktop names Animate, Edit, Recreate, AI, Upscale, Copy, Download, Compare and Similar beside their icons.
 // Phones show every action as a compact icon on one row.
-const labelled = ["animate", "edit", "ai", "upscale", "copy", "download", "compare", "similar"];
+const labelled = [
+  "animate",
+  "edit",
+  "recreate",
+  "ai",
+  "upscale",
+  "copy",
+  "download",
+  "compare",
+  "similar",
+];
 
 /** A viewer bar of the opening surface's own actions in place of the item's (Dream's verdicts). */
 export interface ViewerActions {
@@ -81,13 +91,13 @@ export function MediaViewerActions({
     onVersionChange,
   });
   const prompt = useViewerPrompt(item, { groups: itemGroups, iterate });
-  // AI follows Edit: the prompt's assistance, beside the item's own iterations.
+  // AI follows Recreate: the prompt's assistance, beside the item's own iterations.
   const groups = prompt.ai
     ? itemGroups.map((group) => {
-        const edit = group.findIndex((action) => action.id === "edit");
-        return edit < 0
+        const recreate = group.findIndex((action) => action.id === "recreate");
+        return recreate < 0
           ? group
-          : [...group.slice(0, edit + 1), prompt.ai!, ...group.slice(edit + 1)];
+          : [...group.slice(0, recreate + 1), prompt.ai!, ...group.slice(recreate + 1)];
       })
     : itemGroups;
   if (shortcuts) shortcuts.current = itemGroups;

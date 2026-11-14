@@ -186,9 +186,9 @@ export function GallerySelectionBar({
   const pending = busy !== null;
   // Only what acts on the selection as a whole; an item's own actions stay on its tile and viewer.
   const actions = itemActionGroups([
-    // Selected uploads share Edit › Run Suggested Prompts, one run queued for each.
+    // Selected uploads share Recreate › Run Suggested Prompts, one run queued for each.
     uploads.length > 0 &&
-      itemAction("edit", {
+      itemAction("recreate", {
         loading: recreate.isPending,
         menu: [
           [

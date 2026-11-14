@@ -51,9 +51,9 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
-/** Edit › Run Again: queues the same settings with a new seed, without the composer. */
+/** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
@@ -105,7 +105,7 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
     await expect(field).toBeHidden();
     await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeInViewport();
     await viewer.getByRole("button", { name: "Edit", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit in Composer", exact: true }).click();
     await expect(viewer).toBeHidden();
   }
 });
@@ -283,11 +283,11 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await expect.poll(height).toBeLessThan(line * 1.5);
 });
 
-test("Viewer runs queue into the strip and Edit › Recreate opens the composer", async ({
+test("Viewer runs queue into the strip and Recreate › Recreate in Composer opens the composer", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -303,7 +303,7 @@ test("Viewer runs queue into the strip and Edit › Recreate opens the composer"
   await expect(
     strip.getByRole("listitem", { name: "Show Version 2", exact: true }),
   ).toHaveAttribute("aria-current", "true");
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -433,7 +433,7 @@ test("More Like This Set is offered only for a result in a set", async ({ page }
   await expect(viewer.getByRole("button", { name: "Similar", exact: true })).not.toHaveAttribute(
     "aria-haspopup",
   );
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await expect(page.getByRole("menuitem", { name: "Run Again", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "More Like This Set", exact: true })).toHaveCount(
     0,
@@ -444,15 +444,15 @@ test("Run Again and Recreate draw a new seed; only Run Again, Same Seed keeps it
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Edit queues both Run Agains at once; Recreate loads the composer.
+  // Recreate queues both Run Agains at once; Recreate in Composer loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -504,7 +504,7 @@ test("Run Again, Same Seed and Recreate keep the backend a combined profile ran 
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -512,7 +512,7 @@ test("Run Again, Same Seed and Recreate keep the backend a combined profile ran 
     profileBackend: "radiance",
     seed: 1234567,
   });
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one. Focus,
@@ -529,7 +529,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   const { state } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again, Same Seed", exact: true }).click();
   await expect(
     page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
@@ -1549,6 +1549,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     const row = [
       "Animate",
       "Edit",
+      "Recreate",
       "Upscale",
       "Copy",
       "Download",
@@ -1677,7 +1678,7 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await viewerAction(page, "Edit");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();

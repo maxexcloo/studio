@@ -153,7 +153,7 @@ the primary component reference and verify APIs against the installed version.
   Custom), resets to the item's prompt rather than clearing, and its phone
   editor sends Ask for a Change beside Generate. It rests on one line ending in
   an ellipsis and shows the whole prompt while focused. Its other assistance is
-  the viewer bar's AI, after Edit, laid out as Animate's menu: the remembered
+  the viewer bar's AI, after Recreate, laid out as Animate's menu: the remembered
   Review Prompt, then the image's Suggestions and Custom… (a change typed over
   the prompt), then Refresh Suggestions.
 - Respect safe areas and the phone keyboard. The viewport uses
@@ -223,13 +223,13 @@ the primary component reference and verify APIs against the installed version.
   preserving other accounts and queue tiers. Started background work finishes.
 - The viewer is the iteration hub for finished and unfinished work, using the
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
-  and `itemActions.ts` the order: Animate, Edit, Upscale | Copy, Download |
-  Compare, Similar | Star, Delete. Compare ▾ holds Compare Models, then Open
-  Comparison where the item belongs to one. Edit leads with Run Again and Run Again, Same Seed,
-  which queue from where they are, then Use as Character (starting a card in
-  Library › Characters) and Use as Reference, then what changes the item itself
-  (Edit in Composer, or a video's Trim and the like) with Recreate in Composer last;
-  menu options expand in place on phones and touch screens. The phone viewer bar fits every action
+  and `itemActions.ts` the order for every bar and menu, the selection bar
+  offering those that act on several: Animate, Edit, Recreate, Upscale | Copy,
+  Download | Compare, Similar | Star, Delete. Compare ▾ holds Compare Models, then Open
+  Comparison where the item belongs to one. Edit holds Use as Character (starting a card in
+  Library › Characters) and Use as Reference, then what changes the item itself (Edit in
+  Composer, or a video's Trim and the like). Recreate holds Run Again and Run Again, Same Seed,
+  which queue from where they are, then Recreate in Composer; menu options expand in place on phones and touch screens. The phone viewer bar fits every action
   on one row at a compact size, without More; elsewhere the viewer bar shows
   every action on one row: where they outgrow it the last named actions drop to icons
   alone, and only then do they wrap onto another row, never using More or scrolling. The phone bar drops its prompt field

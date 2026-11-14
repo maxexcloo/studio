@@ -52,7 +52,7 @@ test("Upload takes many files or a folder, lists each failure and shows the new 
   fs.rmSync(folder, { recursive: true, force: true });
 });
 
-test("Edit › Run Suggested Prompts on several uploads queues each suggested prompt as its version and counts the rest", async ({
+test("Recreate › Run Suggested Prompts on several uploads queues each suggested prompt as its version and counts the rest", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -92,7 +92,7 @@ test("Edit › Run Suggested Prompts on several uploads queues each suggested pr
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   for (const id of ["a", "b", "c"])
     await page.getByRole("button", { name: `Select image: Upload ${id}`, exact: true }).click();
-  await (await selectionMenuItem(page, "Edit")).click();
+  await (await selectionMenuItem(page, "Recreate")).click();
   await page.getByRole("menuitem", { name: "Run Suggested Prompts", exact: true }).click();
   await expect(
     page.getByText("Queued 2 recreations. 1 upload has no suggested prompt yet.", { exact: true }),
