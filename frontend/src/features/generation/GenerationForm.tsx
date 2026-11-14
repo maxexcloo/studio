@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -125,6 +125,13 @@ export function GenerationForm({
     profile?.capabilities?.img2img ||
     profile?.capabilities?.imageInput,
   );
+  // Clear turns into Undo, which restores the whole draft, until the draft next changes.
+  const [cleared, setCleared] = useState<typeof draft | null>(null);
+  const clearing = useRef(false);
+  useEffect(() => {
+    if (clearing.current) clearing.current = false;
+    else setCleared(null);
+  }, [draft]);
   if (compact)
     return (
       <form
@@ -199,7 +206,10 @@ export function GenerationForm({
       onKindChange={(kind) =>
         navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
       }
-      onClear={() =>
+      onUndoClear={cleared ? () => setDraft(cleared) : undefined}
+      onClear={() => {
+        clearing.current = true;
+        setCleared(draft);
         setDraft((previous) => ({
           sessionId: previous.sessionId,
           operation: previous.input.kind === "video" ? "animate" : "image",
@@ -211,8 +221,8 @@ export function GenerationForm({
               : { ...initialInput, kind: previous.input.kind }),
             seed: "",
           },
-        }))
-      }
+        }));
+      }}
       onSubmit={() => submit.mutate(undefined)}
       operation={draft.operation}
       onOperationChange={(operation) => setDraft((value) => ({ ...value, operation }))}
