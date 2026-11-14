@@ -203,29 +203,35 @@ export function useChangeSuggestions<K extends QueryKey>({
 /**
  * An assistant menu (AI, Animate): its settings, then its fixed options under their heading, then
  * the suggestions written for this item with Refresh, then any other actions, then Custom… and any
- * run of its own.
+ * run of its own. While what decides its options is `loading`, one row stands in for them all, so
+ * nothing shown moves under a finger when they arrive.
  */
 export const assistMenu = ({
+  loading,
   settings = [],
   fixed,
   suggestions = [],
   others = [],
   last,
 }: {
+  loading?: boolean;
   settings?: Action[];
   fixed: { label: string; options: Action[] };
   suggestions?: Action[];
   others?: Action[];
   last: Action[];
-}): ActionGroups => [
-  settings,
-  fixed.options.length
-    ? [{ id: `${fixed.label}-heading`, label: fixed.label, heading: true }, ...fixed.options]
-    : [],
-  suggestions,
-  others,
-  last,
-];
+}): ActionGroups =>
+  loading
+    ? [[{ id: "loading", label: "Loading…", disabled: true }]]
+    : [
+        settings,
+        fixed.options.length
+          ? [{ id: `${fixed.label}-heading`, label: fixed.label, heading: true }, ...fixed.options]
+          : [],
+        suggestions,
+        others,
+        last,
+      ];
 
 /** Suggestions as their own menu button, beside a field outside a text box's tools. */
 export function ChangeSuggestions<K extends QueryKey>({
