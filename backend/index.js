@@ -16,7 +16,7 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream } from "./domain/dream.ts";
 import { registerDreamRoutes } from "./domain/dream-routes.ts";
-import { createProjects } from "./domain/projects.ts";
+import { createProjects, stylesWithChoice } from "./domain/projects.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { fullBodyPerson } from "./mcp/prompt-checks.js";
 import {
@@ -132,6 +132,7 @@ import {
   outputFileSize,
   recordsFromComfyHistory,
   removeGalleryItems,
+  resultNumbers,
   setGallery,
   cleanupGalleryState,
   updateGalleryJob,
@@ -672,7 +673,8 @@ const admitGeneration = createGenerationAdmission({
   store,
   queue: generationQueue,
   resourceFor: queueResourceFor,
-  pendingItems: makePendingItems,
+  // Numbered as queued, so a chat names a result before it starts.
+  pendingItems: (id, input) => resultNumbers.numbered(makePendingItems(id, input)),
   revision: galleryRevisionValue,
   validate: validateGenerationInput,
   separateRuns: (input) => {
@@ -733,6 +735,7 @@ registerCompareRoutes(app, {
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
   pendingItems: makePendingItems,
+  numbered: (items) => resultNumbers.numbered(items),
   voted: (ownerId, image, others) => {
     const winner = { jobId: image.jobId, values: itemValues(image) };
     taste.record(ownerId, [
@@ -741,6 +744,15 @@ registerCompareRoutes(app, {
         preferenceSignal(winner, { jobId: item.jobId, values: itemValues(item) }),
       ),
     ]);
+  },
+  // Undo on the Dream page (or the vote's notification) restores the brief it replaced.
+  picked: ({ ownerId, projectId, axis }, choice, by) => {
+    const project = projects.list(ownerId).find((entry) => entry.id === projectId);
+    if (!project) return null;
+    const styles = stylesWithChoice(project.brief.styles, axis, choice);
+    if (styles === project.brief.styles) return null;
+    projects.update(ownerId, project.id, { brief: { styles } }, by);
+    return { projectId: project.id, name: project.name, styles };
   },
 });
 registerTasteRoutes(app, { taste });

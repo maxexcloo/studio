@@ -40,6 +40,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     revision: () => 0,
   });
   const votes: string[][] = [];
+  const picks: string[][] = [];
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -59,8 +60,13 @@ test("compare runs queue one seeded set, read back per owner and record the star
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
+    numbered: (items) => items.map((item) => ({ ...item, number: 7 })),
     voted: (ownerId, winner, others) =>
       votes.push([ownerId, winner.id!, ...others.map((item) => item.id!)]),
+    picked: ({ projectId, axis }, choice, by) => {
+      picks.push([projectId!, axis!, choice, by]);
+      return { projectId: projectId!, name: "Foxes", styles: `${axis}: ${choice}` };
+    },
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -98,6 +104,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
 
   const run = await request("/run", {
     variants: [variant("Steps 20", { steps: 20 }), variant("Steps 40", { steps: 40 })],
+    axis: "steps",
+    projectId: "foxes",
   });
   assert.equal(run.status, 201);
   const jobs = run.body.variants.map((entry: { jobId: string }) =>
@@ -132,6 +140,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
       ["Steps 40", "pending"],
     ],
   );
+  assert.equal(run.body.axis, "steps");
+  assert.equal(run.body.variants[0].item.number, 7);
   assert.equal((await request(`/${run.body.id}`, undefined, "GET", "bob")).status, 404);
 
   // Only a finished variant can win; the choice is stored for the taste profile.
@@ -149,8 +159,11 @@ test("compare runs queue one seeded set, read back per owner and record the star
     },
     { id: "o-0", jobId: other.jobId, ownerId: "alice", type: "image", status: "done" },
   ];
-  const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId }, "PUT");
+  const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId, by: "chat" }, "PUT");
   assert.equal(voted.body.vote, winner.jobId);
+  // A pick on an axis goes to the project's brief, which answers what changed.
+  assert.deepEqual(picks, [["foxes", "steps", "Steps 20", "chat"]]);
+  assert.equal(voted.body.brief.styles, "steps: Steps 20");
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
   // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.

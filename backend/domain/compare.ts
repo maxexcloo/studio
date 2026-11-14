@@ -24,6 +24,10 @@ export interface ComparisonRecord {
   /** The exact winning image, including when several variants share one job. */
   winnerItemId?: string;
   votedAt?: string;
+  /** The one thing the variants vary (variants of a result, "lighting"), which a pick adds to the brief. */
+  axis?: string;
+  /** The project whose brief the pick updates, where the run came from an attached chat. */
+  projectId?: string;
 }
 type GalleryItem = QueueMedia & {
   jobId?: string;
@@ -79,8 +83,16 @@ export function registerCompareRoutes(
     /** The caller's visible gallery, or `null` when the account may not use the gallery. */
     gallery(req: Request): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
+    /** The variants' items with their result numbers. */
+    numbered(items: GalleryItem[]): GalleryItem[];
     /** Hears the winning image and other finished variants, for the taste profile; must not throw. */
     voted?(ownerId: string, winner: GalleryItem, others: GalleryItem[]): void;
+    /** Adds an axis comparison's pick to its project's brief, answering what changed, or null. */
+    picked?(
+      record: ComparisonRecord,
+      choice: string,
+      by: "chat" | "studio",
+    ): { projectId: string; name: string; styles: string } | null;
   },
 ) {
   const { store } = options;
@@ -110,11 +122,14 @@ export function registerCompareRoutes(
   const recordItem = (record: ComparisonRecord, items: GalleryItem[], index: number) =>
     variantItem(record.ownerId, items, record.jobIds[index], record.itemIds?.[index]);
   function show(record: ComparisonRecord, items: GalleryItem[]) {
-    const variants = record.jobIds.map((jobId, index) => ({
-      jobId,
-      label: record.labels?.[index] || `Variant ${letter(index)}`,
-      item: recordItem(record, items, index),
-    }));
+    const variants = record.jobIds.map((jobId, index) => {
+      const item = recordItem(record, items, index);
+      return {
+        jobId,
+        label: record.labels?.[index] || `Variant ${letter(index)}`,
+        item: item && options.numbered([item])[0],
+      };
+    });
     const winner = variants.find(
       (variant) =>
         variant.jobId === record.vote &&
@@ -133,6 +148,7 @@ export function registerCompareRoutes(
       seed: record.seed,
       // The result set every variant belongs to, which the gallery shows together.
       ...(sets.size === 1 && set ? { set } : {}),
+      ...(record.axis ? { axis: record.axis } : {}),
       ...shared("prompt"),
       ...shared("negative"),
       vote: winner ? record.vote : null,
@@ -176,6 +192,10 @@ export function registerCompareRoutes(
     save(record);
     return record;
   }
+  const galleryOff = {
+    status: 403,
+    payload: { ok: false, error: "The gallery is off for this account." },
+  };
   const gallery = (req: Request, res: Response) => {
     const items = options.gallery(req);
     if (!items) res.status(403).json({ ok: false, error: "The gallery is off for this account." });
@@ -189,11 +209,7 @@ export function registerCompareRoutes(
 
   directRoute(app, "GET", "/api/comparisons", (account, { query }) => {
     const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
-    if (!items)
-      return {
-        status: 403,
-        payload: { ok: false, error: "The gallery is off for this account." },
-      };
+    if (!items) return galleryOff;
     const jobs = typeof query.jobIds === "string" ? new Set(query.jobIds.split(",")) : null;
     const records = options
       .read()
@@ -231,11 +247,7 @@ export function registerCompareRoutes(
   // (`itemIds`, one per job).
   directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
     const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
-    if (!items)
-      return {
-        status: 403,
-        payload: { ok: false, error: "The gallery is off for this account." },
-      };
+    if (!items) return galleryOff;
     const { jobIds, labels, itemIds } = body || {};
     if (
       !Array.isArray(jobIds) ||
@@ -268,10 +280,10 @@ export function registerCompareRoutes(
     return { status: 201, payload: show(record, items) };
   });
   // Every variant shares the seed and runs as one queue set; a refused variant cancels the rest.
-  app.post("/api/comparisons/run", async (req, res) => {
-    const items = gallery(req, res);
-    if (!items) return;
-    const { variants, sessionId, parentJobId, parentItemId } = req.body || {};
+  directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
+    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    if (!items) return galleryOff;
+    const { variants, sessionId, parentJobId, parentItemId, axis, projectId } = body || {};
     if (
       !Array.isArray(variants) ||
       !sized(variants) ||
@@ -281,28 +293,36 @@ export function registerCompareRoutes(
         variants.length,
       )
     )
-      return res.status(400).json({
-        ok: false,
-        error: `Choose ${range} image variants, each with a label and settings.`,
-      });
-    const ownerId = owner(req);
+      return {
+        status: 400,
+        payload: {
+          ok: false,
+          error: `Choose ${range} image variants, each with a label and settings.`,
+        },
+      };
+    if (
+      (axis !== undefined && !labelsValid([axis], 1)) ||
+      (projectId !== undefined && (typeof projectId !== "string" || !projectId))
+    )
+      return { status: 400, payload: { ok: false, error: "Name the axis and project as text." } };
+    const ownerId = account?.userId || "";
     if (
       sessionId !== undefined &&
       (typeof sessionId !== "string" || !store.session(ownerId, sessionId))
     )
-      return res.status(404).json({ ok: false, error: "Session not found." });
+      return { status: 404, payload: { ok: false, error: "Session not found." } };
     if (
       parentJobId !== undefined &&
       (typeof parentJobId !== "string" ||
         !store.job(ownerId, parentJobId) ||
         store.job(ownerId, parentJobId)?.sessionId !== sessionId)
     )
-      return res.status(404).json({ ok: false, error: "Source generation not found." });
+      return { status: 404, payload: { ok: false, error: "Source generation not found." } };
     if (
       parentItemId !== undefined &&
       (typeof parentItemId !== "string" || !items.some((item) => item.id === parentItemId))
     )
-      return res.status(404).json({ ok: false, error: "Source image not found." });
+      return { status: 404, payload: { ok: false, error: "Source image not found." } };
     const requested = String(variants[0].input.seed ?? "");
     const seed = /^\d+$/.test(requested) ? requested : String(randomInt(2 ** 32));
     const id = randomUUID();
@@ -313,7 +333,7 @@ export function registerCompareRoutes(
       const resultSet = comparisonSet(id, index, String(variant.label).trim());
       const result = await options.admit(
         { ...input, kind: "image", seed, count: 1, resultSet },
-        req.studioAccount,
+        account ?? undefined,
         {
           sessionId: session,
           operation: "image",
@@ -326,7 +346,7 @@ export function registerCompareRoutes(
         await Promise.all(
           jobIds.map((jobId) => options.cancel(ownerId, jobId).catch(() => undefined)),
         );
-        return res.status(result.status).json(result.payload);
+        return { status: result.status, payload: result.payload };
       }
       jobIds.push(String(result.payload.jobId));
     }
@@ -338,18 +358,22 @@ export function registerCompareRoutes(
       jobIds,
       labels: variants.map((variant) => String(variant.label).trim()),
       vote: null,
+      ...(axis ? { axis: String(axis).trim() } : {}),
+      ...(projectId ? { projectId } : {}),
     };
     save(record);
-    return res.status(201).json({ ...show(record, items), sessionId: session });
+    return { status: 201, payload: { ...show(record, items), sessionId: session } };
   });
-  app.put("/api/comparisons/:id/vote", (req, res) => {
-    const items = gallery(req, res);
-    if (!items) return;
+  directRoute(app, "PUT", "/api/comparisons/:id/vote", (account, { params, body }) => {
+    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    if (!items) return galleryOff;
     const records = options.read();
-    const record = records.find((item) => item.id === req.params.id && item.ownerId === owner(req));
+    const record = records.find(
+      (item) => item.id === params.id && item.ownerId === (account?.userId || ""),
+    );
     if (!record)
-      return res.status(404).json({ ok: false, error: "That comparison is unavailable." });
-    const { itemId, jobId } = req.body || {};
+      return { status: 404, payload: { ok: false, error: "That comparison is unavailable." } };
+    const { itemId, jobId, by } = body || {};
     const clear = itemId === null || (itemId === undefined && jobId === null);
     const variants = record.jobIds.map((_, index) => recordItem(record, items, index));
     const winner = clear
@@ -358,18 +382,25 @@ export function registerCompareRoutes(
           itemId !== undefined ? item?.id === itemId : item?.jobId === jobId,
         );
     if (!clear && (!winner || winner.status !== "done"))
-      return res.status(400).json({ ok: false, error: "Choose a finished, available variant." });
+      return {
+        status: 400,
+        payload: { ok: false, error: "Choose a finished, available variant." },
+      };
     record.vote = winner?.jobId || null;
     if (winner) record.winnerItemId = winner.id;
     else delete record.winnerItemId;
     record.votedAt = new Date().toISOString();
     options.write(records);
+    let brief = null;
     if (winner) {
       const others = variants.filter((item): item is GalleryItem =>
         Boolean(item && item.id !== winner.id && item.status === "done"),
       );
       options.voted?.(record.ownerId, winner, others);
+      const label = record.labels?.[variants.indexOf(winner)];
+      if (record.axis && record.projectId && label)
+        brief = options.picked?.(record, label, by === "chat" ? "chat" : "studio") ?? null;
     }
-    return res.json(show(record, items));
+    return { status: 200, payload: { ...show(record, items), ...(brief ? { brief } : {}) } };
   });
 }
