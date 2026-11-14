@@ -89,6 +89,7 @@ export function CharacterMenu({
   onGenerate,
   onSheet,
   onDelete,
+  onUse,
   withinPortal = true,
 }: {
   card: CharacterCard;
@@ -96,6 +97,8 @@ export function CharacterMenu({
   onGenerate: () => void;
   onSheet: () => void;
   onDelete: () => void;
+  /** Library's Use in Composer; the References sheet picks a card by its tile instead. */
+  onUse?: () => void;
   /** Off inside a popover, so choosing an item is not a press outside it. */
   withinPortal?: boolean;
 }) {
@@ -110,6 +113,17 @@ export function CharacterMenu({
         <ActionMenuItems
           groups={[
             [
+              ...(onUse
+                ? [
+                    {
+                      id: "use",
+                      label: "Use in Composer",
+                      icon: icons.prompt,
+                      disabled: !card.references.length,
+                      onClick: onUse,
+                    },
+                  ]
+                : []),
               { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
               {
                 id: "generate",

@@ -95,6 +95,43 @@ test("Picking a character on an img2img model moves the composer to a model that
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
 });
 
+test("Use in Composer stages Library cards in the composer, moving to a model that keeps characters", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.characters.push(mara);
+  const harbour = "a foggy harbour at dawn";
+  state.scenes.push({ id: "scene-1", name: "Harbour", description: harbour, references: [] });
+  const keeper = {
+    ...profiles[0],
+    id: "image:keeper",
+    label: "Keeper Fast",
+    displayName: "Keeper Fast",
+    editReferences: true,
+    keepsCharacters: true,
+  };
+  await serveProfiles(page, [...profiles, keeper]);
+  await page.goto("/library#characters");
+  await page.getByRole("button", { name: "Actions for Mara", exact: true }).click();
+  // The usual action leads the card's menu.
+  await expect(page.getByRole("menuitem").first()).toHaveText("Use in Composer");
+  await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
+  await expect(page).toHaveURL(/\/images\?.*compose=1/);
+  await expect(
+    page.getByText(
+      "Switched to Keeper Fast, which keeps a character's face and build in new scenes.",
+    ),
+  ).toBeVisible();
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(prompt).toHaveValue(withCharacter("", mara.description));
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+
+  await page.goto("/library#scenes");
+  await page.getByRole("button", { name: "Actions for Harbour", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Use in Composer", exact: true }).click();
+  await expect(prompt).toHaveValue(withCharacter(scenePart(harbour, true), mara.description));
+});
+
 test("New Character saves a name, description and gallery images from the References sheet", async ({
   page,
 }) => {

@@ -14,6 +14,7 @@ import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
 import { charactersQuery, type CharacterCard } from "./queries";
+import { useCardInComposer } from "./useCardInComposer";
 
 /**
  * Library › Characters: every card the account keeps, to search, edit and delete, after the cards
@@ -24,6 +25,7 @@ import { charactersQuery, type CharacterCard } from "./queries";
 export function LibraryCharacters({ heading }: { heading: ReactNode }) {
   const characters = useQuery(charactersQuery);
   const dialogs = useCharacterDialogs();
+  const use = useCardInComposer();
   const [query, setQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
@@ -87,6 +89,7 @@ export function LibraryCharacters({ heading }: { heading: ReactNode }) {
                       onGenerate={() => dialogs.generate(card)}
                       onSheet={() => dialogs.sheet(card)}
                       onDelete={() => dialogs.remove(card)}
+                      onUse={() => use.character(card)}
                     />
                   </Group>
                 </Group>
