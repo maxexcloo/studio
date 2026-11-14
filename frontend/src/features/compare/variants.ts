@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile } from "../../types";
 import { compareVariants } from "../../../../shared/compare";
@@ -158,12 +157,11 @@ export function useDraftComparison() {
   return { variants, labels, profileOf, blockedReason };
 }
 
-/** Queues the composer's variants as one comparison with a shared seed, then shows it. */
-export function useCompareRun(onSubmitted?: () => void) {
+/** Queues the composer's variants as one comparison with a shared seed. */
+export function useCompareRun(onQueued: (comparisonId: string) => void) {
   const { draft } = useGeneration();
   const { variants, labels, profileOf } = useDraftComparison();
   const client = useQueryClient();
-  const navigate = useNavigate();
   return useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
@@ -192,8 +190,7 @@ export function useCompareRun(onSubmitted?: () => void) {
       client.setQueryData(["comparison", comparison.id], comparison);
       for (const queryKey of [queueQuery.queryKey, ["gallery"], ["comparisons"]])
         void client.invalidateQueries({ queryKey });
-      onSubmitted?.();
-      navigate(`/compare/${comparison.id}`);
+      onQueued(comparison.id);
     },
   });
 }

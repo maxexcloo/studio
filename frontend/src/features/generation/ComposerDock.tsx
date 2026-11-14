@@ -1,22 +1,39 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
-import { useLocation, useSearchParams } from "react-router";
-import type { OpenComposerState } from "./openComposer";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { api, failure } from "../../api";
-import type { ReferenceAsset } from "../../types";
+import type { MediaKind, ReferenceAsset } from "../../types";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
 import { useKeyboard, useKeyboardDrop, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
-/** The gallery's generation composer; it answers `?compose=1` and shared images. */
-export function ComposerDock() {
-  const [params, setParams] = useSearchParams();
-  const [opened, { open, close }] = useDisclosure(params.get("compose") === "1");
+/**
+ * The gallery's generation composer; it answers `?compose=1` and shared images. The gallery passes
+ * what it needs from the URL, so stepping through the viewer doesn't render it.
+ */
+export const ComposerDock = memo(function ComposerDock({
+  compose,
+  shared,
+  opening,
+  onDropParam,
+  onKindChange,
+  onCompared,
+}: {
+  /** The `compose` parameter. */
+  compose: string | null;
+  /** The `shared` parameter: an image shared to the installed app. */
+  shared: string;
+  /** The key of a navigation from `useOpenComposer`, asking the composer to open. */
+  opening: string;
+  onDropParam: (name: string) => void;
+  onKindChange: (kind: MediaKind) => void;
+  onCompared: (comparisonId: string) => void;
+}) {
+  const [opened, { open, close }] = useDisclosure(compose === "1");
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
@@ -93,13 +110,12 @@ export function ComposerDock() {
   const dockKeyboard = useKeyboard(typingInDock);
   const keyboardInset = dockKeyboard.inset;
   useEffect(() => {
-    if (params.get("compose") === "1") open();
-  }, [params, open]);
+    if (compose === "1") open();
+  }, [compose, open]);
   // An action staging a draft (`useOpenComposer`) opens the composer with its prompt focused, even
   // when it is already open; phones bring up the sheet and leave the keyboard down.
-  const location = useLocation();
   useEffect(() => {
-    if (!(location.state as OpenComposerState | null)?.openComposer) return;
+    if (!opening) return;
     focusIntent.current = "[data-expanded-prompt]";
     open();
     if (phone) return;
@@ -109,17 +125,14 @@ export function ComposerDock() {
         ?.focus({ preventScroll: true }),
     );
     return () => cancelAnimationFrame(frame);
-  }, [location.key]);
+  }, [opening]);
   // An image shared to the installed app (POST /share) arrives as a reference to place.
-  const shared = params.get("shared") || "";
   useEffect(() => {
     if (!shared) return;
     void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
       .then(({ asset }) => placement.place(asset))
       .catch(failure);
-    const next = new URLSearchParams(params);
-    next.delete("shared");
-    setParams(next, { replace: true });
+    onDropParam("shared");
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
@@ -127,11 +140,7 @@ export function ComposerDock() {
     setTappedField(false);
     close();
     setExpanded(false);
-    if (params.has("compose")) {
-      const next = new URLSearchParams(params);
-      next.delete("compose");
-      setParams(next, { replace: true });
-    }
+    if (compose !== null) onDropParam("compose");
   }
   const submitted = () => collapse();
   // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the
@@ -261,7 +270,7 @@ export function ComposerDock() {
               open();
             }}
           >
-            <GenerationForm compact />
+            <GenerationForm compact onKindChange={onKindChange} onCompared={onCompared} />
           </Paper>
         )}
         {!phone && (
@@ -290,6 +299,8 @@ export function ComposerDock() {
                 >
                   <GenerationForm
                     onSubmitted={submitted}
+                    onKindChange={onKindChange}
+                    onCompared={onCompared}
                     focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
                   />
                 </div>
@@ -356,10 +367,15 @@ export function ComposerDock() {
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
           >
-            <GenerationForm fill onSubmitted={submitted} />
+            <GenerationForm
+              fill
+              onSubmitted={submitted}
+              onKindChange={onKindChange}
+              onCompared={onCompared}
+            />
           </div>
         </Drawer>
       )}
     </>
   );
-}
+});

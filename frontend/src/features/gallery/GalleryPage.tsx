@@ -21,7 +21,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
 import { api } from "../../api";
-import type { MediaItem } from "../../types";
+import type { MediaItem, MediaKind } from "../../types";
 import { MediaGrid } from "./MediaGrid";
 import { MorePages } from "./MorePages";
 import { RunsView } from "./RunsView";
@@ -31,6 +31,7 @@ import { currentMedia } from "./mediaSource";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { ComposerDock } from "../generation/ComposerDock";
+import type { OpenComposerState } from "../generation/openComposer";
 import { GallerySelectionBar } from "./GallerySelectionBar";
 import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "../settings/accountPreferences";
@@ -232,14 +233,14 @@ export function GalleryPage() {
   // The image ranks first, being most like itself, unless the filters leave it out.
   const similarSource = loaded.find((item) => item.id === similar);
   const tryAgain = useTryAgain(loaded);
-  // Stable, so the views' memoised tiles render only when their own item changes: `setParams`
-  // changes with every search, including each step through the viewer.
-  const latestSetParams = useRef(setParams);
-  latestSetParams.current = setParams;
+  // Stable, so the views' memoised tiles and the composer render only when their own state
+  // changes: `setParams` and the search change with every step through the viewer.
+  const latest = useRef({ setParams, search: location.search });
+  latest.current = { setParams, search: location.search };
   const openItem = useCallback((item: MediaItem, run?: string) => {
     setFocusItem(null);
     setRun(run);
-    latestSetParams.current(
+    latest.current.setParams(
       (next) => {
         next.set("item", item.id);
         return next;
@@ -247,6 +248,30 @@ export function GalleryPage() {
       { state: { viewer: true } },
     );
   }, []);
+  const dropParam = useCallback(
+    (name: string) =>
+      latest.current.setParams(
+        (next) => {
+          next.delete(name);
+          return next;
+        },
+        { replace: true },
+      ),
+    [],
+  );
+  // The composer's output toggle switches the gallery; the route restores that output's draft.
+  const switchKind = useCallback(
+    (next: MediaKind) =>
+      routerNavigate({
+        pathname: next === "video" ? "/video" : "/images",
+        search: latest.current.search,
+      }),
+    [routerNavigate],
+  );
+  const showCompared = useCallback(
+    (id: string) => routerNavigate(`/compare/${id}`),
+    [routerNavigate],
+  );
   const showItem = useCallback(
     (item: MediaItem) => {
       // Moving to another set's results flips through that set.
@@ -501,7 +526,16 @@ export function GalleryPage() {
         </EmptyState>
       )}
       <MorePages listing={gallery} results={JSON.stringify(galleryKey)} paused={!!itemId} />
-      {!selection.selecting && <ComposerDock />}
+      {!selection.selecting && (
+        <ComposerDock
+          compose={params.get("compose")}
+          shared={params.get("shared") || ""}
+          opening={(location.state as OpenComposerState | null)?.openComposer ? location.key : ""}
+          onDropParam={dropParam}
+          onKindChange={switchKind}
+          onCompared={showCompared}
+        />
+      )}
       {selected && (
         <MediaViewer
           item={currentMedia(loaded, selected)}
