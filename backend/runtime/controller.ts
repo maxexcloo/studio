@@ -114,6 +114,8 @@ export class RuntimeController {
   private stopping = new Set<string>();
   private stopListeners = new Set<(id: string) => void>();
   private current?: RuntimeOperation;
+  /** Who cancelled the running change, which stops at its next check. */
+  private cancelledBy?: string;
   private claimed = false;
   private record: RuntimeRecord;
   private engine: RuntimeEngine;
@@ -146,6 +148,12 @@ export class RuntimeController {
     let interrupted = false;
     for (const operation of this.record.operations)
       if (operation.status === "running") {
+        // Scaling steps are the only ones that change anything; without one, what ran still runs.
+        if (
+          operation.type === "apply" &&
+          !operation.steps.some((step) => /^(Stopping|Starting) /.test(step.message))
+        )
+          this.record.desired = operation.before;
         Object.assign(operation, {
           status: "interrupted",
           finishedAt: this.timestamp(),
@@ -244,11 +252,9 @@ export class RuntimeController {
   private parkedCache?: { until: number; result: Promise<Set<string>> };
   /**
    * The workloads deliberately scaled to zero, cached for five seconds since every status read asks.
-   * A deployment Studio cannot read is not parked, so its worker still shows as down. With automatic
-   * lifecycle control, queued work starts what it needs, so nothing is held back as parked.
+   * A deployment Studio cannot read is not parked, so its worker still shows as down.
    */
   parked(): Promise<Set<string>> {
-    if (this.automaticLifecycle) return Promise.resolve(new Set());
     if (this.parkedCache && this.parkedCache.until > this.now()) return this.parkedCache.result;
     const result = Promise.all(
       this.workloads.map((workload) =>
@@ -456,6 +462,7 @@ export class RuntimeController {
   ) {
     const deadline = this.now() + limit;
     for (;;) {
+      if (this.cancelledBy) throw new Error(`Cancelled by ${this.cancelledBy}.`);
       const waiting = await check();
       if (waiting === undefined) return;
       if (this.now() >= deadline)
@@ -467,19 +474,23 @@ export class RuntimeController {
 
   private async run(operation: RuntimeOperation, plan: Plan) {
     const label = (id: string) => this.workload(id).label;
+    let scaled = false;
     try {
       // New work for a leaving workload waits (acquire refuses it); accepted work finishes and saves first.
       await this.until(
         operation,
         this.timeouts.drain,
         async () => {
-          const busy = plan.stop.filter((id) => this.active.get(id));
+          // Work can't run on a workload without pods, so its leases hold nothing back.
+          const states = await this.states();
+          const busy = plan.stop.filter((id) => this.active.get(id) && holds(states.get(id)!));
           if (!busy.length) return;
           const count = busy.reduce((sum, id) => sum + (this.active.get(id) ?? 0), 0);
           return `Waiting for ${plural(count, "accepted operation")} on ${busy.map(label).join(", ")} to finish.`;
         },
         "; nothing was stopped",
       );
+      scaled = true;
       for (const id of plan.stop) {
         this.step(operation, `Stopping ${label(id)}.`);
         await this.engine.scale(this.workload(id), 0);
@@ -524,6 +535,15 @@ export class RuntimeController {
         () => undefined,
       );
       if (operation.after === undefined) delete operation.after;
+      // A change that gave up before scaling anything, or was cancelled, leaves what runs as the
+      // placement, so reconcile doesn't retry it as if the workloads had been stopped outside Studio.
+      if (
+        operation.type === "apply" &&
+        operation.status === "failed" &&
+        (!scaled || this.cancelledBy)
+      )
+        this.record.desired = operation.after ?? plan.holders;
+      this.cancelledBy = undefined;
       this.current = undefined;
       this.save();
     }
@@ -533,7 +553,7 @@ export class RuntimeController {
    * Admit work on the first ready candidate. Several deployments can serve one worker address (a
    * one- and a two-GPU video deployment behind one Service); the first is the one to start.
    */
-  async acquire(candidates: string | string[]): Promise<RuntimeLease> {
+  async acquire(candidates: string | string[], work = "queued work"): Promise<RuntimeLease> {
     const choices = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!choices.length) throw new RuntimeUnavailable("The selected workload is not configured.");
     const states = await Promise.all(choices.map((workload) => this.engine.state(workload)));
@@ -572,7 +592,7 @@ export class RuntimeController {
       throw new RuntimeUnavailable(
         `Waiting for ${workload.label} to start after the current runtime change.`,
       );
-    await this.switchTo(workload);
+    await this.switchTo(workload, work);
     throw new RuntimeUnavailable(`Waiting for ${workload.label} to start.`);
   }
 
@@ -653,7 +673,7 @@ export class RuntimeController {
    * Automatic lifecycle: start a media workload in place of media in its pool, idle ones first. If
    * running text holds the GPUs it needs, nothing changes and the work waits.
    */
-  private async switchTo(workload: Workload) {
+  private async switchTo(workload: Workload, work: string) {
     this.claim();
     try {
       const states = await this.states();
@@ -668,7 +688,7 @@ export class RuntimeController {
           ),
         );
       const plan = this.placementWith(workload, states, this.runningText(states));
-      this.begin("apply", plan, "automatic");
+      this.begin("apply", plan, `automatic: starting ${workload.label} for ${work}`);
     } finally {
       this.claimed = false;
     }
@@ -790,6 +810,13 @@ export class RuntimeController {
     } finally {
       this.claimed = false;
     }
+  }
+
+  /** Stop the running change at its next check; what it already stopped or started stays so. */
+  cancel(id: string, requestedBy: string) {
+    if (this.current?.id !== id) throw new RuntimeConflict("That change is no longer running.");
+    this.cancelledBy = requestedBy;
+    return structuredClone(this.current);
   }
 
   operation(id: string) {

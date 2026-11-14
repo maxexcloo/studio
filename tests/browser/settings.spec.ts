@@ -657,6 +657,92 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   expect(previews.at(-1)).toEqual({ start: ["video"] });
 });
 
+test("Workers keep a stopped workload quiet and stop a running change on request", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const unreachable = "The direct runtime could not be reached.";
+  // One worker address serves both video workloads: one should run and can't, one is stopped.
+  await page.route("**/api/services/status", (route) =>
+    route.fulfill({
+      json: {
+        services: {
+          video: {
+            state: "offline",
+            reason: "No runtime answered its health check.",
+            endpoints: [
+              {
+                id: "video-worker",
+                label: "Video",
+                state: "offline",
+                reason: unreachable,
+                workloads: ["video", "video-tp2"],
+              },
+            ],
+          },
+        },
+        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+      },
+    }),
+  );
+  const workload = (id: string, label: string, phase: string, gpus = 1) => ({
+    id,
+    label,
+    kind: "video",
+    pool: "gpu",
+    gpus,
+    phase,
+    replicas: phase === "parked" ? 0 : 1,
+    ready: 0,
+    acceptedOperations: 0,
+  });
+  const operation = {
+    id: "stuck",
+    type: "apply",
+    status: "running",
+    requestedBy: "restoring the last placement after an outside stop",
+    startedAt: stamp,
+    before: ["video"],
+    target: ["video-tp2"],
+    stop: ["video"],
+    start: ["video-tp2"],
+    progress: "Waiting for 1 accepted operation on Video to finish.",
+    steps: [],
+  };
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({
+      json: {
+        settings: { automatic: false, parkIdleMinutes: 0 },
+        pools: [{ id: "gpu", capacity: 2, used: 1 }],
+        operation,
+        history: [operation],
+        workloads: [
+          workload("video", "Video", "starting"),
+          workload("video-tp2", "Both GPUs", "parked", 2),
+        ],
+      },
+    }),
+  );
+  const cancelled: string[] = [];
+  await page.route("**/api/runtime/operations/*/cancel", (route) => {
+    cancelled.push(new URL(route.request().url()).pathname);
+    return route.fulfill({ json: operation });
+  });
+  await page.goto("/settings");
+  await section(page, "Settings", "Workers");
+  const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
+  await expect(table.getByRole("row", { name: "Video", exact: true })).toContainText(unreachable);
+  const stopped = table.getByRole("row", { name: "Both GPUs", exact: true });
+  await expect(stopped).toContainText("Stopped");
+  await expect(stopped).not.toContainText(unreachable);
+  await page.getByRole("button", { name: "Stop Change", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Stop Change", exact: true });
+  await dialog.getByRole("button", { name: "Stop Change", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(cancelled).toEqual(["/api/runtime/operations/stuck/cancel"]);
+});
+
 test("Status counts running workers, reads a parked service as Stopped and offers no Start", async ({
   page,
 }) => {
