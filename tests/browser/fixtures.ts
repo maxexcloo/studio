@@ -1214,6 +1214,9 @@ export async function serveDream(
     projects?: any[];
     /** When the visit before this one ended. */
     since?: string;
+    /** Library › Characters' suggested cards; accepting one adds it to `characters`. */
+    suggestions?: any[];
+    characters?: any[];
   } = {},
 ) {
   const state = {
@@ -1231,6 +1234,7 @@ export async function serveDream(
     calibration: options.calibration ?? [],
     judged: new Set<string>(),
     projects: options.projects ?? [],
+    suggestions: options.suggestions ?? [],
     requests: [] as { method: string; path: string; body: any }[],
   };
   // As the backend, without ranking: single results by project in the order given, misses apart.
@@ -1329,6 +1333,31 @@ export async function serveDream(
           nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
         },
       });
+    }
+    if (path === "/api/dream/suggestions")
+      return route.fulfill({ json: { suggestions: state.suggestions } });
+    const suggested = /^\/api\/dream\/suggestions\/([^/]+)\/(accept|dismiss)$/.exec(path);
+    if (suggested) {
+      const suggestion = state.suggestions.find((entry) => entry.id === suggested[1]);
+      state.suggestions = state.suggestions.filter((entry) => entry !== suggestion);
+      if (suggested[2] === "dismiss") return route.fulfill({ json: { ok: true } });
+      const card = {
+        id: `chr-${suggestion.id}`,
+        name: suggestion.name,
+        description: suggestion.description,
+        referenceIds: suggestion.items.map((item: any) => item.id),
+        references: suggestion.items.map((item: any) => ({
+          id: item.id,
+          name: "Character Image",
+          thumbnailUrl: item.thumbnailUrl,
+          url: item.url,
+          width: 1024,
+          height: 1024,
+        })),
+        missing: 0,
+      };
+      options.characters?.push(card);
+      return route.fulfill({ json: { card } });
     }
     if (path === "/api/dream/projects") {
       if (method === "GET") return route.fulfill({ json: { projects: state.projects } });

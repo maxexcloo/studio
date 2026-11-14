@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
+import type { CardKind } from "../../../../shared/characters";
 import type { DigestGroup, Project, Review } from "../../../../shared/projects";
 
 /** One account's Dream settings (backend/domain/dream.ts). */
@@ -92,3 +93,22 @@ export const projectsQuery = queryOptions({
 });
 export const projectPath = (project: { id: string }, action = "") =>
   `/api/dream/projects/${encodeURIComponent(project.id)}${action && `/${action}`}`;
+
+/**
+ * A recurring character, outfit or scene Dream proposes from liked results (backend/domain/dream.ts),
+ * with the results it recurs in.
+ */
+export interface CardSuggestion {
+  id: string;
+  kind: CardKind;
+  name: string;
+  description: string;
+  items: MediaItem[];
+}
+export const suggestionsQuery = queryOptions({
+  queryKey: ["dream", "suggestions"],
+  queryFn: async () =>
+    (await api<{ suggestions: CardSuggestion[] }>("/api/dream/suggestions")).suggestions,
+});
+export const suggestionPath = (suggestion: { id: string }, action: "accept" | "dismiss") =>
+  `/api/dream/suggestions/${encodeURIComponent(suggestion.id)}/${action}`;
