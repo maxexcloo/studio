@@ -31,7 +31,7 @@ Use a [released](https://github.com/maxexcloo/studio/releases) version of `ghcr.
 
 Mount a writable Studio data directory for media and editable definitions; it is the only source of live profiles, guides and catalogue data. Configure worker URLs and server-side credentials as described in [Configuration](#configuration). See [worker operations](worker/README.md) and [profiles](backend/samples/README.md).
 
-Run one application replica with `Recreate`; two schedulers must not control the same workers or SQLite database. Back up data while Studio is stopped, or use a SQLite-aware snapshot for the database alongside its media files; never copy a live SQLite database without its WAL state. Before an update that migrates data, rehearse the [migration and restore](#data--migrations) on a copy.
+Run one application replica with `Recreate`; two schedulers must not control the same workers or SQLite database.
 
 ## Configuration
 
@@ -108,7 +108,7 @@ Library › Imports downloads to the `models` worker. `CIVITAI_API_TOKEN` and `H
 
 ### Profiles, Guides & Catalogue
 
-Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version. The sample profiles in `backend/samples/` seed only a data folder that has never held a profile. Merges, combined backends and removals back up what they change under `backups/` in the data folder.
+Studio's data folder is the only source of live definitions: profiles in `workflows/`, prompting guides in `guides/` and catalogue changes in `library/`. Administrators edit, approve, export and revert them in Library; every edit keeps a version. The sample profiles in `backend/samples/` seed only a data folder that has never held a profile.
 
 A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the shared fields, the backend it runs on and each backend's own block, whose fields replace the shared ones of the same name:
 
@@ -132,22 +132,21 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the
 
 `studio.sqlite` in the data folder holds the queue, sessions, accounts, the gallery and the other runtime records; profiles, guides, `config/models.json`, `library/catalogue.json` and media stay files. Studio refuses to start on a folder whose storage predates the current format and names what is pending.
 
-Data moves only through `migrate-runtime`, run with Studio stopped. Take a ZFS snapshot of the data first, then dry-run, apply and rehearse the restore of the backup it writes under `.backups/`:
+Data moves only through `migrate-runtime`, run with Studio stopped: dry-run, then apply. Studio keeps no backups of its data.
 
 ```sh
 node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data
 node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --apply
-node backend/commands/migrate-runtime.mjs --restore /path/to/studio-data/.backups/STAMP --destination /empty/restore-rehearsal
 ```
 
 The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. Four steps are pending, all safe online:
 
-- `chatRecords` deletes what Studio's own Chat stored: the `studio_chat_messages` table, the Chats list's session marks, the Chat preference and each group's Chat feature. Sessions (which hold the queue's job records), MCP's records and the gateway links stay. It keeps no backup, so its `--restore` is impossible.
-- `pruneBackups` deletes the data folder's `backups/` (copies kept by profile edits, removals, merges and backend combines) and `.backups/` (earlier migration backups and version snapshots), listing each folder with its size first. Their `--restore`s are then impossible.
-- `missingComfyOutputs` deletes gallery records whose file lived only in a worker's ComfyUI output folder (a `/comfy/view` link that isn't Studio media) and is gone, as that folder doesn't survive a worker restart. It asks the worker that made each record for the file: only a 404 marks it missing, and a worker that doesn't answer leaves the rest unknown, so nothing is deleted for it. The dry run reports how many it checked, found missing and left unknown, with a few examples. Applying removes the records with their captions and search vectors, without a backup. It needs the running workers, so it runs only through `POST /api/maintenance/migrations`.
+- `chatRecords` deletes what Studio's own Chat stored: the `studio_chat_messages` table, the Chats list's session marks, the Chat preference and each group's Chat feature. Sessions (which hold the queue's job records), MCP's records and the gateway links stay.
+- `pruneBackups` deletes the backups and leftovers earlier builds wrote: `backups/` (copies kept by profile edits, removals, merges and backend combines), `.backups/` (migration backups and version snapshots) with its `.version` marker, `.bak` copies beside JSON files and the old `logs/` folder, listing each with its size first.
+- `missingComfyOutputs` deletes gallery records whose file lived only in a worker's ComfyUI output folder (a `/comfy/view` link that isn't Studio media) and is gone, as that folder doesn't survive a worker restart. It asks the worker that made each record for the file: only a 404 marks it missing, and a worker that doesn't answer leaves the rest unknown, so nothing is deleted for it. The dry run reports how many it checked, found missing and left unknown, with a few examples. Applying removes the records with their captions and search vectors. It needs the running workers, so it runs only through `POST /api/maintenance/migrations`.
 - `comparisonSets` makes each earlier compare run a result set, as new runs are: its variants' gallery results take the comparison's set, so the gallery keeps them together and links back. Runs whose results already have a set, and Compare Selected comparisons, stay as they are. The dry run counts the comparisons and results it would change, with a few examples. It patches the running gallery, so it runs only through `POST /api/maintenance/migrations`.
 
-`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results without a backup; supply it only for the one account that used Dream. To roll back, stop Studio, roll the data back to the snapshot and deploy the previous image. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
+`--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream. Administrators can inspect the steps online with `POST /api/maintenance/migrations` (`{ "apply": true }` applies only steps that are safe online).
 
 ### Runtime Control
 

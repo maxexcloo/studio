@@ -2,16 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * The migrate-runtime step that deletes the data folder's backup folders: `backups/` (copies kept
- * by profile edits, removals, merges and backend combines) and `.backups/` (earlier migration
- * backups and the snapshots a new version takes on start). Studio writes these but reads them only
- * when a profile has no version history yet, so the step is safe while Studio runs. Plans by
- * default, listing each folder in them with its size; `apply` deletes both folders. Their
- * `--restore`s are then impossible. A second run finds nothing.
+ * The migrate-runtime step that deletes the backups and leftovers older builds wrote into the data
+ * folder: `backups/` (copies kept by profile edits, removals, merges and backend combines),
+ * `.backups/` (migration backups and the snapshots a new version took on start) with its
+ * `.version` marker, the `.bak` copies beside JSON files and `logs/` (logs now go to stdout).
+ * Studio no longer reads any of them, so the step is safe while Studio runs. Plans by default,
+ * listing what it would delete with its size; `apply` deletes it. A second run finds nothing.
  */
-export const pruneBackupsNote =
-  "Deletes these backups for good: no --restore from them is possible afterwards.";
-const roots = ["backups", ".backups"];
+export const pruneBackupsNote = "Deletes these backups and old logs for good.";
+const roots = ["backups", ".backups", "logs", ".version"];
+// Media and caches hold no JSON stores, and walking them is slow.
+const unwalked = new Set(["media", ".thumbnails", ".video-previews", "image-search", ...roots]);
 
 function bytesIn(target) {
   const stat = fs.lstatSync(target);
@@ -22,22 +23,22 @@ function bytesIn(target) {
 }
 
 export function pruneBackups(dataDir, { apply = false } = {}) {
-  const folders = roots
-    .filter((root) => fs.existsSync(path.join(dataDir, root)))
-    .flatMap((root) => {
-      const entries = fs.readdirSync(path.join(dataDir, root)).sort();
-      // An empty root is still listed, so the step deletes it.
-      return entries.length ? entries.map((name) => path.join(root, name)) : [root];
-    })
-    .map((folder) => ({ path: folder, bytes: bytesIn(path.join(dataDir, folder)) }));
+  const listed = [
+    ...roots.filter((root) => fs.existsSync(path.join(dataDir, root))),
+    ...fs.globSync(["**/*.json.bak", "**/.*.json.bak"], {
+      cwd: dataDir,
+      exclude: (name) => unwalked.has(name),
+    }),
+  ];
+  const paths = listed.map((item) => ({ path: item, bytes: bytesIn(path.join(dataDir, item)) }));
   const result = {
     applied: false,
     note: pruneBackupsNote,
-    folders,
-    bytes: folders.reduce((total, folder) => total + folder.bytes, 0),
+    paths,
+    bytes: paths.reduce((total, item) => total + item.bytes, 0),
   };
-  if (!apply || !folders.length) return result;
-  for (const root of roots) fs.rmSync(path.join(dataDir, root), { recursive: true, force: true });
+  if (!apply || !paths.length) return result;
+  for (const item of listed) fs.rmSync(path.join(dataDir, item), { recursive: true, force: true });
   result.applied = true;
   return result;
 }
