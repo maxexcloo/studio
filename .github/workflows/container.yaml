@@ -15,9 +15,10 @@ on:
 permissions:
   contents: read
 
-# A newer push supersedes a running one: only the latest main commit is released and deployed.
+# A newer push supersedes a pull request's run; main runs finish, and Release skips any commit a
+# newer release already includes.
 concurrency:
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: studio-${{ github.ref }}
 
 env:
@@ -212,7 +213,7 @@ jobs:
           # The worker gets a version only when it changed since the last release, so a deployment's
           # GPU workers restart only for that. Nothing is tagged until both images are known, so a
           # failed run never leaves a version behind for the next run to reuse.
-          worker_paths=(.dockerignore .github/workflows/worker.yaml LICENSE NOTICE worker ':(exclude,glob)worker/**/*.md')
+          mapfile -t worker_paths < <(yq '.on.push.paths[] | sub("^!", ":(exclude,glob)")' .github/workflows/worker.yaml)
           worker_commit="$(git log -1 --first-parent --format=%H -- "${worker_paths[@]}")"
           latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
           worker=""
