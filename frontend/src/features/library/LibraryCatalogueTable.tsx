@@ -155,6 +155,7 @@ export function LibraryCatalogueTable({
   const withModelType = models && items.some((item) => item.modelType);
   // LoRA types are set only by editing an entry; until one is, every row would read Unclassified.
   const withType = models || items.some((item) => item.type);
+  const families = unique(items.flatMap(familiesOf));
   const typeLabel = (item: LibraryItem) =>
     [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
   const inView = items.filter((item) =>
@@ -178,21 +179,22 @@ export function LibraryCatalogueTable({
           onViewChange={setView}
           query={query}
           onQueryChange={setQuery}
+          // LoRAs filter by family alone, beside the search; models keep their filters' popup.
           filters={
-            <>
-              <Select
-                label="Family"
-                placeholder="All Families"
-                data={unique(items.flatMap(familiesOf))}
-                value={family}
-                onChange={setFamily}
-                clearable
-                searchable
-                openOnFocus={false}
-                comboboxProps={{ withinPortal: false }}
-                data-mantine-stop-propagation
-              />
-              {withType && (
+            models && (
+              <>
+                <Select
+                  label="Family"
+                  placeholder="All Families"
+                  data={families}
+                  value={family}
+                  onChange={setFamily}
+                  clearable
+                  searchable
+                  openOnFocus={false}
+                  comboboxProps={{ withinPortal: false }}
+                  data-mantine-stop-propagation
+                />
                 <Select
                   label="Type"
                   placeholder="All Types"
@@ -203,24 +205,24 @@ export function LibraryCatalogueTable({
                   comboboxProps={{ withinPortal: false }}
                   data-mantine-stop-propagation
                 />
-              )}
-              {withModelType && (
-                <Select
-                  label="Model Type"
-                  placeholder="All Model Types"
-                  data={[
-                    { value: "original", label: "Original" },
-                    { value: "finetune", label: "Fine-Tune" },
-                    { value: "unclassified", label: "Unclassified" },
-                  ]}
-                  value={modelType}
-                  onChange={setModelType}
-                  clearable
-                  comboboxProps={{ withinPortal: false }}
-                  data-mantine-stop-propagation
-                />
-              )}
-            </>
+                {withModelType && (
+                  <Select
+                    label="Model Type"
+                    placeholder="All Model Types"
+                    data={[
+                      { value: "original", label: "Original" },
+                      { value: "finetune", label: "Fine-Tune" },
+                      { value: "unclassified", label: "Unclassified" },
+                    ]}
+                    value={modelType}
+                    onChange={setModelType}
+                    clearable
+                    comboboxProps={{ withinPortal: false }}
+                    data-mantine-stop-propagation
+                  />
+                )}
+              </>
+            )
           }
           filterCount={filterCount}
           onClearFilters={() => {
@@ -230,6 +232,20 @@ export function LibraryCatalogueTable({
           }}
           actions={
             <>
+              {!models && (
+                <Select
+                  aria-label="Family"
+                  size="sm"
+                  radius="xl"
+                  w={phone ? "8.5rem" : "11rem"}
+                  data={[{ value: "all", label: "All Families" }, ...families]}
+                  value={family ?? "all"}
+                  onChange={(value) => setFamily(value === "all" ? null : value)}
+                  allowDeselect={false}
+                  comboboxProps={{ withinPortal: false }}
+                  data-mantine-stop-propagation
+                />
+              )}
               {onCheckUpdates && (
                 <Tooltip label="Check Updates">
                   <ActionIcon

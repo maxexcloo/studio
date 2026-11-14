@@ -52,6 +52,8 @@ interface UserPreset {
   savedAt?: string;
   /** The parts of a draft it holds, when only some; one without holds them all. */
   parts?: string[];
+  /** The model family its LoRAs were chosen for, which the LoRA picker lists it under. */
+  family?: string;
 }
 const now = () => new Date().toISOString();
 /** The pause key that holds every account's queue. */
@@ -586,8 +588,16 @@ export class Store {
     title: string,
     input: GenerationInput,
     parts?: string[],
+    family?: string,
   ): UserPreset {
-    const preset = { id: randomUUID(), title, input, savedAt: now(), ...(parts ? { parts } : {}) };
+    const preset = {
+      id: randomUUID(),
+      title,
+      input,
+      savedAt: now(),
+      ...(parts ? { parts } : {}),
+      ...(family ? { family } : {}),
+    };
     this.db
       .prepare("INSERT INTO studio_user_presets VALUES (?, ?, ?)")
       .run(preset.id, ownerId, JSON.stringify(preset));

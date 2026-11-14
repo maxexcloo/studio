@@ -5,6 +5,7 @@ import { comparisonSets } from "./comparison-sets.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
+import { stackPresets } from "./stack-presets.js";
 
 /**
  * The migrate-runtime steps, in the order they run, for the command (commands/migrate-runtime.mjs)
@@ -36,6 +37,12 @@ const steps = [
     name: "comparisonSets",
     run: comparisonSets,
     changes: (plan) => plan.items,
+    online: true,
+  },
+  {
+    name: "stackPresets",
+    run: stackPresets,
+    changes: (plan) => plan.stacks,
     online: true,
   },
 ];

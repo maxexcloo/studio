@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { userWorkflowsDir } from "../custom-workflows.js";
 import { dataDir } from "../gallery/store.js";
-import { ownerDocuments } from "../persistence/runtime.ts";
+import { runtimeDatabase } from "../persistence/runtime.ts";
 
 /** Each saved profile definition: its name, declared family and text. */
 export async function profileDefinitions() {
@@ -46,9 +46,12 @@ export async function modelFileReferences({ file }, presetModels) {
     )
       users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
   }
-  const saved = ownerDocuments(dataDir, "lora-stacks").filter(({ value }) =>
-    JSON.stringify(value).includes(quoted),
-  ).length;
-  if (saved) users.push(saved === 1 ? "a saved LoRA stack" : `${saved} saved LoRA stacks`);
+  const db = runtimeDatabase(dataDir);
+  const saved = db.prepare("SELECT 1 FROM sqlite_schema WHERE name = 'studio_user_presets'").get()
+    ? db
+        .prepare("SELECT count(*) AS count FROM studio_user_presets WHERE instr(record, ?)")
+        .get(quoted).count
+    : 0;
+  if (saved) users.push(saved === 1 ? "a saved preset" : `${saved} saved presets`);
   return users;
 }
