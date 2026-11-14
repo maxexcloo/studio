@@ -13,12 +13,11 @@ import {
   Title,
   UnstyledButton,
 } from "@mantine/core";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { DigestGroup } from "../../../../shared/projects";
-import { icons } from "../../ui/icons";
 import { usePhone, useSideways } from "../../ui/usePhone";
 import { MediaViewer } from "../gallery/MediaViewer";
-import { viewerChoices, type Verdict } from "./choices";
+import { dreamChoices, viewerChoices, type Verdict } from "./choices";
 import { Thumbnail } from "./DiscardedDreams";
 import { useJudge } from "./DreamDeck";
 import type { DreamItem } from "./queries";
@@ -30,12 +29,6 @@ const sinceFormat = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",
 });
-// The card's choices, as the deck's bar offers them.
-const choices = [
-  { verdict: "discard", label: "Pass", icon: X },
-  { verdict: "star", label: "Super Like", icon: icons.star },
-  { verdict: "keep", label: "Like", icon: icons.keep },
-] as const;
 
 function DigestCard({
   item,
@@ -75,18 +68,22 @@ function DigestCard({
         </Text>
       </Stack>
       <Group gap="xs" p="xs" grow wrap="nowrap">
-        {choices.map(({ verdict, label, icon: Icon }) => (
-          <Button
-            key={verdict}
-            px={4}
-            variant={verdict === "keep" ? "light" : "default"}
-            leftSection={<Icon size={16} />}
-            aria-label={`${label} ${name}`}
-            onClick={() => onJudge(verdict)}
-          >
-            {label}
-          </Button>
-        ))}
+        {/* The deck bar's large choices; Like is light here, as every card has one. */}
+        {dreamChoices({ kind: "dream", key: item.id, item })
+          .flat()
+          .filter((choice) => choice.main)
+          .map(({ choice, label, icon: Icon, primary }) => (
+            <Button
+              key={choice}
+              px={4}
+              variant={primary ? "light" : "default"}
+              leftSection={<Icon size={16} />}
+              aria-label={`${label} ${name}`}
+              onClick={() => onJudge(choice as Verdict)}
+            >
+              {label}
+            </Button>
+          ))}
       </Group>
     </Card>
   );
