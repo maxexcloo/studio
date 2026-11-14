@@ -1036,8 +1036,8 @@ const faceCheck = createFaceCheck({
       referenceIds: characterImageIds(card),
     })),
   image: galleryStill,
-  reference: (ownerId, assetId) =>
-    bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId),
+  reference: async (ownerId, assetId) =>
+    (await bytesForReferenceAccount(ownerId ? { userId: ownerId } : undefined, assetId)).buffer,
   save: (item, identity) => {
     updateGalleryJob(galleryKey(item), { identity });
     if (identity.drifted) void faceRedo(item, identity);
