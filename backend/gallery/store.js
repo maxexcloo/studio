@@ -205,9 +205,15 @@ function* galleryRows(query = {}, after = null) {
   }
 }
 
-/** The query's items in gallery order, read a batch at a time. */
+/**
+ * The query's items, read a batch at a time: in gallery order within the gallery, then Dream's
+ * pool, then uploads. The order index leads with those, so each batch seeks; across them every
+ * batch would sort the whole table.
+ */
 export function* eachGalleryItem(query = {}) {
-  for (const row of galleryRows(query)) yield parse(row);
+  for (const uploaded of query.uploaded === undefined ? [false, true] : [query.uploaded])
+    for (const dreamPool of query.dreamPool === undefined ? [false, true] : [query.dreamPool])
+      for (const row of galleryRows({ ...query, uploaded, dreamPool })) yield parse(row);
 }
 
 function countGalleryItems(query = {}) {

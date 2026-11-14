@@ -12,8 +12,10 @@ process.env.STUDIO_DATA_DIR = dataDir;
 const { readGalleryRows } = await import("../persistence/gallery-rows.ts");
 const { runtimeDatabase } = await import("../persistence/runtime.ts");
 const {
+  eachGalleryItem,
   filterVisibleGallery,
   forgetGalleryItems,
+  galleryItems,
   galleryRevisionValue,
   pageGallery,
   updateGalleryJob,
@@ -88,6 +90,25 @@ test("paging through 50,000 items serves each once, newest first, with exact cou
     videos.totalApprox,
     items.filter((item) => item.type === "video" && item.status !== "failed").length,
   );
+});
+
+test("a walk over every item costs about one read of the gallery, not a sort per batch", () => {
+  const items = bigGallery(5000).map((item, index) => ({
+    ...item,
+    ...(index % 3 === 1 && { uploaded: true }),
+    ...(index % 5 === 2 && { dream: { state: "unseen" } }),
+  }));
+  setGallery(items);
+  const timed = (read) => {
+    const started = performance.now();
+    const items = read();
+    return { ms: performance.now() - started, items };
+  };
+  const whole = timed(() => galleryItems());
+  const walk = timed(() => [...eachGalleryItem()]);
+  assert.equal(new Set(walk.items.map((item) => item.id)).size, 5000, "every item once");
+  // Sorting the gallery for each of the 25 batches takes about 25 times as long.
+  assert.ok(walk.ms < whole.ms * 5, `${walk.ms} ms walking, ${whole.ms} ms reading all`);
 });
 
 test("paging through a search serves every match once, testing each item once", () => {
