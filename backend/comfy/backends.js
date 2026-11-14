@@ -35,6 +35,11 @@ const reachable = new Map();
 const retryUnreachableMs = 60_000;
 const inventories = new Map();
 const offlineListeners = new Set();
+let parkedCheck = async () => false;
+/** Says whether a worker was stopped on purpose, whose silence is no outage to log. */
+export const setParkedCheck = (check) => {
+  parkedCheck = check;
+};
 /**
  * `error` says why it failed to answer and `at` when it answered or failed to (tests give a time).
  * Only changes are logged, so a worker can be told apart from Studio going down.
@@ -42,12 +47,12 @@ const offlineListeners = new Set();
 export const noteWorkerReachable = (id, up, error, at = Date.now()) => {
   if (!id) return;
   const last = reachable.get(id);
-  if (!up && last?.up !== false)
-    logWarning("Worker stopped answering", {
-      worker: id,
-      reason: error?.cause?.code || error?.code || error?.message || String(error ?? ""),
-    });
-  else if (up && last?.up === false)
+  if (!up && last?.up !== false) {
+    const reason = error?.cause?.code || error?.code || error?.message || String(error ?? "");
+    void parkedCheck(id)
+      .catch(() => false)
+      .then((parked) => parked || logWarning("Worker stopped answering", { worker: id, reason }));
+  } else if (up && last?.up === false)
     logWarning("Worker answering again", {
       worker: id,
       downForS: Math.round((at - last.since) / 1000),
