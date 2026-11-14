@@ -36,6 +36,7 @@ import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
+import { profileName } from "../generation/payload";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
 import { videoExport } from "./download";
@@ -159,20 +160,16 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
   const reference = useGalleryReference();
   const location = useLocation();
   const openComposer = useOpenComposer();
-  if (
-    !(
-      profile?.mediaInputs?.length ||
-      profile?.capabilities.img2img ||
-      profile?.capabilities.imageInput
-    )
-  )
-    return null;
+  if (!profile) return null;
+  const takesImages =
+    profile.mediaInputs?.length || profile.capabilities.img2img || profile.capabilities.imageInput;
   const video = item.type === "video";
   return {
     id: "use-reference",
     label: video ? "Use Frame as Reference" : "Use as Reference",
+    description: takesImages ? undefined : `${profileName(profile)} takes no references`,
     icon: ImagePlus,
-    disabled: reference.isPending,
+    disabled: !takesImages || reference.isPending,
     keepOpen: true,
     onClick: () => {
       reference.mutate(
