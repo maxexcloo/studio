@@ -28,6 +28,7 @@ import { queueQuery } from "../generation/Queue";
 import { WritingThinking } from "../generation/PromptWriting";
 import { mediaSource } from "./mediaSource";
 import { formatBytes } from "../../ui/bytes";
+import { formatDateTime } from "../../ui/dates";
 import { charactersQuery } from "../characters/queries";
 import { identityNote } from "../characters/identity";
 import classes from "./MediaDetails.module.css";
@@ -46,9 +47,7 @@ const elapsed = (ms?: number) => {
 };
 const time = (value?: string) => {
   const date = value ? new Date(value) : null;
-  return date && !Number.isNaN(date.getTime())
-    ? date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
-    : "";
+  return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : "";
 };
 
 type Row = [label: string, value: string];

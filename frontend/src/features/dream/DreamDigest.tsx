@@ -16,13 +16,14 @@ import {
 import { ChevronDown } from "lucide-react";
 import type { DigestGroup } from "../../../../shared/projects";
 import { usePhone, useSideways } from "../../ui/usePhone";
+import { dateFormat } from "../../ui/dates";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { dreamChoices, viewerChoices, type Verdict } from "./choices";
 import { Thumbnail } from "./DiscardedDreams";
 import { useJudge } from "./DreamDeck";
 import type { DreamItem } from "./queries";
 
-const sinceFormat = new Intl.DateTimeFormat(undefined, {
+const sinceFormat = dateFormat({
   weekday: "short",
   day: "numeric",
   month: "short",
