@@ -225,8 +225,6 @@ function historiesFor(ownerId = "") {
 const historyFor = (kind, ownerId) =>
   historiesFor(ownerId)[kind === "negative" ? "negative" : "positive"];
 
-const loadPromptHistory = (seedItems, kind = "positive", ownerId = "") =>
-  historyFor(kind, ownerId).loadPromptHistory(ownerId ? [] : seedItems);
 export const listPrompts = (kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).listPrompts();
 export const promptHistoryEnabled = (kind = "positive", ownerId = "") =>

@@ -1589,8 +1589,10 @@ export function createDream(options: {
       }
       if (steer || project) {
         const latest = read(ownerId);
-        if (steer && latest.steer)
-          latest.steer.remaining > 1 ? latest.steer.remaining-- : delete latest.steer;
+        if (steer && latest.steer) {
+          if (latest.steer.remaining > 1) latest.steer.remaining--;
+          else delete latest.steer;
+        }
         if (project) latest.projectTurns = (latest.projectTurns || 0) + 1;
         write(ownerId, latest);
       }

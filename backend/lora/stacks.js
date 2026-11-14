@@ -165,7 +165,7 @@ function mergeLibrary(into, incoming) {
   into.ratings = { ...other.ratings, ...into.ratings };
   into.recents = [...new Set([...into.recents, ...other.recents])].slice(0, 12);
   for (const [workflow, entries] of Object.entries(other.strengths)) {
-    into.strengths[workflow] = { ...entries, ...(into.strengths[workflow] || {}) };
+    into.strengths[workflow] = { ...entries, ...into.strengths[workflow] };
   }
 }
 
@@ -206,7 +206,7 @@ function applyOp(state, library, op) {
       const workflow = String(op.workflowId || "");
       if (workflow)
         library.strengths[workflow] = {
-          ...(library.strengths[workflow] || {}),
+          ...library.strengths[workflow],
           ...cleanStrengths({ x: op.values }).x,
         };
       break;

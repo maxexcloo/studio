@@ -234,7 +234,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   const meta = base.studio;
   const loader = modelLoader(base);
   meta.defaults = {
-    ...(meta.defaults || {}),
+    ...meta.defaults,
     model: loader.inputs[loaderInput[loader.class_type]],
   };
   delete meta.prompting;
@@ -352,7 +352,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
 
   // Saved as the assistant's version; the import record says who asked for it.
   deps.create(id, text, { by: "assistant", requestedBy: by });
-  record.results = { ...(record.results || {}), profileId: id };
+  record.results = { ...record.results, profileId: id };
   const profileId = `custom:${id}`;
 
   // The guide: drafted from the page and the template's guide; the family's applies otherwise.

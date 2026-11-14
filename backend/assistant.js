@@ -143,9 +143,9 @@ export function gatewayAddress(value, setting) {
       `${setting} must be an absolute HTTP(S) URL without credentials, query or fragment.`,
     );
   const base = url.href.replace(/\/+$/, "");
-  const endpoint = /\/chat\/completions$/.test(base)
+  const endpoint = base.endsWith("/chat/completions")
     ? base
-    : /\/v1$/.test(base)
+    : base.endsWith("/v1")
       ? `${base}/chat/completions`
       : `${base}/v1/chat/completions`;
   const root = endpoint.replace(/\/(?:v1\/)?chat\/completions$/, "");
@@ -1366,7 +1366,7 @@ export function draftedProfile({
   if (typeof read.name === "string" && read.name.trim()) meta.name = read.name.trim().slice(0, 120);
   if (typeof read.description === "string" && read.description.trim())
     meta.description = read.description.trim().slice(0, 300);
-  meta.defaults = { ...(meta.defaults || {}) };
+  meta.defaults = { ...meta.defaults };
   if (modelFile) {
     meta.defaults.model = modelFile;
     // Loader inputs that named the template's file now name this one.

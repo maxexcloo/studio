@@ -107,7 +107,7 @@ const cloudRefusal =
 const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(profile);
 // Request records behind each MCP job, for Reuse tweaks and the result page; the oldest go first.
 const maxPromptRecords = 5000;
-const aborted = (signal) => {
+const aborted = () => {
   const error = new Error(
     "The wait ended because the request was cancelled. The generation continues; collect it later with result.",
   );
@@ -116,14 +116,14 @@ const aborted = (signal) => {
 };
 const pause = (milliseconds, signal) =>
   new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(aborted(signal));
+    if (signal?.aborted) return reject(aborted());
     const timer = setTimeout(() => {
       signal?.removeEventListener("abort", stop);
       resolve();
     }, milliseconds);
     const stop = () => {
       clearTimeout(timer);
-      reject(aborted(signal));
+      reject(aborted());
     };
     signal?.addEventListener("abort", stop, { once: true });
   });
@@ -309,7 +309,7 @@ export class McpMedia {
    * watches `signal` (the prompt assistant's) stops too.
    */
   async call(method, route, body, owner = "", { credential, signal } = {}) {
-    if (signal?.aborted) throw aborted(signal);
+    if (signal?.aborted) throw aborted();
     const pending = this.domainRequest(
       method,
       route,
@@ -322,7 +322,7 @@ export class McpMedia {
       ? await Promise.race([
           pending,
           new Promise((_resolve, reject) =>
-            signal.addEventListener("abort", () => reject(aborted(signal)), { once: true }),
+            signal.addEventListener("abort", () => reject(aborted()), { once: true }),
           ),
         ])
       : await pending;
@@ -1086,7 +1086,7 @@ export class McpMedia {
     this.own(owner, jobId);
     const deadline = Date.now() + seconds * 1000;
     while (true) {
-      if (signal?.aborted) throw aborted(signal);
+      if (signal?.aborted) throw aborted();
       let job = await this.request("GET", `/api/jobs/${safeId(jobId)}`, undefined, owner, {
         signal,
         credential,

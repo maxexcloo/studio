@@ -252,7 +252,7 @@ export function upscalePlan({ width, height, quality = "balanced", target = 0 })
  * file and the text encoder's type come from what the workflow actually loads.
  */
 export function faceDetailSource(item, workflow = null) {
-  const settings = { ...(item?.settings || {}) };
+  const settings = { ...item?.settings };
   const model = String(item?.model || "");
   if (!model.startsWith("custom:")) return { sourceModel: model, sourceSettings: settings };
   const defaults = workflow?.defaults || {};

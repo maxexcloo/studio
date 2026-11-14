@@ -341,7 +341,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       fps: graphDefault("fps") || undefined,
       duration: graphDefault("duration") || undefined,
       resolution: graphDefault("resolution") || "",
-      ...(meta.defaults || {}),
+      ...meta.defaults,
     },
     aspectRatios: meta.aspectRatios || meta.aspects || [],
     aspectPolicy: meta.aspectPolicy === "reference" ? "reference" : "manual",
@@ -368,7 +368,7 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       vae: Boolean(controls.vae),
       clipType: Boolean(controls.clipType),
       weightDtype: Boolean(controls.weightDtype),
-      ...(meta.capabilities || {}),
+      ...meta.capabilities,
     },
     path: file || "",
   };
@@ -646,7 +646,7 @@ export function detectWorkflowMetadata(raw, fallbackName = "", _info = {}) {
     (node) => node.classType === "LoadImage" && "image" in node.inputs,
   );
   const controls = {
-    ...(existing.controls || {}),
+    ...existing.controls,
   };
   // Connections the workflow didn't declare itself: found by node type and order, worth a second look.
   const guessed = [];
@@ -683,7 +683,7 @@ export function detectWorkflowMetadata(raw, fallbackName = "", _info = {}) {
     loraStack: existing.loraStack || null,
     defaults: existing.defaults || {},
     capabilities: {
-      ...(existing.capabilities || {}),
+      ...existing.capabilities,
       ...(controls.startImage ? { startImage: true, imageToImage: true } : {}),
     },
     mediaInputs: Array.isArray(existing.mediaInputs)

@@ -58,9 +58,9 @@ function sharedName(radiance, comfyui) {
 
 /** The combined profile's id: either id without its backend ending, else the ComfyUI id with `-combined`. */
 const combinedId = (radianceId, comfyuiId) =>
-  /-comfyui$/.test(comfyuiId)
+  comfyuiId.endsWith("-comfyui")
     ? comfyuiId.replace(/-comfyui$/, "")
-    : /-radiance$/.test(radianceId)
+    : radianceId.endsWith("-radiance")
       ? radianceId.replace(/-radiance$/, "")
       : `${comfyuiId}-combined`;
 

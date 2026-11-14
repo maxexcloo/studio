@@ -214,7 +214,7 @@ export async function startFakeComfy({
         0,
         promptId,
         queued.prompt || {},
-        { ...(queued.extra_data || {}), client_id: queued.client_id },
+        { ...queued.extra_data, client_id: queued.client_id },
         [],
       ];
       ended.add(promptId);

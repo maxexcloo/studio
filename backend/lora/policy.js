@@ -32,7 +32,7 @@ export function loraCompatibility(info, profile) {
   if (!constraints) return "fits";
   const model = profile?.baseModel || profile?.defaults?.model || profile?.model;
   const context = {
-    baseModels: /^custom:/.test(String(model || "")) ? "" : basename(model),
+    baseModels: String(model || "").startsWith("custom:") ? "" : basename(model),
     conditionings: profile?.recipe?.conditioning,
     profileIds: profile?.id,
   };
