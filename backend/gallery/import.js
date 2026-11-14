@@ -1,3 +1,4 @@
+import { logWarning } from "../crash-log.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { readMultipartUpload, saveUpload } from "../references.js";
 import { localRefusal } from "../route-access.js";
@@ -67,6 +68,7 @@ export function registerGalleryImportRoute(app, { uploaded = () => {} } = {}) {
       if (added) uploaded(item);
       return { status: added ? 201 : 200, payload: { ok: true, id: item.id, added } };
     } catch (error) {
+      logWarning("Gallery import failed", { account: account?.userId, reason: error.message });
       return { status: 400, payload: { ok: false, error: error.message } };
     }
   });
