@@ -38,6 +38,7 @@ export interface DreamSettings {
   paused: boolean;
   dailyImages: number;
   dailyVideos: number;
+  images: boolean;
   videos: boolean;
   /** Takes effect only with Uncensored Models. */
   spicy: boolean;
@@ -318,6 +319,7 @@ const defaultDreamSettings: DreamSettings = {
   paused: false,
   dailyImages: 40,
   dailyVideos: 4,
+  images: true,
   videos: false,
   spicy: false,
 };
@@ -762,7 +764,7 @@ export function createDream(options: {
     options.gallery(ownerId).filter((item) => item.dream?.state === state);
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
-    const image = counts.images < settings.dailyImages;
+    const image = settings.images && counts.images < settings.dailyImages;
     const video = settings.videos && counts.videos < settings.dailyVideos;
     // Videos keep pace with their share of the day's images.
     const videoDue =

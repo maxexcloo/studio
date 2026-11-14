@@ -253,6 +253,7 @@ test("Dream is off until turned on, queues one hidden job per account only while
     paused: false,
     dailyImages: 40,
     dailyVideos: 4,
+    images: true,
     videos: false,
     spicy: false,
   });
@@ -438,8 +439,8 @@ test("Dream stops at today's cap per kind, however much waits unseen, and animat
   state.clock += 86_400_000;
   assert.equal(dream.status("alice").status, "waiting");
 
-  // Videos animate a kept or starred image with the default video profile.
-  await dream.save("alice", { dailyImages: 0, videos: true, dailyVideos: 1 });
+  // With Images off, videos still animate a kept or starred image with the default video profile.
+  await dream.save("alice", { images: false, videos: true, dailyVideos: 1 });
   const video = await dreamOnce();
   assert.equal(video?.input.kind, "video");
   assert.equal(video?.input.profileId, "wan");
