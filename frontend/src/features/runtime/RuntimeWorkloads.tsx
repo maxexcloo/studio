@@ -36,6 +36,7 @@ import { api, post } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -127,9 +128,12 @@ function changePhase(
   return {};
 }
 
+const logTime = dateFormat({ timeStyle: "medium", hourCycle: "h23" });
+const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
+
 /** A change's steps as timestamped lines, then how it ended once it has. */
 function logText(entry: RuntimeOperation) {
-  const time = (at: string) => new Date(at).toLocaleTimeString(undefined, { hour12: false });
+  const time = (at: string) => logTime.format(new Date(at));
   return [
     ...entry.steps.map((step) => `${time(step.at)}  ${step.message}`),
     ...(entry.finishedAt ? [`${time(entry.finishedAt)}  ${entry.error || entry.progress}`] : []),
@@ -149,9 +153,7 @@ const changeLine = (names: (ids: string[]) => string) => (entry: RuntimeOperatio
 
 /** A change's one-line summary: what it did, how it ended, who asked and when. */
 const changeSummary = (entry: RuntimeOperation, change: (entry: RuntimeOperation) => string) =>
-  `${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${new Date(
-    entry.startedAt,
-  ).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`;
+  `${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${shortDateTime.format(new Date(entry.startedAt))}`;
 
 /** Monospace log text, oldest first, kept scrolled to the newest line as it grows, with Copy. */
 function LogText({
@@ -750,10 +752,7 @@ export function RuntimeHistory() {
               header: "Time",
               cell: (entry) => (
                 <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                  {new Date(entry.startedAt).toLocaleString(undefined, {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  {shortDateTime.format(new Date(entry.startedAt))}
                 </Text>
               ),
             },

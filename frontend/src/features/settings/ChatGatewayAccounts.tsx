@@ -3,6 +3,7 @@ import { Alert, Button, Select, Switch } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { formatDateTime } from "../../ui/dates";
 
 export interface GatewayAccounts {
   adminTools: boolean;
@@ -68,7 +69,7 @@ export function ChatGateway({
           <SettingRow
             key={identity}
             label={identity}
-            description={`Awaiting Link${firstSeenAt ? ` · ${new Date(firstSeenAt).toLocaleString("en-AU")}` : ""}`}
+            description={`Awaiting Link${firstSeenAt ? ` · ${formatDateTime(firstSeenAt)}` : ""}`}
             wide
           >
             <Select
