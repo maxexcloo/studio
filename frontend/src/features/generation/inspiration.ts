@@ -124,7 +124,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
   return { blockers, settings, warnings: [...new Set(warnings)] };
 }
 
-/** The Library's inspiration images (administrators only). */
+/** The Library's inspiration images, which every account may read and administrators curate. */
 export const inspirationQuery = queryOptions({
   queryKey: ["presets"],
   queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),

@@ -7,7 +7,6 @@ import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
-import { useIsAdmin } from "../auth/AccountGate";
 import { useRemembered } from "../auth/useRemembered";
 import { inspirationInput, inspirationQuery } from "./inspiration";
 import { iconChipProps } from "./chip";
@@ -105,10 +104,9 @@ export function PresetPicker({
 }) {
   const [opened, setOpened] = useState(false);
   const phone = usePhone();
-  const admin = useIsAdmin();
   const client = useQueryClient();
   const [source, setSource] = useState<"saved" | "inspiration">("saved");
-  const inspiring = admin && source === "inspiration";
+  const inspiring = source === "inspiration";
   const presets = useQuery({ ...presetsQuery, enabled: opened && !inspiring });
   const inspiration = useQuery({ ...inspirationQuery, enabled: opened && inspiring });
   const [query, setQuery] = useState("");
@@ -253,19 +251,17 @@ export function PresetPicker({
       }
     >
       <Stack gap="sm" flex={1} mih={0}>
-        {admin && (
-          <SegmentedControl
-            aria-label="Preset Source"
-            size="xs"
-            fullWidth
-            data={[
-              { value: "saved", label: "Saved" },
-              { value: "inspiration", label: "Inspiration" },
-            ]}
-            value={source}
-            onChange={(value) => setSource(value as typeof source)}
-          />
-        )}
+        <SegmentedControl
+          aria-label="Preset Source"
+          size="xs"
+          fullWidth
+          data={[
+            { value: "saved", label: "Saved" },
+            { value: "inspiration", label: "Inspiration" },
+          ]}
+          value={source}
+          onChange={(value) => setSource(value as typeof source)}
+        />
         <PickerHeader
           label="Presets"
           query={query}

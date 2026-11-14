@@ -69,10 +69,14 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["POST", "/api/queue/abc-1/move"],
     ["POST", "/api/queue/abc-1/clear"],
     ["POST", "/api/queue/clear-failed"],
+    ["GET", "/api/presets"],
+    ["GET", "/api/presets/123/thumbnail"],
   ])
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
-    ["GET", "/api/presets"],
+    ["POST", "/api/presets"],
+    ["POST", "/api/presets/import"],
+    ["DELETE", "/api/presets/123"],
     ["POST", "/api/models/downloads"],
     ["GET", "/api/accounts/admin"],
     ["POST", "/api/accounts/users"],
