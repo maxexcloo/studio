@@ -849,27 +849,21 @@ export class McpMedia {
   }
   /**
    * When each submitted set should be done (epoch ms, in the order given), or null where Studio cannot
-   * say. The first job's end time anchors the chain once Studio knows it (the job has started, or its
-   * turn is known), read for up to `probeMs` while the queue picks it up; later jobs add the sets'
-   * estimates. Sets queue in order and a started set stays together, so each follows the last.
+   * say. The first job's end time anchors the chain where Studio knows it (the job has started, or
+   * its turn is known); later jobs add the sets' estimates. Sets queue in order and a started set
+   * stays together, so each follows the last.
    */
-  async finishTimes(owner, sets, { probeMs = 0, signal } = {}) {
+  async finishTimes(owner, sets, { signal } = {}) {
     const first = sets[0]?.jobs?.[0];
     let cursor = null;
-    const until = Date.now() + probeMs;
-    while (first && cursor === null) {
-      let job;
+    if (first)
       try {
-        job = await this.job(owner, first.job_id, 0, { signal });
+        const job = await this.job(owner, first.job_id, 0, { signal });
+        if (terminal.has(job.status)) cursor = Date.now();
+        else if (Number.isFinite(job.progress?.endsAt)) cursor = job.progress.endsAt;
       } catch (error) {
         if (signal?.aborted) throw error;
-        break;
       }
-      if (terminal.has(job.status)) cursor = Date.now();
-      else if (Number.isFinite(job.progress?.endsAt)) cursor = job.progress.endsAt;
-      else if (Date.now() >= until) break;
-      else await pause(Math.min(250, until - Date.now()), signal);
-    }
     return sets.map(({ jobs = [], estimate }, position) => {
       if (cursor === null || !jobs.length) return null;
       // The anchor already covers the first set's first job.
@@ -1833,7 +1827,7 @@ export class McpMedia {
   /**
    * Pixels and the recorded brief for a requested visual review; never generates or judges. A
    * comparison arrives side by side in one image, so the model reads one small preview. A result
-   * Studio expects within `waitSeconds` is waited for, as generate waits for a quick set.
+   * Studio expects within `waitSeconds` is waited for.
    */
   async review(owner, targets, { scope = "", signal, waitSeconds = 0 } = {}) {
     const records = [];
@@ -2031,43 +2025,6 @@ export class McpMedia {
       outputs,
       markdown: `${header(caption)}\n[![${caption}](${sheet})](${this.allUrl(owner, scope)})`,
     };
-  }
-  /**
-   * Waits up to `seconds` for every job of a submission. Returns their markdown once all
-   * finished with outputs; null when one is still running, failed, or the wait was cancelled.
-   */
-  async settle(owner, submission, seconds, { scope = "", signal } = {}) {
-    if (!seconds || submission.status !== "queued") return null;
-    // One unfinished job sends the whole submission to Result, so stop waiting for the rest.
-    const stop = new AbortController();
-    const linked = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
-    // One shared deadline: the submission's jobs render together and the whole wait never exceeds `seconds`.
-    const deadline = Date.now() + seconds * 1000;
-    const jobs = await Promise.all(
-      submission.jobs.map(async ({ job_id }) => {
-        // A finer poll than Result's: every second counts while the chat waits.
-        const job = await this.job(owner, job_id, Math.max(0, (deadline - Date.now()) / 1000), {
-          signal: linked,
-          interval: 1000,
-        });
-        if (!finished.has(job.status) || !job.outputs?.some((item) => mcpOutputPath(item?.url)))
-          throw new Error("Unfinished.");
-        return job;
-      }),
-    ).catch(() => {
-      stop.abort();
-      return null;
-    });
-    if (!jobs) return null;
-    const entries = jobs.map((job, position) => {
-      const { job_id, ref } = submission.jobs[position];
-      return {
-        jobId: job_id,
-        job,
-        label: ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result",
-      };
-    });
-    return (await this.markdown(owner, entries, scope)).markdown;
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
   async scopeJobs(owner, scope, { signal, credential } = {}) {
