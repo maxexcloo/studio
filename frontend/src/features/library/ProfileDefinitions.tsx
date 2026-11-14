@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Alert, Badge, Button, Group, Menu, Popover, Select, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Combine, Merge, Plus, Zap } from "lucide-react";
+import { ChevronDown, Combine, Merge, Zap } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
@@ -278,7 +278,7 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           actions={
             <ToolbarAction
               label="Import Workflow"
-              icon={<icons.upload size={18} />}
+              icon={icons.upload}
               loading={importing.isPending}
               onClick={workflowFile.open}
             />
@@ -454,7 +454,7 @@ export function GuideDefinitions({ heading }: { heading: ReactNode }) {
           actions={
             <ToolbarAction
               label="New Guide"
-              icon={<Plus size={18} />}
+              icon={icons.add}
               onClick={() =>
                 setEditing({
                   kind: "guide",
