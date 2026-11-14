@@ -67,7 +67,7 @@ export function DeleteMediaDialog({
       onConfirm={() => deletion.mutate(ids)}
       error={
         failure &&
-        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn’t be deleted. ${failure.reason || "Try again."}`
+        `${failure.count} ${failure.count === 1 ? "item" : "items"} couldn't be deleted. ${failure.reason || "Try again."}`
       }
     >
       Delete {ids.length} {ids.length === 1 ? "item and its file" : "items and their files"}?

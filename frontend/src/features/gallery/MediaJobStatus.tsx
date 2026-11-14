@@ -72,7 +72,7 @@ export function MediaJobStatus({
       )}
       {active && job?.status === "writing" && <WritingStream progress={progress} />}
       {item.jobId && queue.error ? (
-        <Alert color="red" title="Couldn’t Load Generation Status">
+        <Alert color="red" title="Couldn't Load Generation Status">
           <Stack gap="sm">
             <Text size="sm">{queue.error.message}</Text>
             <Button
@@ -87,7 +87,7 @@ export function MediaJobStatus({
         </Alert>
       ) : !job && !loading ? (
         <Text size="sm" c="dimmed" ta="center">
-          Nothing to retry. Edit opens this item’s prompt and settings again.
+          Nothing to retry. Edit opens this item's prompt and settings again.
         </Text>
       ) : null}
       {job && (

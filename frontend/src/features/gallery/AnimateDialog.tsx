@@ -118,7 +118,7 @@ export function AnimateDialog({
         >
           <Stack>
             {writer.error && (
-              <Alert color="red" title="Couldn’t Write the Prompt">
+              <Alert color="red" title="Couldn't Write the Prompt">
                 {writer.error.message}
               </Alert>
             )}

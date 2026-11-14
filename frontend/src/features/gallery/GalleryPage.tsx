@@ -479,7 +479,7 @@ export function GalleryPage() {
       {gallery.isPending ? (
         <LoadingState fill label="Loading Gallery" />
       ) : gallery.error && !gallery.data ? (
-        <Alert color="red" title="Couldn’t Load the Gallery">
+        <Alert color="red" title="Couldn't Load the Gallery">
           <Stack gap="sm" align="flex-start">
             {gallery.error.message}
             <Button variant="subtle" onClick={() => void gallery.refetch()}>

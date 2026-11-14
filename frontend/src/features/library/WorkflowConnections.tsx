@@ -202,12 +202,12 @@ export function WorkflowConnections({
   return (
     <Stack gap="md">
       <Text size="sm" c="dimmed">
-        Connect the profile’s controls and reference inputs to workflow nodes. Other inputs keep
+        Connect the profile's controls and reference inputs to workflow nodes. Other inputs keep
         their saved values.
       </Text>
       {preview.isPending && <LoadingState label="Reading Workflow Connections" />}
       {preview.error && (
-        <Alert color="red" title="Couldn’t Read Workflow Connections">
+        <Alert color="red" title="Couldn't Read Workflow Connections">
           <Stack gap="xs">
             <Text size="sm">{preview.error.message}</Text>
             <Button variant="default" size="compact-sm" onClick={() => void preview.refetch()}>

@@ -117,7 +117,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   if (status.error)
     return (
       <Container py="xl">
-        <Alert color="red" title="Can’t Reach Studio">
+        <Alert color="red" title="Can't Reach Studio">
           <Stack gap="sm" align="flex-start">
             {status.error.message}
             <Button onClick={() => void status.refetch()}>Retry</Button>

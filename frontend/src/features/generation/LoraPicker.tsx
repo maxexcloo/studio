@@ -642,7 +642,7 @@ function StackEntry({
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
-            This profile can’t use this LoRA. Disable or remove it.
+            This profile can't use this LoRA. Disable or remove it.
           </Text>
         )}
         {!!triggers.length && (

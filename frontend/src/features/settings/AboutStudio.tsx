@@ -19,12 +19,12 @@ const credits = [
   },
   {
     name: "J-AI Studio",
-    what: "HEISS UI began as a fork of Jasper’s J-AI Studio and its prompt-first idea (MIT).",
+    what: "HEISS UI began as a fork of Jasper's J-AI Studio and its prompt-first idea (MIT).",
     url: "https://github.com/jasperdevs/J-AI-Studio",
   },
   {
     name: "MantineHub",
-    what: "The theme is adapted from RubixCube Innovations’ MantineHub (MIT).",
+    what: "The theme is adapted from RubixCube Innovations' MantineHub (MIT).",
     url: "https://mantinehub.com",
   },
   {
@@ -163,7 +163,7 @@ export function AboutStudio() {
         <SettingRow label="Releases" description="What changed in each release.">
           {link(`${repository}/releases`, "Releases")}
         </SettingRow>
-        <SettingRow label="Source" description="Studio’s code on GitHub.">
+        <SettingRow label="Source" description="Studio's code on GitHub.">
           {link(repository, "GitHub")}
         </SettingRow>
       </SettingGroup>

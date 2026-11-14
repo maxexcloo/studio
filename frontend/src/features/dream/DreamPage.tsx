@@ -48,7 +48,7 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
               </Button>
             )}
             {save.error && (
-              <Alert color="red" title="Couldn’t Turn On Dream">
+              <Alert color="red" title="Couldn't Turn On Dream">
                 {save.error.message}
               </Alert>
             )}
@@ -84,7 +84,7 @@ function OffNotice() {
   return (
     <Group justify="center" gap="xs" role="status" aria-label="Dream Status">
       <Text size="sm" c={save.error ? "red" : "dimmed"}>
-        {save.error ? `Couldn’t Turn On Dream: ${save.error.message}` : "Dream is off."}
+        {save.error ? `Couldn't Turn On Dream: ${save.error.message}` : "Dream is off."}
       </Text>
       <Button
         size="compact-sm"
@@ -171,7 +171,7 @@ export function DreamPage() {
       </Group>
       {data?.reason && (
         <Text size="sm" c="dimmed" ta="center" role="status" aria-label="Dream Status">
-          {data.status === "unavailable" ? `Can’t Run: ${data.reason}` : data.reason}
+          {data.status === "unavailable" ? `Can't Run: ${data.reason}` : data.reason}
         </Text>
       )}
       {view === "discarded" ? (
@@ -196,7 +196,7 @@ export function DreamPage() {
       ) : dream.isPending ? (
         <LoadingState fill label="Loading Dream" />
       ) : dream.isError ? (
-        <Alert color="red" title="Couldn’t Load Dream">
+        <Alert color="red" title="Couldn't Load Dream">
           {dream.error.message}
         </Alert>
       ) : data!.digest.length ? (

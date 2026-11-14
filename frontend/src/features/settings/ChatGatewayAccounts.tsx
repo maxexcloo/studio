@@ -54,7 +54,7 @@ export function ChatGateway({
           description={
             gateway?.adminTools
               ? "Linked administrators can manage Library, catalogue and profiles from chat."
-              : "Only an administrator’s personal MCP token gets admin tools."
+              : "Only an administrator's personal MCP token gets admin tools."
           }
         >
           <Switch
@@ -111,7 +111,7 @@ export function ChatGateway({
         ))}
       </SettingGroup>
       {change.error && (
-        <Alert color="red" title="Couldn’t Save Chat Gateway Changes">
+        <Alert color="red" title="Couldn't Save Chat Gateway Changes">
           {change.error.message}
         </Alert>
       )}

@@ -57,7 +57,7 @@ export function MorePages({
       {failed ? (
         <Stack gap={4} align="center">
           <Text size="sm" c="dimmed">
-            More results couldn’t be loaded.
+            More results couldn't be loaded.
           </Text>
           <Button variant="default" radius="xl" loading={listing.isFetchingNextPage} onClick={more}>
             Retry
