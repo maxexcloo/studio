@@ -361,12 +361,17 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   // Only the tiles near the view render.
   await expect(grid.getByRole("button", { name: "Use reference: Result 0" })).toHaveCount(0);
   expect(await grid.getByRole("listitem").count()).toBeLessThan(150);
-  // Choosing stays a tap; Preview, or Space on a tile, opens the image above the picker.
+  // Choosing stays a tap; Preview opens the image above the picker. Space on a tile opens it too
+  // on touch screens; on desktop it shows the image beside the tile, as hovering Preview does.
   const tile = grid.getByRole("button", { name: "Use reference: Result 148", exact: true });
   await tile.click();
   const chosen = grid.getByRole("button", { name: "Remove reference: Result 148", exact: true });
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
-  await grid.getByRole("button", { name: "Preview Result 147", exact: true }).click();
+  const previewButton = grid
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("button", { name: "Use reference: Result 147", exact: true }) })
+    .getByRole("button", { name: "Preview", exact: true });
+  await previewButton.click();
   const preview = page.getByRole("dialog", { name: /^Result 147/ });
   await expect(preview).toBeVisible();
   await page.keyboard.press("Escape");
@@ -374,8 +379,26 @@ test("The reference grid pages and virtualises as it scrolls, and a tile preview
   await expect(picker).toBeVisible();
   await chosen.focus();
   await page.keyboard.press("Space");
-  await expect(page.getByRole("dialog", { name: /^Result 148/ })).toBeVisible();
-  await page.keyboard.press("Escape");
+  if (test.info().project.use.hasTouch) {
+    await expect(page.getByRole("dialog", { name: /^Result 148/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+  } else {
+    const beside = (name: string) =>
+      page.locator("[data-popup]").getByRole("img", { name, exact: true });
+    await expect(beside("Result 148")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /^Result 148/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(beside("Result 148")).toBeHidden();
+    await expect(chosen).toBeFocused();
+    await page.mouse.move(0, 0);
+    await previewButton.hover();
+    await expect(beside("Result 147")).toBeVisible();
+    // Pressing Preview while the image shows opens it full screen.
+    await previewButton.click();
+    await expect(preview).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(preview).toBeHidden();
+  }
   await expect(picker).toBeVisible();
   await expect(chosen).toHaveAttribute("aria-pressed", "true");
 });

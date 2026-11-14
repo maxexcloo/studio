@@ -136,6 +136,11 @@ export function GalleryChoices({
   useEffect(() => onLayer?.(layered), [layered, onLayer]);
   const name = (item: MediaItem, index: number) =>
     item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result";
+  const image = (item: MediaItem, index: number) => ({
+    src: item.url,
+    thumbnailUrl: item.thumbnailUrl,
+    alt: name(item, index),
+  });
   const morePages = (
     <MorePages
       listing={listing}
@@ -211,16 +216,10 @@ export function GalleryChoices({
                   image={item.thumbnailUrl || item.url}
                   drag={[galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })]}
                   preview={{
-                    label: `Preview ${title}`,
-                    open: () =>
-                      preview.open(
-                        items.map((choice, at) => ({
-                          src: choice.url,
-                          thumbnailUrl: choice.thumbnailUrl,
-                          alt: name(choice, at),
-                        })),
-                        index,
-                      ),
+                    // A result's prompt names its tile already.
+                    label: item.uploaded ? `Preview ${title}` : "Preview",
+                    image: image(item, index),
+                    open: () => preview.open(items.map(image), index),
                   }}
                   action={
                     item.uploaded && (

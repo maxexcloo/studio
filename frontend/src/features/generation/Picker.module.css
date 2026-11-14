@@ -238,6 +238,16 @@
   }
 }
 
+/* A hover preview only shows the picture; the pointer passes through to the tiles under it. */
+.peek {
+  pointer-events: none;
+}
+
+.peek img {
+  max-height: min(70vh, 480px);
+  object-fit: contain;
+}
+
 /* Rows: the picture, then its text, with the row's controls at the end. */
 .tile[data-row] {
   display: flex;
