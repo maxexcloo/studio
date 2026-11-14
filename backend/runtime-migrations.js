@@ -1,6 +1,7 @@
 import { reloadAccountPreferences } from "./account-preferences.js";
 import { reloadAccountStore } from "./account-store.js";
 import { chatRecordChanges, chatRecords } from "./chat-records.js";
+import { comparisonSets } from "./comparison-sets.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
@@ -38,6 +39,12 @@ const steps = [
     changes: (plan) => plan.missing,
     online: true,
   },
+  {
+    name: "comparisonSets",
+    run: comparisonSets,
+    changes: (plan) => plan.items,
+    online: true,
+  },
 ];
 
 const stopped =
@@ -47,7 +54,7 @@ const stopped =
  * Each step's plan, or with `apply` its result (a `backup` path where it writes one). `online`
  * (the running server) skips applying a step that isn't online-safe and has work, returning its
  * plan with `refused`. `dreamOwner` adds the Dream ownership step (the command's --dream-owner).
- * `gallery` is the running server's, for steps that check its records with the workers.
+ * `gallery` is the running server's, for steps that check or patch its records.
  */
 export async function runtimeMigrations(
   dataDir,

@@ -533,8 +533,23 @@ const assistantEngine = registerAssistantRoutes(app, {
   starred: assistant.starred,
 });
 
+const readComparisons = () => {
+  try {
+    return readRuntimeDocument(dataDir, "comparisons");
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+};
 registerGalleryReadRoutes(app, {
   store,
+  compared: (ownerId) => {
+    const records = readComparisons().filter((record) => record.ownerId === ownerId);
+    // Compare Selected names its images; other comparisons hold their jobs' results.
+    const items = new Set(records.flatMap((record) => record.itemIds || []));
+    const jobs = new Set(records.flatMap((record) => (record.itemIds ? [] : record.jobIds)));
+    return (item) => items.has(item.id) || jobs.has(item.jobId);
+  },
   near: (text) => imageSearch.near(text),
   similar: (item) => imageSearch.similar(item),
 });
@@ -723,20 +738,14 @@ registerMigrationRoutes(app, {
         comfy(item.url.replace(/^\/comfy/, ""), { method: "HEAD", timeout: 15_000 }),
       ),
     remove: removeGalleryItems,
+    update: (jobId, patch) => updateGalleryJob(jobId, patch),
   },
 });
 registerCompareRoutes(app, {
   store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
-  read: () => {
-    try {
-      return readRuntimeDocument(dataDir, "comparisons");
-    } catch (error) {
-      if (error.code === "ENOENT") return [];
-      throw error;
-    }
-  },
+  read: readComparisons,
   write: (records) => writeRuntimeDocument(dataDir, "comparisons", records),
   gallery: (req) => recordsForRequest(filterVisibleGallery(gallery), req),
   pendingItems: makePendingItems,

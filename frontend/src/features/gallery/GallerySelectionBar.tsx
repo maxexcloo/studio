@@ -113,6 +113,7 @@ export function GallerySelectionBar({
       }),
     onSuccess: (comparison) => {
       selection.end();
+      void client.invalidateQueries({ queryKey: ["comparisons"] });
       navigate(`/compare/${comparison.id}`);
     },
   });
