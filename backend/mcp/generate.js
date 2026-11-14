@@ -21,6 +21,7 @@ import { isCloudProfile } from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
+import { step } from "../event-loop.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
@@ -204,15 +205,16 @@ export function registerGenerateTools({
     const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and its full prompt revised (status shows it).`;
     // A set Studio expects to finish within the wait comes back finished, so the agent needs no result call;
     // anything longer, or with no trusted estimate, hands back its links at once.
-    const [endsAt] = await media.finishTimes(owner, [submission], {
-      probeMs: etaProbeMs,
-      signal,
-    });
+    const [endsAt] = await step("eta", () =>
+      media.finishTimes(owner, [submission], { probeMs: etaProbeMs, signal }),
+    );
     const expected = endsAt === null ? null : Math.max(0, endsAt - Date.now());
     const seconds = expected !== null && expected <= imageWaitSeconds * 1000 ? imageWaitSeconds : 0;
     // A set that outlasted its wait has no ETA left worth giving.
     const left = seconds ? 0 : expected;
-    const markdown = await media.settle(owner, submission, seconds, { scope: refs, signal });
+    const markdown = await step("wait for results", () =>
+      media.settle(owner, submission, seconds, { scope: refs, signal }),
+    );
     const structured = {
       status: markdown ? "done" : submission.status,
       profile: {

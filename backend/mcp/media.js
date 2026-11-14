@@ -10,6 +10,7 @@ import { promptWords } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
 import { accountPreferences } from "../account-preferences.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
+import { step } from "../event-loop.js";
 import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
@@ -495,7 +496,7 @@ export class McpMedia {
           .finally(() => this.profileRequests.delete(owner));
         this.profileRequests.set(owner, pending);
       }
-      models = await this.profileRequests.get(owner);
+      models = await step("catalogue", () => this.profileRequests.get(owner));
     }
     return models;
   }

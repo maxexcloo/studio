@@ -7,6 +7,7 @@ import { comfyFile, inDotFolder, localOutputFile } from "../comfy/comfy.js";
 import { comfyView, outputMime, ownerMediaTypes } from "../comfy/media-routes.js";
 import { findDirectRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
+import { routeLabel, step } from "../event-loop.js";
 import { galleryJobItems } from "../gallery/store.js";
 import { mediaType, outputMediaPattern } from "../media-paths.js";
 import { mcpAccount, multiUserEnabled } from "../multi-user-auth.js";
@@ -54,7 +55,10 @@ export async function resolveSignedMcpResult(owner, jobId, index) {
  * domain/admission.ts's.
  */
 export function createMcpDomainRequest({ app, admit, ownsItem }) {
-  return async (method, route, input, owner, credential, signal) => {
+  return (method, route, input, owner, credential, signal) =>
+    step(routeLabel(method, route), () => request(method, route, input, owner, credential, signal));
+
+  async function request(method, route, input, owner, credential, signal) {
     const url = new URL(route, "http://localhost");
     const routePath = url.pathname;
     let account;
@@ -81,7 +85,7 @@ export function createMcpDomainRequest({ app, admit, ownsItem }) {
       console.error(`[mcp] ${method} ${routePath} failed:`, error);
       return { status: 500, payload: {} };
     }
-  };
+  }
 
   function generate({ queueSet, parentItemId, ...body }, account) {
     if (parentItemId && !ownsItem(account?.userId || "", parentItemId))

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { performance } from "node:perf_hooks";
 
 import { logWarning } from "./crash-log.js";
@@ -30,6 +31,15 @@ export function tracked(label, run) {
   }
 }
 
+/** A request's method and path with ids and file names left out, so logs name only the route. */
+export const routeLabel = (method, url) =>
+  `${method} ${url
+    .split("?")[0]
+    .split("/")
+    .slice(0, 5)
+    .map((part) => (/[\d.]/.test(part) ? ":id" : part))
+    .join("/")}`;
+
 const name = (entry) => (typeof entry.label === "function" ? entry.label() : entry.label);
 
 export function watchEventLoop({ intervalMs = 100, thresholdMs = 200 } = {}) {
@@ -49,4 +59,21 @@ export function watchEventLoop({ intervalMs = 100, thresholdMs = 200 } = {}) {
     for (const entry of active) if (entry.end) active.delete(entry);
     windowStart = now;
   }, intervalMs).unref();
+}
+
+const steps = new AsyncLocalStorage();
+
+/** Runs `run`, collecting the time each `step` within it takes into `record` (ms by label). */
+export const timeSteps = (record, run) => steps.run(record, run);
+
+/** Adds the time `run` takes to the enclosing timeSteps record under `label`. */
+export async function step(label, run) {
+  const record = steps.getStore();
+  if (!record) return run();
+  const started = performance.now();
+  try {
+    return await run();
+  } finally {
+    record[label] = (record[label] || 0) + Math.round(performance.now() - started);
+  }
 }
