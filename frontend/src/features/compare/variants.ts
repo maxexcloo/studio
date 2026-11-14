@@ -129,6 +129,7 @@ export function useDraftComparison() {
         ? profiles.find((profile) => isProfile(profile, input.profileId))
         : defaultProfile(models.data, input.kind),
       input.profileBackend,
+      Boolean(input.referenceAssets?.length),
     );
   const labels = variantLabels(variants, {
     profile: (input) => {

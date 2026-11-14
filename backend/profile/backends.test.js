@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { runBackend } from "../../shared/profiles.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-backends-"));
 process.env.STUDIO_DATA_DIR = temporary;
@@ -551,4 +552,16 @@ test("MCP reruns an old result on the backend it ran on and sends the backend wi
   assert.equal(sent.at(-1).width, 1024);
   await media.queue("owner", { ...plan.args, profile_backend: "cloud" });
   assert.equal(sent.at(-1).profileBackend, "comfyui");
+});
+
+test("a run with references leaves a default backend that takes none", () => {
+  const backends = [
+    { id: "comfyui", references: 1 },
+    { id: "radiance", references: 0 },
+  ];
+  assert.equal(runBackend(backends, "radiance", undefined, false), "radiance");
+  assert.equal(runBackend(backends, "radiance", undefined, true), "comfyui");
+  // One asked for still runs; one the profile lacks falls back to the rule.
+  assert.equal(runBackend(backends, "radiance", "radiance", true), "radiance");
+  assert.equal(runBackend(backends, "radiance", "cloud", true), "comfyui");
 });

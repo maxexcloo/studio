@@ -18,7 +18,13 @@ import {
   useGenerationActions,
 } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { backendLabel, generationInput, isProfile, profileName } from "../generation/payload";
+import {
+  backendLabel,
+  generationInput,
+  isProfile,
+  profileForBackend,
+  profileName,
+} from "../generation/payload";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
 import { isCloudProfile } from "../../../../shared/profiles";
 import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
@@ -70,14 +76,16 @@ export async function mediaDraft(
   const { profiles } = await client.ensureQueryData(modelsQuery);
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
   const priorId = String(item.settings?.profileId || "");
-  const compatible = profiles.filter(
-    (profile) =>
+  const compatible = profiles.filter((listed) => {
+    const profile = profileForBackend(listed, undefined, true)!;
+    return (
       profile.kind === targetKind &&
       (operation === "image" ||
         profile.mediaInputs?.length ||
         profile.capabilities.imageInput ||
-        profile.capabilities.img2img),
-  );
+        profile.capabilities.img2img)
+    );
+  });
   const original = compatible.find((profile) =>
     priorId ? isProfile(profile, priorId) : profile.model === item.model,
   );
@@ -117,19 +125,21 @@ export async function mediaDraft(
       })
     ).asset;
   const saved = source?.input || item.settings || {};
+  // The first reference slot of the backend a run with references uses.
+  const firstSlot = profileForBackend(profile, undefined, true)?.mediaInputs?.[0]?.id || "image";
   const recordedReferences = source?.input.referenceAssets ?? item.settings?.referenceAssets;
   const recordedDetails = Array.isArray(saved.referenceDetails) ? saved.referenceDetails : [];
   let restored = Array.isArray(recordedReferences)
     ? recordedReferences.map((reference) => ({ ...reference }))
     : recordedDetails.map((asset: ReferenceAsset) => ({
         assetId: asset.id,
-        slot: asset.slot || profile.mediaInputs?.[0]?.id || "image",
+        slot: asset.slot || firstSlot,
         strength: asset.strength,
       }));
   // A job submitted with only `startImageId` (an MCP or API alias) recorded its one reference there.
   const startImageId = String(saved.startImageId || "");
   if (operation === "image" && !restored.length && startImageId)
-    restored = [{ assetId: startImageId, slot: profile.mediaInputs?.[0]?.id || "image" }];
+    restored = [{ assetId: startImageId, slot: firstSlot }];
   const references: ReferenceAsset[] =
     operation !== "image"
       ? []
@@ -153,9 +163,7 @@ export async function mediaDraft(
             };
           }),
         );
-  const preparedReferences = asset
-    ? [{ ...asset, slot: profile.mediaInputs?.[0]?.id || "image" }]
-    : references;
+  const preparedReferences = asset ? [{ ...asset, slot: firstSlot }] : references;
   // A combined profile reruns on the backend that ran (an old per-backend id names its own) while
   // the profile still has it; otherwise on its current one, and the note says so.
   const ran = String(

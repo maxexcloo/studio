@@ -170,8 +170,13 @@ function useGenerationState() {
     ? profiles.find((profile) => isProfile(profile, draft.input.profileId))
     : defaultProfile(models.data, draft.input.kind);
   const profile = useMemo(
-    () => profileForBackend(selectedProfile, draft.input.profileBackend),
-    [selectedProfile, draft.input.profileBackend],
+    () =>
+      profileForBackend(
+        selectedProfile,
+        draft.input.profileBackend,
+        Boolean(draft.references.length || draft.input.referenceAssets?.length),
+      ),
+    [selectedProfile, draft.input.profileBackend, draft.references, draft.input.referenceAssets],
   );
   function update(patch: Partial<GenerationInput>) {
     setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));
