@@ -338,7 +338,7 @@ test("Animate keeps a Dream image and stages it in the Videos composer", async (
 
 test("Calibration judges gallery images, singly and as a pair", async ({ page }) => {
   await fixtures(page);
-  const gallery = ["g1", "g2", "g3", "g4"].map((id) => ({
+  const gallery = ["g1", "g2", "g3", "g4", "g5"].map((id) => ({
     ...dreamItem(id),
     dream: undefined,
   }));
@@ -356,13 +356,17 @@ test("Calibration judges gallery images, singly and as a pair", async ({ page })
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
   await page.getByRole("button", { name: "Pass", exact: true }).click();
+  await expect(card).toContainText("Dream prompt g3");
+  await page.keyboard.press("ArrowRight");
+  // Every fourth card is a pair.
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
     { passed: ["g2"] },
-    { liked: ["g4"], passed: ["g3"] },
+    { liked: ["g3"] },
+    { liked: ["g5"], passed: ["g4"] },
   ]);
 });
 

@@ -317,6 +317,8 @@ interface DreamRecord {
   series?: DreamSeries;
   /** The starred or liked images Dream continued or started a series from, newest first. */
   seeds?: string[];
+  /** Each compared image's rating (`elo`), by item id. */
+  ratings?: Record<string, number>;
   /** Images Dream animated and videos it extended, newest first, so each is used once. */
   animated?: string[];
   extended?: string[];
@@ -419,6 +421,12 @@ const ownSeedEvery = 4;
 /** Dream uses none of its latest seeds again, and draws the sampled one least like them by image. */
 const recentSeeds = 30;
 const compareSeeds = 10;
+/**
+ * Every comparison's answer rates its two images by Elo: each starts at `start` and the winner takes
+ * up to `k` from the loser, Both and Neither drawing them together. A draw of seeds also takes up to
+ * `winners` images rated above the start, and prefers the better rated by `weight` of likeness.
+ */
+const elo = { start: 1500, k: 32, winners: 3, weight: 1000 };
 /** An idea sharing more than this share of its content words with a recent one is a repeat. */
 const repeatOverlap = 0.6;
 const tickMs = 45_000;
@@ -992,13 +1000,23 @@ export function createDream(options: {
     return seeds.length ? pick(seeds) : null;
   }
   /**
-   * A random sample of the account's starred images (`seedSample`) and, for one draw in
+   * A random sample of the account's starred images (`seedSample`) with a few that won comparisons
+   * (`elo`) and, for one draw in
    * `ownSeedEvery`, its Likes, a third as many; otherwise stars Dream made are left out too, unless
    * they are all it starred.
    */
-  function favourites(ownerId: string) {
+  function favourites(ownerId: string, record: DreamRecord) {
     const query = { type: "image", status: "done" };
-    const stars = generations(ownerId, { ...query, favorite: true, sample: seedSample });
+    const ratings = Object.entries(record.ratings || {});
+    const won = shuffled(ratings.filter(([, rating]) => rating > elo.start).map(([id]) => id));
+    const stars = [
+      ...generations(ownerId, { ...query, favorite: true, sample: seedSample }),
+      ...(won.length
+        ? generations(ownerId, { ...query, ids: won.slice(0, elo.winners) }).filter(
+            (item) => !item.favorite,
+          )
+        : []),
+    ];
     const others = stars.filter((item) => !item.dream);
     if (others.length && random(ownSeedEvery)) return others;
     const likes = generations(ownerId, {
@@ -1017,20 +1035,21 @@ export function createDream(options: {
     const prompt = clean(input?.prompt, maxPromptCharacters);
     return input && profile && prompt ? { item, input, profile, prompt } : null;
   }
-  const drawSeeds = (ownerId: string, profiles: DreamProfile[]) =>
-    favourites(ownerId).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
+  const drawSeeds = (ownerId: string, record: DreamRecord, profiles: DreamProfile[]) =>
+    favourites(ownerId, record).flatMap((item) => seedOf(ownerId, item, profiles) ?? []);
   /**
    * A seed for a continued idea or a series: of `drawSeeds`, one Dream has not used lately where it
    * can, the one least like the latest few by image, so its seeds spread across the account's
-   * subjects. Null without one.
+   * subjects, less its rating's lead (`elo`). Null without one.
    */
   function seedPick(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = record.seeds || [];
-    const drawn = drawSeeds(ownerId, profiles);
+    const drawn = drawSeeds(ownerId, record, profiles);
     const unused = drawn.filter(({ item }) => !used.includes(String(item.id)));
     const latest = options.items(ownerId, used.slice(0, compareSeeds));
     const nearest = (item: DreamItem) =>
-      Math.max(-1, ...latest.map((seen) => options.likeness(item, seen) ?? -1));
+      Math.max(-1, ...latest.map((seen) => options.likeness(item, seen) ?? -1)) -
+      ((record.ratings?.[String(item.id)] ?? elo.start) - elo.start) / elo.weight;
     let best: ReturnType<typeof seedOf> = null;
     let least = Infinity;
     for (const seed of unused.length ? unused : drawn) {
@@ -1065,6 +1084,14 @@ export function createDream(options: {
           enabled: true as const,
         })),
     );
+  /** Rates two compared images (`elo`): `score` is 1 where `a` won, 0 where `b` won, ½ for a draw. */
+  function rate(record: DreamRecord, a: string, b: string, score: number) {
+    const ratings = (record.ratings ||= {});
+    const [ratingA, ratingB] = [ratings[a] ?? elo.start, ratings[b] ?? elo.start];
+    const change = elo.k * (score - 1 / (1 + 10 ** ((ratingB - ratingA) / 400)));
+    ratings[a] = Math.round(ratingA + change);
+    ratings[b] = Math.round(ratingB - change);
+  }
   /** Moves the account's explore share a step toward exploring, or with `-1` away from it. */
   function lean(ownerId: string, direction: 1 | -1) {
     const record = read(ownerId);
@@ -1589,8 +1616,13 @@ export function createDream(options: {
           loras = lorasOf(ready, seed.input);
           references = Array.isArray(seed.input.referenceAssets) ? seed.input.referenceAssets : [];
         }
+        const what = likedSeed?.item.favorite
+          ? "a starred image"
+          : likedSeed?.item.dream
+            ? "a liked result"
+            : "an image you chose in a comparison";
         note = likedSeed
-          ? `Varying a ${likedSeed.item.favorite ? "starred image" : "liked result"}: new ${vary}`
+          ? `Varying ${what}: new ${vary}`
           : `Continuing ${project!.name}: new ${vary}`;
       } else if (axis === "profile") ({ profile, note } = otherProfile!);
       else if (axis === "lora") {
@@ -1864,7 +1896,7 @@ export function createDream(options: {
    */
   function pairBase(ownerId: string, record: DreamRecord, profiles: DreamProfile[]) {
     const used = new Set(record.compared);
-    const [base] = drawSeeds(ownerId, profiles).filter(
+    const [base] = drawSeeds(ownerId, record, profiles).filter(
       ({ item, input }) =>
         !used.has(String(item.id)) &&
         !(Array.isArray(input.referenceAssets) && input.referenceAssets.length),
@@ -2412,6 +2444,9 @@ export function createDream(options: {
         label: item.dream!.pair!.label,
       });
       options.taste.record(ownerId, [pairSignal(a.dream!.pair!, answer, side(a), side(b))]);
+      const record = read(ownerId);
+      rate(record, String(a.id), String(b.id), { a: 1, b: 0, both: 0.5, neither: 0.5 }[answer]);
+      write(ownerId, record);
       return items;
     },
     /** Keeps a result and steers the next few ideas toward it. */
@@ -2495,7 +2530,8 @@ export function createDream(options: {
     },
     /**
      * Teaches the taste profile which older images the person likes or passes over (a this-or-that
-     * pair is one of each). The gallery itself stays as it was.
+     * pair is one of each, or both alike, and rates them against each other). The gallery itself
+     * stays as it was.
      */
     calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
       const pool = new Map(
@@ -2515,6 +2551,8 @@ export function createDream(options: {
       ]);
       const ids = [...liked, ...passed];
       const record = read(ownerId);
+      // A pair: one liked over the other, or both alike.
+      if (ids.length === 2) rate(record, ids[0], ids[1], liked.length === 1 ? 1 : 0.5);
       record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
         0,
         judgedLimit,
