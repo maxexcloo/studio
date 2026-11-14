@@ -33,7 +33,6 @@ import {
 } from "./records.js";
 
 export const dataDir = currentDataDir();
-export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
 let galleryRevision = Date.now();
 // Bumped whenever the hide markers change, so a cached page list knows to rebuild.
@@ -163,7 +162,7 @@ function galleryChanged(before, after) {
 
 export function setGallery(items, options = {}) {
   const before = gallery;
-  gallery = sortGallery(items).slice(0, galleryLimit);
+  gallery = sortGallery(items);
   if (options.track !== false) {
     if (galleryChanged(before, gallery)) bumpRevision();
   }
@@ -686,7 +685,6 @@ function writeChangedRows() {
   for (const item of gallery) {
     const key = galleryKey(item);
     if (key && !current.has(key)) current.set(key, item);
-    if (current.size >= galleryLimit) break;
   }
   const changed = [];
   for (const [key, item] of current)
@@ -827,8 +825,7 @@ export function addGalleryItems(items) {
 function saveHiddenGalleryIds() {
   hiddenVersion += 1;
   fs.mkdirSync(dataDir, { recursive: true });
-  const entries = [...hiddenGalleryIds.entries()].slice(-galleryLimit * 2);
-  persistHiddenMarkers(Object.fromEntries(entries));
+  persistHiddenMarkers(Object.fromEntries(hiddenGalleryIds));
 }
 
 export function recordsFromComfyHistory(history) {
@@ -1101,7 +1098,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
       cleared = hiddenGalleryIds.delete(markerOf(galleryKey(item))) || cleared;
     if (cleared) saveHiddenGalleryIds();
   }
-  setGallery(dedupeGallery(replaced).slice(0, galleryLimit));
+  setGallery(dedupeGallery(replaced));
   return completed;
 }
 
