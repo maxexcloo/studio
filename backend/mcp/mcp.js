@@ -21,6 +21,7 @@ import { registerResultTools } from "./results.js";
 import { controlInstructions, registerGpuTools } from "./gpu.js";
 import fs from "node:fs";
 import { appVersion } from "../data-dir.js";
+import { logEvent, logWarning } from "../crash-log.js";
 
 // The generate tool waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -277,11 +278,23 @@ export function registerMcpRoutes(
           else extra.signal?.addEventListener("abort", forward, { once: true });
           const key = extra.requestId === undefined ? null : inflightKey(actor, extra.requestId);
           if (key) inflight.set(key, controller);
+          const started = Date.now();
+          const call = { tool: name, account: owner || scope, client: actor.client || undefined };
           try {
             if (scope === "unlinked") throw new Error(unlinkedMessage);
             if (scope === "anonymous") throw new Error(anonymousMessage);
-            return await action(args, controller.signal);
+            const result = await action(args, controller.signal);
+            logEvent("MCP tool call", { ...call, ms: Date.now() - started });
+            return result;
           } catch (error) {
+            logWarning(
+              controller.signal.aborted ? "MCP tool call cancelled" : "MCP tool call failed",
+              {
+                ...call,
+                ms: Date.now() - started,
+                reason: String(error?.message || error).slice(0, 200),
+              },
+            );
             return {
               isError: true,
               content: [
@@ -308,7 +321,15 @@ export function registerMcpRoutes(
       },
     );
     const toolError = server.createToolError.bind(server);
-    server.createToolError = (message) => toolError(conciseError(message));
+    server.createToolError = (message) => {
+      // Arguments the schema refused never reach the tool's own handler.
+      const reason = conciseError(message);
+      logWarning("MCP tool call refused", {
+        account: owner || scope,
+        reason: reason.slice(0, 200),
+      });
+      return toolError(reason);
+    };
     if (scope === "media" || scope === "unlinked" || scope === "anonymous") {
       const { namedInTier } = registerGenerateTools({
         tool,
