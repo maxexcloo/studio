@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Button, Menu, Stack, Text, Tooltip } from "@mantine/core";
+import { Button, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, FolderUp } from "lucide-react";
 import { api } from "../../api";
 import { icons } from "../../ui/icons";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
@@ -133,7 +134,7 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
   return (
     <>
       <Menu position="bottom-end" width={menuWidth}>
-        <Tooltip label="Upload" disabled={!phone}>
+        <PopupTooltip label="Upload" disabled={!phone}>
           <Menu.Target>
             <Button
               {...(phone ? iconChipProps : chipProps)}
@@ -145,7 +146,7 @@ export function GalleryUpload({ upload }: { upload: ReturnType<typeof useGallery
               {phone ? <icons.upload size={16} /> : "Upload"}
             </Button>
           </Menu.Target>
-        </Tooltip>
+        </PopupTooltip>
         <Menu.Dropdown>
           <ActionMenuItems
             groups={[

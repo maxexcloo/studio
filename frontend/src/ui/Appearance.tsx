@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useLayoutEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
   ColorSwatch,
@@ -31,6 +24,7 @@ import {
   cssVariablesResolver,
   studioTheme,
 } from "../theme";
+import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const colours = [
@@ -256,25 +250,15 @@ export function AppearanceControls() {
   );
 }
 export function AppearanceMenu() {
-  const [opened, setOpened] = useState(false);
   return (
-    <Popover
-      onOpen={() => setOpened(true)}
-      onClose={() => setOpened(false)}
-      width={300}
-      position="bottom-end"
-      offset={18}
-      shadow="md"
-      withArrow
-      trapFocus
-    >
-      <Tooltip label="Appearance" disabled={opened}>
+    <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
+      <PopupTooltip label="Appearance">
         <Popover.Target>
           <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
             <Palette size={19} />
           </ActionIcon>
         </Popover.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Popover.Dropdown data-composer-layer>
         <AppearanceControls />
       </Popover.Dropdown>

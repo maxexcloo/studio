@@ -109,8 +109,9 @@ the primary component reference and verify APIs against the installed version.
   reacts. A closing layer no longer counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
   and dialogs that can have another dialog above use `closeWhenTop`.
-- A trigger's Tooltip wraps `Popover.Target` or `Menu.Target` so the trigger
-  retains `aria-expanded` and toggles its popup. Nested Select/MultiSelect
+- A trigger's tooltip is a `PopupTooltip` wrapping `Popover.Target` or
+  `Menu.Target`, so the trigger retains `aria-expanded` and toggles its popup
+  and the tooltip hides while the popup is open. Nested Select/MultiSelect
   dropdowns stay inside their owning Popover with
   `comboboxProps.withinPortal: false` and preserve focus when selected.
 - Shared chip popups (`ChipPopup`) anchor on desktop and open full-screen

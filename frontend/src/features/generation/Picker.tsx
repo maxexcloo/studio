@@ -29,6 +29,7 @@ import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ScrollingSegments } from "../../ui/ScrollingSegments";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
@@ -199,9 +200,9 @@ export function ChipPopup({
       withinPortal={withinPortal}
       {...fittedPopup}
     >
-      <Tooltip label={title} disabled={!tooltip || opened}>
+      <PopupTooltip label={title} disabled={!tooltip}>
         <Popover.Target>{target}</Popover.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Popover.Dropdown
         {...layer}
         aria-labelledby=""
@@ -582,13 +583,13 @@ export function SortMenu<Sort extends string>({
 }) {
   return (
     <Menu position="bottom-end" withinPortal={false}>
-      <Tooltip label={`Sort: ${labels[value]}`}>
+      <PopupTooltip label={`Sort: ${labels[value]}`}>
         <Menu.Target>
           <ActionIcon aria-label={label} variant="subtle" color="gray">
             <ArrowDownUp size={18} />
           </ActionIcon>
         </Menu.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Menu.Dropdown>
         {(Object.keys(labels) as Sort[]).map((sort) => (
           <Menu.Item

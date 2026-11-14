@@ -15,6 +15,7 @@ import {
 import { Search, type LucideIcon } from "lucide-react";
 import { icons } from "./icons";
 import { ScrollingSegments } from "./ScrollingSegments";
+import { PopupTooltip } from "./PopupTooltip";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
 import classes from "./SectionToolbar.module.css";
@@ -167,7 +168,7 @@ export function SectionToolbar({
         {filters && (
           <Popover position="bottom-end" width={300} trapFocus>
             {/* The Tooltip wraps the target, so the button itself carries aria-expanded. */}
-            <Tooltip label={`Filter ${label}`}>
+            <PopupTooltip label={`Filter ${label}`}>
               <Popover.Target>
                 <ActionIcon
                   aria-label={`Filter ${label}`}
@@ -191,7 +192,7 @@ export function SectionToolbar({
                   )}
                 </ActionIcon>
               </Popover.Target>
-            </Tooltip>
+            </PopupTooltip>
             <Popover.Dropdown aria-label={`${label} Filters`} role="dialog" p="sm">
               <ScrollArea.Autosize mah="min(60dvh, 420px)">
                 {/* Titled with Clear, as the gallery's and the pickers' Filters popups are. */}
@@ -217,13 +218,13 @@ export function SectionToolbar({
         {(onQueryChange || filters) && (more.length > 0 || actions) && <ToolbarDivider />}
         {more.length > 0 && (
           <Menu position="bottom-end">
-            <Tooltip label={`More ${label} Actions`}>
+            <PopupTooltip label={`More ${label} Actions`}>
               <Menu.Target>
                 <ActionIcon variant="subtle" color="gray" aria-label={`More ${label} Actions`}>
                   <icons.more size={18} />
                 </ActionIcon>
               </Menu.Target>
-            </Tooltip>
+            </PopupTooltip>
             <Menu.Dropdown>
               {more.map((action) => (
                 <Menu.Item

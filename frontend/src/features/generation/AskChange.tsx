@@ -12,6 +12,7 @@ import { ArrowUp } from "lucide-react";
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { icons } from "../../ui/icons";
 import { ActionMenuItems, type Action } from "../../ui/ActionBar";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { assistantQuery } from "./PromptAssistant";
 import classes from "./AskChange.module.css";
 
@@ -206,7 +207,7 @@ export function ChangeSuggestions<K extends QueryKey>({
   });
   return (
     <Menu position="top-end" width={240} opened={opened} onChange={setOpened}>
-      <Tooltip label="Suggestions">
+      <PopupTooltip label="Suggestions">
         <Menu.Target>
           <ActionIcon
             variant="subtle"
@@ -218,7 +219,7 @@ export function ChangeSuggestions<K extends QueryKey>({
             <icons.suggestions size={16} />
           </ActionIcon>
         </Menu.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Menu.Dropdown data-composer-layer aria-busy={loading || undefined}>
         <Menu.Label>Suggestions</Menu.Label>
         <ActionMenuItems groups={action.menu!} />
