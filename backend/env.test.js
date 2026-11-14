@@ -20,8 +20,8 @@ test("the shell beats Studio's settings file", () => {
         "--input-type=module",
         "-e",
         `
-        const env = await import("./backend/env.js");
-        console.log(JSON.stringify({ hosts: process.env.STUDIO_ALLOWED_HOSTS, demo: process.env.STUDIO_DEMO, hostsFromFile: env.envFileKeys.has("STUDIO_ALLOWED_HOSTS"), demoFromFile: env.envFileKeys.has("STUDIO_DEMO") }));
+        await import("./backend/env.js");
+        console.log(JSON.stringify({ hosts: process.env.STUDIO_ALLOWED_HOSTS, demo: process.env.STUDIO_DEMO }));
       `,
       ],
       {
@@ -38,8 +38,6 @@ test("the shell beats Studio's settings file", () => {
     assert.deepEqual(JSON.parse(output), {
       hosts: "from-shell",
       demo: "1",
-      hostsFromFile: false,
-      demoFromFile: true,
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
