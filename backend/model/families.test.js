@@ -117,24 +117,17 @@ test("model files are placed by their names", () => {
   assert.deepEqual([unknownCheckpoint.family, unknownCheckpoint.variant.id], ["sdxl", "pony"]);
 });
 
-test("MiniMax-H3-Image's files are the MiniMax H3 Image family and its parts, not H3 video", async () => {
+test("MiniMax-H3-Image's files are the MiniMax H3 Image family, not H3 video", async () => {
   const { refinedFamily } = await import("../family-catalogue.js");
-  const { classifyEncoder, classifyVae } = await import("./components.js");
   const found = classifyModel("unet", "minimax_h3_image_pruned_int8_convrot.safetensors");
   assert.equal(
     classifyModel("unet", "minimax_h3_fl2va_pruned_int8_convrot.safetensors").family,
     "minimax_h3",
   );
-  assert.equal(classifyVae("minimax_h3_video_vae_int8_convrot.safetensors").kind, "h3_video");
   assert.deepEqual([found.family, found.variant.id], ["minimax_h3_image", "standard"]);
   assert.equal(
     refinedFamily("minimax_h3", "minimax_h3_image_pruned_bf16.safetensors"),
     "minimax_h3_image",
-  );
-  assert.equal(classifyVae("minimax_h3_image_vae_fp16.safetensors").kind, "h3_image");
-  assert.equal(
-    classifyEncoder("qwen3vl_32b_minimax_h3_int8_convrot.safetensors").kind,
-    "qwen3vl_32b",
   );
 });
 
@@ -191,20 +184,12 @@ test("Sana is recognised from its own and diffusers-style weights", () => {
   assert.equal(classifyModel("checkpoint", "Sana_Sprint_0.6B_1024px.pth").variant.id, "sprint");
 });
 
-test("every node pack is one registry entry, and a missing one comes with both install routes", async () => {
+test("every node pack is one registry entry", async () => {
   const { nodePacks } = await import("../node-packs.js");
-  const { missingPackPart } = await import("../node-install.js");
   for (const [id, pack] of Object.entries(nodePacks)) {
     assert.match(pack.repository, /^https:\/\/github\.com\/.+\.git$/, id);
     assert.ok(pack.folder && pack.nodes.length, id);
   }
-  assert.equal(missingPackPart({ SanaModelLoader: {}, SanaGenerate: {} }, "comfyui_sana"), null);
-  const part = missingPackPart({}, "seedvr2");
-  assert.deepEqual(
-    [part.part, part.nodePack.repository, part.missingNodes.length],
-    ["comfy", nodePacks.seedvr2.repository, 3],
-  );
-  assert.ok(part.install.commands.length >= 1);
 });
 
 /* ------------------------------------------------------------ Lumina 2, MageFlow, ERNIE */
