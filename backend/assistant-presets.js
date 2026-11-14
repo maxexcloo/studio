@@ -41,7 +41,7 @@ export const seedStyles = Object.freeze([
     label: "Enhance",
     description: "Richer detail in the guide's own style.",
     instruction:
-      "Enhance: keep the prompt’s own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
+      "Enhance: keep the prompt's own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
   {
     id: "fix",
@@ -96,7 +96,7 @@ export const seedStyles = Object.freeze([
     description: "Sensual and explicit, for uncensored models.",
     uncensored: true,
     instruction:
-      "Spicy: make the scene sensual and explicit, building on the request’s own subjects and setting.",
+      "Spicy: make the scene sensual and explicit, building on the request's own subjects and setting.",
   },
   {
     id: "action",
@@ -156,7 +156,7 @@ export const customStyles = Object.freeze({
     custom: true,
     enabled: true,
     instruction:
-      "Custom: apply the person’s instruction below in full. Where it changes a subject, detail or style, it overrides keeping them; keep everything else as asked.",
+      "Custom: apply the person's instruction below in full. Where it changes a subject, detail or style, it overrides keeping them; keep everything else as asked.",
   },
   animate: {
     id: "custom",

@@ -96,7 +96,7 @@ test("a gallery saves each image and lists the ones that aren't images", async (
   });
   const result = await importRedditPost("https://redd.it/many", "", { fetch: redlib.fetch });
   assert.equal(result.items.length, 2);
-  assert.deepEqual(result.failed, [{ image: 3, error: "It isn’t a PNG, JPEG or WebP image." }]);
+  assert.deepEqual(result.failed, [{ image: 3, error: "It isn't a PNG, JPEG or WebP image." }]);
   assert.ok(!redlib.asked.some((url) => url.includes("in-a-comment")), "only the post's media");
 });
 

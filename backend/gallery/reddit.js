@@ -112,7 +112,7 @@ async function fromRedlib(fetcher, route) {
     if (!response.ok)
       throw new Error(
         response.status === 404
-          ? "That Reddit post wasn’t found."
+          ? "That Reddit post wasn't found."
           : `Reddit returned ${response.status}.`,
       );
     return response;
@@ -140,7 +140,7 @@ export async function importRedditPost(link, ownerId = "", { fetch: fetcher = fe
         .split(";")[0]
         .trim()
         .toLowerCase();
-      if (!imageMimes.includes(mime)) throw new Error("It isn’t a PNG, JPEG or WebP image.");
+      if (!imageMimes.includes(mime)) throw new Error("It isn't a PNG, JPEG or WebP image.");
       const buffer = await cappedBody(
         response,
         maxUploadBytes,
@@ -184,7 +184,7 @@ export function registerRedditImportRoute(
           failed: result.failed,
           ...(result.items.length
             ? {}
-            : { error: `None of that post’s images could be saved: ${result.failed[0].error}` }),
+            : { error: `None of that post's images could be saved: ${result.failed[0].error}` }),
         },
       };
     } catch (error) {

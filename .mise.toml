@@ -21,9 +21,9 @@ depends = [
   "test",
 ]
 
-# Frontend copy uses straight apostrophes.
+# Copy uses straight apostrophes.
 [tasks."check:apostrophes"]
-run = "! git grep -n '’' -- frontend/src"
+run = "! git grep -n '’' -- backend frontend/src"
 
 [tasks."check:oxlint"]
 run = "oxlint --deny-warnings"
