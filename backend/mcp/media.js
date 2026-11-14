@@ -183,7 +183,7 @@ function outputIndex(item) {
  * A result page titled `title` (in its tab and heading), refreshing while work is `pending`, with
  * `css` beside the shared style; the static CSP allows inline style and no script.
  */
-const resultPage = (title, pending, body, css = "") =>
+export const resultPage = (title, pending, body, css = "") =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${escapeHtml(title)}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;margin-bottom:1.5rem}.prompt p{opacity:.8;white-space:pre-wrap}${css}</style></head><body><h1>${escapeHtml(title)}</h1>${body}</body></html>`;
 
 export class McpMedia {

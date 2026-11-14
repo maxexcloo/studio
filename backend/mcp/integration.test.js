@@ -2975,7 +2975,9 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
   // A watch page has no preview, and an unknown id opens nothing.
   assert.equal((await fetch(`${page}.jpg`)).status, 404);
-  assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"))).status, 404);
+  const unknown = await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"));
+  assert.equal(unknown.status, 404);
+  assert.match(await unknown.text(), /<h1>Result Unavailable<\/h1>/);
   f.jobs.get(secondJob.job_id).gallery = [];
   assert.equal((await fetch(page)).status, 404, "hiding the output ends the watch page");
 });

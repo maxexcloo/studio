@@ -8,7 +8,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { maxJobsPerCall } from "./controls.js";
-import { McpMedia, maxUploadMegabytes, uploadPage } from "./media.js";
+import { McpMedia, maxUploadMegabytes, resultPage, uploadPage } from "./media.js";
 import { livePrompting } from "../profile/store.js";
 import { gatewaySettings } from "../assistant.js";
 import { mayUseFeature } from "../account-policy.js";
@@ -547,6 +547,14 @@ export function registerMcpRoutes(
     }
   });
   app.get("/mcp/results/:token", async (req, res) => {
+    const pageHeaders = {
+      "Cache-Control": "private, no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy":
+        "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "Content-Type": "text/html; charset=utf-8",
+    };
     try {
       if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
         throw new Error("Invalid host.");
@@ -558,16 +566,7 @@ export function registerMcpRoutes(
           ? await media.allPage(claims, credential)
           : await media.page(claims, credential);
         if (!html) throw new Error("Unavailable.");
-        return res
-          .set({
-            "Cache-Control": "private, no-store",
-            "Referrer-Policy": "no-referrer",
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy":
-              "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-            "Content-Type": "text/html; charset=utf-8",
-          })
-          .send(html);
+        return res.set(pageHeaders).send(html);
       }
       const read = (jobId, index) =>
         accountMode
@@ -588,7 +587,17 @@ export function registerMcpRoutes(
         })
         .send(result.content);
     } catch {
-      res.status(404).json({ error: "The result link is invalid, unavailable or expired." });
+      // People open these links from the chat, so they get a page rather than an API error.
+      res
+        .status(404)
+        .set(pageHeaders)
+        .send(
+          resultPage(
+            "Result Unavailable",
+            false,
+            "<p>This result link is invalid, unavailable or expired. Ask the chat to show the result again.</p>",
+          ),
+        );
     }
   });
   return { endWaits: () => media.endWaits() };
