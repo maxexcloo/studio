@@ -82,7 +82,7 @@ MCP clients reach `/mcp` in one of three ways:
 
 - **Personal token:** an account's own token from Settings › Account, where only that account can view and copy it again, as `Authorization: Bearer <token>`, or in the path (`/mcp/<token>`) for a client that sends no headers. Only an administrator's own token reaches the admin tools.
 - **Trusted gateway:** a chat gateway such as Bifrost (for LibreChat) sends `STUDIO_MCP_API_KEY` with its user's ID in `x-ai-user-id` (and email in `x-ai-user-email`, which links or creates the matching ordinary account). Administrators link other IDs in **Settings › Users › Chat Gateway**. `x-studio-conversation-id` scopes result numbers to one chat.
-- **GPU control:** `CONTROL_MCP_API_KEY` gets only the GPU tools (`gpu_status`, `workloads`, `preview`, `apply`, `mode`, `restart`, `operation`) and needs [Runtime Control](#runtime-control).
+- **GPU control:** `STUDIO_CONTROL_MCP_API_KEY` gets only the GPU tools (`gpu_status`, `workloads`, `preview`, `apply`, `mode`, `restart`, `operation`) and needs [Runtime Control](#runtime-control).
 
 `STUDIO_MCP_PUBLIC_URL` is the internet-facing host: it takes only personal tokens, and signed result, upload and export links use it. The shared keys work only on the other allowed hosts, such as the in-cluster service name.
 

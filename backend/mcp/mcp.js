@@ -97,12 +97,12 @@ export function registerMcpRoutes(
   } = {},
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
-  const controlKey = environment.CONTROL_MCP_API_KEY;
+  const controlKey = environment.STUDIO_CONTROL_MCP_API_KEY;
   // Without a key or accounts nothing is served at /mcp.
   const served = Boolean(mediaKey || controlKey || accountMode);
   if (controlKey && (!runtime || equal(controlKey, mediaKey)))
     throw new Error(
-      "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_NAMESPACES) and a key separate from STUDIO_MCP_API_KEY.",
+      "STUDIO_CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_NAMESPACES) and a key separate from STUDIO_MCP_API_KEY.",
     );
   const publicUrl =
     environment.STUDIO_MCP_PUBLIC_URL?.replace(/\/+$/, "") ||

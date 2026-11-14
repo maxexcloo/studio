@@ -867,7 +867,7 @@ function localLink(f, publicLink) {
   return f.base + url.pathname;
 }
 
-const adminEnvironment = { CONTROL_MCP_API_KEY: controlKey };
+const adminEnvironment = { STUDIO_CONTROL_MCP_API_KEY: controlKey };
 
 test("tool lists, schemas and instructions are identical for every caller and call, so prompt prefixes cache", async (t) => {
   const f = await fixture(t);
