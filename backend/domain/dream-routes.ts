@@ -52,6 +52,19 @@ export function registerDreamRoutes(
       dream.access(owner(account)) ? run(account, input) : refused,
     );
   route("GET", "/api/dream", (account) => ({ status: 200, payload: show(owner(account)) }));
+  // The header's badge: results waiting for a verdict, a comparison counting once, and whether
+  // Dream is running, so the count can change.
+  route("GET", "/api/dream/count", (account) => {
+    const { enabled, paused } = dream.read(owner(account)).settings;
+    const unseen = dream.unseen(owner(account));
+    return {
+      status: 200,
+      payload: {
+        unseen: new Set(unseen.map((item) => item.dream?.pair?.id ?? item.id)).size,
+        active: enabled && !paused,
+      },
+    };
+  });
   route("POST", "/api/dream/visit", (account) => ({
     status: 200,
     payload: { since: dream.visit(owner(account)) },

@@ -16,7 +16,7 @@ import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
 import { useAccount, useGroupFeature } from "../auth/AccountGate";
 import { AccountMenu } from "../auth/AccountMenu";
-import { dreamQuery } from "../dream/queries";
+import { dreamCountQuery } from "../dream/queries";
 import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
 import { StatusAction } from "./ServiceStatus";
@@ -42,9 +42,9 @@ function ModeSwitcher({ mode }: { mode: string }) {
   // Dream's results waiting for a verdict, counted on its tab.
   const unseen =
     useQuery({
-      ...dreamQuery,
+      ...dreamCountQuery,
       enabled: shown["/dream"] !== false,
-      select: (dream) => dream.unseen.length,
+      select: (count) => count.unseen,
     }).data || 0;
   const unseenId = useId();
   return (
