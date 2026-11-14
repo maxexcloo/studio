@@ -458,6 +458,31 @@ test("an idle worker with another model loaded takes work waiting behind a busy 
   }
 });
 
+test("waiting work stays put rather than moving behind work of its tier on a freed worker", async () => {
+  const queue = fixture();
+  const { store, observations, submitted } = queue;
+  queue.adapter.alternatives = () => ["worker:primary", "worker:secondary"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string, origin = {}) =>
+      store.enqueue("alice", session.id, {}, "image", undefined, resource, undefined, origin).id;
+    const busy = enqueue("worker:primary");
+    await queue.queue.tick();
+    // Secondary is free with its own job waiting, which it starts first.
+    const theirs = enqueue("worker:secondary", mcp("b"));
+    const mine = enqueue("worker:primary", mcp("a"));
+    await queue.queue.tick();
+    assert.deepEqual(submitted, [busy, theirs]);
+    assert.equal(store.job("alice", mine)!.resource, "worker:primary");
+    observations.set(busy, { status: "completed" });
+    await queue.queue.tick();
+    assert.deepEqual(submitted, [busy, theirs, mine]);
+    assert.equal(store.job("alice", mine)!.resource, "worker:primary");
+  } finally {
+    store.close();
+  }
+});
+
 test("work routed to a worker that can't take it moves to one that can, and Dream waits for it", async () => {
   const queue = fixture();
   const { store, submitted } = queue;
