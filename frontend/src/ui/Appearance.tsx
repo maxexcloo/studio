@@ -259,8 +259,8 @@ export function AppearanceMenu() {
   const [opened, setOpened] = useState(false);
   return (
     <Popover
-      opened={opened}
-      onChange={setOpened}
+      onOpen={() => setOpened(true)}
+      onClose={() => setOpened(false)}
       width={300}
       position="bottom-end"
       offset={18}
