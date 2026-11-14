@@ -27,18 +27,17 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       // that boundary without requiring a privileged container in the source checks.
       const source = `
       import { installShutdown } from './backend/shutdown.js';
-      import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
+      import { putGalleryItems } from './backend/gallery/store.js';
       import http from 'node:http';
       const kill = process.kill.bind(process);
       process.kill = (pid, signal) => pid === process.pid ? true : kill(pid, signal);
-      setGallery([{ id: 'shutdown-pending', jobId: 'shutdown-pending', type: 'image', status: 'pending', prompt: 'Saved before stop' }]);
+      putGalleryItems([{ id: 'shutdown-pending', jobId: 'shutdown-pending', type: 'image', status: 'pending', prompt: 'Saved before stop' }]);
       const server = http.createServer((_req, res) => { res.writeHead(200); res.write('stream open'); });
       installShutdown({
-        flush: flushPendingGallery,
         drain: async () => {
           process.send({ type: 'draining' });
           await new Promise(resolve => server.close(resolve));
-          setGallery([{ id: 'shutdown-pending', type: 'image', status: 'done', prompt: 'Saved after draining' }]);
+          putGalleryItems([{ id: 'shutdown-pending', type: 'image', status: 'done', prompt: 'Saved after draining' }]);
         }
       });
       server.listen(0, '127.0.0.1', () => process.send({ port: server.address().port }));
@@ -78,7 +77,7 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   );
 }
 
-test("an uncaught exception logs its cause and synchronously saves pending gallery changes", () => {
+test("an uncaught exception logs its cause, with gallery changes already saved", () => {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-crash-"));
   try {
     const result = spawnSync(
@@ -88,9 +87,9 @@ test("an uncaught exception logs its cause and synchronously saves pending galle
         "--eval",
         `
       import { installShutdown } from './backend/shutdown.js';
-      import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
-      installShutdown({ flush: flushPendingGallery });
-      setGallery([{ id: 'crash-pending', type: 'image', status: 'pending' }]);
+      import { putGalleryItems } from './backend/gallery/store.js';
+      installShutdown();
+      putGalleryItems([{ id: 'crash-pending', type: 'image', status: 'pending' }]);
       setImmediate(() => { throw new Error('Fixture crash'); });
     `,
       ],
@@ -116,9 +115,9 @@ test(
     const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-stalled-shutdown-"));
     const source = `
     import { installShutdown } from './backend/shutdown.js';
-    import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
-    setGallery([{ id: 'still-accepted', type: 'image', status: 'pending' }]);
-    installShutdown({ flush: flushPendingGallery, drain: () => new Promise(() => {}), graceMs: 25 });
+    import { putGalleryItems } from './backend/gallery/store.js';
+    putGalleryItems([{ id: 'still-accepted', type: 'image', status: 'pending' }]);
+    installShutdown({ drain: () => new Promise(() => {}), graceMs: 25 });
     process.send({ ready: true });
     setInterval(() => {}, 1000);
   `;

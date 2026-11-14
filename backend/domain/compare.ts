@@ -66,6 +66,9 @@ const range = `${compareVariants.min}–${compareVariants.max}`;
 const sized = (list: unknown[]) =>
   list.length >= compareVariants.min && list.length <= compareVariants.max;
 
+/** The jobs and chosen items a comparison reads from the gallery. */
+type ComparisonIds = { jobIds?: string[]; itemIds?: string[] };
+
 /** Compare runs queue as one set and read back against the caller's current gallery. */
 export function registerCompareRoutes(
   app: Router,
@@ -81,7 +84,7 @@ export function registerCompareRoutes(
     read(): ComparisonRecord[];
     write(records: ComparisonRecord[]): void;
     /** The caller's visible gallery, or `null` when the account may not use the gallery. */
-    gallery(req: Request): GalleryItem[] | null;
+    gallery(req: Request, ids: ComparisonIds): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
     /** The variants' items with their result numbers. */
     numbered(items: GalleryItem[]): GalleryItem[];
@@ -196,8 +199,14 @@ export function registerCompareRoutes(
     status: 403,
     payload: { ok: false, error: "The gallery is off for this account." },
   };
-  const gallery = (req: Request, res: Response) => {
-    const items = options.gallery(req);
+  const galleryFor = (account: RouteAccount | null | undefined, ids: ComparisonIds) =>
+    options.gallery({ studioAccount: account ?? undefined, params: {} } as Request, ids);
+  const idsOf = (record?: ComparisonRecord): ComparisonIds => ({
+    jobIds: record?.jobIds || [],
+    itemIds: record?.itemIds || [],
+  });
+  const gallery = (req: Request, res: Response, ids: ComparisonIds) => {
+    const items = options.gallery(req, ids);
     if (!items) res.status(403).json({ ok: false, error: "The gallery is off for this account." });
     return items;
   };
@@ -208,8 +217,6 @@ export function registerCompareRoutes(
       labels.every((label) => typeof label === "string" && label.trim() && label.length <= 80));
 
   directRoute(app, "GET", "/api/comparisons", (account, { query }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
-    if (!items) return galleryOff;
     const jobs = typeof query.jobIds === "string" ? new Set(query.jobIds.split(",")) : null;
     const records = options
       .read()
@@ -218,6 +225,16 @@ export function registerCompareRoutes(
           record.ownerId === (account?.userId || "") &&
           (!jobs || record.jobIds.some((id) => jobs.has(id))),
       );
+    const items = galleryFor(
+      account,
+      query.members === "1"
+        ? {}
+        : {
+            jobIds: records.flatMap((record) => record.jobIds),
+            itemIds: records.flatMap((record) => record.itemIds || []),
+          },
+    );
+    if (!items) return galleryOff;
     // `members=1` lists only which results each comparison holds, for finding an item's comparison.
     return {
       status: 200,
@@ -234,11 +251,11 @@ export function registerCompareRoutes(
     };
   });
   app.get("/api/comparisons/:id", (req, res) => {
-    const items = gallery(req, res);
-    if (!items) return;
     const record = options
       .read()
       .find((item) => item.id === req.params.id && item.ownerId === owner(req));
+    const items = gallery(req, res, idsOf(record));
+    if (!items) return;
     return record
       ? res.json(show(record, items))
       : res.status(404).json({ ok: false, error: "That comparison is unavailable." });
@@ -246,7 +263,12 @@ export function registerCompareRoutes(
   // MCP records its multi-model runs through this one, and Compare Selected the chosen images
   // (`itemIds`, one per job).
   directRoute(app, "POST", "/api/comparisons", (account, { body }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    const strings = (value: unknown) =>
+      Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+    const items = galleryFor(account, {
+      jobIds: strings(body?.jobIds),
+      itemIds: strings(body?.itemIds),
+    });
     if (!items) return galleryOff;
     const { jobIds, labels, itemIds } = body || {};
     if (
@@ -368,13 +390,16 @@ export function registerCompareRoutes(
     return { status: 201, payload: { ...show(record, items), sessionId: session } };
   }
   directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    const source = body?.parentItemId;
+    const items = galleryFor(account, { itemIds: typeof source === "string" ? [source] : [] });
     return items ? run(account, items, body || {}) : galleryOff;
   });
   // Variants of one result: its recorded run and seed, each variant with its own prompt, lettered
   // A, B, C… in the run's session as versions of it.
   directRoute(app, "POST", "/api/comparisons/variants", async (account, { body }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    const items = galleryFor(account, {
+      itemIds: typeof body?.itemId === "string" ? [body.itemId] : [],
+    });
     if (!items) return galleryOff;
     const { itemId, axis, projectId, variants } = body || {};
     const ownerId = account?.userId || "";
@@ -408,12 +433,12 @@ export function registerCompareRoutes(
     });
   });
   directRoute(app, "PUT", "/api/comparisons/:id/vote", (account, { params, body }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
-    if (!items) return galleryOff;
     const records = options.read();
     const record = records.find(
       (item) => item.id === params.id && item.ownerId === (account?.userId || ""),
     );
+    const items = galleryFor(account, idsOf(record));
+    if (!items) return galleryOff;
     if (!record)
       return { status: 404, payload: { ok: false, error: "That comparison is unavailable." } };
     const { itemId, jobId, by } = body || {};

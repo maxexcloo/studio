@@ -11,11 +11,11 @@ import {
 import { comfy, optionsFor } from "../comfy/comfy.js";
 import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
-import { visibleGallery } from "../gallery/store.js";
+import { galleryChangeCount } from "../gallery/store.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
-import { profileStats } from "../stats.js";
+import { profileStats, recentGallery } from "../stats.js";
 import {
   capabilityForProfile,
   defaultWorker,
@@ -447,13 +447,13 @@ export function withProfileAliases(models) {
 
 /** Profiles whose recent runs mostly fail carry `failing`: the composer badges them and MCP's own pick passes them over. */
 // The visible gallery's profile health, counted again when the gallery changes or a minute on.
-let profileHealth = { items: null, at: 0, stats: {} };
+let profileHealth = { change: -1, at: 0, stats: {} };
 
 export function withFailing(models) {
   if (!models?.profiles) return models;
-  const items = visibleGallery();
-  if (profileHealth.items !== items || Date.now() - profileHealth.at > 60_000)
-    profileHealth = { items, at: Date.now(), stats: profileStats(items) };
+  const change = galleryChangeCount();
+  if (profileHealth.change !== change || Date.now() - profileHealth.at > 60_000)
+    profileHealth = { change, at: Date.now(), stats: profileStats(recentGallery()) };
   const { stats } = profileHealth;
   return {
     ...models,

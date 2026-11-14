@@ -35,6 +35,7 @@ export function createPromptSuggester(options: {
   idle(): boolean;
   allowed(ownerId: string): boolean;
   items(): Iterable<SuggestedPromptItem>;
+  changes?(): number;
   visible(item: SuggestedPromptItem): boolean;
   /** A small (≤512 px) copy of the picture, or null when there is none. */
   image(item: SuggestedPromptItem): Promise<ModelImage | null>;

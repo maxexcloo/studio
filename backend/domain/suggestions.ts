@@ -609,6 +609,7 @@ export function createNextStepWork(options: {
   idle(): boolean;
   allowed(ownerId: string): boolean;
   items(): Iterable<SuggestionItem>;
+  changes?(): number;
   visible(item: SuggestionItem): boolean;
   /** A small (≤512 px) copy of the image, or null when there is none. */
   image(item: SuggestionItem): Promise<ModelImage | null>;

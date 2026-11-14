@@ -7,7 +7,8 @@ import { compareGalleryItems } from "./order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
-const { pageGallery, setGallery, sortGallery } = await import("./store.js");
+const { galleryItems, pageGallery } = await import("./store.js");
+const { setGallery } = await import("../fixtures/gallery.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const item = (id, createdAt, extra = {}) => ({
@@ -19,6 +20,7 @@ const item = (id, createdAt, extra = {}) => ({
   ...extra,
 });
 const ids = (items) => items.map((item) => item.id);
+const sorted = (items) => items.slice().sort(compareGalleryItems);
 
 test("explicit Civitai imports stay newest first even without source prompts", () => {
   const imported = item("civitai:42", "2026-01-03", { prompt: "", civitai: { imageId: "42" } });
@@ -27,7 +29,7 @@ test("explicit Civitai imports stay newest first even without source prompts", (
     imported,
     item("scan", "2026-01-04", { prompt: "" }),
   ];
-  assert.deepEqual(ids(sortGallery(items)), ["civitai:42", "generation", "scan"]);
+  assert.deepEqual(ids(sorted(items)), ["civitai:42", "generation", "scan"]);
   setGallery(items);
   assert.equal(pageGallery({ limit: 1 }).items[0].id, "civitai:42");
 });
@@ -41,8 +43,7 @@ test("server pages and client merges put blank imports last, newest first within
     item("failed", "2026-01-04", { status: "failed", prompt: "" }),
   ];
   const expected = ["failed", "pending", "generation", "history-import", "import-old"];
-  assert.deepEqual(ids(sortGallery(items)), expected);
-  assert.deepEqual(ids(items.slice().sort(compareGalleryItems)), expected);
+  assert.deepEqual(ids(sorted(items)), expected);
   setGallery(items);
   const collected = [];
   let cursor = "";
@@ -65,10 +66,6 @@ test("a removed cursor continues through the bucket boundary and descending id t
   const cursor = pageGallery({ limit: 2 }).nextCursor;
   setGallery(items.filter((item) => item.id !== "m"));
   assert.deepEqual(ids(pageGallery({ cursor, limit: 2 }).items), ["a", "import"]);
-  const legacyCursor = `${Date.parse("2026-01-01")}|m`;
-  assert.deepEqual(ids(pageGallery({ cursor: legacyCursor, limit: 2 }).items), ["a", "import"]);
-  const importCursor = `${Date.parse("2026-12-01")}|import`;
-  assert.deepEqual(pageGallery({ cursor: importCursor, limit: 2 }).items, []);
 });
 
 test("valid dates precede missing and invalid dates, retaining batch indices and id ties", () => {
@@ -92,7 +89,9 @@ test("valid dates precede missing and invalid dates, retaining batch indices and
     "blank-dated",
     "blank-invalid",
   ];
-  assert.deepEqual(ids(sortGallery(items)), expected);
+  assert.deepEqual(ids(sorted(items)), expected);
+  setGallery(items);
+  assert.deepEqual(ids(galleryItems()), expected, "SQLite orders as the comparator does");
 });
 
 test("a ranked page (Find Similar) orders by score, leaves out the unscored and pages by position", () => {
@@ -128,4 +127,59 @@ test("a result set's results page together in set order, where its newest result
     cursor = page.nextCursor;
   } while (cursor);
   assert.deepEqual(ids(collected), ["newest", "set-0", "set-1", "set-2", "between", "oldest"]);
+});
+
+test("paging inside a set carries on through it when a newer result moves the set", () => {
+  const set = (index, createdAt) =>
+    item(`set-${index}`, createdAt, { resultSet: { id: "moving", title: "Moving", index } });
+  setGallery([
+    item("newest", "2026-02-05"),
+    set(0, "2026-02-04"),
+    set(1, "2026-02-03"),
+    set(2, "2026-02-02"),
+    item("oldest", "2026-02-01"),
+  ]);
+  const first = pageGallery({ limit: 2 });
+  assert.deepEqual(ids(first.items), ["newest", "set-0"]);
+  // A result added to the set since sorts first, so the set now stands at the top.
+  setGallery([...galleryItems(), set(3, "2026-02-06")]);
+  const rest = [];
+  let cursor = first.nextCursor;
+  while (cursor) {
+    const page = pageGallery({ cursor, limit: 2 });
+    rest.push(...page.items);
+    cursor = page.nextCursor;
+  }
+  assert.deepEqual(ids(rest), ["set-1", "set-2", "set-3", "oldest"]);
+});
+
+test("each owner pages through only its own items, sets kept together", () => {
+  const owned = (ownerId, id, createdAt, set) =>
+    item(`${ownerId}-${id}`, createdAt, {
+      ownerId,
+      ...(set !== undefined && { resultSet: { id: `${ownerId}-set`, index: set } }),
+    });
+  setGallery(
+    ["alice", "bob"].flatMap((ownerId) => [
+      owned(ownerId, "a", "2026-03-05"),
+      owned(ownerId, "s1", "2026-03-04", 1),
+      owned(ownerId, "b", "2026-03-03"),
+      owned(ownerId, "s0", "2026-03-02", 0),
+      owned(ownerId, "c", "2026-03-01"),
+    ]),
+  );
+  for (const ownerId of ["alice", "bob"]) {
+    const seen = [];
+    let cursor = "";
+    do {
+      const page = pageGallery({ cursor, limit: 2, query: { ownerId } });
+      assert.equal(page.totalApprox, 5);
+      seen.push(...page.items);
+      cursor = page.nextCursor;
+    } while (cursor);
+    assert.deepEqual(
+      ids(seen),
+      ["a", "s0", "s1", "b", "c"].map((id) => `${ownerId}-${id}`),
+    );
+  }
 });

@@ -10,8 +10,9 @@ import test from "node:test";
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-const { galleryRevisionValue, hideGalleryItems, pageGallery, replaceGalleryJob, setGallery } =
+const { galleryRevisionValue, hideGalleryItems, pageGallery, replaceGalleryJob } =
   await import("./store.js");
+const { setGallery } = await import("../fixtures/gallery.js");
 const { makePendingItems } = await import("./records.js");
 
 const url = (filename) =>

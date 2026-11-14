@@ -41,6 +41,7 @@ export function createFaceCheck(options: {
   faces: FaceReader;
   idle(): boolean;
   items(): Iterable<Item>;
+  changes?(): number;
   visible(item: Item): boolean;
   /**
    * The owner's character cards: id and the image IDs Studio sends, its first image first

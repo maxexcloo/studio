@@ -1,9 +1,9 @@
-import { recordBelongsToRequest } from "./account-ownership.js";
+import { ownedQuery, recordBelongsToRequest } from "./account-ownership.js";
 import { downscaleReferences } from "./assistant-routes.js";
 import { isCloudProfile } from "../shared/profiles.ts";
 import { optionsFor } from "./comfy/comfy.js";
 import { families } from "./family-catalogue.js";
-import { gallery } from "./gallery/store.js";
+import { galleryItems } from "./gallery/store.js";
 import { loraInfos } from "./lora/info.js";
 import { accountMayUseLoras, loraAllowed, modelsForAccount } from "./model/catalogue.js";
 import { canonicalProfileId, livePrompting } from "./profile/store.js";
@@ -57,7 +57,7 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
     const families = new Map((await profiles(req)).map((item) => [item.id, item.family]));
     const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
       id === profile.id || (profile.family && families.get(id) === profile.family);
-    const items = gallery
+    const items = galleryItems({ ...ownedQuery(req.studioAccount), favorite: true, status: "done" })
       .filter(
         (item) =>
           item.favorite &&
