@@ -120,7 +120,7 @@ export type Judgement =
 export function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
   const openComposer = useOpenComposer();
-  const { profiles, setDraft } = useGenerationActions();
+  const { setDraft } = useGenerationActions();
   const star = (item: MediaItem) =>
     post("/api/gallery/favorite", { ids: [item.id], favorite: true });
   return useMutation({
@@ -160,7 +160,7 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
       await post(dreamItemPath(item, "keep"));
       // As the viewer's Animate in Composer and Edit, staged in the composer for review.
       if (verdict === "animate" || verdict === "refine") {
-        const { draft } = await mediaDraft(item, verdict, profiles, client);
+        const { draft } = await mediaDraft(item, verdict, client);
         setDraft(draft);
         openComposer(verdict === "animate" ? "video" : "image");
       }
