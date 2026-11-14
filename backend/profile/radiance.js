@@ -8,7 +8,8 @@
  * Radiance's Krea 2 refuses image edits.
  *
  * The worker remembers the conversion and its profile, so a Studio restart finishes it on the next
- * status read; Studio clears it on the worker once the profile has its backend.
+ * status read; Studio clears it on the worker once the profile has its backend. A worker restart
+ * loses it.
  */
 import { civitaiJson, isCivitaiHost } from "../civitai/access.js";
 import { civitaiFileSpec, civitaiLink, civitaiModelFiles } from "../civitai/import.js";
@@ -164,7 +165,16 @@ export function radianceConversions({
 
   async function sync() {
     const { conversion } = await worker({ action: "status" });
-    if (!conversion) return { conversion: last };
+    if (!conversion) {
+      // A restarted worker forgets its conversion; its download resumes on the next start.
+      if (last?.status === "running")
+        last = {
+          ...last,
+          status: "failed",
+          error: "The worker restarted. Start the conversion again.",
+        };
+      return { conversion: last };
+    }
     last = { ...conversion, applied: false };
     if (conversion.status === "done" && conversion.note?.profile) {
       try {
