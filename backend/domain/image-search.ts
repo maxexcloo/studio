@@ -21,6 +21,12 @@ export interface ImageEncoder {
  * scores a fitting description at about 0.10–0.15 and unrelated ones mostly below 0.07.
  */
 export const nearThreshold = 0.08;
+/**
+ * The least likeness to the source that Find Similar keeps at each strictness. Gallery images are
+ * mostly 0.5–0.9 alike to each other, so these keep about a handful, a few dozen and a few hundred.
+ */
+export const similarThresholds = { close: 0.94, similar: 0.9, loose: 0.86 };
+export type SimilarStrictness = keyof typeof similarThresholds;
 const key = (item: IdleItem) => item.url || item.id || "";
 /** Cosine similarity: SigLIP vectors are unit length. */
 function likeness(a: Float32Array, b: Float32Array) {
@@ -83,6 +89,7 @@ export function createImageSearch(options: {
   vectors: ImageVectors;
   idle(): boolean;
   items(): Iterable<IdleItem>;
+  changes?(): number;
   visible(item: IdleItem): boolean;
   /** The image file's bytes. */
   image(item: IdleItem): Promise<Uint8Array>;
@@ -143,15 +150,18 @@ export function createImageSearch(options: {
       };
     },
     /**
-     * Find Similar: each item's likeness to `source`'s image, undefined for items not read yet, or
-     * null when `source` has no vector (Image Search off or not read yet). Uses stored vectors only.
+     * Find Similar: each item's likeness to `source`'s image, undefined for items not read yet or
+     * less alike than `strictness` keeps, or null when `source` has no vector (Image Search off or
+     * not read yet). Uses stored vectors only.
      */
-    similar(source: IdleItem) {
+    similar(source: IdleItem, strictness: SimilarStrictness) {
       const wanted = options.enabled() ? vectors.get(source) : undefined;
       if (!wanted) return null;
+      const least = similarThresholds[strictness];
       return (item: IdleItem) => {
         const vector = vectors.get(item);
-        return vector && likeness(vector, wanted);
+        const score = vector && likeness(vector, wanted);
+        return score !== undefined && score >= least ? score : undefined;
       };
     },
   };

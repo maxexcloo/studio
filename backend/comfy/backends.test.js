@@ -25,6 +25,7 @@ writeTestWorkflows(temporary);
 const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("../gallery/store.js");
+const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 const { makePendingItems, outputsFrom } = await import("../gallery/records.js");
 const { comfyView } = await import("./media-routes.js");
 const { cancelPrompt } = await import("./queue.js");
@@ -83,7 +84,7 @@ function request(backend) {
 
 function queue(id, body) {
   const items = makePendingItems(id, body);
-  store.setGallery([...items, ...store.gallery], { persist: false });
+  setGallery([...items, ...galleryRows()]);
   jobs.set(id, {
     status: "queued",
     comfyBackend: body.comfyBackend,

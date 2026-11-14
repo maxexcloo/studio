@@ -14,7 +14,12 @@ import crypto from "node:crypto";
 import { startFrameSize } from "./animate-profile.js";
 import { families } from "./family-catalogue.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
-import { dedupeGallery, gallery, setGallery, galleryRevisionValue } from "./gallery/store.js";
+import {
+  galleryItem,
+  galleryItems,
+  galleryRevisionValue,
+  putGalleryItems,
+} from "./gallery/store.js";
 import {
   makePendingItems,
   storedChatRecord,
@@ -230,7 +235,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     if (account) {
       const foreign =
         (existing && (existing.ownerId || "") !== job.ownerId) ||
-        gallery.some((item) => item.jobId === id && (item.ownerId || "") !== job.ownerId);
+        galleryItems({ jobId: id }).some((item) => (item.ownerId || "") !== job.ownerId);
       if (foreign)
         return {
           status: 409,
@@ -321,9 +326,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
               )
             : undefined,
         madeWith: (id) =>
-          gallery
-            .find((item) => item.id === id && (item.ownerId || "") === ownerId)
-            ?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
+          galleryItem(id, ownerId)?.settings?.referenceAssets?.map((asset) => asset.assetId) || [],
       });
     }
     // An older page (or a draft restored from before the reference library) can
@@ -429,7 +432,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     body.startedAt = Date.now();
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
-    setGallery(dedupeGallery([...items, ...gallery]));
+    putGalleryItems(items);
     jobs.set(id, {
       status: "queued",
       ownerId: body.ownerId || undefined,

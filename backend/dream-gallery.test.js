@@ -6,8 +6,9 @@ import test from "node:test";
 
 // Each test file runs in its own process, so this folder stays here.
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-gallery-"));
-const { filterVisibleGallery, hasGalleryMedia, pageGallery, setGallery, updateGalleryJob } =
+const { filterVisibleGallery, hasGalleryMedia, pageGallery, updateGalleryJob } =
   await import("./gallery/store.js");
+const { setGallery } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
 const { galleryJobResponse } = await import("./gallery/routes.js");
 const { openDatabase } = await import("./persistence/runtime.ts");

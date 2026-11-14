@@ -5,7 +5,7 @@ import { recordsForRequest } from "../account-ownership.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
 import { requireLocal } from "../route-access.js";
 import { editClip, probeVideo, videoEditKinds } from "../video-previews.js";
-import { addGalleryItems, gallery } from "./store.js";
+import { addGalleryItems, galleryItem } from "./store.js";
 
 /**
  * The Edit menu's video edits (Trim, …): ffmpeg writes the edited clip beside the original, which
@@ -25,8 +25,8 @@ export function registerVideoEditRoutes(app, { store }) {
       return res
         .status(400)
         .json({ ok: false, error: "A trim keeps at least a tenth of a second." });
-    const item = recordsForRequest(gallery, req).find(
-      (entry) => entry.id === galleryItemId && entry.type === "video" && entry.status === "done",
+    const item = recordsForRequest([galleryItem(galleryItemId)].filter(Boolean), req).find(
+      (entry) => entry.type === "video" && entry.status === "done",
     );
     const media = item && mediaParams(item.url);
     const source = media && mediaFile(media.filename, media.subfolder);

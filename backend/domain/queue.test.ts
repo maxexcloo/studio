@@ -1041,9 +1041,8 @@ test("a running job whose worker refuses connections cancels at once; one that t
         return { status: 200, payload: { ok: true } };
       },
       jobs: live,
-      gallery: () => [],
+      items: () => [],
       accountForOwner: () => ({ authenticated: true }),
-      flushGallery: async () => undefined,
       cancelPrompt: () => worker(),
       settled: async (job) => {
         released.push(job.id);

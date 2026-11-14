@@ -2,7 +2,7 @@ import { recordBelongsToAccount, recordsForRequest } from "./account-ownership.j
 import { isDefaultBackend, routeJob } from "./comfy/backends.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { directRoute } from "./domain/direct-route.ts";
-import { gallery, galleryRevisionValue, updateGalleryJob } from "./gallery/store.js";
+import { galleryItems, galleryRevisionValue, updateGalleryJob } from "./gallery/store.js";
 import { referenceAssetForAccount, stageReferenceAssetsForAccount } from "./references.js";
 import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./upscale-jobs.js";
 import {
@@ -111,8 +111,8 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     if (failure) return failure;
     const quality = normalizeQuality(request.quality);
     const itemId = String(request.galleryItemId || "");
-    const ownedItem = gallery.find(
-      (item) => item.id === itemId && recordBelongsToAccount(item, account),
+    const ownedItem = galleryItems({ ids: [itemId] }).find((item) =>
+      recordBelongsToAccount(item, account),
     );
     if (account && !ownedItem)
       return {
@@ -264,7 +264,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
   app.post("/api/upscale/toggle", (req, res) => {
     try {
       const itemId = String(req.body?.galleryItemId || "");
-      const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
+      const [ownedItem] = recordsForRequest(galleryItems({ ids: [itemId] }), req);
       if (req.studioAccount && !ownedItem)
         return res
           .status(404)

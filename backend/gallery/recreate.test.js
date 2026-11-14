@@ -8,12 +8,12 @@ import { openDatabase } from "../persistence/runtime.ts";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-recreate-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_MULTI_USER = "1";
-const [{ registerRecreateRoute }, galleryStore, { Store }, { isVersion }] = await Promise.all([
+const [{ registerRecreateRoute }, { Store }, { isVersion }] = await Promise.all([
   import("./recreate.js"),
-  import("./store.js"),
   import("../domain/store.ts"),
   import("../../shared/versions.ts"),
 ]);
+const { setGallery } = await import("../fixtures/gallery.js");
 after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const store = new Store(openDatabase(":memory:"));
@@ -41,7 +41,7 @@ function call(userId, body) {
 }
 
 test("Recreate makes an upload the source of its runs, in one Recreate session", () => {
-  galleryStore.setGallery([
+  setGallery([
     {
       id: "upload",
       url: "/comfy/view?filename=upload.png",

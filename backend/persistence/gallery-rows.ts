@@ -1,18 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 
 /**
- * Gallery records as one `studio_gallery` row each, keyed by `galleryKey`, so a save writes only
- * the items that changed. The `gallery-rows-v1` step of migrate-runtime moved the older `gallery`
- * document into it.
+ * Gallery records as one `studio_gallery` row each, keyed by `galleryKey`, with indexed columns
+ * derived from each row so the gallery is queried in SQL (gallery/store.js).
  */
 type GalleryItem = { url?: unknown; id?: unknown; outputName?: unknown; filename?: unknown };
 
 export function galleryKey(item: GalleryItem | null | undefined): string {
   return String(item?.url || item?.id || item?.outputName || item?.filename || "");
 }
-
-export const createGalleryTable =
-  "CREATE TABLE IF NOT EXISTS studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL)";
 
 const field = (name: string) => `json_extract(value, '$.${name}')`;
 
@@ -58,6 +54,14 @@ export const galleryIndexes: [string, string][] = [
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
 ];
+
+/** The gallery table with its columns and indexes, for a database that has none yet. */
+export const createGalleryTable = [
+  `CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL, ${galleryColumns
+    .map(([name, expression]) => `${name} GENERATED ALWAYS AS (${expression}) VIRTUAL`)
+    .join(", ")})`,
+  ...galleryIndexes.map(([name, keys]) => `CREATE INDEX ${name} ON studio_gallery (${keys})`),
+].join(";\n");
 
 export function readGalleryRows(db: DatabaseSync): unknown[] {
   return (db.prepare("SELECT value FROM studio_gallery").all() as { value: string }[]).map((row) =>

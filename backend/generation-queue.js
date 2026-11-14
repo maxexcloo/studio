@@ -12,12 +12,7 @@ import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { GenerationQueue, modelOf } from "./domain/queue.ts";
 import { queuePriority } from "./domain/store.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
-import {
-  flushGalleryStrict,
-  gallery,
-  replaceGalleryJob,
-  updateGalleryJob,
-} from "./gallery/store.js";
+import { galleryItem, galleryItems, replaceGalleryJob, updateGalleryJob } from "./gallery/store.js";
 import { storedWritingRecord } from "./gallery/records.js";
 import { jobs } from "./jobs.js";
 import { writeBytesFileAsync } from "./json-store.js";
@@ -84,14 +79,10 @@ export function createGenerationQueue({
   const queueAdapter = createGenerationQueueAdapter({
     submitGeneration: generationRoutes.submitGeneration,
     jobs,
-    gallery: () => gallery,
+    items: (job) => galleryItems({ jobId: job.id, ownerId: job.ownerId }),
     accountForOwner: accountAccessForId,
-    flushGallery: flushGalleryStrict,
     durableSave: async (job) => {
-      const records = gallery.filter(
-        (item) =>
-          item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
-      );
+      const records = galleryItems({ jobId: job.id, ownerId: job.ownerId, status: "done" });
       const moved = await ingestRunResults(
         job.backend,
         records.map((item) => ({
@@ -106,19 +97,13 @@ export function createGenerationQueue({
           ...result.output,
           ...(result.upscale ? { upscale: result.upscale } : {}),
         });
-      await flushGalleryStrict();
       const live = jobs.get(job.id);
       if (live && (live.ownerId || "") === job.ownerId)
         jobs.set(job.id, {
           ...live,
           status: "done",
           error: "",
-          outputs: gallery.filter(
-            (item) =>
-              item.jobId === job.id &&
-              item.status === "done" &&
-              (item.ownerId || "") === job.ownerId,
-          ),
+          outputs: galleryItems({ jobId: job.id, ownerId: job.ownerId, status: "done" }),
         });
       if (moved.comfyFiles.length) {
         await removeComfyFiles(job.backend, moved.comfyFiles);
@@ -208,14 +193,12 @@ export function createGenerationQueue({
           },
           jobs,
         );
-        await flushGalleryStrict();
       },
     });
   const upscaleQueueAdapter = createUpscaleQueueAdapter({
     store,
     jobs,
-    itemFor: (ownerId, itemId) =>
-      gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
+    itemFor: (ownerId, itemId) => galleryItem(itemId, ownerId),
     execute: async (job, callbacks) => {
       const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
       if (!job.providerJobId && job.ownerId && !account?.authenticated)
@@ -228,12 +211,9 @@ export function createGenerationQueue({
       });
     },
     cancelPrompt: (promptId, backend) => cancelPrompt(promptId, comfyOn(backend)),
-    flushGallery: flushGalleryStrict,
     eligible: queueAdapter.eligible,
     settled: async (job) => {
-      const item = gallery.find(
-        (entry) => entry.id === job.input.galleryItemId && (entry.ownerId || "") === job.ownerId,
-      );
+      const item = galleryItem(job.input.galleryItemId, job.ownerId);
       if (item && item.upscale?.jobId === job.id && ["failed", "cancelled"].includes(job.status))
         updateGalleryJob(item.id, {
           upscale: {
@@ -281,15 +261,11 @@ export function createGenerationQueue({
           updateGalleryJob(job.id, {
             ...resultSource(job, job.parentItemId, {
               parent: job.parentJobId ? store.job(job.ownerId, job.parentJobId) : undefined,
-              source: gallery.find(
-                (item) => item.id === job.parentItemId && (item.ownerId || "") === job.ownerId,
-              ),
+              source: galleryItem(job.parentItemId, job.ownerId),
             }),
             ...(job.faceRedo ? { faceRedo: true } : {}),
           });
-        const items = gallery.filter(
-          (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
-        );
+        const items = galleryItems({ jobId: job.id, ownerId: job.ownerId });
         completed(items);
       },
     },

@@ -4,7 +4,6 @@ import { chatRecordChanges, chatRecords } from "./chat-records.js";
 import { comparisonSets } from "./comparison-sets.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamOwnership } from "./dream-ownership.js";
-import { galleryColumnsStep } from "./gallery-columns.js";
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
 import { stackPresets } from "./stack-presets.js";
 
@@ -38,12 +37,6 @@ const steps = [
     name: "comparisonSets",
     run: comparisonSets,
     changes: (plan) => plan.items,
-    online: true,
-  },
-  {
-    name: "galleryColumns",
-    run: galleryColumnsStep,
-    changes: (plan) => plan.columns.length + plan.indexes.length + plan.thumbnails,
     online: true,
   },
   {

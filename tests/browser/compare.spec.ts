@@ -103,6 +103,8 @@ const build = async (page: Page, builder: string, options: string[], run: string
   for (const option of options)
     await page.getByRole("menuitem", { name: option, exact: true }).click();
   await page.getByRole("menuitem", { name: run, exact: true }).click();
+  // A press while the menu fades out only closes it.
+  await expect(page.getByRole("menu")).toHaveCount(0);
 };
 
 test("Compare ▾ builds several variants at once from prompt lines and seeds", async ({ page }) => {
@@ -123,6 +125,7 @@ test("Compare ▾ builds several variants at once from prompt lines and seeds", 
   await compareMenu(page, "Compare Seeds");
   await page.getByRole("radiogroup", { name: "Seeds", exact: true }).getByText("3").click();
   await page.getByRole("menuitem", { name: "Compare 3 Seeds", exact: true }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
   await expect(variants(page).getByRole("radio")).toHaveCount(3);
   await page.getByRole("button", { name: "Compare 3", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\/compare-1$/);
@@ -218,7 +221,7 @@ test("Test LoRA in the Library sweeps a LoRA's strength in the composer", async 
   await page.getByRole("button", { name: "Actions for Detail Slider", exact: true }).click();
   await page.getByRole("menuitem", { name: "Test LoRA", exact: true }).click();
   await expect(prompt(page)).toHaveValue("A fox in fine detail");
-  await expect(page.getByText("Detail Slider Off", { exact: true })).toBeVisible();
+  await expect(variants(page).getByRole("radio")).toHaveCount(4);
   await page.getByRole("button", { name: "Compare 4", exact: true }).click();
   await expect(page).toHaveURL(/\/compare\//);
   expect(

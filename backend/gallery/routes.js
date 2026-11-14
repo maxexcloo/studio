@@ -1,25 +1,29 @@
 import {
-  filterVisibleGallery,
-  gallery,
-  galleryJobItems,
-  hideGalleryItems,
-  removeGalleryItems,
-  saveGallery,
-  setGallery,
   cleanupGalleryState,
-  pageGallery,
-  galleryRevisionValue,
+  eachGalleryItem,
+  filterVisibleGallery,
+  forgetGalleryItems,
+  galleryFilter,
+  searchWords,
   galleryItem,
+  galleryItems,
+  galleryChangeCount,
+  galleryJobItems,
+  galleryRevisionValue,
+  hideGalleryItems,
+  outputFileCandidates,
+  pageGallery,
+  removeGalleryItems,
+  setGalleryFavorites,
   resultNumbers,
   visibleGallery,
 } from "./store.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { galleryFilter, outputFileCandidates, setGalleryFavorites } from "./store.js";
-import { galleryTime } from "./order.js";
 import { makePendingItems } from "./records.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
 import {
+  ownedQuery,
   ownerIdForRequest,
   recordBelongsToAccount,
   recordsForRequest,
@@ -29,9 +33,38 @@ import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { directRoute } from "../domain/direct-route.ts";
 import { queuePriority } from "../domain/store.ts";
+import { similarThresholds } from "../domain/image-search.ts";
 import { adminRefusal } from "../route-access.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
 import { galleryStats } from "../stats.js";
+
+const unique = (values) =>
+  [...new Set(values.filter((value) => typeof value === "string" && value.trim()))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+// Summaries of an account's whole gallery cost a walk over it, so each is kept until it changes.
+const summaries = new Map();
+const keptSummaries = 20;
+
+/** `build(items)` over the request's own visible items the query narrows, kept until the gallery changes. */
+function ownedSummary(req, name, query, build) {
+  const owned = ownedQuery(req.studioAccount);
+  const key = JSON.stringify([galleryChangeCount(), name, owned, query]);
+  if (!summaries.has(key)) {
+    if (summaries.size >= keptSummaries) summaries.delete(summaries.keys().next().value);
+    const items = owned ? eachGalleryItem({ ...owned, ...query, dreamPool: false }) : [];
+    summaries.set(
+      key,
+      build(
+        (function* () {
+          for (const item of items) if (filterVisibleGallery([item]).length) yield item;
+        })(),
+      ),
+    );
+  }
+  return summaries.get(key);
+}
 
 export function galleryJobResponse(store, account, id, settings = false) {
   cleanupGalleryState(store);
@@ -61,8 +94,8 @@ export function galleryJobResponse(store, account, id, settings = false) {
 }
 
 /**
- * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item)` scores items
- * by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
+ * `near(q)` resolves to a test for items that look like the search (domain/image-search.ts), or null; `similar(item, strictness)`
+ * scores items by how alike they look to it, or is null when it can't. `compared(ownerId)` tests whether an item
  * is in one of the owner's comparisons.
  */
 export function registerGalleryReadRoutes(app, { near, similar, store, compared }) {
@@ -71,17 +104,16 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
    * `aspect` and `tag` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
+  const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
   const many = (value) =>
     (Array.isArray(value) ? value : [value])
       .map((item) => String(item ?? "").slice(0, 200))
       .filter(Boolean)
       .slice(0, 50);
-  async function searchFilter(query) {
-    const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
-    const q = one(query.q);
+  function searchFilter(query, looksLike) {
     return galleryFilter({
-      q,
-      near: await near(q),
+      q: one(query.q),
+      near: looksLike,
       favorites: query.favorites === "1",
       workflow: one(query.workflow),
       ...Object.fromEntries(
@@ -97,49 +129,52 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
   app.get("/api/gallery/filters", (req, res) => {
     const type = String(req.query.type || "");
-    const items = recordsForRequest(visibleGallery(), req).filter(
-      (item) => !type || item.type === type,
-    );
-    const unique = (values) =>
-      [...new Set(values.filter((value) => typeof value === "string" && value.trim()))].sort(
-        (a, b) => a.localeCompare(b),
-      );
-    res.json({
+    const found = ownedSummary(req, "filters", type ? { type } : {}, (items) => {
+      const models = new Set();
+      const names = [];
+      const loras = [];
+      const tagged = [];
+      for (const item of items) {
+        models.add(item.model);
+        names.push(item.settings?.modelName);
+        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
+          loras.push(lora?.name);
+        if (item.caption?.tags) tagged.push({ caption: { tags: item.caption.tags } });
+      }
       // Each recorded model resolves once: resolving reads the alias file's state.
-      models: unique([
-        ...[...new Set(items.map((item) => item.model))].map(canonicalProfileId),
-        ...items.map((item) => item.settings?.modelName),
-      ]),
-      loras: unique(
-        items.flatMap((item) =>
-          (Array.isArray(item.settings?.loras) ? item.settings.loras : []).map(
-            (lora) => lora?.name,
-          ),
-        ),
-      ),
+      return {
+        models: unique([...[...models].map(canonicalProfileId), ...names]),
+        loras: unique(loras),
+        tags: topCaptionTags(tagged),
+      };
+    });
+    res.json({
+      models: found.models,
+      loras: found.loras,
       sizes: gallerySizeBands.map((band) => ({
         value: band.id,
         label: band.label,
         description: band.detail,
       })),
       aspects: galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.label })),
-      tags: topCaptionTags(items),
+      tags: found.tags,
     });
   });
 
   // The newest finished image the account made with each LoRA, shown as its picker preview.
   app.get("/api/loras/previews", (req, res) => {
-    const newest = {};
-    for (const item of recordsForRequest(visibleGallery(), req)) {
-      if (item.status !== "done" || !item.thumbnailUrl) continue;
-      const time = Date.parse(item.createdAt || "") || 0;
-      for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
-        if (lora?.name && lora.enabled !== false && !(newest[lora.name]?.time >= time))
-          newest[lora.name] = { time, url: item.thumbnailUrl };
-    }
-    res.json({
-      previews: Object.fromEntries(Object.entries(newest).map(([name, { url }]) => [name, url])),
+    const previews = ownedSummary(req, "lora-previews", { status: "done" }, (items) => {
+      const newest = {};
+      for (const item of items) {
+        if (!item.thumbnailUrl) continue;
+        const time = Date.parse(item.createdAt || "") || 0;
+        for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
+          if (lora?.name && lora.enabled !== false && !(newest[lora.name]?.time >= time))
+            newest[lora.name] = { time, url: item.thumbnailUrl };
+      }
+      return Object.fromEntries(Object.entries(newest).map(([name, { url }]) => [name, url]));
     });
+    res.json({ previews });
   });
 
   directRoute(app, "GET", "/api/gallery", async (account, { query }) => {
@@ -148,41 +183,62 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     const limit = Number(query.limit || 0);
     const cursor = String(query.cursor || "");
     const includeFailed = query.includeFailed !== "0";
-    const search = await searchFilter(query);
+    const looksLike = await near(one(query.q));
+    const search = searchFilter(query, looksLike);
+    // A text search reads only rows holding every word: the filter still decides what matches.
+    const words = search && !looksLike ? searchWords(one(query.q)) : [];
     // `since` (an ISO date) keeps items made from then on; work still generating always shows.
     const since = query.since ? Date.parse(String(query.since)) : 0;
-    // `similar` (an item id, Find Similar) ranks by likeness to that image; none until it is read.
+    // `similar` (an item id, Find Similar) ranks by likeness to that image, keeping those at least
+    // as alike as `strictness` (close, similar or loose); none until it is read.
     const source = query.similar ? galleryItem(String(query.similar)) : null;
+    const strictness = Object.hasOwn(similarThresholds, query.strictness)
+      ? query.strictness
+      : "similar";
     const similarTo = query.similar
-      ? (source && recordBelongsToAccount(source, account) && similar(source)) || (() => undefined)
+      ? (source && recordBelongsToAccount(source, account) && similar(source, strictness)) ||
+        (() => undefined)
       : null;
     // `comparisons` keeps results that are in one of the account's comparisons.
     const inComparison = query.comparisons === "1" ? compared(account?.userId || "") : null;
     // Unfinished work shows only as the account chooses (Settings › Preferences › Gallery): none,
     // work in progress, or queued work too; unsaved, none.
     const work = accountPreferences(account?.userId || "").galleryWork || "none";
-    const page = pageGallery({
-      rank: similarTo,
-      type,
-      limit: limit || 200,
-      cursor,
-      includeFailed,
-      uploads: query.uploads === "1",
-      // The account and every parameter but the page's own name the filter's list.
-      filterKey: JSON.stringify([
-        account?.userId ?? "",
-        work,
-        Object.entries(query).filter(([key]) => key !== "cursor" && key !== "limit"),
-      ]),
-      filter: (item) =>
-        recordBelongsToAccount(item, account) &&
-        // `set` keeps one MCP result set's results.
-        (!query.set || item.resultSet?.id === query.set) &&
-        (!inComparison || inComparison(item)) &&
-        (work !== "none" || item.status !== "pending") &&
-        (!since || item.status === "pending" || galleryTime(item) >= since) &&
-        (!search || search(item)),
-    });
+    const owned = ownedQuery(account);
+    const page = owned
+      ? pageGallery({
+          rank: similarTo,
+          type,
+          limit: limit || 200,
+          cursor,
+          includeFailed,
+          uploads: query.uploads === "1",
+          query: {
+            ...owned,
+            // `set` keeps one MCP result set's results.
+            ...(query.set && { setId: String(query.set) }),
+            ...(work === "none" && { notStatus: "pending" }),
+            ...(Number.isFinite(since) && since && { since }),
+            ...(words.length && { contains: words }),
+          },
+          // The account and every parameter but the page's own name the filter's count.
+          filterKey: JSON.stringify([
+            account?.userId ?? "",
+            work,
+            Object.entries(query).filter(([key]) => key !== "cursor" && key !== "limit"),
+          ]),
+          filter:
+            inComparison || search
+              ? (item) => (!inComparison || inComparison(item)) && (!search || search(item))
+              : null,
+        })
+      : {
+          items: [],
+          nextCursor: "",
+          hasMore: false,
+          revision: galleryRevisionValue(),
+          totalApprox: 0,
+        };
     // Next steps are asked for in the viewer (`/api/suggestions`) and the prompt's thinking (up to
     // 20,000 characters) in Details (`/api/gallery/items/:id`), not carried in every page.
     const listed = ({ nextSteps: _steps, ...item }) => {
@@ -284,11 +340,8 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
 
   directRoute(app, "POST", "/api/gallery/favorite", (account, { body }) => {
     const requested = new Set((Array.isArray(body?.ids) ? body.ids : []).map(String).slice(0, 500));
-    const ids = gallery
+    const ids = galleryItems({ named: requested })
       .filter((item) => recordBelongsToAccount(item, account))
-      .filter((item) =>
-        [item.id, item.url, galleryKey(item)].some((key) => requested.has(String(key))),
-      )
       .flatMap((item) => [item.id, item.url, galleryKey(item)]);
     const changed = setGalleryFavorites(ids, Boolean(body?.favorite));
     starred({ studioAccount: account }, changed, Boolean(body?.favorite));
@@ -305,18 +358,15 @@ export function registerGalleryErrorRoutes(app) {
     const mine = (item) => recordBelongsToAccount(item, account);
     const owned =
       owner === undefined ? mine : owner === "all" ? () => true : (item) => item.ownerId === owner;
-    const clears = (item) =>
-      owned(item) && (item.status === "failed" || item.status === "cancelled");
-    const cleared = gallery.filter(clears);
+    const cleared = galleryItems({ status: ["failed", "cancelled"] }).filter(owned);
     hideGalleryItems(cleared);
-    setGallery(gallery.filter((item) => !clears(item)));
-    saveGallery();
+    forgetGalleryItems(cleared);
     return {
       status: 200,
       payload: {
         ok: true,
         cleared: cleared.length,
-        outputs: filterVisibleGallery(gallery.filter(mine)),
+        outputs: filterVisibleGallery(galleryItems(ownedQuery(account) || {}).filter(mine)),
       },
     };
   });
@@ -325,7 +375,7 @@ export function registerGalleryErrorRoutes(app) {
 /** Deletes the request's own items named by ID (or URL); answers with the IDs it deleted. */
 function deleteRequested(req, ids, deleted) {
   const wanted = new Set(ids.map(String));
-  const removed = recordsForRequest(gallery, req).filter(
+  const removed = recordsForRequest(galleryItems({ named: wanted }), req).filter(
     (item) => wanted.has(item.id) || wanted.has(item.url),
   );
   const files = removeGalleryItems(removed);
@@ -337,7 +387,7 @@ function deleteRequested(req, ids, deleted) {
 /** The visible gallery items each account owns, by owner ID. */
 function ownedGalleries() {
   const owned = new Map();
-  for (const item of visibleGallery()) {
+  for (const item of visibleGallery({}, { ordered: false })) {
     if (!item.ownerId) continue;
     if (!owned.has(item.ownerId)) owned.set(item.ownerId, []);
     owned.get(item.ownerId).push(item);
@@ -410,7 +460,9 @@ export function registerGalleryDeleteRoute(app, { deleted = () => {} } = {}) {
       ok: true,
       files,
       removed: removed.length,
-      outputs: filterVisibleGallery(recordsForRequest(gallery, req)),
+      outputs: filterVisibleGallery(
+        recordsForRequest(galleryItems(ownedQuery(req.studioAccount) || {}), req),
+      ),
     });
   });
 }

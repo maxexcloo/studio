@@ -15,9 +15,9 @@ interface GenerationAdapterOptions {
     account?: RecordValue,
   ): Promise<{ status: number; payload: RecordValue }>;
   jobs: Map<string, RecordValue>;
-  gallery(): RecordValue[];
+  /** The job's own gallery items. */
+  items(job: OwnedJob): RecordValue[];
   accountForOwner(ownerId: string): RecordValue | null;
-  flushGallery(): Promise<unknown>;
   durableSave?(job: OwnedJob): Promise<unknown>;
   cancelPrompt(job: { promptId: string; backend?: string }): Promise<unknown>;
   recover?(job: OwnedJob): Promise<unknown>;
@@ -27,17 +27,13 @@ interface GenerationAdapterOptions {
 
 /** The queue's local generations: generation-routes.js runs them, jobs.js reports their live state. */
 export function createGenerationQueueAdapter(options: GenerationAdapterOptions): QueueAdapter {
-  const ownedItems = (job: OwnedJob) =>
-    options
-      .gallery()
-      .filter((item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId);
   const current = (job: OwnedJob): RecordValue | undefined => {
     const live = options.jobs.get(job.id);
     return live && (live.ownerId || "") === job.ownerId ? live : undefined;
   };
   const observation = (job: OwnedJob): JobObservation | undefined => {
     const live = current(job);
-    const items = ownedItems(job);
+    const items = options.items(job);
     const outputs = items.filter((item) => item.status === "done" && item.url);
     const details = {
       providerJobId: live?.promptId || job.providerJobId,
@@ -109,7 +105,6 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
           );
         throw error;
       }
-      await options.flushGallery();
       return observation(job);
     },
     settled: options.settled,

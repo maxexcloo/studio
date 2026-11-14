@@ -35,7 +35,7 @@ test("vectors keep in float16 across restarts and drop another model's", () => {
 });
 
 test("idle work reads finished images once and search matches those that look alike", async () => {
-  const items = [item("cat"), item("dog"), item("clip", "video")];
+  const items = [item("cat"), item("dog"), item("clip", "video"), item("kitten")];
   const read: string[] = [];
   const texts: string[] = [];
   let enabled = true;
@@ -46,7 +46,7 @@ test("idle work reads finished images once and search matches those that look al
     embedImage: async (bytes) => {
       const name = new TextDecoder().decode(bytes);
       read.push(name);
-      return name === "cat" ? along(0) : along(2);
+      return name === "cat" ? along(0) : name === "kitten" ? along(0, 0.42) : along(2);
     },
     embedText: async (text) => {
       texts.push(text);
@@ -67,31 +67,35 @@ test("idle work reads finished images once and search matches those that look al
   });
   search.startPass("outdated");
   await search.settled();
-  assert.deepEqual(read.sort(), ["cat", "dog"], "images only");
+  assert.deepEqual(read.sort(), ["cat", "dog", "kitten"], "images only");
   assert.equal((await search.status()).remaining, 0);
 
   const near = await search.near("  Ginger Cat ");
   assert.deepEqual(
     items.filter((record) => near!(record)).map((record) => record.id),
-    ["cat"],
+    ["cat", "kitten"],
   );
   await search.near("ginger cat");
   assert.deepEqual(texts, ["ginger cat"], "a repeated search reuses its vector");
 
-  const like = search.similar(items[0])!;
-  assert.deepEqual(
-    items.map((record) => like(record)),
-    [1, 0, undefined],
-    "Find Similar scores stored vectors; unread items have none",
+  // The kitten is 0.91 alike: in at Similar and Loose, out at Close; the dog is out at every one.
+  const scores = (strictness: "close" | "similar" | "loose") =>
+    items.map((record) => search.similar(items[0], strictness)!(record));
+  assert.deepEqual(scores("close"), [1, undefined, undefined, undefined]);
+  assert.ok(Math.abs(scores("similar")[3]! - 0.91) < 0.01);
+  assert.equal(scores("loose")[1], undefined, "unread items and unlike ones have no score");
+  assert.equal(
+    search.similar(items[2], "loose"),
+    null,
+    "an image not read yet has nothing to compare",
   );
-  assert.equal(search.similar(items[2]), null, "an image not read yet has nothing to compare");
 
   downloaded = false;
   assert.equal(await search.near("dog"), null, "a search never downloads the model");
   downloaded = true;
   enabled = false;
   assert.equal(await search.near("dog"), null, "off in Settings");
-  assert.equal(search.similar(items[0]), null, "Find Similar too");
+  assert.equal(search.similar(items[0], "loose"), null, "Find Similar too");
 });
 
 test("images whose files are gone fail alone and never stall the pass", async () => {

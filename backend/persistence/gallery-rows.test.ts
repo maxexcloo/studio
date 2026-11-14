@@ -7,7 +7,7 @@ import test from "node:test";
 import { readGalleryRows, writeGalleryRows } from "./gallery-rows.ts";
 import { closeRuntimeDatabase, runtimeDatabase } from "./runtime.ts";
 
-test("Studio saves the gallery item by item into its rows", (t) => {
+test("Studio writes each gallery change to its row at once, never a preview", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-rows-"));
   t.after(() => {
     closeRuntimeDatabase(dataDir);
@@ -30,11 +30,11 @@ test("Studio saves the gallery item by item into its rows", (t) => {
     });
   run(`
     import assert from 'node:assert/strict';
-    import {gallery,setGallery,setGalleryFavorites,flushGalleryStrict} from './backend/gallery/store.js';
-    assert.deepEqual(gallery.map(item=>item.id),['kept','removed']);
+    import {forgetGalleryItems,galleryItem,galleryItems,putGalleryItems,setGalleryFavorites} from './backend/gallery/store.js';
+    assert.deepEqual(galleryItems().map(item=>item.id),['kept','removed']);
     setGalleryFavorites(['kept'],true);
-    setGallery([{id:'added',type:'image',status:'done',createdAt:'2026-01-02T00:00:00Z',preview:'data:'},...gallery.filter(item=>item.id!=='removed')]);
-    await flushGalleryStrict();
+    forgetGalleryItems([galleryItem('removed')]);
+    putGalleryItems([{id:'added',type:'image',status:'done',createdAt:'2026-01-02T00:00:00Z',preview:'data:'}]);
   `);
   const rows = readGalleryRows(runtimeDatabase(dataDir)) as {
     id: string;

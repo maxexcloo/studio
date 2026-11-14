@@ -16,6 +16,7 @@ import {
   GalleryFilterPanel,
   emptyGalleryFilters,
   useActiveFilters,
+  type FilterChip,
   type GalleryFilterValues,
 } from "./GalleryFilters";
 import { useGalleryColumns } from "./useGalleryLayout";
@@ -44,7 +45,7 @@ export function GalleryToolbar({
   value: GalleryFilterValues;
   onChange: (value: GalleryFilterValues) => void;
   /** View choices that narrow what shows, such as collapsed versions, as removable chips. */
-  extraChips: { key: string; label: string; remove: () => void }[];
+  extraChips: FilterChip[];
   /** The view's own choices: Grid or Runs at the top of the Filter popup, then its on/off filters. */
   view: ReactNode;
   toggles: ReactNode;

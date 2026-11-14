@@ -10,13 +10,13 @@ import { openDatabase } from "../persistence/runtime.ts";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-edits-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_MULTI_USER = "1";
-const [{ registerVideoEditRoutes }, galleryStore, { Store }, media, previews] = await Promise.all([
+const [{ registerVideoEditRoutes }, { Store }, media, previews] = await Promise.all([
   import("./video-edits.js"),
-  import("./store.js"),
   import("../domain/store.ts"),
   import("../media-paths.js"),
   import("../video-previews.js"),
 ]);
+const { setGallery, gallery: galleryRows } = await import("../fixtures/gallery.js");
 after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 let encoder;
 try {
@@ -69,7 +69,7 @@ function seed() {
   const session = store.createSession("alice", "Waves");
   const parent = store.enqueue("alice", session.id, { prompt: "A wave" }, "animate");
   const { url } = media.mediaUrls("clip.mp4", subfolder);
-  galleryStore.setGallery([
+  setGallery([
     {
       id: url,
       url,
@@ -105,7 +105,7 @@ test(
     const denied = await call("bob", { galleryItemId: url, kind: "trim", start: 0, end: 500 });
     assert.equal(denied.code, 404);
     const trimmed = await edited(url, { kind: "trim", start: 500, end: 1500 });
-    const version = galleryStore.gallery.find((item) => item.id === trimmed.id);
+    const version = galleryRows().find((item) => item.id === trimmed.id);
     assert.deepEqual(
       [version.ownerId, version.prompt, version.favorite],
       ["alice", "A wave", undefined],
