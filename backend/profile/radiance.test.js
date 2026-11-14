@@ -116,6 +116,9 @@ test("a finished conversion adds the backend once and clears the worker", async 
   );
   // The profile file itself is untouched until the worker reports the model installed.
   assert.equal(JSON.parse(readEditableProfile(id).text).studio.backends, undefined);
+  await conversions.start(id, { url: "link", name: "fine-tune-fp8", by: "Admin" });
+  conversion = null;
+  assert.match((await conversions.state()).conversion.error, /worker restarted/);
   const saved = addRadianceBackend(id, "fine-tune-fp8.rad", "Admin");
   assert.deepEqual(Object.keys(JSON.parse(saved.text).studio.backends), ["comfyui", "radiance"]);
 });
