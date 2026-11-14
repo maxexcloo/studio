@@ -47,8 +47,8 @@
 
 /* A tablet's toolbar has no room for the count and the slider; the size buttons stay. */
 @container (max-width: 56rem) {
-  .count,
-  .slider {
+  .mode .count,
+  .mode .slider {
     display: none;
   }
 }
