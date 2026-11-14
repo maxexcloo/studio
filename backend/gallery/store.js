@@ -17,7 +17,7 @@ import {
 } from "../persistence/runtime.ts";
 import { loadSharp } from "../sharp-loader.js";
 import { galleryFiltersTest } from "./filters.js";
-import { compareGalleryItems, compareGalleryKeys, setOrder } from "./order.js";
+import { compareGalleryItems, compareGalleryKeys } from "./order.js";
 import {
   generationSettings,
   outputsFrom,
@@ -636,7 +636,7 @@ function* galleryUnits(query, filter, start = null, skipSet = "") {
         const members = setItems(query, set);
         sets.set(set, {
           anchor: members[0] && galleryKey(members[0]),
-          items: (filter ? members.filter(filter) : members).sort(setOrder),
+          items: filter ? members.filter(filter) : members,
         });
       }
       const found = sets.get(set);
@@ -764,7 +764,7 @@ export function pageGallery({
   // The rest of a set the last page stopped inside, even if a newer result has moved the set.
   const rest = from?.set
     ? (() => {
-        const members = setItems(sql, from.set).sort(setOrder);
+        const members = setItems(sql, from.set);
         const at = members.findIndex((item) => galleryKey(item) === from.after);
         return at < 0 ? [] : members.slice(at + 1);
       })()

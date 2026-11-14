@@ -44,7 +44,7 @@ import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
-import { neighbourSets, setMembers, setPosition } from "./resultSets";
+import { setMembers, setPosition } from "./resultSets";
 import { type SwipeDirection, swipeDirection } from "./swipe";
 import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -368,7 +368,6 @@ export function MediaViewer({
   const family = useRunFamily(item, queued, related);
   // An MCP call's other results, for the set's place in the top bar and its strip.
   const members = setMembers(related, item);
-  const neighbours = neighbourSets(related, item);
   // A comparison's set links to its side-by-side view, unless that is where the viewer is.
   const comparison = comparisonOf(useQuery(comparisonMembersQuery).data, item);
   const comparisonPath = comparison && `/compare/${comparison}`;
@@ -788,7 +787,6 @@ export function MediaViewer({
               item={displayed}
               family={family}
               set={members}
-              neighbours={neighbours}
               choose={(next) => {
                 setCompare(false);
                 navigate?.(next);

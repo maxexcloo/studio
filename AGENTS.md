@@ -255,8 +255,10 @@ the primary component reference and verify APIs against the installed version.
   visible until the next version loads, then refit before painting. Navigation
   stops at the first and last item. A result from a run of several, like its
   Open All, flips through only that run's results; other results flip through
-  the gallery. Closing reveals and focuses the current
-  tile.
+  the gallery. A set's results stand together, newest first, in the gallery,
+  Runs and the viewer's set strip, which shows only that set on one row,
+  scrolling sideways to keep the current result in view. Closing reveals and
+  focuses the current tile.
 - On touch screens a tap on the media hides the viewer's chrome (top bar, arrows, strips, prompt,
   actions and Details) with a fade, as Photos does, and another tap shows it; desktop keeps it.
   A picture's tap waits out the double tap, and pinches, drags, long presses and swipes do not

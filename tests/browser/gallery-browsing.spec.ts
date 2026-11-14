@@ -469,7 +469,7 @@ test("An MCP result set is one titled run whose viewer names each result's place
   await expect(
     page.getByRole("button", { name: "Open image: Set prompt 1", exact: true }),
   ).toBeVisible();
-  // Runs stacks the set under its title, in prompt order.
+  // Runs stacks the set under its title, newest first.
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
   await page.keyboard.press("Escape");
@@ -478,9 +478,9 @@ test("An MCP result set is one titled run whose viewer names each result's place
   const tiles = run.getByRole("button", { name: /^Open image: / });
   await expect(tiles).toHaveCount(3);
   expect(await tiles.evaluateAll((all) => all.map((tile) => tile.ariaLabel))).toEqual([
-    "Open image: Fox Wizard",
-    "Open image: Set prompt 1",
     "Open image: Bear Hug",
+    "Open image: Set prompt 1",
+    "Open image: Fox Wizard",
   ]);
   // The viewer names the result's place in its set and jumps along the set's strip.
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
@@ -488,16 +488,16 @@ test("An MCP result set is one titled run whose viewer names each result's place
   await expect(async () => {
     if (!(await viewer.isVisible()))
       await run.getByRole("button", { name: "Open All", exact: true }).click();
-    await expect(viewer.getByText(place("Fox Wizard", 1), { exact: true })).toBeVisible({
+    await expect(viewer.getByText(place("Bear Hug", 1), { exact: true })).toBeVisible({
       timeout: 1000,
     });
   }).toPass();
   const strip = viewer.getByRole("list", { name: "Set: Variety Test", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
-  await strip.getByRole("listitem", { name: "Show Bear Hug (3 of 3)", exact: true }).click();
-  await expect(viewer.getByText(place("Bear Hug", 3), { exact: true })).toBeVisible();
+  await strip.getByRole("listitem", { name: "Show Fox Wizard (3 of 3)", exact: true }).click();
+  await expect(viewer.getByText(place("Fox Wizard", 3), { exact: true })).toBeVisible();
   await expect(
-    viewer.getByRole("img", { name: "Set prompt 2, detailed", exact: true }),
+    viewer.getByRole("img", { name: "Set prompt 0, detailed", exact: true }),
   ).toBeVisible();
   await strip.getByRole("listitem", { name: "Show Set prompt 1 (2 of 3)", exact: true }).click();
   await expect(viewer.getByText(place("Set prompt 1", 2), { exact: true })).toBeVisible();
@@ -1124,7 +1124,7 @@ test("The Tags facet lists the most used caption tags with counts and filters by
   ).toBeVisible();
 });
 
-test("The viewer's strip moves to the sets either side of its own", async ({ page }) => {
+test("The viewer's set strip shows only its own set", async ({ page }) => {
   const state = await fixtures(page);
   // Newest first: set B's results, then set A's.
   state.gallery.push(
@@ -1144,11 +1144,8 @@ test("The viewer's strip moves to the sets either side of its own", async ({ pag
   await page.getByRole("button", { name: "Open image: Prompt a-1", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const strip = viewer.getByRole("list", { name: "Set: Set A", exact: true });
-  await expect(strip.getByRole("listitem")).toHaveCount(3);
-  await strip.getByRole("listitem", { name: "Previous Set: Set B", exact: true }).click();
-  await expect(viewer.getByRole("img", { name: "Prompt b-0", exact: true })).toBeVisible();
-  const other = viewer.getByRole("list", { name: "Set: Set B", exact: true });
-  await other.getByRole("listitem", { name: "Next Set: Set A", exact: true }).click();
+  await expect(strip.getByRole("listitem")).toHaveCount(2);
+  await strip.getByRole("listitem", { name: "Show Prompt a-0 (2 of 2)", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "Prompt a-0", exact: true })).toBeVisible();
 });
 

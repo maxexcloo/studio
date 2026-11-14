@@ -226,14 +226,6 @@
   outline-offset: -2px;
 }
 
-.variation[data-neighbour] {
-  opacity: 0.35;
-}
-
-.variation[data-neighbour]:hover {
-  opacity: 0.7;
-}
-
 /* A dot for each generation from the original, up to three. */
 .variationDepth {
   position: absolute;
