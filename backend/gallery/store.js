@@ -561,9 +561,10 @@ const visibleItem = (item) => !inDreamPool(item) && hasGalleryMedia(item);
 
 /** A result set's visible items the query matches, in gallery order. */
 function setItems(query, id) {
-  // Unordered, so SQLite looks the set up by its index rather than walking the gallery's order.
+  // By the set's index: without statistics SQLite prefers the order index, walking the whole
+  // gallery for every set.
   const { sql, params } = where({ ...query, setId: id });
-  return statement(`SELECT value FROM studio_gallery ${sql}`)
+  return statement(`SELECT value FROM studio_gallery INDEXED BY studio_gallery_set ${sql}`)
     .all(...params)
     .map(parse)
     .filter(visibleItem)
