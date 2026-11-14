@@ -155,7 +155,7 @@ function CatalogueForm({
                 }))
               : [
                   { value: "original", label: "Original" },
-                  { value: "finetune", label: "Finetune" },
+                  { value: "finetune", label: "Fine-Tune" },
                 ]
           }
           value={form.values[lora ? "type" : "modelType"] || null}

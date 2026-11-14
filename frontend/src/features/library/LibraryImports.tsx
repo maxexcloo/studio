@@ -210,7 +210,7 @@ export function LibraryImports({
       >
         <Group gap="xs" wrap="nowrap" align="start">
           <TextInput
-            aria-label="Civitai, Hugging Face or Reddit URL"
+            aria-label="Civitai, Hugging Face or Reddit Link"
             placeholder="Civitai, Hugging Face or Reddit link"
             value={url}
             onChange={(event) => setUrl(event.currentTarget.value)}

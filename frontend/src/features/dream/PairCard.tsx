@@ -26,7 +26,7 @@ export function PairContent({
           {card.question}
         </Text>
         <Text size="xs" c="dimmed" ta="center">
-          {card.pairId ? "Alike But for One Thing" : "From Your Gallery"}
+          {card.pairId ? "Alike but for One Thing" : "From Your Gallery"}
         </Text>
       </div>
       <div className={classes.pair}>

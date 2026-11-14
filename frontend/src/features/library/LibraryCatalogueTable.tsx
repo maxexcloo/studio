@@ -55,7 +55,7 @@ const loraTypes: Record<string, string> = {
   slider: "Slider",
   style: "Style",
 };
-const modelTypes: Record<string, string> = { original: "Original", finetune: "Finetune" };
+const modelTypes: Record<string, string> = { original: "Original", finetune: "Fine-Tune" };
 export function libraryItemCategory(item: LibraryItem) {
   const kind = item.kind === "lora" ? "loras" : modelKinds[item.kind || ""] ? "models" : undefined;
   const folder =
@@ -210,7 +210,7 @@ export function LibraryCatalogueTable({
                   placeholder="All Model Types"
                   data={[
                     { value: "original", label: "Original" },
-                    { value: "finetune", label: "Finetune" },
+                    { value: "finetune", label: "Fine-Tune" },
                     { value: "unclassified", label: "Unclassified" },
                   ]}
                   value={modelType}

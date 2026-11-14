@@ -178,8 +178,7 @@ export function registerCompareRoutes(
   }
   const gallery = (req: Request, res: Response) => {
     const items = options.gallery(req);
-    if (!items)
-      res.status(403).json({ ok: false, error: "Gallery access is disabled for this account." });
+    if (!items) res.status(403).json({ ok: false, error: "The gallery is off for this account." });
     return items;
   };
   const labelsValid = (labels: unknown, length: number) =>
@@ -193,7 +192,7 @@ export function registerCompareRoutes(
     if (!items)
       return {
         status: 403,
-        payload: { ok: false, error: "Gallery access is disabled for this account." },
+        payload: { ok: false, error: "The gallery is off for this account." },
       };
     const jobs = typeof query.jobIds === "string" ? new Set(query.jobIds.split(",")) : null;
     const records = options
@@ -235,7 +234,7 @@ export function registerCompareRoutes(
     if (!items)
       return {
         status: 403,
-        payload: { ok: false, error: "Gallery access is disabled for this account." },
+        payload: { ok: false, error: "The gallery is off for this account." },
       };
     const { jobIds, labels, itemIds } = body || {};
     if (
