@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -15,7 +14,6 @@ const environment = {
   STUDIO_DATA_DIR: dataDir,
   STUDIO_ENV_FILE: path.join(dataDir, ".env"),
   STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
-  STUDIO_DEV_PROXY_TOKEN: crypto.randomBytes(32).toString("base64url"),
   STUDIO_MULTI_USER: "0",
 };
 if (values.demo) environment.STUDIO_DEMO = "1";

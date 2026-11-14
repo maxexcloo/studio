@@ -1181,8 +1181,8 @@ setTimeout(
 // Studio media's thumbnails and posters are built ahead of their first view.
 startMediaWarmup();
 
-// dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
-const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);
+// dev.mjs sets the API port behind Vite, which serves the page.
+const dev = Boolean(process.env.STUDIO_DEV_API_PORT);
 // A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
 // request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
 // POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
