@@ -1,4 +1,3 @@
-
 /**
  * Who is asking: this computer, or someone else. Every trust decision in the
  * server goes through clientOf(req).

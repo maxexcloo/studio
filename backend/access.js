@@ -4,8 +4,7 @@ import { accountSession } from "./account-store.js";
 /** Who is asking, worked out once per request. */
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false };
-  if (!req.studioClient)
-    req.studioClient = classifyClient(req);
+  if (!req.studioClient) req.studioClient = classifyClient(req);
   return req.studioClient;
 }
 
