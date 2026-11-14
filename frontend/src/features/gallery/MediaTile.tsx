@@ -6,7 +6,13 @@ import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { useTouch } from "../../ui/usePhone";
-import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../generation/Queue";
+import {
+  phaseLabel,
+  progressPercent,
+  queueQuery,
+  statusLabels,
+  useQueueAction,
+} from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
@@ -19,7 +25,6 @@ import { terminalStatuses } from "../../../../shared/queue";
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>
   ["done", "failed", "cancelled"].includes(String(item.status));
-const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 function useQueueJob(jobId: string | undefined, enabled: boolean) {
   return useQuery({
@@ -47,7 +52,7 @@ function TileStatus({
   const percent = active && progress?.max ? Math.round(progressPercent(progress)) : undefined;
   const label = active
     ? job?.status === "running" && progress?.phase
-      ? titleCase(progress.phase)
+      ? phaseLabel(progress.phase)
       : statusLabels[job?.status || "queued"]
     : statusLabels[failed ? "failed" : "cancelled"];
   const reason = failed
