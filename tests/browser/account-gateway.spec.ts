@@ -322,11 +322,16 @@ test("Administrators change roles, reset passwords and delete galleries, account
   });
   await page.goto("/settings#users");
   const member = page.getByRole("row", { name: "member@example.test", exact: true });
-  const menu = (item: string) =>
-    member
+  // The closing menu returns focus to its button, so its dialog waits for it to go before typing.
+  const menu = async (item: string) => {
+    await member
       .getByRole("button", { name: "Actions for member@example.test", exact: true })
-      .click()
-      .then(() => page.getByRole("menuitem", { name: item, exact: true }).click());
+      .click();
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+    await expect(
+      page.getByRole("menu", { name: "Actions for member@example.test", exact: true }),
+    ).toBeHidden();
+  };
   await expect(
     member.getByText("2 Images · 1 Video · 1 Cloud Job · 3 GPU min", { exact: true }),
   ).toBeVisible();
