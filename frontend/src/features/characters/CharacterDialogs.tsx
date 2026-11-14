@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ActionIcon, getDefaultZIndex, Menu, Text } from "@mantine/core";
+import { ActionIcon, getDefaultZIndex, Menu } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { menuWidth } from "../../theme";
 import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
@@ -106,26 +107,36 @@ export function CharacterMenu({
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Item leftSection={<icons.edit size={16} />} onClick={onEdit}>
-          Edit Character
-        </Menu.Item>
-        <Menu.Item leftSection={<icons.variations size={16} />} onClick={onGenerate}>
-          Generate References
-        </Menu.Item>
-        <Menu.Item
-          leftSection={<icons.sheet size={16} />}
-          disabled={!card.references.length || card.sheet?.status === "making"}
-          aria-label="Make Sheet"
-          onClick={onSheet}
-        >
-          Make Sheet
-          <Text size="xs" c="dimmed">
-            Front, side and back views, expressions and gear
-          </Text>
-        </Menu.Item>
-        <Menu.Item color="red" leftSection={<icons.delete size={16} />} onClick={onDelete}>
-          Delete Character
-        </Menu.Item>
+        <ActionMenuItems
+          groups={[
+            [
+              { id: "edit", label: "Edit Character", icon: icons.edit, onClick: onEdit },
+              {
+                id: "generate",
+                label: "Generate References",
+                icon: icons.variations,
+                onClick: onGenerate,
+              },
+              {
+                id: "sheet",
+                label: "Make Sheet",
+                description: "Front, side and back views, expressions and gear",
+                icon: icons.sheet,
+                disabled: !card.references.length || card.sheet?.status === "making",
+                onClick: onSheet,
+              },
+            ],
+            [
+              {
+                id: "delete",
+                label: "Delete Character",
+                icon: icons.delete,
+                color: "red",
+                onClick: onDelete,
+              },
+            ],
+          ]}
+        />
       </Menu.Dropdown>
     </Menu>
   );
