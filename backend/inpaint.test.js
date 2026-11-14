@@ -80,7 +80,7 @@ test("feathering scales with the box and never drops to a hard edge", () => {
 });
 
 test("only a PNG data URL is read as a mask", () => {
-  assert.throws(() => maskBufferFromDataUrl("data:image/jpeg;base64,AAAA"), /didn’t come through/);
+  assert.throws(() => maskBufferFromDataUrl("data:image/jpeg;base64,AAAA"), /didn't come through/);
   assert.equal(maskBufferFromDataUrl("data:image/png;base64,AAAA").length, 3);
 });
 

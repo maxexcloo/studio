@@ -586,7 +586,7 @@ export class RuntimeController {
       );
     if (workload.kind === "text")
       throw new RuntimeUnavailable(
-        `${workload.label} is stopped; automatic control doesn’t start text for queued work. Start it in Settings › Workers.`,
+        `${workload.label} is stopped; automatic control doesn't start text for queued work. Start it in Settings › Workers.`,
       );
     if (this.current || this.claimed)
       throw new RuntimeUnavailable(

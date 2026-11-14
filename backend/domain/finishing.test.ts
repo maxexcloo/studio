@@ -174,13 +174,13 @@ test("Finishing waits for idle time, yields a waiting upscale to new work above 
   assert.equal(state.upscales.length, 0);
   store.save({ ...mine, status: "completed" });
 
-  state.ready = { reason: "The SeedVR2 models aren’t installed yet." };
+  state.ready = { reason: "The SeedVR2 models aren't installed yet." };
   await finishing.tick();
   await finishing.tick();
   assert.equal(live().length, 0);
   assert.equal(finishing.waiting("alice"), 1);
   assert.deepEqual(state.logs, [
-    "[Studio] Finish Starred Images waits: The SeedVR2 models aren’t installed yet.",
+    "[Studio] Finish Starred Images waits: The SeedVR2 models aren't installed yet.",
   ]);
 
   state.ready = { faceDetail: false };

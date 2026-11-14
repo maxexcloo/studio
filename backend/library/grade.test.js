@@ -75,7 +75,7 @@ test("the grade table: each rule lands on its grade with its reason", () => {
       "a missing file",
       { resources: [{ name: "Style", status: "missing" }] },
       "partial",
-      /Style isn’t installed/,
+      /Style isn't installed/,
     ],
     [
       "a downloading file",
@@ -109,7 +109,7 @@ test("the grade table: each rule lands on its grade with its reason", () => {
       "an unsupported file",
       { resources: [{ name: "Style", status: "unsupported" }] },
       "partial",
-      /isn’t supported/,
+      /isn't supported/,
     ],
     [
       "no base model recorded",
@@ -125,7 +125,7 @@ test("the grade table: each rule lands on its grade with its reason", () => {
         baseModel: { required: true, installed: false },
       },
       "partial",
-      /base model isn’t installed/,
+      /base model isn't installed/,
     ],
     [
       "no profile for the base model",
@@ -232,7 +232,7 @@ test("saved images grade from their matched preset", () => {
     presetGrade({
       ...preset,
       warnings: [
-        "No sampling schedule was recorded; the selected workflow’s default will be used.",
+        "No sampling schedule was recorded; the selected workflow's default will be used.",
       ],
     }).value,
     "close",
@@ -251,7 +251,7 @@ test("saved images grade from their matched preset", () => {
     resources: [preset.resources[0], { name: "Style", folder: "loras", status: "missing" }],
   });
   assert.equal(missing.value, "partial");
-  assert.ok(missing.reasons.includes("Style isn’t installed"));
+  assert.ok(missing.reasons.includes("Style isn't installed"));
   const paid = presetGrade({
     ...preset,
     resources: [

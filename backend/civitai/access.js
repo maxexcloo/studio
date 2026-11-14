@@ -34,7 +34,7 @@ export async function civitaiFetch(
     try {
       response = await transport(url, { ...init, headers, redirect: "manual" });
     } catch {
-      throw new Error("Couldn’t reach Civitai. Try again shortly.");
+      throw new Error("Couldn't reach Civitai. Try again shortly.");
     }
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get("location");

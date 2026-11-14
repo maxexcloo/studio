@@ -43,7 +43,7 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
     } catch (error) {
       res
         .status(500)
-        .json({ ok: false, error: `Couldn’t save the LoRA library: ${error.message}` });
+        .json({ ok: false, error: `Couldn't save the LoRA library: ${error.message}` });
     }
   });
 

@@ -103,7 +103,7 @@ export function libraryDownloadAccess() {
   return {
     available,
     note: available
-      ? "Downloads enter the worker’s model library."
+      ? "Downloads enter the worker's model library."
       : "Connect a writable Studio worker model library before downloading.",
   };
 }

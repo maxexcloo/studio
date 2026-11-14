@@ -131,7 +131,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
           payload: {
             ok: false,
             reason: "backend-not-ready",
-            error: `${backend.label} isn’t ready for ${profile.label}: ${backend.reason}`,
+            error: `${backend.label} isn't ready for ${profile.label}: ${backend.reason}`,
           },
         };
       // A queued job submits to the worker the queue gave it, if that worker can still run it.
@@ -459,7 +459,7 @@ export function createGenerationSubmission({ loadComfyContext, mediaModels, comf
     const { info } = await loadComfyContext(body.comfyBackend).catch(() => ({ info: null }));
     if (!info)
       return {
-        skipped: "Smart upscale couldn’t check ComfyUI’s nodes",
+        skipped: "Smart upscale couldn't check ComfyUI's nodes",
         quality: body.autoUpscale?.quality,
       };
     const customWorkflow = String(body.model || "").startsWith("custom:")

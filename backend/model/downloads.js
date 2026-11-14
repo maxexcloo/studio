@@ -81,10 +81,10 @@ function remember(entry) {
 /** Refuses anything but a model file from Civitai or Hugging Face for a model folder. */
 function checkSpec(spec) {
   if (!allowedFolders.has(spec.folder))
-    throw new Error("That file doesn’t belong in a ComfyUI model folder.");
+    throw new Error("That file doesn't belong in a ComfyUI model folder.");
   const name = path.basename(String(spec.file || ""));
   if (!name || name !== spec.file || !allowedFolders.get(spec.folder).test(name))
-    throw new Error("That isn’t a downloadable model file.");
+    throw new Error("That isn't a downloadable model file.");
   const url = new URL(spec.url);
   if (
     url.protocol !== "https:" ||
@@ -417,7 +417,7 @@ function refusal(url, status) {
     return !civitaiTokenStatus().set
       ? "Civitai needs a token for this download: add CIVITAI_API_TOKEN to the deployment."
       : status === 401
-        ? "Civitai rejected the deployment’s token: replace CIVITAI_API_TOKEN."
+        ? "Civitai rejected the deployment's token: replace CIVITAI_API_TOKEN."
         : "Civitai refused this download: the version may be in early access or paid. Check it on Civitai.";
   return `The model provider answered HTTP ${status}.`;
 }

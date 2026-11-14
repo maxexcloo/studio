@@ -17,7 +17,7 @@ export function civitaiAvailability(
 ) {
   const deny = (reason, note) => ({ available: false, reason, note });
   if (!version || typeof version !== "object")
-    return deny("licence", "Civitai didn’t say whether this version can be downloaded.");
+    return deny("licence", "Civitai didn't say whether this version can be downloaded.");
   const config =
     version.earlyAccessConfig && typeof version.earlyAccessConfig === "object"
       ? version.earlyAccessConfig
@@ -32,7 +32,7 @@ export function civitaiAvailability(
   if (ends !== undefined && ends !== null && ends !== "") {
     earlyUntil = Date.parse(String(ends));
     if (!Number.isFinite(earlyUntil))
-      return deny("early-access", "Civitai lists an early-access period that couldn’t be read.");
+      return deny("early-access", "Civitai lists an early-access period that couldn't be read.");
   }
   const early = version.availability === "EarlyAccess" || earlyUntil > now;
   if (early || config?.chargeForDownload === true || price > 0) {
@@ -67,7 +67,7 @@ export function civitaiAvailability(
         : "Civitai took this model down.",
     );
   if (version.status !== undefined && version.status !== "Published")
-    return deny("licence", "This version isn’t published.");
+    return deny("licence", "This version isn't published.");
   if (version.requireAuth === true && !process.env.CIVITAI_API_TOKEN)
     return deny("licence", "Civitai needs a token for this download. Add one to the deployment.");
   if (file && !/^[a-f0-9]{64}$/i.test(file.hashes?.SHA256 || ""))

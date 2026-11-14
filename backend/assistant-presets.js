@@ -29,7 +29,7 @@ export const assistantPresets = Object.freeze([
   {
     id: "enhance",
     label: "Enhance",
-    description: "Richer detail in the guide’s own style.",
+    description: "Richer detail in the guide's own style.",
     instruction:
       "Enhance: keep the prompt’s own style and medium and make it clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
@@ -43,7 +43,7 @@ export const assistantPresets = Object.freeze([
   {
     id: "guide",
     label: "Follow Guide",
-    description: "Rewritten to the model’s prompting guide.",
+    description: "Rewritten to the model's prompting guide.",
     instruction:
       "Follow Guide: rewrite it strictly in the format, order, length and wording the prompting guide sets for this model, keeping every subject, detail and style the prompt asks for and adding nothing new.",
   },

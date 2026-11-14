@@ -38,7 +38,7 @@ const deps = {
   ],
 };
 
-test("a lookup lists a Civitai model’s versions and files with availability, licence and fit, without importing", async () => {
+test("a lookup lists a Civitai model's versions and files with availability, licence and fit, without importing", async () => {
   const found = await lookupLibrary(
     { url: "https://civitai.com/models/9?modelVersionId=20" },
     deps,
@@ -75,7 +75,7 @@ test("a lookup lists a Civitai model’s versions and files with availability, l
   await assert.rejects(lookupLibrary({}, deps), /link, or a query/);
 });
 
-test("a search lists Civitai models with each version’s availability", async () => {
+test("a search lists Civitai models with each version's availability", async () => {
   const asked = [];
   const found = await lookupLibrary(
     { query: "watercolour", type: "lora", baseModel: "Flux.1 D" },

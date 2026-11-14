@@ -182,7 +182,7 @@ test("ids are unique and templates are the nearest same-family profile with the 
   );
 });
 
-test("a checkpoint import drafts an uncensored-by-default profile with the page’s settings and queues its missing parts", async () => {
+test("a checkpoint import drafts an uncensored-by-default profile with the page's settings and queues its missing parts", async () => {
   const d = deps();
   const target = record();
   const result = await draftProfileFromImport(target, { by: "admin-1" }, d);
@@ -225,7 +225,7 @@ test("a checkpoint import drafts an uncensored-by-default profile with the page�
   assert.deepEqual(target.results, { catalogueKeys: [], profileId: "real-skin-v3-2" });
   assert.match(
     target.warnings.join(" "),
-    /No guide drafted: the prompt assistant isn’t configured/,
+    /No guide drafted: the prompt assistant isn't configured/,
   );
   assert.deepEqual(target.draft, {
     template: "krea-fast",
@@ -235,7 +235,7 @@ test("a checkpoint import drafts an uncensored-by-default profile with the page�
   });
 });
 
-test("a source that says safe is not uncensored, and the template’s own guidance is dropped for the drafted guide", async () => {
+test("a source that says safe is not uncensored, and the template's own guidance is dropped for the drafted guide", async () => {
   const engine = {
     draftProfile: async (input) => ({
       profile: draftedProfile({ ...input, read: { name: "Ignored Name", steps: 20 } }),
@@ -275,7 +275,7 @@ test("a source that says safe is not uncensored, and the template’s own guidan
 test("nothing is activated without ComfyUI, with unknown nodes, an unknown family or no template", async () => {
   await assert.rejects(
     draftProfileFromImport(record(), {}, deps({ info: async () => null })),
-    /ComfyUI couldn’t be asked/,
+    /ComfyUI couldn't be asked/,
   );
   const unknownNode = deps({
     templates: async () => {
@@ -286,12 +286,12 @@ test("nothing is activated without ComfyUI, with unknown nodes, an unknown famil
   });
   await assert.rejects(
     draftProfileFromImport(record(), {}, unknownNode),
-    /doesn’t know these node types.*MysteryNode/,
+    /doesn't know these node types.*MysteryNode/,
   );
   assert.deepEqual(unknownNode.saved.profiles, {});
   await assert.rejects(
     draftProfileFromImport(record({ baseModel: "Mystery" }), {}, deps()),
-    /can’t tell which family/,
+    /can't tell which family/,
   );
   await assert.rejects(
     draftProfileFromImport(
@@ -311,7 +311,7 @@ test("nothing is activated without ComfyUI, with unknown nodes, an unknown famil
   // A sampler this ComfyUI lacks falls back to the template's, with a warning.
   const odd = record({ sourceText: "Sampler: Heun" });
   await draftProfileFromImport(odd, {}, deps());
-  assert.match(odd.warnings.join(" "), /sampler heun, which this ComfyUI doesn’t offer/);
+  assert.match(odd.warnings.join(" "), /sampler heun, which this ComfyUI doesn't offer/);
 });
 
 test("the import engine drafts a checkpoint on import, records a failure as a warning and drafts again on request", async (t) => {
@@ -357,7 +357,7 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
     resolvePreset: async () => null,
     draftProfile: async (target, options) => {
       calls.push([target.sourceText, options]);
-      if (fail) throw new Error("ComfyUI couldn’t be asked");
+      if (fail) throw new Error("ComfyUI couldn't be asked");
       target.results.profileId = "real-skin-v3";
     },
   });
@@ -365,7 +365,7 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
     by: "admin-1",
   });
   assert.notEqual(created.state, "failed", "a draft failure never fails the import");
-  assert.deepEqual(created.warnings, ["No profile drafted: ComfyUI couldn’t be asked"]);
+  assert.deepEqual(created.warnings, ["No profile drafted: ComfyUI couldn't be asked"]);
   assert.deepEqual(calls, [["Steps: 12", { by: "admin-1", index: 0 }]]);
   assert.equal(publicImport(created).sourceText, undefined, "the page text stays on the server");
   fail = false;

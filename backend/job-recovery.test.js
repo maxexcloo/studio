@@ -338,7 +338,7 @@ test("a running job its runner follows costs the worker nothing: no queue or his
       asked.push(path);
       return {};
     },
-    setGallery: () => assert.fail("a live job’s tiles are the runner’s to write"),
+    setGallery: () => assert.fail("a live job's tiles are the runner's to write"),
     visible: (items) => items,
   });
   for (let tick = 0; tick < 5; tick++) await recover();

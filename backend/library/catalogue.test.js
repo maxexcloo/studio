@@ -251,7 +251,7 @@ test("edits are validated, recorded with who made them, undoable and reviewable"
   assert.equal(
     store.entry("loras/style.safetensors").aiDrafted,
     undefined,
-    "an administrator’s edit clears AI-Drafted",
+    "an administrator's edit clears AI-Drafted",
   );
   assert.equal(store.entry("loras/style.safetensors").history.length, 2);
   assert.equal(store.undo("loras/style.safetensors", { by: "admin-1" }).title, "Drafted");
@@ -269,7 +269,7 @@ test("edits are validated, recorded with who made them, undoable and reviewable"
   assert.equal(store.approve("loras/new.safetensors", { by: "admin-1" }).aiDrafted, undefined);
 });
 
-test("the LoRA view keeps the older shapes, with Studio’s edits applied", (t) => {
+test("the LoRA view keeps the older shapes, with Studio's edits applied", (t) => {
   const f = fixture(t);
   const store = f.store();
   store.migrate();

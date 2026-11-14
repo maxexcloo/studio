@@ -130,7 +130,7 @@ test("saving through the editor records versions, marks AI drafts until an edit 
   assert.deepEqual(
     [edited.version.version, edited.version.aiDrafted, edited.version.by],
     [4, false, "admin-1"],
-    "an administrator’s edit clears AI-Drafted",
+    "an administrator's edit clears AI-Drafted",
   );
   const reverted = editor.revertEditableProfile("image-test", 1, {
     by: "admin-1",

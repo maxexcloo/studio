@@ -155,7 +155,7 @@ test("face detail on an imported workflow's image loads the workflow's model fil
   );
   assert.throws(
     () => upscaleGraph({ ...body, sourceModel: "custom:flux2-real-dream-image-edit" }, info),
-    /custom:flux2-real-dream-image-edit, and ComfyUI doesn’t have it/,
+    /custom:flux2-real-dream-image-edit, and ComfyUI doesn't have it/,
   );
 });
 

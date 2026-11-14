@@ -683,7 +683,7 @@ export function createTaste({
       }));
     } catch (error) {
       const reason = (error as { reason?: string }).reason || "unreachable";
-      throw failure(`The text model couldn’t write the taste profile (${reason}).`, 502);
+      throw failure(`The text model couldn't write the taste profile (${reason}).`, 502);
     }
     let reply: Partial<Record<keyof TasteWords, unknown>> | null;
     try {
@@ -700,7 +700,7 @@ export function createTaste({
         typeof reply?.note === "string" ? reply.note.replace(/\s+/g, " ").trim().slice(0, 400) : "",
     };
     if (!words.likes.length && !words.styles.length && !words.note)
-      throw failure("The text model’s reply was unusable. Try again.", 502);
+      throw failure("The text model's reply was unusable. Try again.", 502);
     const current = load(ownerId);
     // A Clear while the model wrote wins over its reply.
     if (current.since < before.since) return read(ownerId);
