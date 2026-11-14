@@ -371,9 +371,11 @@ function QueueRow({
   const profile = useGenerationActions().profiles.find((entry) =>
     isProfile(entry, job.input?.profileId),
   );
-  // Phones keep the title and a short status (and Paused); the model and reason are in the details.
+  // Phones keep the title and a short status (and Paused, or why it failed); the model and any other
+  // reason are in the details.
+  const reasonShown = !phone || failed || job.reason === pausedReason;
   const status = phone
-    ? [shortStatus(job), job.reason === pausedReason && pausedReason].filter(Boolean).join(" · ")
+    ? [shortStatus(job), reasonShown && job.reason].filter(Boolean).join(" · ")
     : [profile && profileName(profile), shortStatus(job), job.reason].filter(Boolean).join(" · ");
   return (
     <div ref={drag?.elementRef} className={classes.row}>
@@ -422,11 +424,7 @@ function QueueRow({
         </div>
       )}
       <Collapse id={detailsId} expanded={opened} keepMounted={false}>
-        <QueueJobDetails
-          job={job}
-          profile={profile}
-          reason={phone && job.reason !== pausedReason ? job.reason : ""}
-        />
+        <QueueJobDetails job={job} profile={profile} reason={reasonShown ? "" : job.reason} />
       </Collapse>
     </div>
   );
