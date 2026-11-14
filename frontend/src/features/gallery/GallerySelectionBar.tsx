@@ -17,7 +17,7 @@ import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
 import { useUpscaleMany } from "./UpscaleControls";
-import { animateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
+import { animateThemes, useAnimateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
 import type { GallerySelection } from "./useGallerySelection";
 import type { MediaItem } from "../../types";
 import type { useTryAgain } from "./useTryAgain";
@@ -91,6 +91,7 @@ export function GallerySelectionBar({
   const finishedImages = ready.filter((item) => item.type === "image" && !item.uploaded);
   const upscale = useUpscaleMany(finishedImages);
   const iterate = useIterate();
+  const themes = useAnimateThemes();
   const client = useQueryClient();
   const animate = useMutation({
     mutationFn: async (theme: AnimateTheme) => {
@@ -205,10 +206,11 @@ export function GallerySelectionBar({
         ],
       }),
     finishedImages.length > 0 &&
+      themes.length > 0 &&
       itemAction("animate", {
         loading: animate.isPending,
         menu: [
-          (Object.keys(animateThemes) as AnimateTheme[])
+          themes
             .filter((theme) => theme !== "custom")
             .map((theme) => ({
               id: `animate-${theme}`,
