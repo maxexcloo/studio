@@ -10,12 +10,13 @@ import {
 } from "../comfy/backends.js";
 import { comfy, optionsFor } from "../comfy/comfy.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
+import { step } from "../event-loop.js";
 import { families } from "../family-catalogue.js";
 import { uncensoredLoraNames } from "../lora/info.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
-import { profileStats, recentGallery } from "../stats.js";
+import { profileStats, recentRuns } from "../stats.js";
 import {
   capabilityForProfile,
   defaultWorker,
@@ -182,18 +183,21 @@ export function createModelCatalogue({ store, runtime, directCloud }) {
    */
   async function mediaModels(force = false, { wait = true } = {}) {
     const workers = listWorkers();
-    const direct = (await directCloud?.profiles().catch(() => [])) || [];
+    const direct =
+      (await step("models: cloud", () => directCloud?.profiles().catch(() => []))) || [];
     if (!workers.length && !direct.length)
       throw Object.assign(new Error(noWorkerMessage("image")), { noWorker: true });
-    const stopped = await parkedWorkers(runtime?.controller, workers);
+    const stopped = await step("models: parked", () => parkedWorkers(runtime?.controller, workers));
     // A stopped worker has no pod to answer, so it isn't asked (or logged as not answering).
-    const settled = await Promise.allSettled(
-      workers.map((worker) =>
-        stopped.has(worker.id)
-          ? Promise.reject(new Error("stopped"))
-          : wait || contextFor(worker.id).info
-            ? backendModels(worker.id, force)
-            : (backendModels(worker.id).catch(() => null), Promise.reject(new Error("unread"))),
+    const settled = await step("models: read workers", () =>
+      Promise.allSettled(
+        workers.map((worker) =>
+          stopped.has(worker.id)
+            ? Promise.reject(new Error("stopped"))
+            : wait || contextFor(worker.id).info
+              ? backendModels(worker.id, force)
+              : (backendModels(worker.id).catch(() => null), Promise.reject(new Error("unread"))),
+        ),
       ),
     );
     const answered = workers
