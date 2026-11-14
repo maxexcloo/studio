@@ -37,21 +37,21 @@ export const findCard = (cards, value) => {
 
 /**
  * Registers gallery, queue, dream, cards and taste. `tool` is mcp.js's helper, `media` its McpMedia,
- * `refs` the conversation's result scope and `resolve(value)` turns a ref into its job id.
+ * `refs` the conversation's result scope and `resolve(value)` resolves a ref into its job id.
  */
 export function registerManageTools({ tool, server, media, owner, refs, resolve }) {
   const api = (method, route, body, signal) =>
     media.request(method, route, body, owner, { signal });
   /** A ref or job id this owner holds, as its job id. */
-  const owned = (value) => {
-    const id = resolve(value);
+  const owned = async (value) => {
+    const id = await resolve(value);
     media.own(owner, id);
     return id;
   };
   /** The account's jobs, as the route listed them, join this conversation's refs. */
   const handles = (ids) => {
     media.adopt(owner, refs, { jobs: ids.filter(Boolean) });
-    return Object.fromEntries(ids.filter(Boolean).map((id) => [id, media.refOf(owner, refs, id)]));
+    return Object.fromEntries(ids.filter(Boolean).map((id) => [id, media.refOf(id)]));
   };
 
   tool(
@@ -71,7 +71,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
         return mcpJson({ cleared });
       }
       if (!results) throw new Error(`Pass results: the refs or job_ids to ${action}.`);
-      const ids = [...new Set(results.map(owned))];
+      const ids = [...new Set(await Promise.all(results.map(owned)))];
       const urls = [];
       for (const id of ids) {
         const { items = [] } = await api(
@@ -85,7 +85,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
             urls.push(item.url);
       }
       if (!urls.length) throw new Error("None of these results has that output in the gallery.");
-      const changed = ids.map((id) => media.refOf(owner, refs, id) || id);
+      const changed = ids.map((id) => media.refOf(id) || id);
       if (action === "delete") {
         const { removed = [] } = await api("POST", "/api/gallery/delete", { ids: urls }, signal);
         return mcpJson({ deleted: removed.length, results: changed });
@@ -164,7 +164,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
           });
         return mcpJson({ [action]: true, ...answer });
       }
-      const id = owned(job_id);
+      const id = await owned(job_id);
       const route = `/api/queue/${encodeURIComponent(id)}/${action}`;
       const answer = await api("POST", route, action === "move" ? { to: position } : {}, signal);
       if (action !== "retry") return mcpJson({ job_id: id, [action]: true });
@@ -193,6 +193,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     ...(item.jobId ? { link: media.url(owner, item.jobId, item.index || 0) } : {}),
   });
   const dreamItems = (items) => {
+    media.noteNumbers(items);
     const named = handles([...new Set(items.map((item) => item.jobId))]);
     return items.slice(0, maxListed).map((item) => dreamItem(item, named));
   };

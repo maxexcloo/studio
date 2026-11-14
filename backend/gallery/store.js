@@ -4,6 +4,7 @@ import {
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
 import { galleryKey, readGalleryRows, writeGalleryRows } from "../persistence/gallery-rows.ts";
+import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { galleryFiltersTest } from "./filters.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
@@ -59,6 +60,12 @@ function loadGallery() {
 }
 
 export let gallery = loadGallery();
+
+/** Each account's result numbers (domain/result-numbers.ts), shown on its gallery items. */
+export const resultNumbers = createResultNumbers({
+  db: runtimeDatabase(dataDir),
+  existing: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
+});
 
 /*
  * Markers for outputs that were deleted or cleared, so they never come back

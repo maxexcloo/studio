@@ -10,6 +10,7 @@ import {
   pageGallery,
   galleryRevisionValue,
   galleryItem,
+  resultNumbers,
   visibleGallery,
 } from "./store.js";
 import crypto from "node:crypto";
@@ -34,13 +35,16 @@ import { galleryStats } from "../stats.js";
 
 export function galleryJobResponse(store, account, id, settings = false) {
   cleanupGalleryState(store);
-  const items = filterVisibleGallery(
-    galleryJobItems(id).filter((item) => recordBelongsToAccount(item, account)),
+  const items = resultNumbers.numbered(
+    filterVisibleGallery(
+      galleryJobItems(id).filter((item) => recordBelongsToAccount(item, account)),
+    ),
   );
   const fields = [
     "id",
     "jobId",
     "index",
+    "number",
     "status",
     "type",
     "url",
@@ -220,7 +224,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
       status: 200,
       payload: {
         ...page,
-        items: [...queued, ...page.items].map(listed),
+        items: resultNumbers.numbered([...queued, ...page.items]).map(listed),
       },
     };
   });
@@ -229,8 +233,18 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
   directRoute(app, "GET", "/api/gallery/items/:id", (account, { params }) => {
     const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean));
     return item && recordBelongsToAccount(item, account)
-      ? { status: 200, payload: { item } }
+      ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
       : { status: 404, payload: { error: "That item is no longer in the gallery." } };
+  });
+
+  // The result an account's number names ("#12"), as chats refer to it.
+  directRoute(app, "GET", "/api/results/:number", (account, { params }) => {
+    const found = /^\d{1,9}$/.test(params.number)
+      ? resultNumbers.find(account?.userId || "", Number(params.number))
+      : null;
+    return found
+      ? { status: 200, payload: found }
+      : { status: 404, payload: { error: `There is no result #${params.number}.` } };
   });
 }
 
