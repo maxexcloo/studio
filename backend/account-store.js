@@ -210,7 +210,7 @@ export function setGatewayAdminTools(on) {
 export function setDefaultAccessProfile(profileId) {
   const store = readStore();
   if (!validAccountKey(profileId) || !store.profiles[profileId])
-    throw new Error("Choose an existing group");
+    throw new Error("Choose an existing group.");
   store.defaultAccessProfileId = profileId;
   saveStore();
   return defaultAccessProfileId();
@@ -242,7 +242,7 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
 export function deleteAccessProfile(profileId) {
   const store = readStore();
   if (!validAccountKey(profileId) || !store.profiles[profileId])
-    throw new Error("Choose an existing group");
+    throw new Error("Choose an existing group.");
   if (store.defaultAccessProfileId === profileId)
     throw new Error("Choose another default group before deleting this one.");
   if (store.accounts.some((account) => account.accessProfileId === profileId))
@@ -258,7 +258,7 @@ export function assignAccessProfile(accountId, profileId) {
   );
   if (!account) throw new Error("That ordinary user account was not found.");
   if (!validAccountKey(profileId) || !store.profiles[profileId])
-    throw new Error("Choose an existing group");
+    throw new Error("Choose an existing group.");
   account.accessProfileId = profileId;
   saveStore();
   return { id: account.id, accessProfileId: account.accessProfileId };
@@ -285,7 +285,7 @@ export async function createLocalAccount({
     role === accountRoles.user &&
     (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])
   )
-    throw new Error("Assign this user to an existing group");
+    throw new Error("Assign this user to an existing group.");
   if (readStore().accounts.some((account) => usernameKey(account.username) === key))
     throw new Error("An account with that email already exists.");
 
