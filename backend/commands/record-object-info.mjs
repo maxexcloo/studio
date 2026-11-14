@@ -1,14 +1,15 @@
-// Records a ComfyUI /object_info snapshot for the contract tests
-// (backend/contract.test.js), so every built-in graph is checked against what a
-// real ComfyUI version accepts.
+// Records a ComfyUI /object_info snapshot (backend/fixtures/) for the tests that
+// run Studio against a stand-in ComfyUI, so built-in graphs are checked against
+// the node schemas of the version the worker pins (worker/source.json).
 //
 //   node backend/commands/record-object-info.mjs [--url http://127.0.0.1:8188]
-//   node backend/commands/record-object-info.mjs --from object_info.json --version 0.41.0
+//   node backend/commands/record-object-info.mjs --from object_info.json --version 0.45.0
 //
 // Writes backend/fixtures/object_info-comfyui-<version>.json. File lists
 // (models, LoRAs, input images) are emptied, so nothing from this computer
-// ends up in the repository; the tests fill in names of their own. Tooltips
-// and descriptions go too, to keep the file small.
+// ends up in the repository; the tests fill in names of their own. Tooltips,
+// descriptions and ComfyUI's paid partner API nodes, which Studio never runs,
+// go too, to keep the file small.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +60,7 @@ function emptyFileLists(spec) {
 function sanitizeObjectInfo(info) {
   const out = {};
   for (const [name, node] of Object.entries(info || {})) {
+    if (node.api_node) continue;
     const clean = strip(node);
     for (const group of ["required", "optional"]) {
       const inputs = clean.input?.[group];
@@ -93,6 +95,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!version) throw new Error("Pass --version with the ComfyUI version this snapshot is from.");
   const file = path.join(root, "backend", "fixtures", `object_info-comfyui-${version}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(sanitizeObjectInfo(info))}\n`);
-  console.log(`Wrote ${path.relative(root, file)} (${Object.keys(info).length} nodes).`);
+  const snapshot = sanitizeObjectInfo(info);
+  fs.writeFileSync(file, `${JSON.stringify(snapshot)}\n`);
+  console.log(`Wrote ${path.relative(root, file)} (${Object.keys(snapshot).length} nodes).`);
 }
