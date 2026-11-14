@@ -59,8 +59,9 @@ test(
       },
       stdio: "ignore",
     });
+    // Listens from the start, as a backend that fails to start has exited before cleanup runs.
+    const exited = new Promise((resolve) => child.once("exit", resolve));
     t.after(async () => {
-      const exited = new Promise((resolve) => child.once("exit", resolve));
       child.kill();
       await exited;
       fs.rmSync(data, { recursive: true, force: true, maxRetries: 5 });
