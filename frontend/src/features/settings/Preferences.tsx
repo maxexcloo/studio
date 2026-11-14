@@ -185,11 +185,12 @@ function WhereWorkRuns() {
       : assistant?.writingModel;
   const row = <T extends string>(
     label: string,
+    description: string,
     data: { value: T; label: string }[],
     value: T,
     change: (choice: T) => void,
   ) => (
-    <SettingRow wide label={label}>
+    <SettingRow wide label={label} description={description}>
       <SegmentedControl
         aria-label={label}
         fullWidth
@@ -201,9 +202,15 @@ function WhereWorkRuns() {
   );
   return (
     <SettingGroup title="Where Work Runs">
-      {row("Images", sides, preferences.images || "local", (images) => save.mutate({ images }))}
+      {row(
+        "Images",
+        "Where new images run until you pick a model.",
+        sides,
+        preferences.images || "local",
+        (images) => save.mutate({ images }),
+      )}
       {assistant && writingModel && (
-        <SettingRow wide label="Text">
+        <SettingRow wide label="Text" description="The model that writes and improves prompts.">
           {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
           <Select
             aria-label="Text"
@@ -216,8 +223,12 @@ function WhereWorkRuns() {
           />
         </SettingRow>
       )}
-      {row("Videos", videoChoices, preferences.videos || "fast", (videos) =>
-        save.mutate({ videos }),
+      {row(
+        "Videos",
+        "Where new videos run until you pick a model.",
+        videoChoices,
+        preferences.videos || "fast",
+        (videos) => save.mutate({ videos }),
       )}
     </SettingGroup>
   );
