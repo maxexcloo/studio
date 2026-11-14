@@ -8,6 +8,7 @@ import {
   ScrollArea,
   SimpleGrid,
   Text,
+  UnstyledButton,
 } from "@mantine/core";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { icons } from "../../ui/icons";
@@ -16,6 +17,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaSource } from "../gallery/mediaSource";
 import { discardedQuery, dreamItemPath, dreamQuery, type DreamItem } from "./queries";
 import classes from "./DreamPage.module.css";
@@ -35,13 +37,14 @@ export function Thumbnail({ item }: { item: DreamItem }) {
 }
 
 /**
- * Discarded Dream results, newest discard first; Keep moves one into the gallery after all. Studio
- * deletes discards after 30 days, and Delete All deletes them now.
+ * Discarded Dream results, newest discard first; Keep moves one into the gallery after all, on its
+ * card or in the viewer. Studio deletes discards after 30 days, and Delete All deletes them now.
  */
 export function DiscardedDreams() {
   const client = useQueryClient();
   const discarded = useInfiniteQuery(discardedQuery);
   const [confirming, setConfirming] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const deleteAll = useMutation({
     mutationFn: () => api("/api/dream/discarded", { method: "DELETE" }),
     onSuccess: () => setConfirming(false),
@@ -65,6 +68,8 @@ export function DiscardedDreams() {
     );
   const items = discarded.data.pages.flatMap((page) => page.items);
   if (!items.length) return <EmptyState fill>No Discards</EmptyState>;
+  const current = viewing ? items.find((item) => item.id === viewing) : undefined;
+  if (viewing && !current) setViewing(null);
   return (
     <ScrollArea flex={1} mih={0}>
       <Group justify="space-between" gap="sm" pb="sm">
@@ -88,9 +93,14 @@ export function DiscardedDreams() {
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (
           <Card key={item.id} withBorder padding={0} radius="md">
-            <AspectRatio ratio={1}>
-              <Thumbnail item={item} />
-            </AspectRatio>
+            <UnstyledButton
+              aria-label={`View ${item.prompt || "Result"}`}
+              onClick={() => setViewing(item.id)}
+            >
+              <AspectRatio ratio={1}>
+                <Thumbnail item={item} />
+              </AspectRatio>
+            </UnstyledButton>
             <Text size="xs" c="dimmed" lineClamp={2} px="xs" pt={6} mih={36}>
               {item.prompt || item.dream?.prompt}
             </Text>
@@ -119,6 +129,34 @@ export function DiscardedDreams() {
             {discarded.isFetchNextPageError ? "Retry Loading" : "Load More"}
           </Button>
         </Center>
+      )}
+      {current && (
+        <MediaViewer
+          item={current}
+          items={items}
+          navigate={(item) => setViewing(item.id)}
+          close={() => setViewing(null)}
+          actions={{
+            label: "Discard Actions",
+            labelled: ["keep"],
+            groups: [
+              [
+                {
+                  id: "keep",
+                  label: "Keep",
+                  icon: icons.keep,
+                  emphasis: "filled",
+                  onClick: () => {
+                    // Kept, it leaves the discards, so the viewer moves on to the next.
+                    const index = items.indexOf(current);
+                    setViewing((items[index + 1] || items[index - 1])?.id ?? null);
+                    keep.mutate(current);
+                  },
+                },
+              ],
+            ],
+          }}
+        />
       )}
     </ScrollArea>
   );
