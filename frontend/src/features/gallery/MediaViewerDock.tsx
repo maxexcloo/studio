@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Play } from "lucide-react";
+import { CircleAlert, Play } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
 import { queueQuery } from "../generation/Queue";
 import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
@@ -236,6 +236,8 @@ function Thumbnail({
     >
       {thumbnail && result?.status === "done" ? (
         <Image src={thumbnail} alt="" fallbackSrc="" w="100%" h="100%" />
+      ) : result?.status === "failed" || result?.status === "cancelled" ? (
+        <CircleAlert size={16} color="var(--mantine-color-dimmed)" />
       ) : (
         <Loader size="xs" color="gray" />
       )}
