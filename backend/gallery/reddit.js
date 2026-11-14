@@ -6,12 +6,16 @@ import { localRefusal } from "../route-access.js";
 
 /**
  * Import from Reddit: a post's images saved as the caller's uploads, each recording the post's link
- * and title (`source`). Every request goes to the owner's Redlib front end, which serves a post as
- * HTML and proxies its images under its own `/img/` and `/preview/` paths, so Studio never fetches
- * another host.
+ * and title (`source`). Every request goes to the owner's Redlib front end (STUDIO_REDLIB_URL),
+ * which serves a post as HTML and proxies its images under its own `/img/` and `/preview/` paths,
+ * so Studio never fetches another host.
  */
-export const redlib = "https://reddit.excloo.com";
-// Links people paste: Reddit's own, its short links, and Redlib's.
+function redlib() {
+  const value = process.env.STUDIO_REDLIB_URL;
+  if (!value) throw new Error("Set STUDIO_REDLIB_URL to import from Reddit.");
+  return new URL(value).origin;
+}
+// Links people paste: Reddit's own and its short links, and Redlib's own.
 const postHosts = new Set([
   "m.reddit.com",
   "new.reddit.com",
@@ -19,7 +23,6 @@ const postHosts = new Set([
   "old.reddit.com",
   "redd.it",
   "reddit.com",
-  "reddit.excloo.com",
   "www.reddit.com",
 ]);
 const maxPageBytes = 5 * 1024 * 1024;
@@ -33,10 +36,14 @@ export function redditPostPath(link) {
   } catch {
     throw new Error("Paste a link to a Reddit post.");
   }
-  if (!["http:", "https:"].includes(url.protocol) || !postHosts.has(url.hostname.toLowerCase()))
+  const host = url.hostname.toLowerCase();
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    !(postHosts.has(host) || host === new URL(redlib()).hostname)
+  )
     throw new Error("Only Reddit post links can be imported.");
   const id =
-    url.hostname.toLowerCase() === "redd.it"
+    host === "redd.it"
       ? url.pathname.match(/^\/(\w+)\/?$/)?.[1]
       : url.pathname.match(/^(?:\/r\/\w+)?\/(?:gallery|comments)\/(\w+)/)?.[1];
   if (id) return `/comments/${id}`;
@@ -87,9 +94,10 @@ async function cappedBody(response, limit, tooLarge) {
 
 /** GETs a Redlib path, following only redirects that stay on Redlib. */
 async function fromRedlib(fetcher, route) {
-  let url = new URL(route, redlib);
+  const origin = redlib();
+  let url = new URL(route, origin);
   for (let hop = 0; ; hop++) {
-    if (url.origin !== redlib) throw new Error("Reddit sent the import somewhere else.");
+    if (url.origin !== origin) throw new Error("Reddit sent the import somewhere else.");
     const response = await fetcher(url, {
       redirect: "manual",
       // Redlib shows a NSFW post only with this preference.
