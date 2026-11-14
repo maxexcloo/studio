@@ -24,10 +24,10 @@ import {
   LayoutDashboard,
   Layers,
   Lightbulb,
-  Maximize2,
   ListFilter,
   ListX,
   MapPinned,
+  Maximize2,
   MessageCircle,
   Moon,
   Pencil,
@@ -85,9 +85,9 @@ export const icons = {
   delete: Trash2,
   details: Info,
   download: Download,
+  dream: Moon,
   /** Duplicating a record into a new one, such as Duplicate Profile…. */
   duplicate: Files,
-  dream: Moon,
   edit: Pencil,
   /** A link that opens another site in a new tab. */
   external: ExternalLink,
@@ -99,14 +99,14 @@ export const icons = {
   log: ScrollText,
   loras: Puzzle,
   more: Ellipsis,
-  /** An outfit card (Library › Outfits). */
-  outfit: Shirt,
   /** Asking Dream for more in an item's direction (More Like This). */
   moreLikeThis: CopyPlus,
   /** Moving to the next item: the viewer's, a preview's and a comparison's arrows. */
   next: ChevronRight,
   /** Opening every result of a run in the viewer. */
   openAll: GalleryHorizontalEnd,
+  /** An outfit card (Library › Outfits). */
+  outfit: Shirt,
   paste: ClipboardPaste,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
@@ -116,8 +116,6 @@ export const icons = {
   previous: ChevronLeft,
   /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
-  /** Running an item again from its prompt with new seeds (Dream's Variations). */
-  variations: WandSparkles,
   redo: Redo2,
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
@@ -148,6 +146,8 @@ export const icons = {
   /** The uploaded images: the gallery's Uploads toggle, apart from the Upload action. */
   uploads: ImageUp,
   upscale: ImageUpscale,
+  /** Running an item again from its prompt with new seeds (Dream's Variations). */
+  variations: WandSparkles,
   versions: Layers,
   winner: Trophy,
 } satisfies Record<string, LucideIcon>;

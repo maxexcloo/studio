@@ -3,17 +3,17 @@ import type { Action, ActionGroups } from "../../ui/ActionBar";
 
 const definitions = {
   animate: { label: "Animate", icon: icons.animate },
+  compare: { label: "Compare", icon: icons.compare },
+  copy: { label: "Copy", icon: icons.copy },
+  delete: { label: "Delete", icon: icons.delete, color: "red" as const },
+  download: { label: "Download", icon: icons.download },
   edit: { label: "Edit", icon: icons.edit },
   retry: { label: "Retry", icon: icons.retry },
-  stop: { label: "Stop", icon: icons.stop },
-  compare: { label: "Compare", icon: icons.compare },
-  similar: { label: "Similar", icon: icons.similar },
-  upscale: { label: "Upscale", icon: icons.upscale },
-  copy: { label: "Copy", icon: icons.copy },
-  download: { label: "Download", icon: icons.download },
   share: { label: "Share", icon: icons.share },
-  delete: { label: "Delete", icon: icons.delete, color: "red" as const },
+  similar: { label: "Similar", icon: icons.similar },
   star: { label: "Star", icon: icons.star },
+  stop: { label: "Stop", icon: icons.stop },
+  upscale: { label: "Upscale", icon: icons.upscale },
 };
 type ItemActionId = keyof typeof definitions;
 /**
