@@ -117,7 +117,7 @@ export function useViewerPrompt(
                 onClick: () => setReview(!review),
               },
             ],
-            // Library's fixed changes, asked for by name as a suggestion's request is.
+            // Library's fixed changes, asked for as a suggestion's request is.
             fixed: {
               label: "Changes",
               options: (assistant?.changes ?? []).map((change) => ({
@@ -126,7 +126,7 @@ export function useViewerPrompt(
                 description: change.description,
                 icon: icons.suggestions,
                 disabled: ask.pending,
-                onClick: () => pick(change.label),
+                onClick: () => pick(change.instruction),
               })),
             },
             suggestions: offered ? suggestions.group : [],
