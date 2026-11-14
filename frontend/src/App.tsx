@@ -131,7 +131,8 @@ function Workspace() {
           },
           header: { flexShrink: 0 },
           title: { fontSize: "var(--mantine-font-size-xl)" },
-          body: { flex: 1, minHeight: 0, overflowY: "auto" },
+          // The size container WorkspaceSections' navigation fills.
+          body: { flex: 1, minHeight: 0, overflowY: "auto", containerType: "size" },
         }}
         fullScreen={phone}
       >
