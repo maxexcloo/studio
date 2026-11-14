@@ -33,7 +33,6 @@ export function useCharacterDialogs(onLayer: (open: boolean) => void = () => {})
               : ""
           }. Once they finish, pick the ones to keep in Edit Character.`,
         }),
-      onError: (error) => notifications.show({ color: "red", message: error.message }),
     });
   const closeEditor = () => {
     setEditing(undefined);

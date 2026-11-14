@@ -43,7 +43,6 @@ export function useGenerateReferences(preferredProfileId?: string) {
   const client = useQueryClient();
   const models = useQuery(modelsQuery);
   return useMutation({
-    meta: { inlineError: true },
     mutationFn: async (card: CharacterCard) => {
       const profile = referenceProfile(card, models.data?.profiles || [], [
         preferredProfileId,
