@@ -1,4 +1,11 @@
-import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActionIcon,
   ColorSwatch,
@@ -249,9 +256,19 @@ export function AppearanceControls() {
   );
 }
 export function AppearanceMenu() {
+  const [opened, setOpened] = useState(false);
   return (
-    <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
-      <Tooltip label="Appearance">
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      width={300}
+      position="bottom-end"
+      offset={18}
+      shadow="md"
+      withArrow
+      trapFocus
+    >
+      <Tooltip label="Appearance" disabled={opened}>
         <Popover.Target>
           <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
             <Palette size={19} />
