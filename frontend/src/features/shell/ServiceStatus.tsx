@@ -22,7 +22,8 @@ import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import classes from "./ServiceStatus.module.css";
-import { terminalStatuses } from "../../../../shared/queue";
+import { icons } from "../../ui/icons";
+import { pausedReason, terminalStatuses } from "../../../../shared/queue";
 
 /**
  * The one header entry to work in progress and service health on every breakpoint. Desktop opens
@@ -34,7 +35,10 @@ export function StatusAction() {
   const phone = usePhone();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
-  const generating = queue.data?.jobs.some((job) => !terminalStatuses.has(job.status));
+  // Work a paused queue holds is waiting, not generating.
+  const unfinished = queue.data?.jobs.filter((job) => !terminalStatuses.has(job.status)) ?? [];
+  const generating = unfinished.some((job) => job.reason !== pausedReason);
+  const held = !generating && unfinished.length > 0;
   const title = "Generations";
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);
@@ -60,21 +64,27 @@ export function StatusAction() {
       document.removeEventListener("keydown", escape, true);
     };
   }, [phone, opened]);
+  const tooltip = generating ? "Generating" : held ? "Queue Paused" : summary.label;
   const trigger = (
     <ActionIcon
       ref={target}
       aria-label="Open Status"
-      aria-description={generating ? "Generating" : summary.label}
+      aria-description={tooltip}
       aria-haspopup="dialog"
       aria-expanded={opened}
       variant="subtle"
-      color={generating ? "gray" : summary.colour}
+      color={generating || held ? "gray" : summary.colour}
       onClick={() => setOpened(!opened)}
     >
-      {generating ? <Loader size={18} color="gray" /> : <Activity size={19} />}
+      {generating ? (
+        <Loader size={18} color="gray" />
+      ) : held ? (
+        <icons.pause size={19} />
+      ) : (
+        <Activity size={19} />
+      )}
     </ActionIcon>
   );
-  const tooltip = generating ? "Generating" : summary.label;
   // Administrators open Settings › Workers from the summary; it stays read-only for others.
   const admin = useIsAdmin();
   const location = useLocation();
