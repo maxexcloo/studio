@@ -45,9 +45,3 @@ export function compareGalleryKeys(a, b) {
 export function compareGalleryItems(a, b) {
   return compareGalleryKeys(galleryOrderKey(a), galleryOrderKey(b));
 }
-
-/** The order of an MCP result set's results: prompt order, then as made. */
-export const setOrder = (a, b) =>
-  (Number(a.resultSet.index) || 0) - (Number(b.resultSet.index) || 0) ||
-  (galleryTime(a) ?? 0) - (galleryTime(b) ?? 0) ||
-  (Number(a.index) || 0) - (Number(b.index) || 0);
