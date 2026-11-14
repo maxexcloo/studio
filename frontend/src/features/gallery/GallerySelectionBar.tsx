@@ -74,8 +74,16 @@ export function GallerySelectionBar({
   );
   const runningJobs = [...new Set(running.map((item) => item.jobId).filter(Boolean))] as string[];
   const allStarred = ready.length > 0 && ready.every((item) => item.favorite);
-  const downloadUrl = `/api/gallery/export?${new URLSearchParams({ ids: ready.map((item) => item.id).join(",") })}`;
-  const downloadTooLarge = ready.length > 1000 || downloadUrl.length > 6000;
+  // The selection is posted, being too long for a URL, and downloads from the link it returns.
+  const download = useMutation({
+    mutationFn: () =>
+      post<{ href: string }>("/api/gallery/export", { ids: ready.map((item) => item.id) }),
+    onSuccess: ({ href }) => {
+      const link = Object.assign(document.createElement("a"), { href, download: "" });
+      link.click();
+      settle();
+    },
+  });
   const favorites = useFavorites();
   const uploads = ready.filter((item) => item.uploaded);
   const recreate = useRecreateMany();
@@ -255,16 +263,10 @@ export function GallerySelectionBar({
           onClick: () => void share(),
         })
       : itemAction("download", {
-          disabled: !ready.length || downloadTooLarge,
-          description: !ready.length
-            ? "Nothing selected has finished."
-            : downloadTooLarge
-              ? "Too many items to download at once: select fewer."
-              : undefined,
-          link: {
-            href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
-            download: true,
-          },
+          disabled: !ready.length || download.isPending,
+          description: ready.length ? undefined : "Nothing selected has finished.",
+          loading: download.isPending,
+          onClick: () => download.mutate(),
         }),
     itemAction("star", {
       label: allStarred ? "Unstar" : "Star",
@@ -300,8 +302,9 @@ export function GallerySelectionBar({
         setConfirm(true);
       }
     };
-    window.addEventListener("keydown", keys);
-    return () => window.removeEventListener("keydown", keys);
+    // On the document: an open tooltip's Escape stops it there, short of the window.
+    document.addEventListener("keydown", keys);
+    return () => document.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
   // Phones name them by what they select (All, None, Failed, In Progress). Each select takes every
   // match of the search and filters, loading the pages not shown yet first. Select None takes Select

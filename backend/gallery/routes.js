@@ -12,12 +12,17 @@ import {
   galleryItem,
   visibleGallery,
 } from "./store.js";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import { galleryFilter, outputFileCandidates, setGalleryFavorites } from "./store.js";
 import { galleryTime } from "./order.js";
 import { makePendingItems } from "./records.js";
 import { exportFilename, sendGalleryExport } from "./export.js";
-import { recordBelongsToAccount, recordsForRequest } from "../account-ownership.js";
+import {
+  ownerIdForRequest,
+  recordBelongsToAccount,
+  recordsForRequest,
+} from "../account-ownership.js";
 import { accountPreferences } from "../account-preferences.js";
 import { galleryAspects, gallerySizeBands, topCaptionTags } from "./filters.js";
 import { canonicalProfileId } from "../profile/store.js";
@@ -231,20 +236,34 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
 /** `starred` hears which of the caller's items changed, for the taste profile. */
 export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
+  // A selection is posted, as it may be too long for a URL, and downloads through a short-lived
+  // link that only its own account can open.
+  const selections = new Map();
+  const selectionLife = 10 * 60 * 1000;
+  app.post("/api/gallery/export", (req, res) => {
+    const now = Date.now();
+    for (const [token, entry] of selections) if (entry.expires < now) selections.delete(token);
+    const ids = new Set((Array.isArray(req.body?.ids) ? req.body.ids : []).map(String));
+    if (!ids.size) return res.status(400).json({ error: "Select something to download." });
+    const token = crypto.randomUUID();
+    selections.set(token, { ids, ownerId: ownerIdForRequest(req), expires: now + selectionLife });
+    res.json({ href: `/api/gallery/export?selection=${token}` });
+  });
   app.get("/api/gallery/export", (req, res) => {
-    // `ids` (comma-separated) downloads a selection as one archive.
-    const ids = String(req.query.ids || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean)
-      .slice(0, 1000);
+    let ids = null;
+    if (req.query.selection) {
+      const entry = selections.get(String(req.query.selection));
+      if (!entry || entry.expires < Date.now() || entry.ownerId !== ownerIdForRequest(req))
+        return res.status(404).json({ error: "This download has expired. Download again." });
+      ids = entry.ids;
+    }
     res.setHeader("Content-Type", "application/zip");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${exportFilename(ids.length ? "selection" : "gallery", "zip")}"`,
+      `attachment; filename="${exportFilename(ids ? "selection" : "gallery", "zip")}"`,
     );
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    sendGalleryExport(res, { req, ids: ids.length ? new Set(ids) : null });
+    sendGalleryExport(res, { req, ids });
   });
 
   /* ------------------------------------------ Favourites, prompts, earlier work */
