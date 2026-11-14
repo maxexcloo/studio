@@ -76,6 +76,8 @@ export const passConcurrency = 2;
 export const dailyItems = 500;
 const spacingMs = 10_000;
 const recheckMs = 5 * 60_000;
+// Records made this long before the last whole walk are still read when the gallery changes.
+const recentMs = 60 * 60_000;
 const watchMs = 1_000;
 // After this many failures in a row the model, not the item, is at fault: wait, then retry them.
 const failureStreak = 3;
@@ -114,9 +116,12 @@ export function createIdleWork<Item extends IdleItem>(options: {
   unavailable(): Promise<string>;
   idle(): boolean;
   allowed(ownerId: string): boolean;
-  /** Every gallery record, newest first. */
-  items(): Iterable<Item>;
-  /** Counts saved gallery changes: a walk that found nothing is not repeated until it moves. */
+  /** Every gallery record newest first, or only those made from `since` (ms) and pending ones. */
+  items(since?: number): Iterable<Item>;
+  /**
+   * Counts saved gallery changes: after a walk that found nothing, a change walks only recent
+   * records, and the whole gallery is walked again only after `recheckMs`.
+   */
   changes?(): number;
   /** Whether the work takes the record: one in the gallery, or also Dream's pool, with its file present. */
   visible(item: Item): boolean;
@@ -150,8 +155,10 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (reason !== noted) log.info(`[Studio] ${options.name} skip: ${reason}`);
     noted = reason;
   };
-  // The last walk that found nothing to do, so an idle tick doesn't read the whole gallery again.
-  let nothing = { state: "", at: -Infinity };
+  // The last whole walk that found nothing to do, so an idle tick doesn't read the whole gallery
+  // again; `changes` is the gallery's count when a walk last found nothing.
+  const cleared = { state: "", changes: undefined as number | undefined, at: -Infinity };
+  let nothing = cleared;
   const running = () => options.continuous || pass?.state === "running";
   const counting = () => !options.continuous && pass?.state === "running";
 
@@ -234,11 +241,17 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (!options.idle() || running() !== all) return "busy";
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     let item: Item | null = null;
-    const state = `${options.changes?.()}|${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
-    const walk = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
+    const changes = options.changes?.();
+    const state = `${all}|${pass?.scope}|${pass?.startedAt}|${failed.size}|${direct.size}`;
+    const whole = !options.changes || state !== nothing.state || now() - nothing.at > recheckMs;
+    const recent = !whole && changes !== nothing.changes;
+    const walk = whole || recent;
     const finishedBefore = finished;
     if (walk)
-      for await (const candidate of eligible(all))
+      for await (const candidate of eligible(
+        all,
+        recent ? options.items(nothing.at - recentMs) : undefined,
+      ))
         if (!inflight.has(key(candidate))) {
           item = candidate;
           break;
@@ -248,13 +261,15 @@ export function createIdleWork<Item extends IdleItem>(options: {
     if (inflight.size >= (all ? passConcurrency : 1)) return "busy";
     if (item && inflight.has(key(item))) return "busy";
     if (!item) {
-      if (!inflight.size && walk) nothing = { state, at: now() };
+      if (!inflight.size && walk) nothing = { state, changes, at: whole ? now() : nothing.at };
       if (counting() && !inflight.size) {
         pass = { ...pass!, state: "finished", endedAt: stamp() };
         persist();
       }
       return "none";
     }
+    // More may wait beyond the recent records, so the next tick walks the whole gallery again.
+    if (whole) nothing = cleared;
     if (!all) last = time;
     const controller = new AbortController();
     inflight.set(key(item), controller);

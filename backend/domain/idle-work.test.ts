@@ -34,3 +34,35 @@ test("a walk over a large gallery gives the event loop turns, as the server answ
   assert.equal(await walked, "none");
   assert.ok(turns > 3, `other work ran ${turns} times during the walk`);
 });
+
+test("after a walk finds nothing, a gallery change reads only recent records until the next whole walk", async () => {
+  let clock = 1_000_000_000;
+  let changes = 0;
+  const reads: (number | undefined)[] = [];
+  const work = createIdleWork({
+    name: "Test work",
+    enabled: () => true,
+    unavailable: async () => "",
+    idle: () => true,
+    allowed: () => true,
+    items: (since) => {
+      reads.push(since);
+      return [{ id: "item", status: "done" }];
+    },
+    changes: () => changes,
+    visible: () => true,
+    wanted: () => false,
+    run: async () => {},
+    now: () => clock,
+  });
+  assert.equal(await work.tick(), "none");
+  assert.equal(await work.tick(), "none");
+  assert.deepEqual(reads, [undefined], "nothing changed, so nothing is read");
+  changes += 1;
+  clock += 60_000;
+  assert.equal(await work.tick(), "none");
+  assert.deepEqual(reads, [undefined, 1_000_000_000 - 3_600_000]);
+  clock += 5 * 60_000;
+  assert.equal(await work.tick(), "none");
+  assert.deepEqual(reads, [undefined, 1_000_000_000 - 3_600_000, undefined]);
+});
