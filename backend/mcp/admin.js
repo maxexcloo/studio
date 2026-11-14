@@ -207,7 +207,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
   /** Image imports and update checks answer 404 on a Studio without them (an older release behind the gateway). */
   const later = (what) => (error) => {
     throw /HTTP 404\)/.test(error.message)
-      ? new Error(`${what} aren’t available in this Studio yet.`)
+      ? new Error(`${what} aren't available in this Studio yet.`)
       : error;
   };
   const dataUrl = (content, mime) =>
@@ -233,7 +233,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         const item = items.find((entry) => entry.key === wanted);
         if (!item)
           throw new Error(
-            `${wanted} isn’t installed or catalogued. Search with query to find its key.`,
+            `${wanted} isn't installed or catalogued. Search with query to find its key.`,
           );
         return mcpJson({ item: itemView(item, { full: true }) });
       }
@@ -874,7 +874,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         signal,
       });
       const name = /filename="([^"]+)"/.exec(headers["content-disposition"] || "")?.[1] || "";
-      if (!name) throw new Error("Studio didn’t name the export bundle.");
+      if (!name) throw new Error("Studio didn't name the export bundle.");
       const report = JSON.parse(headers["x-studio-export"] || "{}");
       const link = signExport(name);
       return mcpJson({ file: name, link: link.url, expires_at: link.expiresAt, ...report });

@@ -1062,7 +1062,7 @@ export async function outputFileSize(file, type) {
 
 /** An Extend that could not be joined onto its video: the run fails rather than saving it apart. */
 const extendFailure = (reason) =>
-  Object.assign(new Error(`Studio couldn’t add this extension to its video: ${reason}`), {
+  Object.assign(new Error(`Studio couldn't add this extension to its video: ${reason}`), {
     extendFailed: true,
   });
 

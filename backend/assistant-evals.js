@@ -30,7 +30,7 @@ export const loadEvals = (dir = evalsDir) =>
   );
 
 const lower = (value) => String(value || "").toLowerCase();
-const wordCount = (value) => (String(value || "").match(/[\p{L}\p{N}'’-]+/gu) || []).length;
+const wordCount = (value) => (String(value || "").match(/[\p{L}\p{N}'\u2019-]+/gu) || []).length;
 const hasPhrase = (text, phrase) =>
   new RegExp(
     `(^|[^\\p{L}\\p{N}])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}\\p{N}])`,

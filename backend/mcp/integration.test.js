@@ -739,7 +739,7 @@ test("account mode trusts the gateway key only for linked forwarded users and ke
   assert.equal(refused.isError, true);
   assert.match(
     refused.content[0].text,
-    /isn’t linked to a Studio account yet\. Ask an administrator to link it in Settings › Users\./,
+    /isn't linked to a Studio account yet\. Ask an administrator to link it in Settings › Users\./,
   );
   assert.equal(f.requests.length, 0);
 
@@ -1330,7 +1330,7 @@ test("Generate attaches a compact guide once per account unless it read the sele
   assert.equal(f.submitted.length, 13);
 });
 
-test("Models caches each owner’s catalogue for the TTL instead of rescanning per call", async (t) => {
+test("Models caches each owner's catalogue for the TTL instead of rescanning per call", async (t) => {
   const f = await fixture(t);
   const scans = () => f.requests.filter((request) => request.path === "/models").length;
   const alice = await f.client("alice");
@@ -1609,7 +1609,7 @@ test("partial queue failures retain successful owned jobs without retrying the s
   assert.equal(data(await call(client, "status", { job_id: jobId(result) })).status, "running");
 });
 
-test("forwarded identities and native token fallback cannot read, cancel or reuse each other’s jobs", async (t) => {
+test("forwarded identities and native token fallback cannot read, cancel or reuse each other's jobs", async (t) => {
   const f = await fixture(t);
   const alice = await f.client("alice");
   const bob = await f.client("bob");
@@ -3379,7 +3379,7 @@ test("negative prompts reach the submission only where they take effect", async 
   assert.equal(f.submitted.length, 1);
 });
 
-test("prompts run as sent with LoRAs, and a guide’s recommended negative fills in unless the caller gives one", async (t) => {
+test("prompts run as sent with LoRAs, and a guide's recommended negative fills in unless the caller gives one", async (t) => {
   const f = await fixture(t);
   const saved = loraInfo["fixture-unknown.safetensors"];
   loraInfo["fixture-unknown.safetensors"] = {
@@ -3471,7 +3471,7 @@ test("account watch pages read as the signed owner through the loopback credenti
   assert.equal(
     f.requests.find((request) => request.path === "/loras/info")?.authorization,
     `Bearer ${token}`,
-    "LoRA metadata is read with the account’s own credential",
+    "LoRA metadata is read with the account's own credential",
   );
   const before = f.requests.length;
   const response = await fetch(localLink(f, queued.link));
@@ -3505,7 +3505,7 @@ const tieredCatalogue = () => [
   { ...structuredClone(videoProfile), label: "Video · Quality · 20 Steps" },
 ];
 
-test("Models filters by tier and lists only each profile’s id and label by kind", async (t) => {
+test("Models filters by tier and lists only each profile's id and label by kind", async (t) => {
   const f = await fixture(t);
   await f.profiles(tieredCatalogue(), {
     defaults: { image: "qwen-quality", video: videoProfile.id },
@@ -5181,7 +5181,7 @@ test("variants offers lettered options of a result, records the pick and takes l
   assert.match(f.submitted.at(-1).referenceAssets[0].assetId, /^fixture-asset-/);
 });
 
-test("aspect picks the profile’s own preset and resolution its long edge", async (t) => {
+test("aspect picks the profile's own preset and resolution its long edge", async (t) => {
   const f = await fixture(t);
   const presets = [
     { label: "1:1", w: 1024, h: 1024 },
@@ -5811,7 +5811,7 @@ const adminToken = "administrator-mcp-token-long-enough-for-the-fixture";
 const userToken = "ordinary-user-mcp-token-long-enough-for-the-fixture";
 const toolNames = async (client) => (await client.listTools()).tools.map((tool) => tool.name);
 
-test("admin tools register only for an administrator’s own token, and for a gateway-linked administrator only with Chat Gateway Admin Tools on", async (t) => {
+test("admin tools register only for an administrator's own token, and for a gateway-linked administrator only with Chat Gateway Admin Tools on", async (t) => {
   let gatewayAdmin = false;
   const f = await fixture(t, {
     accountMode: true,
@@ -5903,7 +5903,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
   assert.deepEqual(has(await toolNames(await single.client())), []);
 });
 
-test("admin tools go through the Library and profile routes with the administrator’s credential, keep versions and never delete", async (t) => {
+test("admin tools go through the Library and profile routes with the administrator's credential, keep versions and never delete", async (t) => {
   const f = await fixture(t, {
     accountMode: true,
     enabled: false,
@@ -6277,7 +6277,7 @@ test("admin tools go through the Library and profile routes with the administrat
   );
 });
 
-test("Reuse carries how a result’s prompt was written into a plain run again, and drops it for a changed prompt", async (t) => {
+test("Reuse carries how a result's prompt was written into a plain run again, and drops it for a changed prompt", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   data(await call(client, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
