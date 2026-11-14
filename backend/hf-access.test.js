@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hfFetch, hfTokenStatus, mirroredUrl } from "./hf-access.js";
+import { hfFetch, mirroredUrl } from "./hf-access.js";
 
 const token = "hf_abcdefghijklmnopqrstuvwxyz1234";
 
@@ -47,12 +47,4 @@ test("a mirror takes the downloads, and does not get the token", async () => {
     },
   );
   assert.deepEqual(seen, [["hf-mirror.com", null]]);
-});
-
-test("the status says whether a token is set and where from, never the token", () => {
-  const status = hfTokenStatus({ HF_TOKEN: token });
-  assert.equal(status.set, true);
-  assert.equal(status.source, "environment");
-  assert.ok(!JSON.stringify(status).includes(token));
-  assert.deepEqual(hfTokenStatus({}), { set: false, source: "" });
 });

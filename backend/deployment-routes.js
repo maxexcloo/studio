@@ -9,7 +9,7 @@ import {
   saveFlag,
   settingSource,
 } from "./deployment-settings.js";
-import { hfTokenStatus } from "./hf-access.js";
+import { hfTokenValue } from "./hf-access.js";
 import { requireAdmin } from "./route-access.js";
 
 /**
@@ -49,7 +49,7 @@ export function registerDeploymentRoutes(app, { assistantEngine, mediaModels, un
       catalogue: catalogueFlags.map(describeFlag),
       integrations: {
         civitai: { token: civitaiTokenStatus() },
-        huggingFace: { token: hfTokenStatus() },
+        huggingFace: { token: { set: Boolean(hfTokenValue()) } },
         assistant: await assistantIntegration({ engine: assistantEngine }),
       },
     });
