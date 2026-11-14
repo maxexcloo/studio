@@ -262,7 +262,8 @@ test(
         STUDIO_LOCAL_TEXT_MODEL: "local/auto",
         STUDIO_TEXT_KEY: "fixture-text",
         STUDIO_WORKERS: "[]",
-        STUDIO_DEMO: "1",
+        STUDIO_FACE_CHECK: "0",
+        STUDIO_IMAGE_SEARCH: "0",
         STUDIO_MULTI_USER: "1",
       },
       stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -309,11 +310,7 @@ test(
     const administratorCookie = cookie;
     const admin: ServicesStatus = await api("/api/services/status");
     assert.equal(admin.services.text?.state, "healthy");
-    assert.equal(
-      admin.services.image?.state,
-      "unknown",
-      "demo placeholders are not evidence of worker health",
-    );
+    assert.equal(admin.services.image?.state, "unknown", "no image worker is configured");
     assert.equal(
       admin.services.text?.endpoints[0].endpoint,
       `${serviceUrl("text", "text", workerUrl)}/health`,

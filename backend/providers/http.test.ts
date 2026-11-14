@@ -83,7 +83,6 @@ test(
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: dataDir,
         STUDIO_WORKERS: "[]",
-        STUDIO_DEMO: "0",
         STUDIO_MULTI_USER: "1",
         STUDIO_CLIPROXYAPI_URL: providerUrl,
         STUDIO_CLIPROXYAPI_KEY: "fixture-value",

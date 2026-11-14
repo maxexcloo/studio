@@ -138,7 +138,6 @@ test(
           HOST: "127.0.0.1",
           STUDIO_ENV_FILE: "/dev/null",
           STUDIO_DATA_DIR: dataDir,
-          STUDIO_DEMO: "0",
           STUDIO_MULTI_USER: "1",
           STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
           STUDIO_CLIPROXYAPI_URL: "",

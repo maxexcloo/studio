@@ -1,8 +1,7 @@
 import { canAdmin } from "./access.js";
 import { mayUseGenerationProfile } from "./account-policy.js";
-import { demoMode } from "./comfy/comfy.js";
 import { deleteImportedWorkflow, saveImportedWorkflow } from "./custom-workflows.js";
-import { inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
+import { inferModels, offlineModelResult } from "./model/models.js";
 import { requireAdmin } from "./route-access.js";
 import {
   loadWorkflowPreferences,
@@ -42,9 +41,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
       }));
       const models = Object.keys(info || {}).length
         ? inferModels(info, stats)
-        : demoMode
-          ? mockModelResult()
-          : offlineModelResult(defaultWorker()?.url);
+        : offlineModelResult(defaultWorker()?.url);
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(
@@ -54,7 +51,7 @@ export function registerWorkflowRoutes(app, { loadComfyContext }) {
         ...preferencesForRequest(req, preferences),
       });
     } catch {
-      const models = demoMode ? mockModelResult() : offlineModelResult(defaultWorker()?.url);
+      const models = offlineModelResult(defaultWorker()?.url);
       const preferences = loadWorkflowPreferences();
       res.json({
         workflows: workflowsForRequest(

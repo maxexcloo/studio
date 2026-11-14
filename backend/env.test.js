@@ -13,7 +13,7 @@ test("the shell beats Studio's settings file", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
   const file = path.join(dir, "settings.env");
   try {
-    fs.writeFileSync(file, "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\n");
+    fs.writeFileSync(file, "STUDIO_MULTI_USER=1\nSTUDIO_ALLOWED_HOSTS=from-file\n");
     const output = execFileSync(
       process.execPath,
       [
@@ -21,7 +21,7 @@ test("the shell beats Studio's settings file", () => {
         "-e",
         `
         await import("./backend/env.js");
-        console.log(JSON.stringify({ hosts: process.env.STUDIO_ALLOWED_HOSTS, demo: process.env.STUDIO_DEMO }));
+        console.log(JSON.stringify({ hosts: process.env.STUDIO_ALLOWED_HOSTS, multiUser: process.env.STUDIO_MULTI_USER }));
       `,
       ],
       {
@@ -37,7 +37,7 @@ test("the shell beats Studio's settings file", () => {
     );
     assert.deepEqual(JSON.parse(output), {
       hosts: "from-shell",
-      demo: "1",
+      multiUser: "1",
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
