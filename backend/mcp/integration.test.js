@@ -6739,7 +6739,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   // Dream follows the account's group: the route's refusal reaches the chat.
   f.app.get("/api/dream", (req, res) =>
     req.headers.authorization === `Bearer ${otherToken}`
-      ? res.status(403).json({ ok: false, error: "Dream is unavailable for this account." })
+      ? res.status(403).json({ ok: false, error: "Dream is off for this account." })
       : res.json({
           status: "waiting",
           settings: { enabled: true },
@@ -6792,7 +6792,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.match(dream.items[0].link, /^https:\/\/studio\.example\.test\/mcp\/results\//);
   assert.match(
     texts(await call(other, "dream", { action: "status" })),
-    /Dream is unavailable for this account/,
+    /Dream is off for this account/,
   );
   await call(mine, "dream", { action: "keep", item_id: "dream-item" });
   assert.equal(seen.at(-1).path, "/api/dream/dream-item/keep");

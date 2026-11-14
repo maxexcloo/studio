@@ -56,7 +56,7 @@ import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/route
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createSwapRouter } from "./runtime/routes.ts";
-import { createLocalText, createServicesObserver } from "./runtime/services.ts";
+import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
@@ -91,7 +91,7 @@ import {
 
 import { adminRefusal, requireAdmin } from "./route-access.js";
 import express from "express";
-import { configuredBackends, routeJob } from "./comfy/backends.js";
+import { configuredBackends, routeJob, setParkedCheck } from "./comfy/backends.js";
 import { defaultWorker, defaultWorkerId, listWorkers, useWorkloadWorkers } from "./workers.js";
 import fs from "node:fs";
 import http from "node:http";
@@ -226,7 +226,10 @@ for (const [name, migrate] of [
 }
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
 const runtime = await loadRuntime(process.env, { dataDir });
-if (runtime) useWorkloadWorkers(runtime.controller.workloads);
+if (runtime) {
+  useWorkloadWorkers(runtime.controller.workloads);
+  setParkedCheck(async (id) => (await parkedWorkers(runtime.controller, listWorkers())).has(id));
+}
 // The local text route while a local text workload runs; without a runtime, text takes the cloud route.
 const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
 const mcp = registerMcpRoutes(app, {

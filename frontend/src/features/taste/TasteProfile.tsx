@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Group, Stack, TagsInput, Text } from "@mantine/co
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { formatDateTime } from "../../ui/dates";
 import { SettingGroup } from "../../ui/SettingRows";
 import { maxAvoid, maxAvoids } from "../../../../shared/taste";
 import { modelsQuery } from "../generation/GenerationProvider";
@@ -39,8 +40,7 @@ const learnt = (taste: Taste) =>
   [
     taste.signals &&
       `Learnt from ${taste.signals} ${taste.signals === 1 ? "star, comparison or iteration" : "stars, comparisons and iterations"}`,
-    taste.updatedAt &&
-      `Updated ${new Date(taste.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`,
+    taste.updatedAt && `Updated ${formatDateTime(taste.updatedAt)}`,
   ]
     .filter(Boolean)
     .join(" · ");

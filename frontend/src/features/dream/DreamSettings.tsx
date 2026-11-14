@@ -74,7 +74,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         {number("dailyVideos", "Videos per Day", 100, "The most videos Dream makes a day.")}
       </div>
       {save.error && (
-        <Alert color="red" title="Couldn’t Save Dream Settings">
+        <Alert color="red" title="Couldn't Save Dream Settings">
           {save.error.message}
         </Alert>
       )}

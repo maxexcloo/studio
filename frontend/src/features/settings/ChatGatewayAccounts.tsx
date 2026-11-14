@@ -3,6 +3,7 @@ import { Alert, Button, Select, Switch } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { formatDateTime } from "../../ui/dates";
 
 export interface GatewayAccounts {
   adminTools: boolean;
@@ -54,7 +55,7 @@ export function ChatGateway({
           description={
             gateway?.adminTools
               ? "Linked administrators can manage Library, catalogue and profiles from chat."
-              : "Only an administrator’s personal MCP token gets admin tools."
+              : "Only an administrator's personal MCP token gets admin tools."
           }
         >
           <Switch
@@ -68,7 +69,7 @@ export function ChatGateway({
           <SettingRow
             key={identity}
             label={identity}
-            description={`Awaiting Link${firstSeenAt ? ` · ${new Date(firstSeenAt).toLocaleString("en-AU")}` : ""}`}
+            description={`Awaiting Link${firstSeenAt ? ` · ${formatDateTime(firstSeenAt)}` : ""}`}
             wide
           >
             <Select
@@ -111,7 +112,7 @@ export function ChatGateway({
         ))}
       </SettingGroup>
       {change.error && (
-        <Alert color="red" title="Couldn’t Save Chat Gateway Changes">
+        <Alert color="red" title="Couldn't Save Chat Gateway Changes">
           {change.error.message}
         </Alert>
       )}

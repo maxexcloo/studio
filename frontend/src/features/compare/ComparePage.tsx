@@ -119,7 +119,7 @@ export function ComparePage() {
   if (comparison.isPending) return <LoadingState fill label="Loading Comparison" />;
   if (comparison.error)
     return (
-      <Alert color="red" title="Couldn’t Load the Comparison">
+      <Alert color="red" title="Couldn't Load the Comparison">
         {comparison.error.message}
       </Alert>
     );

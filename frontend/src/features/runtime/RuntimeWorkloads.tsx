@@ -36,6 +36,7 @@ import { api, post } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
@@ -120,16 +121,19 @@ function changePhase(
     if (operation.stop.includes(id) && !operation.start.includes(id) && phase === "running")
       return { pending: "stopping" };
   } else if (failed) {
-    if (failed.start.includes(id) && phase !== "running") return { failed: "Couldn’t start." };
+    if (failed.start.includes(id) && phase !== "running") return { failed: "Couldn't start." };
     if (failed.stop.includes(id) && !failed.start.includes(id) && holding(phase))
-      return { failed: "Couldn’t stop." };
+      return { failed: "Couldn't stop." };
   }
   return {};
 }
 
+const logTime = dateFormat({ timeStyle: "medium", hourCycle: "h23" });
+const shortDateTime = dateFormat({ dateStyle: "short", timeStyle: "short" });
+
 /** A change's steps as timestamped lines, then how it ended once it has. */
 function logText(entry: RuntimeOperation) {
-  const time = (at: string) => new Date(at).toLocaleTimeString(undefined, { hour12: false });
+  const time = (at: string) => logTime.format(new Date(at));
   return [
     ...entry.steps.map((step) => `${time(step.at)}  ${step.message}`),
     ...(entry.finishedAt ? [`${time(entry.finishedAt)}  ${entry.error || entry.progress}`] : []),
@@ -149,9 +153,7 @@ const changeLine = (names: (ids: string[]) => string) => (entry: RuntimeOperatio
 
 /** A change's one-line summary: what it did, how it ended, who asked and when. */
 const changeSummary = (entry: RuntimeOperation, change: (entry: RuntimeOperation) => string) =>
-  `${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${new Date(
-    entry.startedAt,
-  ).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`;
+  `${change(entry)} · ${operationLabel(entry.status)} · ${entry.requestedBy} · ${shortDateTime.format(new Date(entry.startedAt))}`;
 
 /** Monospace log text, oldest first, kept scrolled to the newest line as it grows, with Copy. */
 function LogText({
@@ -372,7 +374,7 @@ function AutomaticControlRows({
       </SettingRow>
       <SettingRow
         label="Idle After"
-        description="Time without queued or running work before Studio parks a GPU pool’s image and video workers."
+        description="Time without queued or running work before Studio parks a GPU pool's image and video workers."
       >
         <Select
           aria-label="Idle After"
@@ -419,7 +421,7 @@ function AutomaticControlRows({
       </SettingRow>
       <SettingRow
         label="Let Everyone Swap Models"
-        description="Accounts that aren’t administrators can also swap text out for their waiting work."
+        description="Accounts that aren't administrators can also swap text out for their waiting work."
       >
         <Switch
           aria-label="Let Everyone Swap Models"
@@ -428,7 +430,7 @@ function AutomaticControlRows({
         />
       </SettingRow>
       {save.error && (
-        <Alert color="red" title="Couldn’t Save Automatic Control">
+        <Alert color="red" title="Couldn't Save Automatic Control">
           {save.error.message}
         </Alert>
       )}
@@ -626,7 +628,7 @@ export function RuntimeWorkloads({ reasons }: { reasons: Record<string, string> 
             <Text size="sm" c={operation ? undefined : "red"} style={{ overflowWrap: "anywhere" }}>
               {operation
                 ? `${line.doing} ${names(line.ids)}…`
-                : `Couldn’t ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
+                : `Couldn't ${line.verb} ${names(line.ids)}: ${shown.error || shown.progress}`}
             </Text>
             <Button variant="subtle" size="compact-sm" onClick={() => setLogId(shown.id)}>
               View Log
@@ -750,10 +752,7 @@ export function RuntimeHistory() {
               header: "Time",
               cell: (entry) => (
                 <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
-                  {new Date(entry.startedAt).toLocaleString(undefined, {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  {shortDateTime.format(new Date(entry.startedAt))}
                 </Text>
               ),
             },

@@ -454,7 +454,7 @@ export function LibraryImportReview({
             {!!record.offers?.length && (
               <SettingGroup title="Other Versions">
                 <Text size="xs" c="dimmed">
-                  Only versions that suit this model’s family and worker are listed. Nothing
+                  Only versions that suit this model's family and worker are listed. Nothing
                   downloads until you choose one.
                 </Text>
                 {record.offers.map((offer, index) => (

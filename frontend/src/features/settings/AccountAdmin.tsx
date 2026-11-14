@@ -372,7 +372,7 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(null)}
       >
-        Delete {deleting?.name}? Only a group nobody belongs to that isn’t the default can go.
+        Delete {deleting?.name}? Only a group nobody belongs to that isn't the default can go.
       </ConfirmDialog>
       <Modal
         opened={!!editing}
@@ -474,7 +474,7 @@ function ResetPassword({
     return (
       <Stack>
         <Text size="sm">
-          {account.username} now signs in with this password. It isn’t shown again; give it to them
+          {account.username} now signs in with this password. It isn't shown again; give it to them
           yourself.
         </Text>
         <TextInput
@@ -859,7 +859,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         onConfirm={() => target && change.mutate({ id: target.id, patch: { disabled: true } })}
         onClose={() => setActing(null)}
       >
-        Disable {target?.username}? They are signed out everywhere and can’t sign in until you
+        Disable {target?.username}? They are signed out everywhere and can't sign in until you
         enable them again.
       </ConfirmDialog>
       <ConfirmDialog
@@ -870,7 +870,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
         onConfirm={() => target && removeGallery.mutate(target.id)}
         onClose={() => setActing(null)}
       >
-        Delete all {target && galleryOf(target)} of {target?.username}’s gallery items? Their images
+        Delete all {target && galleryOf(target)} of {target?.username}'s gallery items? Their images
         and videos are deleted for good, as if they deleted them themselves.
       </ConfirmDialog>
       <ConfirmDialog

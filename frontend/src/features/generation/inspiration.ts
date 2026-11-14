@@ -58,7 +58,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
       ["checkpoints", "diffusion_models"].includes(resource.folder || ""),
     );
     if (checkpoint?.profileId && checkpoint.profileId !== profile.id)
-      warnings.push("This profile differs from the source image’s.");
+      warnings.push("This profile differs from the source image's.");
     for (const [field, options] of [
       ["sampler", "samplers"],
       ["scheduler", "schedulers"],
@@ -69,7 +69,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
         profile.options?.[options] &&
         !profile.options[options].includes(value)
       ) {
-        warnings.push(`${field} will use this profile’s default.`);
+        warnings.push(`${field} will use this profile's default.`);
         delete settings[field];
       }
     }
@@ -89,7 +89,7 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
         ).toFixed(6),
       );
       if (adjusted !== value)
-        warnings.push(`${field} will use ${adjusted}, within this profile’s limits.`);
+        warnings.push(`${field} will use ${adjusted}, within this profile's limits.`);
       settings[field] = adjusted;
     }
     if (

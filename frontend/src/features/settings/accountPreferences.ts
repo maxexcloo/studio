@@ -56,7 +56,7 @@ export function showQueued(client: QueryClient, note?: string) {
     note,
     work === "running"
       ? "Queued. It shows in the gallery once it starts."
-      : work !== "queued" && "Queued. It shows in the gallery once it’s done.",
+      : work !== "queued" && "Queued. It shows in the gallery once it's done.",
   ]
     .filter(Boolean)
     .join(" ");

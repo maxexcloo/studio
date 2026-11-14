@@ -1,5 +1,6 @@
 import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
+import { dateFormat } from "../../ui/dates";
 import { isProfile, shownProfileName } from "../generation/payload";
 
 /**
@@ -15,8 +16,8 @@ export function mediaTitle(item: Pick<MediaItem, "prompt" | "title" | "resultSet
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 // Made once: `toLocaleString` with options builds a formatter on every call, once per tile render.
-const timeOnly = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const dayAndTime = new Intl.DateTimeFormat(undefined, {
+const timeOnly = dateFormat({ hour: "numeric", minute: "2-digit" });
+const dayAndTime = dateFormat({
   day: "numeric",
   month: "short",
   hour: "numeric",
@@ -53,12 +54,12 @@ export function mediaDay(item: Pick<MediaItem, "createdAt">) {
   return `${created.getFullYear()}-${pad(created.getMonth() + 1)}-${pad(created.getDate())}`;
 }
 
-const thisYear = new Intl.DateTimeFormat(undefined, {
+const thisYear = dateFormat({
   weekday: "short",
   day: "numeric",
   month: "short",
 });
-const otherYear = new Intl.DateTimeFormat(undefined, {
+const otherYear = dateFormat({
   day: "numeric",
   month: "short",
   year: "numeric",

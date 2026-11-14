@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { isComfyTimeout, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
+import { setParkedCheck } from "./backends.js";
 import { diagnostics, diagnosticsText } from "../diagnostics.js";
 
 /** What a check to `url` throws, cut short after `ms`. */
@@ -55,7 +56,9 @@ test("a bug report tells a busy ComfyUI from one that is not answering", () => {
   );
 });
 
-test("outage logs name the worker, skip busy timeouts and say refused or unreachable", (t) => {
+const logged = () => new Promise((resolve) => setImmediate(resolve));
+
+test("outage logs name the worker, skip busy timeouts and say refused or unreachable", async (t) => {
   const lines = [];
   t.mock.method(console, "error", (line) => lines.push(String(line)));
   noteComfyReachable("primary");
@@ -67,8 +70,19 @@ test("outage logs name the worker, skip busy timeouts and say refused or unreach
   const refused = new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
   noteComfyFetchError("primary", refused);
   noteComfyFetchError("primary", refused);
+  await logged();
   assert.equal(lines.length, 1, "only the change is logged");
   assert.match(lines[0], /Worker stopped answering .*"reason":"ECONNREFUSED"/);
   noteComfyReachable("primary");
   assert.match(lines.at(-1), /Worker answering again .*"worker"/);
+});
+
+test("a worker stopped on purpose goes quiet without an outage log", async (t) => {
+  const lines = [];
+  t.mock.method(console, "error", (line) => lines.push(String(line)));
+  setParkedCheck(async (id) => id === "parked");
+  t.after(() => setParkedCheck(async () => false));
+  noteComfyFetchError("parked", new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } }));
+  await logged();
+  assert.deepEqual(lines, []);
 });
