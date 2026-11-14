@@ -36,7 +36,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["POST", /^\/api\/queue\/cancel$/],
-  ["GET", /^\/api\/gallery(\/export|\/filters|\/jobs\/[\w-]+|\/items\/[^/]+)?$/],
+  ["GET", /^\/api\/(gallery(\/export|\/filters|\/jobs\/[\w-]+|\/items\/[^/]+)?|results\/\d+)$/],
   ["POST", /^\/api\/gallery\/(delete|export|favorite|frame|errors\/clear|recreate|video-edit)$/],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/prompts$/],
@@ -61,7 +61,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/calibration|\/discarded)?)$/],
   [
     "POST",
-    /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
+    /^\/api\/(comparisons(\/run|\/variants)?|taste\/refresh|suggestions|dream\/(calibration|visit)|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/(taste|dream\/discarded)$/],
