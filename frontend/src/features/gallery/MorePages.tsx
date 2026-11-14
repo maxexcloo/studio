@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Center, Loader, Stack, Text } from "@mantine/core";
 import type { UseInfiniteQueryResult } from "@tanstack/react-query";
 
@@ -25,23 +25,32 @@ export function MorePages({
     setFailedFor(results);
     setFailed(false);
   }
-  const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = listing;
-  const more = () => void fetchNextPage().then((result) => setFailed(result.isFetchNextPageError));
+  const [near, setNear] = useState(false);
+  const { hasNextPage, isFetching, isFetchNextPageError, dataUpdatedAt, fetchNextPage } = listing;
+  const more = useCallback(
+    () =>
+      void fetchNextPage({ cancelRefetch: false }).then((result) =>
+        setFailed(result.isFetchNextPageError),
+      ),
+    [fetchNextPage],
+  );
   useEffect(() => {
     const element = trigger.current;
-    if (!element || !hasNextPage || isFetching || failed || isFetchNextPageError || paused) return;
+    if (!element) return;
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          observer.disconnect();
-          void fetchNextPage().then((result) => setFailed(result.isFetchNextPageError));
-        }
-      },
+      (entries) => setNear(entries[entries.length - 1].isIntersecting),
       { root, rootMargin: "800px" },
     );
     observer.observe(element);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetching, isFetchNextPageError, failed, fetchNextPage, paused, root]);
+    return () => {
+      observer.disconnect();
+      setNear(false);
+    };
+  }, [hasNextPage, root]);
+  // Each loaded page checks again: a quick page's fetching and fetched states can reach one render.
+  useEffect(() => {
+    if (near && hasNextPage && !isFetching && !failed && !isFetchNextPageError && !paused) more();
+  }, [near, hasNextPage, isFetching, isFetchNextPageError, failed, more, paused, dataUpdatedAt]);
   if (!hasNextPage) return null;
   return (
     <Center ref={trigger} mih={44}>
