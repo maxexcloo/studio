@@ -16,6 +16,7 @@ import { useRemembered } from "../auth/useRemembered";
 import type { Action } from "../../ui/ActionBar";
 import { itemAction } from "./itemActions";
 import { useItemMutation } from "./useItemMutation";
+import { downloadsQuery } from "../library/queries";
 
 const statusQuery = (quality: UpscaleQuality) => ({
   queryKey: ["upscale-status", quality],
@@ -84,7 +85,7 @@ export function useQuickUpscale(item: MediaItem, enabled: boolean) {
       notifications.show({
         message: "Downloading the face detector in Library › Downloads.",
       });
-      void cache.invalidateQueries({ queryKey: ["library-downloads"] });
+      void cache.invalidateQueries({ queryKey: downloadsQuery.queryKey });
     },
     onError: failure,
   });
