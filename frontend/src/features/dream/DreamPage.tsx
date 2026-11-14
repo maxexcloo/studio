@@ -136,8 +136,8 @@ export function DreamPage() {
           onChange={(value) => setView(value as typeof view)}
           data={[
             { value: "deck", label: "Deck" },
-            { value: "discarded", label: "Discarded" },
             { value: "projects", label: "Projects" },
+            { value: "discarded", label: "Discarded" },
           ]}
         />
         <Group gap={4} wrap="nowrap" ml="auto">
