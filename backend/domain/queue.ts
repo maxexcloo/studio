@@ -552,7 +552,7 @@ export class GenerationQueue {
    * first idle worker for manual work and the last for background work. Model affinity only orders
    * idle workers: it never keeps work waiting while one that can run it is idle. A job on an idle
    * worker without its model moves only to an idle worker that has it, and a job never moves behind
-   * higher-ranked work. Updates `all` in place.
+   * work of its rank or higher, which that worker starts first. Updates `all` in place.
    */
   private rebalance(
     all: OwnedJob[],
@@ -601,7 +601,7 @@ export class GenerationQueue {
             !occupied.has(resource) &&
             !this.scheduling.has(resource) &&
             !all.some(
-              (other) => other.resource === resource && pending(other) && rank(other) < rank(job),
+              (other) => other.resource === resource && pending(other) && rank(other) <= rank(job),
             ),
         );
       const target =
