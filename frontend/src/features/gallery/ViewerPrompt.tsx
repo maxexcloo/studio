@@ -62,16 +62,17 @@ export function useViewerPrompt(
   };
   // Next steps are written for images; they load as the image opens.
   const offered = ask.available && item.type === "image";
+  // Under review the field shows the request while it is asked for.
+  const pick = (request: string) => {
+    if (review) setPrompt(request);
+    ask.send(request, review ? request : prompt);
+  };
   const suggestions = useChangeSuggestions({
     query: nextStepsQuery(item.jobId ?? ""),
     fresh: () => askNextSteps(item.jobId!, true),
     enabled: offered && Boolean(item.jobId),
     disabled: ask.pending,
-    // Under review the field shows the request while it is asked for.
-    onPick: (request) => {
-      if (review) setPrompt(request);
-      ask.send(request, review ? request : prompt);
-    },
+    onPick: pick,
   });
   const assistant = useQuery(assistantQuery).data;
   const profileId = String(item.settings?.profileId || "");
@@ -116,7 +117,18 @@ export function useViewerPrompt(
                 onClick: () => setReview(!review),
               },
             ],
-            fixed: { label: "Changes", options: [] },
+            // Library's fixed changes, asked for by name as a suggestion's request is.
+            fixed: {
+              label: "Changes",
+              options: (assistant?.changes ?? []).map((change) => ({
+                id: `change:${change.id}`,
+                label: change.label,
+                description: change.description,
+                icon: icons.suggestions,
+                disabled: ask.pending,
+                onClick: () => pick(change.label),
+              })),
+            },
             suggestions: offered ? suggestions.group : [],
             last: [
               {

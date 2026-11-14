@@ -18,7 +18,7 @@ import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
 import { useUpscaleMany } from "./UpscaleControls";
-import { animateThemes, useAnimateThemes, useIterate, type AnimateTheme } from "./useMediaAction";
+import { useAnimateThemes, useIterate } from "./useMediaAction";
 import type { GallerySelection } from "./useGallerySelection";
 import type { MediaItem } from "../../types";
 import type { useTryAgain } from "./useTryAgain";
@@ -95,7 +95,7 @@ export function GallerySelectionBar({
   const themes = useAnimateThemes();
   const client = useQueryClient();
   const animate = useMutation({
-    mutationFn: async (theme: AnimateTheme) => {
+    mutationFn: async (theme: string) => {
       const failed: string[] = [];
       let error: unknown;
       for (const item of finishedImages)
@@ -214,13 +214,13 @@ export function GallerySelectionBar({
           fixed: {
             label: "Themes",
             options: themes
-              .filter((theme) => theme !== "custom")
+              .filter((theme) => theme.id !== "custom")
               .map((theme) => ({
-                id: `animate-${theme}`,
-                label: animateThemes[theme],
+                id: `animate-${theme.id}`,
+                label: theme.label,
                 icon: icons.animate,
                 disabled: animate.isPending,
-                onClick: () => animate.mutate(theme),
+                onClick: () => animate.mutate(theme.id),
               })),
           },
           last: [],
