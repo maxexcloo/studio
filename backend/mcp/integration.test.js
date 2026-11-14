@@ -151,6 +151,17 @@ async function fixture(
   const submitted = [];
   const downloads = [];
   let comparisons = [];
+  // Studio's result numbers (domain/result-numbers.ts): one per output, per account, in the order first shown.
+  const counts = new Map();
+  const numbered = (job, index = 0) => {
+    job.numbers ||= [];
+    if (!job.numbers[index]) {
+      const next = (counts.get(job.owner || "") || 0) + 1;
+      counts.set(job.owner || "", next);
+      job.numbers[index] = next;
+    }
+    return job.numbers[index];
+  };
   let failAfter = Infinity;
   let failResponse = [503, { error: "Fixture backend offline" }];
   let completeOnSubmit = false;
@@ -196,7 +207,22 @@ async function fixture(
       settings: req.body,
       ...(jobEtaMs === undefined ? {} : { progress: { endsAt: Date.now() + jobEtaMs } }),
     });
-    res.json({ jobId: id, status: "queued" });
+    const job = jobs.get(id);
+    job.owner = uploader(req);
+    const items = Array.from({ length: Number(req.body.count) || 1 }, (_, index) => ({
+      jobId: id,
+      index,
+      number: numbered(job, index),
+    }));
+    res.json({ jobId: id, status: "queued", items });
+  });
+  app.get("/api/results/:number", (req, res) => {
+    for (const job of jobs.values()) {
+      if ((job.owner || "") !== uploader(req)) continue;
+      const index = (job.numbers || []).indexOf(Number(req.params.number));
+      if (index >= 0) return res.json({ jobId: job.id, index });
+    }
+    res.status(404).json({ error: `There is no result #${req.params.number}.` });
   });
   app.post("/api/comparisons", (req, res) =>
     res.status(201).json({ id: `fixture-comparison-${req.body.jobIds.join("-")}` }),
@@ -250,6 +276,7 @@ async function fixture(
                   id: `${job.id}:${index}`,
                   jobId: job.id,
                   index,
+                  number: numbered(job, index),
                   status: "done",
                   type: job.kind,
                   prompt: job.settings?.prompt,
@@ -305,6 +332,7 @@ async function fixture(
                 id: `${job.id}-${index}`,
                 jobId: job.id,
                 index,
+                number: numbered(job, index),
                 status: "done",
                 type: job.kind,
                 ...recorded,
@@ -452,6 +480,8 @@ async function fixture(
     jobs,
     requests,
     submitted,
+    numbered,
+    owner: uploader,
     failAfter: (count, status, body) => {
       failAfter = count;
       if (status) failResponse = [status, body];
@@ -938,6 +968,7 @@ test("media and administrator credentials discover only their own friendly tools
     "taste",
     "upload",
     "upload_link",
+    "variants",
   ]);
   // Hosts that show MCP titles name each call in plain words.
   assert.deepEqual(Object.fromEntries(tools.map((tool) => [tool.name, tool.title])), {
@@ -958,6 +989,7 @@ test("media and administrator credentials discover only their own friendly tools
     taste: "taste & lora ratings",
     upload: "upload reference",
     upload_link: "upload link",
+    variants: "offer variants",
   });
   await failure(media, "gpu_status");
   const admin = await f.client("administrator", controlKey);
@@ -1006,7 +1038,7 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(reuse.description, /^Follow up on one finished result\./);
   assert.equal(
     reuse.inputSchema.properties.job_id.description,
-    'Its ref as the reply shows it ("result 1"), or a job_id; never "all".',
+    'Its number ("#12"), a variants letter ("B") or a job_id; never "all".',
   );
   assert.deepEqual(reuse.inputSchema.properties.mode.enum, [
     "again",
@@ -1048,8 +1080,8 @@ test("media and administrator credentials discover only their own friendly tools
     // writes a character's shots so the wording never drifts), to 16,100 for reference_strengths
     // and to 17,200 for Cards (describe and rate a card's images), then lowered to 17,100 once Cards'
     // description was tightened, then raised to 17,150 for generate's 18+ floor, to 18,050 for
-    // project and to 18,120 for its character_sheet.
-    JSON.stringify(tools).length + media.getInstructions().length < 18120,
+    // project, to 18,120 for its character_sheet and to 19,000 for variants and result numbers.
+    JSON.stringify(tools).length + media.getInstructions().length < 19000,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -2005,7 +2037,7 @@ test("image Result returns one short linked preview that opens the unchanged ori
   assert.equal(preview, `${link}.jpg`);
   assert.match(
     result.content[0].text,
-    /\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
   assert.doesNotMatch(result.content[0].text, /View Original|\[Download/);
   const response = await fetch(localLink(f, link));
@@ -2314,13 +2346,13 @@ test("background Result collects a later completion without another submission",
   const [message] = result.content;
   assert.match(
     message.text,
-    /\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
+    /\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
   );
   assert.match(message.text, /Stop here unless the user asked for a review\./);
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
-  assert.equal(data(result).ref, "result 1");
+  assert.equal(data(result).ref, "#1");
   const preview = await call(client, "result", {
     job_id: id,
     wait_seconds: 0,
@@ -2578,7 +2610,7 @@ test(
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 17);
+    assert.equal((await client.listTools()).tools.length, 18);
     const profileId = "custom:test-image";
     assert.ok(
       data(await call(client, "models", { kind: "image" })).image.some((line) =>
@@ -2926,38 +2958,36 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   const queued = await generate(first, { prompts: ["A landscape", "A lake"] });
   assert.deepEqual(
     queued.jobs.map((job) => job.ref),
-    ["result 1", "result 2"],
+    ["#1", "#2"],
   );
   for (const job of queued.jobs)
     assert.match(job.link, /^https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}$/);
   assert.deepEqual(
     (await generate(first)).jobs.map((job) => job.ref),
-    ["result 3"],
+    ["#3"],
   );
-  // Another conversation numbers from one again; the same account without a conversation has its own sequence.
+  // Numbers are the account's, as Studio shows them: another conversation carries on, and takes
+  // the first conversation's numbers too.
   const second = await conversation("alice", "conversation-b");
   assert.deepEqual(
     (await generate(second)).jobs.map((job) => job.ref),
-    ["result 1"],
+    ["#4"],
   );
-  assert.equal(
-    data(await call(second, "status", { job_id: "result 1" })).job_id,
-    f.submitted.at(-1).clientJobId,
-  );
+  assert.equal(data(await call(second, "status", { job_id: "#1" })).job_id, queued.jobs[0].job_id);
   assert.deepEqual(
     (await generate(await conversation("alice"))).jobs.map((job) => job.ref),
-    ["result 1"],
+    ["#5"],
   );
 
   const [, secondJob] = queued.jobs;
-  for (const reference of ["result 2", "r2", "#2", "2", "Result #2"]) {
+  for (const reference of ["#2", "# 2", "2"]) {
     const status = data(await call(first, "status", { job_id: reference }));
     assert.equal(status.job_id, secondJob.job_id);
-    assert.equal(status.ref, "result 2");
+    assert.equal(status.ref, "#2");
   }
-  await failure(first, "status", { job_id: "result 9" });
+  await failure(first, "status", { job_id: "#9" });
   // Bob's conversation with the same identifier cannot reach Alice's numbers.
-  await failure(await conversation("bob", "conversation-a"), "status", { job_id: "result 1" });
+  await failure(await conversation("bob", "conversation-a"), "status", { job_id: "#1" });
 
   // The watch page works without the chat: progress first, then the outputs through their own signed links.
   const page = localLink(f, secondJob.link);
@@ -3024,7 +3054,7 @@ test("a conversation keeps its LoRAs off and count where a later generate leaves
   assert.equal(f.submitted.at(-1).count, 1);
 });
 
-test("a client without a conversation header gets its MCP session's own result numbers; the header still wins", async (t) => {
+test("a client without a conversation header gets its MCP session's own results; the header still wins", async (t) => {
   const f = await fixture(t);
   const connect = async (id) => {
     const client = new Client({ name: "studio-session-fixture", version: "1.0.0" });
@@ -3044,17 +3074,17 @@ test("a client without a conversation header gets its MCP session's own result n
   };
   const handover = async (client) =>
     texts(await call(client, "handover", { summary: "Carry on." }));
-  // Two chats like a Grok connector's: no header, each with its own session, numbering from 1.
+  // Two chats like a Grok connector's: no header, each with its own session; numbers are the account's.
   const [first, second] = [await connect(), await connect()];
   const queued = await generate(first);
   const one = jobId(queued);
   assert.deepEqual(
     queued.jobs.map((job) => job.ref),
-    ["result 1"],
+    ["#1"],
   );
   assert.deepEqual(
     (await generate(first)).jobs.map((job) => job.ref),
-    ["result 2"],
+    ["#2"],
   );
   const other = await call(second, "generate", {
     profile_id: imageProfile.id,
@@ -3064,11 +3094,10 @@ test("a client without a conversation header gets its MCP session's own result n
   const two = jobId(data(other));
   assert.deepEqual(
     data(other).jobs.map((job) => job.ref),
-    ["result 1"],
+    ["#3"],
   );
-  assert.equal(data(await call(first, "status", { job_id: "result 1" })).job_id, one);
-  assert.equal(data(await call(second, "status", { job_id: "result 1" })).job_id, two);
-  await failure(second, "status", { job_id: "result 2" });
+  assert.equal(data(await call(first, "status", { job_id: "#1" })).job_id, one);
+  assert.equal(data(await call(second, "status", { job_id: "#3" })).job_id, two);
   assert.match(await handover(first), new RegExp(one));
   assert.doesNotMatch(await handover(first), new RegExp(two));
   assert.doesNotMatch(await handover(second), new RegExp(one));
@@ -3076,27 +3105,25 @@ test("a client without a conversation header gets its MCP session's own result n
   const allPage = async (reply) => {
     const [, link] = /\[All Results\]\((https?:\/\/[^)]+)\)/.exec(texts(reply));
     return [
-      ...(await (await fetch(localLink(f, link))).text()).matchAll(
-        /<h2>(Result \d+) · [^<]+<\/h2>/g,
-      ),
+      ...(await (await fetch(localLink(f, link))).text()).matchAll(/<h2>(#\d+) · [^<]+<\/h2>/g),
     ].map((match) => match[1]);
   };
-  assert.deepEqual(await allPage(other), ["Result 1"]);
+  assert.deepEqual(await allPage(other), ["#3"]);
   assert.deepEqual(
     await allPage(
       await call(first, "generate", { profile_id: imageProfile.id, prompts: ["A hill"], count: 1 }),
     ),
-    ["Result 1", "Result 2", "Result 3"],
+    ["#1", "#2", "#4"],
   );
   // LibreChat's conversation header scopes by itself, whatever session carries it.
   const [left, right] = [await connect("conversation-x"), await connect("conversation-x")];
   assert.deepEqual(
     (await generate(left)).jobs.map((job) => job.ref),
-    ["result 1"],
+    ["#5"],
   );
   assert.deepEqual(
     (await generate(right)).jobs.map((job) => job.ref),
-    ["result 2"],
+    ["#6"],
   );
 });
 test("the Result wait ends promptly when the client cancels or disconnects, without cancelling the generation", async (t) => {
@@ -3664,7 +3691,7 @@ test("Result returns only its markdown, never a settings record", async (t) => {
     wait_seconds: 0,
   });
   assert.equal(pending.content.length, 1);
-  assert.deepEqual(pending.structuredContent, { job_id: id, ref: "result 1", status: "running" });
+  assert.deepEqual(pending.structuredContent, { job_id: id, ref: "#1", status: "running" });
   Object.assign(f.jobs.get(id), {
     status: "done",
     outputs: [{ url: "/comfy/view?filename=lean.png" }],
@@ -3676,9 +3703,9 @@ test("Result returns only its markdown, never a settings record", async (t) => {
   assert.equal(lean.content.length, 1);
   assert.match(
     lean.content[0].text,
-    /^Result 1 is ready\. .+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
+    /^#1 is ready\. .+\n\n\*\*#1\*\* · Fixture Image\n\[!\[#1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
-  assert.deepEqual(lean.structuredContent, { job_id: id, ref: "result 1", status: "done" });
+  assert.deepEqual(lean.structuredContent, { job_id: id, ref: "#1", status: "done" });
 });
 
 test("a finished video notification names its result and profile beside View Video", async (t) => {
@@ -3690,12 +3717,12 @@ test("a finished video notification names its result and profile beside View Vid
     outputs: [{ url: "/comfy/view?filename=wave.mp4" }],
   });
   const result = await call(client, "result", {
-    job_id: "result 1",
+    job_id: "#1",
     wait_seconds: 0,
   });
   assert.match(
     result.content[0].text,
-    /\n\n\*\*Result 1\*\* · Fixture Video · \[View Video\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
+    /\n\n\*\*#1\*\* · Fixture Video · \[View Video\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)$/,
   );
 });
 
@@ -3726,7 +3753,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
     prompt_source: "exact",
     jobs: [...f.jobs.keys()].map((job_id, index) => ({
       job_id,
-      ref: `result ${index + 1}`,
+      ref: `#${index + 1}`,
       link: result.structuredContent.jobs[index].link,
       images: 2,
     })),
@@ -3736,13 +3763,13 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   // images share one contact sheet directly under its header, in one paragraph, linking to All Results.
   assert.match(
     result.content[0].text,
-    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1 \(2 images\)\*\* · Fixture Image\n\[!\[Result 1 \(2 images\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*#1–#2\*\* · Fixture Image\n\[!\[#1–#2\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   assert.ok(result.content[0].text.length < 660, `${result.content[0].text.length} characters`);
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
   assert.match(
     result.content[0].text,
-    /call reuse with its ref \(such as "result 1"\) and its full prompt revised \(status shows it\)/,
+    /call reuse with its ref \(such as "#1"\) and its full prompt revised \(status shows it\)/,
   );
   assert.equal(f.downloads.length, 0, "nothing is downloaded until the sheet is fetched");
   const sheet = await fetch(localLink(f, previews(result)[0]));
@@ -3772,7 +3799,7 @@ test("Generate falls back to the queued response when a job outlasts the wait or
   assert.deepEqual(Object.keys(slow.jobs[0]), ["job_id", "ref", "link"]);
   assert.match(
     texts(slowResult),
-    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call result now or in the background\. When the user later asks to see results, call result\. Never poll or resubmit\. To change or animate one later, call reuse with its ref \(such as "result 1"\) and its full prompt revised \(status shows it\)\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call result now or in the background\. When the user later asks to see results, call result\. Never poll or resubmit\. To change or animate one later, call reuse with its ref \(such as "#1"\) and its full prompt revised \(status shows it\)\.\n\n\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   started = performance.now();
@@ -3851,8 +3878,8 @@ test("Generate waits only when Studio expects the set to finish within the wait,
     data(sets).sets.map((set) => set.eta_seconds),
     [12, 24],
   );
-  assert.match(texts(sets), /^Fixture Image: \[Result 4\]\([^)]+\) \(about 10 s\)$/m);
-  assert.match(texts(sets), /^Other Image: \[Result 5\]\([^)]+\) \(about 25 s\)$/m);
+  assert.match(texts(sets), /^Fixture Image: \[#4\]\([^)]+\) \(about 10 s\)$/m);
+  assert.match(texts(sets), /^Other Image: \[#5\]\([^)]+\) \(about 25 s\)$/m);
 });
 
 const finish = (f, extension = "png") => {
@@ -3878,7 +3905,7 @@ test("Reuse leaves out a saved LoRA made for another model family and says so", 
   // A result made before Studio refused other-family LoRAs can carry one in its saved settings.
   f.submitted[0].loras.push({ name: "fixture-other.safetensors", strength: 0.5, enabled: true });
   finish(f);
-  const again = await call(client, "reuse", { job_id: "result 1" });
+  const again = await call(client, "reuse", { job_id: "#1" });
   assert.equal(again.isError, undefined);
   assert.match(
     texts(again),
@@ -3904,11 +3931,8 @@ test("Status and reuse give a result's full prompt where generate shortens it", 
   const queued = await call(client, "generate", { kind: "image", prompts: [prompt], count: 1 });
   assert.match(texts(queued), /Prompt: A heron [^\n]+…$/);
   finish(f);
-  assert.equal(data(await call(client, "status", { job_id: "result 1" })).prompt, prompt);
-  assert.match(
-    texts(await call(client, "reuse", { job_id: "result 1" })),
-    /Prompt: A heron .+ at dawn$/,
-  );
+  assert.equal(data(await call(client, "status", { job_id: "#1" })).prompt, prompt);
+  assert.match(texts(await call(client, "reuse", { job_id: "#1" })), /Prompt: A heron .+ at dawn$/);
 });
 
 test("Reuse runs a result again with its profile and settings, a new seed and an optional prompt, without Models", async (t) => {
@@ -3931,12 +3955,12 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   finish(f);
   const models = () => f.requests.filter((request) => request.path === "/models").length;
   const before = models();
-  const again = data(await call(client, "reuse", { job_id: "result 1" }));
+  const again = data(await call(client, "reuse", { job_id: "#1" }));
   assert.equal(again.status, "queued");
   assert.deepEqual(again.profile, first.profile);
   assert.deepEqual(
     again.jobs.map((job) => job.ref),
-    ["result 2"],
+    ["#2"],
   );
   const [original, rerun] = f.submitted;
   for (const key of [
@@ -3954,7 +3978,7 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   assert.equal(rerun.seed, "", "a new seed");
   const tweaked = data(
     await call(client, "reuse", {
-      job_id: "result 1",
+      job_id: "#1",
       prompt: "A heron at dusk",
       count: 2,
     }),
@@ -3972,13 +3996,11 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   // mode reference returns a reference asset for Generate, and a rerun keeps a result's references.
   // Arguments a reference doesn't use are named back, not refused.
   const extras = data(
-    await call(client, "reuse", { job_id: "result 1", mode: "reference", request: "bluer" }),
+    await call(client, "reuse", { job_id: "#1", mode: "reference", request: "bluer" }),
   );
   assert.match(extras.asset.id, /^fixture-asset-/);
   assert.match(extras.note, /^Ignored request: mode reference takes only job_id and output_index/);
-  const { asset, note } = data(
-    await call(client, "reuse", { job_id: "result 1", mode: "reference" }),
-  );
+  const { asset, note } = data(await call(client, "reuse", { job_id: "#1", mode: "reference" }));
   assert.match(asset.id, /^fixture-asset-/);
   assert.equal(note, undefined);
   const edit = data(
@@ -4037,7 +4059,7 @@ test("Reuse animates an image from its first frame with the default first-frame 
   finish(f);
   const animated = data(
     await call(client, "reuse", {
-      job_id: "result 1",
+      job_id: "#1",
       mode: "animate",
       prompt: "The heron takes flight",
     }),
@@ -4059,12 +4081,12 @@ test("Reuse animates an image from its first frame with the default first-frame 
   );
   // The 64×48 fixture image sets a 4:3 frame at the profile's 1344×768 pixel count, on its 32-pixel grid.
   assert.deepEqual([body.width, body.height], [1184, 864]);
-  data(await call(client, "reuse", { job_id: "result 1", mode: "animate", tier: "quality" }));
+  data(await call(client, "reuse", { job_id: "#1", mode: "animate", tier: "quality" }));
   assert.equal(f.submitted.at(-1).profileId, "fl-quality");
   assert.equal(f.submitted.at(-1).prompt, "A heron", "the image prompt by default");
   // A video extends from its last frame; a theme has the queue item write the motion prompt.
   finish(f, "mp4");
-  data(await call(client, "reuse", { job_id: "result 2", mode: "animate", theme: "cinematic" }));
+  data(await call(client, "reuse", { job_id: "#2", mode: "animate", theme: "cinematic" }));
   const extended = f.submitted.at(-1);
   assert.equal(extended.kind, "video");
   assert.match(extended.referenceAssets[0].assetId, /^fixture-frame-.+-0-last$/);
@@ -4078,7 +4100,7 @@ test("Reuse animates an image from its first frame with the default first-frame 
   // mode extend continues a video on its own model; length is seconds on the profile's frame grid.
   data(
     await call(client, "reuse", {
-      job_id: "result 3",
+      job_id: "#3",
       mode: "extend",
       prompt: "It lands",
       length: 5,
@@ -4091,14 +4113,14 @@ test("Reuse animates an image from its first frame with the default first-frame 
   );
   assert.match(longer.referenceAssets[0].assetId, /^fixture-frame-.+-0-last$/);
   for (const [args, error] of [
-    [{ job_id: "result 3", mode: "extend", length: 30 }, /makes 1.1 s to 10.1 s/],
-    [{ job_id: "result 1", mode: "extend" }, /mode extend continues a video/],
-    [{ job_id: "result 1", length: 5 }, /length is for mode animate or extend/],
+    [{ job_id: "#3", mode: "extend", length: 30 }, /makes 1.1 s to 10.1 s/],
+    [{ job_id: "#1", mode: "extend" }, /mode extend continues a video/],
+    [{ job_id: "#1", length: 5 }, /length is for mode animate or extend/],
   ])
     assert.match(texts(await call(client, "reuse", args)), error);
   // Another tier needs a profile in it.
   const otherTier = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     tier: "fast",
   });
   assert.equal(otherTier.isError, true);
@@ -4171,9 +4193,9 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.match(texts(result), /^4 matches, newest first\./);
   assert.match(
     texts(result),
-    /- \[Result 3 output 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · /,
+    /- \[#5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · Red Lantern · /,
   );
-  assert.match(texts(result), /\[Result 1\]\([^)]+\) · .*A red heron/);
+  assert.match(texts(result), /\[#1\]\([^)]+\) · .*A red heron/);
   // The images come as one contact sheet, drawn when opened.
   const sheet = /!\[Matching images in order\]\(([^)]+\.jpg)\)/.exec(texts(result))[1];
   const picture = await fetch(localLink(f, sheet));
@@ -4198,13 +4220,11 @@ test("Search finds the account's own finished work through the gallery search, a
     ["studio-lantern", 0],
   ]);
   assert.match(texts(await call(alice, "search", { query: "otter" })), /Nothing in the gallery/);
-  // Refs stay the same across searches and work like a Generate's.
-  assert.equal(
-    (await call(alice, "review", { job_id: "result 3", output_index: 1 })).isError,
-    undefined,
-  );
+  // Numbers stay the same across searches and name one output each, like a Generate's.
+  assert.equal((await call(alice, "review", { job_id: "#5" })).isError, undefined);
+  assert.equal(f.downloads?.at?.(-1)?.index ?? 1, 1);
   const before = f.submitted.length;
-  data(await call(alice, "reuse", { job_id: "result 3", prompt: "A blue paper lantern at night" }));
+  data(await call(alice, "reuse", { job_id: "#4", prompt: "A blue paper lantern at night" }));
   assert.equal(f.submitted.length, before + 1);
   assert.equal(f.submitted.at(-1).prompt, "A blue paper lantern at night");
   // Bob sees his own work; what Alice's search found is hers now.
@@ -4483,7 +4503,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   data(await call(client, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   // Still rendering: the chat is told the result is not finished, never "choose an output" from a completed job.
   const pending = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     prompt: "The heron takes flight",
   });
@@ -4492,7 +4512,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   finish(f);
   // Animate goes to Grok and says so.
   const moved = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     prompt: "The heron takes flight",
   });
@@ -4503,7 +4523,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   // Grok takes only standard aspects: the 64×48 image becomes 4:3 at the profile's pixel count.
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [1108, 831]);
   const animation = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     request: "animate it with Grok",
     prompt: "The heron takes flight",
@@ -4526,7 +4546,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(
     data(
       await call(client, "reuse", {
-        job_id: "result 1",
+        job_id: "#1",
         mode: "animate",
         tier: "standard",
         request: "on Grok",
@@ -4539,7 +4559,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(
     data(
       await call(client, "reuse", {
-        job_id: "result 1",
+        job_id: "#1",
         mode: "animate",
         profile_id: "cloud-video",
         prompt: "The heron takes flight",
@@ -4550,7 +4570,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(f.submitted.at(-1).profileId, "cloud-video");
   // runs_on cloud asks for the cloud as the user's words do; runs_on local refuses rather than switch.
   const cloud = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     runs_on: "cloud",
     prompt: "The heron takes flight",
@@ -4558,7 +4578,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(data(cloud).profile.id, "cloud-video-fast");
   assert.doesNotMatch(texts(cloud), /isn’t running/);
   const local = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     runs_on: "local",
     prompt: "The heron takes flight",
@@ -4566,7 +4586,7 @@ test("Reuse animates on a granted Grok profile while the local video worker is o
   assert.equal(local.isError, true);
   assert.match(texts(local), /^This account has no local video profile that takes a starting/);
   await failure(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     runs_on: "local",
     profile_id: "cloud-video",
@@ -4637,12 +4657,12 @@ test("video stays local while the worker is up, and a plain request never reache
   data(await call(full, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
   assert.equal(
-    data(await call(full, "reuse", { job_id: "result 4", mode: "animate" })).profile.id,
+    data(await call(full, "reuse", { job_id: "#4", mode: "animate" })).profile.id,
     "fl-fast",
   );
   // A named video profile that takes no starting image cannot animate, and says so.
   await failure(full, "reuse", {
-    job_id: "result 4",
+    job_id: "#4",
     mode: "animate",
     profile_id: "fixture-video",
   });
@@ -4653,7 +4673,7 @@ test("video stays local while the worker is up, and a plain request never reache
   assert.match(refused.content[0].text, /^No ready video profile/);
   data(await call(restricted, "generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
-  const nowhere = await call(restricted, "reuse", { job_id: "result 1", mode: "animate" });
+  const nowhere = await call(restricted, "reuse", { job_id: "#1", mode: "animate" });
   assert.equal(nowhere.isError, true);
   assert.match(texts(nowhere), /Local video isn’t running and this account has no Grok access/);
   assert.deepEqual(
@@ -4896,7 +4916,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   );
   assert.deepEqual(
     result.structuredContent.jobs.map((job) => job.ref),
-    ["result 1", "result 2", "result 3", "result 4"],
+    ["#1", "#2", "#3", "#4"],
   );
   assert.ok(performance.now() - started < 5000);
   const excess = await call(client, "generate", {
@@ -5036,7 +5056,7 @@ test("each conversation gets a profile guide once, whole, for tier, fuzzy and ex
   assert.ok(guideOf(await call(third, "generate", { profile_id: "flux 3", prompts: ["A plush"] })));
 });
 
-test("result numbers follow the conversation, and an explicit job id from another chat of the account still works", async (t) => {
+test("result numbers are the account's in every chat, and a job id from another chat still works", async (t) => {
   const f = await fixture(t);
   await f.profiles([structuredClone(imageProfile), localFirstFrame], {
     defaults: { image: imageProfile.id, video: localFirstFrame.id },
@@ -5045,17 +5065,112 @@ test("result numbers follow the conversation, and an explicit job id from anothe
   const earlier = data(await call(old, "generate", { kind: "image", prompts: ["A cat"] }));
   const current = await chat(t, f, "alice", "new-chat");
   const egg = data(await call(current, "generate", { kind: "image", prompts: ["An egg"] }));
-  assert.equal(egg.jobs[0].ref, "result 1");
+  assert.equal(egg.jobs[0].ref, "#2");
   finish(f);
-  // "animate result 1" in the new chat means its egg, not the account's first result.
-  const animated = data(await call(current, "reuse", { job_id: "result 1", mode: "animate" }));
+  // "animate #2" means the result Studio shows as #2, whichever chat made it.
+  const animated = data(await call(current, "reuse", { job_id: "#2", mode: "animate" }));
   assert.equal(f.submitted.at(-1).prompt, "An egg");
-  assert.equal(animated.jobs[0].ref, "result 2");
+  assert.equal(animated.jobs[0].ref, "#3");
+  data(await call(current, "reuse", { job_id: "#1" }));
+  assert.equal(f.submitted.at(-1).prompt, "A cat");
   assert.equal(
     data(await call(current, "status", { job_id: earlier.jobs[0].job_id })).job_id,
     earlier.jobs[0].job_id,
   );
   await failure(await chat(t, f, "bob", "new-chat"), "status", { job_id: earlier.jobs[0].job_id });
+});
+
+test("variants offers lettered options of a result, records the pick and takes letters and numbers", async (t) => {
+  const f = await fixture(t);
+  const client = await chat(t, f, "alice", "fox-chat");
+  data(await call(client, "generate", { kind: "image", prompts: ["A fox at noon"] }));
+  finish(f);
+  const runs = [];
+  const votes = [];
+  const project = {
+    id: "foxes",
+    name: "Foxes",
+    brief: { subjects: "", styles: "", avoid: "" },
+    constraints: { profiles: [], loras: true, aspect: "", resolution: "" },
+  };
+  f.app.post("/api/dream/projects/activity", (_req, res) => res.json({ project }));
+  // Like Studio's: the source's run once per option, lettered, each numbered as it queues.
+  f.app.post("/api/comparisons/variants", (req, res) => {
+    runs.push(req.body);
+    const variants = req.body.variants.map(({ label, prompt }, index) => {
+      const id = `variant-${index}`;
+      const job = { id, owner: f.owner(req), status: "running", kind: "image", outputs: [] };
+      job.settings = { prompt, profileId: imageProfile.id };
+      f.jobs.set(id, job);
+      const name = `${String.fromCharCode(65 + index)} · ${label}`;
+      return { jobId: id, label: name, item: { jobId: id, index: 0, number: f.numbered(job) } };
+    });
+    res.status(201).json({ id: "fox-options", axis: req.body.axis, variants });
+  });
+  f.app.put("/api/comparisons/:id/vote", (req, res) => {
+    votes.push([req.params.id, req.body]);
+    res.json({
+      vote: req.body.jobId,
+      axis: "lighting",
+      variants: [{ jobId: req.body.jobId, label: "B · Golden Dusk" }],
+      brief: { projectId: "foxes", name: "Foxes", styles: "lighting: Golden Dusk" },
+    });
+  });
+  const offered = await call(client, "variants", {
+    result: "#1",
+    axis: "lighting",
+    options: [
+      { label: "Blue Hour", prompt: "A fox at blue hour" },
+      { label: "Golden Dusk", prompt: "A fox at golden dusk" },
+    ],
+  });
+  assert.deepEqual(runs, [
+    {
+      itemId: `${[...f.jobs.keys()][0]}-0`,
+      axis: "lighting",
+      projectId: "foxes",
+      variants: [
+        { label: "Blue Hour", prompt: "A fox at blue hour" },
+        { label: "Golden Dusk", prompt: "A fox at golden dusk" },
+      ],
+    },
+  ]);
+  const text = texts(offered);
+  assert.match(text, /^Queued options A–B of #1, varying lighting/);
+  assert.match(
+    text,
+    /\[Compare Side by Side\]\(https:\/\/studio\.example\.test\/compare\/fox-options\)/,
+  );
+  assert.match(text, /\[A · Blue Hour\]\([^)]+\) #2\n\[B · Golden Dusk\]\([^)]+\) #3/);
+  // A letter names the chat's latest options: reuse with it follows the pick up and records it once.
+  finish(f);
+  data(await call(client, "reuse", { job_id: "B", prompt: "A fox at golden dusk, closer" }));
+  assert.equal(f.submitted.at(-1).prompt, "A fox at golden dusk, closer");
+  assert.deepEqual(votes, [["fox-options", { jobId: "variant-1", by: "chat" }]]);
+  data(await call(client, "reuse", { job_id: "B" }));
+  assert.equal(votes.length, 1);
+  // pick records a choice by number too, and says what changed in the project's brief.
+  const picked = data(await call(client, "variants", { pick: "#3" }));
+  assert.equal(picked.picked, "B · Golden Dusk");
+  assert.equal(picked.brief.styles, "lighting: Golden Dusk");
+  assert.match(picked.note, /undo it on Studio's Dream page/);
+  await failure(client, "variants", { pick: "D" });
+  // generate takes a result's number or letter as a reference image.
+  const uploads = f.requests.filter(
+    (request) => request.path === "/reference-assets/upload",
+  ).length;
+  data(
+    await call(client, "generate", {
+      profile_id: imageProfile.id,
+      prompts: ["The same fox in snow"],
+      reference_asset_ids: ["A"],
+    }),
+  );
+  assert.equal(
+    f.requests.filter((request) => request.path === "/reference-assets/upload").length,
+    uploads + 1,
+  );
+  assert.match(f.submitted.at(-1).referenceAssets[0].assetId, /^fixture-asset-/);
 });
 
 test("aspect picks the profile’s own preset and resolution its long edge", async (t) => {
@@ -5131,8 +5246,8 @@ test('replies label links Result N with one All Results page, and Result "all" s
   assert.equal(/Watch/i.test(text), false, "no Watch wording");
   const [, allLink] = /\[All Results\]\((https:[^)]+)\)/.exec(text);
   assert.deepEqual(
-    [...text.matchAll(/\[(Result \d)\]/g)].map((match) => match[1]),
-    ["Result 1", "Result 2", "Result 3"],
+    [...text.matchAll(/\[(#\d)\]/g)].map((match) => match[1]),
+    ["#1", "#2", "#3"],
   );
   assert.equal(text.match(/All Results/g).length, 1);
   // The All Results page lists every result and fills in as they finish.
@@ -5149,9 +5264,9 @@ test('replies label links Result N with one All Results page, and Result "all" s
   // One call's results sit under its set title, each under its own or its prompt's.
   assert.match(
     html,
-    /<h2>Woodland<\/h2><h3>Result 1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
+    /<h2>Woodland<\/h2><h3>#1 · Bear Hug<\/h3><figure id="result-1"><a href="#view-1"[^>]*><img src="[A-Za-z0-9]{10}"/,
   );
-  assert.match(html, /<h3>Result 2 · A fox<\/h3>/);
+  assert.match(html, /<h3>#2 · A fox<\/h3>/);
   assert.equal(html.match(/<h2>/g).length, 1);
   assert.equal(html.match(/Still generating/g).length, 2);
   // One set's page is titled by it, and a result's page by its set and its own title; prompts fold.
@@ -5189,14 +5304,14 @@ test('replies label links Result N with one All Results page, and Result "all" s
     /^2 results are ready, 1 still running\. Reply with the markdown below exactly/,
   );
   // Results queued together share one contact sheet.
-  assert.match(body, /\*\*Results 1–2\*\*[^\n]*\n\[!\[Results 1–2\]/);
-  assert.match(body, /\[Result 3\]\(https:[^)]+\) · \[All Results\]\(https:[^)]+\)$/);
+  assert.match(body, /\*\*#1–#2\*\*[^\n]*\n\[!\[#1–#2\]/);
+  assert.match(body, /\[#3\]\(https:[^)]+\) · \[All Results\]\(https:[^)]+\)$/);
   assert.equal(/Watch/i.test(body), false);
   assert.equal(previews(shown).length, 1);
   // A result asked for by number still shows its own preview.
   assert.match(
-    texts(await call(client, "result", { job_id: "result 2" })),
-    /\*\*Result 2\*\*[^\n]*\n\[!\[Result 2\]\([^)]+\.jpg\)\]/,
+    texts(await call(client, "result", { job_id: "#2" })),
+    /\*\*#2\*\*[^\n]*\n\[!\[#2\]\([^)]+\.jpg\)\]/,
   );
   // Another conversation and another account see only their own results, and with none here
   // are pointed at search for earlier or starred work.
@@ -5210,7 +5325,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
   assert.equal(data(await call(client, "status", { job_id: first.link })).job_id, first.job_id);
   await failure(await chat(t, f, "bob", "plush-chat"), "status", { job_id: linkId });
   // A pending Result names its link Result N.
-  assert.match(texts(await call(client, "result", { job_id: "result 3" })), /\[Result 3\]\(https:/);
+  assert.match(texts(await call(client, "result", { job_id: "#3" })), /\[#3\]\(https:/);
 });
 
 const guidedCatalogue = () => [
@@ -5286,23 +5401,21 @@ test("Reuse runs the chat's revised prompt as written and refuses a change in wo
   );
   finish(f);
   const submitted = f.submitted.length;
-  const words = await call(client, "reuse", { job_id: "result 1", request: "make it warmer" });
+  const words = await call(client, "reuse", { job_id: "#1", request: "make it warmer" });
   assert.equal(words.isError, true);
   assert.match(texts(words), /Revise the result.s full prompt yourself/);
-  await failure(client, "reuse", { job_id: "result 1", mode: "animate", request: "snow falls" });
+  await failure(client, "reuse", { job_id: "#1", mode: "animate", request: "snow falls" });
   assert.equal(f.submitted.length, submitted);
   const warmer = data(
-    await call(client, "reuse", { job_id: "result 1", prompt: "A cosy cabin in snow, warm light" }),
+    await call(client, "reuse", { job_id: "#1", prompt: "A cosy cabin in snow, warm light" }),
   );
   assert.equal(warmer.prompt_source, "exact");
   assert.equal(f.submitted.at(-1).prompt, "A cosy cabin in snow, warm light");
   assert.equal(f.submitted.at(-1).profileId, imageProfile.id);
   // "Again" reruns the same prompt; another model runs it too, at the result's proportions.
-  data(await call(client, "reuse", { job_id: "result 1" }));
+  data(await call(client, "reuse", { job_id: "#1" }));
   assert.equal(f.submitted.at(-1).prompt, "A cosy cabin in snow");
-  const moved = data(
-    await call(client, "reuse", { job_id: "result 1", profile_id: "Other Image" }),
-  );
+  const moved = data(await call(client, "reuse", { job_id: "#1", profile_id: "Other Image" }));
   assert.equal(moved.profile.id, "fixture-other");
   assert.equal(f.submitted.at(-1).prompt, "A cosy cabin in snow");
   assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [768, 512]);
@@ -5341,15 +5454,15 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
     /^Cloud video unavailable \(quota\)\. .*about 10 more minutes\. Tell the user video needs the local video worker/,
   );
   await failure(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     request: "with Grok",
     prompt: "The wave rolls in",
   });
   assert.equal(f.submitted.length, 1);
   assert.match(
-    texts(await call(client, "result", { job_id: "result 1" })),
-    /^Cloud video unavailable \(quota\)\. Result 1 did not run/,
+    texts(await call(client, "result", { job_id: "#1" })),
+    /^Cloud video unavailable \(quota\)\. #1 did not run/,
   );
   assert.match(
     await (await fetch(localLink(f, first.jobs[0].link))).text(),
@@ -5360,7 +5473,7 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   const now = Date.now();
   t.mock.method(Date, "now", () => now + 11 * 60 * 1000);
   assert.match(
-    texts(await call(client, "result", { job_id: "result 1" })),
+    texts(await call(client, "result", { job_id: "#1" })),
     /^Cloud video unavailable \(quota\)/,
   );
   assert.equal(
@@ -5402,7 +5515,7 @@ test("Review returns real image content and saved settings without generating or
     }),
   );
   finish(f);
-  const result = await call(client, "review", { job_id: "result 1" });
+  const result = await call(client, "review", { job_id: "#1" });
   assert.equal(result.isError, undefined);
   assert.equal(f.submitted.length, 1);
   const images = result.content.filter((item) => item.type === "image");
@@ -5414,7 +5527,7 @@ test("Review returns real image content and saved settings without generating or
   // One compact record per result, as text only: the brief, the prompt and the settings a change needs.
   assert.equal(result.structuredContent, undefined);
   const [record] = reviewed(result);
-  assert.equal(record.ref, "result 1");
+  assert.equal(record.ref, "#1");
   assert.equal(record.settings.seed, "7");
   assert.equal(record.settings.cfg, 4);
   assert.deepEqual(record.settings.loras, [{ name: "fixture-effect.safetensors", strength: 0.6 }]);
@@ -5437,21 +5550,21 @@ test("Review compares two owned results and refuses a hidden result before downl
   const client = await f.client();
   await generate(client, { prompts: ["A heron", "A crane"] });
   finish(f);
-  const compared = await call(client, "review", { job_id: "result 2", compare_to: "result 1" });
+  const compared = await call(client, "review", { job_id: "#2", compare_to: "#1" });
   assert.deepEqual(
     reviewed(compared).map((item) => item.ref),
-    ["result 2", "result 1"],
+    ["#2", "#1"],
   );
   // Both sit side by side in one preview, so a comparison costs one image.
   const sheets = compared.content.filter((item) => item.type === "image");
   assert.equal(sheets.length, 1);
   const sheet = await sharp(Buffer.from(sheets[0].data, "base64")).metadata();
   assert.deepEqual([sheet.width, sheet.height], [128, 48]);
-  assert.match(texts(compared), /The image shows result 2, result 1 from left to right\./);
+  assert.match(texts(compared), /The image shows #2, #1 from left to right\./);
   const [id] = f.jobs.keys();
   f.jobs.get(id).gallery = [];
   const before = f.downloads.length;
-  await failure(client, "review", { job_id: "result 1" });
+  await failure(client, "review", { job_id: "#1" });
   assert.equal(f.downloads.length, before);
   assert.equal(f.submitted.length, 2);
 });
@@ -5470,7 +5583,7 @@ test("Review does not poll or download a pending result, and refuses video", asy
   assert.equal(f.downloads.length, 0);
   await call(client, "generate", { kind: "video", prompts: ["A heron flies"] });
   finish(f, "mp4");
-  const refused = await call(client, "review", { job_id: "result 2" });
+  const refused = await call(client, "review", { job_id: "#2" });
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /still images/);
   assert.equal(f.downloads.length, 0);
@@ -5485,9 +5598,9 @@ test("Review compares any two outputs of one batch", async (t) => {
     url: `/comfy/view?filename=batch-${index}.png`,
   }));
   const result = await call(client, "review", {
-    job_id: "result 1",
+    job_id: "#1",
     output_index: 1,
-    compare_to: "result 1",
+    compare_to: "#1",
     compare_to_output_index: 2,
   });
   assert.equal(result.isError, undefined);
@@ -5521,10 +5634,10 @@ test("comparison winners return to chat with the exact output and can be reused"
     })),
   };
   f.comparisons([comparison]);
-  const winner = data(await call(client, "status", { job_id: "result 1" })).comparisons[0].winner;
-  assert.deepEqual([winner.job_id, winner.output_index, winner.ref], [id, 2, "result 1"]);
+  const winner = data(await call(client, "status", { job_id: "#1" })).comparisons[0].winner;
+  assert.deepEqual([winner.job_id, winner.output_index, winner.ref], [id, 2, "#1"]);
   for (const [name, args] of [
-    ["result", { job_id: "result 1" }],
+    ["result", { job_id: "#1" }],
     ["result", { job_id: "all" }],
     ["search", { query: "" }],
   ]) {
@@ -5550,10 +5663,7 @@ test("comparison winners return to chat with the exact output and can be reused"
   assert.equal(f.submitted.at(-1).parentItemId, `${id}-2`);
   assert.equal(f.submitted.at(-1).seed, "7");
   comparison.vote = null;
-  assert.equal(
-    data(await call(client, "status", { job_id: "result 1" })).comparisons[0].winner,
-    null,
-  );
+  assert.equal(data(await call(client, "status", { job_id: "#1" })).comparisons[0].winner, null);
 });
 
 test("comparison metadata cannot adopt another MCP account's winner", async (t) => {
@@ -5584,17 +5694,17 @@ test("Review waits for a result due within the wait, and says plainly when one i
   const id = jobId(await generate(client));
   // Due in five minutes: no wait, and the reply says there is nothing to review yet, with its link.
   let started = performance.now();
-  const early = await call(client, "review", { job_id: "result 1" });
+  const early = await call(client, "review", { job_id: "#1" });
   assert.ok(performance.now() - started < 2000, "doesn't wait for a result minutes away");
   assert.match(
     texts(early),
-    /^Result 1 is still running, so there is no image to review yet\..*\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
+    /^#1 is still running, so there is no image to review yet\..*\[#1\]\(https:\/\/studio\.example\.test\/mcp\/results\//,
   );
   // Due in a moment, as when the user asks right after a result renders: review waits and sees it.
   f.jobs.get(id).progress = { endsAt: Date.now() + 300 };
   setTimeout(() => finish(f), 300);
   started = performance.now();
-  const later = await call(client, "review", { job_id: "result 1" });
+  const later = await call(client, "review", { job_id: "#1" });
   assert.ok(performance.now() - started < 5000, "returns once the result finishes");
   assert.equal(later.content.filter((item) => item.type === "image").length, 1);
 });
@@ -5605,7 +5715,7 @@ test("Reuse preserves the seed for a requested revision only, and refuses an unk
   const id = jobId(await generate(client, { prompts: ["A heron"], seed: 7, cfg: 4 }));
   finish(f);
   await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     prompt: "A heron at dusk",
     preserve_seed: true,
   });
@@ -5614,12 +5724,12 @@ test("Reuse preserves the seed for a requested revision only, and refuses an unk
   assert.equal(f.submitted.at(-1).prompt, "A heron at dusk");
   const count = f.submitted.length;
   await failure(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     profile_id: imageProfile.id,
     preserve_seed: true,
   });
   const animation = await call(client, "reuse", {
-    job_id: "result 1",
+    job_id: "#1",
     mode: "animate",
     preserve_seed: true,
   });
@@ -5627,9 +5737,9 @@ test("Reuse preserves the seed for a requested revision only, and refuses an unk
   assert.match(texts(animation), /same-model revision/);
   assert.equal(f.assets.size, 0, "invalid revision options cannot upload a reference");
   f.jobs.get(id).settings.seed = "Random";
-  await failure(client, "reuse", { job_id: "result 1", preserve_seed: true });
+  await failure(client, "reuse", { job_id: "#1", preserve_seed: true });
   f.jobs.get(id).settings.seed = "9007199254740993";
-  await failure(client, "reuse", { job_id: "result 1", preserve_seed: true });
+  await failure(client, "reuse", { job_id: "#1", preserve_seed: true });
   assert.equal(f.submitted.length, count);
 });
 
@@ -6166,9 +6276,9 @@ test("Reuse carries how a result’s prompt was written into a plain run again, 
   finish(f);
   const [job] = f.jobs.values();
   job.settings.assistant = { preset: "cinematic", source: "chat" };
-  data(await call(client, "reuse", { job_id: "result 1" }));
+  data(await call(client, "reuse", { job_id: "#1" }));
   assert.deepEqual(f.submitted.at(-1).assistant, { preset: "cinematic", source: "chat" });
-  data(await call(client, "reuse", { job_id: "result 1", prompt: "A heron at dusk" }));
+  data(await call(client, "reuse", { job_id: "#1", prompt: "A heron at dusk" }));
   assert.equal(f.submitted.at(-1).assistant, undefined);
 });
 
@@ -6215,7 +6325,7 @@ test("a pending Generate stays deduplicated, then expires from its settled reply
         jobs: [
           {
             job_id: `job-${++queued}`,
-            ref: `result ${queued}`,
+            ref: `#${queued}`,
             link: `https://fixture.test/${queued}`,
           },
         ],
@@ -6359,8 +6469,8 @@ test("one Generate call fans out over several models with the same prompts and r
   assert.deepEqual(
     data(reply).sets.map((set) => [set.profile.id, set.jobs.map((job) => job.ref)]),
     [
-      [imageProfile.id, ["result 1"]],
-      ["fixture-other", ["result 2"]],
+      [imageProfile.id, ["#1"]],
+      ["fixture-other", ["#2"]],
     ],
   );
   // Each model runs the prompt as sent, and no guide reaches the chat.
@@ -6370,7 +6480,7 @@ test("one Generate call fans out over several models with the same prompts and r
   );
   assert.match(
     texts(reply),
-    /^Queued 2 sets, one per model\.[^\n]+\n\n\[Compare Side by Side\]\([^)]+\/compare\/fixture-comparison-[^)]+\)\nFixture Image: \[Result 1\]\([^)]+\)\nOther Image: \[Result 2\]\([^)]+\)\n\[All Results\]/,
+    /^Queued 2 sets, one per model\.[^\n]+\n\n\[Compare Side by Side\]\([^)]+\/compare\/fixture-comparison-[^)]+\)\nFixture Image: \[#1\]\([^)]+\)\nOther Image: \[#2\]\([^)]+\)\n\[All Results\]/,
   );
   // One shared seed, and one labelled comparison of the two jobs.
   assert.equal(new Set(f.submitted.map((body) => String(body.seed))).size, 1);
@@ -6496,7 +6606,7 @@ test("an older gallery record without an output index still counts as a finished
   const result = await call(client, "result", { job_id: id });
   assert.notEqual(result.isError, true);
   // Both outputs count, shown on one contact sheet.
-  assert.match(texts(result), /Result 1 \(2 images\)/);
+  assert.match(texts(result), /#1 \(2 images\)/);
 });
 
 test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own work through the UI's routes, never another account's", async (t) => {
@@ -6536,8 +6646,8 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
 
   // Gallery: star one output, delete both, clear failed items; each with the caller's own credential.
   assert.deepEqual(
-    data(await call(mine, "gallery", { action: "star", results: ["result 1"], output_index: 1 })),
-    { starred: 1, results: ["result 1"] },
+    data(await call(mine, "gallery", { action: "star", results: ["#1"], output_index: 1 })),
+    { starred: 1, results: ["#1"] },
   );
   assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], favorite: true });
   assert.equal(seen.at(-1).authorization, `Bearer ${userToken}`);
@@ -6605,18 +6715,19 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.deepEqual(
     listed.jobs.map((job) => [job.ref, job.job_id, job.status]),
     [
-      ["result 1", id, "failed"],
-      ["result 2", "composer-job", "queued"],
+      ["#1", id, "failed"],
+      // Studio numbers a job from the composer once it shows; until then its id names it.
+      [undefined, "composer-job", "queued"],
     ],
   );
-  await call(mine, "queue", { action: "move", job_id: "result 2", position: 0 });
+  await call(mine, "queue", { action: "move", job_id: "composer-job", position: 0 });
   assert.deepEqual(
     [seen.at(-1).path, seen.at(-1).body],
     ["/api/queue/composer-job/move", { to: 0 }],
   );
   const retried = data(await call(mine, "queue", { action: "retry", job_id: id }));
   assert.equal(retried.job_id, "retried-job");
-  assert.equal(retried.ref, "result 3");
+  assert.equal(retried.ref, undefined);
   await call(mine, "queue", { action: "pause" });
   assert.equal(seen.at(-1).path, "/api/queue/pause");
   assert.deepEqual(data(await call(mine, "queue", { action: "cancel_all" })), { cancelled: 1 });
@@ -6639,6 +6750,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
               id: "dream-item",
               jobId: "dream-job",
               index: 0,
+              number: 4,
               type: "image",
               prompt: "A dreamy lake",
               dream: { state: "unseen" },
@@ -6647,6 +6759,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
               id: "pair-item",
               jobId: "pair-job",
               index: 0,
+              number: 5,
               type: "image",
               prompt: "Warm light",
               dream: { state: "unseen", pair: { id: "pair-1", side: 0, label: "Warm" } },
@@ -6672,8 +6785,8 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   assert.deepEqual(
     dream.items.map((item) => [item.item_id, item.ref, item.pair_id]),
     [
-      ["dream-item", "result 4", undefined],
-      ["pair-item", "result 5", "pair-1"],
+      ["dream-item", "#4", undefined],
+      ["pair-item", "#5", "pair-1"],
     ],
   );
   assert.match(dream.items[0].link, /^https:\/\/studio\.example\.test\/mcp\/results\//);

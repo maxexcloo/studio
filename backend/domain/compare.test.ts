@@ -169,6 +169,38 @@ test("compare runs queue one seeded set, read back per owner and record the star
   // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.
   assert.deepEqual(votes, [["alice", "w-0", "o-0"]]);
 
+  // Variants of a result rerun its job with its seed, one prompt each, lettered, as its versions.
+  const offered = await request("/variants", {
+    itemId: "w-0",
+    axis: "lighting",
+    variants: [
+      { label: "Blue Hour", prompt: "a fox at blue hour" },
+      { label: "Golden Dusk", prompt: "a fox at golden dusk" },
+    ],
+  });
+  assert.equal(offered.status, 201);
+  assert.deepEqual(
+    offered.body.variants.map((entry: { label: string }) => entry.label),
+    ["A · Blue Hour", "B · Golden Dusk"],
+  );
+  const offeredJobs = offered.body.variants.map((entry: { jobId: string }) =>
+    store.job("alice", entry.jobId)!,
+  );
+  assert.deepEqual(
+    offeredJobs.map((job: { input: Record<string, unknown> }) => [
+      job.input.prompt,
+      job.input.steps,
+      job.input.seed,
+    ]),
+    [
+      ["a fox at blue hour", 20, run.body.seed],
+      ["a fox at golden dusk", 20, run.body.seed],
+    ],
+  );
+  assert.ok(offeredJobs.every((job: { parentJobId?: string }) => job.parentJobId === winner.jobId));
+  assert.equal((await request("/variants", { itemId: "w-0", variants: [{}, {}] })).status, 400);
+  assert.equal((await request("/variants", { itemId: "missing", variants: [] })).status, 404);
+
   // Existing jobs, such as an MCP fan-out run, form a set; foreign jobs are refused.
   const created = await request("", {
     jobIds: jobs.map((job: { id: string }) => job.id),
@@ -208,10 +240,10 @@ test("compare runs queue one seeded set, read back per owner and record the star
   const history = (await request("")).body.comparisons;
   assert.deepEqual(
     history.map((entry: { id: string }) => entry.id),
-    [selected.body.id, created.body.id, run.body.id, "legacy"],
+    [selected.body.id, created.body.id, offered.body.id, run.body.id, "legacy"],
   );
   assert.deepEqual(
-    history[3].variants.map((entry: { label: string; item: unknown }) => [
+    history[4].variants.map((entry: { label: string; item: unknown }) => [
       entry.label,
       Boolean(entry.item),
     ]),

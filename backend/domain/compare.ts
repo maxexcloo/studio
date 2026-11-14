@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
-import { directRoute } from "./direct-route.ts";
+import { directRoute, type RouteAccount } from "./direct-route.ts";
 import type { Store, QueueOrigin } from "./store.ts";
 
 /**
@@ -280,9 +280,7 @@ export function registerCompareRoutes(
     return { status: 201, payload: show(record, items) };
   });
   // Every variant shares the seed and runs as one queue set; a refused variant cancels the rest.
-  directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
-    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
-    if (!items) return galleryOff;
+  async function run(account: RouteAccount, items: GalleryItem[], body: Record<string, any>) {
     const { variants, sessionId, parentJobId, parentItemId, axis, projectId } = body || {};
     if (
       !Array.isArray(variants) ||
@@ -363,6 +361,46 @@ export function registerCompareRoutes(
     };
     save(record);
     return { status: 201, payload: { ...show(record, items), sessionId: session } };
+  }
+  directRoute(app, "POST", "/api/comparisons/run", async (account, { body }) => {
+    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    return items ? run(account, items, body || {}) : galleryOff;
+  });
+  // Variants of one result: its recorded run and seed, each variant with its own prompt, lettered
+  // A, B, C… in the run's session as versions of it.
+  directRoute(app, "POST", "/api/comparisons/variants", async (account, { body }) => {
+    const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
+    if (!items) return galleryOff;
+    const { itemId, axis, projectId, variants } = body || {};
+    const ownerId = account?.userId || "";
+    const source = items.find((item) => item.id === itemId && item.status === "done");
+    const job = source?.jobId ? store.job(ownerId, source.jobId) : undefined;
+    if (!source || !job || job.input.kind === "video")
+      return { status: 404, payload: { ok: false, error: "That image is unavailable." } };
+    if (
+      !Array.isArray(variants) ||
+      variants.some((variant) => typeof variant?.prompt !== "string" || !variant.prompt.trim())
+    )
+      return { status: 400, payload: { ok: false, error: "Give each variant a prompt." } };
+    const {
+      clientJobId: _id,
+      writing: _writing,
+      assistant: _assistant,
+      resultSet: _set,
+      ...input
+    } = job.input;
+    const seed = (source.settings as GenerationInput | undefined)?.seed ?? input.seed;
+    return run(account, items, {
+      variants: variants.map((variant, index) => ({
+        label: [letter(index), String(variant.label || "").trim()].filter(Boolean).join(" · "),
+        input: { ...input, prompt: variant.prompt.trim(), seed },
+      })),
+      sessionId: job.sessionId,
+      parentJobId: job.id,
+      parentItemId: source.id,
+      axis,
+      projectId,
+    });
   });
   directRoute(app, "PUT", "/api/comparisons/:id/vote", (account, { params, body }) => {
     const items = options.gallery({ studioAccount: account ?? undefined, params: {} });
@@ -397,7 +435,8 @@ export function registerCompareRoutes(
         Boolean(item && item.id !== winner.id && item.status === "done"),
       );
       options.voted?.(record.ownerId, winner, others);
-      const label = record.labels?.[variants.indexOf(winner)];
+      // The letter variants of a result lead with stays out of the brief.
+      const label = record.labels?.[variants.indexOf(winner)]?.replace(/^[A-J] · /, "");
       if (record.axis && record.projectId && label)
         brief = options.picked?.(record, label, by === "chat" ? "chat" : "studio") ?? null;
     }

@@ -10,6 +10,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { icons } from "../../ui/icons";
@@ -23,9 +24,13 @@ import { MediaTile } from "../gallery/MediaTile";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
+import { projectPath, projectsQuery } from "../dream/queries";
 import { comparisonQuery, type Comparison } from "./queries";
 import { useStageComparison } from "./variants";
 import classes from "./ComparePage.module.css";
+
+const titleCase = (text: string) =>
+  text.replace(/(^|\s)\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 /**
  * A compare set side by side, labelled by what sets each variant apart: star the winner, take one
@@ -53,7 +58,10 @@ export function ComparePage() {
         await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
       return result;
     },
-    onSuccess: (result) => client.setQueryData(comparisonQuery(id).queryKey, result),
+    onSuccess: ({ brief, ...result }) => {
+      client.setQueryData(comparisonQuery(id).queryKey, result);
+      if (brief) briefChanged(brief);
+    },
     onSettled: () =>
       Promise.all(
         [["comparison", id], ["gallery"], ["gallery-filters"]].map((queryKey) =>
@@ -61,6 +69,32 @@ export function ComparePage() {
         ),
       ),
   });
+  const undoBrief = useMutation({
+    mutationFn: (projectId: string) => post(projectPath({ id: projectId }, "undo"), {}),
+    onSuccess: () => client.invalidateQueries({ queryKey: projectsQuery.queryKey }),
+  });
+  /** The pick's addition to the project's brief, with Undo. */
+  function briefChanged({ projectId, name }: NonNullable<Comparison["brief"]>) {
+    void client.invalidateQueries({ queryKey: projectsQuery.queryKey });
+    const notification = notifications.show({
+      autoClose: 10000,
+      message: (
+        <Group justify="space-between" wrap="nowrap">
+          <Text size="sm">Added to {name}’s brief</Text>
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            onClick={() => {
+              notifications.hide(notification);
+              undoBrief.mutate(projectId);
+            }}
+          >
+            Undo
+          </Button>
+        </Group>
+      ),
+    });
+  }
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
   const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
   // 1–4 star that variant as the winner (again to clear it), unless typing or a layer is above.
@@ -89,7 +123,7 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, seed, prompt, negative, set } = comparison.data;
+  const { variants, seed, prompt, negative, set, axis } = comparison.data;
   const winner = items.find((item) => item.id === comparison.data.winnerItemId);
   // Compare Again brings back every finished variant, the winner first.
   const again = items
@@ -113,7 +147,7 @@ export function ComparePage() {
             </ActionIcon>
           </Tooltip>
           <Title order={1} size="h3">
-            Compare
+            {axis ? `Which ${titleCase(axis)}?` : "Compare"}
           </Title>
         </Group>
         <Text size="sm" c="dimmed" ta="right">

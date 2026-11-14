@@ -88,7 +88,7 @@ export function createResultNumbers({
   }
   return {
     /** The items with their numbers, numbering any that have none; items without a job have none. */
-    numbered<T extends Numbered>(items: T[]): T[] {
+    numbered<T extends Numbered>(items: T[]): (T & { number?: number })[] {
       const byOwner = new Map<string, T[]>();
       for (const item of items)
         if (item.jobId) {

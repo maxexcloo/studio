@@ -928,7 +928,11 @@ const dream = createDream({
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
-registerDreamRoutes(app, { dream, projects });
+registerDreamRoutes(app, {
+  dream,
+  projects,
+  numbered: (items) => resultNumbers.numbered(items),
+});
 // Idle for background work: no live job but Dream's and no text work. Dream yields to all of it,
 // so review, captions and finishing don't wait for Dream to reach its caps.
 const studioIdle = () =>

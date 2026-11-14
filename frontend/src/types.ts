@@ -118,6 +118,8 @@ export interface MediaItem {
   jobId?: string;
   /** Its place among the job's outputs; a saved result keeps its pending tile's place. */
   index?: number;
+  /** The account's number for it, which chats use too (backend/domain/result-numbers.ts). */
+  number?: number;
   url: string;
   thumbnailUrl?: string;
   preview?: string;

@@ -287,3 +287,72 @@ test("Compare Selected sets chosen images side by side, number keys star the win
     page.getByRole("button", { name: "Open image: A tin owl", exact: true }),
   ).toBeVisible();
 });
+
+test("Variants of a result show their numbers, the axis they vary and Undo for the brief a pick changes", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  const names = ["Blue Hour", "Golden Dusk"];
+  const items = names.map((name, index) => ({
+    id: `variant-${index}:0`,
+    jobId: `variant-${index}`,
+    index: 0,
+    number: 12 + index,
+    status: "done",
+    type: "image",
+    url: image,
+    thumbnailUrl: image,
+    prompt: `A fox at ${name.toLowerCase()}`,
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+    settings: { profileId: "image:test", seed: "7" },
+  }));
+  state.gallery.unshift(...items);
+  const comparison = (winner?: (typeof items)[number], brief?: object) => ({
+    id: "fox-options",
+    createdAt: stamp,
+    seed: "7",
+    axis: "lighting",
+    vote: winner?.jobId ?? null,
+    winnerItemId: winner?.id ?? null,
+    variants: items.map((item, index) => ({
+      jobId: item.jobId,
+      label: `${"AB"[index]} · ${names[index]}`,
+      item,
+    })),
+    ...(brief ? { brief } : {}),
+  });
+  const undone: string[] = [];
+  await page.route("**/api/comparisons/fox-options", (route) =>
+    route.fulfill({ json: comparison() }),
+  );
+  await page.route("**/api/comparisons/fox-options/vote", (route) =>
+    route.fulfill({
+      json: comparison(items[1], {
+        projectId: "foxes",
+        name: "Foxes",
+        styles: "lighting: Golden Dusk",
+      }),
+    }),
+  );
+  await page.route("**/api/dream/projects/foxes/undo", (route) => {
+    undone.push(route.request().method());
+    return route.fulfill({ json: { project: { id: "foxes" } } });
+  });
+  await page.goto("/compare/fox-options");
+  await expect(page.getByRole("heading", { name: "Which Lighting?", exact: true })).toBeVisible();
+
+  // Picking one adds it to the chat's project brief, which Undo restores.
+  await page.getByRole("button", { name: "Star B · Golden Dusk as Winner", exact: true }).click();
+  await expect(page.getByText("Added to Foxes’s brief", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(() => undone).toEqual(["POST"]);
+
+  // The viewer names a result by the number chats use for it.
+  await page.getByRole("button", { name: "Open B · Golden Dusk", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  if (testInfo.project.use.isMobile)
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await expect(page.getByText(/^#13 · Image\b/)).toBeVisible();
+});

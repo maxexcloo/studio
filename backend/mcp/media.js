@@ -58,8 +58,10 @@ export function uploadPage({ message = "", open = true } = {}) {
     "body{font-size:1.1rem}form{display:grid;gap:1rem;max-width:30rem}input,button{font:inherit}button{padding:.8rem;border-radius:.5rem}",
   );
 }
-/** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
-const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
+/** An account's result number, as Studio shows it ("#123", or "123"). */
+const numberPattern = /^\s*#?\s*(\d{1,9})\s*$/;
+/** A lettered option of the conversation's latest variants ("B", "option B"). */
+const letterPattern = /^\s*(?:option\s+)?([A-J])\s*$/i;
 const maxReferenceScopes = 5000;
 // Chat hosts such as LibreChat cannot hand an attached file to a tool.
 const attachedImageHint =
@@ -165,13 +167,11 @@ export function mcpOutputPath(value) {
   }
 }
 
-/** A run's header: "Results 3–6" for consecutive numbers, else its labels in order; one job's several images say how many. */
-function runCaption(labels, images) {
-  if (labels.length === 1) return `${labels[0]} (${images} images)`;
-  const numbers = labels.map((label) => Number(/^Result (\d+)$/.exec(label)?.[1]));
-  return numbers.every((number, index) => number && (!index || number === numbers[index - 1] + 1))
-    ? `Results ${numbers[0]}–${numbers.at(-1)}`
-    : labels.join(", ");
+/** A run's header: "#3–#6" for consecutive output numbers, else its labels in order; one job's several images say how many. */
+function runCaption(labels, numbers) {
+  if (numbers.every((number, index) => number && (!index || number === numbers[index - 1] + 1)))
+    return `#${numbers[0]}–#${numbers.at(-1)}`;
+  return labels.length === 1 ? `${labels[0]} (${numbers.length} images)` : labels.join(", ");
 }
 
 /**
@@ -237,9 +237,16 @@ export class McpMedia {
       !this.state.signingKey
     )
       throw new Error("Invalid MCP ownership data.");
-    // Result numbering is additive; files written before it simply start without references.
+    // Which jobs each conversation holds, in order; files written before it simply start without them.
     if (!this.state.refs || typeof this.state.refs !== "object" || Array.isArray(this.state.refs))
       this.state.refs = {};
+    // Each job's Studio result numbers by output (domain/result-numbers.ts), as Studio gave them.
+    if (
+      !this.state.numbers ||
+      typeof this.state.numbers !== "object" ||
+      Array.isArray(this.state.numbers)
+    )
+      this.state.numbers = {};
     if (
       !this.state.links ||
       typeof this.state.links !== "object" ||
@@ -765,6 +772,7 @@ export class McpMedia {
             )
               throw new Error("Studio returned a job owned by another account.");
             this.state.jobs[result.jobId] = owner;
+            this.noteNumbers(result.items || []);
             // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
             this.recordPrompt(result.jobId, {
               ...(ran ? { prompt: ran } : {}),
@@ -880,6 +888,7 @@ export class McpMedia {
       owner,
       options,
     );
+    this.noteNumbers(items);
     const outputs = new Map();
     let kind, profileId, prompt;
     for (const item of items) {
@@ -942,6 +951,7 @@ export class McpMedia {
       )
       .slice(0, limit);
     this.adopt(owner, scope, { jobs: [...new Set(hits.map((item) => item.jobId))] });
+    this.noteNumbers(hits);
     return hits.map((item) => ({ ...item, index: outputIndex(item) }));
   }
   /**
@@ -968,11 +978,11 @@ export class McpMedia {
     this.adopt(owner, "", { assets: hits.map((item) => item.assetId) });
     return hits;
   }
-  /** Scope of a conversation's result numbers: the owner, narrowed by the client's conversation when it sends one. */
+  /** Scope of a conversation's results: the owner, narrowed by the client's conversation when it sends one. */
   referenceScope(owner, conversation = "") {
     return this.digest(`refs\n${owner}\n${conversation}`).slice(0, 32);
   }
-  /** The next "result N" in this scope; numbers are never reused. */
+  /** Adds a job to this scope's results, in order; its place is never reused. */
   reference(owner, scope, jobId, persist = true) {
     const key = scope || this.referenceScope(owner);
     let entry = this.state.refs[key];
@@ -994,16 +1004,30 @@ export class McpMedia {
     if (persist) this.save();
     return number;
   }
-  /** A job's short reference and its signed watch page, returned with the submission. */
+  /** A job's reference ("#12") and its signed watch page, returned with the submission. */
   handle(owner, scope, jobId) {
-    return {
-      ref: `result ${this.reference(owner, scope, jobId)}`,
-      link: this.pageUrl(owner, jobId),
-    };
+    this.reference(owner, scope, jobId);
+    return { ref: this.refOf(jobId) || "Result", link: this.pageUrl(owner, jobId) };
+  }
+  /** Keeps the result numbers Studio gave an owner's items; resolve reads only owned jobs'. */
+  noteNumbers(items) {
+    let changed = false;
+    for (const item of items) {
+      if (!item?.jobId || !item.number) continue;
+      const numbers = (this.state.numbers[item.jobId] ||= []);
+      if (numbers[outputIndex(item)] === item.number) continue;
+      numbers[outputIndex(item)] = item.number;
+      changed = true;
+    }
+    if (changed) this.save();
+  }
+  /** A job output's result number, if Studio gave it. */
+  numberOf(jobId, index = 0) {
+    return this.state.numbers[jobId]?.[index];
   }
   /**
    * Gives an account's own Studio jobs and references to it here, so tools take
-   * them, and numbers the jobs in this scope in their order; anything another owner has is left.
+   * them, and adds the jobs to this scope's results in their order; anything another owner has is left.
    */
   adopt(owner, scope, { jobs = [], assets = [] }) {
     for (const id of jobs) {
@@ -1035,13 +1059,16 @@ export class McpMedia {
     );
     const adopted = [
       ...new Set(visible.flatMap(({ variants }) => variants.map(({ jobId }) => jobId))),
-    ].filter((jobId) => !Object.hasOwn(this.state.jobs, jobId) || !this.refOf(owner, scope, jobId));
+    ].filter(
+      (jobId) => !Object.hasOwn(this.state.jobs, jobId) || !this.inScope(owner, scope, jobId),
+    );
     if (adopted.length) this.adopt(owner, scope, { jobs: adopted });
+    this.noteNumbers(visible.flatMap(({ variants }) => variants.map(({ item }) => item)));
     return visible.map((comparison) => {
       const variants = comparison.variants.map(({ jobId, label, item }) => ({
         job_id: jobId,
         output_index: outputIndex(item || {}),
-        ref: this.refOf(owner, scope, jobId),
+        ref: this.refOf(jobId),
         label,
         link: this.url(owner, jobId, outputIndex(item || {})),
       }));
@@ -1060,27 +1087,104 @@ export class McpMedia {
       };
     });
   }
-  /** Accepts a job ID or a reference such as "result 3" from this conversation. */
-  resolve(owner, scope, value) {
-    // A result link (or its id) from an earlier reply names its job, when it belongs to this account.
+  /**
+   * The job output a value names: a result link (or its id), a result number ("#12"), a letter of
+   * the conversation's latest variants ("B"), else the value as a job id. `index` is set only when
+   * the value named one output.
+   */
+  async resolve(owner, scope, value, { signal } = {}) {
     const short = /^(?:https?:\/\/\S+\/mcp\/results\/)?([A-Za-z0-9]{10})(?:\.jpg)?$/.exec(
       String(value || "").trim(),
     )?.[1];
     const linked = short && Object.hasOwn(this.state.links, short) ? this.state.links[short] : null;
-    if (linked?.jobId && linked.owner === owner) return linked.jobId;
-    const match = referencePattern.exec(String(value || ""));
-    if (!match) return value;
-    const jobId = this.state.refs[scope || this.referenceScope(owner)]?.jobs?.[Number(match[1])];
-    if (!jobId)
-      throw new Error(
-        `There is no result ${Number(match[1])} in this conversation. Use the job_id or a ref returned by generate.`,
-      );
-    return jobId;
+    if (linked?.jobId && linked.owner === owner)
+      return { jobId: linked.jobId, ...(linked.page ? {} : { index: linked.index }) };
+    const letter = letterPattern.exec(String(value || ""))?.[1];
+    if (letter) {
+      const offer = this.state.refs[scope || this.referenceScope(owner)]?.offer;
+      const jobId = offer?.jobs[letter.toUpperCase().charCodeAt(0) - 65];
+      if (!jobId)
+        throw new Error(
+          `There is no option ${letter.toUpperCase()} in this conversation; variants offers lettered options.`,
+        );
+      return { jobId, index: 0, letter: letter.toUpperCase(), offer };
+    }
+    const number = Number(numberPattern.exec(String(value || ""))?.[1]);
+    if (!number) return { jobId: value };
+    const known = Object.entries(this.state.numbers).find(
+      ([jobId, numbers]) => this.state.jobs[jobId] === owner && numbers.includes(number),
+    );
+    if (known) {
+      this.adopt(owner, scope, { jobs: [known[0]] });
+      return { jobId: known[0], index: known[1].indexOf(number) };
+    }
+    let found;
+    try {
+      found = await this.request("GET", `/api/results/${number}`, undefined, owner, { signal });
+    } catch (error) {
+      if (error.aborted) throw error;
+      throw new Error(`There is no result #${number}. Use a number Studio showed, or a job_id.`);
+    }
+    if (Object.hasOwn(this.state.jobs, found.jobId) && this.state.jobs[found.jobId] !== owner)
+      throw new Error(`There is no result #${number}.`);
+    this.adopt(owner, scope, { jobs: [found.jobId] });
+    this.noteNumbers([{ jobId: found.jobId, index: found.index, number }]);
+    return { jobId: found.jobId, index: found.index };
   }
-  refOf(owner, scope, jobId) {
+  /** Whether a value names a result by its number or option letter rather than an id. */
+  namesResult(value) {
+    return numberPattern.test(String(value)) || letterPattern.test(String(value));
+  }
+  /** A result's image as a new reference asset, for generate. */
+  async resultReference(owner, jobId, index) {
+    const result = await this.download(owner, jobId, index);
+    if (!imageMimes.includes(result.mime))
+      throw new Error("Only images can be reused as references.");
+    return this.upload(
+      owner,
+      result.content.toString("base64"),
+      `reference.${result.mime.split("/")[1]}`,
+    );
+  }
+  /** Remembers a conversation's latest lettered options, which "A", "B"… then name. */
+  offer(owner, scope, comparison, jobs) {
     const entry = this.state.refs[scope || this.referenceScope(owner)];
-    const number = entry && Object.entries(entry.jobs).find(([, id]) => id === jobId)?.[0];
-    return number ? `result ${number}` : undefined;
+    entry.offer = { comparison, jobs };
+    this.save();
+  }
+  /**
+   * Records the user's pick among options (`found` from resolve: a letter, or a number in a
+   * comparison) as the comparison's winner, which teaches taste and, for a chat's project, adds the
+   * pick to its brief. Answers the comparison as Studio shows it, with `brief` where it changed.
+   */
+  async pick(owner, scope, found, signal) {
+    const entry = this.state.refs[scope || this.referenceScope(owner)];
+    const comparison = entry?.offer?.jobs.includes(found.jobId)
+      ? entry.offer.comparison
+      : (await this.comparisons(owner, [found.jobId], { scope, signal }))[0]?.id;
+    if (!comparison) throw new Error("That result is not among any options; nothing to pick.");
+    const voted = await this.request(
+      "PUT",
+      `/api/comparisons/${safeId(comparison)}/vote`,
+      { jobId: found.jobId, by: "chat" },
+      owner,
+      { signal },
+    );
+    if (entry?.offer?.comparison === comparison) {
+      entry.offer.picked = found.jobId;
+      this.save();
+    }
+    return voted;
+  }
+  /** Whether a job is among this conversation's results. */
+  inScope(owner, scope, jobId) {
+    const entry = this.state.refs[scope || this.referenceScope(owner)];
+    return Boolean(entry && Object.values(entry.jobs).includes(jobId));
+  }
+  /** A job's reference, its first output's number ("#12"), once Studio gave it. */
+  refOf(jobId) {
+    const number = this.numberOf(jobId);
+    return number ? `#${number}` : undefined;
   }
   async job(owner, jobId, seconds = 0, { signal, credential, interval = 2000 } = {}) {
     this.own(owner, jobId);
@@ -1723,7 +1827,7 @@ export class McpMedia {
       if (!terminal.has(job.status) && due <= waitSeconds * 1000)
         job = await this.job(owner, jobId, waitSeconds, { signal });
       if (!terminal.has(job.status)) {
-        const ref = this.refOf(owner, scope, jobId);
+        const ref = this.refOf(jobId);
         const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "This result";
         return {
           content: [
@@ -1769,7 +1873,7 @@ export class McpMedia {
       if (loras.length) settings.loras = loras.map(({ name, strength }) => ({ name, strength }));
       const recorded = this.promptRecord(jobId);
       records.push({
-        ref: this.refOf(owner, scope, jobId) || jobId,
+        ref: this.refOf(jobId) || jobId,
         ...(index ? { output_index: index } : {}),
         prompt: item.prompt,
         ...(item.negative ? { negative_prompt: item.negative } : {}),
@@ -1814,7 +1918,7 @@ export class McpMedia {
   /** A job's outputs as markdown to reply with once it finished, otherwise its link and state. */
   async result(owner, jobId, seconds = 0, { scope = "", signal } = {}) {
     const job = await this.job(owner, jobId, seconds, { signal });
-    const ref = this.refOf(owner, scope, jobId);
+    const ref = this.refOf(jobId);
     const label = ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result";
     const named = { job_id: jobId, ...(ref ? { ref } : {}) };
     if (!finished.has(job.status)) {
@@ -1900,7 +2004,7 @@ export class McpMedia {
       };
     const caption = runCaption(
       entries.map(({ label }) => label),
-      outputs.length,
+      outputs.map(({ jobId, output_index }) => this.numberOf(jobId, output_index)),
     );
     const sheet = this.sheetUrl(
       owner,
@@ -1959,7 +2063,8 @@ export class McpMedia {
       numbers.map(async (number) => {
         const jobId = entry.jobs[number];
         try {
-          return { number, jobId, job: await this.job(owner, jobId, 0, { signal, credential }) };
+          const job = await this.job(owner, jobId, 0, { signal, credential });
+          return { ref: this.refOf(jobId) || "Result", jobId, job };
         } catch (error) {
           if (error.aborted) throw error;
           return null;
@@ -1994,9 +2099,9 @@ export class McpMedia {
     const shown = done.slice(-maxShownResults);
     // One block per run: results queued together share their contact sheet.
     const runs = [];
-    for (const { number, jobId, job } of shown) {
+    for (const { ref, jobId, job } of shown) {
       const set = this.promptRecord(jobId)?.set;
-      const entry = { jobId, job, label: `Result ${number}` };
+      const entry = { jobId, job, label: ref };
       if (set && runs.at(-1)?.set === set) runs.at(-1).entries.push(entry);
       else runs.push({ set, entries: [entry] });
     }
@@ -2005,9 +2110,7 @@ export class McpMedia {
     );
     const all =
       done.length > 1 || pending.length ? `[All Results](${this.allUrl(owner, scope)})` : "";
-    const pendingLinks = pending.map(
-      ({ number, jobId }) => `[Result ${number}](${this.pageUrl(owner, jobId)})`,
-    );
+    const pendingLinks = pending.map(({ ref, jobId }) => `[${ref}](${this.pageUrl(owner, jobId)})`);
     const markdown = [
       ...blocks.map((block) => block.markdown),
       [...pendingLinks, all].filter(Boolean).join(" · "),
@@ -2028,8 +2131,8 @@ export class McpMedia {
       structuredContent: {
         status: pending.length ? "running" : "done",
         ...(comparisons.length ? { comparisons } : {}),
-        results: jobs.map(({ number, jobId, job }) => ({
-          ref: `result ${number}`,
+        results: jobs.map(({ ref, jobId, job }) => ({
+          ref,
           job_id: jobId,
           status: job.status,
         })),
@@ -2048,14 +2151,14 @@ export class McpMedia {
     const slides = [];
     let shownSet = "";
     const sections = jobs
-      .map(({ number, jobId, job }) => {
+      .map(({ ref, jobId, job }) => {
         // A generate call's results sit under their set's title, each named by its own.
         const set = this.promptRecord(jobId)?.resultSet;
         const setHeading = set && set.id !== shownSet ? `<h2>${escapeHtml(set.title)}</h2>` : "";
         shownSet = set?.id || "";
         const heading = set
-          ? `${setHeading}<h3>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h3>`
-          : `<h2>Result ${number} · ${escapeHtml(this.resultTitle(jobId, job))}</h2>`;
+          ? `${setHeading}<h3>${ref} · ${escapeHtml(this.resultTitle(jobId, job))}</h3>`
+          : `<h2>${ref} · ${escapeHtml(this.resultTitle(jobId, job))}</h2>`;
         if (!terminal.has(job.status)) {
           const progress = Number.isFinite(job.progress)
             ? ` ${Math.round(job.progress > 1 ? job.progress : job.progress * 100)}%`
@@ -2076,7 +2179,7 @@ export class McpMedia {
             const place = slides.length;
             return job.kind === "video"
               ? `<figure id="result-${place}"><video src="${token}" controls playsinline preload="metadata"></video><a href="#view-${place}">Open Large</a> · <a href="${token}">View Original</a></figure>`
-              : `<figure id="result-${place}"><a href="#view-${place}" aria-label="Open ${escapeHtml(label)} Large"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`;
+              : `<figure id="result-${place}"><a href="#view-${place}" aria-label="Open ${escapeHtml(label)} Large"><img src="${token}" alt="${ref}"></a><a href="${token}">View Original</a></figure>`;
           })
           .join("")}${this.promptHtml(jobId, job)}</section>`;
       })
