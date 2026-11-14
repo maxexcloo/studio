@@ -283,7 +283,12 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   }));
   const dream = await serveDream(page, { enabled: false, calibration: gallery });
   await page.goto("/dream");
-  await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
+  // Turn On is the off state's one action; Tune Your Taste sits under it.
+  const tune = page.getByRole("button", { name: "Tune Your Taste", exact: true });
+  await expect(tune).toBeVisible();
+  const turnOn = (await page.getByRole("button", { name: "Turn On", exact: true }).boundingBox())!;
+  expect((await tune.boundingBox())!.y).toBeGreaterThanOrEqual(turnOn.y + turnOn.height);
+  await tune.click();
   const status = page.getByRole("status", { name: "Dream Status", exact: true });
   await expect(status).toContainText("Dream is off.");
   await expect(status.getByRole("button", { name: "Turn On", exact: true })).toBeVisible();

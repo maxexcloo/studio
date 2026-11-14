@@ -39,16 +39,14 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
         fill
         action={
           <Stack align="center" gap="sm">
-            <Group gap="sm">
-              <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
-                Turn On
+            <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
+              Turn On
+            </Button>
+            {onTune && (
+              <Button variant="subtle" size="compact-sm" onClick={onTune}>
+                Tune Your Taste
               </Button>
-              {onTune && (
-                <Button variant="default" onClick={onTune}>
-                  Tune Your Taste
-                </Button>
-              )}
-            </Group>
+            )}
             {save.error && (
               <Alert color="red" title="Couldn’t Turn On Dream">
                 {save.error.message}
