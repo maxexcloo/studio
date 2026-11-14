@@ -17,7 +17,6 @@ import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
-import { useRemembered } from "../auth/useRemembered";
 import { TasteProfile } from "../taste/TasteProfile";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
@@ -27,11 +26,8 @@ import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
 import { dreamQuery, dreamWhen, type Dream } from "./queries";
 import classes from "./DreamPage.module.css";
 
-/**
- * What the deck shows once every card is judged, or before Dream is on. `onTune` starts
- * calibration with gallery images, which needs no GPU and so works while Dream is off.
- */
-function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
+/** What the deck shows once every card is judged, or before Dream is on. */
+function Empty({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   if (!dream.settings.enabled)
     return (
@@ -42,11 +38,6 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
             <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
               Turn On
             </Button>
-            {onTune && (
-              <Button variant="subtle" size="compact-sm" onClick={onTune}>
-                Tune Your Taste
-              </Button>
-            )}
             {save.error && (
               <Alert color="red" title="Couldn't Turn On Dream">
                 {save.error.message}
@@ -78,7 +69,7 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   );
 }
 
-/** Above calibration while Dream is off, as the deck alone doesn't show it. */
+/** Above the deck while Dream is off, as the deck alone doesn't show it. */
 function OffNotice() {
   const save = useDreamSettings();
   return (
@@ -120,7 +111,6 @@ export function DreamPage() {
     "aria-pressed": view === "taste",
     onClick: () => setView(view === "taste" ? "deck" : "taste"),
   } as const;
-  const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
   // A comparison's side whose other failed is judged in While You Were Away.
   const digested = new Set(
@@ -204,11 +194,9 @@ export function DreamPage() {
       ) : (
         <DreamDeck
           items={data!.unseen.filter((item) => !digested.has(item.id))}
-          calibrate={tuning || data!.settings.enabled}
+          calibrate={data!.settings.enabled}
           notice={!data!.settings.enabled && <OffNotice />}
-          empty={(calibration) => (
-            <Empty dream={data!} onTune={calibration ? () => setTuning(true) : undefined} />
-          )}
+          empty={<Empty dream={data!} />}
         />
       )}
     </div>

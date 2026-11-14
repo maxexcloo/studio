@@ -158,13 +158,9 @@ test("On a phone held sideways, a deck card's caption stands beside its media", 
 }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Only touch screens hold a phone sideways.");
   await fixtures(page);
-  await serveDream(page, {
-    enabled: false,
-    calibration: [{ ...dreamItem("one"), dream: undefined }],
-  });
+  await serveDream(page, { calibration: [{ ...dreamItem("one"), dream: undefined }] });
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto("/dream");
-  await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
   await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
   const current = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   const card = (await current.boundingBox())!;
@@ -273,25 +269,14 @@ test("Animate keeps a Dream image and stages it in the Videos composer", async (
   expect(state.referenceRequests).toEqual([{ galleryItemId: "fox" }]);
 });
 
-test("Calibration judges gallery images, singly and as a pair, even while Dream is off", async ({
-  page,
-}) => {
+test("Calibration judges gallery images, singly and as a pair", async ({ page }) => {
   await fixtures(page);
   const gallery = ["g1", "g2", "g3", "g4"].map((id) => ({
     ...dreamItem(id),
     dream: undefined,
   }));
-  const dream = await serveDream(page, { enabled: false, calibration: gallery });
+  const dream = await serveDream(page, { calibration: gallery });
   await page.goto("/dream");
-  // Turn On is the off state's one action; Tune Your Taste sits under it.
-  const tune = page.getByRole("button", { name: "Tune Your Taste", exact: true });
-  await expect(tune).toBeVisible();
-  const turnOn = (await page.getByRole("button", { name: "Turn On", exact: true }).boundingBox())!;
-  expect((await tune.boundingBox())!.y).toBeGreaterThanOrEqual(turnOn.y + turnOn.height);
-  await tune.click();
-  const status = page.getByRole("status", { name: "Dream Status", exact: true });
-  await expect(status).toContainText("Dream is off.");
-  await expect(status.getByRole("button", { name: "Turn On", exact: true })).toBeVisible();
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
   // Super Like's label shows in full, phones included.
@@ -306,7 +291,7 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   await page.getByRole("button", { name: "Pass", exact: true }).click();
   await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
   await page.getByRole("button", { name: "B", exact: true }).click();
-  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
     { passed: ["g2"] },
