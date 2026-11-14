@@ -110,7 +110,7 @@ test("a ranked page (Find Similar) orders by score, leaves out the unscored and 
   assert.deepEqual(ids(pageGallery({ rank, limit: 2, cursor: first.nextCursor }).items), ["a"]);
 });
 
-test("a result set's results page together in set order, where its newest result sorts", () => {
+test("a result set's results page together, newest first, where its newest result sorts", () => {
   const set = (index) => ({ resultSet: { id: "set", title: "Variety Test", index } });
   setGallery([
     item("newest", "2026-01-05"),
@@ -127,7 +127,7 @@ test("a result set's results page together in set order, where its newest result
     collected.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor);
-  assert.deepEqual(ids(collected), ["newest", "set-0", "set-1", "set-2", "between", "oldest"]);
+  assert.deepEqual(ids(collected), ["newest", "set-2", "set-0", "set-1", "between", "oldest"]);
 });
 
 test("paging inside a set carries on through it when a newer result moves the set", () => {
@@ -142,7 +142,7 @@ test("paging inside a set carries on through it when a newer result moves the se
   ]);
   const first = pageGallery({ limit: 2 });
   assert.deepEqual(ids(first.items), ["newest", "set-0"]);
-  // A result added to the set since sorts first, so the set now stands at the top.
+  // A result added to the set since sorts first, so the set now stands at the top, before the page.
   setGallery([...galleryItems(), set(3, "2026-02-06")]);
   const rest = [];
   let cursor = first.nextCursor;
@@ -151,7 +151,7 @@ test("paging inside a set carries on through it when a newer result moves the se
     rest.push(...page.items);
     cursor = page.nextCursor;
   }
-  assert.deepEqual(ids(rest), ["set-1", "set-2", "set-3", "oldest"]);
+  assert.deepEqual(ids(rest), ["set-1", "set-2", "oldest"]);
 });
 
 test("each owner pages through only its own items, sets kept together", () => {
@@ -180,7 +180,7 @@ test("each owner pages through only its own items, sets kept together", () => {
     } while (cursor);
     assert.deepEqual(
       ids(seen),
-      ["a", "s0", "s1", "b", "c"].map((id) => `${ownerId}-${id}`),
+      ["a", "s1", "s0", "b", "c"].map((id) => `${ownerId}-${id}`),
     );
   }
 });

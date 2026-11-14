@@ -1,7 +1,7 @@
 import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Play } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, QueueJob } from "../../types";
@@ -95,7 +95,6 @@ export function MediaViewerDock({
   item,
   family,
   set,
-  neighbours,
   choose,
   actions,
 }: {
@@ -103,8 +102,6 @@ export function MediaViewerDock({
   family: Entry[];
   /** The MCP result set's loaded results, in order (`setMembers`). */
   set: MediaItem[];
-  /** The first results of the sets before and after it in the gallery (`neighbourSets`). */
-  neighbours: { previous?: MediaItem; next?: MediaItem };
   choose?: (item: MediaItem) => void;
   actions: React.ReactNode;
 }) {
@@ -117,13 +114,12 @@ export function MediaViewerDock({
   if (shown.root !== root) setShown({ root, keys: new Set(family.map(({ key }) => key)) });
   return (
     <div className={classes.dock} data-chrome>
-      {(set.length > 1 || neighbours.previous || neighbours.next) && (
+      {set.length > 1 && (
         <ResultStrip
           label={`Set: ${item.resultSet?.title}`}
           entries={set.map((result) => ({ key: result.id, item: result }))}
           current={item}
           name={(result, position) => `Show ${mediaTitle(result!)} (${position} of ${set.length})`}
-          neighbours={neighbours}
           choose={choose}
         />
       )}
@@ -159,7 +155,6 @@ function ResultStrip({
   name,
   entering,
   depths,
-  neighbours,
   choose,
 }: {
   label: string;
@@ -169,23 +164,11 @@ function ResultStrip({
   entering?: (key: string) => boolean;
   /** Marks each entry's generations from the original. */
   depths?: boolean;
-  /** Faded at either end, each moving to its own set. */
-  neighbours?: { previous?: MediaItem; next?: MediaItem };
   choose?: (item: MediaItem) => void;
 }) {
-  const neighbour = (result: MediaItem | undefined, side: "Previous" | "Next") =>
-    result && (
-      <Thumbnail
-        result={result}
-        neighbour
-        label={`${side} Set: ${result.resultSet?.title}`}
-        onClick={() => choose?.(result)}
-      />
-    );
   return (
     <ScrollArea className={classes.strip} onClick={(event) => event.stopPropagation()}>
       <Group gap={6} wrap="nowrap" role="list" aria-label={label} justify="center" px={2} py={2}>
-        {neighbour(neighbours?.previous, "Previous")}
         {entries.map(({ key, item: result, depth }, index) => {
           const shown = result?.id === current.id;
           return (
@@ -200,7 +183,6 @@ function ResultStrip({
             />
           );
         })}
-        {neighbour(neighbours?.next, "Next")}
       </Group>
     </ScrollArea>
   );
@@ -211,7 +193,6 @@ function Thumbnail({
   shown,
   entering,
   depth,
-  neighbour,
   label,
   onClick,
 }: {
@@ -219,18 +200,21 @@ function Thumbnail({
   shown?: boolean;
   entering?: boolean;
   depth?: number;
-  neighbour?: boolean;
   label: string;
   onClick: () => void;
 }) {
   const thumbnail = result?.thumbnailUrl || (result?.type === "image" ? result.url : "");
+  const button = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (shown) button.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [shown]);
   return (
     <UnstyledButton
+      ref={button}
       role="listitem"
       className={classes.variation}
       data-current={shown || undefined}
       data-entering={entering || undefined}
-      data-neighbour={neighbour || undefined}
       aria-current={shown || undefined}
       aria-label={label}
       disabled={!result}
