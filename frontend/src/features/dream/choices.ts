@@ -108,38 +108,43 @@ export function dreamChoices(card: DeckCard): Choice[][] {
 }
 
 /**
- * The choices as the viewer's action groups, on one row: Pass and Like named and large at the
- * ends, the rest as icons between them; phones keep Star there and put the rest under ⋯ More.
- * A comparison names all its answers, A and B large.
+ * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
+ * then More Like This and Variations, then the verdicts at the end, Pass, Super Like and Like, with
+ * Like the filled one. Desktop names every action; phones name Pass and Like and keep More Like
+ * This and Variations under ⋯ More. A comparison names all its answers, A and B large.
  */
 export function viewerChoices(
   card: DeckCard,
   act: (choice: Choice["choice"]) => void,
   phone: boolean,
 ) {
-  let groups: ActionGroups = dreamChoices(card).map((group) =>
-    group.map((choice) => ({
-      id: choice.id,
-      label: choice.label,
-      icon: choice.icon,
-      emphasis: choice.primary ? "filled" : choice.main ? "default" : undefined,
-      onClick: () => act(choice.choice),
-    })),
-  );
-  if (phone && card.kind !== "pair") {
-    const [pass, ...middle] = groups;
-    const like = middle.pop()!;
-    const star = middle.flat().filter((action) => action.id === "star");
-    const rest = middle
-      .map((group) => group.filter((action) => action.id !== "star"))
-      .filter((group) => group.length);
-    const more: Action = { id: "more", label: "More", icon: icons.more, menu: rest };
-    groups = [pass, [...star, ...(rest.length ? [more] : [])], like];
-  }
-  const ids = groups.flat().map((action) => action.id);
+  const action = (choice: Choice): Action => ({
+    id: choice.id,
+    label: choice.label,
+    icon: choice.icon,
+    emphasis: choice.primary ? "filled" : choice.main ? "default" : undefined,
+    onClick: () => act(choice.choice),
+  });
+  const choices = dreamChoices(card).map((group) => group.map(action));
+  if (card.kind === "pair")
+    return {
+      label: "Comparison Answers",
+      groups: choices,
+      labelled: choices.flat().map((choice) => choice.id),
+    };
+  const all = choices.flat();
+  const pick = (...ids: string[]) => ids.flatMap((id) => all.filter((choice) => choice.id === id));
+  const dream = pick("more-like-this", "variations");
+  const groups: ActionGroups = [
+    pick("animate", "edit"),
+    phone && dream.length
+      ? [{ id: "more", label: "More", icon: icons.more, menu: [dream] }]
+      : dream,
+    pick("discard", "star", "keep"),
+  ];
   return {
-    label: card.kind === "pair" ? "Comparison Answers" : "Dream Actions",
+    label: "Dream Actions",
     groups,
-    labelled: card.kind === "pair" ? ids : ["discard", "keep"],
+    labelled: phone ? ["discard", "keep"] : all.map((choice) => choice.id),
   };
 }
