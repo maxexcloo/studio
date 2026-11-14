@@ -124,8 +124,9 @@ export function SectionToolbar({
           if (expanded) close();
           else event.currentTarget.blur();
         }}
+        size="sm"
+        radius="xl"
         w={expanded ? "100%" : "13rem"}
-        miw={expanded ? undefined : "8rem"}
       />
     );
   if (searching && phone && onQueryChange)
@@ -146,7 +147,7 @@ export function SectionToolbar({
           onChange={onViewChange}
         />
       )}
-      <Group gap={4} ml="auto" wrap="nowrap" miw={0}>
+      <Group gap={4} ml="auto" wrap="nowrap">
         {onQueryChange &&
           (phone ? (
             <Tooltip label={`Search ${label}`}>
