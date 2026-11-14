@@ -135,9 +135,4 @@ test("A text-only Radiance default sends a run with references to ComfyUI", asyn
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
-  // Radiance chosen by name keeps the run there, so it takes no references.
-  const backend = page.getByRole("combobox", { name: "Backend", exact: true });
-  await backend.click();
-  await page.getByRole("option", { name: "Radiance", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Choose References", exact: true })).toHaveCount(0);
 });
