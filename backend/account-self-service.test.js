@@ -105,7 +105,8 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   assert.equal("password" in me.body.account, false);
   assert.equal(ordinaryRouteAllowed("GET", "/api/accounts/me"), true);
   assert.equal(ordinaryRouteAllowed("PATCH", "/api/accounts/me"), true);
-  // Compare Variants, the taste profile and Dream are owner-scoped, so ordinary accounts use them too.
+  // Compare Variants, the taste profile, Dream, Details, queue items and card help are owner-scoped,
+  // so ordinary accounts use them too.
   for (const [method, route] of [
     ["POST", "/api/comparisons/run"],
     ["GET", "/api/comparisons/abc-123"],
@@ -120,6 +121,16 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["POST", "/api/dream/%2Fcomfy%2Fview%3Ffilename%3Da.png/keep"],
     ["POST", "/api/dream/item-1/discard"],
     ["POST", "/api/dream/item-1/variations"],
+    ["GET", "/api/dream/calibration"],
+    ["POST", "/api/dream/calibration"],
+    ["POST", "/api/dream/visit"],
+    ["GET", "/api/gallery/items/%2Fcomfy%2Fview%3Ffilename%3Da.png"],
+    ["POST", "/api/gallery/export"],
+    ["POST", "/api/assistant/cards/describe"],
+    ["POST", "/api/assistant/cards/rate"],
+    ["GET", "/api/queue/job-1"],
+    ["POST", "/api/queue/job-1/swap"],
+    ["POST", "/api/queue/sets/set-1/move"],
   ])
     assert.equal(ordinaryRouteAllowed(method, route), true, `${method} ${route}`);
   assert.equal(ordinaryRouteAllowed("POST", "/api/dream/item-1/delete"), false);
