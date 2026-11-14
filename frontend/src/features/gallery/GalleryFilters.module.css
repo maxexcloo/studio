@@ -1,5 +1,6 @@
 /* Search and the normal row replace one another in place on phones. */
 .mode {
+  container-type: inline-size;
   animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
@@ -38,4 +39,16 @@
 
 .slider {
   width: 88px;
+}
+
+.count {
+  white-space: nowrap;
+}
+
+/* A tablet's toolbar has no room for the count and the slider; the size buttons stay. */
+@container (max-width: 56rem) {
+  .count,
+  .slider {
+    display: none;
+  }
 }
