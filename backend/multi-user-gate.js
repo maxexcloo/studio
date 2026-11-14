@@ -19,6 +19,8 @@ export const publicAccountPaths = new Set([
  */
 const ordinaryRoutes = [
   ["GET", /^\/api\/(ping|models|estimate|workflows|stats|animate\/profile)$/],
+  // The Library's inspiration images are shared reading; administrators curate them.
+  ["GET", /^\/api\/presets(\/[\w-]+\/thumbnail)?$/],
   ["GET", /^\/api\/services\/status$/],
   ["GET", /^\/api\/accounts\/(mcp-token(\/reveal)?|me)$/],
   ["PATCH", /^\/api\/accounts\/me$/],
