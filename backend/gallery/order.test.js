@@ -184,3 +184,15 @@ test("each owner pages through only its own items, sets kept together", () => {
     );
   }
 });
+
+test("an owner's titled item with the same prompt is found by its prompt", async () => {
+  const { findGalleryItem } = await import("./store.js");
+  setGallery([
+    item("untitled", "2026-01-03", { ownerId: "alice" }),
+    item("bob's", "2026-01-02", { ownerId: "bob", title: "Bob's Lantern" }),
+    item("alice's", "2026-01-01", { ownerId: "alice", title: "Lantern" }),
+  ]);
+  const titled = (ownerId) => findGalleryItem({ ownerId, prompt: "a lantern", titled: true });
+  assert.equal(titled("alice")?.title, "Lantern");
+  assert.equal(titled("carol"), undefined);
+});

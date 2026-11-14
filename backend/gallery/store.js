@@ -119,7 +119,8 @@ const list = (values) => JSON.stringify([...values].map(String));
  * owner's starred items and kept Dream results; `conversationIds` match the chats that asked for
  * items; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
- * pending one, `before` those made by then.
+ * pending one, `before` those made by then; `prompt` matches the prompt exactly and `titled` keeps
+ * items with a title.
  */
 function where(query = {}) {
   const terms = [];
@@ -163,6 +164,8 @@ function where(query = {}) {
       `(status = 'pending' OR (${query.contains.map(() => "instr(lower(value), ?) > 0").join(" AND ")}))`,
       ...query.contains,
     );
+  if (query.prompt !== undefined) add("json_extract(value, '$.prompt') = ?", query.prompt);
+  if (query.titled) add("json_extract(value, '$.title') IS NOT NULL");
   if (query.since) add("(status = 'pending' OR created_ms >= ?)", Number(query.since));
   // Naming both buckets lets the order index seek the time range rather than compute each row's.
   if (query.before !== undefined) add("bucket IN (0, 1) AND created_ms <= ?", Number(query.before));
