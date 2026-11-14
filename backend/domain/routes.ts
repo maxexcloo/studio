@@ -94,8 +94,16 @@ export function registerRewriteRoutes(
       (!Array.isArray(parts) || !parts.every((part) => typeof part === "string"))
     )
       return res.status(400).json({ error: "Preset parts must be a list of names." });
+    if (req.body.family !== undefined && typeof req.body.family !== "string")
+      return res.status(400).json({ error: "A preset family must be a name." });
     return res.status(201).json({
-      preset: store.createPreset(owner(req), req.body.title.trim(), req.body.input, parts),
+      preset: store.createPreset(
+        owner(req),
+        req.body.title.trim(),
+        req.body.input,
+        parts,
+        req.body.family,
+      ),
     });
   });
   app.delete("/api/user-presets/:id", (req, res) =>

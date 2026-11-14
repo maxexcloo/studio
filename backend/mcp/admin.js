@@ -594,7 +594,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "catalogue_edit",
     "edit catalogue entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field's edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile uses it, taking a LoRA out of every account's stacks first, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max, step} (the whole range: a part left out is cleared), uncensored, links or notes; null clears a field's edit. Returns the new entry and the previous values; undo: true reverts its newest change. remove: true deletes the entry and its installed file when no profile uses it, taking a LoRA out of every account's stacks and presets first, only when the user asks; undo brings the entry back (download the file again). Recorded as from chat.",
     {
       key,
       patch: z

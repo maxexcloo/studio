@@ -349,7 +349,7 @@ for (const surface of ["tile", "viewer"]) {
     });
     await expandComposer(page);
     await page.getByRole("button", { name: "Presets", exact: true }).click();
-    await loadSaved(page, "Preset", "Current Direction");
+    await loadSaved(page, "Current Direction");
     await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
     await page.keyboard.press("Escape");
     if (surface === "viewer") {

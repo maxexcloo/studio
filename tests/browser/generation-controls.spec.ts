@@ -12,7 +12,7 @@ import {
   promptTool,
   profiles,
   saveCurrent,
-  savedAction,
+  renamePreset,
   serveProfiles,
   showUploads,
   stamp,
@@ -241,7 +241,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   await page.getByRole("button", { name: "Use reference: Closing frame", exact: true }).click();
   await closeReferences(page);
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await saveCurrent(page, "Preset", "End Frame Only", ["References"]);
+  await saveCurrent(page, "End Frame Only", ["References"]);
   await expect.poll(() => state.presets.length).toBe(1);
   await closePresets(page);
   expect(state.presets[0].input.referenceAssets).toEqual([
@@ -250,7 +250,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await loadSaved(page, "Preset", "End Frame Only");
+  await loadSaved(page, "End Frame Only");
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Arrive at the closing frame",
   );
@@ -261,7 +261,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   expect(state.jobs[0].input.referenceDetails[0].slot).toBe("end");
 });
 
-test("Saved family LoRA stacks retain order and disabled entries through update and reload", async ({
+test("LoRA presets keep their family, order, strengths and disabled entries through update and reload", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -269,15 +269,29 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
     { name: "detail.safetensors", strength: 0.35, enabled: false },
     { name: "soft-style.safetensors", strength: 0.65, enabled: true },
   ];
-  state.loraLibrary.snapshots["family:test"] = [
-    { id: "copper-stack", name: "Copper Detail", loras: original },
-  ];
-  state.loraLibrary.snapshots["family:other"] = [
-    { id: "other-stack", name: "Other Family Stack", loras: [] },
-  ];
+  const lorasOnly = { parts: ["loras"], savedAt: "2026-11-01T00:00:00.000Z" };
+  state.presets.push(
+    {
+      id: "copper",
+      title: "Copper Detail",
+      input: { loras: original },
+      family: "test",
+      ...lorasOnly,
+    },
+    {
+      id: "other",
+      title: "Other Family",
+      input: { loras: original },
+      family: "other",
+      ...lorasOnly,
+    },
+  );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await loadSaved(page, "Stack", "Copper Detail");
+  // Only this family's presets with LoRAs are listed.
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await expect(page.getByRole("option", { name: "Other Family", exact: true })).toHaveCount(0);
+  await page.getByRole("option", { name: "Copper Detail", exact: true }).click();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await expect(
@@ -285,31 +299,23 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ).toHaveValue("0.35");
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
-  await savedAction(page, "Stack", "Copper Detail", "Update from Current");
+  await expect(page.getByText("Edited", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
   await expect
-    .poll(() => state.loraOperations.map((operation) => operation.op))
-    .toEqual(["stack.update"]);
-  await savedAction(page, "Stack", "Copper Detail", "Rename Stack");
-  const name = page.getByRole("textbox", { name: "Stack Name", exact: true });
-  await name.fill("Copper Detail Refined");
-  await name.press("Enter");
-  await expect
-    .poll(() => state.loraLibrary.snapshots["family:test"][0].name)
-    .toBe("Copper Detail Refined");
+    .poll(() => state.presets[0].input.loras)
+    .toEqual([{ ...original[0], strength: 1.25, enabled: true }, original[1]]);
+  await renamePreset(page, "Copper Detail Refined");
+  await expect.poll(() => state.presets[0].title).toBe("Copper Detail Refined");
   expect(state.jobs).toHaveLength(0);
-  expect(state.loraOperations.map((operation) => operation.op)).toEqual([
-    "stack.update",
-    "stack.rename",
-  ]);
-  expect(state.loraOperations.every((operation) => operation.key === "family:test")).toBe(true);
-  expect(state.loraLibrary.snapshots["family:other"][0].name).toBe("Other Family Stack");
+  expect(state.presets[1].title).toBe("Other Family");
   await page.reload();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await loadSaved(page, "Stack", "Copper Detail Refined");
+  await page.getByRole("button", { name: "Clear LoRAs", exact: true }).click();
+  await loadSaved(page, "Copper Detail Refined");
   await closeLoras(page);
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("Reuse the refined LoRA stack");
+    .fill("Reuse the refined LoRA preset");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras).toEqual([
@@ -354,7 +360,7 @@ test("Clear restores profile defaults and random seed; masked inputs load as Pai
   });
   await create(page);
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await loadSaved(page, "Preset", "Masked Study");
+  await loadSaved(page, "Masked Study");
   await expect(page.getByRole("button", { name: "Clear Seed 117", exact: true })).toBeVisible();
   // A saved mask shows as Paint, whatever role the preset stored.
   const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
@@ -424,7 +430,7 @@ test("LoRA trigger words toggle and published source links work in the gallery e
   });
   await create(page);
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await loadSaved(page, "Preset", "Trigger Study");
+  await loadSaved(page, "Trigger Study");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const triggers = page.getByRole("group", { name: "Detail Slider Trigger Words", exact: true });
   const inkbird = triggers.getByRole("checkbox", { name: "inkbird", exact: true });
@@ -639,7 +645,7 @@ test("References, masking, settings and runtime presets remain editable", async 
     await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
   });
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await saveCurrent(page, "Preset", "Bird Study");
+  await saveCurrent(page, "Bird Study");
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.presets[0].input.seed).toBe("42");
   expect(state.presets[0].input.inpaint.mask).toMatch(/^data:image\/png/);
@@ -647,11 +653,9 @@ test("References, masking, settings and runtime presets remain editable", async 
   await closePresets(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
   await openPresets(page);
-  await savedAction(page, "Preset", "Bird Study", "Update from Current");
-  await savedAction(page, "Preset", "Bird Study", "Rename Preset");
-  const name = page.getByRole("textbox", { name: "Preset Name", exact: true });
-  await name.fill("Updated Bird Study");
-  await name.press("Enter");
+  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  await expect.poll(() => state.presets[0].input.prompt).toBe("An updated amber bird");
+  await renamePreset(page, "Updated Bird Study");
   await expect.poll(() => state.presets[0].title).toBe("Updated Bird Study");
   expect(state.presets[0].input.prompt).toBe("An updated amber bird");
   expect(state.presets).toHaveLength(1);
@@ -667,12 +671,7 @@ test("A preset of some parts holds and loads only those, leaving the rest of the
   await prompt.fill("A copper heron");
   await withSettings(page, () => seed.fill("42"));
   await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await saveCurrent(page, "Preset", "Heron Prompt", [
-    "Negative",
-    "Model & Settings",
-    "Size",
-    "LoRAs",
-  ]);
+  await saveCurrent(page, "Heron Prompt", ["Negative", "Model & Settings", "Size", "LoRAs"]);
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.presets[0].parts).toEqual(["prompt"]);
   expect(Object.keys(state.presets[0].input)).toEqual(["prompt"]);
@@ -680,7 +679,9 @@ test("A preset of some parts holds and loads only those, leaving the rest of the
   await prompt.fill("A grey owl");
   await withSettings(page, () => seed.fill("7"));
   await openPresets(page);
-  await page.getByRole("button", { name: "Load Preset: Heron Prompt", exact: true }).click();
+  // Choosing the edited preset again restores what it holds, asking first.
+  await page.getByRole("combobox", { name: "Preset Name", exact: true }).click();
+  await page.getByRole("option", { name: "Heron Prompt", exact: true }).click();
   await expect(
     page.getByText("Replace the current prompt with this preset? The rest stays as it is.", {
       exact: true,

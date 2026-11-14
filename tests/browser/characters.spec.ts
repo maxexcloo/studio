@@ -279,7 +279,7 @@ test("Use as Character starts a card from a gallery image in Library › Charact
   expect(state.characters).toEqual([]);
 });
 
-test("A member sees only Characters, Outfits and Scenes in the Library, and a group without Characters has neither tab nor Library", async ({
+test("A member sees only their cards and Presets in the Library, and a group without Characters only Presets", async ({
   page,
 }) => {
   await fixtures(page);
@@ -291,11 +291,11 @@ test("A member sees only Characters, Outfits and Scenes in the Library, and a gr
   const nav = page.getByRole("navigation", { name: "Library Sections", exact: true });
   await expect(select.or(nav)).toBeVisible();
   if (await nav.isVisible())
-    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes"]);
+    await expect(nav.getByRole("link")).toHaveText(["Characters", "Outfits", "Scenes", "Presets"]);
   else await expect(select).toHaveValue("Characters");
   await signIn(page, { id: "member", role: "user", features: { characters: false } });
   await page.goto("/library");
-  await expect(page).toHaveURL(/\/images$/);
+  await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
   await page.goto("/images?compose=1");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect(

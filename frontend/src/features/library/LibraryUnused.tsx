@@ -133,7 +133,7 @@ export function LibraryUnused({ heading }: { heading: ReactNode }) {
         onClose={() => setRemoving(null)}
       >
         Remove {removing?.title} from the catalogue and delete its file? A LoRA also leaves every
-        account's stacks.
+        account's stacks and presets.
       </ConfirmDialog>
     </Stack>
   );
