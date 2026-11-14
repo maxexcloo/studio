@@ -205,6 +205,8 @@ test("Dream explains itself while off and saves its settings on the deck", async
   await page.getByRole("button", { name: "Pause Dream", exact: true }).click();
   await expect(page.getByText("Dream Is Paused", { exact: true })).toBeVisible();
   expect(dream.settings.paused).toBe(true);
+  await page.getByRole("button", { name: "Dream Settings", exact: true }).click();
+  await expect(settings).toContainText("Dream is paused · 12 of 200 today");
 });
 
 test("The taste read-out fits the screen and adds what to avoid", async ({ page }) => {
