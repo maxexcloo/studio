@@ -284,6 +284,13 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
   const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
   await expect(card).toContainText("From Your Gallery");
+  // Super Like's label shows in full, phones included.
+  expect(
+    await page
+      .getByRole("button", { name: "Super Like", exact: true })
+      .locator(".mantine-Button-label")
+      .evaluate((label) => label.scrollWidth <= label.clientWidth),
+  ).toBe(true);
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
   await page.getByRole("button", { name: "Pass", exact: true }).click();

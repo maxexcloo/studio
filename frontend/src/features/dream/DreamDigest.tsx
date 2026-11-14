@@ -67,7 +67,8 @@ function DigestCard({
           {review?.miss || item.dream?.why || item.prompt}
         </Text>
       </Stack>
-      <Group gap="xs" p="xs" grow wrap="nowrap">
+      {/* The row is shared by label length, so Super Like is never cut short. */}
+      <Group gap="xs" p="xs" wrap="nowrap">
         {/* The deck bar's large choices; Like is light here, as every card has one. */}
         {dreamChoices({ kind: "dream", key: item.id, item })
           .flat()
@@ -76,6 +77,7 @@ function DigestCard({
             <Button
               key={choice}
               px={4}
+              flex="1 1 auto"
               variant={primary ? "light" : "default"}
               leftSection={<Icon size={16} />}
               aria-label={`${label} ${name}`}
