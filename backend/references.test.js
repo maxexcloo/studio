@@ -72,6 +72,25 @@ test("uploaded images and byte reads are limited to their account owner", async 
   );
 });
 
+test("an unseen Dream result is its owner's reference, as Dream animates it", async () => {
+  const buffer = await sharp({
+    create: { width: 12, height: 12, channels: 3, background: "#abcdef" },
+  })
+    .png()
+    .toBuffer();
+  const { item } = await referenceAssets.saveUpload(
+    { buffer, name: "dream.png", mime: "image/png" },
+    "dreamer",
+  );
+  item.dream = { state: "unseen" };
+  const owner = { userId: "dreamer", role: "user" };
+  assert.equal(referenceAssets.referenceAssetForAccount(owner, item.id).galleryItemId, item.id);
+  assert.equal(
+    referenceAssets.referenceExistsForAccount({ userId: "someone", role: "user" }, item.id),
+    false,
+  );
+});
+
 test("a multipart upload streams to disk and its temporary file is moved into place", async () => {
   const image = await sharp({
     create: { width: 16, height: 16, channels: 3, background: "#654321" },
