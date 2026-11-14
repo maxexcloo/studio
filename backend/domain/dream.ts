@@ -697,7 +697,13 @@ export function createDream(options: {
       return {
         recent: [],
         ...saved,
-        settings: { ...defaultDreamSettings, ...saved.settings },
+        // Only known settings, so a retired key leaves the record on its next save.
+        settings: Object.fromEntries(
+          Object.entries(defaultDreamSettings).map(([key, value]) => [
+            key,
+            saved.settings?.[key as keyof DreamSettings] ?? value,
+          ]),
+        ) as unknown as DreamSettings,
       };
     } catch (error) {
       if ((error as { code?: string }).code === "ENOENT")
