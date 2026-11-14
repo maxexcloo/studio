@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
 
 function call(path, account = null, method = "GET") {

@@ -1,9 +1,20 @@
 // Native port of the Studio MCP media service.
 import crypto from "node:crypto";
 import path from "node:path";
+
 import sharp from "sharp";
+
+import { isCloudProfile, runBackend } from "../../shared/profiles.ts";
+import { withResolution } from "../../shared/resolution.ts";
+import { promptWords } from "../../shared/titles.ts";
+import { accessFeatures } from "../account-policy.js";
+import { accountPreferences } from "../account-preferences.js";
 import { animateProfile, frameSize } from "../animate-profile.js";
+import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
+import { recommendedNegative } from "../lora/prompts.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
+import { imageMimes } from "../reference-names.js";
 import {
   assertAdjustable,
   maxJobsPerCall,
@@ -14,16 +25,7 @@ import {
   resolveLoraName,
   videoLength,
 } from "./controls.js";
-import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
-import { recommendedNegative } from "../lora/prompts.js";
 import { choicePool, chooseProfile } from "./tiers.js";
-import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
-import { withResolution } from "../../shared/resolution.ts";
-import { promptWords } from "../../shared/titles.ts";
-import { imageMimes } from "../reference-names.js";
-import { accessFeatures } from "../account-policy.js";
-import { accountPreferences } from "../account-preferences.js";
-import { isCloudProfile, runBackend } from "../../shared/profiles.ts";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {

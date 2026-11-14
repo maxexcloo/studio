@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import net from "node:net";
@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import type { QueueJob } from "../../shared/queue.ts";
 const { startDemoWorker } = await import(
   new URL("../fixtures/demo-worker.js", import.meta.url).href

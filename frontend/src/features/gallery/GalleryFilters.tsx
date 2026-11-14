@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   Badge,
   Button,
@@ -13,16 +12,19 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { ChevronDown, X, type LucideIcon } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { ChevronDown, type LucideIcon, X } from "lucide-react";
+import type { ReactNode } from "react";
+
+import { profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
-import { usePhone } from "../../ui/usePhone";
 import type { MediaKind, Profile } from "../../types";
-import { useGenerationActions } from "../generation/GenerationProvider";
+import { icons } from "../../ui/icons";
+import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
+import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery, loraTitle } from "../generation/LoraPicker";
 import { profileName, shownProfileName } from "../generation/payload";
-import { profileNameParts } from "../../../../shared/profiles";
+
 import classes from "./GalleryFilters.module.css";
 
 interface GalleryFilterOption {

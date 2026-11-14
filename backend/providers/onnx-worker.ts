@@ -1,5 +1,6 @@
 import { availableParallelism } from "node:os";
 import { parentPort } from "node:worker_threads";
+
 import type { InferenceSession } from "onnxruntime-node";
 
 /**

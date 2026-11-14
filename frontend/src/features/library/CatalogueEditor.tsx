@@ -15,13 +15,14 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { api, post } from "../../api";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { loraInfoQuery } from "../generation/LoraPicker";
-import { libraryItemCategory, type LibraryItem } from "./LibraryCatalogueTable";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
+import { type LibraryItem, libraryItemCategory } from "./LibraryCatalogueTable";
 import { catalogueQuery } from "./queries";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;

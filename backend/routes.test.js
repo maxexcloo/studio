@@ -4,8 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import sharp from "sharp";
 import { fileURLToPath } from "node:url";
+
+import sharp from "sharp";
+
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 

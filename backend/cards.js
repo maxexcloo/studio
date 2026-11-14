@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+
 import { cardKinds, maxCardDescription, maxCardName, maxCards } from "../shared/characters.ts";
 import { mayUseFeature } from "./account-policy.js";
 import { directRoute } from "./domain/direct-route.ts";

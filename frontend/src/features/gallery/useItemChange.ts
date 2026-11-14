@@ -1,8 +1,8 @@
 import type { Change, ChangeAction } from "../../../../shared/suggestions";
 import type { MediaItem } from "../../types";
+import { type ActionGroups, findAction } from "../../ui/ActionBar";
 import { useAskChange } from "../generation/AskChange";
 import { askChange } from "../taste/suggestions";
-import { findAction, type ActionGroups } from "../../ui/ActionBar";
 import type { Iteration } from "./useMediaAction";
 
 /** What carries out an item's change: its current actions, whose Upscale it may run, and runs. */

@@ -9,9 +9,10 @@ import {
   workerReachable,
 } from "../comfy/backends.js";
 import { comfy, optionsFor } from "../comfy/comfy.js";
-import { families } from "../family-catalogue.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
+import { families } from "../family-catalogue.js";
 import { galleryChangeCount } from "../gallery/store.js";
+import { uncensoredLoraNames } from "../lora/info.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { parkedWorkers } from "../runtime/services.ts";
 import { sharedRequests } from "../shared-requests.js";
@@ -26,7 +27,6 @@ import {
 } from "../workers.js";
 import { primeModelMetadata } from "./families.js";
 import { inferModels, offlineModelResult } from "./models.js";
-import { uncensoredLoraNames } from "../lora/info.js";
 
 // A worker context's catalogue, kept per node list (each fetch or stored observation is its own
 // object) until the profile folder or a setting inferModels reads changes (Settings saves the

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { expandComposer, fixtures, profiles, stamp } from "./fixtures";
 
 test("Images and Videos tabs keep an expanding bottom composer", async ({ page }, testInfo) => {

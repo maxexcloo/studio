@@ -1,10 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
+
 import {
-  createIdleWork,
-  pictured,
   type IdleDocument,
   type IdleItem,
   type PassScope,
+  createIdleWork,
+  pictured,
 } from "./idle-work.ts";
 
 /** The SigLIP 2 encoders (providers/siglip.ts). */

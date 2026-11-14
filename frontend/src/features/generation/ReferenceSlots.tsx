@@ -1,18 +1,20 @@
-import { useState, type DragEvent } from "react";
 import { Badge, Image, Menu, Stack, Text, UnstyledButton } from "@mantine/core";
 import { ArrowLeft, ArrowRight, Plus, Replace } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type DragEvent, useState } from "react";
+
 import type { Profile, ReferenceAsset } from "../../types";
+import { icons } from "../../ui/icons";
+import type { SlotLayout } from "./payload";
+import { dragPicture } from "./Picker";
 import {
+  type ReferenceTarget,
   galleryReferenceType,
   referenceCells,
   referenceKey,
   referenceLabel,
-  type ReferenceTarget,
 } from "./references";
-import { dragPicture } from "./Picker";
-import type { SlotLayout } from "./payload";
 import { StrengthControl } from "./StrengthControl";
+
 import classes from "./ReferencePicker.module.css";
 
 /** A placed reference dragged onto another slot moves there. */

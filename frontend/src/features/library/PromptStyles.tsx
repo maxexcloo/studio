@@ -1,4 +1,3 @@
-import { useState, type ReactNode } from "react";
 import {
   Alert,
   Badge,
@@ -12,6 +11,8 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -22,10 +23,10 @@ import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { assistantQuery } from "../generation/PromptAssistant";
 import {
-  promptStylesQuery,
   type PromptStyle,
   type PromptStyleList,
   type PromptStyleVersion,
+  promptStylesQuery,
 } from "./queries";
 
 const path = "/api/profiles/prompt-styles";

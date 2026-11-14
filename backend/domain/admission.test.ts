@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import type { GenerationQueue } from "./queue.ts";
-import { queuePriority, Store } from "./store.ts";
+import { Store, queuePriority } from "./store.ts";
 
 test("a profile that can't batch queues Count as separate seeded runs in one set", async () => {
   const store = new Store(openDatabase(":memory:"));

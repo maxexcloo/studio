@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { minorAge, minorAgeRefusal } from "./minor-age.js";
 
 test("a prompt that states an age under 18 is refused, naming the words", () => {

@@ -1,7 +1,6 @@
 import { Alert, ScrollArea, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { icons } from "../../ui/icons";
-import { LoadingState } from "../../ui/LoadingState";
+
 import {
   characterLead,
   outfitPart,
@@ -9,14 +8,16 @@ import {
   withPart,
   withoutPart,
 } from "../../../../shared/characters";
+import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { PromptCardMenu, promptCardText, usePromptCardDialogs } from "./PromptCardDialogs";
 import {
-  charactersQuery,
-  promptCardsQuery,
   type CharacterCard,
   type PromptCard,
   type PromptCardKind,
+  charactersQuery,
+  promptCardsQuery,
 } from "./queries";
 
 /** The sentences a card may stand as in a prompt: a scene's differs with a character's image. */

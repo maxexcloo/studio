@@ -1,9 +1,9 @@
+import { readGalleryRows, writeGalleryRows } from "./persistence/gallery-rows.ts";
 import {
   runtimeDatabase,
   withOfflineDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
-import { readGalleryRows, writeGalleryRows } from "./persistence/gallery-rows.ts";
 
 /**
  * The migrate-runtime step that clears Dream answers left on records another account owns. Dream

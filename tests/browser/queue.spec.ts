@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { fixtures, image, signIn, stamp } from "./fixtures";
 
 test("the queue pauses, resumes and reorders the account's waiting work", async ({ page }) => {

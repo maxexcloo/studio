@@ -1,11 +1,12 @@
+import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import assert from "node:assert/strict";
 import test from "node:test";
-import { compatibleLoras, loraCompatibility, loraName, strengthRange } from "./policy.js";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./catalogue.js";
+import { compatibleLoras, loraCompatibility, loraName, strengthRange } from "./policy.js";
 
 const profile = {
   id: "custom:fl",

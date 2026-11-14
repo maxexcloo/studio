@@ -1,7 +1,9 @@
-import compression from "compression";
-import staticGzip from "express-static-gzip";
 import path from "node:path";
 import { constants } from "node:zlib";
+
+import compression from "compression";
+import staticGzip from "express-static-gzip";
+
 import { isInside } from "./paths.js";
 
 const immutable = "public, max-age=31536000, immutable";

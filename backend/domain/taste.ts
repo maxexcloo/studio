@@ -1,10 +1,10 @@
+import { maxAvoid, maxAvoids, maxTasteSummary } from "../../shared/taste.ts";
 import {
   deleteRuntimeDocument,
   readRuntimeDocument,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
-import { maxAvoid, maxAvoids, maxTasteSummary } from "../../shared/taste.ts";
-import { directRoute, type RouteAccount } from "./direct-route.ts";
+import { type RouteAccount, directRoute } from "./direct-route.ts";
 
 /**
  * What a person did with a result; "keep" and "discard" are their verdicts on Dream results,

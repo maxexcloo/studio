@@ -1,14 +1,4 @@
 import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type PointerEvent,
-} from "react";
-import {
   ActionIcon,
   Badge,
   Drawer,
@@ -24,30 +14,42 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "react-router";
-import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { X } from "lucide-react";
-import { icons } from "../../ui/icons";
+import {
+  type PointerEvent,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { Link, useLocation } from "react-router";
+
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
-import { useRemembered } from "../auth/useRemembered";
-import { showQueued } from "../settings/accountPreferences";
+import { ActionBarSurface, type ActionGroups, findAction, usualAction } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop, closingPopup } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
+import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
+import { showQueued } from "../settings/accountPreferences";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
-import { mediaNumber, mediaTitle } from "./mediaLabels";
-import { neighbourSets, setMembers, setPosition } from "./resultSets";
 import { MediaJobStatus } from "./MediaJobStatus";
-import classes from "./MediaViewer.module.css";
-import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
-import { MediaViewerDock, useRunFamily, type QueuedRun } from "./MediaViewerDock";
+import { mediaNumber, mediaTitle } from "./mediaLabels";
 import { mediaSource, playbackUrl } from "./mediaSource";
-import { ActionBarSurface, findAction, usualAction, type ActionGroups } from "../../ui/ActionBar";
-import { swipeDirection, type SwipeDirection } from "./swipe";
-import { useMediaIteration, type Iteration } from "./useMediaAction";
+import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
+import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
+import { neighbourSets, setMembers, setPosition } from "./resultSets";
+import { type SwipeDirection, swipeDirection } from "./swipe";
+import { type Iteration, useMediaIteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
+
+import classes from "./MediaViewer.module.css";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );

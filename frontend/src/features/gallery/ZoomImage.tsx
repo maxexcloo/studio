@@ -1,10 +1,12 @@
+import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
-import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
+
 import { closingPopup } from "../../ui/popupClicks";
-import { swipeDirection, type SwipeDirection } from "./swipe";
+import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
+import { type SwipeDirection, swipeDirection } from "./swipe";
+
 import classes from "./ZoomImage.module.css";
 
 export function ZoomImage({

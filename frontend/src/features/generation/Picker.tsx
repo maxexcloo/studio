@@ -1,21 +1,9 @@
 import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type DragEvent,
-  type FocusEvent,
-  type KeyboardEvent,
-  type ReactNode,
-  type Ref,
-} from "react";
-import {
   ActionIcon,
   Box,
   Button,
   Combobox,
   FocusTrap,
-  getDefaultZIndex,
   Group,
   Image,
   InputBase,
@@ -28,21 +16,35 @@ import {
   Text,
   Tooltip,
   UnstyledButton,
+  getDefaultZIndex,
   useCombobox,
 } from "@mantine/core";
 import { ArrowDownUp, Check, type LucideIcon } from "lucide-react";
-import { icons } from "../../ui/icons";
-import { FilterButton } from "../gallery/GalleryFilters";
+import {
+  type CSSProperties,
+  type DragEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import { menuWidth } from "../../theme";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ScrollingSegments } from "../../ui/ScrollingSegments";
 import { SearchInput } from "../../ui/SearchInput";
 import { useFlash } from "../../ui/useFlash";
-import { menuWidth } from "../../theme";
 import { usePhone, useTouch } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
+import { FilterButton } from "../gallery/GalleryFilters";
 import type { PreviewImage } from "../gallery/ImagePreview";
 import { escapePanel, fittedPopup } from "./chip";
+
 import classes from "./Picker.module.css";
 
 /**

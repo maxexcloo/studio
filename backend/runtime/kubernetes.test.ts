@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { KubernetesEngine, urlRequest, type KubernetesRequest } from "./kubernetes.ts";
+
+import { KubernetesEngine, type KubernetesRequest, urlRequest } from "./kubernetes.ts";
 
 const target = { namespace: "text", deployment: "text-qwen" };
 

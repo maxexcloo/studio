@@ -7,10 +7,10 @@ import { referenceAssetForAccount, stageReferenceAssetsForAccount } from "./refe
 import { findUpscaleTarget, prepareUpscale, toggleUpscaleView } from "./upscale-jobs.js";
 import {
   normalizeQuality,
+  uploadUpscaleVideoSource,
   upscaleQualities,
   upscaleStatus,
   upscaleTargets,
-  uploadUpscaleVideoSource,
 } from "./upscale.js";
 import { noWorkerMessage, workerById } from "./workers.js";
 

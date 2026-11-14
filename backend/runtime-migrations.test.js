@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import { registerMigrationRoutes } from "./runtime-migrations.js";
 
 test("the migrations route answers administrators with every step's plan, and logs each run", async (t) => {

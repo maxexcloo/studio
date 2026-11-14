@@ -1,5 +1,5 @@
-import { Component, type ReactNode } from "react";
 import { Alert } from "@mantine/core";
+import { Component, type ReactNode } from "react";
 
 /** Keeps a section that fails to render to an inline alert, so the rest of the app stays up. */
 export class SectionErrorBoundary extends Component<

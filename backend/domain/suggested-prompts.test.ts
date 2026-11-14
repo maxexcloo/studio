@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createPromptSuggester, type SuggestedPromptItem } from "./suggested-prompts.ts";
+
+import { type SuggestedPromptItem, createPromptSuggester } from "./suggested-prompts.ts";
 
 const item = (id: string, extra: Partial<SuggestedPromptItem> = {}): SuggestedPromptItem => ({
   id,

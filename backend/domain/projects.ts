@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { resolutions } from "../../shared/resolution.ts";
+
 import {
+  type Project,
+  type ProjectContent,
   maxProjectBrief,
   maxProjectName,
   maxProjectProfiles,
   projectAspects,
-  type Project,
-  type ProjectContent,
 } from "../../shared/projects.ts";
+import { resolutions } from "../../shared/resolution.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 
 /** Each chat's project and when the chat last asked for something (Dream takes over a quiet one). */

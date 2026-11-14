@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
+
 import { compareUpscale, fixtures, image, stamp } from "./fixtures";
 
 const png = (width: number, height: number) =>

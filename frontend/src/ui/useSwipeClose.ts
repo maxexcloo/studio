@@ -1,4 +1,4 @@
-import { useRef, type TouchEvent } from "react";
+import { type TouchEvent, useRef } from "react";
 
 /** Whether anything from `from` up to and including `to` is scrolled away from its top. */
 function scrolled(from: Element, to: Element) {

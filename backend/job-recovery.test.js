@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { createJobRecovery } from "./job-recovery.js";
 
 /** The recovery's gallery over an array that `read()` returns and `write(items)` replaces. */

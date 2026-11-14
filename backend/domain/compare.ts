@@ -1,9 +1,10 @@
 import { randomInt, randomUUID } from "node:crypto";
+
 import { compareVariants } from "../../shared/compare.ts";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
-import { directRoute, type RouteAccount } from "./direct-route.ts";
-import type { Store, QueueOrigin } from "./store.ts";
+import { type RouteAccount, directRoute } from "./direct-route.ts";
+import type { QueueOrigin, Store } from "./store.ts";
 
 /**
  * A compare set: `compareVariants` image jobs shown side by side. `vote` is the starred winner and,

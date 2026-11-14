@@ -1,6 +1,6 @@
 import type { QueueMedia } from "../../shared/queue.ts";
-import { unreachableCancelReason, type JobObservation, type QueueAdapter } from "./queue.ts";
-import { Store, type OwnedJob } from "./store.ts";
+import { type JobObservation, type QueueAdapter, unreachableCancelReason } from "./queue.ts";
+import { type OwnedJob, Store } from "./store.ts";
 
 type RecordValue = Record<string, any>;
 interface UpscaleOptions {

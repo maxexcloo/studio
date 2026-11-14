@@ -5,35 +5,34 @@ import {
   Button,
   Chip,
   Group,
+  type PopoverProps,
   ScrollArea,
   Select,
   Stack,
   Switch,
   Text,
-  type PopoverProps,
 } from "@mantine/core";
-import { useState } from "react";
-import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
-import { icons } from "../../ui/icons";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { loraLibraryQuery, type LoraLibrary, type LoraRating } from "./loraLibrary";
-import { usePresets, type Preset } from "./PresetPicker";
-import { OrderedItems } from "../../ui/OrderedItems";
-import { EmptyState } from "../../ui/EmptyState";
-import { LoadingState } from "../../ui/LoadingState";
-import { api, post } from "../../api";
-import { useRemembered } from "../auth/useRemembered";
-import { useGeneration } from "./GenerationProvider";
-import type { GenerationInput, Profile } from "../../types";
-import { isProfile, profileForBackend } from "./payload";
-import { StrengthControl } from "./StrengthControl";
+import { ChevronDown, ThumbsDown, ThumbsUp } from "lucide-react";
+import { useState } from "react";
+
 import { loraDefaultStrength, loraFamilyId } from "../../../../shared/profiles";
+import { api, post } from "../../api";
+import type { GenerationInput, Profile } from "../../types";
+import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
+import { modelFamilyLabel } from "../../ui/modelFamily";
+import { OrderedItems } from "../../ui/OrderedItems";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { chipProps } from "./chip";
+import { useGeneration } from "./GenerationProvider";
+import { type LoraLibrary, type LoraRating, loraLibraryQuery } from "./loraLibrary";
+import { isProfile, profileForBackend } from "./payload";
 import {
-  ChipPopup,
   ChipContent,
+  ChipPopup,
   PickerGrid,
   PickerHeader,
   PickerTile,
@@ -43,6 +42,9 @@ import {
   SortMenu,
   useNaming,
 } from "./Picker";
+import { type Preset, usePresets } from "./PresetPicker";
+import { StrengthControl } from "./StrengthControl";
+
 import classes from "./LoraPicker.module.css";
 export interface LoraInfo {
   title?: string;

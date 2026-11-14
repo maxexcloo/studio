@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import zlib from "node:zlib";
+
 import {
   a1111Recipe,
   civitaiJsonRecipe,

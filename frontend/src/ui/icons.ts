@@ -22,17 +22,18 @@ import {
   ImageUp,
   ImageUpscale,
   Info,
-  LayoutDashboard,
   Layers,
+  LayoutDashboard,
   Lightbulb,
   ListFilter,
   ListX,
+  type LucideIcon,
   MapPinned,
   Maximize2,
   MessageCircle,
   Moon,
-  Pencil,
   PenLine,
+  Pencil,
   Play,
   Plus,
   Puzzle,
@@ -58,7 +59,6 @@ import {
   Upload,
   WandSparkles,
   X,
-  type LucideIcon,
 } from "lucide-react";
 
 /** One icon per meaning: every action, mode and recurring control takes its icon from here. */

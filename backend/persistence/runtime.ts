@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 import { tmpdir } from "node:os";
+import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+
 import { createGalleryTable, galleryColumns } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();

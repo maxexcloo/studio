@@ -1,12 +1,13 @@
-import { useState, type ReactNode } from "react";
 import { Alert, Button, Menu, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { type ReactNode, useState } from "react";
+
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
-import { presetHolds, usePresets, type Preset } from "../generation/PresetPicker";
+import { type Preset, presetHolds, usePresets } from "../generation/PresetPicker";
 
 const savedOn = (preset: Preset) =>
   preset.savedAt

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { hfFetch, mirroredUrl } from "./hf-access.js";
 
 const token = "hf_abcdefghijklmnopqrstuvwxyz1234";

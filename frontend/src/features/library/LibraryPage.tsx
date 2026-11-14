@@ -1,26 +1,27 @@
-import { useState, type ReactNode } from "react";
 import { Alert } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+
 import { post } from "../../api";
 import { WorkspaceSections, useWorkspaceSection } from "../../ui/WorkspaceSections";
+import { LibraryCharacters } from "../characters/LibraryCharacters";
+import { LibraryPromptCards } from "../characters/LibraryPromptCards";
+import { useStageComparison } from "../compare/variants";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { CatalogueEditor } from "./CatalogueEditor";
 import {
-  freeUpdate,
   LibraryCatalogueTable,
-  libraryItemCategory,
   type LibraryItem,
+  freeUpdate,
+  libraryItemCategory,
 } from "./LibraryCatalogueTable";
-import { useStageComparison } from "../compare/variants";
-import { LibraryPresets } from "./LibraryPresets";
-import { LibraryUnused } from "./LibraryUnused";
-import { LibraryCharacters } from "../characters/LibraryCharacters";
-import { LibraryPromptCards } from "../characters/LibraryPromptCards";
 import { LibraryDownloads } from "./LibraryDownloads";
 import { LibraryImports } from "./LibraryImports";
+import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
+import { LibraryPresets } from "./LibraryPresets";
+import { LibraryUnused } from "./LibraryUnused";
 import { GuideDefinitions, ProfileDefinitions } from "./ProfileDefinitions";
 import { PromptStyles } from "./PromptStyles";
-import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { catalogueQuery, downloadsQuery, importsQuery } from "./queries";
 
 /** A check's or an update's answer; Update All also says how many started and which failed. */

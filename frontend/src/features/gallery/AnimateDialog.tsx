@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
 import { Alert, Button, Modal, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
@@ -10,11 +11,11 @@ import { useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import {
+  type AnimateRequest,
+  type Iteration,
   useAnimateReview,
   useAnimateWriter,
   useMediaIteration,
-  type AnimateRequest,
-  type Iteration,
 } from "./useMediaAction";
 
 /**

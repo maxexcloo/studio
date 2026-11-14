@@ -1,14 +1,16 @@
-import { useMotionDuration } from "../../ui/Appearance";
-import { memo, useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Drawer, FocusTrap, Paper, Transition } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
-import { GenerationForm } from "./GenerationForm";
-import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
+import { type CSSProperties, memo, useEffect, useId, useRef, useState } from "react";
+
 import { api, failure } from "../../api";
 import type { MediaKind, ReferenceAsset } from "../../types";
+import { useMotionDuration } from "../../ui/Appearance";
 import { closeWhenTop, closingPopup, layerAbove, popupLayer } from "../../ui/popupClicks";
 import { useKeyboard, useKeyboardDrop, useTypingIn } from "../../ui/useKeyboard";
 import { usePhone, useTouch } from "../../ui/usePhone";
+import { GenerationForm } from "./GenerationForm";
+import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
+
 import classes from "./ComposerDock.module.css";
 export const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /**

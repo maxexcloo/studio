@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { writeRuntimeDocument, readRuntimeDocument } from "./persistence/runtime.ts";
+
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-deployment-settings-"));
 process.env.STUDIO_DATA_DIR = temporary;

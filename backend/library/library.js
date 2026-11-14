@@ -1,7 +1,7 @@
 import { localOutputFile } from "../comfy/comfy.js";
 import { galleryItems, putGalleryItems } from "../gallery/store.js";
-import { probeVideo } from "../video-previews.js";
 import { galleryKey } from "../persistence/gallery-rows.ts";
+import { probeVideo } from "../video-previews.js";
 
 const yieldToServer = () => new Promise((resolve) => setImmediate(resolve));
 

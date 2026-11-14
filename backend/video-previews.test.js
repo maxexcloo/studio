@@ -1,10 +1,11 @@
-import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
+import test, { after } from "node:test";
+
 import express from "express";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-previews-test-"));

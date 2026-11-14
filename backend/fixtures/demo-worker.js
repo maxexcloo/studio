@@ -5,7 +5,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+
 import sharp from "sharp";
+
 import { startFakeComfy } from "./fake-comfy.js";
 import { testImageProfile, testVideoProfile, writeTestWorkflows } from "./test-workflows.js";
 

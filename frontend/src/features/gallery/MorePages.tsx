@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Center, Loader, Stack, Text } from "@mantine/core";
 import type { UseInfiniteQueryResult } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Loads a listing's next page as its end nears `root`'s view (the window's without one), keeping

@@ -1,18 +1,20 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { SquareCheck, X } from "lucide-react";
-import type { MediaItem } from "../../types";
-import { icons } from "../../ui/icons";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+
 import { easing } from "../../theme";
+import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
-import { focusTile, type GalleryViewProps } from "./MediaGrid";
-import { mediaSource } from "./mediaSource";
+import { type GalleryViewProps, focusTile } from "./MediaGrid";
 import { mediaTitle } from "./mediaLabels";
-import { inRunOrder, runKey } from "./resultSets";
+import { mediaSource } from "./mediaSource";
 import { MediaTile } from "./MediaTile";
+import { inRunOrder, runKey } from "./resultSets";
 import { useGalleryLayout, useHoldToSelect, useScrollAnchor } from "./useGalleryLayout";
+
 import classes from "./RunsView.module.css";
 
 interface Run {

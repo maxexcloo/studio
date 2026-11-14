@@ -1,35 +1,36 @@
 import { randomInt, randomUUID } from "node:crypto";
+
 import {
-  awaitsWriting,
-  maxPromptCharacters,
-  type GenerationInput,
-  type QueueMedia,
-} from "../../shared/queue.ts";
-import {
+  type CardKind,
+  type Character,
   cardKinds,
   maxCardDescription,
   maxCardName,
   maxCharacterImages,
-  type CardKind,
-  type Character,
 } from "../../shared/characters.ts";
 import type { Project, Review } from "../../shared/projects.ts";
+import {
+  type GenerationInput,
+  type QueueMedia,
+  awaitsWriting,
+  maxPromptCharacters,
+} from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
+import { logFailure } from "./log-failure.ts";
 import type { Chats } from "./projects.ts";
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
-import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
+import { type OwnedJob, type QueueOrigin, type Store, queuePriority } from "./store.ts";
 import {
+  type Taste,
+  type TasteChoice,
+  type TasteRecord,
   itemValues,
   pairAttributes,
   pairSignal,
   tasteSignal,
-  type Taste,
-  type TasteChoice,
-  type TasteRecord,
 } from "./taste.ts";
-import { logFailure } from "./log-failure.ts";
 import { contentRule, writerGuide } from "./writing-standard.ts";
 
 /** One account's Dream settings. Dream is off until the person turns it on. */

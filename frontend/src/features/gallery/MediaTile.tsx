@@ -1,10 +1,12 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Button, Checkbox, Loader, Progress, Text, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+
+import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
 import { useTouch } from "../../ui/usePhone";
 import {
   phaseLabel,
@@ -14,13 +16,13 @@ import {
   useQueueAction,
 } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
-import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
+import { mediaSource } from "./mediaSource";
 import { upscaling, useStopUpscale } from "./UpscaleControls";
-import type { GallerySelection } from "./useGallerySelection";
 import type { useHoldToSelect } from "./useGalleryLayout";
+import type { GallerySelection } from "./useGallerySelection";
+
 import classes from "./MediaTile.module.css";
-import { terminalStatuses } from "../../../../shared/queue";
 
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>

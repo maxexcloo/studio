@@ -1,28 +1,30 @@
 // Studio MCP at /mcp: authentication, a server per request with the actor's tools, and the result, upload and export links.
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
-import express from "express";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { hostAllowed, hostnameOf } from "../request-guard.js";
-import { maxJobsPerCall } from "./controls.js";
-import { McpMedia, maxUploadMegabytes, resultPage, uploadPage } from "./media.js";
-import { livePrompting } from "../profile/store.js";
-import { gatewaySettings } from "../assistant.js";
+import express from "express";
+
 import { mayUseFeature } from "../account-policy.js";
-import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
+import { gatewaySettings } from "../assistant.js";
+import { logEvent, logWarning } from "../crash-log.js";
+import { appVersion } from "../data-dir.js";
+import { livePrompting } from "../profile/store.js";
+import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
-import { registerManageTools } from "./manage.js";
-import { createChatChoices, registerProjectTool } from "./project.js";
+import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
+import { maxJobsPerCall } from "./controls.js";
 import { registerGenerateTools } from "./generate.js";
+import { controlInstructions, registerGpuTools } from "./gpu.js";
+import { registerManageTools } from "./manage.js";
+import { McpMedia, maxUploadMegabytes, resultPage, uploadPage } from "./media.js";
+import { createChatChoices, registerProjectTool } from "./project.js";
 import { registerResultTools } from "./results.js";
 import { registerVariantsTool } from "./variants.js";
-import { controlInstructions, registerGpuTools } from "./gpu.js";
-import fs from "node:fs";
-import { appVersion } from "../data-dir.js";
-import { logEvent, logWarning } from "../crash-log.js";
 
 // The generate tool waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;

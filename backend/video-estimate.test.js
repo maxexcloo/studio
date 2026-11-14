@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { addRun, estimateRun } from "./generation-timing.js";
 
 const result = (runMs, stepMs, steps = 20) => ({

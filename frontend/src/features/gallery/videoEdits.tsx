@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
 import { Alert, Button, Modal, RangeSlider, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";

@@ -1,15 +1,16 @@
-import { useState } from "react";
-import { ActionIcon, getDefaultZIndex, Menu } from "@mantine/core";
+import { ActionIcon, Menu, getDefaultZIndex } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { ActionMenuItems } from "../../ui/ActionBar";
-import { icons } from "../../ui/icons";
+import { useState } from "react";
+
 import { menuWidth } from "../../theme";
-import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
+import { ActionMenuItems } from "../../ui/ActionBar";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
 import { useGeneration } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
+import { CharacterEditor, type CharacterStart } from "./CharacterEditor";
 import { useGenerateReferences } from "./generateReferences";
-import { useDeleteCharacter, useMakeSheet, type CharacterCard } from "./queries";
+import { type CharacterCard, useDeleteCharacter, useMakeSheet } from "./queries";
 
 /**
  * New, Edit and Delete Character, Generate References and Make Sheet for a list of cards: `edit`

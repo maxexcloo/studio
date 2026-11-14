@@ -1,23 +1,24 @@
-import { useState } from "react";
 import { Button, SegmentedControl, Select, Stack, Switch } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { icons } from "../../ui/icons";
+import { useState } from "react";
+
 import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { useAccount } from "../auth/AccountGate";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { accountAdminQuery } from "./AccountAdmin";
-import { FinishStarredImages } from "./FinishStarredImages";
 import {
-  preferencesQuery,
-  useSavePreferences,
-  useTileCaptions,
   type GalleryWorkPreference,
   type SidePreference,
   type VideosPreference,
+  preferencesQuery,
+  useSavePreferences,
+  useTileCaptions,
 } from "./accountPreferences";
+import { FinishStarredImages } from "./FinishStarredImages";
 
 /**
  * Delete Failed Items: everyone deletes their own; administrators of a multi-user Studio may choose

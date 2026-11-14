@@ -1,14 +1,18 @@
-import { useRef } from "react";
 import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useRef } from "react";
+
+import { guidingRoles } from "../../../../shared/profiles";
 import { api, post } from "../../api";
-import { appendGalleryFilters, type GalleryFilterValues } from "../gallery/GalleryFilters";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
+import { type GalleryFilterValues, appendGalleryFilters } from "../gallery/GalleryFilters";
+import { useGeneration } from "./GenerationProvider";
 import {
+  type SlotLayout,
   addReference,
   profileForBackend,
   referenceCapacity,
@@ -17,10 +21,7 @@ import {
   referenceGroupAssets,
   referenceGroups,
   referencePatch,
-  type SlotLayout,
 } from "./payload";
-import { useGeneration } from "./GenerationProvider";
-import { guidingRoles } from "../../../../shared/profiles";
 
 export const galleryReferenceType = "application/x-studio-gallery-item";
 /** What an upload can be (backend/references.js): an image, or a video placed by its first frame. */

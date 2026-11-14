@@ -3,7 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import sharp from "sharp";
+
 import { parseA1111Parameters, readPngInfo, withPngText } from "./png-text.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-png-"));

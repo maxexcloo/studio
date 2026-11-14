@@ -10,21 +10,23 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
-import { useIsAdmin } from "../auth/AccountGate";
-import { Queue, QueueActions, useQueue } from "../generation/Queue";
-import { SwapNotice } from "../runtime/JobSwap";
-import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
+
+import { pausedReason, terminalStatuses } from "../../../../shared/queue";
+import { icons } from "../../ui/icons";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
+import { useIsAdmin } from "../auth/AccountGate";
+import { Queue, QueueActions, useQueue } from "../generation/Queue";
+import { SwapNotice } from "../runtime/JobSwap";
+import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
+
 import classes from "./ServiceStatus.module.css";
-import { icons } from "../../ui/icons";
-import { pausedReason, terminalStatuses } from "../../../../shared/queue";
 
 /**
  * The one header entry to work in progress and service health on every breakpoint. Desktop opens

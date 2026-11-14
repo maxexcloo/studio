@@ -1,10 +1,8 @@
-import { useId, useRef, useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
   FileButton,
   FocusTrap,
-  getDefaultZIndex,
   Group,
   Image,
   Input,
@@ -14,28 +12,31 @@ import {
   TextInput,
   Tooltip,
   UnstyledButton,
+  getDefaultZIndex,
 } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { type ReactNode, useId, useRef, useState } from "react";
+
+import { type CardKind, maxCardDescription, maxCardName } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
-import { icons } from "../../ui/icons";
 import type { Action } from "../../ui/ActionBar";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { TextBox } from "../../ui/TextBox";
+import { icons } from "../../ui/icons";
 import { closeWhenTop } from "../../ui/popupClicks";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { maxCardDescription, maxCardName, type CardKind } from "../../../../shared/characters";
-import { useImagePreview, type PreviewImage } from "../gallery/ImagePreview";
-import { assistantQuery } from "../generation/PromptAssistant";
+import { type PreviewImage, useImagePreview } from "../gallery/ImagePreview";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { GalleryChoices } from "../generation/GalleryChoices";
+import { assistantQuery } from "../generation/PromptAssistant";
 import {
+  type ReferenceTarget,
   galleryReferenceType,
   nextReferenceTarget,
   referenceKey,
   uploadTypes,
   useReferencePlacement,
-  type ReferenceTarget,
 } from "../generation/references";
 import { ReferenceSlots, referenceCellType } from "../generation/ReferenceSlots";
 import { useReferenceBrowser } from "../generation/useReferenceBrowser";

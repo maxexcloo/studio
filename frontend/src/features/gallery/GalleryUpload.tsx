@@ -1,16 +1,17 @@
-import { useRef, useState } from "react";
 import { Button, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, FolderUp } from "lucide-react";
+import { useRef, useState } from "react";
+
 import { api } from "../../api";
+import { menuWidth } from "../../theme";
+import { ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { uploadTypes } from "../generation/references";
-import { ActionMenuItems } from "../../ui/ActionBar";
-import { menuWidth } from "../../theme";
 
 const listedFailures = 5;
 

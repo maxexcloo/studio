@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 for (const kind of ["image", "video"] as const) {

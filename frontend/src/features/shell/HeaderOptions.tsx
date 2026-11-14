@@ -1,9 +1,10 @@
-import { forwardRef, useState } from "react";
 import { ActionIcon, Menu, Popover } from "@mantine/core";
 import { Library, Palette } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { forwardRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+
 import { AppearanceControls } from "../../ui/Appearance";
+import { icons } from "../../ui/icons";
 import { AccountMenuContent } from "../auth/AccountMenu";
 
 // The outer popover and inner menu each retain a ref to the same DOM anchor.

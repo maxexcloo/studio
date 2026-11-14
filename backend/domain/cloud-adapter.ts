@@ -1,7 +1,7 @@
 import type { QueueMedia } from "../../shared/queue.ts";
 import { CliProxyMedia, type CloudRequest } from "../providers/cliproxy.ts";
 import type { JobObservation, QueueAdapter } from "./queue.ts";
-import { Store, type OwnedJob } from "./store.ts";
+import { type OwnedJob, Store } from "./store.ts";
 
 interface ProviderRecord {
   state: "submitting" | "running" | "saved" | "failed" | "cancelled";

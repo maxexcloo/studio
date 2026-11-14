@@ -1,5 +1,5 @@
-import { icons } from "../../ui/icons";
 import type { Action, ActionGroups } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 
 const definitions = {
   animate: { label: "Animate", icon: icons.animate },

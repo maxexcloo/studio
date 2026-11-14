@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { missingComfyOutputs } from "./missing-comfy-outputs.js";
 
 const answer = (status) => Object.assign(new Error(`Comfy ${status}`), { status });

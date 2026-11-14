@@ -1,9 +1,10 @@
 import { Alert, Button, Select, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+
+import { guidingRoles } from "../../../../shared/profiles";
 import { post } from "../../api";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { guidingRoles } from "../../../../shared/profiles";
 
 /** A reference slot's roles: where it goes, then what it guides (Identity, Pose/Layout, Style). */
 const roleOptions = [

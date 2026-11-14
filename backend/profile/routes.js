@@ -1,3 +1,5 @@
+import { loraFamilyId } from "../../shared/profiles.ts";
+import { directRoute } from "../domain/direct-route.ts";
 /**
  * Library › Profiles beyond the JSON editor (profile/editor.js), administrators only:
  *
@@ -42,9 +44,8 @@
  * same routes in process: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
 import { families as familyCatalogue } from "../family-catalogue.js";
-import { directRoute } from "../domain/direct-route.ts";
 import { adminRefusal, fromChat, requireAdmin } from "../route-access.js";
-import { loraFamilyId } from "../../shared/profiles.ts";
+import { backendCandidates, combineBackends } from "./backends.js";
 import {
   approveEditableProfile,
   failure,
@@ -53,10 +54,9 @@ import {
   revertEditableProfile,
 } from "./editor.js";
 import { writeExport } from "./export.js";
-import { backendCandidates, combineBackends } from "./backends.js";
 import { duplicateProfiles, mergeDuplicateProfiles } from "./merge.js";
-import { removeProfile } from "./remove.js";
 import { addRadianceBackend, radianceConversions } from "./radiance.js";
+import { removeProfile } from "./remove.js";
 
 /**
  * `profiles()` and `guides()` give the profile/store.js stores, `promptStyles()` prompt-styles.js's; `objectInfo(kind)` ComfyUI's

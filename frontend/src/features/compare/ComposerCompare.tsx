@@ -1,11 +1,12 @@
-import { useState } from "react";
 import { Button, Menu, SegmentedControl, Tooltip } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, X } from "lucide-react";
-import type { GenerationInput, Profile } from "../../types";
+import { useState } from "react";
+
 import { isCloudProfile } from "../../../../shared/profiles";
 import { menuWidth } from "../../theme";
-import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
+import type { GenerationInput, Profile } from "../../types";
+import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { useRemembered } from "../auth/useRemembered";

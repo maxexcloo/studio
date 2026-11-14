@@ -1,11 +1,12 @@
 import { Boxes, Info, Plug, Server, Shield, UserRound, UsersRound } from "lucide-react";
+
 import { icons } from "../../ui/icons";
-import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import {
   WorkspaceSectionSelect,
   useWorkspaceSection,
   visibleSections,
 } from "../../ui/WorkspaceSections";
+import { useAccount, useIsAdmin } from "../auth/AccountGate";
 
 // Personal sections, then administration, each alphabetical, with Integrations and About apart at
 // the end.

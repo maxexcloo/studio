@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { earliest, listSchedule } from "./eta.ts";
 
 test("waiting work goes to whichever worker frees first, in queue order", () => {

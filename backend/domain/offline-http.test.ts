@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { fork, type ChildProcess } from "node:child_process";
+import { type ChildProcess, fork } from "node:child_process";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -8,10 +8,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import sharp from "sharp";
+
 import type { QueueJob } from "../../shared/queue.ts";
-import { closeRuntimeDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
+import { closeRuntimeDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
 test(

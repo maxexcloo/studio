@@ -3,10 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
+import { closeRuntimeDatabase, runtimeDatabase } from "../persistence/runtime.ts";
 import { createCatalogueStore } from "./catalogue.js";
 import { createImportEngine, createImportStore, importId, publicImport } from "./imports.js";
 import { detectLink } from "./sources.js";
-import { closeRuntimeDatabase, runtimeDatabase } from "../persistence/runtime.ts";
 
 const quiet = { info: () => {}, warn: () => {} };
 const tempDir = (t) => {

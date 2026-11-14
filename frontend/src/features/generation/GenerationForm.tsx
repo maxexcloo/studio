@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
-import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { post } from "../../api";
-import { usePhone } from "../../ui/usePhone";
+import { ArrowUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
 import type { StudioSession } from "../../../../shared/queue";
+import { post } from "../../api";
 import type { MediaKind, QueueJob, ReferenceAsset } from "../../types";
+import { usePhone } from "../../ui/usePhone";
+import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
+import { useCompareRun, useDraftComparison } from "../compare/variants";
+import { showQueued } from "../settings/accountPreferences";
+import { GenerationEditor, blockedProps, submitShortcut, useSubmitState } from "./GenerationEditor";
 import {
   defaultProfile,
   draftForProfile,
@@ -13,14 +18,11 @@ import {
   inputForProfile,
   useGeneration,
 } from "./GenerationProvider";
-import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
+import { generationInput, profileForBackend, referencePatch } from "./payload";
 import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
-import { showQueued } from "../settings/accountPreferences";
-import { generationInput, profileForBackend, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
-import { CompareMenu, VariantStrip } from "../compare/ComposerCompare";
-import { useCompareRun, useDraftComparison } from "../compare/variants";
+
 import classes from "./ComposerDock.module.css";
 
 /**

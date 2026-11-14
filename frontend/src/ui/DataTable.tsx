@@ -1,11 +1,13 @@
-import { Fragment, useState, type ReactNode } from "react";
 import { ActionIcon, Group, Menu, Table, UnstyledButton, VisuallyHidden } from "@mantine/core";
-import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
+import { Fragment, type ReactNode, useState } from "react";
+
 import { menuWidth } from "../theme";
-import { icons } from "./icons";
 import { EmptyState } from "./EmptyState";
+import { icons } from "./icons";
 import { LoadingState } from "./LoadingState";
 import { usePhone } from "./usePhone";
+
 import classes from "./DataTable.module.css";
 
 interface DataColumn<T> {

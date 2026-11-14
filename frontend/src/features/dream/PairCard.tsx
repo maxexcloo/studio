@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
 import { Text } from "@mantine/core";
+import type { ReactNode } from "react";
+
 import { mediaSource } from "../gallery/mediaSource";
 import type { PairDeckCard } from "./deck";
+
 import classes from "./DreamPage.module.css";
 
 export const sideNames = ["A", "B"] as const;

@@ -1,15 +1,15 @@
 import {
   ActionBar,
   ActionIcon,
-  alpha,
   AppShell,
   Badge,
   Button,
+  type CSSProperties,
+  type CSSVariablesResolver,
   CloseButton,
   Collapse,
   Combobox,
   ComboboxPopover,
-  createTheme,
   Drawer,
   FloatingIndicator,
   Input,
@@ -21,18 +21,19 @@ import {
   Paper,
   PasswordInput,
   Popover,
-  rem,
   ScrollArea,
   SegmentedControl,
   Select,
   Switch,
   Table,
   Tooltip,
-  type CSSProperties,
-  type CSSVariablesResolver,
+  alpha,
+  createTheme,
+  rem,
 } from "@mantine/core";
-import { createElement } from "react";
 import { ChevronDown } from "lucide-react";
+import { createElement } from "react";
+
 import classes from "./theme.module.css";
 
 const chevron = createElement(ChevronDown, { size: 16 });

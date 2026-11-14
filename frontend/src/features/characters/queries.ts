@@ -1,16 +1,17 @@
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, post } from "../../api";
-import type { Profile, ReferenceAsset } from "../../types";
+
 import {
+  type Character,
+  type SheetRole,
   characterLead,
   identitySlot,
   withCharacter,
   withoutCharacter,
-  type Character,
-  type SheetRole,
 } from "../../../../shared/characters";
-import { nextReferenceTarget, placeReference } from "../generation/references";
+import { api, post } from "../../api";
+import type { Profile, ReferenceAsset } from "../../types";
 import { queueQuery } from "../generation/Queue";
+import { nextReferenceTarget, placeReference } from "../generation/references";
 
 /** A card as `/api/characters` lists it: its images that still exist, as reference assets. */
 export interface CharacterCard extends Omit<Character, "generated" | "sheet"> {

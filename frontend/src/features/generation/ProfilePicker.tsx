@@ -1,15 +1,16 @@
-import { useEffect } from "react";
 import { Badge } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+
+import { isCloudProfile } from "../../../../shared/profiles";
+import type { GenerationInput, Models, Profile } from "../../types";
+import { modelFamilyLabel } from "../../ui/modelFamily";
 import { useIsAdmin } from "../auth/AccountGate";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
-import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
-import type { GenerationInput, Models, Profile } from "../../types";
-import { backendLabel, isProfile, profileName } from "./payload";
-import { modelFamilyLabel } from "../../ui/modelFamily";
-import { isCloudProfile } from "../../../../shared/profiles";
 import { ChipOption, ChipSelect } from "./ChipSelect";
+import { inputForProfile, modelsQuery, useGeneration } from "./GenerationProvider";
+import { backendLabel, isProfile, profileName } from "./payload";
 
 /**
  * Readiness from the profile's files and its assigned workers; unknown placement shows nothing.

@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import {
   ActionIcon,
   Badge,
@@ -12,12 +11,15 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { Search, type LucideIcon } from "lucide-react";
+import { type LucideIcon, Search } from "lucide-react";
+import { type ComponentPropsWithRef, type ReactNode, useEffect, useRef, useState } from "react";
+
 import { icons } from "./icons";
-import { ScrollingSegments } from "./ScrollingSegments";
 import { PopupTooltip } from "./PopupTooltip";
+import { ScrollingSegments } from "./ScrollingSegments";
 import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
+
 import classes from "./SectionToolbar.module.css";
 
 /** A section's heading (from `WorkspaceSections`) with its toolbar beside it. */

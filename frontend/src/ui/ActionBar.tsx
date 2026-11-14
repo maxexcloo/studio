@@ -1,32 +1,34 @@
 import {
+  ActionIcon,
+  Button,
+  Collapse,
+  Divider,
+  type FloatingPosition,
+  Menu,
+  Paper,
+  type PaperProps,
+  SegmentedControl,
+  Switch,
+  Text,
+  Tooltip,
+} from "@mantine/core";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import {
+  type ComponentProps,
   Fragment,
+  type ReactNode,
   useEffect,
   useId,
   useLayoutEffect,
   useRef,
   useState,
-  type ComponentProps,
-  type ReactNode,
 } from "react";
-import {
-  ActionIcon,
-  Button,
-  Collapse,
-  Divider,
-  Menu,
-  Paper,
-  SegmentedControl,
-  Switch,
-  Text,
-  Tooltip,
-  type FloatingPosition,
-  type PaperProps,
-} from "@mantine/core";
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+
 import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useTouch } from "./usePhone";
+
 import classes from "./ActionBar.module.css";
 
 /** One media or selection action, shown as a menu item or an action bar control. */

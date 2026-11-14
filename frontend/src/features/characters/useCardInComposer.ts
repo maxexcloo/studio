@@ -1,11 +1,12 @@
 import { notifications } from "@mantine/notifications";
 import { useQuery } from "@tanstack/react-query";
+
 import type { Profile } from "../../types";
 import {
+  type Draft,
   defaultProfile,
   draftForProfile,
   useGeneration,
-  type Draft,
 } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import {
@@ -19,13 +20,13 @@ import { orderedReferences } from "../generation/references";
 import { characterEditor, switchedText } from "./CharacterChoices";
 import { promptCardApplied, withPromptCard } from "./PromptCardChoices";
 import {
+  type CharacterCard,
+  type PromptCard,
+  type PromptCardKind,
   applyCharacter,
   characterApplied,
   charactersQuery,
   promptCardsQuery,
-  type CharacterCard,
-  type PromptCard,
-  type PromptCardKind,
 } from "./queries";
 
 /**

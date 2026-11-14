@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+
 import { readGalleryRows } from "./persistence/gallery-rows.ts";
 
 /** The gallery a stopped fixture saved. */

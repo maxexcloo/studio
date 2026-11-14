@@ -1,16 +1,17 @@
 import { AppShell, FocusTrap, Modal } from "@mantine/core";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+
 import { AccountGate, useGroupFeature } from "./features/auth/AccountGate";
 import { useRemembered } from "./features/auth/useRemembered";
-import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
-import { useAppearance } from "./ui/Appearance";
-import { AppHeader } from "./features/shell/AppHeader";
+import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
+import { SettingsTitle } from "./features/settings/SettingsNavigation";
+import { AppHeader } from "./features/shell/AppHeader";
+import { useAppearance } from "./ui/Appearance";
 import { LoadingState } from "./ui/LoadingState";
 import { closeWhenTop } from "./ui/popupClicks";
-import { SettingsTitle } from "./features/settings/SettingsNavigation";
 import { useDialogKeyboard } from "./ui/useKeyboard";
 import { usePhone } from "./ui/usePhone";
 const ComparePage = lazy(() =>

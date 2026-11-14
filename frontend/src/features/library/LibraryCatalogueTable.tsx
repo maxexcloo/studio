@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
-import { icons } from "../../ui/icons";
+import { type ReactNode, useState } from "react";
+
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
+import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";

@@ -1,5 +1,6 @@
+import { type InfiniteData, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";

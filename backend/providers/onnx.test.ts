@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import { createModelFiles } from "./onnx.ts";
 
 test("model files download into their folders, nested ones included", async (t) => {

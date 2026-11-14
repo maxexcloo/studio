@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+
 import {
   closeLoras,
   closePresets,
@@ -6,9 +7,9 @@ import {
   fixtures,
   loadSaved,
   openLoraChoices,
+  openPresets,
   promptMenu,
   promptTool,
-  openPresets,
   saveCurrent,
   stamp,
   withSettings,

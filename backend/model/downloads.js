@@ -1,16 +1,17 @@
-import {
-  workerInventory,
-  workerCopy,
-  workerModelFile,
-  refreshWorkerModels,
-  uploadWorkerModel,
-} from "../worker-models.js";
-import { modelLibraryWorker } from "../workers.js";
 import crypto from "node:crypto";
 import path from "node:path";
-// Every catalogue request goes through Hugging Face access: token and mirror (hf-access.js).
-import { hfAccessNote, hfFetch as fetch, hfMirrored, hfTokenValue } from "../hf-access.js";
+
 import { civitaiFetch, civitaiTokenStatus } from "../civitai/access.js";
+// Every catalogue request goes through Hugging Face access: token and mirror (hf-access.js).
+import { hfFetch as fetch, hfAccessNote, hfMirrored, hfTokenValue } from "../hf-access.js";
+import {
+  refreshWorkerModels,
+  uploadWorkerModel,
+  workerCopy,
+  workerInventory,
+  workerModelFile,
+} from "../worker-models.js";
+import { modelLibraryWorker } from "../workers.js";
 
 /**
  * Streams catalogue files and verified provider files into the worker's model

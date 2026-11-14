@@ -1,3 +1,6 @@
+import { cardKinds, maxCardDescription } from "../shared/characters.ts";
+import { maxPromptCharacters } from "../shared/queue.ts";
+import { replyTitle } from "../shared/titles.ts";
 /**
  * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
  * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
@@ -15,14 +18,9 @@
  * or the LoRA pre-filter.
  */
 import { familyUpsampler, maxInstructionCharacters } from "./assistant-presets.js";
-import { promptStyleStore } from "./prompt-styles.js";
-import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
-import { cleanTriggers } from "./lora/catalogue.js";
-import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
-import { replyTitle } from "../shared/titles.ts";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
-import { reviewInstructions, reviewReply } from "./domain/review.ts";
 import { userContent } from "./domain/model-content.ts";
+import { reviewInstructions, reviewReply } from "./domain/review.ts";
 import {
   avoidFiller,
   contentRule,
@@ -32,8 +30,10 @@ import {
   precedence,
   writerGuide,
 } from "./domain/writing-standard.ts";
-import { maxPromptCharacters } from "../shared/queue.ts";
-import { cardKinds, maxCardDescription } from "../shared/characters.ts";
+import { cleanTriggers } from "./lora/catalogue.js";
+import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
+import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
+import { promptStyleStore } from "./prompt-styles.js";
 
 const gatewayKeys = [
   "STUDIO_ASSISTANT_URL",

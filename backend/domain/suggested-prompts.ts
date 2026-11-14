@@ -1,4 +1,4 @@
-import { createIdleWork, type IdleItem } from "./idle-work.ts";
+import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 export interface SuggestedPromptItem extends IdleItem {

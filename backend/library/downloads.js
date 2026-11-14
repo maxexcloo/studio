@@ -1,9 +1,9 @@
-import { workerInventory, workerModelFile, refreshWorkerModels } from "../worker-models.js";
 import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
 import { hfFetch } from "../hf-access.js";
 import { loraCatalogue } from "../lora/info.js";
 import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
+import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
 
 // Provider download specs live in the catalogue's provider layer (library/catalogue.js).
 export function libraryDownload(id) {

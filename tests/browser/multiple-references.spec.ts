@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+
+import type { Profile } from "../../frontend/src/types";
 import {
   closeReferences,
   create,
@@ -9,7 +11,6 @@ import {
   showUploads,
   stamp,
 } from "./fixtures";
-import type { Profile } from "../../frontend/src/types";
 
 test("Multiple owned references preserve order, role identity and capacity through generation", async ({
   page,

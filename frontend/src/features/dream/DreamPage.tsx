@@ -9,12 +9,13 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { icons } from "../../ui/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fingerprint } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { TasteProfile } from "../taste/TasteProfile";
@@ -23,7 +24,8 @@ import { DreamDeck } from "./DreamDeck";
 import { DreamDigest } from "./DreamDigest";
 import { DreamProjects } from "./DreamProjects";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
-import { dreamQuery, dreamWhen, type Dream } from "./queries";
+import { type Dream, dreamQuery, dreamWhen } from "./queries";
+
 import classes from "./DreamPage.module.css";
 
 /** What the deck shows once every card is judged, or before Dream is on. */

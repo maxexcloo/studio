@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { addUpscale, estimateUpscale, upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
 
 const sample = (history, work, ms, extra = {}) =>

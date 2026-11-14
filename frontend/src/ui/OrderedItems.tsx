@@ -1,14 +1,14 @@
+import { ActionIcon, Group, Stack, Tooltip } from "@mantine/core";
+import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 import {
-  lazy,
+  type ReactNode,
+  type Ref,
   Suspense,
+  lazy,
   useEffect,
   useLayoutEffect,
   useRef,
-  type ReactNode,
-  type Ref,
 } from "react";
-import { ActionIcon, Group, Stack, Tooltip } from "@mantine/core";
-import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 
 export type OrderedItemsProps<T> = {
   items: T[];

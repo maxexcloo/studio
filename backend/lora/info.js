@@ -1,7 +1,7 @@
 import { comfy } from "../comfy/comfy.js";
 import { families as modelFamilies } from "../family-catalogue.js";
-import { enrichLocalLoraInfo, enrichLoraInfo, withFamilyRefinements } from "./catalogue.js";
 import { catalogueStore } from "../library/catalogue.js";
+import { enrichLocalLoraInfo, enrichLoraInfo, withFamilyRefinements } from "./catalogue.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
 const families = {

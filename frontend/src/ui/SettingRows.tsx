@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
 import { Group, Stack, Text } from "@mantine/core";
+import type { ReactNode } from "react";
+
 import { usePhone } from "./usePhone";
+
 import classes from "./SettingRows.module.css";
 
 /**

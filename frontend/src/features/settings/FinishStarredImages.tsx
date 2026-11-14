@@ -1,5 +1,6 @@
 import { Select, Switch } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import type {
   FinishingSettings,
   FinishingStatus,

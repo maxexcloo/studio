@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useLongPress, useMediaQuery } from "@mantine/hooks";
 import { useMantineTheme } from "@mantine/core";
-import type { MediaItem } from "../../types";
+import { useLongPress, useMediaQuery } from "@mantine/hooks";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
 import { easing } from "../../theme";
+import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { usePhone, useSideways } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";

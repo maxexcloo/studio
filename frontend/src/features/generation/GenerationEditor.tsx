@@ -1,4 +1,3 @@
-import { lazy, Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -11,18 +10,21 @@ import {
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp, Image as ImageIcon, Video } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type ReactNode, Suspense, lazy, useLayoutEffect, useRef, useState } from "react";
+
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { defaultProfile, useGeneration, type Draft } from "./GenerationProvider";
+import { usePhone } from "../../ui/usePhone";
 import { GenerationInputControls } from "./GenerationInputControls";
+import { type Draft, defaultProfile, useGeneration } from "./GenerationProvider";
 import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, profileForBackend, referenceDetails, usesNegative } from "./payload";
-import { usePromptIdeas } from "./PromptIdeas";
 import { PromptFields, useDraftChange } from "./PromptFields";
+import { usePromptIdeas } from "./PromptIdeas";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
-import { usePhone } from "../../ui/usePhone";
+
 import classes from "./GenerationEditor.module.css";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 

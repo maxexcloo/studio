@@ -1,5 +1,6 @@
-import { lazy, Suspense, useId, useState } from "react";
-import { ActionIcon, getDefaultZIndex, Group, Modal, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Modal, Text, Tooltip, getDefaultZIndex } from "@mantine/core";
+import { Suspense, lazy, useId, useState } from "react";
+
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { closeWhenTop } from "../../ui/popupClicks";

@@ -2,10 +2,11 @@ import "@fontsource-variable/geist";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "./styles.css";
-import { createRoot } from "react-dom/client";
 import { Notifications } from "@mantine/notifications";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
+
 import { failure } from "./api";
 import { App } from "./App";
 import { AppearanceProvider } from "./ui/Appearance";

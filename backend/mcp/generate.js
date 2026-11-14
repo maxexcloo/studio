@@ -1,6 +1,29 @@
 // MCP's tools that choose a model and queue work: models, generate and reuse.
 import crypto from "node:crypto";
+
 import { z } from "zod";
+
+import {
+  cardImageNote,
+  cardImageSlots,
+  characterImages,
+  characterProfiles,
+  characterShots,
+  composePrompt,
+  identitySlot,
+  keepsCharacterFaces,
+  keepsIdentity,
+  startImageSlot,
+  withCharacter,
+} from "../../shared/characters.ts";
+import { compareVariants } from "../../shared/compare.ts";
+import { isCloudProfile } from "../../shared/profiles.ts";
+import { resolutions } from "../../shared/resolution.ts";
+import { promptWords, replyTitle } from "../../shared/titles.ts";
+import { accessFeatures } from "../account-policy.js";
+import { minorAgeRefusal } from "../minor-age.js";
+import { canonicalProfileId } from "../profile/store.js";
+import { promptStyleStore } from "../prompt-styles.js";
 import {
   closest,
   listedControls,
@@ -12,10 +35,11 @@ import {
   mcpLoras,
   mcpSize,
 } from "./controls.js";
+import { findCard } from "./manage.js";
 import { assertJobCount, mcpJson, replyRule } from "./media.js";
+import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
-import { minorAgeRefusal } from "../minor-age.js";
-import { canonicalProfileId } from "../profile/store.js";
+import { output, shortPrompt } from "./results.js";
 import {
   asksForCloud,
   chooseProfile,
@@ -26,39 +50,17 @@ import {
   mcpTiers,
   nameWords,
   profileFromRequest,
-  serviceState,
-  speedWordList,
   profilesForTier,
   profilesNearTier,
   searchProfiles,
+  serviceState,
+  speedWordList,
   tierOf,
   waitingNote,
   waitingServices,
   withinFamily,
   workerState,
 } from "./tiers.js";
-import { promptStyleStore } from "../prompt-styles.js";
-import { findCard } from "./manage.js";
-import { output, shortPrompt } from "./results.js";
-import { promptWords, replyTitle } from "../../shared/titles.ts";
-import { resolutions } from "../../shared/resolution.ts";
-import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
-import { accessFeatures } from "../account-policy.js";
-import { isCloudProfile } from "../../shared/profiles.ts";
-import { compareVariants } from "../../shared/compare.ts";
-import {
-  cardImageNote,
-  cardImageSlots,
-  characterImages,
-  composePrompt,
-  characterProfiles,
-  characterShots,
-  identitySlot,
-  keepsCharacterFaces,
-  keepsIdentity,
-  startImageSlot,
-  withCharacter,
-} from "../../shared/characters.ts";
 
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;

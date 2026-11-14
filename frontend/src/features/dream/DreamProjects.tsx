@@ -1,11 +1,9 @@
-import { useState } from "react";
 import {
   ActionIcon,
   Alert,
   Badge,
   Button,
   Checkbox,
-  getDefaultZIndex,
   Group,
   Input,
   Menu,
@@ -17,24 +15,27 @@ import {
   Stack,
   Text,
   TextInput,
+  getDefaultZIndex,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
+import {
+  type Project,
+  type ProjectContent,
+  maxProjectBrief,
+  maxProjectName,
+  maxProjectProfiles,
+  projectAspects,
+} from "../../../../shared/projects";
+import { resolutions } from "../../../../shared/resolution";
 import { api } from "../../api";
+import { menuWidth } from "../../theme";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
-import { menuWidth } from "../../theme";
-import { resolutions } from "../../../../shared/resolution";
-import {
-  maxProjectBrief,
-  maxProjectName,
-  maxProjectProfiles,
-  projectAspects,
-  type Project,
-  type ProjectContent,
-} from "../../../../shared/projects";
 import { CardDialog, CardForm } from "../characters/CardImages";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileOptions } from "../generation/ProfilePicker";

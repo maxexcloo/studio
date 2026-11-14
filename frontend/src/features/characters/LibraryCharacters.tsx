@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Button, Group, Paper, Progress, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+
 import { post } from "../../api";
 import type { ReferenceAsset } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
@@ -13,7 +14,7 @@ import { CardSuggestions } from "./CardSuggestions";
 import { characterDetail } from "./CharacterChoices";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import { sheetViews } from "./CharacterEditor";
-import { charactersQuery, type CharacterCard } from "./queries";
+import { type CharacterCard, charactersQuery } from "./queries";
 import { useCardInComposer } from "./useCardInComposer";
 
 /**

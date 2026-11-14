@@ -1,3 +1,4 @@
+import { loraFamilyId } from "../../shared/profiles.ts";
 import { missingNodes, nodeRange, optionsFor, textRange } from "../comfy/comfy.js";
 import {
   loadCustomWorkflows,
@@ -6,11 +7,10 @@ import {
   workflowOnBackend,
   workflowOptionIssues,
 } from "../custom-workflows.js";
-import { classifyModel } from "./families.js";
 import { families } from "../family-catalogue.js";
-import { loraFamilyId } from "../../shared/profiles.ts";
-import { canonicalProfileId } from "../profile/store.js";
 import { imageSaves, inpaintNodes } from "../inpaint.js";
+import { canonicalProfileId } from "../profile/store.js";
+import { classifyModel } from "./families.js";
 
 function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;

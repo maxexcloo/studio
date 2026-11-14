@@ -1,17 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { post } from "../../api";
-import type { StudioSession } from "../../../../shared/queue";
-import type { Profile } from "../../types";
+
 import {
   characterProfiles,
   characterShots,
   identitySlot,
   keepsIdentity,
 } from "../../../../shared/characters";
-import { inputForProfile, initialInput, modelsQuery } from "../generation/GenerationProvider";
+import type { StudioSession } from "../../../../shared/queue";
+import { post } from "../../api";
+import type { Profile } from "../../types";
+import { initialInput, inputForProfile, modelsQuery } from "../generation/GenerationProvider";
 import { generationInput, referencePatch } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
-import { charactersQuery, type CharacterCard } from "./queries";
+import { type CharacterCard, charactersQuery } from "./queries";
 
 /**
  * The profile Generate References uses, ready ones only: with an image on the card, the best that

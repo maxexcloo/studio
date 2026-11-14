@@ -1,19 +1,21 @@
-import { useState, type PointerEvent, type ReactNode } from "react";
 import { ActionIcon, Badge, Menu, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
+  type QueryKey,
+  type UseQueryOptions,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryKey,
-  type UseQueryOptions,
 } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
+import { type PointerEvent, type ReactNode, useState } from "react";
+
 import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
+import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
-import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { assistantQuery } from "./PromptAssistant";
+
 import classes from "./AskChange.module.css";
 
 // Pressing a field action keeps focus (and the phone keyboard) in the text.

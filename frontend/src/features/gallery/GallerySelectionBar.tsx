@@ -1,29 +1,31 @@
-import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Button, Divider, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
 import { Shuffle } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+
 import { failure, post } from "../../api";
+import { menuWidth } from "../../theme";
+import type { MediaItem } from "../../types";
+import { ActionBarGroups, ActionMenuItems, withMore } from "../../ui/ActionBar";
+import { icons } from "../../ui/icons";
 import { layerAbove } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
-import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, withMore } from "../../ui/ActionBar";
-import { menuWidth } from "../../theme";
-import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { assistMenu } from "../generation/AskChange";
-import { itemAction, itemActionGroups } from "./itemActions";
+import { useQueue, useQueueAction } from "../generation/Queue";
+import { showQueued } from "../settings/accountPreferences";
+import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
+import { itemAction, itemActionGroups } from "./itemActions";
 import { finished } from "./MediaTile";
+import { useUpscaleMany } from "./UpscaleControls";
+import type { GallerySelection } from "./useGallerySelection";
+import { useAnimateThemes, useIterate } from "./useMediaAction";
 import { useFavorites } from "./useMediaFavorite";
 import { useRecreateMany } from "./useRecreateMany";
-import { useUpscaleMany } from "./UpscaleControls";
-import { useAnimateThemes, useIterate } from "./useMediaAction";
-import type { GallerySelection } from "./useGallerySelection";
-import type { MediaItem } from "../../types";
 import type { useTryAgain } from "./useTryAgain";
+
 import classes from "./GallerySelectionBar.module.css";
-import { showQueued } from "../settings/accountPreferences";
 
 const shareLimit = 20;
 // Compare Selected sets out up to four images side by side, one per number key.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { graphFromJson, metadataFromJson } from "./custom-workflows.js";
 
 test("visual workflow conversion prefers named widgets and ignores UI-only widget values", () => {

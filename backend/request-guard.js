@@ -1,5 +1,6 @@
-import { gatedPath } from "./gated-path.js";
 import os from "node:os";
+
+import { gatedPath } from "./gated-path.js";
 
 /**
  * The first check on every /api and /comfy request, before anything else runs.

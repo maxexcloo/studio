@@ -1,5 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+
 import { packForNode, withFixes } from "./failure-fixes.js";
 import { describeFailure } from "./failures.js";
 

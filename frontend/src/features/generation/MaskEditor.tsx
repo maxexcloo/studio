@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from "react";
-import type { PointerEvent } from "react";
 import {
   ActionIcon,
   Alert,
@@ -17,13 +15,17 @@ import {
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { Minus, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { PointerEvent } from "react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
+
 import type { ReferenceAsset } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
+
 import classes from "./MaskEditor.module.css";
 
 type Snapshot = { pixels: ImageData; error: string | null };

@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import test from "node:test";
+
 import sharp from "sharp";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-references-"));

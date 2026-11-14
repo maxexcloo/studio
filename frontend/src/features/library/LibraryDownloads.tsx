@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Alert, Badge, Group, Menu, Progress, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import { api, failure, post } from "../../api";
 import type { Models } from "../../types";
 import { formatBytes } from "../../ui/bytes";
@@ -9,11 +10,11 @@ import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { modelsQuery } from "../generation/GenerationProvider";
 import {
+  type DownloadState,
+  type ModelDownload,
   catalogueQuery,
   downloadsQuery,
   importsQuery,
-  type DownloadState,
-  type ModelDownload,
 } from "./queries";
 
 const statusLabel = (status: string) =>

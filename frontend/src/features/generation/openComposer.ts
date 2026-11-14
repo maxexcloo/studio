@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router";
+
 import type { MediaKind } from "../../types";
 
 /** Navigation state asking the gallery composer to open and take focus (`ComposerDock`). */

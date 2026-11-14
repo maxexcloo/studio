@@ -1,6 +1,5 @@
-import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import crypto from "node:crypto";
-import { scryptAsync } from "./kdf.js";
+
 import {
   accountRoles,
   builtInAccessProfile,
@@ -9,8 +8,10 @@ import {
   personalFeatures,
   validAccountKey,
 } from "./account-policy.js";
-import { currentDataDir } from "./data-dir.js";
 import { accountPreferences, forgetAccountPreferences } from "./account-preferences.js";
+import { currentDataDir } from "./data-dir.js";
+import { scryptAsync } from "./kdf.js";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const dataDir = currentDataDir();
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;

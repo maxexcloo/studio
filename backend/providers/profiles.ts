@@ -1,4 +1,5 @@
 import sharp from "sharp";
+
 import type { GenerationInput } from "../../shared/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
 import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";

@@ -1,11 +1,12 @@
 import { notifications } from "@mantine/notifications";
 import {
+  type QueryClient,
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from "@tanstack/react-query";
+
 import { api } from "../../api";
 import { modelsQuery } from "../generation/GenerationProvider";
 

@@ -1,5 +1,6 @@
 // Lettered options: one result varied in one thing, side by side (domain/compare.ts), and the user's pick.
 import { z } from "zod";
+
 import { compareVariants } from "../../shared/compare.ts";
 import { mcpJson } from "./media.js";
 

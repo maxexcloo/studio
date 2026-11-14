@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
+
 import {
   closeReferences,
   expandComposer,
   fixtures,
-  toolbarSearch,
   image,
   selectionAction,
   selectionMenuItem,
   showOnly,
   stamp,
+  toolbarSearch,
   touch,
 } from "./fixtures";
 const results = (count: number) =>

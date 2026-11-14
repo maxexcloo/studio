@@ -3,10 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import { startFakeComfy } from "../fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "../fixtures/test-workflows.js";
-import { mergeWorkerModels, workerUrl } from "./backends.js";
 import { reloadWorkers } from "../workers.js";
+import { mergeWorkerModels, workerUrl } from "./backends.js";
 
 const primaryFiles = new Map();
 const videoFiles = new Map();

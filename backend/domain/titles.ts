@@ -1,4 +1,4 @@
-import { createIdleWork, type IdleItem } from "./idle-work.ts";
+import { type IdleItem, createIdleWork } from "./idle-work.ts";
 
 export interface TitleItem extends IdleItem {
   prompt?: string;

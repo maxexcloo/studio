@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { createIdleWork, pictured, type IdleDocument, type IdleItem } from "./idle-work.ts";
+
+import { type IdleDocument, type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */

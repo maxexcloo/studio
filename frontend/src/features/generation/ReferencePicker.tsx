@@ -1,10 +1,20 @@
-import { useState } from "react";
 import { ActionIcon, Button, FileButton, Image, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { ChevronDown, ImagePlus } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { useState } from "react";
+
+import { startImageSlot } from "../../../../shared/characters";
 import { failure } from "../../api";
-import type { ReferenceAsset, Profile, GenerationInput } from "../../types";
+import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
+import { icons } from "../../ui/icons";
+import { usePhone, useTouch } from "../../ui/usePhone";
+import { useGroupFeature } from "../auth/AccountGate";
+import { CharacterChoices } from "../characters/CharacterChoices";
+import { PromptCardChoices } from "../characters/PromptCardChoices";
+import { chipProps, iconChipProps } from "./chip";
+import { GalleryChoices, galleryTabs } from "./GalleryChoices";
+import { draftForProfile, useGeneration } from "./GenerationProvider";
 import {
   controlRange,
   referenceCapacity,
@@ -12,8 +22,9 @@ import {
   referenceGroup,
   referenceGroups,
 } from "./payload";
-import { draftForProfile, useGeneration } from "./GenerationProvider";
+import { ChipContent, ChipPopup, PickerHeader } from "./Picker";
 import {
+  type ReferenceTarget,
   galleryReferenceType,
   nextReferenceTarget,
   orderedReferences,
@@ -23,19 +34,9 @@ import {
   uploadTypes,
   useReferenceList,
   useReferencePlacement,
-  type ReferenceTarget,
 } from "./references";
 import { ReferenceRoles, ReferenceSlots, referenceCellType } from "./ReferenceSlots";
-import { startImageSlot } from "../../../../shared/characters";
-import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
-import { usePhone, useTouch } from "../../ui/usePhone";
-import { canReadClipboard, readClipboardImages } from "../../ui/clipboard";
-import { chipProps, iconChipProps } from "./chip";
-import { ChipPopup, ChipContent, PickerHeader } from "./Picker";
-import { GalleryChoices, galleryTabs } from "./GalleryChoices";
-import { useGroupFeature } from "../auth/AccountGate";
-import { CharacterChoices } from "../characters/CharacterChoices";
-import { PromptCardChoices } from "../characters/PromptCardChoices";
+import { type ReferenceBrowser, useReferenceBrowser } from "./useReferenceBrowser";
 
 /** The Library's cards, after the gallery's tabs, with Characters. */
 const cardTabs: typeof galleryTabs = [

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import express from "express";
 import sharp from "sharp";
+
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-routes-"));

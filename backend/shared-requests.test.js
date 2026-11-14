@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { sharedRequests } from "./shared-requests.js";
 
 test("callers share a request on its way, per key, until it settles", async () => {

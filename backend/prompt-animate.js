@@ -1,3 +1,4 @@
+import { isCloudProfile } from "../shared/profiles.ts";
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt for the
  * frame a clip starts from and a theme, as the queue item's writing stage (prompt-stage.js) or for
@@ -22,7 +23,6 @@ import {
   precedence,
   writerGuide,
 } from "./domain/writing-standard.ts";
-import { isCloudProfile } from "../shared/profiles.ts";
 import { families } from "./family-catalogue.js";
 import { promptStyleStore } from "./prompt-styles.js";
 

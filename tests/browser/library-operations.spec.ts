@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import {
   chooseView,
   closeLoras,
@@ -6,8 +7,8 @@ import {
   expandComposer,
   fixtures,
   loadFromLibrary,
-  openNav,
   openLoraChoices,
+  openNav,
   openPresets,
   profiles,
   section,

@@ -1,17 +1,18 @@
-import { useState, type ReactNode } from "react";
 import { Alert, Button, Group, Input, Loader, Paper, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+
+import { maxCharacterImages } from "../../../../shared/characters";
 import { post } from "../../api";
 import type { MediaItem, ReferenceAsset } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { icons } from "../../ui/icons";
 import { EmptyState } from "../../ui/EmptyState";
-import { maxCharacterImages } from "../../../../shared/characters";
+import { icons } from "../../ui/icons";
 import { chipProps } from "../generation/chip";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { statusLabels } from "../generation/Queue";
 import { CardDialog, CardFields, CardForm, CardThumbnails } from "./CardImages";
-import { charactersQuery, useMakeSheet, useSaveCharacter, type CharacterCard } from "./queries";
+import { type CharacterCard, charactersQuery, useMakeSheet, useSaveCharacter } from "./queries";
 
 /** What a new card starts from, such as Use as Character's image. */
 export interface CharacterStart {

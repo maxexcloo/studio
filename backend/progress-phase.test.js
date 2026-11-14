@@ -1,5 +1,6 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+
 import { isSampler, nextProgress, phaseOf } from "./progress-phase.js";
 
 const graph = {

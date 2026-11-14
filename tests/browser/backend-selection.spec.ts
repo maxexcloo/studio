@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { profileForBackend } from "../../frontend/src/features/generation/payload";
 import {
   closeLoras,

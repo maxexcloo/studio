@@ -1,10 +1,11 @@
 import path from "node:path";
+
+import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
+import { civitaiAvailability } from "../library/availability.js";
 import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
 import { modelLibraryWorker } from "../workers.js";
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
 import { sameResourceFilename, workflowModelSources } from "./workflow.js";
-import { civitaiAvailability } from "../library/availability.js";
-import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
 
 const samplers = a1111Samplers;
 const schedules = a1111Schedules;

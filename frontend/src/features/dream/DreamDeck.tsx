@@ -1,39 +1,41 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Badge,
   Button,
+  type ButtonProps,
   Group,
   Stack,
   Text,
   Tooltip,
-  type ButtonProps,
 } from "@mantine/core";
-import { icons } from "../../ui/icons";
-import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useOpenComposer } from "../generation/openComposer";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useGenerationActions } from "../generation/GenerationProvider";
+import { icons } from "../../ui/icons";
+import { layerAbove } from "../../ui/popupClicks";
+import { usePhone, useSideways, useTouch } from "../../ui/usePhone";
+import { mediaSource, playbackUrl } from "../gallery/mediaSource";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
-import { mediaSource, playbackUrl } from "../gallery/mediaSource";
-import { queueQuery } from "../generation/Queue";
+import { useGenerationActions } from "../generation/GenerationProvider";
 import { LoraThumbs, loraInfoQuery, loraTitle } from "../generation/LoraPicker";
-import { dreamChoices, viewerChoices, type Choice, type Verdict } from "./choices";
-import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
+import { useOpenComposer } from "../generation/openComposer";
+import { queueQuery } from "../generation/Queue";
+import { type Choice, type Verdict, dreamChoices, viewerChoices } from "./choices";
+import { type DeckCard, type PairDeckCard, deckCards } from "./deck";
 import { PairContent, sideNames } from "./PairCard";
 import {
+  type DreamItem,
+  type PairAnswer,
   calibrationQuery,
   dreamItemPath,
   dreamQuery,
   pairAnswerPath,
-  type DreamItem,
-  type PairAnswer,
 } from "./queries";
-import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
-import { layerAbove } from "../../ui/popupClicks";
+import { type Direction, type Fly, SwipeCard } from "./SwipeCard";
+
 import classes from "./DreamPage.module.css";
 
 type SingleCard = Exclude<DeckCard, PairDeckCard>;

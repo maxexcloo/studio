@@ -2,7 +2,7 @@ import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../s
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
-import { queuePriority, type OwnedJob, type Store } from "./store.ts";
+import { type OwnedJob, type Store, queuePriority } from "./store.ts";
 
 export interface FinishingItem {
   id?: string;

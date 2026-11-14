@@ -1,4 +1,3 @@
-import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -14,10 +13,12 @@ import {
   Title,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useEffect, useState } from "react";
+
 import { api, post } from "../../api";
 import type { Account } from "../../types";
-import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 import { StudioLogo } from "../../ui/StudioLogo";
+import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 
 interface AccountStatus {
   mode: string;

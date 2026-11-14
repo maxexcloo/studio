@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { isVersion, versionPromptOverlap } from "../shared/versions.ts";
 
 const source = { input: { profileId: "sdxl", prompt: "a red fox in the snow at dawn" } };

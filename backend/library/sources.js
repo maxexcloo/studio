@@ -4,11 +4,12 @@
  * it can't be downloaded) and the metadata a catalogue entry needs.
  */
 import path from "node:path";
+
 import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
-import { catalogueKinds } from "./catalogue.js";
 import { hfFetch } from "../hf-access.js";
 import { civitaiAvailability } from "./availability.js";
+import { catalogueKinds } from "./catalogue.js";
 import { civitaiOffers, hfOffers } from "./offers.js";
 
 const modelFolders = new Set(Object.keys(catalogueKinds));

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import sharp from "sharp";
+
 import { sheetView } from "../shared/characters.ts";
 import { sheetPanels, sheetProfile, sheetReferences } from "./character-sheets.js";
 

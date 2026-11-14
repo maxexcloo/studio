@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import { McpMedia } from "./media.js";
 
 test("result links are sealed, reveal no account or job, and earlier signed links still open", (t) => {

@@ -1,13 +1,14 @@
 import { Alert, Select, Stack, Switch } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import {
+  type Flag,
+  type Setting,
   deploymentQuery,
   lockedNote,
   useDeploymentSetting,
-  type Flag,
-  type Setting,
 } from "./deployment";
 import { GalleryPass } from "./GalleryPass";
 import { UnfinishedItems } from "./UnfinishedItems";

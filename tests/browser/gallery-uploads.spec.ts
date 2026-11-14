@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
 import { expect, test } from "@playwright/test";
+
 import { fixtures, image, selectionMenuItem, showOnly, stamp } from "./fixtures";
 
 const png = (name: string) => ({ name, mimeType: "image/png", buffer: Buffer.from(name) });

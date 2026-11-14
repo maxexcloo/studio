@@ -5,11 +5,13 @@ import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
+
 import express from "express";
-import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
-import { createFinishing, registerFinishingRoutes, type FinishingItem } from "./finishing.ts";
+
 import { terminalStatuses } from "../../shared/queue.ts";
-import { queuePriority, Store } from "./store.ts";
+import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
+import { type FinishingItem, createFinishing, registerFinishingRoutes } from "./finishing.ts";
+import { Store, queuePriority } from "./store.ts";
 
 type Item = FinishingItem & { id: string; ownerId: string };
 const image = (id: string, ownerId = "alice", extra: Partial<Item> = {}): Item => ({

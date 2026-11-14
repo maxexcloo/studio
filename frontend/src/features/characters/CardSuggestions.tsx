@@ -1,9 +1,10 @@
 import { Badge, Button, Group, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { post } from "../../api";
 import { SettingGroup } from "../../ui/SettingRows";
 import { useGroupFeature } from "../auth/AccountGate";
-import { suggestionPath, suggestionsQuery, type CardSuggestion } from "../dream/queries";
+import { type CardSuggestion, suggestionPath, suggestionsQuery } from "../dream/queries";
 import { CardThumbnails } from "./CardImages";
 
 const kindLabels = { characters: "Character", outfits: "Outfit", scenes: "Scene" } as const;

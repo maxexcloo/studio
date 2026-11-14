@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { expect, type Locator, type Page } from "@playwright/test";
+
+import { type Locator, type Page, expect } from "@playwright/test";
 
 /** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
 const familyLabels = { flux1: "FLUX.1", sdxl: "SDXL" };

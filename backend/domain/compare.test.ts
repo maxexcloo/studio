@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
+
 import express from "express";
+
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
-import { registerCompareRoutes, type ComparisonRecord } from "./compare.ts";
+import { type ComparisonRecord, registerCompareRoutes } from "./compare.ts";
 import { findDirectRoute } from "./direct-route.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { Store } from "./store.ts";

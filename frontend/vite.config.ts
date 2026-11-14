@@ -1,7 +1,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin, type ProxyOptions } from "vite";
+
 import react from "@vitejs/plugin-react";
+import { type Plugin, type ProxyOptions, defineConfig } from "vite";
+
 import { precompressDir } from "./precompress.mjs";
 
 // Brotli and gzip copies of the built files, which the server sends to browsers that take them.

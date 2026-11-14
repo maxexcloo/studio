@@ -1,6 +1,6 @@
-import { directRoute, type RouteAccount, type RouteRun } from "./direct-route.ts";
+import { type RouteAccount, type RouteRun, directRoute } from "./direct-route.ts";
 import type { Dream, DreamSettings, PairAnswer } from "./dream.ts";
-import { projectPatch, type Projects } from "./projects.ts";
+import { type Projects, projectPatch } from "./projects.ts";
 import { digest } from "./review.ts";
 
 // What Dream's settings route accepts: the ranges of its numbers and its on/off switches.

@@ -17,6 +17,12 @@
         "varsIgnorePattern": "^_"
       }
     ],
+    "eslint/sort-imports": [
+      "error",
+      {
+        "ignoreDeclarationSort": true
+      }
+    ],
     "import/named": "error",
     "react-hooks/exhaustive-deps": "off",
     "react/immutability": "off",

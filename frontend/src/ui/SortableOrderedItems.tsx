@@ -1,9 +1,10 @@
-import { DragDropProvider } from "@dnd-kit/react";
-import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import { Feedback } from "@dnd-kit/dom";
 import { arrayMove } from "@dnd-kit/helpers";
+import { DragDropProvider } from "@dnd-kit/react";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import { Stack } from "@mantine/core";
 import type { ComponentProps } from "react";
+
 import { useMotionDuration } from "./Appearance";
 import { OrderedItemRow, type OrderedItemsProps } from "./OrderedItems";
 

@@ -1,16 +1,17 @@
-import { useState } from "react";
 import { Badge, Button, Menu, Modal, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListRestart } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { useState } from "react";
+
 import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { formatDateTime } from "../../ui/dates";
+import { icons } from "../../ui/icons";
+import { closeWhenTop } from "../../ui/popupClicks";
 import { SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { SettingRow } from "../../ui/SettingRows";
-import { closeWhenTop } from "../../ui/popupClicks";
 import { useAccount } from "../auth/AccountGate";
 import { statusLabels } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";

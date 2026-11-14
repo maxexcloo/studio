@@ -1,11 +1,12 @@
+import { maxPromptCharacters } from "../../shared/queue.ts";
 import {
-  changeActions,
   type Change,
   type ChangeAction,
   type NextStep,
   type Suggestions,
+  changeActions,
 } from "../../shared/suggestions.ts";
-import { createIdleWork, type IdleItem } from "./idle-work.ts";
+import { type IdleItem, createIdleWork } from "./idle-work.ts";
 import { type ModelImage, userContent } from "./model-content.ts";
 import type { PromptWriter, Taste, TasteWriter } from "./taste.ts";
 import {
@@ -16,7 +17,6 @@ import {
   precedence,
   writerGuide,
 } from "./writing-standard.ts";
-import { maxPromptCharacters } from "../../shared/queue.ts";
 
 type SuggestionSurface = "composer" | "viewer" | "animate" | "change" | "draft";
 // The viewer's next steps and Animate's motion ideas may send the image along.

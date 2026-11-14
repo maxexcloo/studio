@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import { loadRuntime } from "./bootstrap.ts";

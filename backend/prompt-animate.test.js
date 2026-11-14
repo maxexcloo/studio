@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { animateClip, animateInstructions, writeAnimatePrompt } from "./prompt-animate.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 

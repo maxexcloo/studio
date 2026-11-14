@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
+
 import { accountCookieName } from "./access.js";
 import { createEmailSession } from "./account-store.js";
 import { logEvent } from "./crash-log.js";

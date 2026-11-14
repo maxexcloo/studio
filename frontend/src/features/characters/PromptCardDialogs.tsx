@@ -1,17 +1,18 @@
+import { ActionIcon, Alert, Button, Menu, getDefaultZIndex } from "@mantine/core";
 import { useState } from "react";
-import { ActionIcon, Alert, Button, getDefaultZIndex, Menu } from "@mantine/core";
-import type { ReferenceAsset } from "../../types";
-import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
-import { ActionMenuItems } from "../../ui/ActionBar";
-import { icons } from "../../ui/icons";
-import { menuWidth } from "../../theme";
+
 import { cardKinds } from "../../../../shared/characters";
+import { menuWidth } from "../../theme";
+import type { ReferenceAsset } from "../../types";
+import { ActionMenuItems } from "../../ui/ActionBar";
+import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
+import { icons } from "../../ui/icons";
 import { CardDialog, CardFields, CardForm } from "./CardImages";
 import {
-  useDeletePromptCard,
-  useSavePromptCard,
   type PromptCard,
   type PromptCardKind,
+  useDeletePromptCard,
+  useSavePromptCard,
 } from "./queries";
 
 /** Each kind's words: its name in titles, and what its description should hold. */

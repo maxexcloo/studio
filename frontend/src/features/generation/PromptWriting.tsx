@@ -1,7 +1,9 @@
 import { Box, Button, Collapse, Stack, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { ChevronDown, ChevronRight } from "lucide-react";
+
 import type { MediaItem, QueueJob } from "../../types";
+
 import classes from "./PromptWriting.module.css";
 
 /**

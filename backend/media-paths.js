@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isInside } from "./paths.js";
-import { currentDataDir } from "./data-dir.js";
+
 import { accountOutputSubfolder } from "./account-ownership.js";
+import { currentDataDir } from "./data-dir.js";
 import { outputFolderName } from "./data-names.js";
+import { isInside } from "./paths.js";
 
 /**
  * Studio-owned media storage. With it, ComfyUI is a worker: each finished output

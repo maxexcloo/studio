@@ -1,20 +1,21 @@
 import { Alert, ScrollArea, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+
+import { characterProfiles, keepsIdentity } from "../../../../shared/characters";
 import type { Models, Profile, ReferenceAsset } from "../../types";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { characterProfiles, keepsIdentity } from "../../../../shared/characters";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { profileName } from "../generation/payload";
 import { PickerGrid, PickerTile } from "../generation/Picker";
 import { CharacterMenu, useCharacterDialogs } from "./CharacterDialogs";
 import {
+  type CharacterCard,
   applyCharacter,
   characterApplied,
   charactersQuery,
   removeCharacter,
-  type CharacterCard,
 } from "./queries";
 
 const sheetStatus = { making: "Making Sheet", done: "Sheet", failed: "Sheet Failed" };

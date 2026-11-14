@@ -1,10 +1,11 @@
 import { Alert, List, Stack, Text } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
-import { definitionsKey, duplicateProfilesQuery, profileStatsQuery, type Merge } from "./queries";
+import { type Merge, definitionsKey, duplicateProfilesQuery, profileStatsQuery } from "./queries";
 
 /**
  * Library › Profiles › Merge Duplicate Profiles: previews same-named profiles that run the same

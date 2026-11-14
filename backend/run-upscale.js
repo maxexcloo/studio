@@ -1,7 +1,7 @@
 import { normalizeComfyError } from "./comfy/comfy.js";
-import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
 import { generationSettings, outputsFrom } from "./gallery/records.js";
 import { saveIntoStudioFolder } from "./graphs.js";
+import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
 
 /**
  * Smart upscale as part of a run: the size menu's 2K and 4K. The upscale goes

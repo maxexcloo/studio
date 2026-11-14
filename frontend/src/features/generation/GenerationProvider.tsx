@@ -1,4 +1,7 @@
+import { useForm } from "@mantine/form";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
+  type ReactNode,
   createContext,
   useCallback,
   useContext,
@@ -6,14 +9,12 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
-import { useForm } from "@mantine/form";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
+
 import { api } from "../../api";
-import { useRememberedKey } from "../auth/useRemembered";
+import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { setFamilyLabels } from "../../ui/modelFamily";
+import { useRememberedKey } from "../auth/useRemembered";
 import { isProfile, profileForBackend, referencePatch } from "./payload";
 
 export const modelsQuery = queryOptions({

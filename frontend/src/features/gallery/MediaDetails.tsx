@@ -1,4 +1,3 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Anchor,
@@ -14,23 +13,26 @@ import {
 } from "@mantine/core";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
+
 import { api } from "../../api";
 import type { MediaItem, Profile } from "../../types";
-import { useCopy } from "../../ui/clipboard";
-import { icons } from "../../ui/icons";
-import { useGenerationActions } from "../generation/GenerationProvider";
-import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
-import { loraInfoQuery } from "../generation/LoraPicker";
-import { mediaTitle } from "./mediaLabels";
-import { derivations } from "./versions";
-import { queueQuery } from "../generation/Queue";
-import { WritingThinking } from "../generation/PromptWriting";
-import { mediaSource } from "./mediaSource";
 import { formatBytes } from "../../ui/bytes";
+import { useCopy } from "../../ui/clipboard";
 import { formatDateTime } from "../../ui/dates";
-import { charactersQuery } from "../characters/queries";
+import { icons } from "../../ui/icons";
 import { identityNote } from "../characters/identity";
+import { charactersQuery } from "../characters/queries";
+import { useGenerationActions } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
+import { backendLabel, isProfile, shownProfileName } from "../generation/payload";
+import { WritingThinking } from "../generation/PromptWriting";
+import { queueQuery } from "../generation/Queue";
+import { mediaTitle } from "./mediaLabels";
+import { mediaSource } from "./mediaSource";
+import { derivations } from "./versions";
+
 import classes from "./MediaDetails.module.css";
 
 const fileStem = (name: unknown) =>

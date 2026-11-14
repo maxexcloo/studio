@@ -3,11 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createCatalogueStore } from "./catalogue.js";
+
+import { loraDefaultStrength } from "../../shared/profiles.ts";
 import { enrichLocalLoraInfo } from "../lora/catalogue.js";
 import { loraCompatibility, strengthRange } from "../lora/policy.js";
 import { mcpLoras, prepareLoras } from "../mcp/controls.js";
-import { loraDefaultStrength } from "../../shared/profiles.ts";
+import { createCatalogueStore } from "./catalogue.js";
 
 const hex = (digit) => digit.repeat(64);
 const quiet = { info: () => {}, warn: () => {} };

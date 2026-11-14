@@ -1,12 +1,13 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+
 import {
-  completedTiming,
+  RunTimer,
   addRun,
+  completedTiming,
   estimateRun,
   isWarm,
   remainingMs,
-  RunTimer,
   runVariant,
   slowSteps,
   timingKey,

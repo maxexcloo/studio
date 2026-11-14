@@ -1,7 +1,9 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Paper } from "@mantine/core";
+import { type ReactNode, type RefObject, useEffect, useRef } from "react";
+
 import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
+
 import classes from "./DreamPage.module.css";
 
 export type Direction = "left" | "right" | "up" | "down";

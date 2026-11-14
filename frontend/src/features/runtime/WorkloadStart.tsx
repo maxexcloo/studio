@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+
 import type { RuntimeOperation, RuntimePreview } from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { applyPlacement, PlacementChanges, runtimeStatusQuery } from "./RuntimeWorkloads";
+import { PlacementChanges, applyPlacement, runtimeStatusQuery } from "./RuntimeWorkloads";
 
 interface StartRequest {
   label: string;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { matchesGalleryFilters, topCaptionTags } from "./filters.js";
 
 const item = {

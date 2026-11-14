@@ -3,13 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import express from "express";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { registerMcpRoutes } from "./mcp.js";
-import { createChatAssistantMemory } from "./assistant.js";
-import { closeRuntimeDatabase, databaseFile, runtimeDatabase } from "../persistence/runtime.ts";
+import express from "express";
+
 import { fakeStudio } from "../fixtures/fake-studio.js";
+import { closeRuntimeDatabase, databaseFile, runtimeDatabase } from "../persistence/runtime.ts";
+import { createChatAssistantMemory } from "./assistant.js";
+import { registerMcpRoutes } from "./mcp.js";
 
 const gateway = {
   STUDIO_ASSISTANT_URL: "http://fixture-writer.invalid:4000",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createFaceCheck, faceThreshold, type FaceReader, type Identity } from "./face-check.ts";
+
+import { type FaceReader, type Identity, createFaceCheck, faceThreshold } from "./face-check.ts";
 
 type ShotItem = {
   id: string;

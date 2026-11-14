@@ -1,12 +1,13 @@
-import { Fragment } from "react";
 import { Anchor, Button, Group, Kbd, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Check } from "lucide-react";
+import { Fragment } from "react";
+
 import { api } from "../../api";
 import { useCopy } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
-import { StudioLogo } from "../../ui/StudioLogo";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
+import { StudioLogo } from "../../ui/StudioLogo";
 import { usePhone } from "../../ui/usePhone";
 
 const repository = "https://github.com/maxexcloo/studio";

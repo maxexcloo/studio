@@ -1,3 +1,4 @@
 {
-  "ignorePatterns": ["backend/fixtures/object_info-*.json"]
+  "ignorePatterns": ["backend/fixtures/object_info-*.json"],
+  "sortImports": true
 }
