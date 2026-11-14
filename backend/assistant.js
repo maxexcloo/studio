@@ -1176,6 +1176,8 @@ export function createAssistant(
       ],
       temperature: 0.2,
       signal,
+      // Titles answer in seconds; one stuck upstream gives way to the next item instead.
+      timeout: 30_000,
     });
     const text = replyTitle(reply.text);
     if (!text) throw new AssistantError("unusable reply");
