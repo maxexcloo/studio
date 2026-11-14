@@ -90,8 +90,9 @@ function OffNotice() {
 }
 
 /**
- * Dream: While You Were Away, then the deck for comparisons and calibration, with its pause and
- * settings; the discards, projects or the taste profile. Opening it counts as a visit.
+ * Dream: the deck of unseen results, comparisons and calibration, with its pause and settings;
+ * While You Were Away as the overview per project, the projects, the discards or the taste profile.
+ * Opening it counts as a visit.
  */
 export function DreamPage() {
   const phone = usePhone();
@@ -104,7 +105,9 @@ export function DreamPage() {
   }, [client]);
   const save = useDreamSettings();
   // Dream always opens on the deck; Taste is its own control beside Settings.
-  const [view, setView] = useState<"deck" | "discarded" | "projects" | "taste">("deck");
+  const [view, setView] = useState<"deck" | "overview" | "discarded" | "projects" | "taste">(
+    "deck",
+  );
   const taste = {
     variant: view === "taste" ? "light" : "subtle",
     color: view === "taste" ? undefined : "gray",
@@ -112,10 +115,6 @@ export function DreamPage() {
     onClick: () => setView(view === "taste" ? "deck" : "taste"),
   } as const;
   const data = dream.data;
-  // A comparison's side whose other failed is judged in While You Were Away.
-  const digested = new Set(
-    data?.digest.flatMap((group) => [...group.items, ...group.misses].map((item) => item.id)),
-  );
   return (
     <div className={classes.page}>
       <Group className={classes.toolbar} gap="sm" wrap="nowrap">
@@ -126,6 +125,7 @@ export function DreamPage() {
           onChange={(value) => setView(value as typeof view)}
           data={[
             { value: "deck", label: "Deck" },
+            { value: "overview", label: "Overview" },
             { value: "projects", label: "Projects" },
             { value: "discarded", label: "Discarded" },
           ]}
@@ -189,11 +189,15 @@ export function DreamPage() {
         <Alert color="red" title="Couldn't Load Dream">
           {dream.error.message}
         </Alert>
-      ) : data!.digest.length ? (
-        <DreamDigest groups={data!.digest} since={data!.since} />
+      ) : view === "overview" ? (
+        data!.digest.length ? (
+          <DreamDigest groups={data!.digest} since={data!.since} />
+        ) : (
+          <Empty dream={data!} />
+        )
       ) : (
         <DreamDeck
-          items={data!.unseen.filter((item) => !digested.has(item.id))}
+          items={data!.unseen}
           calibrate={data!.settings.enabled}
           notice={!data!.settings.enabled && <OffNotice />}
           empty={<Empty dream={data!} />}
