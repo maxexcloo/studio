@@ -31,7 +31,7 @@ for (const development of [false, true]) {
               capabilities: ["image", "video", "upscale", "models"],
             },
           ]),
-          STUDIO_DEV_PROXY_TOKEN: development ? "startup-test-proxy" : "",
+          STUDIO_DEV_API_PORT: development ? "18787" : "",
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       });
