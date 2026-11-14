@@ -9,11 +9,11 @@
  *
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
- * Backends backs up the profiles it replaces, only an empty group can be deleted, a model file goes
- * only with its catalogue entry (catalogue_edit remove, when no profile uses it) and no tool touches
- * a GPU. The maintenance tool runs Settings' upkeep: migrations and Merge
- * Duplicate Profiles back up what they change, and ending another account's unfinished job is the
- * one step that cannot be undone, so that tool alone is marked destructive.
+ * Backends and Merge Duplicate Profiles keep the replaced ids as aliases and their versions, only
+ * an empty group can be deleted, a model file goes only with its catalogue entry (catalogue_edit
+ * remove, when no profile uses it) and no tool touches a GPU. The maintenance tool runs Settings'
+ * upkeep; ending another account's unfinished job is the one step that cannot be undone, so that
+ * tool alone is marked destructive.
  */
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
@@ -23,7 +23,7 @@ import { imageMimes } from "../reference-names.js";
 import { redditPostPath } from "../gallery/reddit.js";
 
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with library, profiles, accounts or maintenance before stating or changing it. Nothing downloads unless asked (downloads start), edits are new versions with base_hash from profiles get, removals (catalogue_edit remove, profile_edit remove, combine_backends apply) run only when asked and back up or keep versions first, and no tool touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles, guides, accounts' groups and studio maintenance only when the user asks. Read the current state with library, profiles, accounts or maintenance before stating or changing it. Nothing downloads unless asked (downloads start), edits are new versions with base_hash from profiles get, removals (catalogue_edit remove, profile_edit remove, combine_backends apply) run only when asked and keep versions, and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
