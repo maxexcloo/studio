@@ -84,7 +84,6 @@ import {
 } from "./domain/taste.ts";
 import { createTitler } from "./domain/titles.ts";
 import { registerGalleryImportRoute } from "./gallery/import.js";
-import { compareGalleryItems } from "./gallery/order.js";
 import { makePendingItems } from "./gallery/records.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 import { registerRedditImportRoute } from "./gallery/reddit.js";
@@ -96,6 +95,7 @@ import {
 } from "./gallery/routes.js";
 import {
   cleanupGalleryState,
+  countGalleryItems,
   dataDir,
   deleteOwnedGalleryItems,
   eachGalleryItem,
@@ -796,24 +796,6 @@ const textBusy = () =>
       .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0),
   );
 /** Whether what the owner is offered may be worded explicitly. */
-// Dream reads an account's gallery many times a tick: one copy serves them until the gallery
-// changes, and is let go once Dream stops asking.
-let dreamCopy = { key: "", items: [], timer: null };
-function dreamGallery(ownerId) {
-  const key = `${ownerId}|${galleryChangeCount()}`;
-  if (dreamCopy.key !== key)
-    dreamCopy = {
-      key,
-      items: galleryItems({ ownerId }, { ordered: false })
-        .sort(compareGalleryItems)
-        .map(withCanonicalProfile),
-      timer: null,
-    };
-  clearTimeout(dreamCopy.timer);
-  dreamCopy.timer = setTimeout(() => (dreamCopy = { key: "", items: [], timer: null }), 30_000);
-  dreamCopy.timer.unref();
-  return dreamCopy.items;
-}
 const explicitFor = (ownerId) =>
   explicitWording(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId));
 // Suggestions (domain/suggestions.ts): composer ideas and viewer next steps from taste.
@@ -885,7 +867,8 @@ const dream = createDream({
     Math.max(1, listWorkers().filter((worker) => worker.capabilities.includes("image")).length),
   writer: assistantEngine,
   guide: assistant.guide,
-  gallery: dreamGallery,
+  gallery: (ownerId, query) => galleryItems({ ownerId, ...query }).map(withCanonicalProfile),
+  count: (ownerId, query) => countGalleryItems({ ownerId, ...query }),
   items: (ownerId, ids) => galleryItems({ ownerId, ids }).map(withCanonicalProfile),
   visible: filterVisibleGallery,
   // Only the owner's own record: updateGalleryJob alone matches any account's item.
