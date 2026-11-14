@@ -1,4 +1,5 @@
-import { memo, type Ref } from "react";
+import { type Ref, memo } from "react";
+
 import type { ChangeAction } from "../../../../shared/suggestions";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
@@ -7,14 +8,15 @@ import { askDraftChange, askDraftSteps, draftStepsQuery } from "../taste/suggest
 import {
   ChangeSuggestions,
   ProposalLabel,
-  proposedClass,
   UndoButton,
+  proposedClass,
   useAskChange,
 } from "./AskChange";
 import type { Draft } from "./GenerationProvider";
 import { usePromptAssistant } from "./PromptAssistant";
-import type { usePromptIdeas } from "./PromptIdeas";
 import { usePromptHistory } from "./PromptHistory";
+import type { usePromptIdeas } from "./PromptIdeas";
+
 import classes from "./PromptFields.module.css";
 
 type Operation = Draft["operation"];

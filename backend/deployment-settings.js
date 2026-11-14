@@ -1,4 +1,5 @@
 import fs from "node:fs";
+
 import { currentDataDir } from "./data-dir.js";
 import { databaseFile, readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 

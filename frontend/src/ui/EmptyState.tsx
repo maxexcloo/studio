@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { Center, Stack, Text } from "@mantine/core";
+import type { ReactNode } from "react";
 
 /** One short, centred Title Case line such as No Images, with an optional action beneath. */
 export function EmptyState({

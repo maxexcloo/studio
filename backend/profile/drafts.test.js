@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
+import { draftedProfile } from "../assistant.js";
 import {
   chooseTemplate,
   draftId,
@@ -7,7 +9,6 @@ import {
   partsOf,
   recommendedFromText,
 } from "./drafts.js";
-import { draftedProfile } from "../assistant.js";
 import { validateProfileText } from "./editor.js";
 
 const sha = (char) => char.repeat(64);

@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Group, NumberInput, Slider } from "@mantine/core";
+import { useState } from "react";
 
 /**
  * A strength as a slider with its exact value beside it, for a LoRA or a guiding reference.

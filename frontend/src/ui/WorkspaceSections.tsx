@@ -1,6 +1,6 @@
-import { Suspense, useState, type ReactNode } from "react";
 import {
   Box,
+  type ComboboxData,
   Divider,
   Grid,
   Group,
@@ -8,14 +8,16 @@ import {
   Select,
   Stack,
   Text,
-  type ComboboxData,
 } from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
+import { type ReactNode, Suspense, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+
 import { LoadingState } from "./LoadingState";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 import { SectionHeading } from "./SectionHeading";
 import { usePhone } from "./usePhone";
+
 import classes from "./WorkspaceSections.module.css";
 
 /**

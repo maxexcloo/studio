@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
 import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
+
 import { post } from "../../api";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ownAccountQuery, useAccount } from "./AccountGate";

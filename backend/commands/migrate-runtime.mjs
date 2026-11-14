@@ -1,5 +1,6 @@
-import { parseArgs } from "node:util";
 import path from "node:path";
+import { parseArgs } from "node:util";
+
 import { runtimeMigrations } from "../runtime-migrations.js";
 const { values } = parseArgs({
   options: {

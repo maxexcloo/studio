@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
 import { Button, Progress, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScanText } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type ReactNode, useState } from "react";
+
 import { api, post } from "../../api";
+import { icons } from "../../ui/icons";
 import { SettingRow } from "../../ui/SettingRows";
 
 type PassScope = "all" | "outdated" | "missing";

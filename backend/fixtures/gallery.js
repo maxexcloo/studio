@@ -1,5 +1,5 @@
-import { runtimeDatabase } from "../persistence/runtime.ts";
 import { dataDir, galleryItems, putGalleryItems } from "../gallery/store.js";
+import { runtimeDatabase } from "../persistence/runtime.ts";
 
 /** Replaces the whole test gallery with `items`. */
 export function setGallery(items) {

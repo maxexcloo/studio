@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import test from "node:test";
+
 import { classifyClient } from "./client-trust.js";
 import { hostAllowed, hostnameOf, requestGuard } from "./request-guard.js";
 

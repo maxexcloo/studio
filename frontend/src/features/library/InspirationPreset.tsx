@@ -1,14 +1,15 @@
-import { useState } from "react";
 import { Alert, Button, Card, Group, Image, Stack, Text } from "@mantine/core";
-import { useOpenComposer } from "../generation/openComposer";
+import { useState } from "react";
+
 import type { GenerationInput } from "../../types";
+import { initialInput, inputForProfile, useGeneration } from "../generation/GenerationProvider";
 import {
+  type LibraryPreset,
   compatibleSettings,
   inspirationInput,
-  type LibraryPreset,
 } from "../generation/inspiration";
+import { useOpenComposer } from "../generation/openComposer";
 import { isProfile } from "../generation/payload";
-import { initialInput, inputForProfile, useGeneration } from "../generation/GenerationProvider";
 import { ProfilePicker } from "../generation/ProfilePicker";
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Alert,
   Badge,
@@ -12,11 +11,13 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { api } from "../../api";
+import type { Account } from "../../types";
 import { DialogFooter } from "../../ui/ConfirmDialog";
 import { LoadingState } from "../../ui/LoadingState";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
-import type { Account } from "../../types";
 import { ownAccountQuery, useIsAdmin } from "../auth/AccountGate";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 

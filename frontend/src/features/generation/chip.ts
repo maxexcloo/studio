@@ -1,5 +1,7 @@
 import type { KeyboardEvent, PointerEvent } from "react";
+
 import { popupMiddlewares } from "../../theme";
+
 import classes from "./GenerationInputControls.module.css";
 
 /** Shared Button props for the compact chips in the generation rail. */

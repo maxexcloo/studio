@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
 import { ActionIcon, Stack, Tooltip } from "@mantine/core";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+
 import { icons } from "../../ui/icons";
-import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { SectionHeader } from "../../ui/SectionToolbar";
 import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
+import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
+import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { GenerationSettings } from "./GenerationSettings";

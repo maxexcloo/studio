@@ -1,7 +1,9 @@
 import fs from "node:fs";
+
 import sharp from "sharp";
-import { createModelFiles, createOnnxRunner } from "./onnx.ts";
+
 import type { InferRequest } from "./onnx-worker.ts";
+import { createModelFiles, createOnnxRunner } from "./onnx.ts";
 
 /**
  * SigLIP 2 (base, patch 16, 224 px; Apache-2.0) as ONNX: the full-precision vision encoder, which

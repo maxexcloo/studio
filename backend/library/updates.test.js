@@ -3,11 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
-import { createCatalogueStore } from "./catalogue.js";
-import { civitaiAvailability } from "./availability.js";
-import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
+
 import { withCatalogueSources } from "../catalogue-downloads.js";
+import { closeRuntimeDatabase, readRuntimeDocument } from "../persistence/runtime.ts";
+import { civitaiAvailability } from "./availability.js";
+import { createCatalogueStore } from "./catalogue.js";
+import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
 
 const { model } = JSON.parse(
   fs.readFileSync(new URL("../fixtures/civitai/model-offers.json", import.meta.url), "utf8"),

@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
-import { mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
+
+import { displayEdge } from "../shared/media.ts";
 import {
   comfyFileUrl,
   localOutputFile,
@@ -10,8 +11,8 @@ import {
 } from "./comfy/comfy.js";
 import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
+import { mediaType } from "./media-paths.js";
 import { loadSharp } from "./sharp-loader.js";
-import { displayEdge } from "../shared/media.ts";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
 // only has to pull a full-resolution image when it actually opens the viewer.

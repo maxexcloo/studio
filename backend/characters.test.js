@@ -1,19 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import {
   cardImageNote,
   cardImageSlots,
   characterLead,
+  characterProfiles,
   composePrompt,
+  identitySlot,
   outfitPart,
   scenePart,
-  withPart,
-  withoutPart,
-  characterProfiles,
-  identitySlot,
   startImageSlot,
   withCharacter,
+  withPart,
   withoutCharacter,
+  withoutPart,
 } from "../shared/characters.ts";
 
 test("a character's lead starts a prompt once, and removing it restores the prompt", () => {

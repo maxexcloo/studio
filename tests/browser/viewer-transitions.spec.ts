@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
+
 import { fixtures, stamp, viewerAction } from "./fixtures";
 
 const original = await sharp({

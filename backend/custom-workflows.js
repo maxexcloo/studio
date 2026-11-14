@@ -1,11 +1,12 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
+
+import { guidingRoles, profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
 import { dataDir } from "./gallery/store.js";
-import { chainReferenceSlots } from "./reference-chains.js";
 import { writeJsonFile } from "./json-store.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
-import { guidingRoles, profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
+import { chainReferenceSlots } from "./reference-chains.js";
 
 export { profileBackendLabels, sharedProfileFields };
 

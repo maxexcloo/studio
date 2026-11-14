@@ -3,13 +3,13 @@ import { mayUseGenerationProfile } from "./account-policy.js";
 import { deleteImportedWorkflow, saveImportedWorkflow } from "./custom-workflows.js";
 import { inferModels, offlineModelResult } from "./model/models.js";
 import { requireAdmin } from "./route-access.js";
+import { defaultWorker, defaultWorkerId } from "./workers.js";
 import {
   loadWorkflowPreferences,
   previewWorkflowImport,
   saveWorkflowPreferences,
   workflowSummaries,
 } from "./workflow-catalogue.js";
-import { defaultWorker, defaultWorkerId } from "./workers.js";
 
 /** The workflow list, imports and their removal. `loadComfyContext` is model/catalogue.js's. */
 export function registerWorkflowRoutes(app, { loadComfyContext }) {

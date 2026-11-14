@@ -5,7 +5,9 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import sharp from "sharp";
+
 import { writeGalleryRows } from "./persistence/gallery-rows.ts";
 import { runtimeDatabase } from "./persistence/runtime.ts";
 

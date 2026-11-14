@@ -1,14 +1,15 @@
+import { notifications } from "@mantine/notifications";
 import {
+  type QueryClient,
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from "@tanstack/react-query";
-import { notifications } from "@mantine/notifications";
-import { useOpenComposer } from "../generation/openComposer";
-import { api, post } from "../../api";
+
+import { isCloudProfile } from "../../../../shared/profiles";
 import type { StudioSession } from "../../../../shared/queue";
+import { api, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import { useRemembered } from "../auth/useRemembered";
 import {
@@ -17,7 +18,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
-import { assistantQuery } from "../generation/PromptAssistant";
+import { useOpenComposer } from "../generation/openComposer";
 import {
   backendLabel,
   generationInput,
@@ -25,9 +26,9 @@ import {
   profileForBackend,
   profileName,
 } from "../generation/payload";
+import { assistantQuery } from "../generation/PromptAssistant";
 import { queueJobQuery, queueQuery } from "../generation/Queue";
-import { isCloudProfile } from "../../../../shared/profiles";
-import { useVideosPreference, type VideosPreference } from "../settings/accountPreferences";
+import { type VideosPreference, useVideosPreference } from "../settings/accountPreferences";
 import { useItemMutation } from "./useItemMutation";
 
 type Operation = "image" | "refine" | "animate" | "extend";

@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import { once } from "node:events";
-import { createServer, request as forward } from "node:http";
 import fs from "node:fs";
+import { createServer, request as forward } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import { startFakeComfy } from "../fixtures/fake-comfy.js";
 import { testImageProfile, writeTestWorkflows } from "../fixtures/test-workflows.js";
 

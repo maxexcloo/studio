@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test, { type TestContext } from "node:test";
+
 import express from "express";
-import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
-import type { userContent } from "./model-content.ts";
+
 import type { Change } from "../../shared/suggestions.ts";
+import type { userContent } from "./model-content.ts";
+import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
 import type { TasteRecord, TasteWriter } from "./taste.ts";
 
 /** A message as the model got it: its text, and how many images came with it. */

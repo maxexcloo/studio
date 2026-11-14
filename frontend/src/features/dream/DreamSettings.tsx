@@ -1,13 +1,14 @@
-import { useState } from "react";
 import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Text, Tooltip } from "@mantine/core";
-import { icons } from "../../ui/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { api } from "../../api";
+import { icons } from "../../ui/icons";
 import { NumberSetting } from "../../ui/NumberSetting";
 import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { fittedPopup } from "../generation/chip";
-import { dreamCountQuery, dreamQuery, dreamWhen, type Dream, type DreamSettings } from "./queries";
+import { type Dream, type DreamSettings, dreamCountQuery, dreamQuery, dreamWhen } from "./queries";
 
 /** Saves part of the Dream settings and shows the result at once. */
 export function useDreamSettings() {

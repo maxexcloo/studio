@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -11,10 +10,12 @@ import {
   TextInput,
 } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+
+import { profileNameParts } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import { formatBytes } from "../../ui/bytes";
 import { DialogFooter } from "../../ui/ConfirmDialog";
-import { profileNameParts } from "../../../../shared/profiles";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { definitionsKey } from "./queries";
 

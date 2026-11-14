@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { stackPresets } from "./stack-presets.js";
+
+import { Store } from "./domain/store.ts";
 import {
   closeRuntimeDatabase,
   ownerDocumentName,
@@ -11,7 +12,7 @@ import {
   runtimeDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
-import { Store } from "./domain/store.ts";
+import { stackPresets } from "./stack-presets.js";
 
 test("stackPresets turns saved LoRA stacks into LoRA presets with unique names", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-stack-presets-"));

@@ -1,9 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Transition } from "@mantine/core";
 import { useFocusWithin, useHover, useMergedRef } from "@mantine/hooks";
 import { Minus, Plus } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
+
 import { useMotionDuration } from "../../ui/Appearance";
+
 import classes from "./MediaZoom.module.css";
 
 type Mode = "Fit" | "Fill" | "Actual Size" | "Custom";

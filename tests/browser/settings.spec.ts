@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({

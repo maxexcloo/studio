@@ -1,40 +1,42 @@
 import {
-  Fragment,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
+  ActionIcon,
+  Button,
+  FocusTrap,
+  Loader,
+  Menu,
+  Modal,
+  type ModalProps,
+  Textarea,
+  type TextareaProps,
+  Tooltip,
+  VisuallyHidden,
+  getDefaultZIndex,
+  useProps,
+} from "@mantine/core";
+import { useMergedRef } from "@mantine/hooks";
+import { ArrowUp, Check, type LucideIcon } from "lucide-react";
+import {
   type CSSProperties,
+  Fragment,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
   type Ref,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
 } from "react";
-import {
-  ActionIcon,
-  Button,
-  FocusTrap,
-  getDefaultZIndex,
-  Loader,
-  Menu,
-  Modal,
-  Textarea,
-  Tooltip,
-  type ModalProps,
-  type TextareaProps,
-  useProps,
-  VisuallyHidden,
-} from "@mantine/core";
-import { useMergedRef } from "@mantine/hooks";
-import { ArrowUp, Check, type LucideIcon } from "lucide-react";
-import { ActionBarGroups, ActionMenuItems, type Action } from "./ActionBar";
+
 import { menuWidth } from "../theme";
-import { icons } from "./icons";
+import { type Action, ActionBarGroups, ActionMenuItems } from "./ActionBar";
 import { useCopy } from "./clipboard";
+import { icons } from "./icons";
 import { popupLayer } from "./popupClicks";
 import { PopupTooltip } from "./PopupTooltip";
 import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
+
 import classes from "./TextBox.module.css";
 
 // Pressing ⋯ or a phone editor tool keeps focus (and the keyboard) in the text, so nothing that

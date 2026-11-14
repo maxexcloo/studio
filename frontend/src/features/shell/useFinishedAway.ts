@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queueQuery } from "../generation/Queue";
+import { useEffect, useRef } from "react";
+
 import { terminalStatuses } from "../../../../shared/queue";
+import { queueQuery } from "../generation/Queue";
 
 const title = "Studio";
 

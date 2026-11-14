@@ -1,5 +1,7 @@
 import path from "node:path";
-import { dataDir } from "./gallery/store.js";
+
+import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
+import { repointedPreferences } from "./combined-profiles.js";
 import {
   allCustomWorkflowRecords,
   detectWorkflowFormat,
@@ -10,9 +12,8 @@ import {
   workflowMissingFiles,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { catalogueDownloadsForFile } from "./catalogue-downloads.js";
+import { dataDir } from "./gallery/store.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
-import { repointedPreferences } from "./combined-profiles.js";
 import { workflowRisks } from "./workflow-risk.js";
 
 let preferencesCache = null;

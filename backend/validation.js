@@ -1,10 +1,10 @@
 import { isResolution } from "../shared/resolution.ts";
-import { catalogueLoraInfo } from "./lora/info.js";
-import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
-import { keptTriggers } from "./lora/prompts.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
-import { inferModels } from "./model/models.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
+import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
+import { catalogueLoraInfo } from "./lora/info.js";
+import { keptTriggers } from "./lora/prompts.js";
+import { inferModels } from "./model/models.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {

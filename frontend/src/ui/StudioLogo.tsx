@@ -1,4 +1,5 @@
 import { Title, type TitleOrder } from "@mantine/core";
+
 import classes from "./StudioLogo.module.css";
 
 export function StudioLogo({ order }: { order: TitleOrder }) {

@@ -1,8 +1,9 @@
 import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
-import { api } from "../../api";
-import type { MediaItem } from "../../types";
+
 import type { CardKind } from "../../../../shared/characters";
 import type { DigestGroup, Project, Review } from "../../../../shared/projects";
+import { api } from "../../api";
+import type { MediaItem } from "../../types";
 
 /** One account's Dream settings (backend/domain/dream.ts). */
 export interface DreamSettings {

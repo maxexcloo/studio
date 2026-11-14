@@ -1,13 +1,14 @@
-import { useState } from "react";
 import { Alert, Checkbox, Group, Select, Stack, Text, TextInput } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { backendLabel } from "../generation/payload";
 import { modelsQuery } from "../generation/GenerationProvider";
+import { backendLabel } from "../generation/payload";
 import { definitionsKey, duplicateProfilesQuery } from "./queries";
 
 interface Member {

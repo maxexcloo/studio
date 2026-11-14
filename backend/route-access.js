@@ -1,5 +1,4 @@
 import { canAdmin, clientOf } from "./access.js";
-
 import { multiUserEnabled } from "./multi-user-auth.js";
 
 /** This computer in single-user mode; an administrator in account mode. */

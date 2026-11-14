@@ -8,7 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import sharp from "sharp";
+
 import type { QueueJob } from "../../shared/queue.ts";
 const { imageRecipe, readImageMetadata } = await import(
   new URL("../image-metadata.js", import.meta.url).href

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { create, fixtures, image, openTheme, promptTool, stamp } from "./fixtures";
 
 test("A click outside an open popup only closes it", async ({ page }) => {

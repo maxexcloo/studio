@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
+
 import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })

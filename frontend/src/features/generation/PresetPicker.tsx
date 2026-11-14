@@ -1,16 +1,17 @@
-import { useState } from "react";
 import { Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { Check } from "lucide-react";
-import { icons } from "../../ui/icons";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
+import { useState } from "react";
+
 import { api } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
-import { inspirationInput, inspirationQuery } from "./inspiration";
 import { iconChipProps } from "./chip";
+import { inspirationInput, inspirationQuery } from "./inspiration";
 import { generationInput } from "./payload";
 import {
   ChipPopup,
@@ -18,12 +19,13 @@ import {
   SaveButton,
   SavedList,
   SavedName,
-  SortMenu,
-  savedSortLabels,
-  savedItems,
-  useNaming,
   type SavedSort,
+  SortMenu,
+  savedItems,
+  savedSortLabels,
+  useNaming,
 } from "./Picker";
+
 import classes from "./Picker.module.css";
 export interface Preset {
   id: string;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { createIdleWork } from "./idle-work.ts";
 
 test("a walk over a large gallery gives the event loop turns, as the server answers meanwhile", async () => {

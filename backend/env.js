@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+
 import { projectRoot } from "./data-root.js";
 
 // The shell wins over .env, which Studio only reads (Settings saves to SQLite,

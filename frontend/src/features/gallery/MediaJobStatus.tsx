@@ -1,11 +1,12 @@
 import { Alert, Button, Group, Loader, Progress, Stack, Text } from "@mantine/core";
 import { useState } from "react";
-import type { MediaItem } from "../../types";
-import { useTryAgain } from "./useTryAgain";
-import { progressPercent, QueueJobAction, statusLabels, useQueue } from "../generation/Queue";
-import { WritingStream } from "../generation/PromptWriting";
+
 import { terminalStatuses } from "../../../../shared/queue";
+import type { MediaItem } from "../../types";
 import { icons } from "../../ui/icons";
+import { WritingStream } from "../generation/PromptWriting";
+import { QueueJobAction, progressPercent, statusLabels, useQueue } from "../generation/Queue";
+import { useTryAgain } from "./useTryAgain";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({

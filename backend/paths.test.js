@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { isInside, pathKey } from "./paths.js";
 
 test("POSIX paths keep their case", () => {

@@ -1,15 +1,18 @@
+import { notifications } from "@mantine/notifications";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
   Camera,
   Check,
   FastForward,
   Film,
-  ImageDown,
   Flame,
+  ImageDown,
   ImagePlus,
   ListChecks,
-  MessagesSquare,
   Loader,
+  type LucideIcon,
+  MessagesSquare,
   Repeat,
   Rewind,
   Scissors,
@@ -19,59 +22,57 @@ import {
   Waves,
   Wind,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { notifications } from "@mantine/notifications";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
-import { useOpenComposer } from "../generation/openComposer";
+
 import { post } from "../../api";
 import type { MediaItem, Profile } from "../../types";
+import { type Action, type ActionGroups, ActionMenuItems } from "../../ui/ActionBar";
 import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { useFlash } from "../../ui/useFlash";
 import { useGroupFeature } from "../auth/AccountGate";
-import { useStageComparison } from "../compare/variants";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
-import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
+import { useStageComparison } from "../compare/variants";
 import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
-import { assistantQuery, type AssistantOption } from "../generation/PromptAssistant";
-import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
-import { queueQuery, useQueueAction } from "../generation/Queue";
+import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
+import { useOpenComposer } from "../generation/openComposer";
 import { profileForBackend, profileName } from "../generation/payload";
+import { type AssistantOption, assistantQuery } from "../generation/PromptAssistant";
+import { queueQuery, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
-import { ActionMenuItems, type Action, type ActionGroups } from "../../ui/ActionBar";
+import {
+  type VideosPreference,
+  showQueued,
+  useVideosPreference,
+} from "../settings/accountPreferences";
+import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import { videoExport } from "./download";
+import { itemAction, itemActionGroups } from "./itemActions";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
-import { itemAction, itemActionGroups } from "./itemActions";
-import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
 import {
+  type SimilarStrictness,
   similarStrictnessOptions,
   useSimilarStrictness,
-  type SimilarStrictness,
 } from "./similarStrictness";
+import { useStopUpscale, useUpscaleAction } from "./UpscaleControls";
+import { useItemMutation } from "./useItemMutation";
 import {
+  type AnimateOffers,
+  type AnimateRequest,
+  type Iteration,
   animateProfileQuery,
   useAnimateReview,
   useAnimateThemes,
   useMediaAction,
   useMediaIteration,
-  type AnimateOffers,
-  type AnimateRequest,
-  type Iteration,
 } from "./useMediaAction";
-import { useItemMutation } from "./useItemMutation";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
-import {
-  showQueued,
-  useVideosPreference,
-  type VideosPreference,
-} from "../settings/accountPreferences";
-import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
+import { type VideoEdit, useVideoEdit } from "./videoEdits";
 
 /** An action whose options come to one runs that option itself, so no submenu holds just one. */
 function withoutLoneOption(action: Action): Action {

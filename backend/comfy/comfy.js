@@ -1,9 +1,10 @@
-import { setTimeout as delay } from "node:timers/promises";
-import { noteWorkerReachable, workerReachable, workerUrl } from "./backends.js";
-import { listensBeyondThisComputer } from "../client-trust.js";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+
+import { listensBeyondThisComputer } from "../client-trust.js";
 import { mediaFile, mediaType } from "../media-paths.js";
+import { noteWorkerReachable, workerReachable, workerUrl } from "./backends.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "../..");

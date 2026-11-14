@@ -1,9 +1,10 @@
 // A chat's project (domain/projects.ts): the project tool, and how generate keeps to its brief and constraints.
 import { z } from "zod";
+
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { maxJobsPerCall } from "./controls.js";
-import { localUnlessAsked, mcpTiers, profilesForTier } from "./tiers.js";
 import { mcpJson } from "./media.js";
+import { localUnlessAsked, mcpTiers, profilesForTier } from "./tiers.js";
 
 const tierWords = {
   "super fast": "turbo",

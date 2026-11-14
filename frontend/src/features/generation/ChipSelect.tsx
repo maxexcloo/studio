@@ -1,16 +1,18 @@
-import type { ReactNode } from "react";
 import {
   Button,
   ColorSwatch,
   ComboboxPopover,
+  type ComboboxPopoverProps,
   Group,
   Stack,
   Text,
-  type ComboboxPopoverProps,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
+
 import { useTouch } from "../../ui/usePhone";
 import { chipProps } from "./chip";
+
 import classes from "./GenerationInputControls.module.css";
 
 /**

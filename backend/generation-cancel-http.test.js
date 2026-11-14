@@ -8,10 +8,12 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+
 import sharp from "sharp";
+
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
-import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "./fixtures/fake-kubernetes.ts";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { closeRuntimeDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {

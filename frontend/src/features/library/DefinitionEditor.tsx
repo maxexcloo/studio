@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Alert,
   Badge,
@@ -14,25 +13,27 @@ import {
   Switch,
   Tabs,
   Text,
-  Textarea,
   TextInput,
+  Textarea,
 } from "@mantine/core";
-import { SettingGroup } from "../../ui/SettingRows";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+
+import { sharedProfileFields } from "../../../../shared/profiles";
 import { api, post } from "../../api";
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
-import { LoadingState } from "../../ui/LoadingState";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { loraInfoQuery } from "../generation/LoraPicker";
-import { WorkflowConnections } from "./WorkflowConnections";
-import { backendLabel } from "../generation/payload";
-import { sharedProfileFields } from "../../../../shared/profiles";
 import { icons } from "../../ui/icons";
+import { LoadingState } from "../../ui/LoadingState";
+import { SettingGroup } from "../../ui/SettingRows";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
+import { backendLabel } from "../generation/payload";
 import { catalogueQuery, definitionsKey } from "./queries";
+import { WorkflowConnections } from "./WorkflowConnections";
 
 export type DefinitionKind = "profile" | "guide";
 interface DefinitionMeta {

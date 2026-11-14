@@ -3,17 +3,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
+import { pausedReason } from "../../shared/queue.ts";
 import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationQueueAdapter } from "./generation-adapter.ts";
 import {
   GenerationQueue,
-  goneOutputs,
   type JobObservation,
   type QueueAdapter,
+  goneOutputs,
   unreachableCancelReason,
 } from "./queue.ts";
-import { pausedReason } from "../../shared/queue.ts";
-import { everyone, listedFinishedJobs, type OwnedJob, queuePriority, Store } from "./store.ts";
+import { type OwnedJob, Store, everyone, listedFinishedJobs, queuePriority } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;

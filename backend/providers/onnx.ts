@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Worker } from "node:worker_threads";
+
 import type { InferRequest } from "./onnx-worker.ts";
 
 /**

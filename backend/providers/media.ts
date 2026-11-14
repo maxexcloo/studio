@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+
 import sharp from "sharp";
+
 import type { QueueMedia } from "../../shared/queue.ts";
 import type { OwnedJob } from "../domain/store.ts";
 

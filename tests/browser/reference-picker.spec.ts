@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
+
+import type { Profile } from "../../frontend/src/types";
 import {
   closeReferences,
   create,
@@ -10,7 +12,6 @@ import {
   showUploads,
   stamp,
 } from "./fixtures";
-import type { Profile } from "../../frontend/src/types";
 
 async function setup(page: Page) {
   const state = await fixtures(page);

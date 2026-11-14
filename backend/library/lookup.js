@@ -9,6 +9,8 @@
  * Nothing here downloads, writes or deletes. Dependencies are injected so tests run offline.
  */
 import { civitaiLink } from "../civitai/import.js";
+import { civitaiAvailability } from "./availability.js";
+import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
 import {
   civitaiLinks,
   civitaiUncensored,
@@ -16,8 +18,6 @@ import {
   resolveCivitaiModel,
   resolveHuggingFace,
 } from "./sources.js";
-import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
-import { civitaiAvailability } from "./availability.js";
 
 const maxSearchResults = 5;
 const maxVersions = 12;

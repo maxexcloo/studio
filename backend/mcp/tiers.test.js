@@ -1,21 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
+import { isCloudProfile } from "../../shared/profiles.ts";
 import {
   asksForCloud,
   chooseProfile,
   familyMatches,
-  localUnlessAsked,
   findProfile,
+  localUnlessAsked,
   nameWords,
   profileFromRequest,
-  withinFamily,
   profilesForTier,
   profilesNearTier,
   searchProfiles,
   takesFirstFrame,
   tierOf,
+  withinFamily,
 } from "./tiers.js";
-import { isCloudProfile } from "../../shared/profiles.ts";
 
 test("tiers come from the label segment, and untiered labels are standard", () => {
   assert.equal(tierOf({ label: "Krea 2 Turbo · Super Fast · 2 Steps" }), "turbo");

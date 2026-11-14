@@ -3,8 +3,8 @@
  * hash), and the lookups the download route and import review use.
  */
 import { families } from "./family-catalogue.js";
-import { existingCopy } from "./model/downloads.js";
 import { encoderKinds, vaeKinds } from "./model/components.js";
+import { existingCopy } from "./model/downloads.js";
 
 // The commit each repository's files are fetched at, so a download is always the file its
 // `sha256` names. When a file changes upstream, the Library's update check offers it as an Update

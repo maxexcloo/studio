@@ -1,4 +1,3 @@
-import { useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -13,6 +12,8 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
@@ -20,14 +21,14 @@ import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useFlash } from "../../ui/useFlash";
 import { inspirationQuery } from "../generation/inspiration";
-import { catalogueQuery, importsQuery } from "./queries";
 import {
+  type ImportRecord,
+  LibraryImportReview,
   gradeColours,
   importBusy,
-  LibraryImportReview,
   stateLabel,
-  type ImportRecord,
 } from "./LibraryImportReview";
+import { catalogueQuery, importsQuery } from "./queries";
 
 /** Sorts the best grade first and unknown grades after the known ones. */
 function gradeRank(grade: string) {

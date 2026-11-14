@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { closeReferences, create, fixtures, showUploads } from "./fixtures";
 
 test("Mask zoom and Hand pan preserve painting history and saved masks", async ({

@@ -11,15 +11,17 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { icons } from "../../ui/icons";
 import { useState } from "react";
+
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
+import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
-import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaSource } from "../gallery/mediaSource";
-import { discardedQuery, dreamItemPath, dreamQuery, type DreamItem } from "./queries";
+import { MediaViewer } from "../gallery/MediaViewer";
+import { type DreamItem, discardedQuery, dreamItemPath, dreamQuery } from "./queries";
+
 import classes from "./DreamPage.module.css";
 
 export function Thumbnail({ item }: { item: DreamItem }) {

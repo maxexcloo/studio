@@ -1,5 +1,5 @@
 import type { DigestGroup, Project, ProjectBrief, Review } from "../../shared/projects.ts";
-import { createIdleWork, pictured, type IdleItem } from "./idle-work.ts";
+import { type IdleItem, createIdleWork, pictured } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 export interface ReviewItem extends IdleItem {

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+
 import sharp from "sharp";
 
 // Each test file runs in its own process, so these folders stay here.

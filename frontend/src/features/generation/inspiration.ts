@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+
 import { api } from "../../api";
 import type { GenerationInput, Profile } from "../../types";
 import { inputForProfile } from "./GenerationProvider";

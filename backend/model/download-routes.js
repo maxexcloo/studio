@@ -1,10 +1,10 @@
-import { refreshWorkerModels } from "../worker-models.js";
 import { catalogueDownload } from "../catalogue-downloads.js";
-import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
 import { directRoute } from "../domain/direct-route.ts";
-import { adminRefusal } from "../route-access.js";
 import { libraryDownload } from "../library/downloads.js";
+import { adminRefusal } from "../route-access.js";
+import { refreshWorkerModels } from "../worker-models.js";
 import { defaultWorkerId } from "../workers.js";
+import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   // Every downloads answer starts from the worker's current files.

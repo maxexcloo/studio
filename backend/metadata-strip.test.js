@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { stripMetadata } from "./metadata-strip.js";
 import { loadSharp } from "./sharp-loader.js";
 

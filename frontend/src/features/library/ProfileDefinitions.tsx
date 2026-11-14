@@ -1,26 +1,27 @@
-import { useState, type ReactNode } from "react";
 import { Alert, Badge, Button, Group, Menu, Popover, Select, Stack, Text } from "@mantine/core";
 import { useFileDialog } from "@mantine/hooks";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDown, Combine, Merge, Zap } from "lucide-react";
-import { icons } from "../../ui/icons";
+import { type ReactNode, useState } from "react";
+
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
+import { icons } from "../../ui/icons";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { usePhone, useTouch } from "../../ui/usePhone";
 import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
-import {
-  DefinitionEditor,
-  definitionPath,
-  type DefinitionKind,
-  type LoadedDefinition,
-} from "./DefinitionEditor";
-import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
+import { usePhone, useTouch } from "../../ui/usePhone";
+import { modelsQuery } from "../generation/GenerationProvider";
 import { CombineBackends } from "./CombineBackends";
 import { ConvertToRadiance } from "./ConvertToRadiance";
-import { modelsQuery } from "../generation/GenerationProvider";
-import { definitionsKey, profileStatsQuery, type ProfileStats } from "./queries";
+import {
+  DefinitionEditor,
+  type DefinitionKind,
+  type LoadedDefinition,
+  definitionPath,
+} from "./DefinitionEditor";
+import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
+import { type ProfileStats, definitionsKey, profileStatsQuery } from "./queries";
 
 interface ProfileRow {
   id: string;

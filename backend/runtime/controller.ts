@@ -1,8 +1,7 @@
-import { setTimeout as delay } from "node:timers/promises";
 import { createHash, randomUUID } from "node:crypto";
-import type { ServiceKind } from "../../shared/services.ts";
+import { setTimeout as delay } from "node:timers/promises";
+
 import {
-  textHoldsGpus,
   type RuntimeOperation,
   type RuntimePodLog,
   type RuntimePreview,
@@ -10,7 +9,9 @@ import {
   type RuntimeStatus,
   type RuntimeSwap,
   type WorkloadPhase,
+  textHoldsGpus,
 } from "../../shared/runtime.ts";
+import type { ServiceKind } from "../../shared/services.ts";
 import type { DeploymentState } from "./kubernetes.ts";
 
 /** One Kubernetes deployment Studio may scale between 0 and 1 replicas (runtime/workloads.ts). */

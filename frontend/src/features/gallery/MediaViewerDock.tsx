@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
 import { Group, Image, Loader, ScrollArea, UnstyledButton } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Play } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { terminalStatuses } from "../../../../shared/queue";
 import type { MediaItem, QueueJob } from "../../types";
 import { queueQuery } from "../generation/Queue";
-import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
 import { mediaTitle } from "./mediaLabels";
+import { derivation, knownResults, versionGroups, versionSources, versionTree } from "./versions";
+
 import classes from "./MediaViewer.module.css";
-import { terminalStatuses } from "../../../../shared/queue";
 
 interface Entry {
   key: string;

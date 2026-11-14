@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+
 import { fixtures, stamp, videoClip, viewerAction } from "./fixtures";
 
 const clip = videoClip();

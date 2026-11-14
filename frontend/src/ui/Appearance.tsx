@@ -1,11 +1,10 @@
-import { createContext, useContext, useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
   ColorSwatch,
   MantineProvider,
   Popover,
-  SegmentedControl,
   ScrollArea,
+  SegmentedControl,
   Stack,
   Text,
   Tooltip,
@@ -15,13 +14,15 @@ import {
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
 import { Check, Palette } from "lucide-react";
+import { type ReactNode, createContext, useContext, useLayoutEffect, useMemo } from "react";
+
 import {
-  backgrounds,
-  motionSpeeds,
-  type MotionSpeed,
   type Background,
+  type MotionSpeed,
   type Rounding,
+  backgrounds,
   cssVariablesResolver,
+  motionSpeeds,
   studioTheme,
 } from "../theme";
 import { PopupTooltip } from "./PopupTooltip";

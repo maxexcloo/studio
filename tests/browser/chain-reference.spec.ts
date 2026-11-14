@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
+
 import { expect, test } from "@playwright/test";
+
+import type { Profile } from "../../frontend/src/types";
 import {
   closeReferences,
   create,
@@ -11,7 +14,6 @@ import {
   showUploads,
   stamp,
 } from "./fixtures";
-import type { Profile } from "../../frontend/src/types";
 
 const workflow = JSON.parse(
   readFileSync(

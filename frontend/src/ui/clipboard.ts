@@ -1,4 +1,5 @@
 import { notifications } from "@mantine/notifications";
+
 import { failure } from "../api";
 import { useFlash } from "./useFlash";
 

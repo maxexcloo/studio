@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { loraPromptMetadata } from "./catalogue.js";
 import { negativeUnused, recommendedNegative, withLoraTriggers } from "./prompts.js";
 

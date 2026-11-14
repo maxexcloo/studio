@@ -1,6 +1,7 @@
 import { Alert, Group, Stack, Text } from "@mantine/core";
-import { queryOptions, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { type UseQueryResult, queryOptions, useQuery } from "@tanstack/react-query";
 import { Circle, CircleDot } from "lucide-react";
+
 import type {
   ServiceHealth,
   ServiceStatus,

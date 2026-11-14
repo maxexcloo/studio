@@ -1,4 +1,4 @@
-import { Tooltip, usePopoverContext, type TooltipProps } from "@mantine/core";
+import { Tooltip, type TooltipProps, usePopoverContext } from "@mantine/core";
 
 /**
  * The tooltip of a popover's or menu's trigger, wrapping its `Popover.Target` or `Menu.Target`,

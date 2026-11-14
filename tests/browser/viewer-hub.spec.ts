@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page, expect, test } from "@playwright/test";
+
 import type { Profile } from "../../frontend/src/types";
 import {
   closeLoras,

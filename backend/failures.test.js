@@ -1,6 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import test from "node:test";
+
 import { describeFailure, failureTitles, troubleshootingAnchor } from "./failures.js";
 
 test("every failure headline has its own section in README.md › Troubleshooting, which the card links to", () => {

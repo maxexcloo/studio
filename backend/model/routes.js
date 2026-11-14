@@ -1,5 +1,5 @@
-import { accountPreferences } from "../account-preferences.js";
 import { ownerIdForRequest } from "../account-ownership.js";
+import { accountPreferences } from "../account-preferences.js";
 import { animateProfile } from "../animate-profile.js";
 import { directRoute } from "../domain/direct-route.ts";
 import {

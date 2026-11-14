@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   AspectRatio,
   Badge,
@@ -14,11 +13,13 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
 import type { DigestGroup } from "../../../../shared/projects";
-import { usePhone, useSideways } from "../../ui/usePhone";
 import { dateFormat } from "../../ui/dates";
+import { usePhone, useSideways } from "../../ui/usePhone";
 import { MediaViewer } from "../gallery/MediaViewer";
-import { dreamChoices, viewerChoices, type Verdict } from "./choices";
+import { type Verdict, dreamChoices, viewerChoices } from "./choices";
 import { Thumbnail } from "./DiscardedDreams";
 import { useJudge } from "./DreamDeck";
 import type { DreamItem } from "./queries";
