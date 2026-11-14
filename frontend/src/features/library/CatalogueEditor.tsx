@@ -146,7 +146,7 @@ function CatalogueForm({
         <Select
           label={lora ? "LoRA Type" : "Model Type"}
           clearable
-          placeholder="Inherit Source Classification"
+          placeholder={lora ? "Unclassified" : "Inherit Source Classification"}
           data={
             lora
               ? ["slider", "style", "character", "concept"].map((value) => ({
@@ -166,7 +166,10 @@ function CatalogueForm({
             <Select
               label="Runtime Role"
               clearable
-              data={["effect", "acceleration", "supporting"]}
+              data={["effect", "acceleration", "supporting"].map((value) => ({
+                value,
+                label: value[0].toUpperCase() + value.slice(1),
+              }))}
               value={form.values.role || null}
               onChange={(value) => form.setFieldValue("role", value || "")}
             />
