@@ -6,6 +6,7 @@ import {
   pausedReason,
   terminalStatuses,
 } from "../../shared/queue.ts";
+import { tracked } from "../event-loop.js";
 import { logFailure } from "./log-failure.ts";
 import { type OwnedJob, Store, everyone, pendingStatuses, queuePriority } from "./store.ts";
 
@@ -210,7 +211,7 @@ export class GenerationQueue {
   start() {
     this.stopped = false;
     if (!this.timer) {
-      this.timer = setInterval(() => void this.tick(), 1000);
+      this.timer = setInterval(() => void tracked("Queue", () => this.tick()), 1000);
       this.timer.unref();
       void this.tick();
     }

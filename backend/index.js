@@ -83,6 +83,7 @@ import {
   tasteSignal,
 } from "./domain/taste.ts";
 import { createTitler } from "./domain/titles.ts";
+import { track, tracked, watchEventLoop } from "./event-loop.js";
 import { registerGalleryImportRoute } from "./gallery/import.js";
 import { makePendingItems } from "./gallery/records.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
@@ -207,10 +208,26 @@ import { registerWorkflowRoutes } from "./workflow-routes.js";
 let drainServer = async () => {};
 installShutdown({ drain: () => drainServer() });
 
+watchEventLoop();
 const app = express();
 // Routes match exactly as written. Express otherwise matches /API/… to /api/… while every gate
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
+// Ids and file names in a path are left out, so a stall names only the route.
+app.use((req, res, next) => {
+  const path = () =>
+    req.originalUrl
+      .split("?")[0]
+      .split("/")
+      .slice(0, 5)
+      .map((part) => (/[\d.]/.test(part) ? ":id" : part))
+      .join("/");
+  res.once(
+    "close",
+    track(() => `${req.method} ${path()}`),
+  );
+  next();
+});
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
 app.use(requestGuard({ network: networkListening }));
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue
@@ -372,7 +389,7 @@ async function ingestRecoveredRecords(backend, records, promptIds = []) {
   }
   return moved.records;
 }
-setInterval(() => recoverRunningJobs(), 5000).unref();
+setInterval(() => void tracked("Job recovery", recoverRunningJobs), 5000).unref();
 
 async function recoverGalleryFromHistory() {
   // Recovery follows only jobs already recorded in this runtime's gallery.

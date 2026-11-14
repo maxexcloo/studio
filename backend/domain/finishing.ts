@@ -1,4 +1,5 @@
 import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../shared/upscale.ts";
+import { tracked } from "../event-loop.js";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse } from "./admission.ts";
 import { logFailure } from "./log-failure.ts";
@@ -170,7 +171,10 @@ export function createFinishing(options: {
     read,
     tick,
     start() {
-      timer ||= setInterval(() => void tick().catch(tickFailed), tickMs);
+      timer ||= setInterval(
+        () => void tracked("Finish Starred Images", tick).catch(tickFailed),
+        tickMs,
+      );
       timer.unref();
     },
     stop() {
