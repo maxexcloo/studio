@@ -309,10 +309,13 @@ test("Update All applies every free update in one request", async ({ page }) => 
       json: {
         items: [
           item("Style", { latest: { name: "Style 2", downloadable: true } }),
-          item("Detail", {
-            latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
-            freeAlternative: { name: "Detail 2", downloadable: true },
-          }),
+          {
+            ...item("Detail", {
+              latest: { name: "Detail 3", downloadable: false, unavailable: { reason: "paid" } },
+              freeAlternative: { name: "Detail 2", downloadable: true },
+            }),
+            families: ["sdxl"],
+          },
         ],
       },
     }),
@@ -327,6 +330,18 @@ test("Update All applies every free update in one request", async ({ page }) => 
   await openNav(page, "Library");
   await section(page, "Library", "LoRAs");
   const loras = page.getByRole("region", { name: "Library: LoRAs", exact: true });
+  // LoRAs filter by family alone, from one dropdown beside the search.
+  await expect(loras.getByRole("button", { name: "Filter LoRAs", exact: true })).toHaveCount(0);
+  const family = loras.getByRole("combobox", { name: "Family", exact: true });
+  await expect(family).toHaveValue("All Families");
+  await family.click();
+  await page.getByRole("option", { name: "SDXL", exact: true }).click();
+  const table = loras.getByRole("table", { name: "Library LoRAs", exact: true });
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("Detail");
+  await family.click();
+  await page.getByRole("option", { name: "All Families", exact: true }).click();
+  await expect(table.getByRole("row")).toHaveCount(3);
   await loras.getByRole("button", { name: "Update All", exact: true }).click();
   await expect(loras.getByText("2 updates queued.", { exact: true })).toBeVisible();
   await expect(loras.getByRole("button", { name: "Update All", exact: true })).toBeHidden();
