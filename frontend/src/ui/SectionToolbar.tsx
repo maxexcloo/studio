@@ -215,7 +215,7 @@ export function SectionToolbar({
             </Popover.Dropdown>
           </Popover>
         )}
-        {(onQueryChange || filters) && (more.length > 0 || actions) && <ToolbarDivider />}
+        {(onQueryChange || filters) && more.length > 0 && <ToolbarDivider />}
         {more.length > 0 && (
           <Menu position="bottom-end">
             <PopupTooltip label={`More ${label} Actions`}>
