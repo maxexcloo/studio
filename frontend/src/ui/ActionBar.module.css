@@ -64,16 +64,19 @@
   --button-height: 30px;
 }
 
-/* Tight enough for every action across a 375 px phone. */
-.actions[data-compact] .options {
+/* Tight enough for every action across a 375 px phone, or a fitted bar whose names have all gone. */
+.actions[data-compact] .options,
+.actions[data-tight] .options {
   padding-inline: 2px 1px;
 }
 
-.actions[data-compact] .chevron {
+.actions[data-compact] .chevron,
+.actions[data-tight] .chevron {
   margin-inline-start: 0;
 }
 
-.actions[data-compact] .chevron svg {
+.actions[data-compact] .chevron svg,
+.actions[data-tight] .chevron svg {
   width: 10px;
   height: 10px;
 }
