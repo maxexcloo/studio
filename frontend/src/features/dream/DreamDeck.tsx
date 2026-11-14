@@ -218,16 +218,18 @@ const cardLabel = (card: DeckCard, top: boolean) =>
  * opens it in the viewer over the deck with the card's choices in its bar; an answer there returns
  * to the deck. With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste
  * profile: swipe or press ← to pass and → to like; judging them changes nothing in the gallery
- * beyond an optional Super Like (Star). `empty` shows once the
+ * beyond an optional Super Like (Star). `notice` shows above the cards; `empty` shows once the
  * deck is through, told whether calibration images are available.
  */
 export function DreamDeck({
   items,
   calibrate,
+  notice,
   empty,
 }: {
   items: DreamItem[];
   calibrate: boolean;
+  notice?: ReactNode;
   empty: (calibration: boolean) => ReactNode;
 }) {
   const phone = usePhone();
@@ -373,6 +375,7 @@ export function DreamDeck({
   const batch = counts.dreamed + unseen.length;
   return (
     <>
+      {notice}
       <BatchStrip done={counts.dreamed} total={batch} />
       <div className={classes.stage}>
         {[next, top].map(

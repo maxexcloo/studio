@@ -80,6 +80,26 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   );
 }
 
+/** Above calibration while Dream is off, as the deck alone doesn't show it. */
+function OffNotice() {
+  const save = useDreamSettings();
+  return (
+    <Group justify="center" gap="xs" role="status" aria-label="Dream Status">
+      <Text size="sm" c={save.error ? "red" : "dimmed"}>
+        {save.error ? `Couldn’t Turn On Dream: ${save.error.message}` : "Dream is off."}
+      </Text>
+      <Button
+        size="compact-sm"
+        variant="light"
+        loading={save.isPending}
+        onClick={() => save.mutate({ enabled: true })}
+      >
+        Turn On
+      </Button>
+    </Group>
+  );
+}
+
 /**
  * Dream: While You Were Away, then the deck for comparisons and calibration, with its pause and
  * settings; the discards, projects or the taste profile. Opening it counts as a visit.
@@ -187,6 +207,7 @@ export function DreamPage() {
         <DreamDeck
           items={data!.unseen.filter((item) => !digested.has(item.id))}
           calibrate={tuning || data!.settings.enabled}
+          notice={!data!.settings.enabled && <OffNotice />}
           empty={(calibration) => (
             <Empty dream={data!} onTune={calibration ? () => setTuning(true) : undefined} />
           )}
