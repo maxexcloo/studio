@@ -27,10 +27,8 @@ import { createChatChoices, registerProjectTool } from "./project.js";
 import { registerResultTools } from "./results.js";
 import { registerVariantsTool } from "./variants.js";
 
-// The generate tool waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
-export const generateWaitSeconds = 30;
-// How long generate reads the first job for its end time while the queue picks it up.
-const etaProbeMilliseconds = 2000;
+// Review waits up to this long for a result Studio expects to finish within it.
+const defaultReviewWaitSeconds = 30;
 // An identical generate from the same conversation within this window is the same request (see generate).
 const generateDedupeWindowMs = 120_000;
 // Every client gets the same workflow rules from Studio itself, so a client needs no prompt prefix; tool descriptions
@@ -85,8 +83,7 @@ export function registerMcpRoutes(
     runtime,
     // Each media worker's health and work (runtime/services.ts WorkerStatus), for gpu_status.
     workerStatus = async () => [],
-    imageWaitSeconds = generateWaitSeconds,
-    etaProbeMs = etaProbeMilliseconds,
+    reviewWaitSeconds = defaultReviewWaitSeconds,
     generateDedupeMs = generateDedupeWindowMs,
     allowedHost = (req) => hostAllowed(req.headers.host),
     accountMode = false,
@@ -353,8 +350,6 @@ export function registerMcpRoutes(
         resolve,
         resolveOutput,
         publicUrl,
-        imageWaitSeconds,
-        etaProbeMs,
         generateDedupeMs,
         reviewedGuides,
         recentGenerates,
@@ -362,7 +357,7 @@ export function registerMcpRoutes(
         chatAssistant,
         chatChoices,
       });
-      registerResultTools({ tool, server, media, actor, resolveOutput, imageWaitSeconds });
+      registerResultTools({ tool, server, media, actor, resolveOutput, reviewWaitSeconds });
       registerManageTools({ tool, server, media, owner, refs, resolve });
       registerProjectTool({ tool, server, media, owner, chat: actor.conversation, namedInTier });
       registerVariantsTool({

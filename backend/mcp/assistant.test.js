@@ -115,7 +115,6 @@ async function fixture(t, environment = gateway) {
     dataDir,
     environment: { STUDIO_MCP_PUBLIC_URL: "https://studio.example.test", ...environment },
     accountMode: true,
-    imageWaitSeconds: 0,
     authenticateAccountToken: (token) => tokens[token] || null,
   });
   const server = app.listen(0, "127.0.0.1");

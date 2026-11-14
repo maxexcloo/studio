@@ -21,7 +21,6 @@ import { isCloudProfile } from "../../shared/profiles.ts";
 import { resolutions } from "../../shared/resolution.ts";
 import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { accessFeatures } from "../account-policy.js";
-import { step } from "../event-loop.js";
 import { minorAgeRefusal } from "../minor-age.js";
 import { canonicalProfileId } from "../profile/store.js";
 import { promptStyleStore } from "../prompt-styles.js";
@@ -37,7 +36,7 @@ import {
   mcpSize,
 } from "./controls.js";
 import { findCard } from "./manage.js";
-import { assertJobCount, mcpJson, replyRule } from "./media.js";
+import { assertJobCount, mcpJson } from "./media.js";
 import { assertAvoided, briefLine, keptChoices, projectArgs, projectTargets } from "./project.js";
 import { exactPromptInstructions, fullBodyPerson, promptListProblem } from "./prompt-checks.js";
 import { output, shortPrompt } from "./results.js";
@@ -160,8 +159,6 @@ export function registerGenerateTools({
   actor,
   resolveOutput,
   publicUrl,
-  imageWaitSeconds,
-  etaProbeMs,
   generateDedupeMs,
   reviewedGuides,
   recentGenerates,
@@ -203,20 +200,10 @@ export function registerGenerateTools({
     const label = profile.label || profile.id;
     // Iterations that rebuild a whole generate call drift from the result; reuse keeps its settings.
     const followUp = `To change or animate one later, call reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and its full prompt revised (status shows it).`;
-    // A set Studio expects to finish within the wait comes back finished, so the agent needs no result call;
-    // anything longer, or with no trusted estimate, hands back its links at once.
-    const [endsAt] = await step("eta", () =>
-      media.finishTimes(owner, [submission], { probeMs: etaProbeMs, signal }),
-    );
-    const expected = endsAt === null ? null : Math.max(0, endsAt - Date.now());
-    const seconds = expected !== null && expected <= imageWaitSeconds * 1000 ? imageWaitSeconds : 0;
-    // A set that outlasted its wait has no ETA left worth giving.
-    const left = seconds ? 0 : expected;
-    const markdown = await step("wait for results", () =>
-      media.settle(owner, submission, seconds, { scope: refs, signal }),
-    );
+    const [endsAt] = await media.finishTimes(owner, [submission], { signal });
+    const left = endsAt === null ? 0 : Math.max(0, endsAt - Date.now());
     const structured = {
-      status: markdown ? "done" : submission.status,
+      status: submission.status,
       profile: {
         id: profile.id,
         label,
@@ -224,7 +211,7 @@ export function registerGenerateTools({
         ...(isCloudProfile(profile) ? { remote: true } : {}),
       },
       prompt_source: promptSource,
-      ...(!markdown && left ? { eta_seconds: Math.round(left / 1000) } : {}),
+      ...(left ? { eta_seconds: Math.round(left / 1000) } : {}),
       jobs: submission.jobs.map(({ job_id, ref, link, status, images }) => ({
         job_id,
         ref,
@@ -250,17 +237,6 @@ export function registerGenerateTools({
       : [];
     // Several results, or any still running, also get one All Results page that fills in as they finish.
     const all = `[All Results](${media.allUrl(owner, refs)})`;
-    if (markdown)
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Done on ${label}. ${note}${replyRule} ${followUp}\n\n${markdown}${submission.jobs.length > 1 ? `\n\n${all}` : ""}${prompts}`,
-          },
-          ...extra,
-        ],
-        structuredContent: structured,
-      };
     const pending = [
       ...submission.jobs.map(
         ({ ref, link, images }) =>
@@ -316,7 +292,7 @@ export function registerGenerateTools({
       await media.finishTimes(
         owner,
         sets.map(({ queued }) => queued),
-        { probeMs: etaProbeMs, signal },
+        { signal },
       )
     ).map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
     const lines = sets.map(
