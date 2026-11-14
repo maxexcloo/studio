@@ -258,7 +258,6 @@ export function CatalogueEditor({
       opened
       onClose={close}
       title={`Edit ${item.title || item.name || item.file || item.key}`}
-      size="lg"
       fullScreen={phone}
     >
       <FocusTrap.InitialFocus />
