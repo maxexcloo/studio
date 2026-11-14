@@ -834,6 +834,11 @@ const suggestions = createSuggestions({
     ),
   promptWriter: (ownerId) =>
     promptWriter(ownerId ? accountAccessForId(ownerId) : undefined, accountPreferences(ownerId)),
+  fixed: (kind) =>
+    promptStyleStore()
+      .usable(kind)
+      .filter((style) => !style.custom)
+      .map((style) => style.label),
 });
 registerSuggestionRoutes(app, {
   suggestions,
