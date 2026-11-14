@@ -217,7 +217,7 @@ export function registerFinishingRoutes(app: Router, { finishing }: { finishing:
   const owner = (req: Request) => req.studioAccount?.userId || "";
   const allowed = (req: Request, res: Response) => {
     if (finishing.allowed(owner(req))) return true;
-    res.status(403).json({ ok: false, error: "Upscaling is disabled for this account." });
+    res.status(403).json({ ok: false, error: "Upscale is off for this account." });
     return false;
   };
   const show = (ownerId: string): FinishingStatus => ({

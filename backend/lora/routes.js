@@ -36,9 +36,7 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
 
   app.put("/api/loras/library", (req, res) => {
     if (!accountMayUseLoras(req))
-      return res
-        .status(403)
-        .json({ ok: false, error: "LoRA access is disabled for this account." });
+      return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
     try {
       res.json({ ok: true, library: saveLoraLibrary(req.body?.library, ownerIdForRequest(req)) });
     } catch (error) {
@@ -53,7 +51,7 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
     if (!accountMayUseLoras({ studioAccount: account }))
       return {
         status: 403,
-        payload: { ok: false, error: "LoRA access is disabled for this account." },
+        payload: { ok: false, error: "LoRAs are off for this account." },
       };
     try {
       return {
@@ -89,9 +87,7 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
 
   app.put("/api/loras/:workflowId", (req, res) => {
     if (!accountMayUseLoras(req))
-      return res
-        .status(403)
-        .json({ ok: false, error: "LoRA access is disabled for this account." });
+      return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
     try {
       res.json({
         ok: true,
