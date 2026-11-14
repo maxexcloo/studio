@@ -3,16 +3,16 @@ import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog, DialogFooter } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
 import { type Preset, presetHolds, usePresets } from "../generation/PresetPicker";
 
+const savedDate = dateFormat({ dateStyle: "medium" });
 const savedOn = (preset: Preset) =>
-  preset.savedAt
-    ? new Date(preset.savedAt).toLocaleDateString(undefined, { dateStyle: "medium" })
-    : "";
+  preset.savedAt ? savedDate.format(new Date(preset.savedAt)) : "";
 
 /**
  * Library › Presets: the account's presets with what each holds. Edit in Composer loads one there,
