@@ -29,16 +29,10 @@ import { uploadedGalleryItem } from "./uploads.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
 import { galleryKey } from "./persistence/gallery-rows.ts";
 
-export const maxUploadBytes = Math.max(
-  1024,
-  Number(process.env.STUDIO_REFERENCE_MAX_BYTES || 25 * 1024 * 1024),
-);
-const maxVideoBytes = Math.max(maxUploadBytes, 200 * 1024 * 1024);
+export const maxUploadBytes = 25 * 1024 * 1024;
+const maxVideoBytes = 200 * 1024 * 1024;
 const megabytes = (bytes) => Math.round(bytes / 1024 / 1024);
-const maxPixels = Math.max(
-  1_000_000,
-  Number(process.env.STUDIO_REFERENCE_MAX_PIXELS || 80_000_000),
-);
+const maxPixels = 80_000_000;
 const acceptedMimes = new Set(imageMimes);
 
 function safeName(value = "reference-image") {

@@ -97,8 +97,7 @@ function indexRemove(name) {
  * in the last 15 minutes counts as in use (an open gallery page) and stays;
  * a removed thumbnail is simply made again when it is next asked for.
  */
-export const cacheLimitBytes =
-  Math.max(16, Number(process.env.STUDIO_THUMBNAIL_CACHE_MB) || 2048) * 1024 * 1024;
+export const cacheLimitBytes = 2048 * 1024 * 1024;
 const inUseMs = 15 * 60 * 1000;
 const sweepEveryMs = 10 * 60 * 1000;
 // When each thumbnail was last served by this server. The file's access time

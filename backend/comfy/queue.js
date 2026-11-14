@@ -102,11 +102,8 @@ export function isTransientComfyError(error) {
   );
 }
 
-// How long ComfyUI may stay silent before a run is given up on (shorter in tests).
-const defaultLostAfterMs =
-  Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0
-    ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS)
-    : 60_000;
+// How long ComfyUI may stay silent before a run is given up on (tests pass a shorter one).
+const defaultLostAfterMs = 60_000;
 
 // A worker that takes the connection but answers slowly is busy (decoding and saving a long video), not gone.
 const defaultBusyLostAfterMs = 20 * 60_000;

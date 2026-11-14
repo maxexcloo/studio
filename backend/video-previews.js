@@ -30,8 +30,7 @@ const version = "v2-720-24-8";
 const previewEdge = 720;
 const posterEdge = 768;
 const maxSourceBytes = 512 * 1024 * 1024;
-export const maxCacheBytes =
-  Math.max(16, Number(process.env.STUDIO_VIDEO_PREVIEW_CACHE_MB) || 512) * 1024 * 1024;
+export const maxCacheBytes = 512 * 1024 * 1024;
 const pending = new Map();
 const remoteVersions = new Map();
 const queue = [];
