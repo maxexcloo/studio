@@ -113,7 +113,7 @@ test(
       [member.status, member.body.error],
       [503, "The prompt assistant is not configured."],
     );
-    for (const route of ["rewrite", "animate", "negative", "loras", "character"]) {
+    for (const route of ["rewrite", "animate", "negative", "loras"]) {
       const refused = await call(`/api/assistant/${route}`, {
         method: "POST",
         cookie: cookies.limited,

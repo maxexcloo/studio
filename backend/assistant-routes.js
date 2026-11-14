@@ -431,11 +431,6 @@ export function registerAssistantRoutes(
     }
   }
   const cardKind = (kind) => (Object.hasOwn(cardKinds, kind) ? kind : null);
-  directRoute(app, "POST", "/api/assistant/character", (account, { body, stop }) =>
-    cardImages(account, [body?.assetId], stop, ([image], explicit) =>
-      engine.character({ image, explicit, signal: stop }),
-    ),
-  );
   directRoute(app, "POST", "/api/assistant/cards/describe", (account, { body, stop }) => {
     const kind = cardKind(body?.kind);
     if (!kind) return refuse(400, "Name a card kind: characters, outfits or scenes.").refusal;

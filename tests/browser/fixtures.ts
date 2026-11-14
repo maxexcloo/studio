@@ -503,12 +503,6 @@ export async function fixtures(page: Page) {
       active.forEach((job) => (job.status = "cancelled"));
       return respond({ outcomes: active.map((job) => ({ job, cancelRequested: false })) });
     }
-    if (path === "/api/queue/cancel-pending") {
-      jobs
-        .filter((j) => ["queued", "waiting"].includes(j.status))
-        .forEach((j) => (j.status = "cancelled"));
-      return respond({ cancelled: jobs.length });
-    }
     if (path.match(/^\/api\/queue\/[^/]+\/cancel$/)) {
       const job = jobs.find((j) => j.id === path.split("/")[3]);
       job.status = "cancelled";
