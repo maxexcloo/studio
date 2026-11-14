@@ -216,11 +216,12 @@ export function registerGenerateTools({
       },
       prompt_source: promptSource,
       ...(!markdown && left ? { eta_seconds: Math.round(left / 1000) } : {}),
-      jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({
+      jobs: submission.jobs.map(({ job_id, ref, link, status, images }) => ({
         job_id,
         ref,
         link,
         ...(status ? { status } : {}),
+        ...(images ? { images } : {}),
       })),
     };
     // The prompt each result ran, shortened unless reuse is revising it; one line when every job shares it.
@@ -253,7 +254,8 @@ export function registerGenerateTools({
       };
     const pending = [
       ...submission.jobs.map(
-        ({ ref, link }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})`,
+        ({ ref, link, images }) =>
+          `[${ref[0].toUpperCase()}${ref.slice(1)}](${link})${images ? ` (${images} images)` : ""}`,
       ),
       all,
     ].join(" · ");
