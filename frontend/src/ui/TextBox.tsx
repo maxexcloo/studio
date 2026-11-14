@@ -31,6 +31,7 @@ import { menuWidth } from "../theme";
 import { icons } from "./icons";
 import { copyText } from "./clipboard";
 import { popupLayer } from "./popupClicks";
+import { PopupTooltip } from "./PopupTooltip";
 import { useKeyboard, useKeyboardDrop } from "./useKeyboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
@@ -208,7 +209,7 @@ export function TextBox({
         })
       }
     >
-      <Tooltip label={busy || "More Actions"} disabled={menuOpened}>
+      <PopupTooltip label={busy || "More Actions"}>
         <Menu.Target>
           <ActionIcon
             ref={more}
@@ -222,7 +223,7 @@ export function TextBox({
             {busy ? <Loader size={16} /> : <icons.more size={18} />}
           </ActionIcon>
         </Menu.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Menu.Dropdown>
         {listed!.map((tool) => (
           <Fragment key={tool.id}>

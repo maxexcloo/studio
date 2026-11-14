@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from "react";
-import { ActionIcon, Menu, Tooltip } from "@mantine/core";
+import type { ReactNode } from "react";
+import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { post } from "../../api";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { ownAccountQuery, useAccount } from "./AccountGate";
 
 /** The account's name, Account and Sign Out, last after any `children` (the phone overflow's items). */
@@ -47,16 +48,15 @@ export function AccountMenuContent({ children }: { children?: ReactNode }) {
   );
 }
 export function AccountMenu() {
-  const [opened, setOpened] = useState(false);
   return (
-    <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md" width={240}>
-      <Tooltip label="Account" disabled={opened}>
+    <Menu position="bottom-end" shadow="md" width={240}>
+      <PopupTooltip label="Account">
         <Menu.Target>
           <ActionIcon aria-label="Account" variant="subtle" color="gray">
             <UserRound size={19} />
           </ActionIcon>
         </Menu.Target>
-      </Tooltip>
+      </PopupTooltip>
       <Menu.Dropdown>
         <AccountMenuContent />
       </Menu.Dropdown>

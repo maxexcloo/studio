@@ -19,6 +19,7 @@ import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { SwapNotice } from "../runtime/JobSwap";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
+import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { useSwipeClose } from "../../ui/useSwipeClose";
 import classes from "./ServiceStatus.module.css";
@@ -116,9 +117,9 @@ export function StatusAction() {
           returnFocus
           shadow="md"
         >
-          <Tooltip label={tooltip} disabled={opened}>
+          <PopupTooltip label={tooltip}>
             <Popover.Target>{trigger}</Popover.Target>
-          </Tooltip>
+          </PopupTooltip>
           <Popover.Dropdown
             ref={dropdown}
             aria-label={title}

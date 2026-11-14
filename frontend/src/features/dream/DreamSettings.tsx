@@ -87,7 +87,7 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
   const phone = usePhone();
   const [opened, setOpened] = useState(false);
   const button = (
-    <Tooltip label="Dream Settings">
+    <Tooltip label="Dream Settings" disabled={opened}>
       <ActionIcon
         variant={opened ? "light" : "subtle"}
         color={opened ? undefined : "gray"}

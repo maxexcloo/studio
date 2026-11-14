@@ -444,11 +444,21 @@ test("Account menu names the account by its email and opens the account workspac
     ]);
   } else {
     // Appearance, Library, Settings, Account: each named on hover.
-    await page.getByRole("button", { name: "Appearance", exact: true }).hover();
+    const appearance = page.getByRole("button", { name: "Appearance", exact: true });
+    await appearance.hover();
     await expect(page.getByRole("tooltip", { name: "Appearance", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Account", exact: true }).hover();
+    // A trigger's tooltip gives way to its popup, and the trigger still toggles it.
+    await appearance.click();
+    await expect(appearance).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("tooltip", { name: "Appearance", exact: true })).toBeHidden();
+    await appearance.click();
+    await expect(appearance).toHaveAttribute("aria-expanded", "false");
+    const account = page.getByRole("button", { name: "Account", exact: true });
+    await account.hover();
     await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Account", exact: true }).click();
+    await account.click();
+    await expect(account).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeHidden();
   }
   await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
