@@ -201,7 +201,7 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     server,
     "dream",
     "dream",
-    "The user's Dream (background images from their taste; needs the Dream feature), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer toward it) or variations (count new seeds) take an item_id; answer takes a pair_id and answer. settings sets any of enabled, paused, videos, spicy, dailyImages, dailyVideos. discarded lists discards.",
+    "The user's Dream (background images from their taste; needs the Dream feature), when asked. status: settings, today's counts, unseen items. keep, discard, more (keep and steer toward it) or variations (count new seeds) take an item_id; answer takes a pair_id and answer. settings sets enabled, paused, images, videos, spicy, dailyImages, dailyVideos. discarded lists discards.",
     {
       action: z.enum([
         "status",
