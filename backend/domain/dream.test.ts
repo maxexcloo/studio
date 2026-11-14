@@ -115,6 +115,7 @@ function fixture(t: TestContext, catalogue = profiles) {
           (!query.ids || query.ids.includes(String(item.id))) &&
           !query.notIds?.includes(String(item.id)) &&
           (!query.jobIds || query.jobIds.includes(item.jobId)) &&
+          (query.uploaded === undefined || Boolean(item.uploaded) === query.uploaded) &&
           (query.before === undefined || Date.parse(item.createdAt || "") <= query.before),
       )
       .slice(0, query.sample);
@@ -893,6 +894,35 @@ test("Dream seeds from the account's stars, its own results only one draw in fou
   assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt liked/);
   assert.deepEqual(dream.read("alice").seeds, ["liked", "old"]);
   assert.equal(state.items.find((item) => item.id === "liked")?.favorite, undefined);
+});
+
+test("Dream samples only stars it can seed from, however many uploads and retired profiles' stars there are", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const star = (id: string, profileId: string, extra: Partial<DreamItem> = {}) => {
+    const input = { kind: "image", prompt: `prompt ${id}`, profileId };
+    const session = store.createSession("alice", "Gallery").id;
+    const job = store.enqueue("alice", session, input, "image", undefined, "worker:image", id);
+    store.save({ ...job, status: "completed" });
+    state.items.push({
+      id,
+      jobId: job.id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      favorite: true,
+      ...extra,
+    });
+  };
+  for (let index = 0; index < 10; index++) {
+    star(`retired-${index}`, "retired");
+    star(`upload-${index}`, "flux", { uploaded: true });
+  }
+  star("usable", "flux");
+  state.rolls = [99];
+  const job = await dreamOnce();
+  assert.match(String(job?.dream?.why), /^Varying a starred image: /);
+  assert.match(state.calls.at(-1)!.user, /Seed prompt: prompt usable/);
 });
 
 test("Comparisons rate gallery images against each other, and an image that wins seeds Dream", async (t) => {
