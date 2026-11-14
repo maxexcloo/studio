@@ -96,6 +96,11 @@ const mcpBearerRoutes = [
   ["POST", /^\/api\/comparisons$/],
   // status and results read the comparisons their jobs are in.
   ["GET", /^\/api\/comparisons$/],
+  // The variants tool's lettered options and the user's pick.
+  ["POST", /^\/api\/comparisons\/variants$/],
+  ["PUT", /^\/api\/comparisons\/[\w-]+\/vote$/],
+  // A result the chat names by its number ("#12").
+  ["GET", /^\/api\/results\/\d+$/],
   // An uploaded reference's own pixels (owner-scoped): rewrite_prompt's vision references and import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],
