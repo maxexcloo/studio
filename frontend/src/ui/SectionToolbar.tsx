@@ -35,14 +35,14 @@ export function SectionHeader({ heading, children }: { heading: ReactNode; child
  */
 export function ToolbarAction({
   label,
-  icon,
+  icon: Icon,
   ...props
-}: { label: string; icon: ReactNode } & Omit<
+}: { label: string; icon: LucideIcon } & Omit<
   ComponentPropsWithRef<typeof Button<"button">>,
   "children"
 >) {
   return (
-    <Button size="compact-sm" leftSection={icon} {...props}>
+    <Button size="compact-sm" leftSection={<Icon size={16} />} {...props}>
       {label}
     </Button>
   );

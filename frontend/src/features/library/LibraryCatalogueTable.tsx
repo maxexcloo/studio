@@ -244,7 +244,7 @@ export function LibraryCatalogueTable({
               {onUpdateAll && (
                 <ToolbarAction
                   label="Update All"
-                  icon={<icons.download size={16} />}
+                  icon={icons.download}
                   disabled={updatePending}
                   onClick={onUpdateAll}
                 />

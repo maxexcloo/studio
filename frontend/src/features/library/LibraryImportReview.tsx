@@ -346,7 +346,7 @@ export function LibraryImportReview({
                     actions={
                       <ToolbarAction
                         label="Download Missing"
-                        icon={<icons.download size={18} />}
+                        icon={icons.download}
                         disabled={!missing || action.isPending}
                         onClick={() => run("download")}
                       />

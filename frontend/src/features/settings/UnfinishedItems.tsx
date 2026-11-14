@@ -103,21 +103,18 @@ export function UnfinishedItems() {
         {jobs.length > 0 && (
           <SectionToolbar
             label="Unfinished Items"
-            actions={(Object.keys(bulk) as Bulk[]).map((key) => {
-              const Icon = bulk[key].icon;
-              return (
-                <ToolbarAction
-                  key={key}
-                  label={bulk[key].label}
-                  icon={<Icon size={16} />}
-                  variant="subtle"
-                  color={key === "delete-all" ? "red" : "gray"}
-                  loading={key === "retry-all" && actAll.isPending}
-                  disabled={actAll.isPending}
-                  onClick={() => (key === "retry-all" ? actAll.mutate(key) : setConfirming(key))}
-                />
-              );
-            })}
+            actions={(Object.keys(bulk) as Bulk[]).map((key) => (
+              <ToolbarAction
+                key={key}
+                label={bulk[key].label}
+                icon={bulk[key].icon}
+                variant="subtle"
+                color={key === "delete-all" ? "red" : "gray"}
+                loading={key === "retry-all" && actAll.isPending}
+                disabled={actAll.isPending}
+                onClick={() => (key === "retry-all" ? actAll.mutate(key) : setConfirming(key))}
+              />
+            ))}
           />
         )}
         <DataTable
