@@ -13,7 +13,7 @@ mise run setup
 mise run dev
 ```
 
-Open <http://localhost:5173>. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
+Open the preview address it prints (<http://localhost:5173>, or a free port when another checkout holds it; set `STUDIO_DEV_PORT` to choose). Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`; settings in the shell override these. Image Search and Face Check stay off unless the shell turns them on. A new data folder starts with the sample profiles in `backend/samples/`. Automatic worker lifecycle control is disabled.
 
 `mise run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference.
 
