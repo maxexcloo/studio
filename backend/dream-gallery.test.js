@@ -6,7 +6,7 @@ import test from "node:test";
 
 // Each test file runs in its own process, so this folder stays here.
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-gallery-"));
-const { filterVisibleGallery, hasGalleryMedia, pageGallery, updateGalleryJob } =
+const { filterVisibleGallery, galleryItems, hasGalleryMedia, pageGallery, updateGalleryJob } =
   await import("./gallery/store.js");
 const { setGallery } = await import("./fixtures/gallery.js");
 const { makePendingItems } = await import("./gallery/records.js");
@@ -58,4 +58,25 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
   updateGalleryJob("unseen", { dream: { ...mark, state: "kept" } });
   assert.deepEqual(shown().sort(), ["mine", "unseen"]);
   assert.equal(galleryJobResponse(queue, alice, "job-unseen").payload.items.length, 1);
+});
+
+test("Dream reads its results, an owner's liked items and a chat's items by query", () => {
+  setGallery([
+    item("plain"),
+    { ...item("starred"), favorite: true },
+    item("kept", "kept"),
+    item("unseen", "unseen"),
+    item("gone", "discarded"),
+    { ...item("asked"), chat: { conversationId: "chat-1" } },
+    { ...item("bobs"), ownerId: "bob", favorite: true },
+    { ...item("bobs-kept", "kept"), ownerId: "bob" },
+  ]);
+  const ids = (query) =>
+    galleryItems({ ownerId: "alice", ...query })
+      .map((entry) => entry.id)
+      .sort();
+  assert.deepEqual(ids({ dreamState: "unseen" }), ["unseen"]);
+  assert.deepEqual(ids({ dreamState: ["kept", "discarded"] }), ["gone", "kept"]);
+  assert.deepEqual(ids({ liked: true }), ["kept", "starred"]);
+  assert.deepEqual(ids({ conversationIds: ["chat-1"] }), ["asked"]);
 });

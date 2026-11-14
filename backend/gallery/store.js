@@ -9,7 +9,7 @@ import { currentDataDir } from "../data-dir.js";
 import { createResultNumbers } from "../domain/result-numbers.ts";
 import { generationRecord } from "../generation-record.js";
 import { mediaFile, mediaParams, mediaPath, mediaUrls } from "../media-paths.js";
-import { galleryKey } from "../persistence/gallery-rows.ts";
+import { dreamState, galleryKey } from "../persistence/gallery-rows.ts";
 import {
   readRuntimeDocument,
   runtimeDatabase,
@@ -115,9 +115,10 @@ const list = (values) => JSON.stringify([...values].map(String));
 
 /**
  * The SQL for a gallery query: each field narrows the rows. `ownerId` is exact ("" is the
- * single-user owner); `status` and `notStatus` take one or several; `ids` match items' ids,
- * `named` their id, URL or gallery key and `idPrefix` the start of their id; `since` keeps items
- * made from then on (ms) and every pending one.
+ * single-user owner); `status`, `notStatus` and `dreamState` take one or several; `liked` keeps the
+ * owner's starred items and kept Dream results; `conversationIds` match the chats that asked for
+ * items; `ids` match items' ids, `named` their id, URL or gallery key and `idPrefix` the start of
+ * their id; `since` keeps items made from then on (ms) and every pending one.
  */
 function where(query = {}) {
   const terms = [];
@@ -138,6 +139,22 @@ function where(query = {}) {
     add("status IN (SELECT value FROM json_each(?))", list([query.status].flat()));
   if (query.notStatus !== undefined)
     add("status NOT IN (SELECT value FROM json_each(?))", list([query.notStatus].flat()));
+  if (query.dreamState !== undefined) {
+    const states = [query.dreamState].flat();
+    add(`${dreamState} IN (${states.map(() => "?").join(", ")})`, ...states);
+  }
+  // Starred rows read only the owner's order index, kept ones the Dream index.
+  if (query.liked)
+    add(
+      `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_owner_order WHERE owner_id = ? AND favorite = 1 UNION ALL SELECT rowid FROM studio_gallery WHERE ${dreamState} = 'kept' AND owner_id = ?)`,
+      String(query.ownerId),
+      String(query.ownerId),
+    );
+  if (query.conversationIds)
+    add(
+      "json_extract(value, '$.chat.conversationId') IN (SELECT value FROM json_each(?))",
+      list(query.conversationIds),
+    );
   // Words found in the row's own JSON (lowercased by SQLite, ASCII only): a cheap first pass a
   // search's filter confirms. Pending rows always pass, as searches never hide work in progress.
   if (query.contains?.length)
@@ -161,12 +178,18 @@ function where(query = {}) {
 /**
  * Every item the query matches, in gallery order unless `ordered` is false (sorting a whole
  * gallery costs more than reading it). A query for unfinished states reads the status index: its
- * statistics say each status is common, as most items are done.
+ * statistics say each status is common, as most items are done. A query for Dream states reads
+ * the Dream index.
  */
 export function galleryItems(query = {}, { ordered = true } = {}) {
   const { sql, params } = where(query);
   const unfinished = query.status !== undefined && ![query.status].flat().includes("done");
-  const index = unfinished ? "INDEXED BY studio_gallery_status" : "";
+  const index =
+    query.dreamState !== undefined
+      ? "INDEXED BY studio_gallery_dream"
+      : unfinished
+        ? "INDEXED BY studio_gallery_status"
+        : "";
   return statement(
     `SELECT value FROM studio_gallery ${index} ${sql} ${ordered ? `ORDER BY ${order}` : ""}`,
   )
@@ -217,7 +240,7 @@ export function* eachGalleryItem(query = {}) {
       for (const row of galleryRows({ ...query, uploaded, dreamPool })) yield parse(row);
 }
 
-function countGalleryItems(query = {}) {
+export function countGalleryItems(query = {}) {
   const { sql, params } = where(query);
   return statement(`SELECT count(*) AS count FROM studio_gallery ${sql}`).get(...params).count;
 }
