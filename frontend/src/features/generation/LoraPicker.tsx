@@ -202,12 +202,7 @@ export function LoraPicker({ value, onChange, picker, position = "top-end" }: Lo
               onOpenedChange={setAdding}
               target={
                 // "Add" keeps the footer to one row beside Clear, Save Stack and Apply.
-                <Button
-                  variant="default"
-                  aria-label="Add LoRAs"
-                  leftSection={<icons.add size={16} />}
-                  onClick={() => setAdding(true)}
-                >
+                <Button variant="default" aria-label="Add LoRAs" onClick={() => setAdding(true)}>
                   Add
                 </Button>
               }
