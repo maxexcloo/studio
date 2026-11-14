@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { comfy } from "./comfy/comfy.js";
-import { currentComfyBackend } from "./comfy/backends.js";
 import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { runtimeDatabase } from "./persistence/runtime.ts";
@@ -58,10 +57,12 @@ function storedName(filename) {
 }
 
 /** One output into Studio media: the rewritten output, and the ComfyUI file to remove, or null when it stays put. */
-async function ingestOutput(output, ownerId = "") {
+async function ingestOutput(worker, output, ownerId = "") {
   const ref = comfyRef(output?.url);
   if (!ref) return null;
-  const bytes = Buffer.from(await comfy(`/view?${new URLSearchParams(ref)}`, { timeout: 120_000 }));
+  const bytes = Buffer.from(
+    await comfy(worker, `/view?${new URLSearchParams(ref)}`, { timeout: 120_000 }),
+  );
   const subfolder = mediaSubfolder(ownerId);
   const filename = storedName(ref.filename);
   const file = mediaPath(filename, subfolder);
@@ -74,15 +75,15 @@ async function ingestOutput(output, ownerId = "") {
 }
 
 /**
- * A run's results (each picture with its optional upscale) into Studio media.
+ * A run's results (each picture with its optional upscale) on `worker` into Studio media.
  * The returned `comfyFiles` are removed from ComfyUI only after the gallery
  * has the new addresses (removeComfyFiles).
  */
-export async function ingestRunResults(results, ownerId = "", { strict = false } = {}) {
+export async function ingestRunResults(worker, results, ownerId = "", { strict = false } = {}) {
   const move = async (output) => {
     if (!output?.url) return { output, comfyFile: null };
     try {
-      const moved = await ingestOutput(output, ownerId);
+      const moved = await ingestOutput(worker, output, ownerId);
       return moved || { output, comfyFile: null };
     } catch (error) {
       if (strict) throw error;
@@ -109,13 +110,13 @@ export async function ingestRunResults(results, ownerId = "", { strict = false }
 
 /**
  * Gallery records recovered from ComfyUI's history (a restart between a run
- * finishing and its delivery) into Studio media, keeping each record's title.
+ * finishing and its delivery) on `worker` into Studio media, keeping each record's title.
  */
-export async function ingestRecords(records) {
+export async function ingestRecords(worker, records) {
   const comfyFiles = [];
   const move = async (output, ownerId) => {
     try {
-      const moved = await ingestOutput(output, ownerId);
+      const moved = await ingestOutput(worker, output, ownerId);
       if (!moved) return null;
       comfyFiles.push(moved.comfyFile);
       return moved.output;
@@ -151,21 +152,20 @@ export async function ingestRecords(records) {
   return { records: result, comfyFiles };
 }
 
-/** Asks the Studio worker node to delete files ComfyUI no longer needs. Never throws. */
-export async function removeComfyFiles(files) {
+/** Asks `backend`'s Studio worker node to delete files its ComfyUI no longer needs. Never throws. */
+export async function removeComfyFiles(backend, files) {
   const all = (files || []).filter((file) => file?.filename);
   // The worker takes at most 256 names a call.
   if (all.length > 256) {
     let deleted = 0;
     for (let start = 0; start < all.length; start += 256)
-      deleted += (await removeComfyFiles(all.slice(start, start + 256))).deleted;
+      deleted += (await removeComfyFiles(backend, all.slice(start, start + 256))).deleted;
     return { deleted, skipped: all.length - deleted };
   }
   const list = all;
   if (!list.length) return { deleted: 0, skipped: 0 };
-  const backend = currentComfyBackend();
   try {
-    const result = await comfy("/studio/worker/delete", {
+    const result = await comfy(backend, "/studio/worker/delete", {
       method: "POST",
       headers: { "content-type": "application/json", ...workerTokenHeader() },
       body: JSON.stringify({ files: list }),

@@ -95,16 +95,16 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
  * the upscale made from it when there is one. `pairs` says which save node
  * each upscale came from; the upscales themselves are not pictures of their own.
  */
-export function pairRunOutputs(entryOutputs = {}, pairs = []) {
+export function pairRunOutputs(worker, entryOutputs = {}, pairs = []) {
   const upscaleIds = new Set(pairs.map((pair) => pair.upscale));
   const results = [];
   for (const [nodeId, output] of Object.entries(entryOutputs || {})) {
     if (upscaleIds.has(nodeId)) continue;
     const pair = pairs.find((item) => item.base === nodeId);
     const upscales = pair
-      ? outputsFrom({ outputs: { [pair.upscale]: entryOutputs[pair.upscale] || {} } })
+      ? outputsFrom(worker, { outputs: { [pair.upscale]: entryOutputs[pair.upscale] || {} } })
       : [];
-    outputsFrom({ outputs: { [nodeId]: output } }).forEach((base, index) => {
+    outputsFrom(worker, { outputs: { [nodeId]: output } }).forEach((base, index) => {
       results.push({
         output: base,
         upscale: pair ? upscales[index] || null : null,

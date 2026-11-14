@@ -159,7 +159,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     { slot: "reference", assetId: asset.id },
   ];
   const generation = { family: "sdxl", width: 1024, height: 1024 };
-  const staged = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
+  const staged = await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs, {
     generation,
   });
   assert.equal(staged.length, 2);
@@ -176,15 +176,20 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     source,
   );
 
-  const off = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs.slice(0, 1), {
-    generation: { ...generation, autoResizeInputs: false },
-  });
+  const off = await referenceAssets.stageReferenceAssetsForAccount(
+    "primary",
+    undefined,
+    refs.slice(0, 1),
+    {
+      generation: { ...generation, autoResizeInputs: false },
+    },
+  );
   assert.equal(off[0].temporary, undefined);
   assert.deepEqual(uploads.at(-1).buffer, source);
-  await referenceAssets.stageReferenceAssetsForAccount(undefined, refs.slice(0, 1));
+  await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs.slice(0, 1));
   assert.deepEqual(uploads.at(-1).buffer, source, "upscale operations keep full resolution");
 
-  const painted = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
+  const painted = await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs, {
     generation: { ...generation, inpaint: { mask: "painted" } },
   });
   assert.deepEqual(
@@ -193,7 +198,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
     "inpaint source and mask retain their coordinate system",
   );
   assert.notDeepEqual(uploads.at(-1).buffer, source, "additional references still resize");
-  const owned = await referenceAssets.stageReferenceAssetsForAccount(undefined, refs, {
+  const owned = await referenceAssets.stageReferenceAssetsForAccount("primary", undefined, refs, {
     generation,
     unique: true,
   });

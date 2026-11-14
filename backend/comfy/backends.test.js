@@ -5,16 +5,13 @@ import path from "node:path";
 import test from "node:test";
 import { startFakeComfy } from "../fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "../fixtures/test-workflows.js";
-import {
-  backendUrl,
-  currentComfyBackend,
-  mergeWorkerModels,
-  withComfyBackend,
-} from "./backends.js";
+import { mergeWorkerModels, workerUrl } from "./backends.js";
 import { reloadWorkers } from "../workers.js";
 
-const primary = await startFakeComfy();
-const video = await startFakeComfy();
+const primaryFiles = new Map();
+const videoFiles = new Map();
+const primary = await startFakeComfy({ outputFiles: primaryFiles });
+const video = await startFakeComfy({ outputFiles: videoFiles });
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backends-"));
 const imageWorker = { id: "primary", capabilities: ["image", "upscale", "models"] };
 const videoWorker = { id: "video", capabilities: ["video"] };
@@ -28,8 +25,10 @@ writeTestWorkflows(temporary);
 const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("../gallery/store.js");
-const { makePendingItems } = await import("../gallery/records.js");
+const { makePendingItems, outputsFrom } = await import("../gallery/records.js");
+const { comfyView } = await import("./media-routes.js");
 const { cancelPrompt } = await import("./queue.js");
+const { comfyOn } = await import("./comfy.js");
 
 test.after(async () => {
   await primary.close();
@@ -138,17 +137,17 @@ test(
     assert.equal(jobs.get("video-one").outputs[0].settings.comfyBackend, "video");
     assert.equal(jobs.get("image-one").outputs[0].type, "image");
     assert.equal(jobs.get("video-one").outputs[0].type, "video");
-    const history = await withComfyBackend("video", () => comfy("/history"));
+    const history = await comfy("video", "/history");
     const recovered = store
-      .recordsFromComfyHistory(history)
+      .recordsFromComfyHistory("video", history)
       .find((item) => item.jobId === "video-one");
     assert.equal(recovered.prompt, videoBody.prompt);
     assert.equal(recovered.width, 512);
     assert.equal(recovered.settings.comfyBackend, "video");
     assert.equal(recovered.assistant, undefined);
-    const primaryHistory = await withComfyBackend("primary", () => comfy("/history"));
+    const primaryHistory = await comfy("primary", "/history");
     const rebuilt = store
-      .recordsFromComfyHistory(primaryHistory)
+      .recordsFromComfyHistory("primary", primaryHistory)
       .find((item) => item.jobId === "image-one");
     assert.deepEqual(rebuilt?.assistant, {
       preset: "cinematic",
@@ -167,7 +166,7 @@ test("cancel a video without interrupting primary image work", async () => {
   const prompt = await queued;
   await waitFor(() => jobs.get("video-cancel").promptId);
   const before = primary.requests.length;
-  await withComfyBackend(jobs.get("video-cancel").comfyBackend, () => cancelPrompt(prompt.id));
+  await cancelPrompt(prompt.id, comfyOn(jobs.get("video-cancel").comfyBackend));
   jobs.set("video-cancel", { ...jobs.get("video-cancel"), status: "cancelling" });
   video.drop(prompt.id);
   await running;
@@ -234,12 +233,25 @@ test("catalogue selects local video models from secondary", () => {
 test("lost secondary configuration never silently falls back to primary", () => {
   process.env.STUDIO_WORKERS = JSON.stringify([{ ...imageWorker, url: primary.url }]);
   reloadWorkers();
-  assert.throws(() => withComfyBackend("video", () => backendUrl()), /no longer configured/);
+  assert.throws(() => workerUrl("video"), /no longer configured/);
+  assert.throws(() => workerUrl(""), { noWorker: true });
   process.env.STUDIO_WORKERS = bothWorkers;
   reloadWorkers();
-  assert.equal(currentComfyBackend(), "primary");
+  assert.equal(workerUrl("video"), video.url);
+});
+
+test("a ComfyUI file is read from the worker its address names", async () => {
+  primaryFiles.set("same.png", Buffer.from("primary"));
+  videoFiles.set("same.png", Buffer.from("video"));
+  const [output] = outputsFrom("video", {
+    outputs: { 9: { images: [{ filename: "same.png", type: "output" }] } },
+  });
+  const query = Object.fromEntries(new URLSearchParams(output.url.split("?")[1]));
+  assert.equal(query.worker, "video");
+  assert.equal(String((await comfyView(undefined, query)).content), "video");
   assert.equal(
-    withComfyBackend("video", () => backendUrl()),
-    video.url,
+    String((await comfyView(undefined, { ...query, worker: "primary" })).content),
+    "primary",
   );
+  assert.equal((await comfyView(undefined, { ...query, worker: "" })).status, 502);
 });

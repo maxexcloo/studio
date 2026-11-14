@@ -5,9 +5,9 @@ import {
   temporaryInputFiles,
 } from "./media-store.js";
 import { flushGalleryStrict } from "./gallery/store.js";
-import { withComfyBackend } from "./comfy/backends.js";
+import { workerUrl } from "./comfy/backends.js";
 import { defaultWorkerId } from "./workers.js";
-import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
+import { comfy, comfyOn, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
 import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { describeFailure } from "./failures.js";
 import { withFixes } from "./failure-fixes.js";
@@ -128,12 +128,8 @@ function queueLatestPreview(id, buffer) {
   previewSlots.set(id, slot);
 }
 
-function outputsFromExecutedOutput(output = {}) {
-  return outputsFrom({ outputs: { executed: output } });
-}
-
-function applyExecutedOutputPreviews(id, output) {
-  const outputs = outputsFromExecutedOutput(output);
+function applyExecutedOutputPreviews(worker, id, output = {}) {
+  const outputs = outputsFrom(worker, { outputs: { executed: output } });
   if (!outputs.length) return false;
   const previews = outputs.map((item) => item.url);
   const current = jobs.get(id) || {};
@@ -204,10 +200,7 @@ function withEta(id, progress, now = Date.now()) {
  * (a model or upscale without a trusted estimate), since everything behind it
  * would be a guess.
  */
-function refreshQueueEstimates(
-  now = Date.now(),
-  { apply = true, backend = defaultWorkerId() } = {},
-) {
+function refreshQueueEstimates(now = Date.now(), { apply = true, backend = "" } = {}) {
   const queues = new Map();
   for (const [id, job] of jobs) {
     if (!["queued", "running", "cancelling"].includes(job.status)) continue;
@@ -293,12 +286,12 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
 }
 
 /** When Studio's own queue should be clear (now, when empty), or null when a job in it has no known length. */
-export function queueClearsAt(now = Date.now(), backend = defaultWorkerId()) {
+export function queueClearsAt(now, backend) {
   return refreshQueueEstimates(now, { apply: false, backend });
 }
 
-function openProgressSocket(id) {
-  const wsUrl = activeComfyUrl().replace(/^http/i, "ws");
+function openProgressSocket(worker, id) {
+  const wsUrl = workerUrl(worker).replace(/^http/i, "ws");
   let socket;
   try {
     socket = new WebSocket(`${wsUrl}/ws?clientId=${encodeURIComponent(id)}`);
@@ -335,7 +328,7 @@ function sendSocketFeatureFlags(socket) {
  * at once, and its start is what times the setup. The socket belongs to this
  * job alone; `run.promptId`, once known, only guards against strays.
  */
-function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
+function watchProgress(id, run, socket, graph = {}) {
   if (!socket) return null;
   const terminal = () => {
     const job = jobs.get(id);
@@ -363,7 +356,7 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       if (data.prompt_id && run.promptId && data.prompt_id !== run.promptId) return;
       // Anything ComfyUI says on this socket shows it is still there.
       run.alive?.();
-      noteComfyReachable();
+      noteComfyReachable(run.worker);
       const timing = runTimings.get(id);
       if (timing?.timer) {
         timing.timer.note(message);
@@ -391,7 +384,7 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
         refreshQueueEstimates();
       }
       if (message.type === "executed" && data.output) {
-        applyExecutedOutputPreviews(id, data.output);
+        applyExecutedOutputPreviews(run.worker, id, data.output);
         // The picture is saved and Smart upscale takes over: from here a stop keeps the picture.
         if (run.pairs?.some((pair) => pair.base === String(data.node))) {
           run.saved.set(String(data.node), data.output);
@@ -503,15 +496,13 @@ function showReconnecting(id, run, on) {
 }
 
 /**
+ * Runs a generation on its worker, `body.comfyBackend`.
  * `prepare` may put more into the run's graph before ComfyUI gets it: Smart
  * upscale (run-upscale.js) returns the graph with its upscale and which save
  * node each upscale belongs to, or `{ skipped }` saying why there is none.
  */
-function runJob(id, body, options = {}) {
-  return withComfyBackend(body.comfyBackend, () => runJobOnBackend(id, body, options));
-}
-
-async function runJobOnBackend(id, body, { prepare = null } = {}) {
+async function runJob(id, body, { prepare = null } = {}) {
+  const worker = body.comfyBackend;
   jobBodies.set(id, body);
   const timing = { timer: null, estimate: generationEstimate(body), warm: false };
   runTimings.set(id, timing);
@@ -541,11 +532,19 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       };
       timing.upscale = { estimate: upscaleEstimate(learn), learn, startAt: null, endAt: null };
     }
-    socket = openProgressSocket(id);
+    socket = openProgressSocket(worker, id);
     await waitForSocketOpen(socket);
     sendSocketFeatureFlags(socket);
     // `saved`: Smart upscale's source pictures, by save node, as ComfyUI reported them; `missed`: why their upscale did not finish.
-    const run = { promptId: null, wake: null, alive: null, pairs, saved: new Map(), missed: null };
+    const run = {
+      worker,
+      promptId: null,
+      wake: null,
+      alive: null,
+      pairs,
+      saved: new Map(),
+      missed: null,
+    };
     watchProgress(id, run, socket, prompt);
     if (["cancelling", "cancelled"].includes(jobs.get(id)?.status)) {
       setTerminalJob(id, { status: "cancelled" });
@@ -554,7 +553,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       return;
     }
     submissionStarted = true;
-    const queued = await comfy("/prompt", {
+    const queued = await comfy(worker, "/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -589,7 +588,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       status: ["cancelling", "cancelled"].includes(jobs.get(id)?.status) ? "cancelling" : "running",
       promptId: queued.prompt_id,
     });
-    const tracker = promptTracker(queued.prompt_id);
+    const tracker = promptTracker(queued.prompt_id, { request: comfyOn(worker) });
     run.alive = tracker.alive;
     /**
      * Into the gallery: each picture with its upscale riding on it.
@@ -598,7 +597,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
      */
     const deliver = async (results, missed = null) => {
       // ComfyUI as a worker: the pictures move into Studio media before anything shows them.
-      const moved = await ingestRunResults(results, body.ownerId || "");
+      const moved = await ingestRunResults(worker, results, body.ownerId || "");
       results = moved.results;
       const comfyCopies = moved.comfyFiles;
       const upscaled = (result) =>
@@ -640,16 +639,16 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
       await flushGalleryStrict();
       noteIngested([id]);
-      await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
+      await removeComfyFiles(worker, [...comfyCopies, ...temporaryInputFiles(body)]);
       if (comfyCopies.length)
-        await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
+        await forgetComfyRun(worker, { promptIds: [queued.prompt_id] }).catch(() => false);
       socket?.close();
     };
     // The pictures Smart upscale was working on, from what ComfyUI said as each was saved.
     const savedResults = () =>
       pairs.flatMap((pair) => {
         const output = run.saved.get(pair.base);
-        return output ? pairRunOutputs({ [pair.base]: output }, [pair]) : [];
+        return output ? pairRunOutputs(worker, { [pair.base]: output }, [pair]) : [];
       });
     let cancelSent = false;
     while (true) {
@@ -660,7 +659,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       if (jobs.get(id)?.status === "cancelling" || jobs.get(id)?.status === "cancelled") {
         // A cancel acknowledgement does not prove execution stopped. Track the own prompt to its end.
         if (!cancelSent)
-          await cancelPrompt(queued.prompt_id)
+          await cancelPrompt(queued.prompt_id, comfyOn(worker))
             .then(() => {
               cancelSent = true;
             })
@@ -704,7 +703,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           socket.readyState === WebSocket.CLOSING ||
           socket.readyState === WebSocket.CLOSED
         ) {
-          socket = openProgressSocket(id);
+          socket = openProgressSocket(worker, id);
           await waitForSocketOpen(socket);
           sendSocketFeatureFlags(socket);
           watchProgress(id, run, socket, prompt);
@@ -712,7 +711,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       }
       const entry = checked.state === "done" ? checked.entry : null;
       if (entry && ["cancelling", "cancelled"].includes(jobs.get(id)?.status)) {
-        const results = pairRunOutputs(entry.outputs, pairs);
+        const results = pairRunOutputs(worker, entry.outputs, pairs);
         if (results.length) await deliver(results, { cancelled: true });
         else {
           updateGalleryJob(id, { status: "cancelled" });
@@ -723,7 +722,9 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       }
       // Stopped or failed after its pictures were saved (and the socket missed it): keep them.
       if (entry?.status?.status_str === "error" && pairs.length) {
-        const results = pairRunOutputs(entry.outputs, pairs).filter((result) => result.paired);
+        const results = pairRunOutputs(worker, entry.outputs, pairs).filter(
+          (result) => result.paired,
+        );
         if (results.length) {
           const messages = entry.status.messages || [];
           const interrupted = messages.some(([type]) => type === "execution_interrupted");
@@ -747,7 +748,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       }
       if (entry) {
         recordTiming(id, body, timing);
-        const results = pairRunOutputs(entry.outputs, pairs);
+        const results = pairRunOutputs(worker, entry.outputs, pairs);
         // Replacing the placeholder with nothing would delete the tile; keep it as a failure that says why.
         if (!results.length) {
           throw Object.assign(new Error("ComfyUI finished the run but saved no image."), {

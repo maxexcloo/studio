@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { logWarning } from "../crash-log.js";
 import { families } from "../family-catalogue.js";
 import {
@@ -10,19 +9,11 @@ import {
   workerById,
 } from "../workers.js";
 
-// Per-operation context, never a mutable global URL: jobs on different workers overlap.
-// The scope holds a worker id (workers.js); outside any scope it is the default worker.
-const backendScope = new AsyncLocalStorage();
-export const currentComfyBackend = () => backendScope.getStore() || defaultWorkerId();
-export const withComfyBackend = (backend, operation) =>
-  backendScope.run(String(backend || defaultWorkerId() || ""), operation);
 export const configuredBackends = () => listWorkers().map((worker) => worker.id);
-export const isDefaultBackend = (backend = currentComfyBackend()) =>
-  Boolean(backend) && backend === defaultWorkerId();
+export const isDefaultBackend = (backend) => Boolean(backend) && backend === defaultWorkerId();
 
-/** The address of the worker this operation runs on. */
-export function backendUrl() {
-  const id = currentComfyBackend();
+/** The address of worker `id`. */
+export function workerUrl(id) {
   if (!id)
     throw Object.assign(new Error(noWorkerMessage("image")), { status: 503, noWorker: true });
   const worker = workerById(id);

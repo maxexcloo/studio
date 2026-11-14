@@ -58,17 +58,17 @@ test("a bug report tells a busy ComfyUI from one that is not answering", () => {
 test("outage logs name the worker, skip busy timeouts and say refused or unreachable", (t) => {
   const lines = [];
   t.mock.method(console, "error", (line) => lines.push(String(line)));
-  noteComfyReachable();
+  noteComfyReachable("primary");
   lines.length = 0;
   // A timed-out check is a busy ComfyUI, not an outage.
-  noteComfyFetchError(Object.assign(new Error("timed out"), { name: "TimeoutError" }));
+  noteComfyFetchError("primary", Object.assign(new Error("timed out"), { name: "TimeoutError" }));
   assert.deepEqual(lines, []);
   // A refusal is one, and the log says which kind.
   const refused = new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
-  noteComfyFetchError(refused);
-  noteComfyFetchError(refused);
+  noteComfyFetchError("primary", refused);
+  noteComfyFetchError("primary", refused);
   assert.equal(lines.length, 1, "only the change is logged");
   assert.match(lines[0], /Worker stopped answering .*"reason":"ECONNREFUSED"/);
-  noteComfyReachable();
+  noteComfyReachable("primary");
   assert.match(lines.at(-1), /Worker answering again .*"worker"/);
 });

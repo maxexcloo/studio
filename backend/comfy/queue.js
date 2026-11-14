@@ -1,4 +1,4 @@
-import { comfy, isComfyTimeout } from "./comfy.js";
+import { isComfyTimeout } from "./comfy.js";
 
 /**
  * Studio's side of ComfyUI's queue: stopping only its own runs, and following a
@@ -23,7 +23,7 @@ export function queuePlace(queue, promptId) {
 }
 
 /**
- * Stops one of Studio's own prompts and nothing else. A current ComfyUI does it
+ * Stops one of Studio's own prompts and nothing else, on the worker `request` asks (comfyOn). A current ComfyUI does it
  * in one atomic call (/api/jobs/{id}/cancel: dequeue if pending, interrupt if
  * running). An older one gets the same by hand: delete it from the pending
  * list, and interrupt only when it is the prompt running right now. Older
@@ -33,7 +33,7 @@ export function queuePlace(queue, promptId) {
  * "unreachable" when the worker refuses the connection or is gone (parked,
  * stopped, no longer configured): nothing of Studio's can be running there.
  */
-export async function cancelPrompt(promptId, request = comfy) {
+export async function cancelPrompt(promptId, request) {
   if (!promptId) return "";
   try {
     const answer = await request(`/api/jobs/${encodeURIComponent(promptId)}/cancel`, {
@@ -116,7 +116,7 @@ const droppedRunMessage =
   "ComfyUI no longer has this run. It may have restarted, or the run was removed from its queue.";
 
 /**
- * Follows one queued prompt until ComfyUI has its result. Each `check()` asks
+ * Follows one queued prompt until ComfyUI has its result, through `request` (comfyOn). Each `check()` asks
  * ComfyUI's history once and answers:
  *   { state: "done", entry }          - the history entry is there
  *   { state: "waiting", reconnected } - still queued or running
@@ -131,7 +131,7 @@ const droppedRunMessage =
 export function promptTracker(
   promptId,
   {
-    request = comfy,
+    request,
     now = Date.now,
     lostAfterMs = defaultLostAfterMs,
     busyLostAfterMs = defaultBusyLostAfterMs,

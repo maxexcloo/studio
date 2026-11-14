@@ -100,7 +100,7 @@ test("legacy start images resize before upload and register their temporary copy
       headers: { "content-type": "application/json" },
     });
   });
-  const body = { family: "sdxl", width: 1024, height: 1024 };
+  const body = { comfyBackend: "primary", family: "sdxl", width: 1024, height: 1024 };
   const name = await uploadReferenceImage(url, body);
   const meta = await sharp(uploads[0]).metadata();
   assert.ok(meta.width * meta.height <= 1024 ** 2);
@@ -108,7 +108,12 @@ test("legacy start images resize before upload and register their temporary copy
   assert.deepEqual([body.width, body.height], [meta.width, meta.height]);
   assert.deepEqual(body.requestedSize, { width: 1024, height: 1024 });
   assert.deepEqual(body.stagedInputNames, [name]);
-  await uploadReferenceImage(url, { width: 1024, height: 1024, autoResizeInputs: false });
+  await uploadReferenceImage(url, {
+    comfyBackend: "primary",
+    width: 1024,
+    height: 1024,
+    autoResizeInputs: false,
+  });
   assert.deepEqual(uploads[1], buffer);
 });
 

@@ -10,7 +10,8 @@ export function promptTitle(text = "") {
   return oneLine.length > 68 ? `${oneLine.slice(0, 65)}...` : oneLine || "Untitled prompt";
 }
 
-export function outputsFrom(history) {
+/** What a run on `worker` made, as addresses that name it (comfy/media-routes.js). */
+export function outputsFrom(worker, history) {
   const urls = [];
   for (const output of Object.values(history.outputs || {})) {
     const imageItems = Array.isArray(output?.images)
@@ -26,6 +27,7 @@ export function outputsFrom(history) {
         filename,
         subfolder: item.subfolder || "",
         type: item.type || "output",
+        worker,
       });
       const isVideo = collectionType === "video" || videoPattern.test(filename);
       urls.push({

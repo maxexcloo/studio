@@ -1,10 +1,5 @@
 import { recordBelongsToAccount, recordsForRequest } from "./account-ownership.js";
-import {
-  currentComfyBackend,
-  isDefaultBackend,
-  routeJob,
-  withComfyBackend,
-} from "./comfy/backends.js";
+import { isDefaultBackend, routeJob } from "./comfy/backends.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { gallery, galleryRevisionValue, updateGalleryJob } from "./gallery/store.js";
@@ -26,8 +21,8 @@ import { noWorkerMessage, workerById } from "./workers.js";
  */
 export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue, store }) {
   /**
-   * Upscaling runs on a worker with Upscale (workers.js): the routes below run
-   * inside its scope, so its node list, uploads and the job itself all go there.
+   * Upscaling runs on a worker with Upscale (workers.js): the routes below are given
+   * its id, so its node list, uploads and the job itself all go there.
    */
   function onUpscaleWorker(handler) {
     return (req, res) => {
@@ -37,7 +32,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
         res.status(status).json(payload);
         return undefined;
       }
-      return withComfyBackend(worker.id, () => handler(req, res));
+      return handler(req, res, worker.id);
     };
   }
   const noUpscaleWorker = () => ({
@@ -50,10 +45,10 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     },
   });
 
-  /** `force` reads ComfyUI again instead of the 30s cache. */
-  async function upscaleInfo({ force = false } = {}) {
+  /** Worker `worker`'s node list; `force` reads ComfyUI again instead of the 30s cache. */
+  async function upscaleInfo(worker, { force = false } = {}) {
     try {
-      return { info: (await loadComfyContext({ force })).info };
+      return { info: (await loadComfyContext(worker, { force })).info };
     } catch {
       return {
         failure: {
@@ -61,7 +56,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           payload: {
             ok: false,
             offline: true,
-            error: `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
+            error: `${isDefaultBackend(worker) ? "ComfyUI" : workerById(worker)?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
           },
         },
       };
@@ -71,16 +66,16 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     status.nodesInstalled
       ? "The SeedVR2 models aren’t installed yet."
       : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`;
-  async function upscaleContext(res, options) {
-    const { info, failure } = await upscaleInfo(options);
+  async function upscaleContext(res, worker, options) {
+    const { info, failure } = await upscaleInfo(worker, options);
     if (failure) res.status(failure.status).json(failure.payload);
     return info || null;
   }
 
   app.get(
     "/api/upscale/status",
-    onUpscaleWorker(async (req, res) => {
-      const info = await upscaleContext(res, { force: req.query.fresh === "1" });
+    onUpscaleWorker(async (req, res, worker) => {
+      const info = await upscaleContext(res, worker, { force: req.query.fresh === "1" });
       if (!info) return;
       const status = {
         ...upscaleStatus(info, req.query.quality),
@@ -98,10 +93,10 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
   async function queueUpscale(account, request, origin) {
     const worker = routeJob("upscale");
     if (!worker) return noUpscaleWorker();
-    return withComfyBackend(worker.id, () => queueUpscaleOnWorker(account, request, origin));
+    return queueUpscaleOnWorker(worker.id, account, request, origin);
   }
 
-  async function queueUpscaleOnWorker(account, request, origin) {
+  async function queueUpscaleOnWorker(worker, account, request, origin) {
     const target = request.target === undefined ? 0 : Number(request.target);
     if (target !== 0 && !upscaleTargets.includes(target)) {
       return {
@@ -112,7 +107,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
         },
       };
     }
-    const { info, failure } = await upscaleInfo();
+    const { info, failure } = await upscaleInfo(worker);
     if (failure) return failure;
     const quality = normalizeQuality(request.quality);
     const itemId = String(request.galleryItemId || "");
@@ -179,10 +174,10 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
     let upscaleItem = item;
     try {
       if (item.type === "video") {
-        imageName = await uploadUpscaleVideoSource(item);
+        imageName = await uploadUpscaleVideoSource(worker, item);
       } else {
         const asset = referenceAssetForAccount(account, item.id);
-        const [staged] = await stageReferenceAssetsForAccount(account, [
+        const [staged] = await stageReferenceAssetsForAccount(worker, account, [
           { assetId: asset.id, slot: "upscale", source: asset.source },
         ]);
         imageName = staged?.comfyName || "";
@@ -246,7 +241,7 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
           },
           operation: "upscale",
           parentJobId: parent?.id,
-          resource: `worker:${currentComfyBackend()}`,
+          resource: `worker:${worker}`,
           origin,
         },
       ],
@@ -289,15 +284,13 @@ export function registerUpscaleRoutes(app, { finishing, loadComfyContext, queue,
   async function upscaleReady(quality) {
     const worker = routeJob("upscale");
     if (!worker) return { reason: noWorkerMessage("upscale") };
-    return withComfyBackend(worker.id, async () => {
-      const { info, failure } = await upscaleInfo();
-      if (failure) return { reason: failure.payload.error };
-      const status = upscaleStatus(info, quality);
-      if (!status.ready) return { reason: upscaleUnready(status) };
-      return {
-        faceDetail: status.faceDetail.nodesInstalled && status.faceDetail.detectors.length > 0,
-      };
-    });
+    const { info, failure } = await upscaleInfo(worker.id);
+    if (failure) return { reason: failure.payload.error };
+    const status = upscaleStatus(info, quality);
+    if (!status.ready) return { reason: upscaleUnready(status) };
+    return {
+      faceDetail: status.faceDetail.nodesInstalled && status.faceDetail.detectors.length > 0,
+    };
   }
 
   return { queueUpscale, upscaleReady };

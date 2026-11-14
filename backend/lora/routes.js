@@ -12,6 +12,7 @@ import {
   saveLoraLibrary,
   saveLoraStack,
 } from "./stacks.js";
+import { defaultWorkerId } from "../workers.js";
 
 /**
  * An account's LoRA library and per-workflow stacks, and what each installed LoRA was trained for.
@@ -68,13 +69,20 @@ export function registerLoraRoutes(app, { comfyDownMessage, loadComfyContext }) 
     if (!accountMayUseLoras({ studioAccount: account }))
       return { status: 200, payload: { ok: true, loras: {} } };
     try {
-      const { info } = await loadComfyContext();
+      const { info } = await loadComfyContext(defaultWorkerId());
       const names = optionsFor(info, "LoraLoader", "lora_name").filter(loraAllowed(account));
-      return { status: 200, payload: { ok: true, loras: await loraInfos(names) } };
+      return {
+        status: 200,
+        payload: { ok: true, loras: await loraInfos(defaultWorkerId(), names) },
+      };
     } catch (error) {
       return {
         status: 503,
-        payload: { ok: false, loras: {}, error: comfyDownMessage(error?.message) },
+        payload: {
+          ok: false,
+          loras: {},
+          error: comfyDownMessage(defaultWorkerId(), error?.message),
+        },
       };
     }
   });

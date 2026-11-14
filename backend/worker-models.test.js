@@ -187,3 +187,35 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
     /STUDIO_WORKER_TOKEN/,
   );
 });
+
+test("Civitai matching reads the Model Library worker's files, not the image worker's", async (t) => {
+  process.env.STUDIO_WORKER_TOKEN = "worker-test-fixture";
+  const server = http.createServer((_req, res) => {
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        ok: true,
+        files: [{ path: "loras/kept.safetensors", size: 4096, mtimeMs: 1 }],
+        paused: [],
+        space: {},
+        writable: true,
+      }),
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  process.env.STUDIO_WORKERS = JSON.stringify([
+    { id: "image", url: "http://127.0.0.1:9", capabilities: ["image"] },
+    { id: "library", url: `http://127.0.0.1:${server.address().port}`, capabilities: ["models"] },
+  ]);
+  reloadWorkers();
+  const { matchResources } = await import("./civitai/import.js");
+  const matched = await matchResources(
+    { resources: [{ folder: "loras", file: "kept.safetensors", nameOnly: true, supported: true }] },
+    { loras: ["kept.safetensors"] },
+  );
+  assert.equal(matched.resources[0].status, "installed");
+});
