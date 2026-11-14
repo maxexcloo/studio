@@ -325,6 +325,7 @@ function CardImages({
   const noun = max > 1 ? "Images" : "Image";
   return (
     <Input.Wrapper
+      size="md"
       component="section"
       aria-label={noun}
       label={noun}
