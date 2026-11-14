@@ -68,6 +68,10 @@ export interface Action {
   };
   /** Why nothing in its options can run, above them. */
   note?: string;
+  /** Names its group in menus (Themes, Suggestions) rather than acting. */
+  heading?: boolean;
+  /** Runs as its options show, so they load only when wanted (an item's suggestions). */
+  onOpen?: () => void;
 }
 /** Groups are separated by dividers, in menus and bars alike. */
 export type ActionGroups = Action[][];
@@ -121,14 +125,24 @@ const isSetting = (action: Action) =>
 
 /** What clicking the action does: its own click, or with options the first that isn't a setting. */
 export const usualAction = (action: Action): Action | undefined =>
-  action.menu ? action.menu.flat().find((option) => !isSetting(option)) : action;
+  action.menu ? action.menu.flat().find((option) => !isSetting(option) && !option.heading) : action;
 
-const note = (action: Action) =>
-  action.note && (
-    <Menu.Label fw={400} maw={menuWidth}>
-      {action.note}
-    </Menu.Label>
-  );
+const note = (action: Action) => (
+  <>
+    {action.onOpen && <Opened onOpen={action.onOpen} />}
+    {action.note && (
+      <Menu.Label fw={400} maw={menuWidth}>
+        {action.note}
+      </Menu.Label>
+    )}
+  </>
+);
+
+/** Tells an action its options are showing; they mount only while open. */
+function Opened({ onOpen }: { onOpen: () => void }) {
+  useEffect(onOpen, []);
+  return null;
+}
 
 /**
  * A menu item's label with its one-line description, if any, under it; the label stays its
@@ -164,6 +178,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
       {group.map((action) => {
         const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
         const describedBy = `${uid}-${id}`;
+        if (action.heading) return <Menu.Label key={id}>{label}</Menu.Label>;
         if (action.choice)
           return (
             <div key={id} className={classes.choice}>

@@ -12,6 +12,7 @@ import {
   ProposalLabel,
   proposalText,
   proposedClass,
+  assistMenu,
   SendButton,
   UndoButton,
   useChangeSuggestions,
@@ -104,8 +105,8 @@ export function useViewerPrompt(
           label: "AI",
           icon: icons.assistant,
           loading: ask.pending,
-          menu: [
-            [
+          menu: assistMenu({
+            settings: [
               {
                 id: "review",
                 label: "Review Prompt",
@@ -115,10 +116,9 @@ export function useViewerPrompt(
                 onClick: () => setReview(!review),
               },
             ],
-            [
-              ...(offered
-                ? suggestions.action.menu![0].map((step) => ({ ...step, icon: icons.suggestions }))
-                : []),
+            fixed: { label: "Changes", options: [] },
+            suggestions: offered ? suggestions.group : [],
+            last: [
               {
                 id: "custom",
                 label: "Custom…",
@@ -127,8 +127,7 @@ export function useViewerPrompt(
                 onClick: custom,
               },
             ],
-            ...(offered ? suggestions.action.menu!.slice(1) : []),
-          ],
+          }),
         }
       : null;
   // Improve Prompt's styles, but Custom, whose place AI's Custom… takes.

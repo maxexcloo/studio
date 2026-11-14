@@ -252,6 +252,11 @@ export const animateThemes = {
   custom: "Custom",
 } as const;
 export type AnimateTheme = keyof typeof animateThemes;
+/** A theme to animate with, and for Custom an instruction already chosen (a suggested motion). */
+export interface AnimateRequest {
+  theme: AnimateTheme;
+  instruction?: string;
+}
 /** The themes the assistant can write for the account: none without it, Spicy only where allowed. */
 export function useAnimateThemes(): AnimateTheme[] {
   const assistant = useQuery(assistantQuery).data;

@@ -21,6 +21,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
@@ -34,7 +35,9 @@ import { useGroupFeature } from "../auth/AccountGate";
 import { useStageComparison } from "../compare/variants";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { defaultProfile, useGeneration } from "../generation/GenerationProvider";
+import { assistMenu, useChangeSuggestions } from "../generation/AskChange";
 import { assistantQuery } from "../generation/PromptAssistant";
+import { askMotionIdeas, motionIdeasQuery } from "../taste/suggestions";
 import { queueQuery, useQueue, useQueueAction } from "../generation/Queue";
 import { profileForBackend, profileName } from "../generation/payload";
 import { useGalleryReference } from "../generation/references";
@@ -57,6 +60,7 @@ import {
   useMediaAction,
   useMediaIteration,
   type AnimateOffers,
+  type AnimateRequest,
   type AnimateTheme,
   type Iteration,
 } from "./useMediaAction";
@@ -252,8 +256,8 @@ interface MediaActionOptions {
   iterate?: (iteration: Iteration) => void;
   onApplied?: () => void;
   onCompare?: () => void;
-  /** Opens Animate's dialog for a theme: Custom Animation, or any theme under Review Prompt. */
-  onAnimate: (theme: AnimateTheme) => void;
+  /** Opens Animate's dialog: Custom Animation, or any theme or suggested motion under Review Prompt. */
+  onAnimate: (choice: AnimateRequest) => void;
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
   onTrim: () => void;
@@ -399,17 +403,37 @@ export function useMediaActions(
   // Nothing can animate: say why.
   const refusal = animation.error?.message;
   const themes = useAnimateThemes();
-  const themeItems = (disabled: boolean) =>
-    themes.map((theme) => ({
-      id: `animate-${theme}`,
-      label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
-      icon: themeIcons[theme],
-      disabled,
-      onClick:
-        theme === "custom" || review
-          ? () => onAnimate(theme)
-          : () => run({ kind: "animate", theme }),
-    }));
+  const themeItem = (theme: AnimateTheme, disabled: boolean): Action => ({
+    id: `animate-${theme}`,
+    label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
+    icon: themeIcons[theme],
+    disabled,
+    onClick:
+      theme === "custom" || review
+        ? () => onAnimate({ theme })
+        : () => run({ kind: "animate", theme }),
+  });
+  const themeOptions = (disabled: boolean) => ({
+    label: "Themes",
+    options: themes
+      .filter((theme) => theme !== "custom")
+      .map((theme) => themeItem(theme, disabled)),
+  });
+  const customTheme = (disabled: boolean) =>
+    themes.includes("custom") ? [themeItem("custom", disabled)] : [];
+  // Motions written for this image, asked for only once its Animate menu opens.
+  const [motionsFor, setMotionsFor] = useState<string>();
+  const motions = useChangeSuggestions({
+    query: motionIdeasQuery(item.jobId ?? ""),
+    fresh: () => askMotionIdeas(item.jobId!, true),
+    enabled: motionsFor === item.id,
+    disabled: !animation.data,
+    onPick: (instruction) =>
+      review
+        ? onAnimate({ theme: "custom", instruction })
+        : run({ kind: "animate", theme: "custom", instruction }),
+  });
+  const motionsOffered = image && Boolean(item.jobId && assistant.data?.available);
   // Themes write the prompt into an editable review before anything queues.
   const reviewItems = assistant.data?.available
     ? [
@@ -437,10 +461,13 @@ export function useMediaActions(
         loading: running === "animate" || action.isPending,
         // When nothing can animate, the options stay disabled and the note says why.
         note: refusal,
-        menu: [
-          [...modelChoice, ...reviewItems],
-          [...themeItems(!animation.data)],
-          [
+        onOpen: motionsOffered ? () => setMotionsFor(item.id) : undefined,
+        menu: assistMenu({
+          settings: [...modelChoice, ...reviewItems],
+          fixed: themeOptions(!animation.data),
+          suggestions: motionsOffered ? motions.group : [],
+          last: [
+            ...customTheme(!animation.data),
             {
               id: "animate-composer",
               label: "Animate in Composer",
@@ -449,7 +476,7 @@ export function useMediaActions(
               onClick: () => action.mutate("animate"),
             },
           ],
-        ],
+        }),
       }),
     ready &&
       item.type === "video" &&
@@ -459,11 +486,12 @@ export function useMediaActions(
         // A theme continues the clip from its last frame at once; the composer shows it first. It
         // keeps the clip's own model unless videos run on Cloud.
         note: refusal,
-        menu: [
-          [...modelChoice, ...reviewItems],
-          [...themeItems(action.isPending)],
-          [...(reference ? [reference] : []), saveFrame],
-          [
+        menu: assistMenu({
+          settings: [...modelChoice, ...reviewItems],
+          fixed: themeOptions(action.isPending),
+          others: [...(reference ? [reference] : []), saveFrame],
+          last: [
+            ...customTheme(action.isPending),
             {
               id: "extend",
               label: "Extend in Composer",
@@ -472,7 +500,7 @@ export function useMediaActions(
               onClick: () => action.mutate("extend"),
             },
           ],
-        ],
+        }),
       }),
     // Edit changes the item itself or reuses it elsewhere; a video's edits each save a new version
     // and the original stays.
