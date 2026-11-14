@@ -265,19 +265,13 @@ test("Model classification saves and reads back while definition administration 
     "Original",
   );
   administrator = false;
-  // Without Characters an ordinary account has no Library at all (characters.spec.ts covers the
-  // Characters-only Library a member gets with it).
+  // Without Characters an ordinary account's Library holds only its Presets (characters.spec.ts
+  // covers the cards a member gets with it).
   await signIn(page, { id: "account-a", role: "user", features: { characters: false } });
   await serveProfiles(page, profiles);
-  await page.goto("/library");
-  await expect(page).toHaveURL(/\/images$/);
-  const options = page.getByRole("button", { name: "More Options", exact: true });
-  if (await options.isVisible()) await options.click();
-  await expect(
-    page
-      .getByRole("link", { name: "Library", exact: true })
-      .or(page.getByRole("menuitem", { name: "Library", exact: true })),
-  ).toHaveCount(0);
+  await page.goto("/library#models");
+  await expect(page.getByText("No Presets", { exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Library Models", exact: true })).toHaveCount(0);
   expect(writes).toHaveLength(1);
 });
 

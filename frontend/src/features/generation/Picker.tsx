@@ -775,10 +775,13 @@ export function SaveButton<T extends SavedItem>({
   disabled: boolean;
   onUpdate: (record: T) => Promise<unknown>;
 }) {
+  const phone = usePhone();
   return (
     <Button
       size="compact-sm"
       variant="subtle"
+      // A phone sheet's footer is one tight row, beside the record's name above.
+      aria-label={`Save ${noun}`}
       disabled={disabled || (!!current && !edited)}
       onClick={() =>
         current
@@ -786,7 +789,7 @@ export function SaveButton<T extends SavedItem>({
           : naming.name("save")
       }
     >
-      Save {noun}
+      {phone ? "Save" : `Save ${noun}`}
     </Button>
   );
 }

@@ -279,7 +279,9 @@ test("Phones open the stack first and add LoRAs from a list that scrolls under i
   const search = adding.getByRole("textbox", { name: "Search LoRAs", exact: true });
   await expect(search).toBeVisible();
   await expect(search).not.toBeFocused();
-  await pickerTab(page, "LoRAs", "All");
+  // The extra LoRAs list no family, so they show under All Families.
+  await adding.getByRole("combobox", { name: "Family", exact: true }).click();
+  await page.getByRole("option", { name: "All Families", exact: true }).click();
   // The list scrolls inside itself, keeping the search and the footer in sight.
   await adding.getByRole("button", { name: "extra-9", exact: true }).scrollIntoViewIfNeeded();
   await expect(search).toBeInViewport();
