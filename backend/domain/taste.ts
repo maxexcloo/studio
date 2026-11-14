@@ -8,8 +8,8 @@ import { directRoute, type RouteAccount } from "./direct-route.ts";
 
 /**
  * What a person did with a result; "keep" and "discard" are their verdicts on Dream results,
- * "calibrate-like" and "calibrate-pass" on older gallery images Dream showed them again, and
- * "preferred" is a compare winner chosen over one other variant, and "pair-both" and "pair-neither"
+ * "calibrate-like" and "calibrate-pass" on older gallery images Dream showed them again, "delete"
+ * a finished result they deleted from the gallery, and "preferred" is a compare winner chosen over one other variant, and "pair-both" and "pair-neither"
  * answer a Dream comparison with both or neither.
  */
 type TasteKind =
@@ -23,7 +23,8 @@ type TasteKind =
   | "keep"
   | "discard"
   | "calibrate-like"
-  | "calibrate-pass";
+  | "calibrate-pass"
+  | "delete";
 /** A LoRA a result loaded; older signals keep its name alone. */
 type TasteLora = string | { name: string; strength?: number };
 /** The settings a result ran with, for choices that vary them. */
@@ -59,7 +60,7 @@ export interface TasteChoice {
   settings?: TasteSettings;
   seed?: string;
   tags?: string[];
-  /** How Dream came to make it: "exploit", or "explore:<axis>" for the first thing it tried. */
+  /** How Dream came to make it (`DreamOrigin.arm` in domain/dream.ts). */
   arm?: string;
   /** A Dream comparison side's value of the thing its pair varies, such as 30 for Steps. */
   value?: string | number;
@@ -173,7 +174,7 @@ const summariseGapMs = 10 * 60_000;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const instructions = [
   "You keep the words of one person's taste profile for a media studio: what they like and pass over in images and videos. Studio scores their models, LoRAs and settings itself, so leave those out.",
-  "Revise the current profile with the recent signals: what they starred or unstarred, chose in a comparison, iterated on, kept or discarded from Dream (results Studio made for them unasked), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).",
+  "Revise the current profile with the recent signals: what they starred or unstarred, chose in a comparison, iterated on, deleted, kept or discarded from Dream (results Studio made for them unasked), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).",
   'A "preferred" signal is relative: they liked that result more than the one after "over", which may still be good to them; it is no dislike.',
   'A signal with a question answers a Dream comparison: two results alike but for one thing; pair-both means either suits them, pair-neither that neither does (the side after "and" is the other one).',
   "Titles, captions and tags say what a result shows: learn the subjects, styles, media, lighting and colour they come back to and those they pass over.",
@@ -233,6 +234,7 @@ const signalWeights: Record<TasteKind, number> = {
   discard: -0.5,
   "calibrate-like": 0.5,
   "calibrate-pass": -0.5,
+  delete: -1,
 };
 /**
  * The attributes a Dream comparison's axis covers. Its answer moves only those in which the two

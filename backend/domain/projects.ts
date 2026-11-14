@@ -11,7 +11,7 @@ import {
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 
 /** Each chat's project and when the chat last asked for something (Dream takes over a quiet one). */
-type Chats = Record<string, { projectId: string; at: string }>;
+export type Chats = Record<string, { projectId: string; at: string }>;
 interface ProjectsRecord {
   projects: Project[];
   chats: Chats;
@@ -134,6 +134,8 @@ export function createProjects({
   };
   return {
     list: (ownerId: string) => read(ownerId).projects,
+    /** Each attached chat's project and latest request, by conversation id. */
+    chats: (ownerId: string) => read(ownerId).chats,
     create(ownerId: string, patch: ProjectPatch) {
       if (!patch.name) throw failure("Name the project.", 400);
       const record = read(ownerId);
