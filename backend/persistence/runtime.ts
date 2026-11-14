@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { createGalleryTable, galleryColumns } from "./gallery-rows.ts";
+import { createGalleryIndexes, createGalleryTable, galleryColumns } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
 /** The JSON stores runtime-json-v1 moved into SQLite. */
@@ -110,6 +110,15 @@ function hasMigration(db: DatabaseSync, name: string) {
   );
 }
 
+function hasGalleryColumns(db: DatabaseSync) {
+  const columns = new Set(
+    (db.prepare("PRAGMA table_xinfo(studio_gallery)").all() as { name: string }[]).map(
+      (column) => column.name,
+    ),
+  );
+  return galleryColumns.every(([name]) => columns.has(name));
+}
+
 /** Opens a database with Studio's settings; the server shares one connection through runtimeDatabase. */
 export function openDatabase(filename: string): DatabaseSync {
   const db = new DatabaseSync(filename);
@@ -132,6 +141,8 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
       CREATE TABLE IF NOT EXISTS studio_library_imports (id TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_ingested_jobs (job_id TEXT PRIMARY KEY, at INTEGER NOT NULL);`);
     if (!hasTable(db, "studio_gallery")) db.exec(createGalleryTable);
+    // A gallery without its columns gets them from a migration first (assertCurrentStorage).
+    if (hasGalleryColumns(db)) db.exec(createGalleryIndexes);
     // Gathers the statistics that let SQLite pick a gallery query's narrowest index (a set's,
     // not the gallery's order), as SQLite advises on opening a long-lived connection.
     db.exec("PRAGMA optimize=0x10002");
@@ -170,12 +181,7 @@ export function assertCurrentStorage(dataDir: string): void {
     throw new Error(
       `${dataDir} still holds ${pending.join(", ")}, so it predates current storage. Migrate it first with migrate-runtime from Studio v2026.11.10.4, the last release with those steps (see README.md, Data & Migrations), then start this Studio.`,
     );
-  const columns = new Set(
-    (db.prepare("PRAGMA table_xinfo(studio_gallery)").all() as { name: string }[]).map(
-      (column) => column.name,
-    ),
-  );
-  if (galleryColumns.some(([name]) => !columns.has(name)))
+  if (!hasGalleryColumns(db))
     throw new Error(
       `${dataDir}'s gallery has no indexed columns yet. Add them first with migrate-runtime's galleryColumns step from Studio v2026.11.14.18 (see README.md, Data & Migrations), then start this Studio.`,
     );

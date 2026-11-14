@@ -109,6 +109,18 @@ type PairAxis = "profile" | "lora" | "strength" | "steps" | "cfg" | "wording";
 export type PairAnswer = "a" | "b" | "both" | "neither";
 type DreamState = "unseen" | "kept" | "discarded";
 type DreamVideoSource = { item: DreamItem; extend: boolean };
+/**
+ * A gallery read narrowed in SQL (gallery/store.js): Dream states, starred items with kept results
+ * (`liked`), kind, status, the chats that asked for them or ids.
+ */
+type DreamQuery = {
+  dreamState?: DreamState | DreamState[];
+  liked?: boolean;
+  type?: string;
+  status?: string;
+  conversationIds?: string[];
+  ids?: string[];
+};
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
 interface DreamMark extends DreamOrigin {
   state: DreamState;
@@ -634,8 +646,10 @@ export function createDream(options: {
   slots(): number;
   writer: DreamWriter | null;
   guide(profile: DreamProfile): unknown;
-  /** Every gallery record the owner has, Dream's pool included, newest first. */
-  gallery(ownerId: string): DreamItem[];
+  /** The owner's gallery records the query matches, Dream's pool included, newest first. */
+  gallery(ownerId: string, query: DreamQuery): DreamItem[];
+  /** How many of the owner's gallery records the query matches. */
+  count(ownerId: string, query: DreamQuery): number;
   /** The owner's gallery records with these ids, Dream's pool included. */
   items(ownerId: string, ids: string[]): DreamItem[];
   /** The records the normal gallery shows. */
@@ -758,14 +772,14 @@ export function createDream(options: {
    * account (composer, MCP or Dream). Uploads, imports and records rebuilt without a job
    * never reach Dream, so it shows and learns only from what the account made here.
    */
-  function generations(ownerId: string) {
+  function generations(ownerId: string, query: DreamQuery) {
     const jobs = store.jobIds(ownerId);
     return options
-      .visible(options.gallery(ownerId))
+      .visible(options.gallery(ownerId, query))
       .filter((item) => (item.ownerId || "") === ownerId && item.jobId && jobs.has(item.jobId));
   }
   const pool = (ownerId: string, state: DreamState) =>
-    options.gallery(ownerId).filter((item) => item.dream?.state === state);
+    options.gallery(ownerId, { dreamState: state });
   /** The kinds Dream may still make today, the one it is behind on first. */
   function kinds(settings: DreamSettings, counts: { images: number; videos: number }) {
     const image = settings.images && counts.images < settings.dailyImages;
@@ -859,9 +873,7 @@ export function createDream(options: {
     const done = (item: DreamItem, type: string) => item.type === type && item.status === "done";
     const score = (item: DreamItem) => item.review?.score ?? 0;
     const best = (a: DreamItem, b: DreamItem) => score(b) - score(a);
-    const liked = generations(ownerId).filter(
-      (item) => item.favorite || item.dream?.state === "kept",
-    );
+    const liked = generations(ownerId, { liked: true });
     const [video] = liked
       .filter(
         (item) =>
@@ -870,15 +882,8 @@ export function createDream(options: {
       .sort(best);
     const fresh = (item: DreamItem) => done(item, "image") && !animated.has(String(item.id));
     const reviewed = options
-      .gallery(ownerId)
-      .filter(
-        (item) =>
-          fresh(item) &&
-          item.dream &&
-          item.dream.state !== "discarded" &&
-          !item.review?.miss &&
-          score(item) > 0,
-      )
+      .gallery(ownerId, { dreamState: ["unseen", "kept"], type: "image", status: "done" })
+      .filter((item) => fresh(item) && !item.review?.miss && score(item) > 0)
       .sort(best);
     const stills = [...reviewed, ...liked.filter(fresh)].map((item) => ({ item, extend: false }));
     return video && chance(extendShare) ? [{ item: video, extend: true }, ...stills] : stills;
@@ -942,13 +947,14 @@ export function createDream(options: {
    */
   function seedFor(ownerId: string, project: Project) {
     const chats = options.chats(ownerId);
-    const made = generations(ownerId).filter(
-      (item) =>
-        item.type === "image" &&
-        item.status === "done" &&
-        (chats[item.chat?.conversationId || ""]?.projectId === project.id ||
-          item.dream?.projectId === project.id),
-    );
+    const conversationIds = Object.keys(chats).filter((id) => chats[id].projectId === project.id);
+    const images = { type: "image", status: "done" };
+    const made = [
+      ...(conversationIds.length ? generations(ownerId, { ...images, conversationIds }) : []),
+      ...generations(ownerId, { ...images, dreamState: "kept" }).filter(
+        (item) => item.dream?.projectId === project.id,
+      ),
+    ].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     const seeds = [
       ...made.filter((item) => !item.dream).slice(0, seedLatest),
       ...made.filter((item) => item.favorite || item.dream).slice(0, seedPicks),
@@ -964,21 +970,14 @@ export function createDream(options: {
    * its profile where that is still ready.
    */
   function picks(ownerId: string, profiles: DreamProfile[]) {
-    return generations(ownerId)
-      .filter(
-        (item) =>
-          item.type === "image" &&
-          item.status === "done" &&
-          (item.favorite || item.dream?.state === "kept"),
-      )
-      .flatMap((item) => {
-        const input = store.job(ownerId, String(item.jobId))?.input;
-        const profile = profiles.find(
-          (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
-        );
-        const prompt = clean(input?.prompt, maxPromptCharacters);
-        return input && profile && prompt ? [{ item, input, profile, prompt }] : [];
-      });
+    return generations(ownerId, { liked: true, type: "image", status: "done" }).flatMap((item) => {
+      const input = store.job(ownerId, String(item.jobId))?.input;
+      const profile = profiles.find(
+        (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
+      );
+      const prompt = clean(input?.prompt, maxPromptCharacters);
+      return input && profile && prompt ? [{ item, input, profile, prompt }] : [];
+    });
   }
   /** The settings of a seed's input a continued idea or a comparison keeps. */
   const settingsOf = (input: GenerationInput): GenerationInput =>
@@ -1090,8 +1089,8 @@ export function createDream(options: {
   }
   /** A few of the newest starred or kept prompts, sampled so each idea sees different ones. */
   function tastePrompts(ownerId: string) {
-    const pool = generations(ownerId)
-      .filter((item) => (item.favorite || item.dream?.state === "kept") && item.prompt)
+    const pool = generations(ownerId, { liked: true })
+      .filter((item) => item.prompt)
       .slice(0, tastePool);
     return shuffled(pool)
       .slice(0, 3 + random(3))
@@ -1431,8 +1430,7 @@ export function createDream(options: {
       return { status: "unavailable", reason: "The prompt assistant is not configured." };
     const counts = today(ownerId);
     const judged =
-      (record.judged?.length || 0) +
-      options.gallery(ownerId).filter((item) => item.dream && item.dream.state !== "unseen").length;
+      (record.judged?.length || 0) + options.count(ownerId, { dreamState: ["kept", "discarded"] });
     const every = judged >= pairJudgedAt ? pairEveryJudged : pairEvery;
     let reason = "";
     let idle = "";
@@ -1495,7 +1493,7 @@ export function createDream(options: {
       const open = [...(otherProfile ? ["profile"] : []), ...(fresh ? ["lora"] : []), "prompt"];
       const made = (arm: string) =>
         options
-          .gallery(ownerId)
+          .gallery(ownerId, { dreamState: ["unseen", "kept", "discarded"] })
           .filter((item) => item.dream?.arm?.startsWith(arm) && !item.dream.pair).length;
       const share = Math.round((record.explore ?? exploreShare.start) * 100);
       const axis = !steer && !chance(100 - share) ? open[made("explore:") % open.length] : "";
@@ -2041,14 +2039,8 @@ export function createDream(options: {
     if (!options.access(ownerId)) return false;
     if (now() - Date.parse(record.suggestedAt || "") < suggestEveryMs) return false;
     if ((record.suggestions?.length || 0) >= maxSuggestions) return false;
-    const liked = generations(ownerId)
-      .filter(
-        (item) =>
-          item.type === "image" &&
-          item.status === "done" &&
-          (item.favorite || item.dream?.state === "kept") &&
-          clean(item.prompt, 1),
-      )
+    const liked = generations(ownerId, { liked: true, type: "image", status: "done" })
+      .filter((item) => clean(item.prompt, 1))
       .slice(0, suggestFrom);
     if (liked.length < suggestAfter) return false;
     if ((await options.online("image")).text !== "online") return false;
@@ -2243,13 +2235,10 @@ export function createDream(options: {
     return ids.length;
   }
   /** The owner's finished gallery images that are old enough to calibrate with. */
-  const calibrationPool = (ownerId: string) => {
+  const calibrationPool = (ownerId: string, ids?: string[]) => {
     const before = now() - calibrationAgeMs;
-    return generations(ownerId).filter(
-      (item) =>
-        item.type === "image" &&
-        item.status === "done" &&
-        Date.parse(item.createdAt || "") <= before,
+    return generations(ownerId, { type: "image", status: "done", ...(ids && { ids }) }).filter(
+      (item) => Date.parse(item.createdAt || "") <= before,
     );
   };
   function shuffled<T>(items: T[]) {
@@ -2378,8 +2367,16 @@ export function createDream(options: {
      */
     suggestions(ownerId: string) {
       if (!options.cards(ownerId)) return [];
-      const items = new Map(options.gallery(ownerId).map((item) => [String(item.id), item]));
-      return (read(ownerId).suggestions || []).flatMap((suggestion) => {
+      const suggestions = read(ownerId).suggestions || [];
+      const items = new Map(
+        options
+          .items(
+            ownerId,
+            suggestions.flatMap((suggestion) => suggestion.itemIds),
+          )
+          .map((item) => [String(item.id), item]),
+      );
+      return suggestions.flatMap((suggestion) => {
         const shown = suggestion.itemIds.flatMap((id) => (items.has(id) ? [items.get(id)!] : []));
         return shown.length ? [{ ...suggestion, items: shown }] : [];
       });
@@ -2433,7 +2430,9 @@ export function createDream(options: {
      * pair is one of each). The gallery itself stays as it was.
      */
     calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
-      const pool = new Map(calibrationPool(ownerId).map((item) => [String(item.id), item]));
+      const pool = new Map(
+        calibrationPool(ownerId, [...liked, ...passed]).map((item) => [String(item.id), item]),
+      );
       const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
         const item = pool.get(id);
         if (!item) throw failure("That gallery image is unavailable.", 404);

@@ -12,6 +12,9 @@ export function galleryKey(item: GalleryItem | null | undefined): string {
 
 const field = (name: string) => `json_extract(value, '$.${name}')`;
 
+/** A row's Dream state, null outside Dream; the `studio_gallery_dream` index's expression. */
+export const dreamState = field("dream.state");
+
 /**
  * Columns derived from each row's JSON, so queries filter and order the gallery in SQL. `created_ms`
  * is Date.parse's time (null when unreadable) and `bucket` is order.js's galleryBucket: JS `trim`
@@ -43,8 +46,8 @@ export const galleryColumns: [string, string][] = [
 const galleryOrder =
   "uploaded, dream_pool, bucket, created_ms DESC, job_id DESC, item_index, item_id DESC, status, type, favorite";
 
-/** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets and
- * states. */
+/** The indexes over `galleryColumns`: gallery order with and without an owner, jobs, ids, sets,
+ * states and Dream states. */
 export const galleryIndexes: [string, string][] = [
   ["studio_gallery_order", galleryOrder],
   ["studio_gallery_owner_order", `owner_id, ${galleryOrder}`],
@@ -53,15 +56,18 @@ export const galleryIndexes: [string, string][] = [
   ["studio_gallery_set", "set_id"],
   ["studio_gallery_status", "status"],
   ["studio_gallery_upscale", "upscale_status"],
+  ["studio_gallery_dream", `${dreamState}, owner_id`],
 ];
 
-/** The gallery table with its columns and indexes, for a database that has none yet. */
-export const createGalleryTable = [
-  `CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL, ${galleryColumns
-    .map(([name, expression]) => `${name} GENERATED ALWAYS AS (${expression}) VIRTUAL`)
-    .join(", ")})`,
-  ...galleryIndexes.map(([name, keys]) => `CREATE INDEX ${name} ON studio_gallery (${keys})`),
-].join(";\n");
+/** The gallery table with its columns, for a database that has none yet. */
+export const createGalleryTable = `CREATE TABLE studio_gallery (key TEXT PRIMARY KEY, value TEXT NOT NULL, ${galleryColumns
+  .map(([name, expression]) => `${name} GENERATED ALWAYS AS (${expression}) VIRTUAL`)
+  .join(", ")})`;
+
+/** The gallery's indexes, made where missing as the database opens. */
+export const createGalleryIndexes = galleryIndexes
+  .map(([name, keys]) => `CREATE INDEX IF NOT EXISTS ${name} ON studio_gallery (${keys})`)
+  .join(";\n");
 
 export function readGalleryRows(db: DatabaseSync): unknown[] {
   return (db.prepare("SELECT value FROM studio_gallery").all() as { value: string }[]).map((row) =>

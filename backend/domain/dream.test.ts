@@ -58,6 +58,7 @@ function fixture(t: TestContext, catalogue = profiles) {
   const state = {
     clock: Date.now(),
     items: [] as DreamItem[],
+    reads: [] as Record<string, unknown>[],
     access: Object.fromEntries(
       ["alice", "bob"].map((userId) => [
         userId,
@@ -94,6 +95,18 @@ function fixture(t: TestContext, catalogue = profiles) {
     ],
     revision: () => 0,
   });
+  // Narrows as gallery/store.js's queries do, so each read takes only what it asks for.
+  const matching = (ownerId: string, query: Record<string, any>) =>
+    state.items.filter(
+      (item) =>
+        item.ownerId === ownerId &&
+        (query.dreamState === undefined || [query.dreamState].flat().includes(item.dream?.state)) &&
+        (!query.liked || item.favorite || item.dream?.state === "kept") &&
+        (!query.type || item.type === query.type) &&
+        (!query.status || item.status === query.status) &&
+        (!query.conversationIds || query.conversationIds.includes(item.chat?.conversationId)) &&
+        (!query.ids || query.ids.includes(String(item.id))),
+    );
   const dream = createDream({
     dataDir,
     store,
@@ -130,7 +143,11 @@ function fixture(t: TestContext, catalogue = profiles) {
       },
     },
     guide: () => ({ summary: "natural language" }),
-    gallery: (ownerId) => state.items.filter((item) => item.ownerId === ownerId),
+    count: (ownerId, query) => matching(ownerId, query).length,
+    gallery: (ownerId, query) => {
+      state.reads.push(query);
+      return matching(ownerId, query);
+    },
     items: (ownerId, ids) =>
       state.items.filter((item) => item.ownerId === ownerId && ids.includes(String(item.id))),
     visible: (items) => items.filter((item) => !item.dream || item.dream.state === "kept"),
@@ -204,6 +221,11 @@ function fixture(t: TestContext, catalogue = profiles) {
     store.save({ ...store.job(ownerId, jobId)!, status: "completed" });
     for (const item of state.items) if (item.jobId === jobId) item.status = "done";
   };
+  /** Gallery reads not narrowed to Dream results, liked items, chats or ids: walks of the gallery. */
+  const walks = () =>
+    state.reads.filter(
+      (query) => !query.dreamState && !query.liked && !query.conversationIds && !query.ids,
+    );
   const dreamJobs = (ownerId?: string) =>
     store.jobs(ownerId).filter((job) => job.priority === queuePriority.dream);
   const live = (ownerId?: string) =>
@@ -244,6 +266,7 @@ function fixture(t: TestContext, catalogue = profiles) {
     dreamJobs,
     live,
     dreamOnce,
+    walks,
     dataDir,
     generated,
     projects,
@@ -743,7 +766,7 @@ test("Dream's ideas take the account's projects in turn and While You Were Away 
 });
 
 test("Dream varies a starred image, and a quiet chat's project once the chat hands it over, one axis at a time", async (t) => {
-  const { dream, state, store, projects, dreamOnce } = fixture(t);
+  const { dream, state, store, projects, dreamOnce, walks } = fixture(t);
   await dream.save("alice", { enabled: true });
   const beach = projects.create("alice", { name: "Beach", brief: { avoid: "crowds" } });
   projects.attach("alice", "chat-1", beach.id);
@@ -813,6 +836,7 @@ test("Dream varies a starred image, and a quiet chat's project once the chat han
   // A new request takes the project back for the next hour.
   projects.activity("alice", "chat-1");
   assert.equal((await dreamOnce())?.dream?.projectId, undefined);
+  assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
 test("The explore share starts at a fifth and leans toward whichever side the person keeps", async (t) => {
@@ -1410,7 +1434,7 @@ test("A series follows a starred image's character through one night on its prof
 });
 
 test("Dream videos animate the best-reviewed still and extend kept videos, each once, on local GPUs", async (t) => {
-  const { dream, state, generated, dreamOnce } = fixture(t, profiles);
+  const { dream, state, generated, dreamOnce, walks } = fixture(t, profiles);
   const frameOf = (job: Awaited<ReturnType<typeof dreamOnce>>) =>
     (job!.input.referenceAssets as { assetId: string; slot: string }[])[0];
   await dream.save("alice", { enabled: true, dailyImages: 0, videos: true, dailyVideos: 10 });
@@ -1480,6 +1504,7 @@ test("Dream videos animate the best-reviewed still and extend kept videos, each 
   state.videoRefusal = "No video profile that takes a starting image is available to this account.";
   assert.equal(await dreamOnce(), undefined);
   assert.equal(dream.status("alice").reason, state.videoRefusal);
+  assert.deepEqual(walks(), [], "Dream never walks the whole gallery");
 });
 
 test("A Dream video skips a source that left the gallery and animates the next", async (t) => {
