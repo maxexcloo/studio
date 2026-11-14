@@ -1,7 +1,7 @@
 // Numbers for the About page, Settings › Users and per-profile health. Computed from the gallery
 // record only: nothing is tracked beyond what Studio already keeps about its own outputs.
 import { isCloudProfile } from "../shared/profiles.ts";
-import { visibleGallery } from "./gallery/store.js";
+import { galleryRuns } from "./gallery/store.js";
 import { canonicalProfileId } from "./profile/store.js";
 
 /**
@@ -31,9 +31,15 @@ export function galleryStats(items = []) {
 
 const dayMs = 86_400_000;
 
-/** The visible items profileStats counts: those of its last 30 days. */
-export const recentGallery = () =>
-  visibleGallery({ since: Date.now() - 30 * dayMs }, { ordered: false });
+/** The runs profileStats counts, those of its last 30 days, read a page per event loop turn. */
+export async function recentRuns() {
+  const runs = [];
+  for (const page of galleryRuns(Date.now() - 30 * dayMs)) {
+    runs.push(...page);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  return runs;
+}
 
 /**
  * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),

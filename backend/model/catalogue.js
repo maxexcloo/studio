@@ -11,7 +11,6 @@ import {
 import { comfy, optionsFor } from "../comfy/comfy.js";
 import { customWorkflowsRevision } from "../custom-workflows.js";
 import { families } from "../family-catalogue.js";
-import { galleryChangeCount } from "../gallery/store.js";
 import { uncensoredLoraNames } from "../lora/info.js";
 import { canonicalProfileId, profileAliasBackend, profileStore } from "../profile/store.js";
 import { parkedWorkers } from "../runtime/services.ts";
@@ -446,14 +445,23 @@ export function withProfileAliases(models) {
 }
 
 /** Profiles whose recent runs mostly fail carry `failing`: the composer badges them and MCP's own pick passes them over. */
-// The visible gallery's profile health, counted again when the gallery changes or a minute on.
-let profileHealth = { change: -1, at: 0, stats: {} };
+// The visible gallery's profile health, counted in the background at most once a minute; a
+// catalogue read meanwhile uses the last count.
+let profileHealth = { at: -Infinity, stats: {}, counting: false };
 
 export function withFailing(models) {
   if (!models?.profiles) return models;
-  const change = galleryChangeCount();
-  if (profileHealth.change !== change || Date.now() - profileHealth.at > 60_000)
-    profileHealth = { change, at: Date.now(), stats: profileStats(recentGallery()) };
+  if (!profileHealth.counting && Date.now() - profileHealth.at > 60_000) {
+    profileHealth.counting = true;
+    recentRuns()
+      .then(
+        (runs) => (profileHealth = { at: Date.now(), stats: profileStats(runs), counting: false }),
+      )
+      .catch((error) => {
+        profileHealth.counting = false;
+        console.warn(`[Studio] Profile health couldn't be counted: ${error.message}`);
+      });
+  }
   const { stats } = profileHealth;
   return {
     ...models,

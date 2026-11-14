@@ -457,6 +457,36 @@ export function filterVisibleGallery(items) {
 export const visibleGallery = (query = {}, options = {}) =>
   filterVisibleGallery(galleryItems({ ...query, dreamPool: false }, options));
 
+/**
+ * The finished and failed runs made from `since` (ms) that the gallery shows, Dream's pool aside,
+ * with only the fields profile health counts, a page of `size` at a time: each page reads
+ * without parsing whole records, and the caller may give other work a turn between pages.
+ */
+export function* galleryRuns(since, size = 500) {
+  for (let after = 0; ;) {
+    const rows = statement(
+      `SELECT rowid, key, status, favorite,
+         json_extract(value, '$.createdAt') AS createdAt,
+         json_extract(value, '$.settings.profileId') AS profileId,
+         json_extract(value, '$.timing.runMs') AS runMs
+       FROM studio_gallery
+       WHERE rowid > ? AND dream_pool = 0 AND created_ms >= ? AND status IN ('done', 'failed')
+       ORDER BY rowid LIMIT ?`,
+    ).all(after, since, size);
+    yield rows
+      .filter((row) => !isGalleryHidden({ url: row.key, createdAt: row.createdAt }))
+      .map((row) => ({
+        status: row.status,
+        favorite: row.favorite === 1,
+        createdAt: row.createdAt,
+        settings: { profileId: row.profileId },
+        timing: { runMs: row.runMs },
+      }));
+    if (rows.length < size) return;
+    after = rows.at(-1).rowid;
+  }
+}
+
 /* ---------------------------------------------------------------- Search */
 
 /** What a gallery search looks through: the title (domain/titles.ts), its MCP result set's title, its own title there and its character, the prompts (an upload's suggested one too), an import's source title, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
