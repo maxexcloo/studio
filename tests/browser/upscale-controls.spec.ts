@@ -38,7 +38,7 @@ test("Upscale's menu sets quality and Face Detail like Animate's settings and ru
   // Quality is a segmented control at the top, Balanced until another is chosen.
   const quality = page.getByRole("radiogroup", { name: "Upscale Quality", exact: true });
   await expect(quality.getByRole("radio", { name: "Balanced", exact: true })).toBeChecked();
-  const run = page.getByRole("menuitem", { name: "Upscale Image", exact: true });
+  const run = page.getByRole("menuitem", { name: "Upscale", exact: true });
   await run.click();
   await expect.poll(() => submitted.length).toBe(1);
   expect(submitted[0]).toEqual({
@@ -129,7 +129,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
     const quality = page.getByRole("radiogroup", { name: "Upscale Quality", exact: true });
     const size = page.getByRole("radiogroup", { name: "Upscale Size", exact: true });
     const face = page.getByRole("menuitem", { name: "Face Detail", exact: true });
-    const run = page.getByRole("menuitem", { name: "Upscale Image", exact: true });
+    const run = page.getByRole("menuitem", { name: "Upscale", exact: true });
     await expect(size.getByRole("radio", { name: "Auto", exact: true })).toBeChecked();
     await quality.getByText("High", { exact: true }).click();
     await size.getByText("4K", { exact: true }).click();
@@ -205,12 +205,12 @@ test("Offline workers and unavailable upscale models explain why submission is d
   // The menu says why, above its settings, and offers to check again.
   const menu = page.getByRole("menu");
   await expect(menu).toContainText("The selected upscale worker is offline.");
-  await expect(page.getByRole("menuitem", { name: "Upscale Image", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toHaveCount(0);
   offline = false;
   await page.getByRole("menuitem", { name: "Check Again", exact: true }).click();
   await expect(menu).toContainText("This worker has no upscale models.");
   await expect(page.getByRole("menuitem", { name: "Face Detail", exact: true })).toBeDisabled();
-  await expect(page.getByRole("menuitem", { name: "Upscale Image", exact: true })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Upscale", exact: true })).toBeDisabled();
   expect(submitted).toHaveLength(0);
 });
 

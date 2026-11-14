@@ -430,8 +430,9 @@ export function useMediaActions(
         note: refusal,
         menu: [
           [...modelChoice, ...reviewItems],
+          [...themeItems(action.isPending)],
+          [...(reference ? [reference] : []), saveFrame],
           [
-            ...themeItems(action.isPending),
             {
               id: "extend",
               label: "Extend in Composer",
@@ -440,7 +441,6 @@ export function useMediaActions(
               onClick: () => action.mutate("extend"),
             },
           ],
-          [...(reference ? [reference] : []), saveFrame],
         ],
       }),
     // Edit runs the item again from here first, then reuses it elsewhere, then changes the item
@@ -474,7 +474,7 @@ export function useMediaActions(
                   [
                     {
                       id: "edit-image",
-                      label: "Edit Image",
+                      label: "Edit in Composer",
                       icon: icons.edit,
                       disabled: action.isPending,
                       onClick: () => action.mutate("refine"),
@@ -572,7 +572,6 @@ export function useMediaActions(
     ready &&
       (transfer.canShare
         ? itemAction("share", {
-            label: `Share ${item.type === "video" ? "Video" : "Image"}`,
             disabled: transfer.sharing,
             loading: transfer.sharing,
             keepOpen: !transfer.shareReady,

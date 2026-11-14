@@ -98,7 +98,7 @@ test("Phones that share natively share the image where desktop downloads it", as
     return;
   }
   await expect(download).toHaveCount(0);
-  await viewerAction(page, "Share Image");
+  await viewerAction(page, "Share");
   await expect
     .poll(() => page.evaluate(() => (window as any).sharedMedia?.[0]?.type))
     .toBe("image/png");
