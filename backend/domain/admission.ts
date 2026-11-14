@@ -1,5 +1,6 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { referencedResult } from "../../shared/versions.ts";
+import { step } from "../event-loop.js";
 import { GenerationQueue } from "./queue.ts";
 import { type OwnedJob, type QueueOrigin, type QueuedCopy, Store, queuePriority } from "./store.ts";
 
@@ -77,7 +78,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
       if (job && scope && job.sessionId !== scope.sessionId)
         return { status: 409, payload: { error: "That generation belongs to another session." } };
       if (!job) {
-        const checked = await options.validate(input, account);
+        const checked = await step("validate", () => options.validate(input, account));
         if (checked.status >= 400) return checked;
         const title = String(input.prompt || "Generation").slice(0, 100);
         // MCP work (its queue tier) joins its conversation's session; other unscoped work gets its own.
@@ -102,7 +103,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             input: copy,
             operation: scope?.operation || (input.kind === "video" ? "animate" : "image"),
             parentJobId: scope?.parentJobId,
-            resource: await options.resourceFor(copy, origin?.priority),
+            resource: await step("resource", () => options.resourceFor(copy, origin?.priority)),
             requestedId: clientId ? (index ? `${clientId}-${index + 1}` : clientId) : undefined,
             origin: {
               ...origin,
@@ -116,7 +117,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
           });
         let jobs: OwnedJob[];
         try {
-          jobs = options.store.enqueueAll(ownerId, session, queued);
+          jobs = await step("enqueue", () => options.store.enqueueAll(ownerId, session, queued));
         } catch (error) {
           const failure = error as Error & { code?: string };
           if (String(failure.code || "").startsWith("ERR_SQLITE"))
@@ -126,13 +127,15 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             };
           throw error;
         }
-        for (const each of jobs) options.admitted?.(each);
+        await step("admitted", () => jobs.forEach((each) => options.admitted?.(each)));
         job = jobs[0];
       }
       void options.queue.tick();
       const items = job.items.length
         ? job.items
-        : options.pendingItems(job.id, { ...job.input, ownerId, createdAt: job.createdAt });
+        : await step("pending items", () =>
+            options.pendingItems(job!.id, { ...job!.input, ownerId, createdAt: job!.createdAt }),
+          );
       return {
         status: 200,
         payload: { jobId: job.id, items, revision: options.revision(), sessionId: job.sessionId },

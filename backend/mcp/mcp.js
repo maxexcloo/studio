@@ -13,7 +13,7 @@ import { mayUseFeature } from "../account-policy.js";
 import { gatewaySettings } from "../assistant.js";
 import { logEvent, logWarning } from "../crash-log.js";
 import { appVersion } from "../data-dir.js";
-import { track } from "../event-loop.js";
+import { timeSteps, track } from "../event-loop.js";
 import { livePrompting } from "../profile/store.js";
 import { hostAllowed, hostnameOf } from "../request-guard.js";
 import { adminInstructions, registerAdminTools } from "./admin.js";
@@ -288,8 +288,14 @@ export function registerMcpRoutes(
           try {
             if (scope === "unlinked") throw new Error(unlinkedMessage);
             if (scope === "anonymous") throw new Error(anonymousMessage);
-            const result = await action(args, controller.signal);
-            logEvent("MCP tool call", { ...call, ms: Date.now() - started });
+            const steps = {};
+            const result = await timeSteps(steps, () => action(args, controller.signal));
+            const slow = Object.entries(steps).filter(([, ms]) => ms >= 50);
+            logEvent("MCP tool call", {
+              ...call,
+              ms: Date.now() - started,
+              ...(slow.length && { steps: Object.fromEntries(slow) }),
+            });
             return result;
           } catch (error) {
             logWarning(
