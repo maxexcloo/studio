@@ -734,7 +734,7 @@ function pauseControl(paused: QueuePause, everyone: boolean) {
         (key): key is QueueAction["action"] => Boolean(key),
       )
     : [everyone ? "pause-all" : "pause"];
-  return { held, label: held ? "Resume" : "Pause Queue", actions };
+  return { held, label: held ? "Resume Queue" : "Pause Queue", actions };
 }
 export function Queue() {
   const queue = useQueue();
