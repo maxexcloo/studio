@@ -134,14 +134,14 @@ A profile can run one model on Radiance or ComfyUI. Its `studio` block holds the
 
 `studio.sqlite` in the data folder holds the queue, sessions, accounts, the gallery and the other runtime records; profiles, guides, `config/models.json`, `library/catalogue.json` and media stay files. Studio refuses to start on a folder whose storage predates the current format and names what is pending.
 
-Data moves only through `migrate-runtime`: dry-run, then apply. Run the command with Studio stopped; steps that need the running server's gallery or workers say so and run only through `POST /api/maintenance/migrations` (`{ "apply": true }` applies), for administrators. Studio keeps no backups of its data.
+Data moves only through `migrate-runtime`: dry-run, then apply. Run the command with Studio stopped; administrators can also apply the steps that are safe while Studio runs through `POST /api/maintenance/migrations` (`{ "apply": true }` applies). Studio keeps no backups of its data.
 
 ```sh
 node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data
 node backend/commands/migrate-runtime.mjs --data-dir /path/to/studio-data --apply
 ```
 
-The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so a folder that predates current storage must first be migrated with `migrate-runtime` from Studio v2026.11.10.4. `backend/runtime-migrations.js` lists the pending steps; each step's module says what it changes.
+The dry run reports mappings, counts and conflicts; a conflict stops the apply and the command exits non-zero. A step is removed once the live data folder has applied it, so an older folder needs `migrate-runtime` from each release that still had its pending steps; Git history keeps them. `backend/runtime-migrations.js` lists the pending steps; each step's module says what it changes.
 
 `--dream-owner <account id>` removes Dream answers and taste signals about other accounts' results; supply it only for the one account that used Dream.
 
