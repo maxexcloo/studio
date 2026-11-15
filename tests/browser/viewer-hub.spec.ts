@@ -370,6 +370,12 @@ test("A regenerated result shows beside its source until All Versions collapses 
   await page.getByRole("switch", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(1);
   await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
+  // Closing on the other version returns to the tile holding it.
+  await page.keyboard.press("Escape");
+  await tiles.click();
+  await viewer.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(tiles).toBeFocused();
 });
 
 test("The strip holds the item's versions, not the other results of its run", async ({ page }) => {
