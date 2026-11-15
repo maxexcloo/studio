@@ -201,10 +201,14 @@ export function buildProfile({
 /**
  * The size step an imported workflow's model needs. A latent node may accept any
  * multiple of 8 while the model itself needs 16 or 32 (Qwen Image 2.1): an
- * off-step size is silently cut by ComfyUI and can come out mangled.
+ * off-step size is silently cut by ComfyUI and can come out mangled. Radiance's nodes refuse
+ * anything but multiples of 32, also while their worker's node list hasn't arrived.
  */
 export function workflowFamilyStep(workflow) {
-  return workflowFamilyValue(workflow, "sizeStep") || 0;
+  const radiance = Object.values(workflow.graph || {}).some((node) =>
+    String(node?.class_type).startsWith("Radiance"),
+  );
+  return Math.max(workflowFamilyValue(workflow, "sizeStep") || 0, radiance ? 32 : 0);
 }
 
 /** A family catalogue value for an imported workflow: its declared family's, else its model file's family's. */
