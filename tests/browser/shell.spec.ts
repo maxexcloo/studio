@@ -79,12 +79,11 @@ test("A phone held sideways keeps the phone layout and an iPad in landscape does
   await page.setViewportSize({ width: 844, height: 390 });
   await page.goto("/images");
   const more = page.getByRole("button", { name: "More Options", exact: true });
-  const settings = page.getByRole("link", { name: "Settings", exact: true });
   await expect(more).toBeVisible();
-  await expect(settings).toHaveCount(0);
+  await expect(page.locator(":root")).toHaveAttribute("data-phone", "sideways");
   await page.setViewportSize({ width: 1180, height: 820 });
-  await expect(settings).toBeVisible();
-  await expect(more).toHaveCount(0);
+  await expect(page.locator(":root")).not.toHaveAttribute("data-phone");
+  await expect(more).toBeVisible();
 });
 
 test("Work that finishes while Studio is hidden counts in the title and app badge until it returns", async ({
@@ -146,4 +145,31 @@ test("The mode switcher settles on each mode without a render loop", async ({ pa
   }
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("The centred creative modes leave Status and More Options usable at each layout", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/images");
+  const modes = page.getByRole("navigation", { name: "Creative Modes" });
+  const more = page.getByRole("button", { name: "More Options", exact: true });
+  for (const width of [375, 844, 1440]) {
+    await page.setViewportSize({ width, height: width === 844 ? 390 : 900 });
+    await expect(modes).toBeVisible();
+    await expect
+      .poll(() =>
+        modes.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          return Math.abs(bounds.left + bounds.width / 2 - window.innerWidth / 2);
+        }),
+      )
+      .toBeLessThan(1);
+    await page.getByRole("button", { name: "Open Status", exact: true }).click({ trial: true });
+    await more.click();
+    await page.getByRole("menuitem", { name: "Library", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: /^Library/ })).toBeVisible();
+    await page.getByRole("button", { name: "Close Library", exact: true }).click();
+    await expect(page).toHaveURL(/\/images$/);
+  }
 });

@@ -213,6 +213,13 @@ function WhereWorkRuns() {
         preferences.images || "local",
         (images) => save.mutate({ images }),
       )}
+      {row(
+        "Videos",
+        "Where new videos run until you pick a model.",
+        videoChoices,
+        preferences.videos || "fast",
+        (videos) => save.mutate({ videos }),
+      )}
       {assistant && writingModel && (
         <SettingRow wide label="Text" description="The model that writes and improves prompts.">
           {/* The gateway's and Studio's text workloads' models, keeping the current one a choice. */}
@@ -229,13 +236,6 @@ function WhereWorkRuns() {
             nothingFoundMessage="No Matches"
           />
         </SettingRow>
-      )}
-      {row(
-        "Videos",
-        "Where new videos run until you pick a model.",
-        videoChoices,
-        preferences.videos || "fast",
-        (videos) => save.mutate({ videos }),
       )}
     </SettingGroup>
   );

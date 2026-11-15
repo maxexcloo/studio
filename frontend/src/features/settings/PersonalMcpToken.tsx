@@ -20,7 +20,7 @@ export interface McpTokenStatus {
 }
 
 /**
- * Settings › Account › MCP Access, with Rotate Token and Revoke Token in the section's Danger Zone. The account's
+ * Settings › Account › MCP Token, with Rotate Token and Revoke Token in the section's Danger Zone. The account's
  * own token loads while the section shows, hidden until Show, so Copy works within the tap.
  */
 export function PersonalMcpToken() {
@@ -59,7 +59,7 @@ export function PersonalMcpToken() {
         const result = await post<{ token: string }>("/api/accounts/mcp-token");
         if (startedVisit === visit.current) {
           setToken(result.token);
-          setShown(true);
+          setShown(false);
         }
       }
       await client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
@@ -73,30 +73,22 @@ export function PersonalMcpToken() {
   const endpoint = status.data?.endpoint || "";
   return (
     <>
-      <SettingGroup title="MCP Access">
-        {status.error && <Alert color="red">{status.error.message}</Alert>}
-        {error && <Alert color="red">{error}</Alert>}
-        <SettingRow
-          label="MCP Endpoint"
-          description={
-            <Text span size="xs" style={{ wordBreak: "break-all" }}>
-              {endpoint}
-            </Text>
-          }
-        >
-          <CopyButton size="compact-sm" text={endpoint} label="Copy URL" />
-        </SettingRow>
-        <SettingRow
-          label="MCP Token"
-          description={
-            status.data?.createdAt
-              ? `Carries your account's access. Created ${formatDateTime(status.data.createdAt)}.`
-              : "Carries your account's access. Send it as a bearer token, or use the URL with it in a client that only takes a URL (such as Grok)."
-          }
-        >
+      <SettingGroup
+        title="MCP Token"
+        toolbar={
           <Badge color={status.data?.enabled ? "green" : "gray"} miw="max-content">
             {status.data?.enabled ? "Token Active" : "No Token Issued"}
           </Badge>
+        }
+      >
+        {status.error && <Alert color="red">{status.error.message}</Alert>}
+        {error && <Alert color="red">{error}</Alert>}
+        <Stack gap="xs" py="sm">
+          <Text size="xs" c="dimmed">
+            {status.data?.createdAt
+              ? `Carries your account's access. Created ${formatDateTime(status.data.createdAt)}.`
+              : "Carries your account's access. Send it as a bearer token, or use the URL with it in a client that only takes a URL (such as Grok)."}
+          </Text>
           {status.data && !status.data.enabled && (
             <Button
               size="compact-sm"
@@ -108,41 +100,51 @@ export function PersonalMcpToken() {
               Create Token
             </Button>
           )}
-        </SettingRow>
-        {status.data?.enabled &&
-          (status.data.viewable ? (
-            <Stack gap="xs" py="sm">
-              <TextInput
-                label="Your MCP Token"
-                value={shown ? token : "•".repeat(24)}
-                readOnly
-                autoComplete="off"
-                onFocus={(event) => shown && event.currentTarget.select()}
-              />
-              <Group gap="xs">
-                <Button
-                  size="compact-sm"
-                  variant="default"
-                  leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
-                  disabled={!token}
-                  onClick={() => setShown(!shown)}
-                >
-                  {shown ? "Hide" : "Show"}
-                </Button>
-                <CopyButton size="compact-sm" text={token} label="Copy Token" />
-                <CopyButton
-                  size="compact-sm"
-                  text={endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`}
-                  label="Copy URL with Token"
+          {status.data?.enabled &&
+            (status.data.viewable ? (
+              <Stack gap="xs">
+                <TextInput
+                  aria-label="MCP Token"
+                  value={shown ? token : "•".repeat(24)}
+                  readOnly
+                  autoComplete="off"
+                  onFocus={(event) => shown && event.currentTarget.select()}
                 />
-              </Group>
-            </Stack>
-          ) : (
-            <Text size="sm" c="dimmed" py="sm">
-              Rotate it in the Danger Zone to view. This token was created before Studio kept tokens
-              to show again.
+                <Group gap="xs">
+                  <Button
+                    size="compact-sm"
+                    variant="default"
+                    leftSection={shown ? <icons.hide size={16} /> : <icons.show size={16} />}
+                    disabled={!token}
+                    onClick={() => setShown(!shown)}
+                  >
+                    {shown ? "Hide" : "Show"}
+                  </Button>
+                  <CopyButton size="compact-sm" text={token} label="Copy Token" />
+                  <CopyButton
+                    size="compact-sm"
+                    text={endpoint && token && `${endpoint.replace(/\/+$/, "")}/${token}`}
+                    label="Copy URL with Token"
+                  />
+                </Group>
+              </Stack>
+            ) : (
+              <Text size="sm" c="dimmed" py="sm">
+                Rotate it in the Danger Zone to view. This token was created before Studio kept
+                tokens to show again.
+              </Text>
+            ))}
+        </Stack>
+        <SettingRow
+          label="MCP Endpoint"
+          description={
+            <Text span size="xs" style={{ wordBreak: "break-all" }}>
+              {endpoint}
             </Text>
-          ))}
+          }
+        >
+          <CopyButton size="compact-sm" text={endpoint} label="Copy URL" />
+        </SettingRow>
       </SettingGroup>
       {status.data?.enabled && (
         <SettingGroup title="Danger Zone" danger>

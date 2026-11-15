@@ -2,7 +2,6 @@ import {
   ActionIcon,
   ColorSwatch,
   MantineProvider,
-  Popover,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -13,7 +12,7 @@ import {
   useMantineTheme,
 } from "@mantine/core";
 import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
-import { Check, Palette } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   type ReactNode,
   createContext,
@@ -33,7 +32,6 @@ import {
   motionSpeeds,
   studioTheme,
 } from "../theme";
-import { PopupTooltip } from "./PopupTooltip";
 import { usePhone, useSideways, useTouch } from "./usePhone";
 
 const defaults: Appearance = {
@@ -271,21 +269,5 @@ export function AppearanceControls() {
         </Stack>
       </Stack>
     </ScrollArea.Autosize>
-  );
-}
-export function AppearanceMenu() {
-  return (
-    <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
-      <PopupTooltip label="Appearance">
-        <Popover.Target>
-          <ActionIcon aria-label="Appearance" variant="subtle" color="gray">
-            <Palette size={19} />
-          </ActionIcon>
-        </Popover.Target>
-      </PopupTooltip>
-      <Popover.Dropdown data-composer-layer>
-        <AppearanceControls />
-      </Popover.Dropdown>
-    </Popover>
   );
 }
