@@ -59,9 +59,9 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
     server,
     "gallery",
     "manage gallery",
-    "Change the user's gallery when asked: star or unstar results, delete them with their files (only on request), or clear_failed. results: refs from generate or search; output_index picks one output, else all.",
+    "Change the user's gallery when asked: like, dislike (hides) or clear_rating results, delete them with their files (only on request), or clear_failed. results: refs from generate or search; output_index picks one output, else all.",
     {
-      action: z.enum(["star", "unstar", "delete", "clear_failed"]),
+      action: z.enum(["like", "dislike", "clear_rating", "delete", "clear_failed"]),
       results: z.array(result).min(1).max(maxResults).optional(),
       output_index: z.number().int().min(0).max(999).optional(),
     },
@@ -94,11 +94,11 @@ export function registerManageTools({ tool, server, media, owner, refs, resolve 
       await api(
         "POST",
         "/api/gallery/favorite",
-        { ids: urls, favorite: action === "star" },
+        { ids: urls, rating: { like: "liked", dislike: "disliked" }[action] ?? null },
         signal,
       );
       return mcpJson({
-        [action === "star" ? "starred" : "unstarred"]: urls.length,
+        [{ like: "liked", dislike: "disliked" }[action] ?? "cleared"]: urls.length,
         results: changed,
       });
     },

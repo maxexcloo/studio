@@ -380,14 +380,16 @@ export function createSuggestions({
   /** The taste profile and the prompts the owner liked, as the model's context. */
   function tasteContext(ownerId: string) {
     const record = taste.read(ownerId);
-    const liked = [
+    // Signals keep whole prompts; a few opening sentences show the taste.
+    const prompts = (kinds: string[]) => [
       ...new Set(
         record.signals
-          .filter((signal) => ["star", "compare", "keep"].includes(signal.kind) && signal.prompt)
-          // Signals keep whole prompts; a few opening sentences show the taste.
+          .filter((signal) => kinds.includes(signal.kind) && signal.prompt)
           .map((signal) => signal.prompt!.slice(0, 300)),
       ),
     ];
+    const liked = prompts(["like", "compare", "keep"]);
+    const disliked = prompts(["dislike", "report"]).slice(0, 3);
     // A different few each time, so ideas don't keep drawing on the same prompts.
     for (let index = liked.length - 1; index > 0; index--) {
       const other = randomInt(index + 1);
@@ -400,6 +402,9 @@ export function createSuggestions({
         `Taste profile: ${record.summary || "(none yet)"}`,
         "Prompts they liked:",
         ...(liked.length ? liked.map((text) => `- ${text}`) : ["(none yet)"]),
+        ...(disliked.length
+          ? ["Prompts they disliked; steer away from them:", ...disliked.map((text) => `- ${text}`)]
+          : []),
       ],
     };
   }
@@ -615,7 +620,7 @@ export function createSuggestions({
       const prompt = drafted ? clean(body.prompt, maxPromptCharacters) : "";
       if (surface === "draft" && !prompt) return empty("Write a prompt to change first.");
       if (surface === "composer" && !known)
-        return empty("Star a few results so Studio learns your taste.");
+        return empty("Like a few results so Studio learns your taste.");
       const key = JSON.stringify([ownerId, surface, kind, prompt, body.jobId ?? "", spicy]);
       const cached = cache.get(key);
       if (cached && cached.until > now() && !fresh) return cached.value;

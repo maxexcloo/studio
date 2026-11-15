@@ -116,11 +116,12 @@ const list = (values) => JSON.stringify([...values].map(String));
 
 /**
  * The SQL for a gallery query: each field narrows the rows. `ownerId` is exact ("" is the
- * single-user owner); `status`, `notStatus` and `dreamState` take one or several; `liked` keeps the
- * owner's starred items and kept Dream results; `conversationIds` match the chats that asked for
+ * single-user owner); `unlisted` keeps (or leaves out) what the gallery doesn't list: disliked items
+ * and Dream's pool; `rating` is "liked" or "disliked"; `status`, `notStatus` and `dreamState` take
+ * one or several; `liked` keeps the owner's liked items and kept Dream results; `conversationIds` match the chats that asked for
  * items; `ids` match items' ids and `notIds` leave them out, `named` their id, URL or gallery key
  * and `idPrefix` the start of their id; `since` keeps items made from then on (ms) and every
- * pending one, `before` those made by then; `prompt` matches the prompt exactly and `titled` keeps
+ * pending one, `before` those made by then; `limit` (galleryItems) reads only that many; `prompt` matches the prompt exactly and `titled` keeps
  * items with a title.
  */
 function where(query = {}) {
@@ -132,12 +133,12 @@ function where(query = {}) {
   };
   if (query.ownerId !== undefined) add("owner_id = ?", String(query.ownerId));
   if (query.uploaded !== undefined) add("uploaded = ?", query.uploaded ? 1 : 0);
-  if (query.dreamPool !== undefined) add("dream_pool = ?", query.dreamPool ? 1 : 0);
+  if (query.unlisted !== undefined) add("unlisted = ?", query.unlisted ? 1 : 0);
   if (query.type) add("type = ?", query.type);
   if (query.jobId !== undefined) add("job_id = ?", String(query.jobId));
   if (query.jobIds) add("job_id IN (SELECT value FROM json_each(?))", list(query.jobIds));
   if (query.setId) add("set_id = ?", query.setId);
-  if (query.favorite) add("favorite = 1");
+  if (query.rating) add("rating = ?", query.rating);
   if (query.status !== undefined)
     add("status IN (SELECT value FROM json_each(?))", list([query.status].flat()));
   if (query.notStatus !== undefined)
@@ -146,10 +147,10 @@ function where(query = {}) {
     const states = [query.dreamState].flat();
     add(`${dreamState} IN (${states.map(() => "?").join(", ")})`, ...states);
   }
-  // Starred rows read only the owner's order index, kept ones the Dream index.
+  // Liked rows read only the owner's order index, kept ones the Dream index.
   if (query.liked)
     add(
-      `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_owner_order WHERE owner_id = ? AND favorite = 1 UNION ALL SELECT rowid FROM studio_gallery WHERE ${dreamState} = 'kept' AND owner_id = ?)`,
+      `rowid IN (SELECT rowid FROM studio_gallery INDEXED BY studio_gallery_owner_order WHERE owner_id = ? AND rating = 'liked' UNION ALL SELECT rowid FROM studio_gallery WHERE ${dreamState} = 'kept' AND owner_id = ?)`,
       String(query.ownerId),
       String(query.ownerId),
     );
@@ -213,10 +214,11 @@ export function galleryItems(query = {}, { ordered = true } = {}) {
       : unfinished
         ? "INDEXED BY studio_gallery_status"
         : "";
+  const limit = query.limit === undefined ? [] : [query.limit];
   return statement(
-    `SELECT value FROM studio_gallery ${index} ${sql} ${ordered ? `ORDER BY ${order}` : ""}`,
+    `SELECT value FROM studio_gallery ${index} ${sql} ${ordered ? `ORDER BY ${order}` : ""} ${limit.length ? "LIMIT ?" : ""}`,
   )
-    .all(...params)
+    .all(...params, ...limit)
     .map(parse);
 }
 
@@ -253,24 +255,24 @@ function* galleryRows(query = {}, after = null) {
 }
 
 /**
- * The query's items, read a batch at a time: in gallery order within the gallery, then Dream's
- * pool, then uploads. The order index leads with those, so each batch seeks; across them every
- * batch would sort the whole table. With `after` (a gallery key), only those after its record,
- * or all of them once it is gone.
+ * The query's items, read a batch at a time: in gallery order within the gallery, then what it
+ * doesn't list, then uploads. The order index leads with those, so each batch seeks; across them
+ * every batch would sort the whole table. With `after` (a gallery key), only those after its
+ * record, or all of them once it is gone.
  */
 export function* eachGalleryItem(query = {}, after) {
   const from =
     after &&
-    statement(`SELECT ${keyColumns}, uploaded, dream_pool FROM studio_gallery WHERE key = ?`).get(
+    statement(`SELECT ${keyColumns}, uploaded, unlisted FROM studio_gallery WHERE key = ?`).get(
       after,
     );
   for (const uploaded of query.uploaded === undefined ? [false, true] : [query.uploaded])
-    for (const dreamPool of query.dreamPool === undefined ? [false, true] : [query.dreamPool]) {
-      const place = Number(uploaded) * 2 + Number(dreamPool);
-      const fromPlace = from ? from.uploaded * 2 + from.dream_pool : -1;
+    for (const unlisted of query.unlisted === undefined ? [false, true] : [query.unlisted]) {
+      const place = Number(uploaded) * 2 + Number(unlisted);
+      const fromPlace = from ? from.uploaded * 2 + from.unlisted : -1;
       if (place < fromPlace) continue;
       const rows = galleryRows(
-        { ...query, uploaded, dreamPool },
+        { ...query, uploaded, unlisted },
         place === fromPlace ? rowKey(from) : null,
       );
       for (const row of rows) yield parse(row);
@@ -460,22 +462,30 @@ function isComfyOutputItem(item) {
   return Boolean(item?.url && String(item.url).startsWith("/comfy/view?"));
 }
 
-/** A Dream result the person has not kept: it lives in Dream's own pool (domain/dream.ts), not the gallery. */
-const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept");
+/**
+ * An item the gallery doesn't list: one the person disliked, or a Dream result they have not kept,
+ * which lives in Dream's own pool (domain/dream.ts).
+ */
+const isUnlisted = (item) =>
+  item?.rating === "disliked" || Boolean(item?.dream && item.dream.state !== "kept");
 
-/** Whether an item's media is there: not hidden and its file present, in the gallery or Dream's pool. */
+/** Whether an item's media is there: not deleted and its file present, listed or not. */
 export function hasGalleryMedia(item) {
   if (isGalleryHidden(item)) return false;
   return isComfyOutputItem(item) ? hasExistingOutputFile(item) : true;
 }
 
-export function filterVisibleGallery(items) {
-  return items.filter((item) => !inDreamPool(item) && hasGalleryMedia(item));
+/** The items the gallery lists, with `disliked` those in its Disliked view too. */
+export function filterVisibleGallery(items, { disliked = false } = {}) {
+  return items.filter(
+    (item) =>
+      (!isUnlisted(item) || (disliked && item.rating === "disliked")) && hasGalleryMedia(item),
+  );
 }
 
 /** The visible items (filterVisibleGallery) the query matches, in gallery order. */
 export const visibleGallery = (query = {}, options = {}) =>
-  filterVisibleGallery(galleryItems({ ...query, dreamPool: false }, options));
+  filterVisibleGallery(galleryItems({ ...query, unlisted: false }, options));
 
 /** The names of the LoRAs runs made from `since` (ms) used, read without parsing whole records. */
 export function galleryLoraNames(since) {
@@ -491,18 +501,18 @@ export function galleryLoraNames(since) {
 }
 
 /**
- * The finished and failed runs made from `since` (ms) that the gallery shows, Dream's pool aside,
+ * The finished and failed runs made from `since` (ms) that the gallery lists,
  * with only the fields profile health counts, a page of `size` at a time: each page reads only
  * the runs index, and the caller may give other work a turn between pages.
  */
 export function* galleryRuns(since, size = 200) {
   for (let after = [since, ""]; ;) {
     const rows = statement(
-      `SELECT key, status, favorite, created_ms,
+      `SELECT key, status, rating, created_ms,
          json_extract(value, '$.settings.profileId') AS profileId,
          json_extract(value, '$.timing.runMs') AS runMs
        FROM studio_gallery INDEXED BY studio_gallery_runs
-       WHERE (created_ms, key) > (?, ?) AND dream_pool = 0 AND status IN ('done', 'failed')
+       WHERE (created_ms, key) > (?, ?) AND unlisted = 0 AND status IN ('done', 'failed')
        ORDER BY created_ms, key LIMIT ?`,
     ).all(...after, size);
     yield rows
@@ -510,7 +520,7 @@ export function* galleryRuns(since, size = 200) {
       .filter((row) => !isGalleryHidden({ url: row.key, createdAt: row.createdAt }))
       .map((row) => ({
         status: row.status,
-        favorite: row.favorite === 1,
+        rating: row.rating,
         createdAt: row.createdAt,
         settings: { profileId: row.profileId },
         timing: { runMs: row.runMs },
@@ -554,7 +564,7 @@ function gallerySearchText(item) {
 /**
  * A gallery filter for a search: every word must appear somewhere, or the
  * image looks like the search (`near`, from domain/image-search.ts), and
- * `favorites` keeps starred images only. Runs still generating always pass,
+ Runs still generating always pass,
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
@@ -577,7 +587,6 @@ export function searchWords(q) {
 export function galleryFilter({
   q = "",
   near = null,
-  favorites = false,
   lora = "",
   model = "",
   workflow = "",
@@ -587,10 +596,9 @@ export function galleryFilter({
 } = {}) {
   const terms = searchTerms(q);
   const filtered = galleryFiltersTest({ lora, model, workflow, size, aspect, tag });
-  if (!terms.length && !favorites && !filtered) return null;
+  if (!terms.length && !filtered) return null;
   return (item) => {
     if (item.status === "pending") return true;
-    if (favorites && !item.favorite) return false;
     if (filtered && !filtered(item)) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
@@ -598,15 +606,24 @@ export function galleryFilter({
   };
 }
 
-/** Stars (or unstars) finished gallery items by id, URL or key. Returns the items that changed. */
-export function setGalleryFavorites(keys, favorite) {
+/**
+ * Rates finished gallery items by id, URL or key: "liked", "disliked" or null to clear. Returns the
+ * items that changed, each with the rating it had as `was`.
+ */
+export function setGalleryRatings(keys, rating) {
   const wanted = keys.map(String).filter(Boolean);
   if (!wanted.length) return [];
-  const upserts = galleryItems({ named: wanted })
-    .filter((item) => item.status === "done" && Boolean(item.favorite) !== Boolean(favorite))
-    .map(({ favorite: _favorite, ...rest }) => (favorite ? { ...rest, favorite: true } : rest));
-  putGalleryItems(upserts);
-  return upserts;
+  const changed = galleryItems({ named: wanted }).filter(
+    (item) => item.status === "done" && (item.rating || null) !== rating,
+  );
+  putGalleryItems(
+    changed.map(({ rating: _rating, ...rest }) => (rating ? { ...rest, rating } : rest)),
+  );
+  return changed.map((item) => ({
+    ...item,
+    rating: rating || undefined,
+    was: item.rating || null,
+  }));
 }
 
 /* ---------------------------------------------------------------- Paging */
@@ -667,8 +684,6 @@ function afterKey(key) {
   ];
 }
 
-const visibleItem = (item) => !inDreamPool(item) && hasGalleryMedia(item);
-
 /** A result set's visible items the query matches, in gallery order. */
 function setItems(query, id) {
   // By the set's index: without statistics SQLite prefers the order index, walking the whole
@@ -677,7 +692,7 @@ function setItems(query, id) {
   return statement(`SELECT value FROM studio_gallery INDEXED BY studio_gallery_set ${sql}`)
     .all(...params)
     .map(parse)
-    .filter(visibleItem)
+    .filter(hasGalleryMedia)
     .sort(compareGalleryItems);
 }
 
@@ -691,7 +706,7 @@ function* galleryUnits(query, filter, start = null, skipSet = "") {
   const sets = new Map();
   for (const row of galleryRows(query, start)) {
     const item = parse(row);
-    if (!visibleItem(item)) continue;
+    if (!hasGalleryMedia(item)) continue;
     const set = item.resultSet?.id;
     if (set) {
       if (set === skipSet) continue;
@@ -806,7 +821,8 @@ export function pageGallery({
   const sql = {
     ...query,
     uploaded: uploads,
-    dreamPool: false,
+    // Disliked items show only in their own view, Dream's pool never.
+    unlisted: query.rating === "disliked",
     ...(type && { type }),
     notStatus: [query.notStatus ?? [], "cancelled", ...(includeFailed ? [] : ["failed"])].flat(),
   };

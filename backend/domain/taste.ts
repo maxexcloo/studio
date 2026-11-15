@@ -8,14 +8,19 @@ import {
 import { type RouteAccount, directRoute } from "./direct-route.ts";
 
 /**
- * What a person did with a result; "keep" and "discard" are their verdicts on Dream results,
+ * What a person did with a result; "like" and "dislike" rate it ("unlike" and "undislike" take a
+ * rating back), "report" names an issue they asked Studio to fix, "keep" and "discard" are their
+ * verdicts on Dream results,
  * "calibrate-like" and "calibrate-pass" on older gallery images Dream showed them again, "delete"
  * a finished result they deleted from the gallery, and "preferred" is a compare winner chosen over one other variant, and "pair-both" and "pair-neither"
  * answer a Dream comparison with both or neither.
  */
 type TasteKind =
-  | "star"
-  | "unstar"
+  | "like"
+  | "unlike"
+  | "dislike"
+  | "undislike"
+  | "report"
   | "compare"
   | "preferred"
   | "pair-both"
@@ -78,6 +83,8 @@ interface TasteSignal extends TasteChoice {
   answer?: string;
   /** What that comparison varies: profile, lora, strength, steps, cfg or wording. */
   axis?: string;
+  /** For "report": what was wrong, such as "Hands: six fingers". */
+  issue?: string;
 }
 /** A job's input, or a gallery item's settings with its own fields (`itemValues`). */
 type ChoiceValues = Record<string, unknown>;
@@ -165,9 +172,9 @@ export interface TasteWriter<Content = string> {
 }
 
 const maxSignals = 200;
-/** Comparison answers fill at most half the signals, so a run of them can't push out stars and keeps. */
+/** Comparison answers fill at most half the signals, so a run of them can't push out likes and keeps. */
 const answerKinds = new Set<TasteKind>(["preferred", "pair-both", "pair-neither"]);
-/** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
+/** One action, such as a bulk like, adds at most this many signals so it can't flood the profile. */
 const maxPerCall = 20;
 /** The summariser reads each prompt cut to this length; signals keep it whole. */
 const maxPrompt = 300;
@@ -177,7 +184,7 @@ const summariseGapMs = 10 * 60_000;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const instructions = [
   "You keep the words of one person's taste profile for a media studio: what they like and pass over in images and videos. Studio scores their models, LoRAs and settings itself, so leave those out.",
-  "Revise the current profile with the recent signals: what they starred or unstarred, chose in a comparison, iterated on, deleted, kept or discarded from Dream (results Studio made for them unasked), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).",
+  "Revise the current profile with the recent signals: what they liked or disliked (or took back with unlike, undislike), reported an issue with (report, with the issue they named), chose in a comparison, iterated on, deleted, kept or discarded from Dream (results Studio made for them unasked), or liked or passed over when Dream showed them their own older images again (calibrate-like, calibrate-pass).",
   'A "preferred" signal is relative: they liked that result more than the one after "over", which may still be good to them; it is no dislike.',
   'A signal with a question answers a Dream comparison: two results alike but for one thing; pair-both means either suits them, pair-neither that neither does (the side after "and" is the other one).',
   "Titles, captions and tags say what a result shows: learn the subjects, styles, media, lighting and colour they come back to and those they pass over.",
@@ -201,6 +208,7 @@ const describe = (signal: TasteSignal) =>
   [
     `- ${signal.kind}`,
     signal.question && `${signal.question} ${signal.answer}`,
+    signal.issue && `issue ${JSON.stringify(signal.issue)}`,
     ...details(signal),
     ...(signal.over ? ["over", ...details(signal.over)] : []),
     ...(signal.also ? ["and", ...details(signal.also)] : []),
@@ -223,11 +231,14 @@ const halfLifeMs = 60 * 86_400_000;
 /**
  * How far one signal moves the score of each thing its result had. A "preferred" signal without an
  * axis is a compare winner: liked, while the variant it beat stays as it was (a relative choice,
- * no dislike). An unstar takes back its star.
+ * no dislike). Unlike and undislike take back a rating; a report counts against what the result had.
  */
 const signalWeights: Record<TasteKind, number> = {
-  star: 1.5,
-  unstar: -1.5,
+  like: 1.5,
+  unlike: -1.5,
+  dislike: -1.5,
+  undislike: 1.5,
+  report: -1,
   compare: 1,
   preferred: 1,
   "pair-both": 0.5,
@@ -450,19 +461,19 @@ interface SetResult {
   jobId?: string;
   ownerId?: string;
   status?: string;
-  favorite?: boolean;
+  rating?: string;
   resultSet?: { id: string };
 }
 /**
- * Starring a result of an MCP set picks it from the set, like a compare vote: a preference for it
- * over each other run of the set the owner left unstarred. `values` reads a result's recorded values.
+ * Liking a result of an MCP set picks it from the set, like a compare vote: a preference for it
+ * over each other run of the set the owner left unliked. `values` reads a result's recorded values.
  */
 export function setPreferenceSignals(
-  starred: SetResult[],
+  liked: SetResult[],
   gallery: SetResult[],
   values: (item: SetResult) => ChoiceValues,
 ): Omit<TasteSignal, "at">[] {
-  return starred.flatMap((winner) => {
+  return liked.flatMap((winner) => {
     const set = winner.resultSet?.id;
     if (!set) return [];
     const others = new Map<string, SetResult>();
@@ -472,7 +483,7 @@ export function setPreferenceSignals(
         item.jobId &&
         item.jobId !== winner.jobId &&
         item.status === "done" &&
-        !item.favorite &&
+        item.rating !== "liked" &&
         (item.ownerId || "") === (winner.ownerId || "")
       )
         others.set(item.jobId, item);
@@ -653,7 +664,7 @@ export function createTaste({
       throw failure("The text model is offline. Try again once it is back.", 503);
     const before = load(ownerId);
     if (!before.signals.length)
-      throw failure("Star, compare or iterate on a few results first.", 400);
+      throw failure("Like, compare or iterate on a few results first.", 400);
     attempted.set(ownerId, now());
     const recent = before.signals.slice(0, Math.min(50, Math.max(before.since, 20)));
     const list = (label: string, entries: string[]) =>

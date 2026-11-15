@@ -35,7 +35,7 @@ const titleCase = (text: string) =>
   text.replace(/(^|\s)\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 /**
- * A compare set side by side, labelled by what sets each variant apart: star the winner, take one
+ * A compare set side by side, labelled by what sets each variant apart: pick the winner (liking it), take one
  * into the composer (Use This), or bring them all back to change one (Compare Again).
  */
 export function ComparePage() {
@@ -49,15 +49,15 @@ export function ComparePage() {
   );
   const hold = useHoldToSelect(items, undefined);
   const tryAgain = useTryAgain(items);
-  const star = useMutation({
+  const choose = useMutation({
     mutationFn: async (item: MediaItem) => {
       const winner = comparison.data?.winnerItemId === item.id;
       const result = await api<Comparison>(`/api/comparisons/${encodeURIComponent(id)}/vote`, {
         method: "PUT",
         body: JSON.stringify({ itemId: winner ? null : item.id }),
       });
-      if (!winner && !item.favorite)
-        await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
+      if (!winner && item.rating !== "liked")
+        await post("/api/gallery/favorite", { ids: [item.id], rating: "liked" });
       return result;
     },
     onSuccess: ({ brief, ...result }) => {
@@ -99,11 +99,11 @@ export function ComparePage() {
   }
   const use = useMutation({ mutationFn: (item: MediaItem) => stage.useThis(item) });
   const compareAgain = useMutation({ mutationFn: () => stage.again(again) });
-  // 1–4 star that variant as the winner (again to clear it), unless typing or a layer is above.
+  // 1–4 pick that variant as the winner (again to clear it), unless typing or a layer is above.
   const pick = useRef<(index: number) => void>(undefined);
   pick.current = (index) => {
     const item = comparison.data?.variants[index]?.item;
-    if (item?.status === "done" && !star.isPending) star.mutate(item);
+    if (item?.status === "done" && !choose.isPending) choose.mutate(item);
   };
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -195,15 +195,15 @@ export function ComparePage() {
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
                   actions={
                     item.status === "done" && (
-                      <Tooltip label={won ? "Clear Winner" : "Star as Winner"}>
+                      <Tooltip label={won ? "Clear Winner" : "Pick as Winner"}>
                         <ActionIcon
-                          className={classes.star}
+                          className={classes.winner}
                           variant={won ? "filled" : "default"}
                           size="lg"
-                          aria-label={won ? `Clear Winner ${label}` : `Star ${label} as Winner`}
+                          aria-label={won ? `Clear Winner ${label}` : `Pick ${label} as Winner`}
                           aria-pressed={won}
-                          loading={star.isPending && star.variables?.id === item.id}
-                          onClick={() => star.mutate(item)}
+                          loading={choose.isPending && choose.variables?.id === item.id}
+                          onClick={() => choose.mutate(item)}
                         >
                           <icons.winner size={18} fill={won ? "currentColor" : "none"} />
                         </ActionIcon>

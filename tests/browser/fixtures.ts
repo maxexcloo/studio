@@ -381,7 +381,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/suggestions")
       return respond({
         suggestions: [],
-        reason: "Star a few results so Studio learns your taste.",
+        reason: "Like a few results so Studio learns your taste.",
       });
     if (path === "/api/assistant/rewrite")
       return respond({ prompt: "A cinematic amber bird", source: "model" });
@@ -580,7 +580,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/gallery/favorite" && method === "POST") {
       gallery
         .filter((item) => body.ids.includes(item.id))
-        .forEach((item) => (item.favorite = body.favorite));
+        .forEach((item) => (item.rating = body.rating ?? undefined));
       return respond({ ok: true });
     }
     if (path === "/api/gallery/delete" && method === "POST") {
@@ -625,7 +625,8 @@ export async function fixtures(page: Page) {
           (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
           (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
           Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-          (url.searchParams.get("favorites") !== "1" || i.favorite) &&
+          (i.rating === "disliked") === (url.searchParams.get("rating") === "disliked") &&
+          (url.searchParams.get("rating") !== "liked" || i.rating === "liked") &&
           (!url.searchParams.has("tag") ||
             url.searchParams.getAll("tag").some((tag) => i.caption?.tags?.includes(tag))) &&
           (!url.searchParams.has("set") || i.resultSet?.id === url.searchParams.get("set")) &&
@@ -1075,11 +1076,10 @@ export async function withSettings(page: Page, steps: () => Promise<void>) {
   await closePopup(page, "Settings");
 }
 
-/** Chooses what an open Filters popup shows: All, Starred or Uploads. */
-/** Shows the gallery's Starred or Uploads alone with its toolbar toggle, or All with neither. */
-export async function showOnly(page: Page, choice: "All" | "Starred" | "Uploads") {
+/** Shows the gallery's Liked, Disliked or Uploads alone with its toolbar toggle, or All with none. */
+export async function showOnly(page: Page, choice: "All" | "Liked" | "Disliked" | "Uploads") {
   const toggle = (name: string) => page.getByRole("button", { name, exact: true });
-  for (const name of ["Starred", "Uploads"]) {
+  for (const name of ["Liked", "Disliked", "Uploads"]) {
     const on = (await toggle(name).getAttribute("aria-pressed")) === "true";
     if (on !== (name === choice)) await toggle(name).click();
     await expect(toggle(name)).toHaveAttribute("aria-pressed", String(name === choice));
@@ -1214,7 +1214,7 @@ export const dreamItem = (id: string, extra: Record<string, unknown> = {}) => ({
   settings: { profileId: "image:test" },
   dream: {
     prompt: `Dream prompt ${id}`,
-    why: `Because you star ${id}.`,
+    why: `Because you like ${id}.`,
     at: stamp,
     state: "unseen",
   },
@@ -1427,17 +1427,18 @@ export async function serveDream(
     state.unseen = state.unseen.filter((entry) => entry !== item);
     state.discarded = state.discarded.filter((entry) => entry !== item);
     item.dream = { ...item.dream, state: verdict === "discard" ? "discarded" : "kept" };
+    if (verdict === "like") item.rating = "liked";
     if (verdict === "discard") state.discarded.unshift(item);
     return route.fulfill({
       status: verdict === "variations" ? 202 : 200,
       json: verdict === "variations" ? { item, jobId: "job-variations" } : { item },
     });
   });
-  // As the backend: starring an unseen result keeps it.
+  // As the backend: rating an unseen result keeps or discards it.
   await page.route(/\/api\/gallery\/favorite$/, (route) => {
     const body = route.request().postDataJSON();
     state.requests.push({ method: "POST", path: "/api/gallery/favorite", body });
-    if (body.favorite) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
+    if (body.rating) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
     return route.fulfill({ json: { ok: true, items: [] } });
   });
   return state;

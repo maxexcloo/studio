@@ -8,6 +8,7 @@ import { AnimateDialog } from "./AnimateDialog";
 import { namedItemActions } from "./itemActions";
 import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
+import { ReportIssueDialog } from "./ReportIssueDialog";
 import type { AnimateRequest, Iteration } from "./useMediaAction";
 import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt, useViewerPrompt } from "./ViewerPrompt";
@@ -67,6 +68,7 @@ export function MediaViewerActions({
   const transfer = useMediaTransfer(item, true);
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const itemGroups = useMediaActions(item, {
     transfer,
     compare,
@@ -75,6 +77,7 @@ export function MediaViewerActions({
     onCompare,
     onAnimate: setAnimating,
     onDelete,
+    onReport: () => setReporting(true),
     onRetried,
     onTrim: () => setTrimming(true),
     onVersionChange,
@@ -119,6 +122,9 @@ export function MediaViewerActions({
         />
       )}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
+      {reporting && (
+        <ReportIssueDialog item={item} iterate={iterate} onClose={() => setReporting(false)} />
+      )}
     </ActionBarSurface>
   );
 }

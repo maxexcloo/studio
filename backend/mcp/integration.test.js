@@ -253,7 +253,7 @@ async function fixture(
     if (job) job.status = "cancelled";
     res.json({ ok: true });
   });
-  // Like the studio's gallery list, newest first: `type`, `favorites` and every word of `q` in the
+  // Like the studio's gallery list, newest first: `type`, `rating` and every word of `q` in the
   // title or prompt narrow it, and work still running always shows.
   app.get("/api/gallery", (req, res) => {
     const terms = String(req.query.q || "")
@@ -285,7 +285,7 @@ async function fixture(
                   type: job.kind,
                   prompt: job.settings?.prompt,
                   ...(job.title ? { title: job.title } : {}),
-                  ...(job.favorite ? { favorite: true } : {}),
+                  ...(job.rating ? { rating: job.rating } : {}),
                   ...output,
                 }))
               : [{ id: `${job.id}:pending`, jobId: job.id, status: "pending", type: job.kind }]),
@@ -294,7 +294,7 @@ async function fixture(
           (item) =>
             item.status === "pending" ||
             ((!req.query.type || item.type === req.query.type) &&
-              (req.query.favorites !== "1" || item.favorite) &&
+              (!req.query.rating || item.rating === req.query.rating) &&
               terms.every((term) =>
                 `${item.title || ""} ${item.prompt || ""}`.toLowerCase().includes(term),
               )),
@@ -4112,7 +4112,7 @@ test("Search finds the account's own finished work through the gallery search, a
     id: "studio-waves",
     status: "done",
     kind: "video",
-    favorite: true,
+    rating: "liked",
     outputs: [{ url: "/comfy/view?filename=waves.mp4" }],
     settings: { prompt: "Red waves rolling in", profileId: videoProfile.id },
   });
@@ -4148,18 +4148,18 @@ test("Search finds the account's own finished work through the gallery search, a
   assert.deepEqual((await search(alice, { query: "red", kind: "video" })).hits, [
     ["studio-waves", 0],
   ]);
-  const starred = await search(alice, { starred: true, model: "wan", aspect: "landscape" });
-  // Stars and the gallery's filters pass through, and a starred hit says so.
+  const liked = await search(alice, { liked: true, model: "wan", aspect: "landscape" });
+  // Likes and the gallery's filters pass through, and a liked hit says so.
   assert.deepEqual(f.requests.findLast((request) => request.path === "/gallery").query, {
     q: "",
     includeFailed: "0",
     limit: "200",
-    favorites: "1",
+    rating: "liked",
     model: "wan",
     aspect: "landscape",
   });
-  assert.deepEqual(starred.hits, [["studio-waves", 0]]);
-  assert.match(texts(starred.result), /\) ★/);
+  assert.deepEqual(liked.hits, [["studio-waves", 0]]);
+  assert.match(texts(liked.result), /\) ♥/);
   assert.deepEqual((await search(alice, { query: "paper lantern", limit: 1 })).hits, [
     ["studio-lantern", 0],
   ]);
@@ -5286,10 +5286,10 @@ test('replies label links Result N with one All Results page, and Result "all" s
     /\*\*#2\*\*[^\n]*\n\[!\[#2\]\([^)]+\.jpg\)\]/,
   );
   // Another conversation and another account see only their own results, and with none here
-  // are pointed at search for earlier or starred work.
+  // are pointed at search for earlier or liked work.
   const none = await call(await chat(t, f, "alice", "other-chat"), "result", { job_id: "all" });
   assert.equal(none.isError, true);
-  assert.match(texts(none), /call search \(starred: true/);
+  assert.match(texts(none), /call search \(liked: true/);
   assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"))).status, 404);
   // A result link or its id from a reply names its job, only for its own account.
   const linkId = /\/mcp\/results\/([A-Za-z0-9]{10})/.exec(first.link)[1];
@@ -6639,12 +6639,17 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
     outputs: [{ url: "/comfy/view?filename=a.png" }, { url: "/comfy/view?filename=b.png" }],
   });
 
-  // Gallery: star one output, delete both, clear failed items; each with the caller's own credential.
+  // Gallery: like one output, dislike it, delete both, clear failed items; each with the caller's own credential.
   assert.deepEqual(
-    data(await call(mine, "gallery", { action: "star", results: ["#1"], output_index: 1 })),
-    { starred: 1, results: ["#1"] },
+    data(await call(mine, "gallery", { action: "like", results: ["#1"], output_index: 1 })),
+    { liked: 1, results: ["#1"] },
   );
-  assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], favorite: true });
+  assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], rating: "liked" });
+  assert.deepEqual(
+    data(await call(mine, "gallery", { action: "dislike", results: ["#1"], output_index: 1 })),
+    { disliked: 1, results: ["#1"] },
+  );
+  assert.deepEqual(seen.at(-1).body, { ids: ["/comfy/view?filename=b.png"], rating: "disliked" });
   assert.equal(seen.at(-1).authorization, `Bearer ${userToken}`);
   assert.equal(data(await call(mine, "gallery", { action: "delete", results: [id] })).deleted, 2);
   assert.deepEqual(data(await call(mine, "gallery", { action: "clear_failed" })), { cleared: 2 });
@@ -6660,7 +6665,7 @@ test("Gallery, Queue, Dream, Taste and Reuse upscale act on the caller's own wor
   const before = seen.length;
   for (const [name, args] of [
     ["gallery", { action: "delete", results: [id] }],
-    ["gallery", { action: "star", results: [id] }],
+    ["gallery", { action: "like", results: [id] }],
     ["queue", { action: "retry", job_id: id }],
     ["reuse", { job_id: id, mode: "upscale" }],
   ])

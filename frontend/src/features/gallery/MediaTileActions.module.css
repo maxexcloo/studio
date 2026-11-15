@@ -22,7 +22,7 @@
 *:hover > .actions .control,
 *:focus-within > .actions .control,
 .actions[data-opened] .control,
-.control[data-starred] {
+.control[data-liked] {
   opacity: 1;
 }
 
@@ -33,6 +33,6 @@
 }
 
 :where(:root[data-phone]) .download,
-:where(:root[data-phone]) .favorite:not([data-starred]) {
+:where(:root[data-phone]) .like:not([data-liked]) {
   display: none;
 }

@@ -89,11 +89,11 @@ export function registerResultTools({
     server,
     "search",
     "search gallery",
-    "Search the user's whole gallery by words, file name or look, with refs for reuse, review and result (★ starred); filter by starred, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
+    "Search the user's whole gallery by words, file name or look, with refs for reuse, review and result (♥ liked); filter by liked, model or lora (part of a name) or aspect. uploads: the user's uploads, as reference_asset_ids.",
     {
       query: z.string().trim().max(200).default(""),
       kind: z.enum(["image", "video"]).optional(),
-      starred: z.boolean().default(false),
+      liked: z.boolean().default(false),
       model: z.string().trim().max(200).optional(),
       lora: z.string().trim().max(200).optional(),
       aspect: z.enum(["landscape", "portrait", "square"]).optional(),
@@ -148,12 +148,12 @@ export function registerResultTools({
         job_id: item.jobId,
         output_index: item.index,
         link: media.url(owner, item.jobId, item.index),
-        starred: Boolean(item.favorite),
+        liked: item.rating === "liked",
       }));
       const lines = hits.map((item, position) => {
         const { ref, link } = results[position];
         return [
-          `- [${ref}](${link})${item.favorite ? " ★" : ""}`,
+          `- [${ref}](${link})${item.rating === "liked" ? " ♥" : ""}`,
           item.title && shortPrompt(item.title),
           item.settings?.modelName || item.model || item.settings?.profileId,
           String(item.createdAt || "").slice(0, 10),

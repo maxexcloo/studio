@@ -9,13 +9,14 @@ import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaActionMenu } from "./MediaActions";
 import { mediaTitle } from "./mediaLabels";
 import { useMediaTransfer } from "./mediaShare";
+import { ReportIssueDialog } from "./ReportIssueDialog";
 import type { AnimateRequest } from "./useMediaAction";
-import { useMediaFavorite } from "./useMediaFavorite";
+import { useMediaRating } from "./useMediaRating";
 import { TrimVideoDialog } from "./videoEdits";
 
 import classes from "./MediaTileActions.module.css";
 
-/** Star, Download and More over a gallery tile; the More menu doubles as its context menu. */
+/** Like, Download and More over a gallery tile; the More menu doubles as its context menu. */
 export function MediaTileActions({
   item,
   opened,
@@ -33,7 +34,9 @@ export function MediaTileActions({
   const [deleting, setDeleting] = useState(false);
   const [animating, setAnimating] = useState<AnimateRequest | null>(null);
   const [trimming, setTrimming] = useState(false);
-  const favorite = useMediaFavorite(item);
+  const [reporting, setReporting] = useState(false);
+  const rating = useMediaRating(item);
+  const liked = item.rating === "liked";
   const transfer = useMediaTransfer(item, opened);
   const name = mediaTitle(item);
   return (
@@ -48,16 +51,16 @@ export function MediaTileActions({
         aria-label={`Actions for ${name}`}
       >
         {item.status === "done" && (
-          <Tooltip label={item.favorite ? "Unstar" : "Star"}>
+          <Tooltip label={liked ? "Unlike" : "Like"}>
             <ActionIcon
-              className={`${classes.control} ${classes.favorite}`}
-              data-starred={item.favorite || undefined}
-              aria-label={`${item.favorite ? "Unstar" : "Star"} ${name}`}
-              aria-pressed={Boolean(item.favorite)}
+              className={`${classes.control} ${classes.like}`}
+              data-liked={liked || undefined}
+              aria-label={`${liked ? "Unlike" : "Like"} ${name}`}
+              aria-pressed={liked}
               variant="default"
-              onClick={() => favorite.mutate()}
+              onClick={rating.like}
             >
-              <icons.star size={16} fill={item.favorite ? "currentColor" : "none"} />
+              <icons.like size={16} fill={liked ? "currentColor" : "none"} />
             </ActionIcon>
           </Tooltip>
         )}
@@ -94,6 +97,7 @@ export function MediaTileActions({
                 onApplied={() => onOpenedChange(false)}
                 onAnimate={setAnimating}
                 onDelete={() => setDeleting(true)}
+                onReport={() => setReporting(true)}
                 onTrim={() => setTrimming(true)}
               />
             )}
@@ -108,6 +112,7 @@ export function MediaTileActions({
       />
       {animating && <AnimateDialog item={item} {...animating} onClose={() => setAnimating(null)} />}
       {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
+      {reporting && <ReportIssueDialog item={item} onClose={() => setReporting(false)} />}
     </>
   );
 }

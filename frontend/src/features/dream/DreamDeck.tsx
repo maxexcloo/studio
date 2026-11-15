@@ -36,7 +36,7 @@ const directions: Record<Verdict, Direction> = {
   discard: "left",
   keep: "right",
   variations: "up",
-  star: "right",
+  like: "right",
   animate: "right",
   refine: "right",
   more: "right",
@@ -57,7 +57,7 @@ const keyDirections: Record<string, Direction> = {
   ArrowUp: "up",
   ArrowDown: "down",
 };
-/** Full screen's choices that return to the deck: a verdict or answer, not Star, Edit and the like. */
+/** Full screen's choices that return to the deck: a verdict or answer, not Like, Edit and others. */
 const closing = new Set<string>(["discard", "keep", "a", "b", "both", "neither"]);
 
 /** The card's media: the top card plays a video; cards beneath show its still. */
@@ -126,13 +126,14 @@ export type Judgement =
   | { card: SingleCard; verdict: Verdict }
   | { card: PairDeckCard; verdict: PairAnswer };
 
-/** Sends a verdict: Dream results move to the gallery or discards; gallery images only teach. */
+/**
+ * Sends a verdict: Dream results move to the gallery or, disliked, out of sight; gallery images
+ * teach, and a Like or Dislike rates them too.
+ */
 export function useJudge(onFailed: (card: DeckCard) => void) {
   const client = useQueryClient();
   const openComposer = useOpenComposer();
   const { setDraft } = useGenerationActions();
-  const star = (item: MediaItem) =>
-    post("/api/gallery/favorite", { ids: [item.id], favorite: true });
   return useMutation({
     mutationFn: async (judgement: Judgement) => {
       if (judgement.card.kind === "pair") {
@@ -153,7 +154,11 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
       if (judgement.card.kind === "calibration") {
-        if (verdict === "star") await star(item);
+        if (verdict === "like" || verdict === "discard")
+          await post("/api/gallery/favorite", {
+            ids: [item.id],
+            rating: verdict === "like" ? "liked" : "disliked",
+          });
         return post(
           "/api/dream/calibration",
           verdict === "discard" ? { passed: [item.id] } : { liked: [item.id] },
@@ -165,8 +170,7 @@ export function useJudge(onFailed: (card: DeckCard) => void) {
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
       }
-      // Starring an unseen result keeps it (backend/domain/dream.ts).
-      if (verdict === "star") return star(item);
+      if (verdict === "like") return post(dreamItemPath(item, "like"));
       await post(dreamItemPath(item, "keep"));
       // As the viewer's Animate in Composer and Edit, staged in the composer for review.
       if (verdict === "animate" || verdict === "refine") {
@@ -255,16 +259,16 @@ const cardLabel = (card: DeckCard, top: boolean) =>
 
 /**
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
- * Swipe or press ← to pass, → to like (keep), ↑ to like and queue variations; the bar offers Pass,
- * Super Like and Like. A comparison asks about two results alike but for one thing: tapping an
+ * Swipe or press ← to dislike, → to keep, ↑ to keep and queue variations; the bar offers Dislike,
+ * Like and Keep. A comparison asks about two results alike but for one thing: tapping an
  * image chooses it, with Undo until its notification closes; ← or a left swipe answers A, → B,
  * ↑ Both and ↓ Neither, and Neither and Both sit under the pair. Tapping a single card (or its View
  * action), or holding or pinching any card (or a side's label), opens it in the viewer over the
- * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Pass, Like
- * or an answer there returns to the deck, and the others move on in the viewer.
+ * deck, with all the card's choices (Edit, Animate and More Like This too) in its bar; Dislike,
+ * Keep or an answer there returns to the deck, and the others move on in the viewer.
  * Older gallery images join in (see `deckCards`) to teach the taste profile and rate images against
  * each other; with `pairsOnly` (Dream is off) the deck only compares them;
- * judging them changes nothing in the gallery beyond an optional Super Like (Star). `empty` shows
+ * judging them changes nothing in the gallery beyond an explicit Like or Dislike. `empty` shows
  * once the deck is through, told whether calibration images are available.
  */
 export function DreamDeck({
@@ -485,8 +489,8 @@ export function DreamDeck({
                   card.kind === "pair"
                     ? { left: "A", right: "B", up: "Both", down: "Neither" }
                     : {
-                        left: "Pass",
-                        right: "Like",
+                        left: "Dislike",
+                        right: "Keep",
                         ...(card.kind === "dream" && card.item.type === "image"
                           ? { up: "Variations" }
                           : {}),
@@ -544,8 +548,8 @@ export function DreamDeck({
       {/* A comparison's images are its A and B, so only Neither and Both stand under it. */}
       {top.kind !== "pair" ? (
         <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
-          {/* Phones share the row by label length, so Super Like is never cut short. */}
-          {[choice("discard"), choice("star"), choice("keep")].map((option) =>
+          {/* Phones share the row by label length, so no label is cut short. */}
+          {[choice("discard"), choice("like"), choice("keep")].map((option) =>
             button(option, phone ? { px: "xs", flex: "1 1 auto" } : { size: "lg", miw: "9rem" }),
           )}
         </Group>
@@ -560,7 +564,7 @@ export function DreamDeck({
         <Text size="xs" c="dimmed" ta="center">
           {top.kind === "pair"
             ? "← A · → B · ↑ Both · ↓ Neither"
-            : `← Pass · → Like${image && dream ? " · ↑ Like & Variations" : ""}`}
+            : `← Dislike · → Keep${image && dream ? " · ↑ Keep & Variations" : ""}`}
         </Text>
       )}
       {viewer}

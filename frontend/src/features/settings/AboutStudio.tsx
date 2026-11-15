@@ -45,7 +45,7 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["/"], [mod, "F"]], action: "Search the Gallery" },
   { keys: [[mod, "Enter"]], action: "Generate" },
   { keys: [["←"], ["→"]], action: "Previous or Next in the Viewer" },
-  { keys: [["F"]], action: "Star the Viewed Item" },
+  { keys: [["F"]], action: "Like the Viewed Item" },
   { keys: [["E"]], action: "Edit the Viewed Image" },
   { keys: [["U"]], action: "Upscale, or Show the Original" },
   { keys: [["P"]], action: "Open the Prompt in the Composer" },
@@ -56,7 +56,7 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["←"], ["→"]], action: "Pass or Like in Dream, or Choose A or B" },
   { keys: [["↑"]], action: "Variations in Dream, or Both in a Comparison" },
   { keys: [["↓"]], action: "Neither in a Dream Comparison" },
-  { keys: [["1"], ["2"], ["3"], ["4"]], action: "Star a Compare Winner" },
+  { keys: [["1"], ["2"], ["3"], ["4"]], action: "Pick a Compare Winner" },
 ];
 const link = (href: string, label: string) => (
   <Anchor href={href} target="_blank" rel="noopener noreferrer" size="sm">

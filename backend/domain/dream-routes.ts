@@ -232,7 +232,7 @@ export function registerDreamRoutes(
       return refuse(error);
     }
   });
-  for (const verdict of ["keep", "discard", "more"] as const)
+  for (const verdict of ["keep", "like", "discard", "more"] as const)
     route("POST", `/api/dream/:itemId/${verdict}`, (account, { params }) => {
       try {
         return { status: 200, payload: { item: dream[verdict](owner(account), params.itemId) } };

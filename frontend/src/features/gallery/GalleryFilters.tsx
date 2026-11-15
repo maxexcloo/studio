@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
 
 import { profileNameParts } from "../../../../shared/profiles";
 import { api } from "../../api";
-import type { MediaKind, Profile } from "../../types";
+import type { MediaKind, Profile, Rating } from "../../types";
 import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
@@ -62,12 +62,13 @@ const dates: { value: GalleryDate; label: string; chip: string; days: number }[]
 ];
 
 /**
- * Every gallery filter: the facets (any value matches), a date range, Starred, Uploads and
- * Comparisons.
+ * Every gallery filter: the facets (any value matches), a date range, Liked or Disliked, Uploads
+ * and Comparisons.
  */
 export interface GalleryFilterValues extends Record<Facet, string[]> {
   date: GalleryDate;
-  starred: boolean;
+  /** Liked or disliked items only; disliked ones show nowhere else. */
+  rating: Rating | "";
   /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
   uploads: boolean;
   /** Only results in one of the account's comparisons. */
@@ -80,7 +81,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   aspect: [],
   tag: [],
   date: "",
-  starred: false,
+  rating: "",
   uploads: false,
   comparisons: false,
 };
@@ -88,7 +89,7 @@ export const emptyGalleryFilters: GalleryFilterValues = {
 /** The gallery request's filter parameters. */
 export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFilterValues) {
   for (const key of facets) for (const value of filters[key]) params.append(key, value);
-  params.set("favorites", filters.starred ? "1" : "0");
+  if (filters.rating) params.set("rating", filters.rating);
   params.set("uploads", filters.uploads ? "1" : "0");
   if (filters.comparisons) params.set("comparisons", "1");
   const date = dates.find((option) => option.value === filters.date);
@@ -205,8 +206,8 @@ interface FilterProps {
 }
 
 /**
- * The active filters as removable chips, one per value, plus any `extra` view choices. Starred and
- * Uploads have none: their own toggle or tab shows them.
+ * The active filters as removable chips, one per value, plus any `extra` view choices. Liked,
+ * Disliked and Uploads have none: their own toggle or tab shows them.
  */
 export function useActiveFilters(
   { kind, value, onChange }: FilterProps,
@@ -395,7 +396,7 @@ export function FilterToggle({
 /**
  * The filters, shared by the gallery's Filter popup and the reference picker: the gallery's `view`
  * (Grid or Runs) with the view's own `toggles` (such as All Versions) under it, then the date and
- * each facet. Starred and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
+ * each facet. Liked, Disliked and Uploads sit outside it, as the gallery's toggles and the picker's tabs.
  * Choices apply at once.
  */
 export function GalleryFilterPanel({

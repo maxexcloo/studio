@@ -40,7 +40,7 @@ const tasteQuery = queryOptions({
 const learnt = (taste: Taste) =>
   [
     taste.signals &&
-      `Learnt from ${taste.signals} ${taste.signals === 1 ? "star, comparison or iteration" : "stars, comparisons and iterations"}`,
+      `Learnt from ${taste.signals} ${taste.signals === 1 ? "like, comparison or iteration" : "likes, comparisons and iterations"}`,
     taste.updatedAt && `Updated ${formatDateTime(taste.updatedAt)}`,
   ]
     .filter(Boolean)
@@ -140,7 +140,7 @@ export function TasteProfile({ fill = false }: { fill?: boolean }) {
               </>
             ) : (
               <Text size="sm" c="dimmed">
-                Nothing learnt yet. Star, compare or iterate on results and Studio picks up your
+                Nothing learnt yet. Like, compare or iterate on results and Studio picks up your
                 taste.
               </Text>
             ))}

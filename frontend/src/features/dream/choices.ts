@@ -5,28 +5,28 @@ import { icons } from "../../ui/icons";
 import type { DeckCard } from "./deck";
 import type { PairAnswer } from "./queries";
 
-export type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine" | "more";
+export type Verdict = "discard" | "keep" | "variations" | "like" | "animate" | "refine" | "more";
 
 /** One way to judge the top card, as the deck's bar and the viewer's bar both offer it. */
 export interface Choice {
   choice: Verdict | PairAnswer;
-  /** The viewer's action id, which its keyboard shortcuts find (E Edit, F Star). */
+  /** The viewer's action id, which its keyboard shortcuts find (E Edit, F Like). */
   id: string;
   label: string;
   icon: LucideIcon;
   /** Its key on desktop. */
   hint?: string;
   tip?: string;
-  /** One of the bars' large choices: Pass, Super Like and Like, or a comparison's A and B. */
+  /** One of the bars' large choices: Dislike, Like and Keep, or a comparison's A and B. */
   main?: boolean;
   primary?: boolean;
 }
 
 /**
  * The top card's choices, in groups: a comparison's Neither, A, B and Both (the picks in the
- * middle); a single card's Pass, then Edit and Animate, Super Like, Variations and More Like This,
- * then Like. Edit, Animate, Variations and More Like This need a Dream image; a gallery image is
- * passed, liked or super liked.
+ * middle); a single card's Dislike, then Edit and Animate, Like, Variations and More Like This,
+ * then Keep. Edit, Animate, Variations and More Like This need a Dream image; a gallery image is
+ * disliked, kept or liked.
  */
 export function dreamChoices(card: DeckCard): Choice[][] {
   if (card.kind === "pair") {
@@ -58,17 +58,27 @@ export function dreamChoices(card: DeckCard): Choice[][] {
     ];
   }
   const dreamImage = card.kind === "dream" && card.item.type === "image";
-  // Super Like keeps a really good one and stars it: the strongest thing taste learns.
-  const star: Choice = {
-    choice: "star",
-    id: "star",
-    label: "Super Like",
-    tip: "Super Like: keep and star it",
-    icon: icons.star,
+  // Like keeps a really good one and likes it: the strongest thing taste learns.
+  const like: Choice = {
+    choice: "like",
+    id: "like",
+    label: "Like",
+    tip: "Like: keep and like it",
+    icon: icons.like,
     main: true,
   };
   return [
-    [{ choice: "discard", id: "discard", label: "Pass", icon: X, hint: "←", main: true }],
+    [
+      {
+        choice: "discard",
+        id: "discard",
+        label: "Dislike",
+        tip: "Dislike: hide it and see less like it",
+        icon: icons.dislike,
+        hint: "←",
+        main: true,
+      },
+    ],
     ...(dreamImage
       ? [
           [
@@ -76,12 +86,12 @@ export function dreamChoices(card: DeckCard): Choice[][] {
             { choice: "animate", id: "animate", label: "Animate", icon: icons.animate },
           ] satisfies Choice[],
           [
-            star,
+            like,
             {
               choice: "variations",
               id: "variations",
               label: "Variations",
-              tip: "Like & Variations",
+              tip: "Keep & Variations",
               icon: icons.variations,
               hint: "↑",
             },
@@ -93,12 +103,12 @@ export function dreamChoices(card: DeckCard): Choice[][] {
             },
           ] satisfies Choice[],
         ]
-      : [[star]]),
+      : [[like]]),
     [
       {
         choice: "keep",
         id: "keep",
-        label: "Like",
+        label: "Keep",
         icon: icons.keep,
         hint: "→",
         main: true,
@@ -110,8 +120,8 @@ export function dreamChoices(card: DeckCard): Choice[][] {
 
 /**
  * The choices as the viewer's action groups, on one row in the item bar's order: Animate and Edit,
- * then Recreate ▾ holding Variations and More Like This, then the verdicts at the end, Pass, Super
- * Like and Like, with Like the filled one. Phones leave Super Like's name to its star. A comparison
+ * then Recreate ▾ holding Variations and More Like This, then the verdicts at the end, Dislike,
+ * Like and Keep, with Keep the filled one. Phones leave Like's name to its icon. A comparison
  * names all its answers, A and B large.
  */
 export function viewerChoices(
@@ -143,11 +153,11 @@ export function viewerChoices(
         ? [{ id: "recreate", label: "Recreate", icon: icons.recreate, menu: [dream] }]
         : []),
     ],
-    pick("discard", "star", "keep"),
+    pick("discard", "like", "keep"),
   ];
   return {
     label: "Dream Actions",
     groups,
-    labelled: ["animate", "edit", "recreate", "discard", ...(phone ? [] : ["star"]), "keep"],
+    labelled: ["animate", "edit", "recreate", "discard", ...(phone ? [] : ["like"]), "keep"],
   };
 }

@@ -9,6 +9,7 @@ import {
   profiles,
   selectionAction,
   serveProfiles,
+  showOnly,
   stamp,
   touch,
   viewerAction,
@@ -64,13 +65,11 @@ async function galleryFixture(page: Page) {
   return state;
 }
 
-test("A tile can be starred and read back without opening the viewer", async ({
-  page,
-}, testInfo) => {
+test("A tile can be liked and read back without opening the viewer", async ({ page }, testInfo) => {
   const state = await galleryFixture(page);
   const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
   await tile.hover();
-  // Phones show a tile's star once it is starred; until then, selection stars it.
+  // Phones show a tile's Like once it is liked; until then, selection likes it.
   if (testInfo.project.use.isMobile) {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
     const selectable = page.getByRole("button", {
@@ -78,18 +77,41 @@ test("A tile can be starred and read back without opening the viewer", async ({
       exact: true,
     });
     await selectable.click();
-    await selectionAction(page, "Star").click();
-  } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();
+    await selectionAction(page, "Like").click();
+  } else await page.getByRole("button", { name: "Like A copper bird", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Unstar A copper bird", exact: true }),
+    page.getByRole("button", { name: "Unlike A copper bird", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(() => state.gallery[0].favorite).toBe(true);
+  await expect.poll(() => state.gallery[0].rating).toBe("liked");
   await expect(page).toHaveURL(/\/images$/);
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Unstar A copper bird", exact: true }),
+    page.getByRole("button", { name: "Unlike A copper bird", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Dislike hides a tile, Disliked shows it and Restore brings it back", async ({ page }) => {
+  const state = await galleryFixture(page);
+  const select = async () => {
+    await page.getByRole("button", { name: "Select Items", exact: true }).click();
+    await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
+  };
+  const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
+  await select();
+  await selectionAction(page, "Dislike").click();
+  await expect(tile).toBeHidden();
+  await expect.poll(() => state.gallery[0].rating).toBe("disliked");
+  // Undo is offered while the dislike's notification shows.
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeVisible();
+  await showOnly(page, "Disliked");
+  await expect(tile).toBeVisible();
+  await select();
+  await selectionAction(page, "Restore").click();
+  await expect(tile).toBeHidden();
+  await expect.poll(() => state.gallery[0].rating).toBeUndefined();
+  await showOnly(page, "All");
+  await expect(tile).toBeVisible();
 });
 
 test("The same tile menu opens by context click and More, with keyboard navigation", async ({
@@ -100,14 +122,16 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await tileMenu(page);
   // Off the menu, so no submenu opens under the pointer.
   await page.mouse.move(0, 0);
-  // Select, then the viewer's sections and order: Animate, Edit, Recreate | Share | Star, Delete.
+  // Select, then the viewer's sections and order: Animate, Edit, Recreate | Share | Like, Dislike,
+  // Delete.
   await expect(page.getByRole("menuitem")).toHaveText([
     "Select",
     "Animate",
     "Edit",
     "Recreate",
     "Share",
-    "Star",
+    "Like",
+    "Dislike",
     "Delete",
   ]);
   await page.keyboard.press("Escape");

@@ -45,7 +45,7 @@ export interface Action {
    * this variant, at the bar's ends around the smaller icons.
    */
   emphasis?: "default" | "filled";
-  /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
+  /** A toggled-on action (Like): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
   /** An on/off option: a checked menu item (Show Upscale), or with `keepOpen` a switch row. */
   checked?: boolean;

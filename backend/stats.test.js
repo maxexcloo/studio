@@ -26,7 +26,7 @@ test("profile stats count the last 30 days and flag a profile failing most of it
   });
   const stats = profileStats(
     [
-      run("steady", "done", 1, { favorite: true, timing: { runMs: 9000 } }),
+      run("steady", "done", 1, { rating: "liked", timing: { runMs: 9000 } }),
       run("steady", "done", 2, { timing: { runMs: 11000 } }),
       run("steady", "failed", 3),
       run("steady", "cancelled", 1),
@@ -38,7 +38,7 @@ test("profile stats count the last 30 days and flag a profile failing most of it
   assert.deepEqual(stats.steady, {
     runs: 3,
     failed: 1,
-    starred: 1,
+    liked: 1,
     lastAt: new Date(now - 86_400_000).toISOString(),
     medianRunMs: 11000,
     failing: false,
