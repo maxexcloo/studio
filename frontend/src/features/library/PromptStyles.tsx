@@ -73,12 +73,12 @@ const kinds: { value: Kind; label: string; description: string }[] = [
   {
     value: "improve",
     label: "Improve Prompt",
-    description: "Rewrite styles for the prompt box's Improve Prompt, then Custom….",
+    description: "Styles Improve Prompt rewrites a prompt in, listed before Custom…",
   },
   {
     value: "animate",
     label: "Animate",
-    description: "Themes Animate writes a motion prompt for, then Custom….",
+    description: "Themes Animate writes a motion prompt for, listed before Custom…",
   },
   {
     value: "change",
