@@ -75,13 +75,36 @@ window.addEventListener(
   (event) => {
     const target = event.target as Element;
     // Sees open dialogs before a press closes one, so its fade-out is not taken for a fade-in.
-    openLayers();
-    // A dialog opened from a popup, such as a delete confirmation, sits above it and owns its clicks.
-    closing =
-      !target.closest(`${popupLayer}, [aria-expanded="true"], .mantine-Modal-root`) && popupOpen();
+    const top = openLayers().at(-1);
+    const phone = document.documentElement.hasAttribute("data-phone");
+    if (phone && top?.matches(popupLayer)) {
+      // Comboboxes control a listbox inside the dropdown rather than the dropdown itself.
+      const trigger =
+        document.getElementById(top.id.replace(/-dropdown$/, "")) ||
+        [...document.querySelectorAll<HTMLElement>('[aria-expanded="true"][aria-controls]')].find(
+          (control) =>
+            control
+              .getAttribute("aria-controls")!
+              .split(" ")
+              .some((id) => {
+                const list = document.getElementById(id);
+                return list && top.contains(list);
+              }),
+        );
+      const control = trigger?.closest(".mantine-Input-wrapper") || trigger;
+      closing = !top.contains(target) && !control?.contains(target);
+      // The same press must not arm a hold or another action beneath the popup.
+      if (closing) event.stopPropagation();
+    } else {
+      // A dialog opened from a popup owns its own clicks.
+      closing =
+        !target.closest(`${popupLayer}, [aria-expanded="true"], .mantine-Modal-root`) &&
+        popupOpen();
+    }
   },
   true,
 );
+window.addEventListener("pointercancel", () => (closing = false), true);
 window.addEventListener("mousedown", (event) => closing && event.preventDefault(), true);
 window.addEventListener(
   "click",

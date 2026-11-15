@@ -110,8 +110,9 @@ recur across features.
   Delete last, and share their sizing and item style. An action's settings sit
   in its menu, not a separate dialog. An option whose label alone is ambiguous
   carries a one-line `description`, except in item action menus.
-- Sections sort alphabetically, except settings first, Like before Dislike,
-  Refresh and Custom… last and Delete last.
+- Media categories use Images, Videos, Text. Other unordered peers sort
+  alphabetically, except settings first, Like before Dislike, Refresh and
+  Custom… last and Delete last.
 - Labels name the verb alone where the menu or box already says what it acts
   on (Upscale, Share, Clear; not Clear Prompt), adding a word only where the
   verb alone is ambiguous (Stop Upscale, Edit in Composer). One action keeps
@@ -121,7 +122,8 @@ recur across features.
   selection bar. `MediaActions.tsx` owns their availability and
   `itemActions.ts` their labels, icons, groups and order; there is no ⋯ More.
   Submenus match in bar and menu, and assistant menus share `assistMenu`.
-  Bars name Retry, Stop and the menus and show the rest as icons; when they
+  Desktop bars name Retry, Stop and the menus and show the rest as icons;
+  phone media item bars use icons with accessible names and menu indicators. When they
   outgrow their row the last names drop, then phones narrow the controls, and
   only then do they wrap, never scrolling.
 - Like and Dislike rate an item and teach taste. A Dislike never deletes: it
@@ -139,7 +141,9 @@ recur across features.
   (`sideways` for a phone held sideways), never their own width queries,
   `visibleFrom` or `hiddenFrom` to tell a phone.
 - Outside click and Escape close only the topmost layer; nothing beneath
-  reacts. A closing layer no longer counts while it fades out.
+  reacts. On phones the first outside tap consumes the pointer and click,
+  leaving the control beneath for the next tap. A closing layer no longer
+  counts while it fades out.
   `ui/popupClicks.ts` owns this: custom handlers defer to `layerAbove(owner)`,
   and dialogs that can have another dialog above use `closeWhenTop`.
 - A trigger's tooltip is a `PopupTooltip` wrapping `Popover.Target` or
@@ -159,11 +163,12 @@ recur across features.
   waits for a tap.
 - Preserve drafts and focus through expansion. Actions staging a gallery draft
   use `useOpenComposer`.
-- Use the shared `TextBox`. Its tools sit in one ⋯ menu one level deep, a
-  tool's options listed under its name, never in a submenu. Composer fields
-  edit in place; other phone text boxes open the shared full-screen editor,
-  which shows the tools as named buttons above the keyboard. A box without
-  tools has no ⋯, Copy or Clear.
+- Use the shared `TextBox`. Desktop fields expose only ⋯, with Copy and
+  Clear/Reset/Undo alongside the tools in one flat menu, each tool's options
+  under its name. Composer fields edit in place; other phone text boxes open
+  the shared full-screen editor. Phone controls show Copy, Clear/Reset/Undo
+  and More above the keyboard, with tools in More and form sends separate.
+  A box without tools has no ⋯, Copy or Clear.
 - Respect safe areas and the phone keyboard. The viewport uses
   `interactive-widget=resizes-visual`; only the surface being typed into follows
   the visual viewport through `useKeyboard`, centred dialogs and the floating

@@ -1,6 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
 
-import { closeReferences, create, fixtures, image, pickerTab, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, stamp } from "./fixtures";
 
 function referenceItem() {
   return {
@@ -48,13 +48,23 @@ test("Reference browsing keeps its scroll, query and filters in the gallery edit
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect.poll(() => listing.evaluate((element) => element.scrollTop)).toBe(120);
   await (await referenceSearch(page)).fill("Copper");
-  await pickerTab(page, "References", "Liked");
+  await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
+  const filters = page.getByRole("dialog", { name: "Filters", exact: true });
+  const aspect = filters.getByRole("combobox", { name: "Aspect", exact: true });
+  await aspect.click();
+  await page.getByRole("option", { name: "Square", exact: true }).click();
+  await aspect.press("Escape");
+  await aspect.press("Escape");
+  await expect(filters).toBeHidden();
   await finishReferences(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await expect(references.getByRole("radio", { name: "Liked", exact: true })).toBeChecked();
-  await expect(references.getByRole("textbox", { name: "Search Liked", exact: true })).toHaveValue(
-    "Copper",
-  );
+  await expect(
+    references.getByRole("textbox", { name: "Search Gallery", exact: true }),
+  ).toHaveValue("Copper");
+  await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
+  await expect(filters.getByText("Square", { exact: true }).first()).toBeVisible();
+  await aspect.press("Escape");
+  await expect(filters).toBeHidden();
   await page
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })
     .click();

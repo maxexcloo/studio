@@ -5,12 +5,14 @@ import type { Profile } from "../../frontend/src/types";
 import { formatDateTime } from "../../frontend/src/ui/dates";
 import {
   closeLoras,
+  closeTextEditor,
   fixtures,
   image,
   profiles,
   serveProfiles,
   stamp,
   viewerAction,
+  viewerPromptMenu,
 } from "./fixtures";
 
 async function seed(
@@ -170,13 +172,14 @@ test("Custom… turns a change in plain words into the chosen action's prompt in
   );
   const surface = viewer.getByRole("group", { name: "Generation Actions", exact: true });
   const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
-  // Edit's Custom… asks in a box of its own, which keeps the last request.
+  // The prompt's Custom… asks in a box of its own, which keeps the last request.
   const askForChange = async (request?: string) => {
-    await viewerAction(page, "Edit");
+    await viewerPromptMenu(page);
     await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
     const custom = page.getByRole("dialog", { name: "Custom Change", exact: true });
     if (request) await custom.getByRole("textbox", { name: "Change", exact: true }).fill(request);
     await custom.getByRole("button", { name: "Ask", exact: true }).click();
+    await closeTextEditor(page, "Prompt");
   };
   await askForChange("make it night");
   // The proposal replaces the prompt in place under the chosen action and what it changed; Undo
@@ -288,8 +291,9 @@ test("Edit offers the image's next steps as changes, and picking one asks at onc
       });
     }),
   );
-  await viewerAction(page, "Edit");
+  await viewerPromptMenu(page);
   await page.getByRole("menuitem", { name: "Add Rain", exact: true }).click();
+  await closeTextEditor(page, "Prompt");
   const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(field).toHaveValue("An amber bird in rain");
   await expect(viewer.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
@@ -334,6 +338,113 @@ test("The viewer's prompt rests on one line and shows the whole prompt while foc
   await expect(summary).toHaveCount(0);
   await field.blur();
   await expect.poll(height).toBeLessThan(line * 1.5);
+});
+
+test("Custom Animation keeps text tools and submission in its phone editor and closes only the top layer", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    document.execCommand = (command: string) => {
+      const field = document.activeElement as HTMLTextAreaElement;
+      if (command !== "copy" || field?.tagName !== "TEXTAREA") return false;
+      (window as any).copied = field.value;
+      return true;
+    };
+  });
+  const { state } = await seed(page);
+  await viewerAction(page, "Animate");
+  await page.getByRole("menuitem", { name: "Custom…", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Custom Animation", exact: true });
+  const summary = dialog.getByRole("textbox", { name: "Instruction", exact: true });
+  const phone = testInfo.project.use.isMobile;
+  const editor = page.getByRole("dialog", { name: "Instruction", exact: true });
+  if (phone) await summary.click();
+  const surface = phone ? editor : dialog;
+  const field = surface.getByRole("textbox", { name: "Instruction", exact: true });
+  if (phone) {
+    await expect(surface.locator("[data-text-editor]")).toBeVisible();
+    await expect(
+      surface.getByRole("group", { name: "Instruction Tools", exact: true }),
+    ).toBeVisible();
+  }
+  await field.fill("The bird unfolds its wings.");
+  const more = surface.getByRole("button", { name: "More Instruction Actions", exact: true });
+  const edit = async (name: string) => {
+    if (phone) return surface.getByRole("button", { name, exact: true }).click();
+    await more.click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  };
+  await edit("Copy");
+  await expect
+    .poll(() => page.evaluate(() => (window as any).copied))
+    .toBe("The bird unfolds its wings.");
+  await edit("Clear");
+  await expect(field).toHaveValue("");
+  await expect(surface.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
+  await edit("Undo");
+  await expect(field).toHaveValue("The bird unfolds its wings.");
+  await more.click();
+  await expect(page.getByRole("menu").getByText("Suggestions", { exact: true })).toBeVisible();
+  if (phone) {
+    await expect(page.getByRole("menuitem", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Clear", exact: true })).toHaveCount(0);
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(surface).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await more.click();
+  // Dismissing More by pressing the field leaves its editor and parent intact.
+  await field.click();
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(surface).toBeVisible();
+  if (phone) {
+    await field.press("Escape");
+    await expect(editor).toBeHidden();
+    await expect(dialog).toBeVisible();
+    await expect(summary).toBeFocused();
+    await summary.click();
+    await expect(field).toHaveValue("The bird unfolds its wings.");
+  } else {
+    await expect(surface.getByRole("button", { name: "Copy", exact: true })).toHaveCount(0);
+    await expect(surface.getByRole("button", { name: "Clear", exact: true })).toHaveCount(0);
+  }
+  await surface.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input.writing).toMatchObject({
+    kind: "animate",
+    theme: "custom",
+    instruction: "The bird unfolds its wings.",
+  });
+});
+
+test("Viewer prompt keeps edit actions with no assistant tools and restores its original text", async ({
+  page,
+}, testInfo) => {
+  const { viewer } = await seed(page, {}, async (page) => {
+    await page.route("**/api/assistant", (route) =>
+      route.fulfill({ json: { available: false, presets: [] } }),
+    );
+  });
+  const summary = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  const phone = testInfo.project.use.isMobile;
+  if (phone) await summary.click();
+  const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  const more = surface.getByRole("button", { name: "More Prompt Actions", exact: true });
+  await expect(more).toBeDisabled();
+  await field.fill("A bird at night");
+  const edit = async (name: string) => {
+    if (phone) return surface.getByRole("button", { name, exact: true }).click();
+    await more.click();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+  };
+  if (phone) await expect(surface.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
+  await edit("Reset");
+  await expect(field).toHaveValue("An amber bird");
+  await edit("Undo");
+  await expect(field).toHaveValue("A bird at night");
 });
 
 test("Viewer runs queue into the strip and Recreate › Recreate in Composer opens the composer", async ({
@@ -1640,8 +1751,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   expect(bounds?.height).toBe(viewport.height);
   const phone = viewport.width < 768;
   if (phone) {
-    // Phones fit every action on the bar's one row; names drop from the last where they outgrow
-    // it, only the four menus having any.
+    // Phone actions remain accessible as icons on one row.
     const bar = dialog.getByRole("group", { name: "Generation Actions", exact: true });
     const row = [
       "Animate",
@@ -1661,8 +1771,12 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
       }),
     );
     expect(new Set(tops.map(Math.round)).size).toBe(1);
-    for (const name of ["Animate", "Edit"])
-      await expect(bar.getByRole("button", { name, exact: true })).toHaveText(name);
+    for (const name of ["Animate", "Edit"]) {
+      await expect(bar.getByRole("button", { name, exact: true })).toHaveText("");
+      await viewerAction(page, name);
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
   }
   await viewerAction(page, "Share");
   const download = page.getByRole("menuitem", { name: "Download", exact: true });

@@ -453,13 +453,13 @@ export function useMediaActions(
     custom: () => openViewer({ custom: true }),
   };
   const [editReview, setEditReview] = useEditReview();
-  const editAssisted = assisted && ready && Boolean(item.jobId);
-  // The image's next steps load as the viewer opens it, elsewhere once Edit opens.
+  const editAssisted = !edit && assisted && ready && Boolean(item.jobId);
+  // Tile suggestions load when Edit opens; the viewer prompt owns its own suggestions.
   const [stepsFor, setStepsFor] = useState<string>();
   const steps = useChangeSuggestions({
     query: nextStepsQuery(item.jobId ?? ""),
     fresh: () => askNextSteps(item.jobId!, true),
-    enabled: editAssisted && image && (Boolean(edit) || stepsFor === item.id),
+    enabled: editAssisted && image && stepsFor === item.id,
     disabled: editAsk.pending,
     onPick: editAsk.pick,
   });
