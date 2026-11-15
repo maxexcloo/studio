@@ -232,15 +232,15 @@ the primary component reference and verify APIs against the installed version.
   same actions as tiles and context menus. `MediaActions.tsx` owns availability
   and `itemActions.ts` the order for every bar and menu, the selection bar
   offering those that act on several, with no ⋯ More anywhere: Animate ▾, Edit ▾,
-  Recreate ▾ | Share ▾ | Star, Delete. Edit holds the viewer's prompt assistance
+  Recreate ▾ | Share ▾ | Like, Dislike, Delete. Edit holds the viewer's prompt assistance
   (Review Prompt, Library's changes, Suggestions, Custom…), then Upscale, Edit in
   Composer, Use as Reference and Use as Character (starting a card in Library ›
   Characters), or a video's Trim and the like. Recreate holds Run Again and Run
-  Again, Same Seed, which queue from where they are, then Compare Models, Open
+  Again, Same Seed, which queue from where they are, and Report Issue…, then Compare Models, Open
   Comparison where the item belongs to one and Similar, then Recreate in Composer.
   Options expand in place on phones and touch screens. Share holds Copy Prompt, Copy Details, Download and, where the device shares
   files, Share. A tile's context menu starts with Select, which starts selecting
-  with that item. Bars name every action but Star and Delete: phones under their
+  with that item. Bars name every action but Like, Dislike and Delete: phones under their
   icons across one row, elsewhere beside them on one row; where they outgrow it
   the last names drop, and only then do they wrap onto another row, never
   scrolling. The phone bar drops its prompt field while Details is open. Gallery
@@ -248,6 +248,11 @@ the primary component reference and verify APIs against the installed version.
   filters, which stay in place; its quick selects take every match, not only
   loaded pages, and it confirms deletion. A finished action ends
   the selection, keeping selected only the items it failed for; opening a menu does not.
+- Like and Dislike rate an item and teach taste; a Dislike never deletes. It hides
+  the item from the gallery, Dream and search with Undo, and the Disliked switch
+  in the gallery's Filters shows it, where Dislike reads Restore. Report Issue… asks
+  what is wrong, has the assistant fix it as an edit or a run on its seed,
+  queues that as a version and dislikes the original with the issue.
 - Details sections show their content in full rather than scrolling it in a
   box. Only a long caption folds, with Expand at the end of its last line; its
   tags always show. Prompt and Negative Prompt alone have a Copy beside their heading.
@@ -310,21 +315,21 @@ the primary component reference and verify APIs against the installed version.
   reports them, without waiting for every loaded page; the gallery shows
   unfinished work as the account's Unfinished Work preference says (None by
   default, In Progress or Queued). Keep notifications clear of actions.
-- Dream results stay in their own pool until liked; Like and Pass teach taste.
+- Dream results stay in their own pool until kept; Dislike, Like and Keep teach taste.
   Dream opens on the deck, a swipeable card stack of unseen results,
   comparisons and calibration, keyed on desktop; Overview's While You Were Away
   lists each project's unseen results by how well they fit its brief, misses
-  folded last and kept. Its cards and the deck's bar offer only large Pass,
-  Super Like (keep and star) and Like; a comparison's images fill its card and
+  folded last and kept. Its cards and the deck's bar offer only large Dislike,
+  Like (keep and like) and Keep; a comparison's images fill its card and
   are its A and B, a tap choosing one with Undo and a hold, pinch or its label
   opening it in the viewer, over compact Neither and Both. The viewer's bar
   offers every choice, Variations and More Like This under Recreate ▾. A
   comparison's viewer steps between its sides as any viewer does, naming the
   shown side in the top bar, with Side by Side in its bar on desktop. Familiar ideas vary
-  one thing of a starred or liked image on its profile, LoRAs and settings; a
+  one thing of a liked or kept image on its profile, LoRAs and settings; a
   project's brief steers them rather than replacing them.
   Calibration uses only the account's own Studio generations and leaves the
-  gallery unchanged apart from an explicit Star. Dream keeps every free
+  gallery unchanged apart from an explicit Like or Dislike. Dream keeps every free
   GPU busy within its daily caps: images start while nobody's own work waits,
   videos only while Studio is idle. Its jobs show in the
   person's queue with a Dream badge, wait below everyone's own work and are not

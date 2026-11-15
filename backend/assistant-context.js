@@ -13,7 +13,7 @@ import { defaultWorkerId } from "./workers.js";
 
 /**
  * What the prompt assistant reads for an account: its profiles, their prompting guides, its LoRAs,
- * its starred prompts and reference images. `catalogueModels` and `loadComfyContext` are
+ * its liked prompts and reference images. `catalogueModels` and `loadComfyContext` are
  * model/catalogue.js's.
  */
 export function createAssistantContext({ catalogueModels, loadComfyContext }) {
@@ -53,15 +53,19 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
       return null;
     }
   };
-  // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
-  const starred = async (req, profile) => {
+  // Learning from likes: the account's six newest liked prompts on the same family, and their LoRAs.
+  const liked = async (req, profile) => {
     const families = new Map((await profiles(req)).map((item) => [item.id, item.family]));
     const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
       id === profile.id || (profile.family && families.get(id) === profile.family);
-    const items = galleryItems({ ...ownedQuery(req.studioAccount), favorite: true, status: "done" })
+    const items = galleryItems({
+      ...ownedQuery(req.studioAccount),
+      rating: "liked",
+      status: "done",
+    })
       .filter(
         (item) =>
-          item.favorite &&
+          item.rating === "liked" &&
           item.status === "done" &&
           item.prompt &&
           recordBelongsToRequest(item, req) &&
@@ -112,5 +116,5 @@ export function createAssistantContext({ catalogueModels, loadComfyContext }) {
       ...(edits ? { edits } : {}),
     };
   }
-  return { caption, guide, image, loras, profiles, starred, target };
+  return { caption, guide, image, liked, loras, profiles, target };
 }

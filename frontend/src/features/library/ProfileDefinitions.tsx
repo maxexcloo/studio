@@ -70,7 +70,7 @@ function ProfileUse({ stats }: { stats?: ProfileStats }) {
         {[
           `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"}`,
           stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
-          done > 0 && `${percent(stats.starred, done)} Starred`,
+          done > 0 && `${percent(stats.liked, done)} Liked`,
           stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s`,
         ]
           .filter(Boolean)

@@ -64,7 +64,7 @@ export const importsQuery = queryOptions({
 export interface ProfileStats {
   runs: number;
   failed: number;
-  starred: number;
+  liked: number;
   medianRunMs?: number;
   failing: boolean;
 }

@@ -17,6 +17,7 @@ import {
   Eye,
   EyeOff,
   Files,
+  Flag,
   GalleryHorizontalEnd,
   Gauge,
   Heart,
@@ -52,8 +53,9 @@ import {
   Shirt,
   SlidersHorizontal,
   Sparkles,
-  Star,
   TextCursorInput,
+  ThumbsDown,
+  ThumbsUp,
   Trash2,
   Trophy,
   Undo2,
@@ -89,6 +91,8 @@ export const icons = {
   custom: PenLine,
   delete: Trash2,
   details: Info,
+  /** Disliking an item hides it from the gallery; again, in its Disliked view, restores it. */
+  dislike: ThumbsDown,
   download: Download,
   dream: Moon,
   /** Duplicating a record into a new one, such as Duplicate Profile…. */
@@ -100,6 +104,7 @@ export const icons = {
   /** Hiding a revealed secret again, such as the MCP token. */
   hide: EyeOff,
   keep: Heart,
+  like: ThumbsUp,
   /** A record's timestamped lines: a runtime change's steps or a workload's log. */
   log: ScrollText,
   loras: Puzzle,
@@ -129,6 +134,8 @@ export const icons = {
   /** Asking again: checking for updates, refreshing status and suggestions. */
   refresh: RefreshCw,
   rename: TextCursorInput,
+  /** Report Issue…: saying what is wrong with a result so Studio fixes it. */
+  report: Flag,
   /** Returning a text to where it started, such as the viewer's prompt. */
   reset: RotateCcw,
   resume: CirclePlay,
@@ -145,7 +152,6 @@ export const icons = {
   show: Eye,
   /** Similar: the gallery ranked by likeness to an image. */
   similar: ScanSearch,
-  star: Star,
   /** Stopping work: a stop sign rather than a bare square, which reads as a checkbox. */
   stop: CircleStop,
   /** Short changes offered for an image or draft. */

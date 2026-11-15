@@ -20,7 +20,7 @@ const image = (id: string, ownerId = "alice", extra: Partial<Item> = {}): Item =
   type: "image",
   status: "done",
   prompt: "a fox in the snow",
-  favorite: true,
+  rating: "liked",
   ...extra,
 });
 
@@ -98,7 +98,7 @@ function fixture(t: TestContext) {
   return { finishing, store, state, live, complete, session };
 }
 
-test("Finish Starred Images is off until turned on and turning it off forgets the waiting list", async (t) => {
+test("Finish Liked Images is off until turned on and turning it off forgets the waiting list", async (t) => {
   const { finishing, state, live } = fixture(t);
   assert.deepEqual(finishing.read("alice").settings, {
     enabled: false,
@@ -106,13 +106,13 @@ test("Finish Starred Images is off until turned on and turning it off forgets th
     faceDetail: true,
   });
   state.items.push(image("a"));
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a"], true);
   await finishing.tick();
   assert.equal(finishing.waiting("alice"), 0);
   assert.equal(live().length, 0);
 
   await finishing.save("alice", { enabled: true, quality: "high" });
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a"], true);
   assert.equal(finishing.waiting("alice"), 1);
   await finishing.save("alice", { enabled: false });
   assert.equal(finishing.waiting("alice"), 0);
@@ -120,7 +120,7 @@ test("Finish Starred Images is off until turned on and turning it off forgets th
   assert.equal(live().length, 0);
 });
 
-test("Starring queues finishable images once, unstarring takes them off, and one upscale runs at a time", async (t) => {
+test("Liking queues finishable images once, unliking takes them off, and one upscale runs at a time", async (t) => {
   const { finishing, state, live, complete } = fixture(t);
   await finishing.save("alice", { enabled: true, quality: "fast" });
   state.items.push(
@@ -131,10 +131,10 @@ test("Starring queues finishable images once, unstarring takes them off, and one
     image("video", "alice", { type: "video" }),
     image("rendering", "alice", { status: "pending" }),
   );
-  finishing.starred("alice", ["a", "b", "c", "done", "video", "rendering"], true);
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a", "b", "c", "done", "video", "rendering"], true);
+  finishing.liked("alice", ["a"], true);
   assert.equal(finishing.waiting("alice"), 3);
-  finishing.starred("alice", ["c"], false);
+  finishing.liked("alice", ["c"], false);
   assert.equal(finishing.waiting("alice"), 2);
 
   await finishing.tick();
@@ -144,7 +144,7 @@ test("Starring queues finishable images once, unstarring takes them off, and one
     { ownerId: "alice", galleryItemId: "a", quality: "fast", faceDetail: false },
   ]);
   // Unstarring a started image leaves its upscale running.
-  finishing.starred("alice", ["a"], false);
+  finishing.liked("alice", ["a"], false);
   assert.equal(live().length, 1);
   complete();
   await finishing.tick();
@@ -165,7 +165,7 @@ test("Finishing waits for idle time, yields a waiting upscale to new work above 
   const { finishing, store, state, live, session } = fixture(t);
   await finishing.save("alice", { enabled: true });
   state.items.push(image("a"));
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a"], true);
 
   state.textBusy = true;
   await finishing.tick();
@@ -182,7 +182,7 @@ test("Finishing waits for idle time, yields a waiting upscale to new work above 
   assert.equal(live().length, 0);
   assert.equal(finishing.waiting("alice"), 1);
   assert.deepEqual(state.logs, [
-    "Finish Starred Images waits: The SeedVR2 models aren't installed yet.",
+    "Finish Liked Images waits: The SeedVR2 models aren't installed yet.",
   ]);
 
   state.ready = { faceDetail: false };
@@ -211,15 +211,15 @@ test("Finishing keeps each account's list to itself and leaves accounts that may
   await finishing.save("bob", { enabled: true });
   state.items.push(image("a"), image("b", "bob"));
   // Bob cannot queue Alice's image.
-  finishing.starred("bob", ["a"], true);
+  finishing.liked("bob", ["a"], true);
   assert.equal(finishing.waiting("bob"), 0);
   state.allowed.alice = false;
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a"], true);
   assert.equal(finishing.waiting("alice"), 0);
   state.allowed.alice = true;
-  finishing.starred("alice", ["a"], true);
+  finishing.liked("alice", ["a"], true);
   state.allowed.alice = false;
-  finishing.starred("bob", ["b"], true);
+  finishing.liked("bob", ["b"], true);
   await finishing.tick();
   assert.equal(live().length, 1);
   assert.deepEqual(

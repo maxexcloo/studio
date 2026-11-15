@@ -43,7 +43,7 @@ export async function recentRuns() {
 
 /**
  * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),
- * how many finished ones were starred, the median run time, and `failing` when at least half of five
+ * how many finished ones were liked, the median run time, and `failing` when at least half of five
  * or more runs in the last week failed.
  */
 export function profileStats(items = [], now = Date.now()) {
@@ -61,7 +61,7 @@ export function profileStats(items = [], now = Date.now()) {
     const entry = stats.get(profile) || {
       runs: 0,
       failed: 0,
-      starred: 0,
+      liked: 0,
       times: [],
       week: 0,
       weekFailed: 0,
@@ -70,7 +70,7 @@ export function profileStats(items = [], now = Date.now()) {
     entry.runs += 1;
     if (item.status === "failed") entry.failed += 1;
     else {
-      if (item.favorite) entry.starred += 1;
+      if (item.rating === "liked") entry.liked += 1;
       const ms = Number(item.timing?.runMs);
       if (ms > 0) entry.times.push(ms);
     }

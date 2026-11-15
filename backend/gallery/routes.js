@@ -36,7 +36,7 @@ import {
   removeGalleryItems,
   resultNumbers,
   searchWords,
-  setGalleryFavorites,
+  setGalleryRatings,
   visibleGallery,
 } from "./store.js";
 
@@ -61,7 +61,7 @@ function ownedSummary(req, name, query, build) {
   if (kept && (kept.changes === changes || Date.now() - kept.at < summaryMs)) return kept.value;
   summaries.delete(key);
   if (summaries.size >= keptSummaries) summaries.delete(summaries.keys().next().value);
-  const items = owned ? eachGalleryItem({ ...owned, ...query, dreamPool: false }) : [];
+  const items = owned ? eachGalleryItem({ ...owned, ...query, unlisted: false }) : [];
   const value = build(
     (function* () {
       for (const item of items) if (filterVisibleGallery([item]).length) yield item;
@@ -119,7 +119,6 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
     return galleryFilter({
       q: one(query.q),
       near: looksLike,
-      favorites: query.favorites === "1",
       workflow: one(query.workflow),
       ...Object.fromEntries(
         ["lora", "model", "size", "aspect", "tag"].map((key) => [key, many(query[key])]),
@@ -222,6 +221,7 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
             ...owned,
             // `set` keeps one MCP result set's results.
             ...(query.set && { setId: String(query.set) }),
+            ...(["liked", "disliked"].includes(query.rating) && { rating: query.rating }),
             ...(work === "none" && { notStatus: "pending" }),
             ...(Number.isFinite(since) && since && { since }),
             ...(words.length && { contains: words }),
@@ -292,7 +292,9 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
 
   // One item in full, as Details shows it: the gallery's pages leave out its prompt's thinking.
   directRoute(app, "GET", "/api/gallery/items/:id", (account, { params }) => {
-    const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean));
+    const [item] = filterVisibleGallery([galleryItem(params.id)].filter(Boolean), {
+      disliked: true,
+    });
     return item && recordBelongsToAccount(item, account)
       ? { status: 200, payload: { item: resultNumbers.numbered([item])[0] } }
       : { status: 404, payload: { error: "That item is no longer in the gallery." } };
@@ -309,8 +311,8 @@ export function registerGalleryReadRoutes(app, { near, similar, store, compared 
   });
 }
 
-/** `starred` hears which of the caller's items changed, for the taste profile. */
-export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
+/** `rated` hears which of the caller's items changed, and any issue reported, for the taste profile. */
+export function registerGalleryHistoryRoutes(app, { rated = () => {} } = {}) {
   // A selection is posted, as it may be too long for a URL, and downloads through a short-lived
   // link that only its own account can open.
   const selections = new Map();
@@ -341,15 +343,19 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
     sendGalleryExport(res, { req, ids });
   });
 
-  /* ------------------------------------------ Favourites, prompts, earlier work */
+  /* -------------------------------------------- Ratings, prompts, earlier work */
 
   directRoute(app, "POST", "/api/gallery/favorite", (account, { body }) => {
     const requested = new Set((Array.isArray(body?.ids) ? body.ids : []).map(String).slice(0, 500));
     const ids = galleryItems({ named: requested })
       .filter((item) => recordBelongsToAccount(item, account))
       .flatMap((item) => [item.id, item.url, galleryKey(item)]);
-    const changed = setGalleryFavorites(ids, Boolean(body?.favorite));
-    starred({ studioAccount: account }, changed, Boolean(body?.favorite));
+    // "liked" or "disliked"; anything else clears the rating. A dislike may carry the issue
+    // Report Issue named.
+    const rating = ["liked", "disliked"].includes(body?.rating) ? body.rating : null;
+    const issue = rating === "disliked" ? String(body?.issue || "").slice(0, 300) : "";
+    const changed = setGalleryRatings(ids, rating);
+    rated({ studioAccount: account }, changed, issue);
     return { status: 200, payload: { ok: true, items: changed, revision: galleryRevisionValue() } };
   });
 }

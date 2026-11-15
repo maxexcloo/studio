@@ -19,8 +19,8 @@ const qualities: { value: UpscaleQuality; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
-/** Settings › Preferences: smart upscale of starred images while the GPU is idle. */
-export function FinishStarredImages() {
+/** Settings › Preferences: smart upscale of liked images while the GPU is idle. */
+export function FinishLikedImages() {
   const client = useQueryClient();
   const finishing = useQuery(finishingQuery);
   const save = useMutation({
@@ -45,17 +45,17 @@ export function FinishStarredImages() {
   return (
     <>
       <SettingRow
-        label="Finish Starred Images"
+        label="Finish Liked Images"
         description={
           settings?.enabled && status?.waiting
-            ? `Upscale images you star while the GPU is idle. ${status.waiting} waiting.`
-            : "Upscale images you star while the GPU is idle."
+            ? `Upscale images you like while the GPU is idle. ${status.waiting} waiting.`
+            : "Upscale images you like while the GPU is idle."
         }
       >
         <Switch
           // Remounts once loaded so the saved state appears without the thumb sliding.
           key={settings ? "loaded" : "loading"}
-          aria-label="Finish Starred Images"
+          aria-label="Finish Liked Images"
           checked={settings?.enabled ?? false}
           disabled={!settings}
           onChange={(event) => save.mutate({ enabled: event.currentTarget.checked })}
@@ -76,7 +76,7 @@ export function FinishStarredImages() {
           </SettingRow>
           <SettingRow
             label="Finishing Quality"
-            description="Higher quality takes longer for each starred image."
+            description="Higher quality takes longer for each liked image."
             wide
           >
             <Select

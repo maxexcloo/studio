@@ -2,6 +2,7 @@ import { logger } from "./crash-log.js";
 import { directRoute } from "./domain/direct-route.ts";
 import { dreamAnimationStars } from "./dream-animation-stars.js";
 import { dreamOwnership } from "./dream-ownership.js";
+import { galleryRatings } from "./gallery-ratings.js";
 import { mcpOwnershipRows } from "./mcp-ownership-rows.js";
 
 /**
@@ -24,6 +25,12 @@ const steps = [
     name: "mcpOwnership",
     run: mcpOwnershipRows,
     changes: (plan) => (plan.document ? 1 : 0),
+    online: true,
+  },
+  {
+    name: "galleryRatings",
+    run: galleryRatings,
+    changes: (plan) => plan.likes + plan.unstarred + plan.dislikes + plan.signals,
     online: true,
   },
 ];
