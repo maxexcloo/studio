@@ -8,6 +8,7 @@ import { api } from "../../api";
 import { menuWidth } from "../../theme";
 import { ActionMenuItems } from "../../ui/ActionBar";
 import { icons } from "../../ui/icons";
+import { plural } from "../../ui/plural";
 import { PopupTooltip } from "../../ui/PopupTooltip";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, iconChipProps } from "../generation/chip";
@@ -81,7 +82,6 @@ export function useGalleryUpload(onUploaded: () => void) {
     }
     setUploading(false);
     const uploaded = chosen.length - failed.length;
-    const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
     const summary = [
       uploaded ? `Uploaded ${plural(uploaded, "file")} to Uploads.` : "Nothing was uploaded.",
       failed.length && `${plural(failed.length, "file")} failed.`,

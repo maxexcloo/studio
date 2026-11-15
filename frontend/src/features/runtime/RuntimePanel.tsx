@@ -11,6 +11,7 @@ import type {
 import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { plural } from "../../ui/plural";
 import { SettingGroup } from "../../ui/SettingRows";
 import { BenchmarkResults } from "./Benchmarks";
 import { AutomaticControl, RuntimeHistory, RuntimeWorkloads } from "./RuntimeWorkloads";
@@ -120,7 +121,6 @@ export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) 
     return { colour: "red", label: "Services Unavailable" };
   return { colour: "yellow", label: "Services Partly Available" };
 }
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
 /** A media service's state: Stopped or another failing state, else how many workers run its jobs. */
 const mediaState = (service: ServiceStatus) => {
   if (service.state !== "healthy") return healthLabel(service.state);
