@@ -17,13 +17,7 @@ Open the preview address it prints (<http://localhost:5173>, or a free port when
 
 `mise run dev:demo` runs without a GPU against a stand-in worker (`backend/fixtures/demo-worker.js`) whose test profiles finish every run with a plain picture, not model inference. Its data stays in `data/demo`.
 
-Before submitting a change, run the checks, build the frontend and run the browser scenarios against that build. Install the browsers once with `npx playwright install chromium webkit`. Browser scenarios use isolated fixtures and cover desktop and phone interactions; real generation needs separate verification against the intended worker.
-
-```sh
-mise run check
-mise run build
-mise run test:browser
-```
+Before submitting a change, run `mise run check`. CI builds the frontend and runs the browser scenarios, which use isolated fixtures; real generation needs separate verification against the intended worker.
 
 ## Running Studio
 
