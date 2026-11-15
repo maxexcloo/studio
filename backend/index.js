@@ -480,7 +480,7 @@ registerLibraryRoutes(app, {
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
-  references: (model) => modelFileReferences(model, presetModels),
+  references: (model, options) => modelFileReferences(model, presetModels, options),
   recentLoras: () => galleryLoraNames(Date.now() - 90 * 86_400_000),
   profileDefinitions,
 });

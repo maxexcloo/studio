@@ -63,7 +63,11 @@ export function ReferencePicker({
    */
   onCharacterProfile?: (
     profile: Profile,
-    next: { references: ReferenceAsset[]; prompt: string },
+    next: {
+      references: ReferenceAsset[];
+      prompt: string;
+      cardParts?: GenerationInput["cardParts"];
+    },
   ) => void;
   browser?: ReferenceBrowser;
   /** The text a character's description joins: the editor's prompt. */
@@ -284,7 +288,15 @@ export function ReferencePicker({
             kind={tab}
             query={cardQuery}
             prompt={prompt.value}
-            onChange={prompt.onChange}
+            parts={input.cardParts}
+            onChange={(prompt, cardParts) => {
+              if (onInputChange) onInputChange({ prompt, cardParts });
+              else
+                setDraft((previous) => ({
+                  ...previous,
+                  input: { ...previous.input, prompt, cardParts },
+                }));
+            }}
             onLayer={setLayer}
           />
         </>
@@ -303,6 +315,7 @@ export function ReferencePicker({
             query={cardQuery}
             references={references}
             prompt={prompt.value}
+            parts={input.cardParts}
             profile={profile}
             switchable={Boolean(onCharacterProfile) || (!value && !selectedProfile && !ownPrompt)}
             onChange={(next) => {
@@ -312,7 +325,13 @@ export function ReferencePicker({
               else if (editor) setDraft((previous) => draftForProfile(previous, editor, next));
               else {
                 list.set(next.references);
-                if (next.prompt !== prompt.value) prompt.onChange(next.prompt);
+                if (onInputChange)
+                  onInputChange({ prompt: next.prompt, cardParts: next.cardParts });
+                else
+                  setDraft((previous) => ({
+                    ...previous,
+                    input: { ...previous.input, prompt: next.prompt, cardParts: next.cardParts },
+                  }));
               }
               settle();
             }}

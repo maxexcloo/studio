@@ -39,7 +39,7 @@ export interface Preset {
 }
 /** The parts of a draft a preset may hold, by their input fields; Model & Settings has the rest. */
 const presetParts = [
-  { value: "prompt", label: "Prompt", noun: "prompt", keys: ["prompt"] },
+  { value: "prompt", label: "Prompt", noun: "prompt", keys: ["prompt", "cardParts"] },
   { value: "negative", label: "Negative", noun: "negative prompt", keys: ["negative"] },
   { value: "settings", label: "Model & Settings", noun: "model and settings", keys: [] },
   {
@@ -197,6 +197,17 @@ export function PresetPicker({
   const selected = records.find((preset) => preset.id === selection.presetId);
   const edited = !!selected && presetEdited(selected, current());
   const prompted = !!input.prompt.trim();
+  const canSave = (savedParts || presetParts.map((part) => part.value)).some((part) =>
+    part === "prompt"
+      ? prompted
+      : part === "negative"
+        ? !!input.negative.trim()
+        : part === "references"
+          ? !!(references.length || input.referenceAssets.length)
+          : part === "loras"
+            ? !!input.loras.length
+            : true,
+  );
   const ideas = (inspiration.data?.presets || []).map((preset) => ({
     ...preset,
     detail: preset.prompt,
@@ -237,7 +248,7 @@ export function PresetPicker({
             naming={naming}
             current={selected}
             edited={edited}
-            disabled={!prompted || !presets.isSuccess}
+            disabled={!canSave || !presets.isSuccess}
             onUpdate={(preset) => presets.update(preset, presetInput(current(), preset.parts))}
           />
         </>
@@ -253,7 +264,7 @@ export function PresetPicker({
             records={records}
             current={selected}
             edited={edited}
-            canSave={prompted}
+            canSave={canSave}
             replaces={(preset) =>
               prompted && (!selected || edited) ? replaceMessage(preset) : undefined
             }
@@ -288,10 +299,19 @@ export function PresetPicker({
             }
             onLoad={(preset) => {
               // A preset of some parts leaves the rest of the draft as it is.
-              onLoad(preset.parts ? { ...current(), ...preset.input } : preset.input, {
-                presetId: preset.id,
-                presetTitle: preset.title,
-              });
+              onLoad(
+                preset.parts
+                  ? {
+                      ...current(),
+                      ...(preset.parts.includes("prompt") ? { cardParts: undefined } : {}),
+                      ...preset.input,
+                    }
+                  : preset.input,
+                {
+                  presetId: preset.id,
+                  presetTitle: preset.title,
+                },
+              );
               setOpened(false);
             }}
             onSave={(title) =>

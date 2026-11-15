@@ -6,8 +6,9 @@ import { DataTable } from "../../ui/DataTable";
 import { dateFormat } from "../../ui/dates";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
-import { useGeneration } from "../generation/GenerationProvider";
+import { draftForInput, useGeneration } from "../generation/GenerationProvider";
 import { useOpenComposer } from "../generation/openComposer";
+import { generationInput } from "../generation/payload";
 import { type Preset, presetHolds, usePresets } from "../generation/PresetPicker";
 
 const savedDate = dateFormat({ dateStyle: "medium" });
@@ -20,12 +21,13 @@ const savedOn = (preset: Preset) =>
  */
 export function LibraryPresets({ heading }: { heading: ReactNode }) {
   const presets = usePresets();
-  const { setDraft } = useGeneration();
+  const { setDraft, draftForKind, profiles } = useGeneration();
   const openComposer = useOpenComposer();
   const [query, setQuery] = useState("");
   const [renaming, setRenaming] = useState<Preset | null>(null);
   const [name, setName] = useState("");
   const [deleting, setDeleting] = useState<Preset | null>(null);
+  const [replacing, setReplacing] = useState<Preset | null>(null);
   const taken = presets.records.some(
     (preset) =>
       preset.id !== renaming?.id &&
@@ -36,14 +38,26 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
     void presets.rename(renaming, name.trim()).then(() => setRenaming(null));
   };
   const edit = (preset: Preset) => {
-    setDraft((previous) => ({
-      ...previous,
-      // A preset of some parts leaves the rest of the draft as it is.
-      input: preset.parts ? { ...previous.input, ...preset.input } : preset.input,
-      presetId: preset.id,
-      presetTitle: preset.title,
-    }));
-    openComposer(preset.input.kind === "video" ? "video" : "image");
+    const kind = preset.input.kind || "image";
+    const previous = draftForKind(kind);
+    const input = preset.parts
+      ? {
+          ...generationInput(
+            previous.input,
+            profiles.find((profile) => profile.id === previous.input.profileId),
+            previous.references,
+          ),
+          ...(preset.parts.includes("prompt") ? { cardParts: undefined } : {}),
+          ...preset.input,
+        }
+      : preset.input;
+    setDraft(
+      draftForInput(input, {
+        presetId: preset.id,
+        presetTitle: preset.title,
+      }),
+    );
+    openComposer(kind);
   };
   return (
     <Stack gap="md">
@@ -103,7 +117,20 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           ]}
           rowActions={(preset) => (
             <>
-              <Menu.Item leftSection={<icons.edit size={16} />} onClick={() => edit(preset)}>
+              <Menu.Item
+                leftSection={<icons.edit size={16} />}
+                onClick={() => {
+                  const previous = draftForKind(preset.input.kind || "image");
+                  if (
+                    previous.input.prompt.trim() ||
+                    previous.input.negative.trim() ||
+                    previous.references.length ||
+                    previous.input.loras.length
+                  )
+                    setReplacing(preset);
+                  else edit(preset);
+                }}
+              >
                 Edit in Composer
               </Menu.Item>
               <Menu.Item
@@ -146,6 +173,20 @@ export function LibraryPresets({ heading }: { heading: ReactNode }) {
           </DialogFooter>
         </Stack>
       </Modal>
+      <ConfirmDialog
+        opened={!!replacing}
+        title="Load Preset"
+        action="Replace"
+        pending={false}
+        onConfirm={() => {
+          if (replacing) edit(replacing);
+          setReplacing(null);
+        }}
+        onClose={() => setReplacing(null)}
+      >
+        Replace the draft's saved parts with {replacing?.title}? Other parts of a partial preset
+        stay as they are.
+      </ConfirmDialog>
       <ConfirmDialog
         opened={!!deleting}
         title="Delete Preset"
