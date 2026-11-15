@@ -10,6 +10,7 @@ import { type SwipeDirection, swipeDirection } from "./swipe";
 import classes from "./ZoomImage.module.css";
 
 export function ZoomImage({
+  mediaId,
   src,
   original,
   alt,
@@ -20,6 +21,7 @@ export function ZoomImage({
   arrive,
   onTap,
 }: {
+  mediaId?: string;
   src: string;
   /** The full picture `src` may be a smaller copy of, loaded once zoom passes the copy's pixels. */
   original?: string;
@@ -38,7 +40,8 @@ export function ZoomImage({
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
   const [loading, setLoading] = useState(true);
-  const [displayedSrc, setDisplayedSrc] = useState(src);
+  const [displayed, setDisplayed] = useState({ src, mediaId, alt });
+  const displayedSrc = displayed.src;
   const [switching, setSwitching] = useState(false);
   const [versionFailed, setVersionFailed] = useState(false);
   const [versionRetry, setVersionRetry] = useState(0);
@@ -46,13 +49,18 @@ export function ZoomImage({
   // The original zoom has needed: it stays once loaded, and a version change starts from its copy.
   const [sharpened, setSharpened] = useState<string>();
   const wanted = original && sharpened === original ? original : src;
-  const zoom = useMediaZoom({ ...size, disabled: loading || failed });
+  const zoom = useMediaZoom({ ...size, disabled: loading || failed, resetKey: displayed.mediaId });
   const image = useRef<HTMLImageElement>(null);
   const suppressClick = useRef(false);
   const touched = useRef(false);
   const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
   const pendingTap = useRef(0);
   useEffect(() => () => clearTimeout(pendingTap.current), []);
+  useEffect(() => {
+    clearTimeout(pendingTap.current);
+    lastTap.current = null;
+    setSharpened(undefined);
+  }, [mediaId]);
   const gesture = useRef<{
     id: number;
     at: number;
@@ -67,6 +75,7 @@ export function ZoomImage({
 
   useEffect(() => {
     if (wanted === displayedSrc) {
+      if (displayed.mediaId !== mediaId) setDisplayed({ src: wanted, mediaId, alt });
       setSwitching(false);
       setVersionFailed(false);
       if (zoom.picture.current?.querySelector("img")?.naturalWidth) setFailed(false);
@@ -81,7 +90,7 @@ export function ZoomImage({
       .decode()
       .then(() => {
         if (current) {
-          setDisplayedSrc(wanted);
+          setDisplayed({ src: wanted, mediaId, alt });
           setFailed(false);
         }
       })
@@ -94,7 +103,7 @@ export function ZoomImage({
     return () => {
       current = false;
     };
-  }, [wanted, displayedSrc, versionRetry]);
+  }, [wanted, displayedSrc, versionRetry, mediaId]);
   // Sharpening is quiet: the copy stays in view until the original has decoded, and stays if it fails.
   const sharpening = wanted !== src;
 
@@ -116,7 +125,7 @@ export function ZoomImage({
   // A cached image shows in the first frame rather than after its load event.
   useLayoutEffect(() => {
     if (image.current?.complete && image.current.naturalWidth) loaded(image.current);
-  }, []);
+  }, [displayedSrc]);
   // The placeholder takes its own shape (the gallery has it decoded already), so a recorded size
   // that differs from the picture never stretches it before the image loads.
   useLayoutEffect(() => {
@@ -302,7 +311,7 @@ export function ZoomImage({
             <img
               ref={image}
               src={displayedSrc}
-              alt={alt}
+              alt={displayed.alt}
               draggable={false}
               width={size.width}
               height={size.height}

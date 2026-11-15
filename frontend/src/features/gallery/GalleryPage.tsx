@@ -9,7 +9,13 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { focusManager, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type InfiniteData,
+  focusManager,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { LayoutGrid, Rows3, SquareCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
@@ -32,11 +38,17 @@ import { GalleryToolbar } from "./GalleryToolbar";
 import { GalleryUpload, droppedFiles, useGalleryUpload } from "./GalleryUpload";
 import { MediaGrid } from "./MediaGrid";
 import { mediaDetail, mediaTitle } from "./mediaLabels";
-import { currentMedia } from "./mediaSource";
+import { currentMedia, mediaIdentity, reconcileViewerItems } from "./mediaSource";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
 import { MorePages } from "./MorePages";
-import { galleryKey, galleryPage, galleryQuery, viewerItemQuery } from "./queries";
+import {
+  type GalleryResultsPage,
+  galleryKey,
+  galleryPage,
+  galleryQuery,
+  viewerItemQuery,
+} from "./queries";
 import { inRunOrder, runKey } from "./resultSets";
 import { RunsView } from "./RunsView";
 import {
@@ -138,44 +150,74 @@ export function GalleryPage() {
     // Returning to the tab reads only the first page (below), not every loaded page.
     refetchOnWindowFocus: false,
   });
-  // Reads the first page afresh into the shown results: the newest tiles show without waiting for
-  // every loaded page to refetch. Calls while one is reading share it.
-  const readingFirst = useRef<Promise<unknown>>(undefined);
-  const refreshFirst = useCallback(
-    () =>
-      (readingFirst.current ??= galleryPage(listing, "")
-        .then((first) =>
-          client.setQueryData(listingKey, (data) => {
-            if (!data) return data;
-            // The fresh first page leads; what it pushed past its end stays, as the next page
-            // carries on from the old first page's cursor. What it holds leaves the later pages
-            // (a set moves up whole when a result joins it), and its jobs' unfinished tiles give
-            // way to their results.
-            const fresh = new Set(first.items.flatMap((item) => [item.id, item.jobId || item.id]));
-            const [old, ...rest] = data.pages;
-            const page = {
-              ...old,
-              items: [
-                ...first.items,
-                ...old.items.filter((item) => !fresh.has(item.id) && !fresh.has(item.jobId || "")),
-              ],
-            };
-            const ids = new Set(first.items.map((item) => item.id));
-            const later = rest.map((page) => ({
-              ...page,
-              items: page.items.filter((item) => !ids.has(item.id)),
-            }));
-            return { ...data, pages: [page, ...later] };
-          }),
-        )
-        .catch(() => undefined)
-        .finally(() => {
-          readingFirst.current = undefined;
-        })),
-    [listing, listingKey, client],
+  // Query ownership deduplicates overlapping signals and cancels reads on account changes or
+  // optimistic media mutations. Refreshes keep loaded pages and their continuation cursors.
+  const refresh = useQuery({
+    queryKey: [...galleryKey, "refresh", ...listingKey.slice(1)],
+    enabled: false,
+    retry: false,
+    queryFn: async ({ signal }) => {
+      const held = client.getQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey);
+      const known = new Set(held?.pages.flatMap((page) => page.items.map(mediaIdentity)));
+      const first = await galleryPage(listing, "", 60, signal);
+      // If more than a page arrived while away, bridge to the held results sequentially so no
+      // matches disappear between the fresh first page and the old continuation cursor.
+      let edge = first;
+      while (
+        known.size &&
+        edge.hasMore &&
+        !edge.items.some((item) => known.has(mediaIdentity(item)))
+      ) {
+        edge = await galleryPage(listing, edge.nextCursor, 60, signal);
+        first.items.push(...edge.items);
+      }
+      if (signal.aborted) return first;
+      client.setQueryData<InfiniteData<GalleryResultsPage, string>>(listingKey, (data) => {
+        if (!data) return data;
+        const ids = new Set(first.items.map((item) => item.id));
+        const replaced = new Set(
+          first.items.flatMap((item) =>
+            item.jobId && item.index !== undefined ? [`${item.jobId}-${item.index}`] : [],
+          ),
+        );
+        const keep = (item: MediaItem) => !ids.has(item.id) && !replaced.has(item.id);
+        return {
+          ...data,
+          pages: data.pages.map((page, index) => ({
+            ...page,
+            ...(!index && !page.items.length && data.pages.length === 1
+              ? { hasMore: first.hasMore, nextCursor: first.nextCursor }
+              : {}),
+            totalApprox: first.totalApprox,
+            items: index ? page.items.filter(keep) : [...first.items, ...page.items.filter(keep)],
+          })),
+        };
+      });
+      return first;
+    },
+  });
+  const { refetch: readFirst } = refresh;
+  const pendingFirst = useRef<typeof listingKey | null>(null);
+  const refreshFirst = useCallback(() => {
+    if (client.isFetching({ queryKey: listingKey, exact: true })) {
+      pendingFirst.current = listingKey;
+      return;
+    }
+    pendingFirst.current = null;
+    void readFirst({ cancelRefetch: false });
+  }, [client, listingKey, readFirst]);
+  useEffect(
+    () => () => {
+      pendingFirst.current = null;
+    },
+    [listingKey],
   );
+  // A final job can finish during pagination: once it settles there may be no active poll left.
+  useEffect(() => {
+    if (!gallery.isFetching && pendingFirst.current === listingKey) refreshFirst();
+  }, [gallery.isFetching, gallery.dataUpdatedAt, gallery.errorUpdatedAt, listingKey, refreshFirst]);
   // Active work's tiles are the newest, on the first page: only it polls, for live previews.
-  // Work starting or finishing refreshes every page through the queue key below.
+  // Starting or finishing work uses the same first-page read, never a full pagination refetch.
   useEffect(() => {
     if (!jobs?.active) return;
     const timer = setInterval(() => {
@@ -195,8 +237,7 @@ export function GalleryPage() {
     if (seenJobs.current === jobs?.key) return;
     seenJobs.current = jobs?.key;
     void refreshFirst();
-    void client.invalidateQueries({ queryKey: galleryKey });
-  }, [jobs?.key, client, refreshFirst]);
+  }, [jobs?.key, refreshFirst]);
   const loaded = useMemo(
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
@@ -217,17 +258,18 @@ export function GalleryPage() {
     (itemId && lastShown.current && viewerItemId(lastShown.current) === itemId
       ? lastShown.current
       : null);
+  const shown = selected && currentMedia(loaded, selected);
   lastShown.current = selected;
   useEffect(() => {
-    if (!selected || viewerItemId(selected) === itemId) return;
+    if (!shown || viewerItemId(shown) === itemId) return;
     setParams(
       (next) => {
-        next.set("item", viewerItemId(selected));
+        next.set("item", viewerItemId(shown));
         return next;
       },
       { replace: true, state: location.state },
     );
-  }, [selected, itemId, setParams, location.state]);
+  }, [shown, itemId, setParams, location.state]);
   // Every generation shows by default; turning All Versions off collapses each version chain into
   // one Grid tile showing its original. Runs always shows all.
   const queue = useQuery(queueQuery).data?.jobs;
@@ -241,6 +283,47 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
+  const candidates = useMemo(
+    () =>
+      run
+        ? inRunOrder(loaded.filter((candidate) => runKey(candidate) === run))
+        : versions
+          ? [...versions.values()].map(
+              (group) => group.find((version) => version.id === shown?.id) || group[0],
+            )
+          : items,
+    [run, loaded, versions, shown?.id, items],
+  );
+  const viewerOrder = useRef<{
+    scope: string;
+    items: MediaItem[];
+    retained: Map<string, MediaItem>;
+    total?: number;
+  } | null>(null);
+  const viewerScope = JSON.stringify([listingKey, run, grouped]);
+  if (!itemId) viewerOrder.current = null;
+  else {
+    const previous = viewerOrder.current;
+    const retained = new Map(previous?.scope === viewerScope ? previous.retained : []);
+    // Dislike hides the current tile, but it remains a neighbour until this viewer closes.
+    if (shown) retained.set(mediaIdentity(shown), shown);
+    for (const candidate of candidates) retained.delete(mediaIdentity(candidate));
+    const next =
+      previous?.scope === viewerScope
+        ? reconcileViewerItems(previous.items, candidates, [...retained.values()])
+        : candidates;
+    const reset =
+      previous?.scope !== viewerScope ||
+      !previous.items.length ||
+      (shown && !next.some((item) => mediaIdentity(item) === mediaIdentity(shown)));
+    viewerOrder.current = {
+      scope: viewerScope,
+      items: reset ? candidates : next,
+      retained,
+      total: reset ? gallery.data?.pages.at(-1)?.totalApprox : previous.total,
+    };
+  }
+  const viewerItems = viewerOrder.current?.items || candidates;
   // The query the shown results answer: placeholder results still answer the previous one.
   const [resultsKey, setResultsKey] = useState(() => JSON.stringify(listingKey));
   if (!gallery.isPlaceholderData && resultsKey !== JSON.stringify(listingKey))
@@ -374,7 +457,7 @@ export function GalleryPage() {
   // New uploads show at once under the Uploads filter.
   const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
   // The viewer nearing the last loaded item loads the next page, so navigation carries on.
-  const shownIndex = selected && !run ? items.findIndex((item) => item.id === selected.id) : -1;
+  const shownIndex = shown && !run ? items.findIndex((item) => item.id === shown.id) : -1;
   const nearEnd = shownIndex >= 0 && items.length - shownIndex <= 3;
   const { hasNextPage, isFetching, isFetchNextPageError, fetchNextPage } = gallery;
   useEffect(() => {
@@ -598,6 +681,16 @@ export function GalleryPage() {
                 : "No Images"}
         </EmptyState>
       )}
+      {refresh.isError && (
+        <Alert color="red" title="Couldn't Update the Gallery">
+          <Stack gap="sm" align="flex-start">
+            {refresh.error.message}
+            <Button variant="subtle" loading={refresh.isFetching} onClick={refreshFirst}>
+              Retry
+            </Button>
+          </Stack>
+        </Alert>
+      )}
       <MorePages listing={gallery} results={JSON.stringify(listingKey)} paused={!!itemId} />
       {!selection.selecting && (
         <ComposerDock
@@ -611,20 +704,25 @@ export function GalleryPage() {
       )}
       {selected && (
         <MediaViewer
-          item={currentMedia(loaded, selected)}
-          items={
-            run
-              ? inRunOrder(loaded.filter((candidate) => runKey(candidate) === run))
-              : versions
-                ? [...versions.values()].map(
-                    (group) => group.find((version) => version.id === selected.id) || group[0],
-                  )
-                : items
-          }
+          item={shown || selected}
+          items={viewerItems}
           related={loaded}
-          total={run || versions ? undefined : gallery.data?.pages.at(-1)?.totalApprox}
+          total={run || versions ? undefined : viewerOrder.current?.total}
           navigate={showItem}
-          onReturnFocus={(item) => setFocusItem(item.id)}
+          onReturnFocus={(item) => {
+            const visible = new Set(loaded.map((candidate) => candidate.id));
+            if (visible.has(item.id)) return setFocusItem(item.id);
+            const index = viewerItems.findIndex(
+              (candidate) => mediaIdentity(candidate) === mediaIdentity(item),
+            );
+            const neighbour =
+              viewerItems.slice(index + 1).find((candidate) => visible.has(candidate.id)) ||
+              viewerItems
+                .slice(0, index)
+                .reverse()
+                .find((candidate) => visible.has(candidate.id));
+            setFocusItem(neighbour?.id || null);
+          }}
           close={closeViewer}
         />
       )}

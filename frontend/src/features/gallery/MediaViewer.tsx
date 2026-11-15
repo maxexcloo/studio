@@ -735,7 +735,7 @@ export function MediaViewer({
                   ) : (
                     <Suspense fallback={<LoadingState label="Loading Image" fill />}>
                       <ZoomImage
-                        key={item.id}
+                        mediaId={item.id}
                         src={source.displayUrl}
                         original={source.url}
                         alt={item.prompt || "Generated Image"}
