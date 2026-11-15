@@ -478,21 +478,21 @@ export function galleryLoraNames(since) {
 
 /**
  * The finished and failed runs made from `since` (ms) that the gallery shows, Dream's pool aside,
- * with only the fields profile health counts, a page of `size` at a time: each page reads
- * without parsing whole records, and the caller may give other work a turn between pages.
+ * with only the fields profile health counts, a page of `size` at a time: each page reads only
+ * the runs index, and the caller may give other work a turn between pages.
  */
 export function* galleryRuns(since, size = 200) {
-  for (let after = 0; ;) {
+  for (let after = [since, ""]; ;) {
     const rows = statement(
-      `SELECT rowid, key, status, favorite,
-         json_extract(value, '$.createdAt') AS createdAt,
+      `SELECT key, status, favorite, created_ms,
          json_extract(value, '$.settings.profileId') AS profileId,
          json_extract(value, '$.timing.runMs') AS runMs
-       FROM studio_gallery
-       WHERE rowid > ? AND dream_pool = 0 AND created_ms >= ? AND status IN ('done', 'failed')
-       ORDER BY rowid LIMIT ?`,
-    ).all(after, since, size);
+       FROM studio_gallery INDEXED BY studio_gallery_runs
+       WHERE (created_ms, key) > (?, ?) AND dream_pool = 0 AND status IN ('done', 'failed')
+       ORDER BY created_ms, key LIMIT ?`,
+    ).all(...after, size);
     yield rows
+      .map((row) => ({ ...row, createdAt: new Date(row.created_ms).toISOString() }))
       .filter((row) => !isGalleryHidden({ url: row.key, createdAt: row.createdAt }))
       .map((row) => ({
         status: row.status,
@@ -502,7 +502,7 @@ export function* galleryRuns(since, size = 200) {
         timing: { runMs: row.runMs },
       }));
     if (rows.length < size) return;
-    after = rows.at(-1).rowid;
+    after = [rows.at(-1).created_ms, rows.at(-1).key];
   }
 }
 
