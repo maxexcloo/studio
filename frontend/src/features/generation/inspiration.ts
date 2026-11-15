@@ -113,8 +113,6 @@ export function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
     "profileId",
     "referenceAssets",
     "referenceDetails",
-    "startImage",
-    "startImageId",
     "workflow",
   ])
     delete settings[field];

@@ -11,7 +11,6 @@ import {
   customWorkflowGraph,
   nameSavesForRun,
   saveIntoStudioFolder,
-  uploadReferenceImage,
 } from "./graphs.js";
 
 test("workflow prompt policy remains separate from the user edit", () => {
@@ -83,39 +82,6 @@ test("a single-user run from an imported workflow saves where the workflow says;
   );
   assert.equal(graph[3].inputs.filename_prefix, "studio/elsewhere");
   assert.equal("filename_prefix" in graph[4].inputs, false);
-});
-
-test("legacy start images resize before upload and register their temporary copy", async (t) => {
-  const { default: sharp } = await import("sharp");
-  const buffer = await sharp({
-    create: { width: 3000, height: 4000, channels: 3, background: "#445566" },
-  })
-    .png()
-    .toBuffer();
-  const url = `data:image/png;base64,${buffer.toString("base64")}`;
-  const uploads = [];
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
-    const file = init.body.get("image");
-    uploads.push(Buffer.from(await file.arrayBuffer()));
-    return new Response(JSON.stringify({ name: file.name }), {
-      headers: { "content-type": "application/json" },
-    });
-  });
-  const body = { comfyBackend: "primary", family: "sdxl", width: 1024, height: 1024 };
-  const name = await uploadReferenceImage(url, body);
-  const meta = await sharp(uploads[0]).metadata();
-  assert.ok(meta.width * meta.height <= 1024 ** 2);
-  assert.equal(meta.width % 8, 0);
-  assert.deepEqual([body.width, body.height], [meta.width, meta.height]);
-  assert.deepEqual(body.requestedSize, { width: 1024, height: 1024 });
-  assert.deepEqual(body.stagedInputNames, [name]);
-  await uploadReferenceImage(url, {
-    comfyBackend: "primary",
-    width: 1024,
-    height: 1024,
-    autoResizeInputs: false,
-  });
-  assert.deepEqual(uploads[1], buffer);
 });
 
 test("account image runs and their upscales save into the owner's folder", async () => {

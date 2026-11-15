@@ -47,8 +47,8 @@ fs.writeFileSync(
 test("lists Studio's profile files and reads one with its hash", () => {
   const list = editor.listEditableProfiles();
   assert.deepEqual(
-    list.map((item) => [item.id, item.name, item.kind, item.edited]),
-    [["image-test", "Test Image", "image", null]],
+    list.map((item) => [item.id, item.name, item.kind]),
+    [["image-test", "Test Image", "image"]],
   );
   const read = editor.readEditableProfile("image-test");
   assert.match(read.text, /Test Image/);
@@ -135,11 +135,7 @@ test("saving backs up the old file, records the edit and refuses a stale base or
   );
   assert.match(saved.text, /Edited Image/);
   assert.notEqual(saved.hash, hash);
-  assert.equal(saved.edited.by, "admin-id");
-  assert.equal(saved.edited.baseHash, hash);
-  assert.equal(editor.listEditableProfiles()[0].edited.by, "admin-id");
-  // The edits list sits beside the profiles but isn't one.
-  assert.equal(editor.listEditableProfiles().length, 1);
+  assert.equal(saved.version.by, "admin-id");
 });
 
 test("an updated model file moves the profiles that named it, each as a new version", () => {

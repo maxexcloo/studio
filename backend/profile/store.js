@@ -4,8 +4,7 @@
  * Profiles stay where they are (`<data>/workflows/<id>.json`, read by custom-workflows.js); every
  * change becomes an immutable version under `<data>/history/profiles/<id>/<n>.json`, and
  * `<data>/workflows/.studio-meta.json` records each profile's current version, origin, AI-Drafted
- * marker and who saved it. profile/editor.js still writes `.studio-edits.json` for every profile
- * Studio changed or drafted (the retired seed deploy read it to skip them).
+ * marker and who saved it.
  * `<data>/workflows/.studio-aliases.json` maps a removed profile id to the profile that replaced it
  * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile/merge.js
  * and profile/backends.js, and by renames migrate-runtime applied), so records that still name the old id resolve to the kept profile
@@ -78,11 +77,9 @@ export function writeVersion(dir, n, record) {
 export function createProfileStore({
   dataDir = currentDataDir(),
   workflowsDir = path.join(dataDir, "workflows"),
-  log = logger,
 } = {}) {
   const metaFile = path.join(workflowsDir, ".studio-meta.json");
   const aliasFile = path.join(workflowsDir, ".studio-aliases.json");
-  const editsFile = path.join(workflowsDir, ".studio-edits.json");
   const historyDir = (id) => path.join(dataDir, "history", "profiles", id);
   const readMeta = () => readObject(metaFile);
 
@@ -163,52 +160,6 @@ export function createProfileStore({
     meta[id] = { ...meta[id], aiDrafted: false, approvedAt: stamp(), approvedBy: String(by || "") };
     writeJsonFile(metaFile, meta);
     return meta[id];
-  }
-
-  /**
-   * The boot migration, safe on every start. A profile without history gets its current file as its
-   * seed version. A profile whose file changed outside Studio (a seed deploy, or one listed in
-   * `.studio-edits.json`, marked "studio") gets that as a new version. Nothing is deleted.
-   */
-  function migrate() {
-    if (!fs.existsSync(workflowsDir)) return { profiles: 0, versions: 0 };
-    const edits = readObject(editsFile);
-    let profiles = 0;
-    let added = 0;
-    for (const name of fs.readdirSync(workflowsDir)) {
-      if (!name.endsWith(".json") || name.startsWith(".")) continue;
-      const id = name.slice(0, -5);
-      if (!validId(id)) continue;
-      let text;
-      try {
-        text = fs.readFileSync(path.join(workflowsDir, name), "utf8");
-      } catch {
-        continue;
-      }
-      profiles += 1;
-      const edited = edits[id];
-      if (!versionsIn(historyDir(id)).length) {
-        record(id, text, { origin: "seed", by: "seed", at: edited?.editedAt || stamp() });
-        added += 1;
-        const meta = readMeta();
-        if (edited?.baseHash && meta[id]) {
-          meta[id].seedHash = edited.baseHash;
-          writeJsonFile(metaFile, meta);
-        }
-      } else if (latest(id)?.hash !== hashOf(text)) {
-        record(id, text, {
-          origin: edited ? "studio" : "seed",
-          by: edited ? edited.by || "studio" : "seed",
-          note: "Changed outside Studio",
-        });
-        added += 1;
-      }
-    }
-    if (added)
-      log.info?.(
-        `Recorded ${added} profile version${added === 1 ? "" : "s"} under history/profiles.`,
-      );
-    return { profiles, versions: added };
   }
 
   /** Records what an export held (`{id: hash}`), so the next export can say what changed since. */
@@ -309,7 +260,6 @@ export function createProfileStore({
     versions,
     version,
     approve,
-    migrate,
     markExported,
     known,
     meta,
