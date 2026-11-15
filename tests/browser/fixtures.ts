@@ -905,8 +905,7 @@ export async function openNav(page: Page, label: string) {
 }
 
 export async function openTheme(page: Page) {
-  await page.getByRole("button", { name: "More Options", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Appearance", exact: true }).click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
 }
 
 /** A toolbar's search box: in the toolbar on desktop, opened from its icon on phones. */

@@ -67,7 +67,7 @@ for (const failFirst of [false, true]) {
       return route.fulfill({ json: { ok: true, upscaleActive: body.active, revision: 1 } });
     });
     await page.goto("/images");
-    await page.getByRole("button", { name: "Open image: A blue portrait", exact: true }).click();
+    await page.getByRole("button", { name: "Open image: Blue Portrait", exact: true }).click();
     const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
     const image = viewer.getByRole("img", { name: item.prompt, exact: true });
     await expect
@@ -187,11 +187,11 @@ test("The viewer fits a large image but never enlarges a small one beyond its ac
   await page.goto("/images");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const zoom = viewer.locator("[data-zoom-mode]");
-  await page.getByRole("button", { name: "Open image: A small image", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Small Image", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "A small image", exact: true })).toBeVisible();
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBe(1);
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
-  await page.getByRole("button", { name: "Open image: A large image", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Large Image", exact: true }).click();
   await expect(viewer.getByRole("img", { name: "A large image", exact: true })).toBeVisible();
   await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
 });
@@ -233,7 +233,7 @@ test("The viewer shows a server picture's display copy, and its original once zo
   });
   await page.goto("/images");
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await page.getByRole("button", { name: "Open image: A large image", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: Large Image", exact: true }).click();
   const image = viewer.getByRole("img", { name: "A large image", exact: true });
   await expect(image).toHaveAttribute(
     "src",

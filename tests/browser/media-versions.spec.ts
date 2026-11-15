@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { mediaTitle } from "../../frontend/src/features/gallery/mediaLabels";
 import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 for (const kind of ["image", "video"] as const) {
@@ -54,7 +55,9 @@ for (const kind of ["image", "video"] as const) {
       });
     });
     await page.goto(kind === "image" ? "/images" : "/video");
-    await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
+    await page
+      .getByRole("button", { name: `Open ${kind}: ${mediaTitle(item)}`, exact: true })
+      .click();
     const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
     const media =
       kind === "image"

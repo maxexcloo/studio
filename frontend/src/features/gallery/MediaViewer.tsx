@@ -36,9 +36,9 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { comparisonMembersQuery, comparisonOf } from "../compare/queries";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaDetails } from "./MediaDetails";
+import { MediaDetails, MediaDetailsMetadata } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
-import { mediaNumber, mediaTitle } from "./mediaLabels";
+import { mediaTitle } from "./mediaLabels";
 import { mediaSource, playbackUrl } from "./mediaSource";
 import { MediaViewerActions, ViewerActionGroups, type ViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, type QueuedRun, useRunFamily } from "./MediaViewerDock";
@@ -431,14 +431,6 @@ export function MediaViewer({
     },
     [],
   );
-  const subtitle = [
-    mediaNumber(item),
-    item.type === "video" ? "Video" : "Image",
-    String(item.settings?.profileName || ""),
-    source.width ? `${source.width} × ${source.height}` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
   const detailsPanel = (
     <MediaDetails
       item={displayed}
@@ -832,9 +824,7 @@ export function MediaViewer({
                       <Text fw={600} lineClamp={2}>
                         {mediaTitle(item)}
                       </Text>
-                      <Text size="xs" c="dimmed">
-                        {subtitle}
-                      </Text>
+                      <MediaDetailsMetadata item={displayed} />
                     </Stack>
                     {detailsPanel}
                   </Stack>
@@ -855,7 +845,7 @@ export function MediaViewer({
             closeButtonProps={{ "aria-label": "Close Details" }}
             // The title scrolls away with the details instead of staying pinned.
             styles={{
-              // The subtitle sits close under the title, as on desktop.
+              // The metadata sits close under the title, as on desktop.
               header: { position: "static", paddingBottom: 0 },
               inner: { bottom: barOffset },
               overlay: { bottom: barOffset },
@@ -863,9 +853,7 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Text size="xs" c="dimmed" mt={2}>
-                {subtitle}
-              </Text>
+              <MediaDetailsMetadata item={displayed} />
               {detailsPanel}
             </Stack>
           </Drawer>
