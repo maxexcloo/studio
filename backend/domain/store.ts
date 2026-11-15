@@ -286,11 +286,14 @@ export class Store {
       .map((row) => JSON.parse(row.record as string));
   }
 
-  /** Unfinished jobs, optionally one owner's, in queue order: read through the status index. */
+  /**
+   * Unfinished jobs, optionally one owner's, in queue order: read through the status index, named
+   * because the gathered statistics average its few open jobs with the many finished ones.
+   */
   openJobs(ownerId?: string): OwnedJob[] {
     return this.db
       .prepare(
-        `SELECT record FROM studio_queue WHERE status IN (${placeholders(openStatuses)})${ownerId === undefined ? "" : " AND owner_id = ?"} ORDER BY created_at, rowid`,
+        `SELECT record FROM studio_queue INDEXED BY studio_queue_status WHERE status IN (${placeholders(openStatuses)})${ownerId === undefined ? "" : " AND owner_id = ?"} ORDER BY created_at, rowid`,
       )
       .all(...openStatuses, ...(ownerId === undefined ? [] : [ownerId]))
       .map((row) => JSON.parse(row.record as string));
@@ -414,7 +417,7 @@ export class Store {
     };
     for (const row of this.db
       .prepare(
-        `SELECT rowid, created_at, record FROM studio_queue WHERE status IN (${placeholders(openStatuses)})`,
+        `SELECT rowid, created_at, record FROM studio_queue INDEXED BY studio_queue_status WHERE status IN (${placeholders(openStatuses)})`,
       )
       .all(...openStatuses) as Row[])
       add(row);
