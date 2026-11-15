@@ -424,7 +424,12 @@ test("Header appearance preferences persist across reloads", async ({ page }) =>
     .getByRole("radiogroup", { name: "Background", exact: true })
     .getByText("Warm", { exact: true })
     .click();
-  await page.getByText("Fast", { exact: true }).click();
+  const animations = page.getByRole("radiogroup", { name: "Animations", exact: true });
+  for (const label of ["Off", "Fast", "Standard", "Relaxed"]) {
+    await animations.getByText(label, { exact: true }).click();
+    await expect(animations.getByRole("radio", { name: label, exact: true })).toBeChecked();
+  }
+  await animations.getByText("Fast", { exact: true }).click();
   await page.getByText("Round", { exact: true }).click();
   await page.getByText("Dark", { exact: true }).click();
   await page.getByText("Fixed Width", { exact: true }).click();
