@@ -34,6 +34,8 @@ import {
 import { ChevronDown } from "lucide-react";
 import { createElement } from "react";
 
+import type { Appearance } from "../../shared/appearance";
+
 import classes from "./theme.module.css";
 
 const chevron = createElement(ChevronDown, { size: 16 });
@@ -42,19 +44,24 @@ const chevron = createElement(ChevronDown, { size: 16 });
 // https://github.com/RubixCube-Innovations/mantine-theme-builder/tree/main/src/themes/shadcn
 // Retain keyboard focus, standard Mantine palette lengths and Studio's amber accent.
 
+export type Background = Appearance["background"];
 export const backgrounds = {
   default: { label: "Default", light: "#ffffff", dark: "#09090b" },
   neutral: { label: "Neutral", light: "#f4f4f5", dark: "#111113" },
   warm: { label: "Warm", light: "#faf6ef", dark: "#17130f" },
   cool: { label: "Cool", light: "#f1f5f9", dark: "#0f1720" },
-} as const;
-export type Background = keyof typeof backgrounds;
+} as const satisfies Record<Background, { label: string; light: string; dark: string }>;
 /** Every action and row menu's width; their icons are 16px. */
 export const menuWidth = 220;
 /** Popups flip and shift to stay 12 px inside the screen. */
 export const popupMiddlewares = { flip: true, shift: { padding: 12, crossAxis: true } };
-export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
-export type MotionSpeed = keyof typeof motionSpeeds;
+export type MotionSpeed = Appearance["motion"];
+export const motionSpeeds = {
+  off: 0,
+  fast: 100,
+  standard: 160,
+  relaxed: 260,
+} as const satisfies Record<MotionSpeed, number>;
 // Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
 // overshoots. CSS reads the same values as --studio-ease-enter/-exit and --studio-motion-exit.
 export const easing = {
@@ -68,7 +75,7 @@ const raise = {
   out: { opacity: 0, transform: "scale(0.98)" },
   transitionProperty: "transform, opacity",
 };
-export type Rounding = "square" | "soft" | "round";
+export type Rounding = Appearance["rounding"];
 
 // Translucent blurred surface for custom chrome (viewer controls, docks) that is not a Mantine
 // surface. Mantine surfaces receive it through the component defaults below.
