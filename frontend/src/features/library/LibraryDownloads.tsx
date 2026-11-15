@@ -2,13 +2,12 @@ import { Alert, Badge, Group, Menu, Progress, Stack, Text } from "@mantine/core"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { api, failure, post } from "../../api";
-import type { Models } from "../../types";
+import { failure, post } from "../../api";
 import { formatBytes } from "../../ui/bytes";
 import { DataTable } from "../../ui/DataTable";
 import { icons } from "../../ui/icons";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
-import { modelsQuery } from "../generation/GenerationProvider";
+import { fetchModels, modelsQuery } from "../generation/GenerationProvider";
 import {
   type DownloadState,
   type ModelDownload,
@@ -63,7 +62,7 @@ export function LibraryDownloads({ heading, active }: { heading: ReactNode; acti
         .map((item) => `${item.id}:${item.finishedAt || ""}`),
     );
     if ([...completed].some((key) => !seenCompleted.current.has(key))) {
-      void api<Models>("/api/models")
+      void fetchModels(false)
         .then((models) => client.setQueryData(modelsQuery.queryKey, models))
         .catch(failure);
       for (const queryKey of [catalogueQuery.queryKey, importsQuery.queryKey])
