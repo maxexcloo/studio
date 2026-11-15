@@ -2187,7 +2187,6 @@ test("invalid generation controls, references and excessive batches fail before 
     { cfg: 21 },
     { denoise: 1.1 },
     { sampler: "unsupported" },
-    { scheduler: "unsupported" },
     { face_detail: true },
     { reference_asset_ids: ["unowned-asset"] },
     { loras: [{ name: "unavailable-effect.safetensors", strength: 1 }] },
@@ -2221,13 +2220,13 @@ test("invalid generation controls, references and excessive batches fail before 
     ),
     "Fix the generate arguments: count: Too big: expected number to be <=10. One call queues at most 10 images (prompts × count); split a bigger set into calls made one after another.",
   );
+  // A control that changes the result is refused where the profile has none; one it sets itself is left out.
   await f.profiles([{ ...imageProfile, capabilities: {} }]);
   await failure(client, "generate", {
     profile_id: imageProfile.id,
     prompts: ["A tree"],
-    negative_prompt: "Blur",
+    denoise: 0.5,
   });
-  await failure(client, "generate", { profile_id: imageProfile.id, prompts: ["A tree"], cfg: 1 });
   assert.equal(f.submitted.length, 0);
 });
 
@@ -2518,17 +2517,15 @@ test("reference-mode capabilities override text controls without losing the prof
   assert.deepEqual(details.imageModes.reference.controls.negative_prompt, {});
   assert.ok(details.imageModes.reference.controls.denoise);
   assert.equal(details.loras_total, 2);
-  const refused = await call(client, "generate", {
+  const ignored = await call(client, "generate", {
     profile_id: imageProfile.id,
     prompts: ["A tree"],
     negative_prompt: "Blur",
   });
-  assert.equal(refused.isError, true);
-  assert.match(
-    refused.content[0].text,
-    /negative_prompt cannot be adjusted.*Adjustable controls: .*cfg/,
-  );
-  assert.equal(f.submitted.length, 0);
+  assert.match(ignored.content[0].text, /negative_prompt was left out: .*no negative prompt input/);
+  assert.equal(f.submitted.length, 1);
+  assert.equal(f.submitted[0].negative, undefined);
+  f.submitted.length = 0;
   const uploaded = data(await call(client, "upload", { content_base64: png.toString("base64") }));
   await generate(client, {
     reference_asset_ids: [uploaded.asset.id],
@@ -3314,22 +3311,25 @@ test("Models counts a profile's LoRAs without listing them and details only the 
   for (const key of ["steps", "cfg", "negative_prompt"])
     assert.equal(fixed.controls[key], undefined, key);
   for (const key of ["steps", "cfg"]) assert.equal(fixed.defaults[key], undefined, key);
+  // A control the profile fixes runs at its own value, and the reply says what was left out.
   for (const [field, value, pattern] of [
-    ["steps", 20, /steps cannot be adjusted.*fixed at 4.*Adjustable controls: aspect, count, seed/],
-    ["cfg", 3, /cfg cannot be adjusted.*fixed at 1/],
-    ["negative_prompt", "Blur", /negative_prompt cannot be adjusted.*no negative prompt input/],
+    ["steps", 20, /steps was left out: It is fixed at 4\./],
+    ["cfg", 3, /cfg was left out: It is fixed at 1\./],
+    ["negative_prompt", "Blur", /negative_prompt was left out: .*no negative prompt input/],
   ]) {
     const result = await call(client, "generate", {
       profile_id: imageProfile.id,
       prompts: ["A tree"],
       [field]: value,
     });
-    assert.equal(result.isError, true);
     assert.match(result.content[0].text, pattern);
+    assert.deepEqual(
+      [f.submitted.at(-1).steps, f.submitted.at(-1).cfg, f.submitted.at(-1).negative],
+      [4, 1, undefined],
+    );
   }
-  assert.equal(f.submitted.length, 0);
   await generate(client, { steps: 4 });
-  assert.equal(f.submitted.length, 1, "a value equal to the fixed one is accepted");
+  assert.equal(f.submitted.length, 4, "a value equal to the fixed one is accepted");
   const refused = await call(client, "generate", {
     profile_id: imageProfile.id,
     prompts: ["refuse with reason"],
@@ -3416,15 +3416,19 @@ test("negative prompts reach the submission only where they take effect", async 
   const advertised = data(await call(client, "models", { profile_id: imageProfile.id })).controls
     .negative_prompt;
   assert.match(advertised.note, /cfg 1/);
-  const refused = await call(client, "generate", {
+  const ignored = await call(client, "generate", {
     profile_id: imageProfile.id,
     prompts: ["A tree"],
     negative_prompt: "Blur",
   });
-  assert.match(refused.content[0].text, /negative_prompt has no effect at cfg 1.*Set cfg above 1/);
+  assert.match(
+    ignored.content[0].text,
+    /negative_prompt was left out: it has no effect at cfg 1\. Next time set cfg above 1/,
+  );
+  assert.equal(f.submitted[0].negative, undefined);
   await generate(client, { negative_prompt: "Blur", cfg: 4 });
-  assert.deepEqual([f.submitted[0].negative, f.submitted[0].cfg], ["Blur", 4]);
-  // A guidance-distilled profile locked at cfg 1 explains why instead of dropping the negative.
+  assert.deepEqual([f.submitted[1].negative, f.submitted[1].cfg], ["Blur", 4]);
+  // A guidance-distilled profile locked at cfg 1 says why it left the negative out.
   await f.profiles([
     { ...cfgOne, constraints: { ...imageProfile.constraints, cfg: { min: 1, max: 1 } } },
   ]);
@@ -3434,7 +3438,7 @@ test("negative prompts reach the submission only where they take effect", async 
     negative_prompt: "Blur",
   });
   assert.match(distilled.content[0].text, /runs at cfg 1 \(guidance-distilled\)/);
-  assert.equal(f.submitted.length, 1);
+  assert.equal(f.submitted[2].negative, undefined);
 });
 
 test("prompts run as sent with LoRAs, and a guide's recommended negative fills in unless the caller gives one", async (t) => {

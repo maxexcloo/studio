@@ -150,9 +150,22 @@ export function listedControls(profile) {
   return controls;
 }
 
-/** Rejects a supplied control the profile does not let MCP adjust, naming it and the adjustable alternatives. */
-export function assertAdjustable(profile, args) {
+// Controls the profile sets itself: one given anyway is left out, as the request still runs as asked.
+const ignorable = new Set(["seed", "steps", "cfg", "negative_prompt", "sampler", "scheduler"]);
+
+/**
+ * The profile's adjustable `controls`, and `args` without the ignorable ones it sets itself, with an
+ * `ignored` note saying why each was left out ("" when none was). Any other control it does not let
+ * MCP adjust is refused, naming it and the adjustable alternatives.
+ */
+export function assertAdjustable(profile, request) {
   const controls = mcpControls(profile);
+  const args = { ...request };
+  const notes = [];
+  const leaveOut = (field, reason) => {
+    delete args[field];
+    notes.push(`${field} was left out:${reason}`);
+  };
   const adjustable = Object.keys(controls).join(", ");
   for (const field of [
     "seed",
@@ -180,6 +193,10 @@ export function assertAdjustable(profile, args) {
       reason = profile.capabilities?.negativePrompt
         ? " This profile runs at cfg 1 (guidance-distilled), where a negative prompt has no effect. Describe what you want positively in the prompt instead."
         : " This profile has no negative prompt input (guidance-distilled). Describe what you want positively in the prompt instead.";
+    if (ignorable.has(field)) {
+      leaveOut(field, reason || " the profile sets it itself.");
+      continue;
+    }
     throw new Error(
       `${field} cannot be adjusted for ${profile.label || profile.id}.${reason} Adjustable controls: ${adjustable}.`,
     );
@@ -208,12 +225,12 @@ export function assertAdjustable(profile, args) {
     args.negative_prompt &&
     controls.negative_prompt &&
     cfgIgnoresNegative(args.cfg ?? profile.defaults?.cfg)
-  ) {
-    throw new Error(
-      `negative_prompt has no effect at cfg 1 for ${profile.label || profile.id}. Set cfg above 1 (up to ${controls.cfg?.max ?? "its maximum"}) together with negative_prompt, or describe what you want positively in the prompt instead.`,
+  )
+    leaveOut(
+      "negative_prompt",
+      ` it has no effect at cfg 1. Next time set cfg above 1 (up to ${controls.cfg?.max ?? "its maximum"}) with it, or describe what you want positively in the prompt.`,
     );
-  }
-  return controls;
+  return { controls, args, ignored: notes.join(" ") };
 }
 
 const clip = (value, length) => {
