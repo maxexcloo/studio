@@ -10,7 +10,7 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
@@ -42,6 +42,15 @@ export function StatusAction() {
   const unfinished = queue.data?.jobs.filter((job) => !terminalStatuses.has(job.status)) ?? [];
   const generating = unfinished.some((job) => job.reason !== pausedReason);
   const held = !generating && unfinished.length > 0;
+  // The summary counts running work too, so it reads again as soon as the account's own starts or ends.
+  const client = useQueryClient();
+  const running = unfinished.filter((job) =>
+    ["starting", "running", "saving"].includes(job.status),
+  );
+  const runningKey = running.map((job) => job.id).join();
+  useEffect(() => {
+    void client.invalidateQueries({ queryKey: servicesStatusQuery.queryKey });
+  }, [client, runningKey]);
   const title = "Generations";
   // A sideways touch drag pulls the drawer with the finger; far enough, and it closes.
   const swipe = useSwipeClose("left", close);

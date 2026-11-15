@@ -573,6 +573,12 @@ test("each resource's load names its running job and counts queued work and the 
       model: "flux",
     });
     assert.equal(queue.queue.loads().get("worker:video"), undefined);
+    // A job a restart left running is its worker's current work before this process accepts it.
+    const recovered = store.save({
+      ...store.job("alice", enqueue("worker:secondary"))!,
+      status: "running",
+    });
+    assert.equal(queue.queue.loads().get("worker:secondary")?.current, recovered.id);
   } finally {
     store.close();
   }
