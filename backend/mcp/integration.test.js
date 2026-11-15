@@ -2525,6 +2525,53 @@ test("reference-mode capabilities override text controls without losing the prof
   ]);
 });
 
+test("a chat image becomes the linked person's Upload and is refused for anyone else", async (t) => {
+  const linked = {
+    userId: "chat-upload-account",
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  };
+  const f = await fixture(t, {
+    accountMode: true,
+    environment: adminEnvironment,
+    authenticateGatewayIdentity: (user) => (user === "librechat-linked" ? linked : null),
+  });
+  const send = (key, user) =>
+    fetch(`${f.base}/mcp/uploads?name=beach.png`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${key}`,
+        "content-type": "application/octet-stream",
+        ...(user ? { "x-ai-user-id": user } : {}),
+      },
+      body: png,
+    });
+  for (const [key, user] of [
+    [mediaKey, "librechat-unlinked"],
+    [mediaKey, ""],
+    [controlKey, "librechat-linked"],
+  ])
+    assert.equal((await send(key, user)).status, 403, `${key} ${user}`);
+  assert.equal((await send("wrong", "librechat-linked")).status, 401);
+  assert.equal(
+    f.requests.filter((request) => request.path === "/reference-assets/upload").length,
+    0,
+  );
+  const sent = await send(mediaKey, "librechat-linked");
+  assert.equal(sent.status, 201);
+  const { asset } = await sent.json();
+  assert.equal(
+    f.requests.findLast((request) => request.path === "/reference-assets/upload").account,
+    linked.userId,
+  );
+  // Its own chats take it as a reference straight away.
+  const client = await f.client("librechat-linked");
+  await generate(client, { reference_asset_ids: [asset.id] });
+  assert.equal(f.submitted.at(-1).referenceAssets[0].assetId, asset.id);
+});
+
 test("identical uploads sharing an upstream asset id preserve access for both uploading owners", async (t) => {
   const f = await fixture(t);
   f.deduplicateUploads();
