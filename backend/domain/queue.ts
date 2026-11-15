@@ -667,6 +667,10 @@ export class GenerationQueue {
       );
     };
     const taken = new Set<string>();
+    const batches = new Map<string, OwnedJob[]>();
+    for (const job of all)
+      if (job.queueBatch)
+        batches.set(job.queueBatch, [...(batches.get(job.queueBatch) || []), job]);
     // A job whose own worker can't take it now (not reachable, or stopped) moves as from a busy one.
     const stranded = (job: OwnedJob) => {
       if (!job.resource.startsWith("worker:")) return false;
@@ -684,7 +688,14 @@ export class GenerationQueue {
           !this.scheduling.has(job.resource),
       )
       .sort((a, b) => tier(a.job) - tier(b.job));
-    for (const { job, index } of movable) {
+    for (const { job } of movable) {
+      const members = job.queueBatch ? batches.get(job.queueBatch)! : [job];
+      // One prompt's split Count moves as a unit until it starts, then keeps its reservation.
+      if (
+        job.queueBatch &&
+        (job.id !== job.queueBatch || members.some((member) => !pending(member)))
+      )
+        continue;
       const targets = this.adapter
         .alternatives(job)
         .filter(
@@ -707,12 +718,22 @@ export class GenerationQueue {
       if (!target) continue;
       taken.add(target);
       logEvent(`Moved job ${job.id} from ${job.resource} to ${target}`);
-      all[index] = this.store.save({
-        ...job,
-        resource: target,
-        backend: target.startsWith("worker:") ? target.slice("worker:".length) : job.backend,
-        reason: "",
-      });
+      this.store.db.exec("BEGIN IMMEDIATE");
+      try {
+        const moved = members.map((member) =>
+          this.store.save({
+            ...member,
+            resource: target,
+            backend: target.startsWith("worker:") ? target.slice("worker:".length) : member.backend,
+            reason: "",
+          }),
+        );
+        this.store.db.exec("COMMIT");
+        for (const member of moved) all[all.findIndex((item) => item.id === member.id)] = member;
+      } catch (error) {
+        this.store.db.exec("ROLLBACK");
+        throw error;
+      }
     }
   }
 

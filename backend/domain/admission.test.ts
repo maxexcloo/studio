@@ -32,6 +32,8 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
   ]);
   assert.equal(new Set(split.map((job) => job.queueSet)).size, 1);
   assert.ok(split[0].queueSet);
+  assert.equal(split[0].queueBatch, split[0].id);
+  assert.ok(split.every((job) => job.queueBatch === split[0].id));
   const random = await run("single", "");
   assert.deepEqual(
     random.map((job) => job.input.seed),
@@ -42,6 +44,38 @@ test("a profile that can't batch queues Count as separate seeded runs in one set
     batched.map((job) => job.input.count),
     [3],
   );
+  assert.equal(batched[0].queueBatch, undefined);
+});
+
+test("MCP's later runs reserve the first run's worker without conflating different prompts", async () => {
+  const store = new Store(openDatabase(":memory:"));
+  let routes = 0;
+  const admit = createGenerationAdmission({
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    validate: async () => ({ status: 200, payload: {} }),
+    resourceFor: async () => `worker:${++routes}`,
+    pendingItems: () => [],
+    revision: () => 0,
+  });
+  const account = { userId: "alice", role: "user" };
+  try {
+    for (const [id, batch] of [
+      ["first", "first"],
+      ["second", "first"],
+      ["other", "other"],
+    ])
+      await admit({ count: 1, clientJobId: id }, account, undefined, {
+        queueSet: "set",
+        queueBatch: batch,
+      });
+    assert.equal(store.job("alice", "first")?.resource, "worker:1");
+    assert.equal(store.job("alice", "second")?.resource, "worker:1");
+    assert.equal(store.job("alice", "other")?.resource, "worker:2");
+    assert.equal(routes, 2);
+  } finally {
+    store.close();
+  }
 });
 
 test("a Count whose derived ID is taken queues nothing, then and on retry", async () => {
