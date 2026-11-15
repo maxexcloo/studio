@@ -8,6 +8,7 @@ import {
   Select,
   Stack,
   Text,
+  Title,
 } from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
 import { type ReactNode, Suspense, useState } from "react";
@@ -15,7 +16,6 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { LoadingState } from "./LoadingState";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
-import { SectionHeading } from "./SectionHeading";
 import { usePhone } from "./usePhone";
 
 import classes from "./WorkspaceSections.module.css";
@@ -185,7 +185,11 @@ export function WorkspaceSections({
           const heading = (
             <div>
               {/* Phones name the section in the header's Section Select already. */}
-              {!phone && <SectionHeading>{section.label}</SectionHeading>}
+              {!phone && (
+                <Title order={3} size="h4">
+                  {section.label}
+                </Title>
+              )}
               <Text size="sm" c="dimmed">
                 {section.description}
               </Text>

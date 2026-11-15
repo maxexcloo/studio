@@ -54,11 +54,7 @@ function DigestCard({
       </UnstyledButton>
       <Stack gap={4} px="xs" pt={6}>
         <Group gap={6} wrap="nowrap">
-          {fresh && (
-            <Badge size="sm" variant="light">
-              New
-            </Badge>
-          )}
+          {fresh && <Badge size="sm">New</Badge>}
           {review && (
             <Badge size="sm" variant="default" aria-label={`Fits the brief ${review.score} of 10`}>
               {review.score}/10
